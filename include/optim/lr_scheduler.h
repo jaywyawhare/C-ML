@@ -13,14 +13,14 @@ extern "C" {
 LRScheduler* lr_scheduler_cosine_annealing(Optimizer* optimizer, int T_max, float eta_min);
 
 LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int num_milestones,
-                                      float gamma);
+                                     float gamma);
 
 void lr_scheduler_step_epoch(LRScheduler* scheduler);
 
 void lr_scheduler_step_metric(LRScheduler* scheduler, float metric);
 
 LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int total_steps,
-                                     float pct_start, float div_factor, float final_div_factor);
+                                    float pct_start, float div_factor, float final_div_factor);
 
 #ifdef __cplusplus
 }

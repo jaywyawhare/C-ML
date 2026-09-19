@@ -11,15 +11,20 @@
 static void mkdirs(const char* path) {
     char cmd[1024];
     snprintf(cmd, sizeof(cmd), "mkdir -p '%s'", path);
-    if (system(cmd) != 0) { /* mkdir best-effort */ }
+    if (system(cmd) != 0) { /* mkdir best-effort */
+    }
 }
 
-static void write_ppm(const char* path, int w, int h, unsigned char r, unsigned char g, unsigned char b) {
+static void write_ppm(const char* path, int w, int h, unsigned char r, unsigned char g,
+                      unsigned char b) {
     FILE* f = fopen(path, "wb");
-    if (!f) return;
+    if (!f)
+        return;
     fprintf(f, "P6\n%d %d\n255\n", w, h);
     for (int i = 0; i < w * h; i++) {
-        fputc(r, f); fputc(g, f); fputc(b, f);
+        fputc(r, f);
+        fputc(g, f);
+        fputc(b, f);
     }
     fclose(f);
 }
@@ -48,24 +53,24 @@ static void setup_squad_file(void) {
     snprintf(path, sizeof(path), "%s/squad.json", tmpdir);
     mkdirs(tmpdir);
     FILE* f = fopen(path, "w");
-    if (!f) return;
-    fprintf(f,
-        "{\n"
-        "  \"data\": [{\n"
-        "    \"title\": \"Test\",\n"
-        "    \"paragraphs\": [{\n"
-        "      \"context\": \"The quick brown fox jumps over the lazy dog.\",\n"
-        "      \"qas\": [{\n"
-        "        \"question\": \"What color is the fox?\",\n"
-        "        \"id\": \"q1\",\n"
-        "        \"answers\": [{\n"
-        "          \"text\": \"brown\",\n"
-        "          \"answer_start\": 10\n"
-        "        }]\n"
-        "      }]\n"
-        "    }]\n"
-        "  }]\n"
-        "}\n");
+    if (!f)
+        return;
+    fprintf(f, "{\n"
+               "  \"data\": [{\n"
+               "    \"title\": \"Test\",\n"
+               "    \"paragraphs\": [{\n"
+               "      \"context\": \"The quick brown fox jumps over the lazy dog.\",\n"
+               "      \"qas\": [{\n"
+               "        \"question\": \"What color is the fox?\",\n"
+               "        \"id\": \"q1\",\n"
+               "        \"answers\": [{\n"
+               "          \"text\": \"brown\",\n"
+               "          \"answer_start\": 10\n"
+               "        }]\n"
+               "      }]\n"
+               "    }]\n"
+               "  }]\n"
+               "}\n");
     fclose(f);
 }
 
@@ -77,17 +82,24 @@ static void setup_librispeech_dir(void) {
     char path[768];
     snprintf(path, sizeof(path), "%s/1-2-0001.flac", dir);
     FILE* f = fopen(path, "w");
-    if (f) { fprintf(f, "fake_audio"); fclose(f); }
+    if (f) {
+        fprintf(f, "fake_audio");
+        fclose(f);
+    }
 
     snprintf(path, sizeof(path), "%s/1-2.trans.txt", dir);
     f = fopen(path, "w");
-    if (f) { fprintf(f, "1-2-0001 HELLO WORLD\n"); fclose(f); }
+    if (f) {
+        fprintf(f, "1-2-0001 HELLO WORLD\n");
+        fclose(f);
+    }
 }
 
 static void cleanup(void) {
     char cmd[1024];
     snprintf(cmd, sizeof(cmd), "rm -rf '%s'", tmpdir);
-    if (system(cmd) != 0) { /* rm best-effort */ }
+    if (system(cmd) != 0) { /* rm best-effort */
+    }
 }
 
 static int test_imagenet_open(void) {
@@ -95,10 +107,20 @@ static int test_imagenet_open(void) {
     snprintf(dir, sizeof(dir), "%s/images", tmpdir);
 
     CMLImageNetLoader* loader = cml_imagenet_open(dir, 16);
-    if (!loader) return 0;
-    if (loader->num_samples != 3) { cml_imagenet_free(loader); return 0; }
-    if (loader->num_classes != 2) { cml_imagenet_free(loader); return 0; }
-    if (loader->image_size != 16) { cml_imagenet_free(loader); return 0; }
+    if (!loader)
+        return 0;
+    if (loader->num_samples != 3) {
+        cml_imagenet_free(loader);
+        return 0;
+    }
+    if (loader->num_classes != 2) {
+        cml_imagenet_free(loader);
+        return 0;
+    }
+    if (loader->image_size != 16) {
+        cml_imagenet_free(loader);
+        return 0;
+    }
     cml_imagenet_free(loader);
     return 1;
 }
@@ -108,12 +130,24 @@ static int test_imagenet_load_batch(void) {
     snprintf(dir, sizeof(dir), "%s/images", tmpdir);
 
     CMLImageNetLoader* loader = cml_imagenet_open(dir, 4);
-    if (!loader) return 0;
+    if (!loader)
+        return 0;
 
     Dataset* ds = cml_imagenet_load_batch(loader, 0, 2);
-    if (!ds) { cml_imagenet_free(loader); return 0; }
-    if (ds->num_samples != 2) { dataset_free(ds); cml_imagenet_free(loader); return 0; }
-    if (ds->input_size != 3 * 4 * 4) { dataset_free(ds); cml_imagenet_free(loader); return 0; }
+    if (!ds) {
+        cml_imagenet_free(loader);
+        return 0;
+    }
+    if (ds->num_samples != 2) {
+        dataset_free(ds);
+        cml_imagenet_free(loader);
+        return 0;
+    }
+    if (ds->input_size != 3 * 4 * 4) {
+        dataset_free(ds);
+        cml_imagenet_free(loader);
+        return 0;
+    }
 
     dataset_free(ds);
     cml_imagenet_free(loader);
@@ -125,8 +159,12 @@ static int test_load_image_folder(void) {
     snprintf(dir, sizeof(dir), "%s/images", tmpdir);
 
     Dataset* ds = cml_load_image_folder(dir, 4);
-    if (!ds) return 0;
-    if (ds->num_samples != 3) { dataset_free(ds); return 0; }
+    if (!ds)
+        return 0;
+    if (ds->num_samples != 3) {
+        dataset_free(ds);
+        return 0;
+    }
     dataset_free(ds);
     return 1;
 }
@@ -136,11 +174,24 @@ static int test_squad_open(void) {
     snprintf(path, sizeof(path), "%s/squad.json", tmpdir);
 
     CMLSQuADLoader* loader = cml_squad_open(path);
-    if (!loader) return 0;
-    if (loader->num_samples != 1) { cml_squad_free(loader); return 0; }
-    if (strcmp(loader->questions[0], "What color is the fox?") != 0) { cml_squad_free(loader); return 0; }
-    if (strcmp(loader->answers[0], "brown") != 0) { cml_squad_free(loader); return 0; }
-    if (loader->answer_starts[0] != 10) { cml_squad_free(loader); return 0; }
+    if (!loader)
+        return 0;
+    if (loader->num_samples != 1) {
+        cml_squad_free(loader);
+        return 0;
+    }
+    if (strcmp(loader->questions[0], "What color is the fox?") != 0) {
+        cml_squad_free(loader);
+        return 0;
+    }
+    if (strcmp(loader->answers[0], "brown") != 0) {
+        cml_squad_free(loader);
+        return 0;
+    }
+    if (loader->answer_starts[0] != 10) {
+        cml_squad_free(loader);
+        return 0;
+    }
     cml_squad_free(loader);
     return 1;
 }
@@ -150,24 +201,38 @@ static int test_librispeech_open(void) {
     snprintf(dir, sizeof(dir), "%s/audio", tmpdir);
 
     CMLLibriSpeechLoader* loader = cml_librispeech_open(dir);
-    if (!loader) return 0;
-    if (loader->num_samples != 1) { cml_librispeech_free(loader); return 0; }
-    if (strcmp(loader->transcripts[0], "HELLO WORLD") != 0) { cml_librispeech_free(loader); return 0; }
-    if (loader->sample_rate != 16000) { cml_librispeech_free(loader); return 0; }
+    if (!loader)
+        return 0;
+    if (loader->num_samples != 1) {
+        cml_librispeech_free(loader);
+        return 0;
+    }
+    if (strcmp(loader->transcripts[0], "HELLO WORLD") != 0) {
+        cml_librispeech_free(loader);
+        return 0;
+    }
+    if (loader->sample_rate != 16000) {
+        cml_librispeech_free(loader);
+        return 0;
+    }
     cml_librispeech_free(loader);
     return 1;
 }
 
 static int test_imagenet_null_safety(void) {
-    if (cml_imagenet_open(NULL, 224) != NULL) return 0;
-    if (cml_imagenet_load_batch(NULL, 0, 1) != NULL) return 0;
+    if (cml_imagenet_open(NULL, 224) != NULL)
+        return 0;
+    if (cml_imagenet_load_batch(NULL, 0, 1) != NULL)
+        return 0;
     cml_imagenet_free(NULL);
     return 1;
 }
 
 static int test_squad_null_safety(void) {
-    if (cml_squad_open(NULL) != NULL) return 0;
-    if (cml_squad_open("/nonexistent/path.json") != NULL) return 0;
+    if (cml_squad_open(NULL) != NULL)
+        return 0;
+    if (cml_squad_open("/nonexistent/path.json") != NULL)
+        return 0;
     cml_squad_free(NULL);
     return 1;
 }

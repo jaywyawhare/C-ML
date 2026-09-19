@@ -8,7 +8,6 @@
 
 static const char* program_path(void);
 
-
 /* cml_init() latches process-global state, so each combination is exercised in
  * a fresh child rather than by re-initialising in place. */
 static int init_rc_with(const char* viz, const char* no_export) {
@@ -21,9 +20,8 @@ static int init_rc_with(const char* viz, const char* no_export) {
      * port made the launcher exit immediately. With nothing on the port it
      * starts its own server and blocks. */
     char cmd[512];
-    snprintf(cmd, sizeof(cmd),
-             "VIZ_LAUNCHED=1 %s %s %s --probe-init",
-             viz ? viz : "", no_export ? no_export : "", program_path());
+    snprintf(cmd, sizeof(cmd), "VIZ_LAUNCHED=1 %s %s %s --probe-init", viz ? viz : "",
+             no_export ? no_export : "", program_path());
     return system(cmd);
 }
 
@@ -40,16 +38,15 @@ int main(int argc, char** argv) {
 
     printf("=== VIZ / NO_EXPORT mutual exclusion ===\n");
 
-    CHECK("neither flag: init succeeds",  init_rc_with(NULL, NULL) == 0);
-    CHECK("VIZ alone: init succeeds",     init_rc_with("VIZ=1", NULL) == 0);
+    CHECK("neither flag: init succeeds", init_rc_with(NULL, NULL) == 0);
+    CHECK("VIZ alone: init succeeds", init_rc_with("VIZ=1", NULL) == 0);
     CHECK("NO_EXPORT alone: init succeeds", init_rc_with(NULL, "NO_EXPORT=1") == 0);
 
     int both = init_rc_with("VIZ=1", "NO_EXPORT=1");
     CHECK("VIZ + NO_EXPORT: init is rejected", both != 0);
 
     /* VIZ=0 is not "VIZ requested", so it must not trip the conflict. */
-    CHECK("VIZ=0 with NO_EXPORT: init succeeds",
-          init_rc_with("VIZ=0", "NO_EXPORT=1") == 0);
+    CHECK("VIZ=0 with NO_EXPORT: init succeeds", init_rc_with("VIZ=0", "NO_EXPORT=1") == 0);
 
     return TEST_SUMMARY();
 }

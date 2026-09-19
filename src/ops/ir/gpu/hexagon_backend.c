@@ -11,10 +11,10 @@ typedef int (*remote_handle_open_fn)(const char* name, uint32_t* handle);
 typedef int (*remote_handle_invoke_fn)(uint32_t handle, uint32_t method_id, void* args, int nargs);
 typedef int (*remote_handle_close_fn)(uint32_t handle);
 
-static void* s_dsp_lib = NULL;
-static remote_handle_open_fn   fn_remote_handle_open   = NULL;
-static remote_handle_invoke_fn fn_remote_handle_invoke  = NULL;
-static remote_handle_close_fn  fn_remote_handle_close   = NULL;
+static void* s_dsp_lib                                 = NULL;
+static remote_handle_open_fn fn_remote_handle_open     = NULL;
+static remote_handle_invoke_fn fn_remote_handle_invoke = NULL;
+static remote_handle_close_fn fn_remote_handle_close   = NULL;
 
 static void* try_dlopen_dsp(void) {
     /* Mock/alternative transport override (used by tests to exercise the
@@ -59,7 +59,8 @@ CMLHexagonBackend* cml_hexagon_backend_create(void) {
 }
 
 int cml_hexagon_backend_init(CMLHexagonBackend* backend) {
-    if (!backend) return -1;
+    if (!backend)
+        return -1;
 
     if (backend->initialized) {
         LOG_WARNING("Hexagon backend already initialized");
@@ -91,7 +92,7 @@ int cml_hexagon_backend_init(CMLHexagonBackend* backend) {
     }
 
     uint32_t test_handle = 0;
-    int rc = fn_remote_handle_open("cml_hexagon_skel", &test_handle);
+    int rc               = fn_remote_handle_open("cml_hexagon_skel", &test_handle);
     if (rc == 0) {
         LOG_INFO("Hexagon DSP session opened successfully");
         fn_remote_handle_close(test_handle);
@@ -101,35 +102,35 @@ int cml_hexagon_backend_init(CMLHexagonBackend* backend) {
         backend->dsp_version = 68;
     }
 
-    backend->hvx_length = 128;
-    backend->has_hmx = (backend->dsp_version >= 73);
-    backend->handle = lib;
+    backend->hvx_length  = 128;
+    backend->has_hmx     = (backend->dsp_version >= 73);
+    backend->handle      = lib;
     backend->initialized = true;
-    s_dsp_lib = lib;
+    s_dsp_lib            = lib;
 
-    LOG_INFO("Hexagon backend initialized: DSP V%d, HVX %d-byte, HMX=%s",
-             backend->dsp_version, backend->hvx_length,
-             backend->has_hmx ? "yes" : "no");
+    LOG_INFO("Hexagon backend initialized: DSP V%d, HVX %d-byte, HMX=%s", backend->dsp_version,
+             backend->hvx_length, backend->has_hmx ? "yes" : "no");
     return 0;
 
 fail:
     CML_DLCLOSE(lib);
-    fn_remote_handle_open = NULL;
+    fn_remote_handle_open   = NULL;
     fn_remote_handle_invoke = NULL;
-    fn_remote_handle_close = NULL;
+    fn_remote_handle_close  = NULL;
     return -1;
 }
 
 void cml_hexagon_backend_free(CMLHexagonBackend* backend) {
-    if (!backend) return;
+    if (!backend)
+        return;
 
     if (backend->handle) {
         CML_DLCLOSE(backend->handle);
-        backend->handle = NULL;
-        s_dsp_lib = NULL;
-        fn_remote_handle_open = NULL;
+        backend->handle         = NULL;
+        s_dsp_lib               = NULL;
+        fn_remote_handle_open   = NULL;
         fn_remote_handle_invoke = NULL;
-        fn_remote_handle_close = NULL;
+        fn_remote_handle_close  = NULL;
     }
 
     backend->initialized = false;
@@ -151,7 +152,7 @@ int cml_hexagon_execute(CMLHexagonBackend* backend, CMLGraph_t ir) {
     }
 
     uint32_t session = 0;
-    int rc = fn_remote_handle_open("cml_hexagon_skel", &session);
+    int rc           = fn_remote_handle_open("cml_hexagon_skel", &session);
     if (rc != 0) {
         LOG_ERROR("Hexagon execute: failed to open DSP session (rc=%d)", rc);
         return -1;
@@ -160,13 +161,13 @@ int cml_hexagon_execute(CMLHexagonBackend* backend, CMLGraph_t ir) {
     LOG_DEBUG("Hexagon execute: DSP session opened (handle=0x%x)", session);
 
     struct IRNode* node = ir->head;
-    int node_idx = 0;
-    int status = 0;
+    int node_idx        = 0;
+    int status          = 0;
 
     while (node) {
         const char* op_name = uop_type_to_string(node->type);
-        LOG_DEBUG("Hexagon execute: node %d, op=%s, inputs=%d",
-                  node_idx, op_name, node->num_inputs);
+        LOG_DEBUG("Hexagon execute: node %d, op=%s, inputs=%d", node_idx, op_name,
+                  node->num_inputs);
 
         /*
          * Invoke the remote procedure for this operation.
@@ -178,8 +179,8 @@ int cml_hexagon_execute(CMLHexagonBackend* backend, CMLGraph_t ir) {
         uint32_t method_id = (uint32_t)node->type;
         rc = fn_remote_handle_invoke(session, method_id, node->params, node->num_inputs);
         if (rc != 0) {
-            LOG_ERROR("Hexagon execute: remote invoke failed for node %d (op=%s, rc=%d)",
-                      node_idx, op_name, rc);
+            LOG_ERROR("Hexagon execute: remote invoke failed for node %d (op=%s, rc=%d)", node_idx,
+                      op_name, rc);
             status = -1;
             break;
         }

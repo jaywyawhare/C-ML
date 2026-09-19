@@ -15,7 +15,6 @@
 #include "nn.h"
 #include "test_harness.h"
 
-
 #define APPROX_EQ(a, b) (fabsf((float)(a) - (float)(b)) < 1e-4f)
 
 /* ── 1. Partial execution stops at target ─────────────────────────────────── */
@@ -23,9 +22,9 @@
 static void test_partial_exec_stops_early(void) {
     printf("Test: execute_up_to stops before downstream nodes\n");
 
-    float a_data[] = {1.0f, 2.0f, 3.0f};
-    float b_data[] = {4.0f, 5.0f, 6.0f};
-    int   shape[]  = {3};
+    float a_data[]   = {1.0f, 2.0f, 3.0f};
+    float b_data[]   = {4.0f, 5.0f, 6.0f};
+    int shape[]      = {3};
     TensorConfig cfg = {0};
 
     Tensor* a = tensor_from_data(a_data, shape, 1, &cfg);
@@ -36,7 +35,7 @@ static void test_partial_exec_stops_early(void) {
     Tensor* d = uop_relu(c);
     Tensor* e = uop_mul(d, b);
 
-    CMLGraph_t ir = c->ir_context;
+    CMLGraph_t ir         = c->ir_context;
     struct IRNode* c_node = (struct IRNode*)c->ir_node;
 
     /* Execute only up to c */
@@ -48,7 +47,7 @@ static void test_partial_exec_stops_early(void) {
      * frees the original node. The tensor is repointed at the replacement
      * (orig_output->ir_node = chain_tail), so the tensor is the stable handle
      * and a cached IRNode* is dangling. */
-    c_node = (struct IRNode*)c->ir_node;
+    c_node                = (struct IRNode*)c->ir_node;
     struct IRNode* d_node = (struct IRNode*)d->ir_node;
     struct IRNode* e_node = (struct IRNode*)e->ir_node;
 
@@ -58,12 +57,15 @@ static void test_partial_exec_stops_early(void) {
 
     /* Result of c should be correct: [5,7,9] */
     float* cd = (float*)c->data;
-    int values_ok = cd && APPROX_EQ(cd[0], 5.0f) && APPROX_EQ(cd[1], 7.0f)
-                        && APPROX_EQ(cd[2], 9.0f);
+    int values_ok =
+        cd && APPROX_EQ(cd[0], 5.0f) && APPROX_EQ(cd[1], 7.0f) && APPROX_EQ(cd[2], 9.0f);
     CHECK("c values correct after partial exec", values_ok);
 
-    tensor_free(a); tensor_free(b); tensor_free(c);
-    tensor_free(d); tensor_free(e);
+    tensor_free(a);
+    tensor_free(b);
+    tensor_free(c);
+    tensor_free(d);
+    tensor_free(e);
     cml_reset_ir_context();
 }
 
@@ -72,10 +74,10 @@ static void test_partial_exec_stops_early(void) {
 static void test_dce_skips_unused_branch(void) {
     printf("Test: DCE skips branch not needed by target\n");
 
-    float a_data[] = {2.0f};
-    float b_data[] = {3.0f};
-    float c_data[] = {10.0f};
-    int   shape[]  = {1};
+    float a_data[]   = {2.0f};
+    float b_data[]   = {3.0f};
+    float c_data[]   = {10.0f};
+    int shape[]      = {1};
     TensorConfig cfg = {0};
 
     Tensor* a = tensor_from_data(a_data, shape, 1, &cfg);
@@ -88,7 +90,7 @@ static void test_dce_skips_unused_branch(void) {
     /* Branch 2 (not needed for x): y = c + a  (independent output) */
     Tensor* y = uop_add(c, a);
 
-    CMLGraph_t ir = x->ir_context;
+    CMLGraph_t ir         = x->ir_context;
     struct IRNode* x_node = (struct IRNode*)x->ir_node;
     struct IRNode* y_node = (struct IRNode*)y->ir_node;
 
@@ -102,8 +104,11 @@ static void test_dce_skips_unused_branch(void) {
     CHECK("x = a*b = 6", xd && APPROX_EQ(xd[0], 6.0f));
     (void)y_node; /* y may incidentally execute if it precedes x in the list */
 
-    tensor_free(a); tensor_free(b); tensor_free(c);
-    tensor_free(x); tensor_free(y);
+    tensor_free(a);
+    tensor_free(b);
+    tensor_free(c);
+    tensor_free(x);
+    tensor_free(y);
     cml_reset_ir_context();
 }
 
@@ -114,29 +119,38 @@ static void test_tail_matches_full_exec(void) {
 
     float a_data[16], b_data[16];
     int shape[] = {4, 4};
-    for (int i = 0; i < 16; i++) { a_data[i] = (float)(i + 1); b_data[i] = 1.0f / (float)(i + 1); }
+    for (int i = 0; i < 16; i++) {
+        a_data[i] = (float)(i + 1);
+        b_data[i] = 1.0f / (float)(i + 1);
+    }
     TensorConfig cfg = {0};
 
     /* Run via execute_up_to(tail) */
-    Tensor* a1 = tensor_from_data(a_data, shape, 2, &cfg);
-    Tensor* b1 = tensor_from_data(b_data, shape, 2, &cfg);
-    Tensor* c1 = uop_mul(a1, b1);
-    Tensor* d1 = uop_relu(c1);
+    Tensor* a1             = tensor_from_data(a_data, shape, 2, &cfg);
+    Tensor* b1             = tensor_from_data(b_data, shape, 2, &cfg);
+    Tensor* c1             = uop_mul(a1, b1);
+    Tensor* d1             = uop_relu(c1);
     struct IRNode* d1_node = (struct IRNode*)d1->ir_node;
     cml_ir_execute_up_to(a1->ir_context ? a1->ir_context : d1->ir_context, d1_node);
-    float* r1 = (float*)d1->data;
+    float* r1     = (float*)d1->data;
     float sample1 = r1 ? r1[0] : -999.0f;
-    tensor_free(a1); tensor_free(b1); tensor_free(c1); tensor_free(d1);
+    tensor_free(a1);
+    tensor_free(b1);
+    tensor_free(c1);
+    tensor_free(d1);
     cml_reset_ir_context();
 
     /* Run via normal tensor_data_ptr (full lazy path) */
-    Tensor* a2 = tensor_from_data(a_data, shape, 2, &cfg);
-    Tensor* b2 = tensor_from_data(b_data, shape, 2, &cfg);
-    Tensor* c2 = uop_mul(a2, b2);
-    Tensor* d2 = uop_relu(c2);
-    float* r2 = (float*)tensor_data_ptr(d2);
+    Tensor* a2    = tensor_from_data(a_data, shape, 2, &cfg);
+    Tensor* b2    = tensor_from_data(b_data, shape, 2, &cfg);
+    Tensor* c2    = uop_mul(a2, b2);
+    Tensor* d2    = uop_relu(c2);
+    float* r2     = (float*)tensor_data_ptr(d2);
     float sample2 = r2 ? r2[0] : -999.0f;
-    tensor_free(a2); tensor_free(b2); tensor_free(c2); tensor_free(d2);
+    tensor_free(a2);
+    tensor_free(b2);
+    tensor_free(c2);
+    tensor_free(d2);
     cml_reset_ir_context();
 
     CHECK("partial(tail) == full exec result", APPROX_EQ(sample1, sample2));
@@ -148,14 +162,20 @@ static void test_lazy_fill(void) {
     printf("Test: lazy FILL op materializes correct values\n");
 
     int shape[] = {8};
-    Tensor* t = uop_fill(shape, 1, 3.14f);
-    if (!t) { CHECK("uop_fill returned non-NULL", 0); return; }
+    Tensor* t   = uop_fill(shape, 1, 3.14f);
+    if (!t) {
+        CHECK("uop_fill returned non-NULL", 0);
+        return;
+    }
 
     float* d = (float*)tensor_data_ptr(t);
-    int ok = d != NULL;
+    int ok   = d != NULL;
     if (ok) {
         for (int i = 0; i < 8; i++) {
-            if (!APPROX_EQ(d[i], 3.14f)) { ok = 0; break; }
+            if (!APPROX_EQ(d[i], 3.14f)) {
+                ok = 0;
+                break;
+            }
         }
     }
     CHECK("fill materializes 3.14f across all elements", ok);
@@ -170,14 +190,20 @@ static void test_lazy_rand_uniform(void) {
     printf("Test: lazy RAND_UNIFORM stays in [0,1)\n");
 
     int shape[] = {64};
-    Tensor* t = uop_rand_uniform(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!t) { CHECK("uop_rand_uniform returned non-NULL", 0); return; }
+    Tensor* t   = uop_rand_uniform(shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    if (!t) {
+        CHECK("uop_rand_uniform returned non-NULL", 0);
+        return;
+    }
 
     float* d = (float*)tensor_data_ptr(t);
-    int ok = d != NULL;
+    int ok   = d != NULL;
     if (ok) {
         for (int i = 0; i < 64; i++) {
-            if (d[i] < 0.0f || d[i] >= 1.0f) { ok = 0; break; }
+            if (d[i] < 0.0f || d[i] >= 1.0f) {
+                ok = 0;
+                break;
+            }
         }
     }
     CHECK("rand_uniform values in [0,1)", ok);
@@ -192,13 +218,19 @@ static void test_lazy_arange(void) {
     printf("Test: lazy ARANGE produces start..stop with step\n");
 
     Tensor* t = uop_arange_op(0.0f, 5.0f, 1.0f, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!t) { CHECK("uop_arange_op returned non-NULL", 0); return; }
+    if (!t) {
+        CHECK("uop_arange_op returned non-NULL", 0);
+        return;
+    }
 
     float* d = (float*)tensor_data_ptr(t);
-    int ok = d != NULL && (int)t->numel == 5;
+    int ok   = d != NULL && (int)t->numel == 5;
     if (ok) {
         for (int i = 0; i < 5; i++) {
-            if (!APPROX_EQ(d[i], (float)i)) { ok = 0; break; }
+            if (!APPROX_EQ(d[i], (float)i)) {
+                ok = 0;
+                break;
+            }
         }
     }
     CHECK("arange(0,5,1) = [0,1,2,3,4]", ok);
@@ -219,22 +251,26 @@ static void test_backward_dce(void) {
     float b_data[] = {3.0f};
     float c_data[] = {5.0f};
 
-    Tensor* a = cml_tensor_1d(a_data, 1);
-    Tensor* b = cml_tensor_1d(b_data, 1);
+    Tensor* a   = cml_tensor_1d(a_data, 1);
+    Tensor* b   = cml_tensor_1d(b_data, 1);
     Tensor* c_t = cml_tensor_1d(c_data, 1);
     if (!a || !b || !c_t) {
         CHECK("tensor allocation", 0);
-        tensor_free(a); tensor_free(b); tensor_free(c_t);
+        tensor_free(a);
+        tensor_free(b);
+        tensor_free(c_t);
         return;
     }
 
     cml_set_requires_grad(a, true);
 
-    Tensor* ab  = cml_mul(a, b);
-    Tensor* y   = cml_add(ab, c_t);
+    Tensor* ab = cml_mul(a, b);
+    Tensor* y  = cml_add(ab, c_t);
     if (!y) {
         CHECK("graph construction", 0);
-        tensor_free(a); tensor_free(b); tensor_free(c_t);
+        tensor_free(a);
+        tensor_free(b);
+        tensor_free(c_t);
         tensor_free(ab);
         return;
     }
@@ -253,8 +289,11 @@ static void test_backward_dce(void) {
     /* b should NOT have a grad (requires_grad=false) */
     CHECK("b has no gradient (no requires_grad)", b->grad == NULL);
 
-    tensor_free(a); tensor_free(b); tensor_free(c_t);
-    tensor_free(ab); tensor_free(y);
+    tensor_free(a);
+    tensor_free(b);
+    tensor_free(c_t);
+    tensor_free(ab);
+    tensor_free(y);
     cml_reset_ir_context();
 }
 
@@ -264,26 +303,26 @@ static void test_chained_lazy_via_data_ptr(void) {
     printf("Test: chained lazy ops execute on-demand via tensor_data_ptr\n");
 
     /* None of the ops run until we call tensor_data_ptr */
-    float a_data[] = {-1.0f, 2.0f, -3.0f, 4.0f};
-    int shape[] = {4};
+    float a_data[]   = {-1.0f, 2.0f, -3.0f, 4.0f};
+    int shape[]      = {4};
     TensorConfig cfg = {0};
-    Tensor* a = tensor_from_data(a_data, shape, 1, &cfg);
-    Tensor* b = uop_relu(a);
-    Tensor* c = uop_relu(b); /* relu(relu(x)) = relu(x) */
+    Tensor* a        = tensor_from_data(a_data, shape, 1, &cfg);
+    Tensor* b        = uop_relu(a);
+    Tensor* c        = uop_relu(b); /* relu(relu(x)) = relu(x) */
 
     /* b and c should not have data yet */
     struct IRNode* b_node = b ? (struct IRNode*)b->ir_node : NULL;
     struct IRNode* c_node = c ? (struct IRNode*)c->ir_node : NULL;
-    int b_pending = b_node && !b_node->is_executed;
+    int b_pending         = b_node && !b_node->is_executed;
     CHECK("b not yet executed before data access", b_pending);
 
     /* Force execution of c via data_ptr */
     float* cd = (float*)tensor_data_ptr(c);
-    int ok = cd != NULL;
+    int ok    = cd != NULL;
     if (ok) {
         /* relu(relu([-1,2,-3,4])) = [0,2,0,4] */
-        ok = APPROX_EQ(cd[0], 0.0f) && APPROX_EQ(cd[1], 2.0f)
-          && APPROX_EQ(cd[2], 0.0f) && APPROX_EQ(cd[3], 4.0f);
+        ok = APPROX_EQ(cd[0], 0.0f) && APPROX_EQ(cd[1], 2.0f) && APPROX_EQ(cd[2], 0.0f) &&
+             APPROX_EQ(cd[3], 4.0f);
     }
     CHECK("chained relu result correct", ok);
     /* relu now lowers to max(x,0) in the decompose pass, so c->ir_node points at
@@ -291,7 +330,9 @@ static void test_chained_lazy_via_data_ptr(void) {
     (void)c_node;
     CHECK("c executed after data_ptr", c->is_executed);
 
-    tensor_free(a); tensor_free(b); tensor_free(c);
+    tensor_free(a);
+    tensor_free(b);
+    tensor_free(c);
     cml_reset_ir_context();
 }
 
@@ -300,7 +341,7 @@ static void test_chained_lazy_via_data_ptr(void) {
 static void test_reset_does_not_materialize_pending_rand(void) {
     printf("Test: reset_ir_context does not execute pending lazy rand ops\n");
 
-    int shape[] = {8};
+    int shape[]      = {8};
     TensorConfig cfg = {0};
     float after_reset[8];
     float baseline[8];
@@ -364,15 +405,14 @@ static void test_permute_does_not_force_source_execution(void) {
     }
 
     struct IRNode* src_node = (struct IRNode*)src->ir_node;
-    PermuteParams pp = {.perm = (int[]){1, 0}, .num_dims = 2};
-    Tensor* out = uop_permute(src, &pp);
+    PermuteParams pp        = {.perm = (int[]){1, 0}, .num_dims = 2};
+    Tensor* out             = uop_permute(src, &pp);
 
     CHECK("lazy permute output created", out != NULL);
     CHECK("permute keeps source lazy before read", src_node && !src_node->is_executed);
 
     float* out_data = out ? (float*)tensor_data_ptr(out) : NULL;
-    int ok = out_data != NULL && out->ndim == 2 &&
-             out->shape[0] == 3 && out->shape[1] == 2;
+    int ok = out_data != NULL && out->ndim == 2 && out->shape[0] == 3 && out->shape[1] == 2;
     if (ok) {
         for (int i = 0; i < 6; i++) {
             if (!APPROX_EQ(out_data[i], 2.5f)) {
@@ -393,19 +433,20 @@ static void test_permute_does_not_force_source_execution(void) {
 static void test_dropout_layer_stays_lazy(void) {
     printf("Test: dropout layer builds lazy graph\n");
 
-    int shape[] = {8};
-    Tensor* src = uop_fill(shape, 1, 2.0f);
+    int shape[]    = {8};
+    Tensor* src    = uop_fill(shape, 1, 2.0f);
     Dropout* layer = cml_nn_dropout(0.25f, false);
     if (!src || !layer) {
         CHECK("dropout layer setup", 0);
         tensor_free(src);
-        if (layer) module_free((Module*)layer);
+        if (layer)
+            module_free((Module*)layer);
         cml_reset_ir_context();
         return;
     }
     module_set_training((Module*)layer, true);
 
-    Tensor* out = module_forward((Module*)layer, src);
+    Tensor* out             = module_forward((Module*)layer, src);
     struct IRNode* out_node = out ? (struct IRNode*)out->ir_node : NULL;
 
     CHECK("dropout output created", out != NULL);
@@ -425,28 +466,25 @@ static void test_dropout_layer_stays_lazy(void) {
 static void test_pool2d_layers_stay_lazy(void) {
     printf("Test: maxpool2d/avgpool2d layers build lazy graphs\n");
 
-    int shape[] = {1, 1, 4, 4};
-    float values[] = {
-        1, 2, 3, 4,
-        5, 6, 7, 8,
-        9, 10, 11, 12,
-        13, 14, 15, 16
-    };
-    TensorConfig cfg = {0};
-    Tensor* src = tensor_from_data(values, shape, 4, &cfg);
+    int shape[]          = {1, 1, 4, 4};
+    float values[]       = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    TensorConfig cfg     = {0};
+    Tensor* src          = tensor_from_data(values, shape, 4, &cfg);
     MaxPool2d* max_layer = cml_nn_maxpool2d(2, 2, 0, 1, false);
     AvgPool2d* avg_layer = cml_nn_avgpool2d(2, 2, 0, false, true);
     if (!src || !max_layer || !avg_layer) {
         CHECK("pool2d layer setup", 0);
         tensor_free(src);
-        if (max_layer) module_free((Module*)max_layer);
-        if (avg_layer) module_free((Module*)avg_layer);
+        if (max_layer)
+            module_free((Module*)max_layer);
+        if (avg_layer)
+            module_free((Module*)avg_layer);
         cml_reset_ir_context();
         return;
     }
 
-    Tensor* max_out = module_forward((Module*)max_layer, src);
-    Tensor* avg_out = module_forward((Module*)avg_layer, src);
+    Tensor* max_out         = module_forward((Module*)max_layer, src);
+    Tensor* avg_out         = module_forward((Module*)avg_layer, src);
     struct IRNode* max_node = max_out ? (struct IRNode*)max_out->ir_node : NULL;
     struct IRNode* avg_node = avg_out ? (struct IRNode*)avg_out->ir_node : NULL;
 
@@ -457,11 +495,9 @@ static void test_pool2d_layers_stay_lazy(void) {
 
     float* max_data = max_out ? (float*)tensor_data_ptr(max_out) : NULL;
     float* avg_data = avg_out ? (float*)tensor_data_ptr(avg_out) : NULL;
-    int ok_max = max_data &&
-                 APPROX_EQ(max_data[0], 6.0f) && APPROX_EQ(max_data[1], 8.0f) &&
+    int ok_max      = max_data && APPROX_EQ(max_data[0], 6.0f) && APPROX_EQ(max_data[1], 8.0f) &&
                  APPROX_EQ(max_data[2], 14.0f) && APPROX_EQ(max_data[3], 16.0f);
-    int ok_avg = avg_data &&
-                 APPROX_EQ(avg_data[0], 3.5f) && APPROX_EQ(avg_data[1], 5.5f) &&
+    int ok_avg = avg_data && APPROX_EQ(avg_data[0], 3.5f) && APPROX_EQ(avg_data[1], 5.5f) &&
                  APPROX_EQ(avg_data[2], 11.5f) && APPROX_EQ(avg_data[3], 13.5f);
     CHECK("maxpool2d values correct after materialization", ok_max);
     CHECK("avgpool2d values correct after materialization", ok_avg);
@@ -490,39 +526,45 @@ static void test_midgraph_realization_executes_upstream(void) {
      * not decompose, so no replacement node rescues a poisoned mark (an
      * elementwise variant of this test passes even with the bug present,
      * because decompose rebuilds the target and clears the poison). */
-    float a_data[24], b_data[24];   /* A=[4,6], B=[6,4] */
+    float a_data[24], b_data[24]; /* A=[4,6], B=[6,4] */
     for (int i = 0; i < 24; i++) {
         a_data[i] = (float)((i * 7) % 11) - 5.0f;
         b_data[i] = (float)((i * 5) % 13) / 6.0f - 1.0f;
     }
-    int ashape[] = {4, 6};
-    int bshape[] = {6, 4};
+    int ashape[]     = {4, 6};
+    int bshape[]     = {6, 4};
     TensorConfig cfg = {0};
 
     Tensor* A = tensor_from_data(a_data, ashape, 2, &cfg);
     Tensor* B = tensor_from_data(b_data, bshape, 2, &cfg);
-    if (!A || !B) { CHECK("graph setup", 0); return; }
+    if (!A || !B) {
+        CHECK("graph setup", 0);
+        return;
+    }
 
     /* chain 1: P = A@B ; S1 = P @ Pᵀ via explicit permute */
-    Tensor* P = uop_matmul(A, B);
+    Tensor* P        = uop_matmul(A, B);
     PermuteParams pp = {.perm = (int[]){1, 0}, .num_dims = 2};
-    Tensor* Pt1 = uop_permute(P, &pp);
-    Tensor* S1 = uop_matmul(P, Pt1);
+    Tensor* Pt1      = uop_permute(P, &pp);
+    Tensor* S1       = uop_matmul(P, Pt1);
 
     /* chain 2 reuses P with a second permute node */
     Tensor* Pt2 = uop_permute(P, &pp);
-    Tensor* S2 = uop_matmul(P, Pt2);
+    Tensor* S2  = uop_matmul(P, Pt2);
 
     CHECK("S1 pending before realization", S1 && !S1->is_executed);
 
     /* Realize chain 1 while chain 2 is still pending */
     float* pd = P ? (float*)tensor_data_ptr(P) : NULL;
     float* s1 = S1 ? (float*)tensor_data_ptr(S1) : NULL;
-    int ok = s1 != NULL && pd != NULL;
+    int ok    = s1 != NULL && pd != NULL;
     /* Guard against a false pass where both buffers are zero-filled */
     int p_nonzero = 0;
     for (int i = 0; i < 24; i++)
-        if (fabsf(pd[i]) > 1e-6f) { p_nonzero = 1; break; }
+        if (fabsf(pd[i]) > 1e-6f) {
+            p_nonzero = 1;
+            break;
+        }
     ok = ok && p_nonzero;
     if (ok) {
         /* S1[i][j] = row_i(P) · row_j(P); P is [4,4] */
@@ -541,16 +583,21 @@ static void test_midgraph_realization_executes_upstream(void) {
 
     /* Chain 2 must produce identical values through the shared P */
     float* s2 = S2 ? (float*)tensor_data_ptr(S2) : NULL;
-    ok = s2 != NULL;
+    ok        = s2 != NULL;
     if (ok) {
         for (int i = 0; i < 16 && ok; i++)
-            if (fabsf(s1[i] - s2[i]) > 1e-5f) ok = 0;
+            if (fabsf(s1[i] - s2[i]) > 1e-5f)
+                ok = 0;
     }
     CHECK("second chain sharing P agrees", ok);
 
-    tensor_free(A); tensor_free(B); tensor_free(P);
-    tensor_free(Pt1); tensor_free(S1);
-    tensor_free(Pt2); tensor_free(S2);
+    tensor_free(A);
+    tensor_free(B);
+    tensor_free(P);
+    tensor_free(Pt1);
+    tensor_free(S1);
+    tensor_free(Pt2);
+    tensor_free(S2);
     cml_reset_ir_context();
 }
 

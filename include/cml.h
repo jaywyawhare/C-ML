@@ -94,9 +94,9 @@ Tensor* cml_tensor_1d(const float* data, int size);
 /* 1-D FFT. cml_fft_1d transforms separate real/imag buffers in place (radix-2 for
  * power-of-two n, O(n^2) DFT otherwise); inverse!=0 = inverse (1/n normalized).
  * cml_fft transforms a complex signal tensor stored as [n,2] and returns [n,2]. */
-int     cml_fft_1d(float* re, float* im, int n, int inverse);
+int cml_fft_1d(float* re, float* im, int n, int inverse);
 Tensor* cml_fft(Tensor* x, int inverse);
-Tensor* cml_fft2(Tensor* x, int inverse);  /* 2-D FFT of [H,W,2] complex image */
+Tensor* cml_fft2(Tensor* x, int inverse); /* 2-D FFT of [H,W,2] complex image */
 
 Tensor* cml_add(Tensor* a, Tensor* b);
 /* In-place elementwise (eager): a op= b into a's realized buffer, no allocation.
@@ -187,8 +187,7 @@ Tensor* cml_sort(Tensor* a, int dim, bool descending);
 Tensor* cml_topk(Tensor* a, int k, int dim, bool largest, bool sorted);
 /* Like cml_topk but also writes the k index tensor through indices_out
  * (NULL stores nothing). */
-Tensor* cml_topk_with_indices(Tensor* a, int k, int dim, bool largest,
-                              Tensor** indices_out);
+Tensor* cml_topk_with_indices(Tensor* a, int k, int dim, bool largest, Tensor** indices_out);
 Tensor* cml_masked_select(Tensor* a, Tensor* mask);
 Tensor** cml_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs);
 Tensor* cml_diagonal(Tensor* a, int offset, int dim1, int dim2);
@@ -196,7 +195,8 @@ Tensor* cml_lerp(Tensor* a, Tensor* b, float weight);
 Tensor* cml_idiv(Tensor* a, Tensor* b);
 Tensor* cml_mod(Tensor* a, Tensor* b);
 Tensor* cml_contiguous(Tensor* a);
-Tensor* cml_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode);
+Tensor* cml_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
+                           ScatterReduceMode mode);
 Tensor* cml_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode);
 
 Tensor* cml_arange(float start, float end, float step, const TensorConfig* config);
@@ -230,8 +230,10 @@ Tensor* cml_bfloat16(Tensor* a);
 
 Tensor* cml_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config);
 Tensor* cml_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config);
-Tensor* cml_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
-Tensor* cml_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
+Tensor* cml_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out,
+                           const TensorConfig* config);
+Tensor* cml_xavier_normal(int* shape, int ndim, int fan_in, int fan_out,
+                          const TensorConfig* config);
 
 Sequential* cml_nn_sequential(void);
 Sequential* cml_nn_sequential_add(Sequential* seq, Module* layer);
@@ -255,26 +257,26 @@ Conv2d* cml_nn_conv2d(int in_channels, int out_channels, int kernel_size, int st
 Conv3d* cml_nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
                       int dilation, bool use_bias, DType dtype, DeviceType device);
 ConvTranspose1d* cml_nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size,
-                                          int stride, int padding, int output_padding,
-                                          bool use_bias, DType dtype, DeviceType device);
+                                         int stride, int padding, int output_padding, bool use_bias,
+                                         DType dtype, DeviceType device);
 ConvTranspose2d* cml_nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size,
-                                          int stride, int padding, int output_padding,
-                                          bool use_bias, DType dtype, DeviceType device);
+                                         int stride, int padding, int output_padding, bool use_bias,
+                                         DType dtype, DeviceType device);
 ConvTranspose3d* cml_nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size,
-                                          int stride, int padding, int output_padding,
-                                          bool use_bias, DType dtype, DeviceType device);
+                                         int stride, int padding, int output_padding, bool use_bias,
+                                         DType dtype, DeviceType device);
 BatchNorm1d* cml_nn_batchnorm1d(int num_features, float eps, float momentum, bool affine,
-                                 bool track_running_stats, DType dtype, DeviceType device);
+                                bool track_running_stats, DType dtype, DeviceType device);
 BatchNorm2d* cml_nn_batchnorm2d(int num_features, float eps, float momentum, bool affine,
                                 bool track_running_stats, DType dtype, DeviceType device);
 BatchNorm3d* cml_nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,
-                                 bool track_running_stats, DType dtype, DeviceType device);
+                                bool track_running_stats, DType dtype, DeviceType device);
 LayerNorm* cml_nn_layernorm(int normalized_shape, float eps, bool affine, DType dtype,
                             DeviceType device);
 LayerNorm2d* cml_nn_layernorm2d(int num_channels, float eps, bool affine, DType dtype,
-                                 DeviceType device);
+                                DeviceType device);
 InstanceNorm2d* cml_nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
-                                       DeviceType device);
+                                      DeviceType device);
 GroupNorm* cml_nn_groupnorm(int num_groups, int num_channels, float eps, bool affine, DType dtype,
                             DeviceType device);
 Embedding* cml_nn_embedding(int num_embeddings, int embedding_dim, int padding_idx, DType dtype,
@@ -318,21 +320,22 @@ TransformerEncoderLayer* cml_nn_transformer_encoder_layer(int d_model, int nhead
                                                           int dim_feedforward, float dropout,
                                                           DType dtype, DeviceType device);
 TransformerEncoder* cml_nn_transformer_encoder(int d_model, int nhead, int dim_feedforward,
-                                                float dropout, int num_layers,
-                                                DType dtype, DeviceType device);
-TransformerDecoderLayer* cml_nn_transformer_decoder_layer(int d_model, int nhead, int dim_feedforward,
-                                                           float dropout, DType dtype, DeviceType device);
+                                               float dropout, int num_layers, DType dtype,
+                                               DeviceType device);
+TransformerDecoderLayer* cml_nn_transformer_decoder_layer(int d_model, int nhead,
+                                                          int dim_feedforward, float dropout,
+                                                          DType dtype, DeviceType device);
 TransformerDecoder* cml_nn_transformer_decoder(int d_model, int nhead, int dim_feedforward,
-                                                float dropout, int num_layers,
-                                                DType dtype, DeviceType device);
+                                               float dropout, int num_layers, DType dtype,
+                                               DeviceType device);
 
 Upsample* cml_nn_upsample(float scale_factor, const int* output_size, int num_output_dims,
-                           UpsampleMode mode, bool align_corners);
+                          UpsampleMode mode, bool align_corners);
 PixelShuffle* cml_nn_pixel_shuffle(int upscale_factor);
 PixelUnshuffle* cml_nn_pixel_unshuffle(int downscale_factor);
 
-Tensor* cml_f_interpolate(Tensor* input, int* output_size, int num_dims,
-                           UpsampleMode mode, bool align_corners);
+Tensor* cml_f_interpolate(Tensor* input, int* output_size, int num_dims, UpsampleMode mode,
+                          bool align_corners);
 Tensor* cml_f_pixel_shuffle(Tensor* input, int upscale_factor);
 Tensor* cml_f_pixel_unshuffle(Tensor* input, int downscale_factor);
 
@@ -345,19 +348,19 @@ Optimizer* cml_optim_rmsprop(Parameter** parameters, int num_parameters, float l
 Optimizer* cml_optim_adagrad(Parameter** parameters, int num_parameters, float lr,
                              float weight_decay, float eps);
 Optimizer* cml_optim_adamw(Parameter** parameters, int num_parameters, float lr, float weight_decay,
-                            float beta1, float beta2, float epsilon);
-Optimizer* cml_optim_nadam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
-                            float beta1, float beta2, float epsilon);
-Optimizer* cml_optim_adamax(Parameter** parameters, int num_parameters, float lr, float weight_decay,
-                             float beta1, float beta2, float epsilon);
-Optimizer* cml_optim_adadelta(Parameter** parameters, int num_parameters, float rho,
-                               float weight_decay, float epsilon);
-Optimizer* cml_optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                            float beta1, float beta2, float epsilon);
+Optimizer* cml_optim_nadam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                           float beta1, float beta2, float epsilon);
+Optimizer* cml_optim_adamax(Parameter** parameters, int num_parameters, float lr,
+                            float weight_decay, float beta1, float beta2, float epsilon);
+Optimizer* cml_optim_adadelta(Parameter** parameters, int num_parameters, float rho,
+                              float weight_decay, float epsilon);
+Optimizer* cml_optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
+                          float beta1, float beta2, float epsilon);
 Optimizer* cml_optim_lars(Parameter** parameters, int num_parameters, float lr, float momentum,
-                           float weight_decay, float trust_coefficient);
+                          float weight_decay, float trust_coefficient);
 Optimizer* cml_optim_muon(Parameter** parameters, int num_parameters, float lr, float momentum,
-                           float weight_decay, bool nesterov);
+                          float weight_decay, bool nesterov);
 Optimizer* cml_optim_adam_for_model(Module* model, float lr, float weight_decay, float beta1,
                                     float beta2, float eps);
 Optimizer* cml_optim_sgd_for_model(Module* model, float lr, float momentum, float weight_decay);
@@ -365,15 +368,18 @@ void cml_optim_zero_grad(Optimizer* optimizer);
 void cml_optim_step(Optimizer* optimizer);
 
 LRScheduler* cml_lr_scheduler_step(Optimizer* opt, int step_size, float gamma);
-LRScheduler* cml_lr_scheduler_reduce_on_plateau(Optimizer* opt, float factor, int patience, float min_lr);
+LRScheduler* cml_lr_scheduler_reduce_on_plateau(Optimizer* opt, float factor, int patience,
+                                                float min_lr);
 LRScheduler* cml_lr_scheduler_exponential(Optimizer* opt, float gamma);
 LRScheduler* cml_lr_scheduler_cosine(Optimizer* opt, int T_max, float eta_min);
 LRScheduler* cml_lr_scheduler_one_cycle(Optimizer* opt, float max_lr, int total_steps,
-                                         float pct_start, float div_factor, float final_div_factor);
+                                        float pct_start, float div_factor, float final_div_factor);
 LRScheduler* cml_lr_scheduler_multi_step(Optimizer* opt, int* milestones, int num_milestones,
-                                          float gamma);
-LRScheduler* cml_lr_scheduler_polynomial(Optimizer* opt, int total_iters, float power, float min_lr);
-LRScheduler* cml_lr_scheduler_warmup(LRScheduler* inner, int warmup_steps, float warmup_start_factor);
+                                         float gamma);
+LRScheduler* cml_lr_scheduler_polynomial(Optimizer* opt, int total_iters, float power,
+                                         float min_lr);
+LRScheduler* cml_lr_scheduler_warmup(LRScheduler* inner, int warmup_steps,
+                                     float warmup_start_factor);
 float cml_lr_scheduler_update(LRScheduler* scheduler, float metric);
 float cml_lr_scheduler_get_lr(LRScheduler* scheduler);
 void cml_lr_scheduler_free(LRScheduler* scheduler);
@@ -433,16 +439,16 @@ bool cml_autocast_is_enabled(void);
 DType cml_autocast_default_dtype(void);
 void cml_autocast_set_dtype(DType dtype);
 DType cml_autocast_get_dtype(void);
-GradScaler* cml_grad_scaler_create(float init_scale, float growth_factor,
-                                     float backoff_factor, int growth_interval);
+GradScaler* cml_grad_scaler_create(float init_scale, float growth_factor, float backoff_factor,
+                                   int growth_interval);
 void cml_grad_scaler_free(GradScaler* scaler);
 Tensor* cml_grad_scaler_scale(GradScaler* scaler, Tensor* loss);
 void cml_grad_scaler_unscale(GradScaler* scaler, Parameter** params, int num_params);
 void cml_grad_scaler_step(GradScaler* scaler, void (*step_fn)(void*), void* optimizer);
 void cml_grad_scaler_update(GradScaler* scaler);
 
-SparseCOOData* cml_sparse_coo_tensor(Tensor* indices, Tensor* values,
-                                      const int* dense_shape, int dense_ndim);
+SparseCOOData* cml_sparse_coo_tensor(Tensor* indices, Tensor* values, const int* dense_shape,
+                                     int dense_ndim);
 SparseCOOData* cml_sparse_from_dense(Tensor* dense);
 Tensor* cml_sparse_to_dense(SparseCOOData* sparse, const TensorConfig* config);
 Tensor* cml_sparse_matmul(SparseCOOData* sparse, Tensor* dense);

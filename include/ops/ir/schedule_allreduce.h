@@ -4,7 +4,7 @@
 #define CML_OPS_IR_SCHEDULE_ALLREDUCE_H
 
 #include "ops/ir/schedule.h"
-#include "ops/uops.h"    
+#include "ops/uops.h"
 #include <stddef.h>
 #include <stdbool.h>
 
@@ -20,45 +20,42 @@ typedef enum {
 } AllReduceOp;
 
 typedef enum {
-    AR_ALGO_RING              = 0,  
+    AR_ALGO_RING = 0,
     AR_ALGO_TREE,
     AR_ALGO_FLAT,
     AR_ALGO_RECURSIVE_HALVING,
-    AR_ALGO_AUTO,               
+    AR_ALGO_AUTO,
 } AllReduceAlgo;
 
 typedef struct AllReduceStep {
-    int     src_rank;
-    int     dst_rank;
-    size_t  chunk_offset;   
-    size_t  chunk_bytes;
-    bool    is_reduce;      
+    int src_rank;
+    int dst_rank;
+    size_t chunk_offset;
+    size_t chunk_bytes;
+    bool is_reduce;
 } AllReduceStep;
 
 typedef struct ScheduleAllReduce {
-    Tensor*           input;
-    Tensor*           output;         
-    AllReduceOp       op;
-    AllReduceAlgo     algo;
+    Tensor* input;
+    Tensor* output;
+    AllReduceOp op;
+    AllReduceAlgo algo;
 
-    int*              device_ids;     
-    int               num_devices;
+    int* device_ids;
+    int num_devices;
 
-    AllReduceStep*    steps;         
-    int               num_steps;
+    AllReduceStep* steps;
+    int num_steps;
 
     CMLScheduleItem** overlap_kernels;
-    int               num_overlap_kernels;
+    int num_overlap_kernels;
 
-    size_t            buffer_bytes;   
-    int               chunk_count;   
+    size_t buffer_bytes;
+    int chunk_count;
 } ScheduleAllReduce;
 
-ScheduleAllReduce* schedule_allreduce_build(Tensor* t,
-                                            AllReduceOp op,
-                                            AllReduceAlgo algo,
-                                            const int* device_ids,
-                                            int num_devices);
+ScheduleAllReduce* schedule_allreduce_build(Tensor* t, AllReduceOp op, AllReduceAlgo algo,
+                                            const int* device_ids, int num_devices);
 
 void schedule_allreduce_free(ScheduleAllReduce* ar);
 
@@ -68,8 +65,7 @@ int schedule_allreduce_inject(CMLSchedule* sched, ScheduleAllReduce* ar);
 
 size_t schedule_allreduce_comm_bytes(const ScheduleAllReduce* ar);
 
-double schedule_allreduce_latency_us(const ScheduleAllReduce* ar,
-                                     double bandwidth_gbps,
+double schedule_allreduce_latency_us(const ScheduleAllReduce* ar, double bandwidth_gbps,
                                      double latency_us);
 
 void schedule_allreduce_print(const ScheduleAllReduce* ar);
@@ -78,4 +74,4 @@ void schedule_allreduce_print(const ScheduleAllReduce* ar);
 }
 #endif
 
-#endif 
+#endif

@@ -35,42 +35,48 @@
 typedef void (*kernel_fn_t)(void);
 
 typedef struct {
-    uint64_t     key;   /* 0 == empty slot */
-    kernel_fn_t  fn;
+    uint64_t key; /* 0 == empty slot */
+    kernel_fn_t fn;
 } KernelCacheSlot;
 
 struct CMLLLVMBackend {
-    LLVMOrcLLJITRef     jit;          /* persistent; lives until destroy    */
+    LLVMOrcLLJITRef jit; /* persistent; lives until destroy    */
     LLVMTargetMachineRef tm;
     /* No shared ctx: each kernel gets its own LLVMContextCreate() so the
      * context lifetime is tied to the ORC TSC/TSM, not to the backend.
      * LLVMOrcCreateNewThreadSafeContextFromLLVMContext transfers ownership,
      * so a shared backend->ctx would become dangling after the first kernel. */
-    bool                 initialized;
-    int                  kernel_count; /* for unique symbol names            */
-    KernelCacheSlot      op_cache[OP_CACHE_SIZE]; /* keyed by shape signature */
+    bool initialized;
+    int kernel_count;                        /* for unique symbol names            */
+    KernelCacheSlot op_cache[OP_CACHE_SIZE]; /* keyed by shape signature */
 };
 
 /* FNV-1a over (type, up to four shape dims). key 0 is reserved for "empty". */
-static uint64_t shape_key(UOpType type, int64_t a, int64_t b,
-                          int64_t c, int64_t d) {
-    uint64_t h = 1469598103934665603ULL;
-    uint64_t v[5] = { (uint64_t)type, (uint64_t)a, (uint64_t)b,
-                      (uint64_t)c, (uint64_t)d };
-    for (int i = 0; i < 5; i++) { h ^= v[i]; h *= 1099511628211ULL; }
+static uint64_t shape_key(UOpType type, int64_t a, int64_t b, int64_t c, int64_t d) {
+    uint64_t h    = 1469598103934665603ULL;
+    uint64_t v[5] = {(uint64_t)type, (uint64_t)a, (uint64_t)b, (uint64_t)c, (uint64_t)d};
+    for (int i = 0; i < 5; i++) {
+        h ^= v[i];
+        h *= 1099511628211ULL;
+    }
     return h ? h : 1;
 }
 
 /* Find the cached fn for key, or the slot index to insert into.
  * Returns the fn (non-NULL) on hit; on miss returns NULL and sets *slot to the
  * slot to populate (an empty slot within the probe window, else evict home). */
-static kernel_fn_t cache_lookup(struct CMLLLVMBackend* b, uint64_t key,
-                                unsigned* slot) {
+static kernel_fn_t cache_lookup(struct CMLLLVMBackend* b, uint64_t key, unsigned* slot) {
     unsigned home = (unsigned)(key % OP_CACHE_SIZE);
     for (unsigned p = 0; p < OP_CACHE_PROBE; p++) {
         unsigned idx = (home + p) % OP_CACHE_SIZE;
-        if (b->op_cache[idx].key == key) { *slot = idx; return b->op_cache[idx].fn; }
-        if (b->op_cache[idx].key == 0)   { *slot = idx; return NULL; }
+        if (b->op_cache[idx].key == key) {
+            *slot = idx;
+            return b->op_cache[idx].fn;
+        }
+        if (b->op_cache[idx].key == 0) {
+            *slot = idx;
+            return NULL;
+        }
     }
     *slot = home; /* window full: evict the home slot (JIT'd code stays owned by ORC) */
     return NULL;
@@ -91,7 +97,8 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
     }
 
     CMLLLVMBackend* b = cml_calloc(1, sizeof(CMLLLVMBackend));
-    if (!b) return NULL;
+    if (!b)
+        return NULL;
 
     char* triple = LLVMGetDefaultTargetTriple();
     LLVMTargetRef target;
@@ -107,9 +114,8 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
     /* Use native CPU so LLVM emits AVX2/AVX-512/NEON/SVE as available. */
     char* cpu      = LLVMGetHostCPUName();
     char* features = LLVMGetHostCPUFeatures();
-    b->tm = LLVMCreateTargetMachine(
-        target, triple, cpu, features,
-        LLVMCodeGenLevelAggressive, LLVMRelocDefault, LLVMCodeModelDefault);
+    b->tm = LLVMCreateTargetMachine(target, triple, cpu, features, LLVMCodeGenLevelAggressive,
+                                    LLVMRelocDefault, LLVMCodeModelDefault);
     LLVMDisposeMessage(cpu);
     LLVMDisposeMessage(features);
     LLVMDisposeMessage(triple);
@@ -137,9 +143,12 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
 }
 
 void cml_llvm_backend_destroy(CMLLLVMBackend* backend) {
-    if (!backend) return;
-    if (backend->jit)  LLVMOrcDisposeLLJIT(backend->jit);
-    if (backend->tm)   LLVMDisposeTargetMachine(backend->tm);
+    if (!backend)
+        return;
+    if (backend->jit)
+        LLVMOrcDisposeLLJIT(backend->jit);
+    if (backend->tm)
+        LLVMDisposeTargetMachine(backend->tm);
     cml_free(backend);
 }
 
@@ -150,7 +159,8 @@ void cml_llvm_backend_destroy(CMLLLVMBackend* backend) {
 /* Add noalias to the first n_ptrs pointer parameters (0-indexed). */
 static void add_noalias(LLVMContextRef ctx, LLVMValueRef fn, unsigned n_ptrs) {
     unsigned kind = LLVMGetEnumAttributeKindForName("noalias", 7);
-    if (!kind) return; /* older LLVM that doesn't support it */
+    if (!kind)
+        return; /* older LLVM that doesn't support it */
     for (unsigned i = 0; i < n_ptrs; i++) {
         LLVMAttributeRef a = LLVMCreateEnumAttribute(ctx, kind, 0);
         LLVMAddAttributeAtIndex(fn, i + 1 /* 1-indexed */, a);
@@ -162,8 +172,8 @@ static void add_noalias(LLVMContextRef ctx, LLVMValueRef fn, unsigned n_ptrs) {
  * ---------------------------------------------------------------------- */
 
 typedef struct {
-    LLVMValueRef      i;      /* phi (induction variable)   */
-    LLVMValueRef      start;  /* loop start value (for close_loop incoming) */
+    LLVMValueRef i;     /* phi (induction variable)   */
+    LLVMValueRef start; /* loop start value (for close_loop incoming) */
     LLVMBasicBlockRef body;
     LLVMBasicBlockRef exit;
     LLVMBasicBlockRef header;
@@ -172,16 +182,15 @@ typedef struct {
 /* Emit a counted loop with i in [start, end).  For threaded kernels start is a
  * runtime parameter (= chunk offset), so bcast_index(i, ...) sees the global
  * element index and the modulo broadcast is correct even when chunked. */
-static LoopInfo emit_loop(LLVMBuilderRef bld, LLVMContextRef ctx,
-                          LLVMValueRef fn, LLVMValueRef start,
-                          LLVMValueRef end, const char* name) {
+static LoopInfo emit_loop(LLVMBuilderRef bld, LLVMContextRef ctx, LLVMValueRef fn,
+                          LLVMValueRef start, LLVMValueRef end, const char* name) {
     LoopInfo info;
     LLVMTypeRef i64 = LLVMInt64TypeInContext(ctx);
 
     char h[64], body[64], ex[64];
-    snprintf(h,    sizeof(h),    "%s.hdr",  name);
+    snprintf(h, sizeof(h), "%s.hdr", name);
     snprintf(body, sizeof(body), "%s.body", name);
-    snprintf(ex,   sizeof(ex),   "%s.exit", name);
+    snprintf(ex, sizeof(ex), "%s.exit", name);
 
     info.header = LLVMAppendBasicBlockInContext(ctx, fn, h);
     info.body   = LLVMAppendBasicBlockInContext(ctx, fn, body);
@@ -191,7 +200,7 @@ static LoopInfo emit_loop(LLVMBuilderRef bld, LLVMContextRef ctx,
     LLVMBuildBr(bld, info.header);
 
     LLVMPositionBuilderAtEnd(bld, info.header);
-    info.i = LLVMBuildPhi(bld, i64, "i");
+    info.i            = LLVMBuildPhi(bld, i64, "i");
     LLVMValueRef cond = LLVMBuildICmp(bld, LLVMIntULT, info.i, end, "cond");
     LLVMBuildCondBr(bld, cond, info.body, info.exit);
 
@@ -199,41 +208,44 @@ static LoopInfo emit_loop(LLVMBuilderRef bld, LLVMContextRef ctx,
     return info;
 }
 
-static void close_loop(LLVMBuilderRef bld, LoopInfo* info,
-                       LLVMBasicBlockRef entry_bb) {
-    LLVMTypeRef i64  = LLVMInt64TypeInContext(LLVMGetTypeContext(LLVMTypeOf(info->i)));
-    LLVMValueRef one = LLVMConstInt(i64, 1, 0);
+static void close_loop(LLVMBuilderRef bld, LoopInfo* info, LLVMBasicBlockRef entry_bb) {
+    LLVMTypeRef i64     = LLVMInt64TypeInContext(LLVMGetTypeContext(LLVMTypeOf(info->i)));
+    LLVMValueRef one    = LLVMConstInt(i64, 1, 0);
     LLVMValueRef i_next = LLVMBuildAdd(bld, info->i, one, "i.next");
     LLVMBuildBr(bld, info->header);
 
-    LLVMValueRef in_vals[] = { info->start, i_next };
-    LLVMBasicBlockRef in_bbs[] = { entry_bb, info->body };
+    LLVMValueRef in_vals[]     = {info->start, i_next};
+    LLVMBasicBlockRef in_bbs[] = {entry_bb, info->body};
     LLVMAddIncoming(info->i, in_vals, in_bbs, 2);
 }
 
 /* Element LLVM type for a tensor dtype the JIT emits kernels for (f32/f64/int). */
 static LLVMTypeRef elem_type(LLVMContextRef ctx, DType dt) {
     switch (dt) {
-    case DTYPE_FLOAT64: return LLVMDoubleTypeInContext(ctx);
-    case DTYPE_INT64:   return LLVMInt64TypeInContext(ctx);
-    case DTYPE_INT32:   return LLVMInt32TypeInContext(ctx);
-    default:            return LLVMFloatTypeInContext(ctx);
+    case DTYPE_FLOAT64:
+        return LLVMDoubleTypeInContext(ctx);
+    case DTYPE_INT64:
+        return LLVMInt64TypeInContext(ctx);
+    case DTYPE_INT32:
+        return LLVMInt32TypeInContext(ctx);
+    default:
+        return LLVMFloatTypeInContext(ctx);
     }
 }
-static int dtype_is_int_jit(DType dt) {
-    return dt == DTYPE_INT32 || dt == DTYPE_INT64;
-}
+static int dtype_is_int_jit(DType dt) { return dt == DTYPE_INT32 || dt == DTYPE_INT64; }
 
 /* Resolve an input's element index at loop position i for a shape known at
  * codegen time.  Broadcasting collapses to a constant here: in_n == out_n is a
  * straight index (no arithmetic), in_n == 1 is a constant-0 splat, and only the
  * genuinely-broadcast case emits a urem.  This is what lets LLVM vectorize the
  * common contiguous/scalar cases with no runtime broadcast branch. */
-static LLVMValueRef bcast_index(LLVMBuilderRef bld, LLVMContextRef ctx,
-                                LLVMValueRef i, int64_t in_n, int64_t out_n) {
+static LLVMValueRef bcast_index(LLVMBuilderRef bld, LLVMContextRef ctx, LLVMValueRef i,
+                                int64_t in_n, int64_t out_n) {
     LLVMTypeRef i64 = LLVMInt64TypeInContext(ctx);
-    if (in_n == out_n || in_n <= 0) return i;
-    if (in_n == 1) return LLVMConstInt(i64, 0, 0);
+    if (in_n == out_n || in_n <= 0)
+        return i;
+    if (in_n == 1)
+        return LLVMConstInt(i64, 0, 0);
     return LLVMBuildURem(bld, i, LLVMConstInt(i64, (unsigned long long)in_n, 0), "bidx");
 }
 
@@ -248,11 +260,15 @@ static LLVMValueRef bcast_index(LLVMBuilderRef bld, LLVMContextRef ctx,
  * -- the shape at the centre of layernorm and softmax -- silently mixed rows.
  * Those nodes go to the interpreter, whose _broadcast_idx is shape-aware. */
 static bool jit_bcast_is_exact(const Tensor* in, const Tensor* out) {
-    if (!in || !out) return false;
-    if (in->numel == out->numel || in->numel == 1) return true;
-    if (in->ndim > out->ndim) return false;
+    if (!in || !out)
+        return false;
+    if (in->numel == out->numel || in->numel == 1)
+        return true;
+    if (in->ndim > out->ndim)
+        return false;
     for (int k = 1; k <= in->ndim; k++) {
-        if (in->shape[in->ndim - k] != out->shape[out->ndim - k]) return false;
+        if (in->shape[in->ndim - k] != out->shape[out->ndim - k])
+            return false;
     }
     return true;
 }
@@ -261,12 +277,10 @@ static bool jit_bcast_is_exact(const Tensor* in, const Tensor* out) {
  * Intrinsic helpers
  * ---------------------------------------------------------------------- */
 
-#define INTR1(mod, name, name_len, f32) \
-    LLVMGetIntrinsicDeclaration(mod, LLVMLookupIntrinsicID(name, name_len), \
-                                (LLVMTypeRef[]){f32}, 1)
+#define INTR1(mod, name, name_len, f32)                                                            \
+    LLVMGetIntrinsicDeclaration(mod, LLVMLookupIntrinsicID(name, name_len), (LLVMTypeRef[]){f32}, 1)
 
-static LLVMValueRef call1(LLVMBuilderRef bld, LLVMTypeRef f32,
-                          LLVMValueRef intr, LLVMValueRef arg,
+static LLVMValueRef call1(LLVMBuilderRef bld, LLVMTypeRef f32, LLVMValueRef intr, LLVMValueRef arg,
                           const char* res) {
     LLVMTypeRef ft = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
     return LLVMBuildCall2(bld, ft, intr, (LLVMValueRef[]){arg}, 1, res);
@@ -278,17 +292,17 @@ static LLVMValueRef call1(LLVMBuilderRef bld, LLVMTypeRef f32,
  * the argument as double is an ABI mismatch -- the callee reads a garbage float
  * and the caller reads a garbage double back, which is how f64 erf/asin/acos/
  * atan returned zeros. `base` is the double-precision name. */
-static LLVMValueRef extern_libm(LLVMModuleRef mod, LLVMContextRef ctx,
-                                const char* base, DType dt) {
+static LLVMValueRef extern_libm(LLVMModuleRef mod, LLVMContextRef ctx, const char* base, DType dt) {
     char name[32];
-    int  is_f32 = (dt != DTYPE_FLOAT64);
+    int is_f32 = (dt != DTYPE_FLOAT64);
     snprintf(name, sizeof(name), "%s%s", base, is_f32 ? "f" : "");
 
     LLVMValueRef fn = LLVMGetNamedFunction(mod, name);
-    if (fn) return fn;
+    if (fn)
+        return fn;
     LLVMTypeRef ety = is_f32 ? LLVMFloatTypeInContext(ctx) : LLVMDoubleTypeInContext(ctx);
     LLVMTypeRef ft  = LLVMFunctionType(ety, (LLVMTypeRef[]){ety}, 1, 0);
-    fn = LLVMAddFunction(mod, name, ft);
+    fn              = LLVMAddFunction(mod, name, ft);
     LLVMSetLinkage(fn, LLVMExternalLinkage);
     return fn;
 }
@@ -300,11 +314,11 @@ static LLVMValueRef extern_libm(LLVMModuleRef mod, LLVMContextRef ctx,
  * Signature: void(ptr in0, ptr in1, ptr out, i64, i64, i64) — the three size
  * params are retained for ABI stability but unused (the shapes are constants).
  * ---------------------------------------------------------------------- */
-static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
-                                     const char* fn_name, int64_t out_numel,
-                                     int64_t in0_numel, int64_t in1_numel, DType dt) {
+static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type, const char* fn_name,
+                                     int64_t out_numel, int64_t in0_numel, int64_t in1_numel,
+                                     DType dt) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
-    LLVMTypeRef f32    = elem_type(ctx, dt);  /* element type (f32 or f64) */
+    LLVMTypeRef f32    = elem_type(ctx, dt); /* element type (f32 or f64) */
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
@@ -312,7 +326,7 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
     /* start/end are runtime parameters for threaded dispatch: the loop iterates
      * i in [start, end) and writes to out[i - start].  bcast_index uses i
      * directly, so the modulo broadcast is correct even when chunked. */
-    LLVMTypeRef params[] = { ptr, ptr, ptr, i64, i64, i64, i64, i64 };
+    LLVMTypeRef params[] = {ptr, ptr, ptr, i64, i64, i64, i64, i64};
     LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 8, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 3); /* in0, in1, out are noalias */
@@ -324,7 +338,7 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
     LLVMValueRef end   = LLVMGetParam(fn, 7);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
-    LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
+    LLVMBuilderRef bld      = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
     LoopInfo loop = emit_loop(bld, ctx, fn, start, end, "elem");
@@ -342,21 +356,27 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
         /* Integer arithmetic (i32/i64). Only add/sub/mul/div/max are routed to
          * the JIT for integer dtypes (see the dispatch guard). */
         switch (type) {
-        case UOP_ADD: result = LLVMBuildAdd(bld, v0, v1, "r"); break;
-        case UOP_SUB: result = LLVMBuildSub(bld, v0, v1, "r"); break;
-        case UOP_MUL: result = LLVMBuildMul(bld, v0, v1, "r"); break;
+        case UOP_ADD:
+            result = LLVMBuildAdd(bld, v0, v1, "r");
+            break;
+        case UOP_SUB:
+            result = LLVMBuildSub(bld, v0, v1, "r");
+            break;
+        case UOP_MUL:
+            result = LLVMBuildMul(bld, v0, v1, "r");
+            break;
         case UOP_DIV: {
             /* guard divide-by-zero: y==0 ? 0 : x/y (matches interpreter) */
             LLVMValueRef zero = LLVMConstInt(f32, 0, 0);
             LLVMValueRef isz  = LLVMBuildICmp(bld, LLVMIntEQ, v1, zero, "isz");
             LLVMValueRef safe = LLVMBuildSelect(bld, isz, LLVMConstInt(f32, 1, 0), v1, "safe");
             LLVMValueRef q    = LLVMBuildSDiv(bld, v0, safe, "q");
-            result = LLVMBuildSelect(bld, isz, zero, q, "r");
+            result            = LLVMBuildSelect(bld, isz, zero, q, "r");
             break;
         }
         case UOP_MAX: {
             LLVMValueRef cmp = LLVMBuildICmp(bld, LLVMIntSGT, v0, v1, "gt");
-            result = LLVMBuildSelect(bld, cmp, v0, v1, "r");
+            result           = LLVMBuildSelect(bld, cmp, v0, v1, "r");
             break;
         }
         default:
@@ -367,39 +387,45 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
             return NULL;
         }
     } else
-    switch (type) {
-    case UOP_ADD:  result = LLVMBuildFAdd(bld, v0, v1, "r"); break;
-    case UOP_SUB:  result = LLVMBuildFSub(bld, v0, v1, "r"); break;
-    case UOP_MUL:  result = LLVMBuildFMul(bld, v0, v1, "r"); break;
-    case UOP_DIV:
-        result = LLVMBuildFDiv(bld, v0, v1, "r");   /* IEEE: /0 = inf */
-        break;
-    case UOP_MAX: {
-        /* NaN propagates (torch.maximum), so an ordered select is not enough:
-         * v0+v1 is NaN whenever either operand is. */
-        LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOGT, v0, v1, "gt");
-        LLVMValueRef m   = LLVMBuildSelect(bld, cmp, v0, v1, "m");
-        LLVMValueRef uno = LLVMBuildFCmp(bld, LLVMRealUNO, v0, v1, "uno");
-        LLVMValueRef sum = LLVMBuildFAdd(bld, v0, v1, "nanprop");
-        result = LLVMBuildSelect(bld, uno, sum, m, "r");
-        break;
-    }
-    case UOP_CMPLT: {
-        LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOLT, v0, v1, "lt");
-        result = LLVMBuildUIToFP(bld, cmp, f32, "r");
-        break;
-    }
-    case UOP_POW: {
-        LLVMValueRef pow_fn = INTR1(mod, "llvm.pow", 8, f32);
-        LLVMTypeRef  ft     = LLVMFunctionType(f32, (LLVMTypeRef[]){f32,f32}, 2, 0);
-        result = LLVMBuildCall2(bld, ft, pow_fn, (LLVMValueRef[]){v0,v1}, 2, "r");
-        break;
-    }
-    default:
-        LLVMDisposeBuilder(bld);
-        LLVMDisposeModule(mod);
-        return NULL;
-    }
+        switch (type) {
+        case UOP_ADD:
+            result = LLVMBuildFAdd(bld, v0, v1, "r");
+            break;
+        case UOP_SUB:
+            result = LLVMBuildFSub(bld, v0, v1, "r");
+            break;
+        case UOP_MUL:
+            result = LLVMBuildFMul(bld, v0, v1, "r");
+            break;
+        case UOP_DIV:
+            result = LLVMBuildFDiv(bld, v0, v1, "r"); /* IEEE: /0 = inf */
+            break;
+        case UOP_MAX: {
+            /* NaN propagates (torch.maximum), so an ordered select is not enough:
+             * v0+v1 is NaN whenever either operand is. */
+            LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOGT, v0, v1, "gt");
+            LLVMValueRef m   = LLVMBuildSelect(bld, cmp, v0, v1, "m");
+            LLVMValueRef uno = LLVMBuildFCmp(bld, LLVMRealUNO, v0, v1, "uno");
+            LLVMValueRef sum = LLVMBuildFAdd(bld, v0, v1, "nanprop");
+            result           = LLVMBuildSelect(bld, uno, sum, m, "r");
+            break;
+        }
+        case UOP_CMPLT: {
+            LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOLT, v0, v1, "lt");
+            result           = LLVMBuildUIToFP(bld, cmp, f32, "r");
+            break;
+        }
+        case UOP_POW: {
+            LLVMValueRef pow_fn = INTR1(mod, "llvm.pow", 8, f32);
+            LLVMTypeRef ft      = LLVMFunctionType(f32, (LLVMTypeRef[]){f32, f32}, 2, 0);
+            result              = LLVMBuildCall2(bld, ft, pow_fn, (LLVMValueRef[]){v0, v1}, 2, "r");
+            break;
+        }
+        default:
+            LLVMDisposeBuilder(bld);
+            LLVMDisposeModule(mod);
+            return NULL;
+        }
 
     /* out[i - start]: the chunk-local index for output storage */
     LLVMValueRef rel_idx = LLVMBuildSub(bld, loop.i, start, "rel");
@@ -417,16 +443,15 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type,
  * Unary elementwise: out[i] = op(in[i%n_in])
  * Signature: void(ptr in, ptr out, i64 out_n, i64 in_n)
  * ---------------------------------------------------------------------- */
-static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
-                                    const char* fn_name, int64_t out_numel,
-                                    int64_t in_numel, DType dt) {
+static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type, const char* fn_name,
+                                    int64_t out_numel, int64_t in_numel, DType dt) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
-    LLVMTypeRef f32    = elem_type(ctx, dt);  /* element type (f32 or f64) */
+    LLVMTypeRef f32    = elem_type(ctx, dt); /* element type (f32 or f64) */
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr, ptr, i64, i64, i64, i64 };
+    LLVMTypeRef params[] = {ptr, ptr, i64, i64, i64, i64};
     LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 6, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 2); /* in, out are noalias */
@@ -437,7 +462,7 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
     LLVMValueRef end   = LLVMGetParam(fn, 5);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
-    LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
+    LLVMBuilderRef bld      = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
     LoopInfo loop = emit_loop(bld, ctx, fn, start, end, "elem");
@@ -451,12 +476,16 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         /* Integer unary (i32/i64): only neg/abs/square are routed here. */
         LLVMValueRef zero = LLVMConstInt(f32, 0, 0);
         switch (type) {
-        case UOP_NEG:    result = LLVMBuildSub(bld, zero, val, "r"); break;
-        case UOP_SQUARE: result = LLVMBuildMul(bld, val, val, "r"); break;
+        case UOP_NEG:
+            result = LLVMBuildSub(bld, zero, val, "r");
+            break;
+        case UOP_SQUARE:
+            result = LLVMBuildMul(bld, val, val, "r");
+            break;
         case UOP_ABS: {
             LLVMValueRef neg = LLVMBuildSub(bld, zero, val, "neg");
             LLVMValueRef isn = LLVMBuildICmp(bld, LLVMIntSLT, val, zero, "isn");
-            result = LLVMBuildSelect(bld, isn, neg, val, "r");
+            result           = LLVMBuildSelect(bld, isn, neg, val, "r");
             break;
         }
         default:
@@ -484,8 +513,8 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         break;
 
     case UOP_RSQRT: {
-        LLVMValueRef sq  = call1(bld, f32, INTR1(mod, "llvm.sqrt", 9, f32), val, "sq");
-        result = LLVMBuildFDiv(bld, one_f, sq, "r");
+        LLVMValueRef sq = call1(bld, f32, INTR1(mod, "llvm.sqrt", 9, f32), val, "sq");
+        result          = LLVMBuildFDiv(bld, one_f, sq, "r");
         break;
     }
 
@@ -518,37 +547,37 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         break;
 
     case UOP_TAN: {
-        LLVMValueRef s  = call1(bld, f32, INTR1(mod, "llvm.sin", 8, f32), val, "s");
-        LLVMValueRef c  = call1(bld, f32, INTR1(mod, "llvm.cos", 8, f32), val, "c");
-        result = LLVMBuildFDiv(bld, s, c, "r");
+        LLVMValueRef s = call1(bld, f32, INTR1(mod, "llvm.sin", 8, f32), val, "s");
+        LLVMValueRef c = call1(bld, f32, INTR1(mod, "llvm.cos", 8, f32), val, "c");
+        result         = LLVMBuildFDiv(bld, s, c, "r");
         break;
     }
 
     case UOP_ASIN: {
         LLVMValueRef f = extern_libm(mod, ctx, "asin", dt);
-        LLVMTypeRef  t = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
-        result = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
+        LLVMTypeRef t  = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
+        result         = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
         break;
     }
 
     case UOP_ACOS: {
         LLVMValueRef f = extern_libm(mod, ctx, "acos", dt);
-        LLVMTypeRef  t = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
-        result = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
+        LLVMTypeRef t  = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
+        result         = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
         break;
     }
 
     case UOP_ATAN: {
         LLVMValueRef f = extern_libm(mod, ctx, "atan", dt);
-        LLVMTypeRef  t = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
-        result = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
+        LLVMTypeRef t  = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
+        result         = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
         break;
     }
 
     case UOP_ERF: {
         LLVMValueRef f = extern_libm(mod, ctx, "erf", dt);
-        LLVMTypeRef  t = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
-        result = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
+        LLVMTypeRef t  = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
+        result         = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
         break;
     }
 
@@ -572,12 +601,12 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         LLVMValueRef lt = LLVMBuildFCmp(bld, LLVMRealOLT, val, zero_f, "lt");
         LLVMValueRef gf = LLVMBuildUIToFP(bld, gt, f32, "gf");
         LLVMValueRef lf = LLVMBuildUIToFP(bld, lt, f32, "lf");
-        result = LLVMBuildFSub(bld, gf, lf, "r");
+        result          = LLVMBuildFSub(bld, gf, lf, "r");
         break;
     }
 
     case UOP_RECIP: {
-        result = LLVMBuildFDiv(bld, one_f, val, "r");   /* IEEE: 1/0 = inf */
+        result = LLVMBuildFDiv(bld, one_f, val, "r"); /* IEEE: 1/0 = inf */
         break;
     }
 
@@ -587,7 +616,7 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
          * is how a diverged tensor turns back into zeros. Identical for every
          * finite value and still lowers to vmaxps-class code. */
         LLVMValueRef cmp = LLVMBuildFCmp(bld, LLVMRealOLT, val, zero_f, "lt");
-        result = LLVMBuildSelect(bld, cmp, zero_f, val, "r");
+        result           = LLVMBuildSelect(bld, cmp, zero_f, val, "r");
         break;
     }
 
@@ -599,16 +628,16 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
         LLVMValueRef c6  = LLVMBuildSelect(bld, l6, cl, six, "c6");
         /* NaN survived the lower clamp above but would be pinned to 6 here. */
         LLVMValueRef uno = LLVMBuildFCmp(bld, LLVMRealUNO, val, val, "isnan");
-        result = LLVMBuildSelect(bld, uno, val, c6, "r");
+        result           = LLVMBuildSelect(bld, uno, val, c6, "r");
         break;
     }
 
     case UOP_SIGMOID: {
         /* 1 / (1 + exp(-x)) */
-        LLVMValueRef neg  = LLVMBuildFNeg(bld, val, "nx");
-        LLVMValueRef e    = call1(bld, f32, INTR1(mod, "llvm.exp", 8, f32), neg, "e");
-        LLVMValueRef denom= LLVMBuildFAdd(bld, one_f, e, "d");
-        result = LLVMBuildFDiv(bld, one_f, denom, "r");
+        LLVMValueRef neg   = LLVMBuildFNeg(bld, val, "nx");
+        LLVMValueRef e     = call1(bld, f32, INTR1(mod, "llvm.exp", 8, f32), neg, "e");
+        LLVMValueRef denom = LLVMBuildFAdd(bld, one_f, e, "d");
+        result             = LLVMBuildFDiv(bld, one_f, denom, "r");
         break;
     }
 
@@ -622,30 +651,30 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type,
          * denormals. Calling the same function the interpreter does keeps the
          * two paths bit-comparable. */
         LLVMValueRef f = extern_libm(mod, ctx, "tanh", dt);
-        LLVMTypeRef  t = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
-        result = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
+        LLVMTypeRef t  = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
+        result         = LLVMBuildCall2(bld, t, f, (LLVMValueRef[]){val}, 1, "r");
         break;
     }
 
     case UOP_SILU: {
         /* x * sigmoid(x) */
-        LLVMValueRef neg  = LLVMBuildFNeg(bld, val, "nx");
-        LLVMValueRef e    = call1(bld, f32, INTR1(mod, "llvm.exp", 8, f32), neg, "e");
-        LLVMValueRef denom= LLVMBuildFAdd(bld, one_f, e, "d");
-        LLVMValueRef sig  = LLVMBuildFDiv(bld, one_f, denom, "sig");
-        result = LLVMBuildFMul(bld, val, sig, "r");
+        LLVMValueRef neg   = LLVMBuildFNeg(bld, val, "nx");
+        LLVMValueRef e     = call1(bld, f32, INTR1(mod, "llvm.exp", 8, f32), neg, "e");
+        LLVMValueRef denom = LLVMBuildFAdd(bld, one_f, e, "d");
+        LLVMValueRef sig   = LLVMBuildFDiv(bld, one_f, denom, "sig");
+        result             = LLVMBuildFMul(bld, val, sig, "r");
         break;
     }
 
     case UOP_QUICK_GELU: {
         /* QuickGELU: x * sigmoid(1.702 * x) */
-        LLVMValueRef c    = LLVMConstReal(f32, 1.702f);
-        LLVMValueRef cx   = LLVMBuildFMul(bld, c, val, "cx");
-        LLVMValueRef neg  = LLVMBuildFNeg(bld, cx, "ncx");
-        LLVMValueRef e    = call1(bld, f32, INTR1(mod, "llvm.exp", 8, f32), neg, "e");
-        LLVMValueRef denom= LLVMBuildFAdd(bld, one_f, e, "d");
-        LLVMValueRef sig  = LLVMBuildFDiv(bld, one_f, denom, "sig");
-        result = LLVMBuildFMul(bld, val, sig, "r");
+        LLVMValueRef c     = LLVMConstReal(f32, 1.702f);
+        LLVMValueRef cx    = LLVMBuildFMul(bld, c, val, "cx");
+        LLVMValueRef neg   = LLVMBuildFNeg(bld, cx, "ncx");
+        LLVMValueRef e     = call1(bld, f32, INTR1(mod, "llvm.exp", 8, f32), neg, "e");
+        LLVMValueRef denom = LLVMBuildFAdd(bld, one_f, e, "d");
+        LLVMValueRef sig   = LLVMBuildFDiv(bld, one_f, denom, "sig");
+        result             = LLVMBuildFMul(bld, val, sig, "r");
         break;
     }
 
@@ -693,7 +722,7 @@ static LLVMKernel begin_unary_kernel(LLVMContextRef ctx, const char* fn_name) {
     k.i64    = LLVMInt64TypeInContext(ctx);
     k.void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { k.ptr, k.ptr, k.i64 };
+    LLVMTypeRef params[] = {k.ptr, k.ptr, k.i64};
     k.fn = LLVMAddFunction(k.mod, fn_name, LLVMFunctionType(k.void_t, params, 3, 0));
     add_noalias(ctx, k.fn, 2);
 
@@ -702,9 +731,9 @@ static LLVMKernel begin_unary_kernel(LLVMContextRef ctx, const char* fn_name) {
     return k;
 }
 
-static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
-                                     const char* fn_name, int64_t n_elems) {
-    LLVMKernel k = begin_unary_kernel(ctx, fn_name);
+static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type, const char* fn_name,
+                                     int64_t n_elems) {
+    LLVMKernel k       = begin_unary_kernel(ctx, fn_name);
     LLVMModuleRef mod  = k.mod;
     LLVMTypeRef f32    = k.f32;
     LLVMTypeRef ptr    = k.ptr;
@@ -713,8 +742,9 @@ static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
     LLVMValueRef fn    = k.fn;
     LLVMValueRef in_p  = k.in_p;
     LLVMValueRef out_p = k.out_p;
-    (void)ptr; (void)void_t;
-    LLVMValueRef n     = LLVMConstInt(i64, (unsigned long long)n_elems, 0);
+    (void)ptr;
+    (void)void_t;
+    LLVMValueRef n = LLVMConstInt(i64, (unsigned long long)n_elems, 0);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
     LLVMBasicBlockRef loop  = LLVMAppendBasicBlockInContext(ctx, fn, "loop");
@@ -725,7 +755,7 @@ static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
     LLVMValueRef zero_i64 = LLVMConstInt(i64, 0, 0);
     LLVMValueRef one_i64  = LLVMConstInt(i64, 1, 0);
 
-    float init_val = (type == UOP_MAX_REDUCE) ? -3.402823466e+38f : 0.0f;
+    float init_val    = (type == UOP_MAX_REDUCE) ? -3.402823466e+38f : 0.0f;
     LLVMValueRef init = LLVMConstReal(f32, (double)init_val);
 
     LLVMPositionBuilderAtEnd(bld, entry);
@@ -747,7 +777,7 @@ static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
          * skipped and the reduction would report the largest finite value. */
         LLVMValueRef uno = LLVMBuildFCmp(bld, LLVMRealUNO, val, acc, "uno");
         LLVMValueRef sum = LLVMBuildFAdd(bld, val, acc, "nanprop");
-        new_acc = LLVMBuildSelect(bld, uno, sum, m, "mxn");
+        new_acc          = LLVMBuildSelect(bld, uno, sum, m, "mxn");
         break;
     }
     default: /* SUM, MEAN */
@@ -759,10 +789,10 @@ static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
     LLVMValueRef cond   = LLVMBuildICmp(bld, LLVMIntULT, i_next, n, "cond");
     LLVMBuildCondBr(bld, cond, loop, done);
 
-    LLVMValueRef i_vals[]   = { zero_i64, i_next };
-    LLVMBasicBlockRef i_bbs[] = { entry, loop };
-    LLVMAddIncoming(i,   i_vals, i_bbs, 2);
-    LLVMValueRef acc_vals[] = { init, new_acc };
+    LLVMValueRef i_vals[]     = {zero_i64, i_next};
+    LLVMBasicBlockRef i_bbs[] = {entry, loop};
+    LLVMAddIncoming(i, i_vals, i_bbs, 2);
+    LLVMValueRef acc_vals[] = {init, new_acc};
     LLVMAddIncoming(acc, acc_vals, i_bbs, 2);
 
     LLVMPositionBuilderAtEnd(bld, done);
@@ -770,7 +800,7 @@ static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
     if (type == UOP_MEAN) {
         LLVMTypeRef f32t = LLVMFloatTypeInContext(ctx);
         LLVMValueRef nf  = LLVMBuildUIToFP(bld, n, f32t, "nf");
-        final_val = LLVMBuildFDiv(bld, new_acc, nf, "mean");
+        final_val        = LLVMBuildFDiv(bld, new_acc, nf, "mean");
     }
 
     LLVMValueRef out_gep = LLVMBuildGEP2(bld, f32, out_p, &zero_i64, 1, "outp");
@@ -788,10 +818,9 @@ static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type,
  * three are baked as constants. Same signature as the global reducer (the i64
  * param is ignored) so the dispatch call-through is uniform.
  * ---------------------------------------------------------------------- */
-static LLVMModuleRef build_reduction_axis(LLVMContextRef ctx, UOpType type,
-                                          const char* fn_name, int64_t outer,
-                                          int64_t inner, int64_t count) {
-    LLVMKernel k = begin_unary_kernel(ctx, fn_name);
+static LLVMModuleRef build_reduction_axis(LLVMContextRef ctx, UOpType type, const char* fn_name,
+                                          int64_t outer, int64_t inner, int64_t count) {
+    LLVMKernel k       = begin_unary_kernel(ctx, fn_name);
     LLVMModuleRef mod  = k.mod;
     LLVMTypeRef f32    = k.f32;
     LLVMTypeRef ptr    = k.ptr;
@@ -800,16 +829,17 @@ static LLVMModuleRef build_reduction_axis(LLVMContextRef ctx, UOpType type,
     LLVMValueRef fn    = k.fn;
     LLVMValueRef in_p  = k.in_p;
     LLVMValueRef out_p = k.out_p;
-    (void)ptr; (void)void_t;
+    (void)ptr;
+    (void)void_t;
 
     LLVMValueRef c_nout   = LLVMConstInt(i64, (unsigned long long)(outer * inner), 0);
     LLVMValueRef c_inner  = LLVMConstInt(i64, (unsigned long long)inner, 0);
     LLVMValueRef c_count  = LLVMConstInt(i64, (unsigned long long)count, 0);
     LLVMValueRef c_cinner = LLVMConstInt(i64, (unsigned long long)(count * inner), 0);
-    LLVMValueRef z   = LLVMConstInt(i64, 0, 0);
-    LLVMValueRef one = LLVMConstInt(i64, 1, 0);
-    float init_val = (type == UOP_MAX_REDUCE) ? -3.402823466e+38f : 0.0f;
-    LLVMValueRef init = LLVMConstReal(f32, (double)init_val);
+    LLVMValueRef z        = LLVMConstInt(i64, 0, 0);
+    LLVMValueRef one      = LLVMConstInt(i64, 1, 0);
+    float init_val        = (type == UOP_MAX_REDUCE) ? -3.402823466e+38f : 0.0f;
+    LLVMValueRef init     = LLVMConstReal(f32, (double)init_val);
 
     LLVMBasicBlockRef entry  = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
     LLVMBasicBlockRef p_hdr  = LLVMAppendBasicBlockInContext(ctx, fn, "p.hdr");
@@ -828,9 +858,9 @@ static LLVMModuleRef build_reduction_axis(LLVMContextRef ctx, UOpType type,
     LLVMBuildCondBr(bld, LLVMBuildICmp(bld, LLVMIntULT, p, c_nout, "pc"), p_body, p_exit);
 
     LLVMPositionBuilderAtEnd(bld, p_body);
-    LLVMValueRef base = LLVMBuildAdd(bld,
-        LLVMBuildMul(bld, LLVMBuildUDiv(bld, p, c_inner, "pd"), c_cinner, "b0"),
-        LLVMBuildURem(bld, p, c_inner, "pm"), "base");
+    LLVMValueRef base =
+        LLVMBuildAdd(bld, LLVMBuildMul(bld, LLVMBuildUDiv(bld, p, c_inner, "pd"), c_cinner, "b0"),
+                     LLVMBuildURem(bld, p, c_inner, "pm"), "base");
     LLVMBuildBr(bld, r_hdr);
 
     LLVMPositionBuilderAtEnd(bld, r_hdr);
@@ -844,28 +874,31 @@ static LLVMModuleRef build_reduction_axis(LLVMContextRef ctx, UOpType type,
     LLVMValueRef nacc;
     if (type == UOP_MAX_REDUCE) {
         LLVMValueRef c = LLVMBuildFCmp(bld, LLVMRealOGT, v, acc, "gt");
-        nacc = LLVMBuildSelect(bld, c, v, acc, "mx");
+        nacc           = LLVMBuildSelect(bld, c, v, acc, "mx");
     } else {
         nacc = LLVMBuildFAdd(bld, acc, v, "s");
     }
     LLVMValueRef rnext = LLVMBuildAdd(bld, r, one, "rn");
     LLVMBuildBr(bld, r_hdr);
 
-    LLVMValueRef r_in[]   = { z, rnext };  LLVMBasicBlockRef rb[] = { p_body, r_body };
+    LLVMValueRef r_in[]    = {z, rnext};
+    LLVMBasicBlockRef rb[] = {p_body, r_body};
     LLVMAddIncoming(r, r_in, rb, 2);
-    LLVMValueRef acc_in[] = { init, nacc }; LLVMAddIncoming(acc, acc_in, rb, 2);
+    LLVMValueRef acc_in[] = {init, nacc};
+    LLVMAddIncoming(acc, acc_in, rb, 2);
 
     LLVMPositionBuilderAtEnd(bld, r_done);
     LLVMValueRef final_v = acc;
     if (type == UOP_MEAN) {
         LLVMValueRef cf = LLVMBuildUIToFP(bld, c_count, f32, "cf");
-        final_v = LLVMBuildFDiv(bld, acc, cf, "mean");
+        final_v         = LLVMBuildFDiv(bld, acc, cf, "mean");
     }
     LLVMBuildStore(bld, final_v, LLVMBuildGEP2(bld, f32, out_p, &p, 1, "op"));
     LLVMValueRef pnext = LLVMBuildAdd(bld, p, one, "pn");
     LLVMBuildBr(bld, p_hdr);
 
-    LLVMValueRef p_in[] = { z, pnext }; LLVMBasicBlockRef pb[] = { entry, r_done };
+    LLVMValueRef p_in[]    = {z, pnext};
+    LLVMBasicBlockRef pb[] = {entry, r_done};
     LLVMAddIncoming(p, p_in, pb, 2);
 
     LLVMPositionBuilderAtEnd(bld, p_exit);
@@ -878,15 +911,14 @@ static LLVMModuleRef build_reduction_axis(LLVMContextRef ctx, UOpType type,
  * Fill: out[i] = val  (val passed at runtime — allows caching)
  * Signature: void(ptr out, i64 n, float val)
  * ---------------------------------------------------------------------- */
-static LLVMModuleRef build_fill_op(LLVMContextRef ctx, const char* fn_name,
-                                   int64_t out_numel) {
+static LLVMModuleRef build_fill_op(LLVMContextRef ctx, const char* fn_name, int64_t out_numel) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
     LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr, i64, f32 };
+    LLVMTypeRef params[] = {ptr, i64, f32};
     LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 3, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 1); /* out is noalias */
@@ -896,10 +928,10 @@ static LLVMModuleRef build_fill_op(LLVMContextRef ctx, const char* fn_name,
     LLVMValueRef fval  = LLVMGetParam(fn, 2);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
-    LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
+    LLVMBuilderRef bld      = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
-    LoopInfo loop = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), out_n, "fill");
+    LoopInfo loop    = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), out_n, "fill");
     LLVMValueRef gep = LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "p");
     LLVMBuildStore(bld, fval, gep);
     close_loop(bld, &loop, entry);
@@ -913,16 +945,15 @@ static LLVMModuleRef build_fill_op(LLVMContextRef ctx, const char* fn_name,
 /* -------------------------------------------------------------------------
  * Where: out[i] = cond[i] ? a[i] : b[i]
  * ---------------------------------------------------------------------- */
-static LLVMModuleRef build_where_op(LLVMContextRef ctx, const char* fn_name,
-                                    int64_t out_numel, int64_t cond_numel,
-                                    int64_t a_numel, int64_t b_numel) {
+static LLVMModuleRef build_where_op(LLVMContextRef ctx, const char* fn_name, int64_t out_numel,
+                                    int64_t cond_numel, int64_t a_numel, int64_t b_numel) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
     LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr, ptr, ptr, ptr, i64, i64, i64, i64, i64, i64 };
+    LLVMTypeRef params[] = {ptr, ptr, ptr, ptr, i64, i64, i64, i64, i64, i64};
     LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 10, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 4);
@@ -935,30 +966,26 @@ static LLVMModuleRef build_where_op(LLVMContextRef ctx, const char* fn_name,
     LLVMValueRef end    = LLVMGetParam(fn, 9);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
-    LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
+    LLVMBuilderRef bld      = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
     LoopInfo loop = emit_loop(bld, ctx, fn, start, end, "where");
 
-    LLVMValueRef zf  = LLVMConstReal(f32, 0.0);
+    LLVMValueRef zf = LLVMConstReal(f32, 0.0);
 
     LLVMValueRef ic = bcast_index(bld, ctx, loop.i, cond_numel, out_numel);
-    LLVMValueRef ia = bcast_index(bld, ctx, loop.i, a_numel,    out_numel);
-    LLVMValueRef ib = bcast_index(bld, ctx, loop.i, b_numel,    out_numel);
+    LLVMValueRef ia = bcast_index(bld, ctx, loop.i, a_numel, out_numel);
+    LLVMValueRef ib = bcast_index(bld, ctx, loop.i, b_numel, out_numel);
 
-    LLVMValueRef vc = LLVMBuildLoad2(bld, f32,
-        LLVMBuildGEP2(bld, f32, cond_p, &ic, 1, "pc"), "vc");
-    LLVMValueRef va = LLVMBuildLoad2(bld, f32,
-        LLVMBuildGEP2(bld, f32, a_p,    &ia, 1, "pa"), "va");
-    LLVMValueRef vb = LLVMBuildLoad2(bld, f32,
-        LLVMBuildGEP2(bld, f32, b_p,    &ib, 1, "pb"), "vb");
+    LLVMValueRef vc = LLVMBuildLoad2(bld, f32, LLVMBuildGEP2(bld, f32, cond_p, &ic, 1, "pc"), "vc");
+    LLVMValueRef va = LLVMBuildLoad2(bld, f32, LLVMBuildGEP2(bld, f32, a_p, &ia, 1, "pa"), "va");
+    LLVMValueRef vb = LLVMBuildLoad2(bld, f32, LLVMBuildGEP2(bld, f32, b_p, &ib, 1, "pb"), "vb");
 
     LLVMValueRef is_true = LLVMBuildFCmp(bld, LLVMRealONE, vc, zf, "it");
     LLVMValueRef result  = LLVMBuildSelect(bld, is_true, va, vb, "r");
 
     LLVMValueRef rel_idx = LLVMBuildSub(bld, loop.i, start, "rel");
-    LLVMBuildStore(bld, result,
-        LLVMBuildGEP2(bld, f32, out, &rel_idx, 1, "pout"));
+    LLVMBuildStore(bld, result, LLVMBuildGEP2(bld, f32, out, &rel_idx, 1, "pout"));
     close_loop(bld, &loop, entry);
 
     LLVMPositionBuilderAtEnd(bld, loop.exit);
@@ -970,15 +997,15 @@ static LLVMModuleRef build_where_op(LLVMContextRef ctx, const char* fn_name,
 /* -------------------------------------------------------------------------
  * Gather: out[i] = input[i*C + (int)indices[i]]
  * ---------------------------------------------------------------------- */
-static LLVMModuleRef build_gather_op(LLVMContextRef ctx, const char* fn_name,
-                                     int64_t n_rows, int64_t n_cols) {
+static LLVMModuleRef build_gather_op(LLVMContextRef ctx, const char* fn_name, int64_t n_rows,
+                                     int64_t n_cols) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
     LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr, ptr, ptr, i64, i64 };
+    LLVMTypeRef params[] = {ptr, ptr, ptr, i64, i64};
     LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 5, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 3);
@@ -990,19 +1017,18 @@ static LLVMModuleRef build_gather_op(LLVMContextRef ctx, const char* fn_name,
     LLVMValueRef C       = LLVMConstInt(i64, (unsigned long long)n_cols, 0);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
-    LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
+    LLVMBuilderRef bld      = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
     LoopInfo loop = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), N, "gather");
 
-    LLVMValueRef idx_f  = LLVMBuildLoad2(bld, f32,
-        LLVMBuildGEP2(bld, f32, indices, &loop.i, 1, "pidx"), "idxf");
+    LLVMValueRef idx_f =
+        LLVMBuildLoad2(bld, f32, LLVMBuildGEP2(bld, f32, indices, &loop.i, 1, "pidx"), "idxf");
     LLVMValueRef idx    = LLVMBuildFPToSI(bld, idx_f, i64, "idx");
     LLVMValueRef offset = LLVMBuildAdd(bld, LLVMBuildMul(bld, loop.i, C, "row"), idx, "off");
-    LLVMValueRef val    = LLVMBuildLoad2(bld, f32,
-        LLVMBuildGEP2(bld, f32, input, &offset, 1, "pin"), "v");
-    LLVMBuildStore(bld, val,
-        LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout"));
+    LLVMValueRef val =
+        LLVMBuildLoad2(bld, f32, LLVMBuildGEP2(bld, f32, input, &offset, 1, "pin"), "v");
+    LLVMBuildStore(bld, val, LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout"));
 
     close_loop(bld, &loop, entry);
     LLVMPositionBuilderAtEnd(bld, loop.exit);
@@ -1014,15 +1040,15 @@ static LLVMModuleRef build_gather_op(LLVMContextRef ctx, const char* fn_name,
 /* -------------------------------------------------------------------------
  * 2D permute (transpose): out[j*M+i] = in[i*N+j]
  * ---------------------------------------------------------------------- */
-static LLVMModuleRef build_permute_2d(LLVMContextRef ctx, const char* fn_name,
-                                      int64_t rows, int64_t cols) {
+static LLVMModuleRef build_permute_2d(LLVMContextRef ctx, const char* fn_name, int64_t rows,
+                                      int64_t cols) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
     LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr, ptr, i64, i64 };
+    LLVMTypeRef params[] = {ptr, ptr, i64, i64};
     LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 4, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 2);
@@ -1058,8 +1084,8 @@ static LLVMModuleRef build_permute_2d(LLVMContextRef ctx, const char* fn_name,
     LLVMPositionBuilderAtEnd(bld, j_body);
     LLVMValueRef in_off  = LLVMBuildAdd(bld, LLVMBuildMul(bld, iv, N, "iN"), jv, "io");
     LLVMValueRef out_off = LLVMBuildAdd(bld, LLVMBuildMul(bld, jv, M, "jM"), iv, "oo");
-    LLVMValueRef vv = LLVMBuildLoad2(bld, f32,
-        LLVMBuildGEP2(bld, f32, in_p, &in_off, 1, "pin"), "v");
+    LLVMValueRef vv =
+        LLVMBuildLoad2(bld, f32, LLVMBuildGEP2(bld, f32, in_p, &in_off, 1, "pin"), "v");
     LLVMBuildStore(bld, vv, LLVMBuildGEP2(bld, f32, out, &out_off, 1, "pout"));
     LLVMValueRef jn = LLVMBuildAdd(bld, jv, one, "j.next");
     LLVMBuildBr(bld, j_hdr);
@@ -1071,9 +1097,11 @@ static LLVMModuleRef build_permute_2d(LLVMContextRef ctx, const char* fn_name,
     LLVMPositionBuilderAtEnd(bld, i_exit);
     LLVMBuildRetVoid(bld);
 
-    LLVMValueRef jv_in[] = { zero, jn };  LLVMBasicBlockRef jb[] = { i_hdr, j_body };
+    LLVMValueRef jv_in[]   = {zero, jn};
+    LLVMBasicBlockRef jb[] = {i_hdr, j_body};
     LLVMAddIncoming(jv, jv_in, jb, 2);
-    LLVMValueRef iv_in[] = { zero, in2 }; LLVMBasicBlockRef ib[] = { entry, j_exit };
+    LLVMValueRef iv_in[]   = {zero, in2};
+    LLVMBasicBlockRef ib[] = {entry, j_exit};
     LLVMAddIncoming(iv, iv_in, ib, 2);
 
     LLVMDisposeBuilder(bld);
@@ -1083,15 +1111,15 @@ static LLVMModuleRef build_permute_2d(LLVMContextRef ctx, const char* fn_name,
 /* -------------------------------------------------------------------------
  * Expand (broadcast): out[i] = in[i % in_n]
  * ---------------------------------------------------------------------- */
-static LLVMModuleRef build_expand_op(LLVMContextRef ctx, const char* fn_name,
-                                     int64_t out_numel, int64_t in_numel) {
+static LLVMModuleRef build_expand_op(LLVMContextRef ctx, const char* fn_name, int64_t out_numel,
+                                     int64_t in_numel) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
     LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr, ptr, i64, i64 };
+    LLVMTypeRef params[] = {ptr, ptr, i64, i64};
     LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 4, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 2);
@@ -1101,13 +1129,12 @@ static LLVMModuleRef build_expand_op(LLVMContextRef ctx, const char* fn_name,
     LLVMValueRef out_n = LLVMConstInt(i64, (unsigned long long)out_numel, 0);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
-    LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
+    LLVMBuilderRef bld      = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
-    LoopInfo loop = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), out_n, "expand");
+    LoopInfo loop    = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), out_n, "expand");
     LLVMValueRef idx = bcast_index(bld, ctx, loop.i, in_numel, out_numel);
-    LLVMValueRef v   = LLVMBuildLoad2(bld, f32,
-        LLVMBuildGEP2(bld, f32, in_p, &idx, 1, "pin"), "v");
+    LLVMValueRef v   = LLVMBuildLoad2(bld, f32, LLVMBuildGEP2(bld, f32, in_p, &idx, 1, "pin"), "v");
     LLVMBuildStore(bld, v, LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout"));
     close_loop(bld, &loop, entry);
 
@@ -1120,15 +1147,14 @@ static LLVMModuleRef build_expand_op(LLVMContextRef ctx, const char* fn_name,
 /* -------------------------------------------------------------------------
  * Reshape: memcpy loop
  * ---------------------------------------------------------------------- */
-static LLVMModuleRef build_reshape_op(LLVMContextRef ctx, const char* fn_name,
-                                      int64_t n_elems) {
+static LLVMModuleRef build_reshape_op(LLVMContextRef ctx, const char* fn_name, int64_t n_elems) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
     LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr, ptr, i64 };
+    LLVMTypeRef params[] = {ptr, ptr, i64};
     LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 3, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 2);
@@ -1138,12 +1164,12 @@ static LLVMModuleRef build_reshape_op(LLVMContextRef ctx, const char* fn_name,
     LLVMValueRef n    = LLVMConstInt(i64, (unsigned long long)n_elems, 0);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
-    LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
+    LLVMBuilderRef bld      = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
     LoopInfo loop = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), n, "copy");
-    LLVMValueRef v = LLVMBuildLoad2(bld, f32,
-        LLVMBuildGEP2(bld, f32, in_p, &loop.i, 1, "pin"), "v");
+    LLVMValueRef v =
+        LLVMBuildLoad2(bld, f32, LLVMBuildGEP2(bld, f32, in_p, &loop.i, 1, "pin"), "v");
     LLVMBuildStore(bld, v, LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout"));
     close_loop(bld, &loop, entry);
 
@@ -1156,16 +1182,15 @@ static LLVMModuleRef build_reshape_op(LLVMContextRef ctx, const char* fn_name,
 /* -------------------------------------------------------------------------
  * Matmul: C[m,n] = Σ_k A[m,k]*B[k,n]
  * ---------------------------------------------------------------------- */
-static LLVMModuleRef build_matmul_kernel(LLVMContextRef ctx, const char* fn_name,
-                                         int64_t dim_m, int64_t dim_n,
-                                         int64_t dim_k) {
+static LLVMModuleRef build_matmul_kernel(LLVMContextRef ctx, const char* fn_name, int64_t dim_m,
+                                         int64_t dim_n, int64_t dim_k) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
     LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr, ptr, ptr, i64, i64, i64 };
+    LLVMTypeRef params[] = {ptr, ptr, ptr, i64, i64, i64};
     LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 6, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
     add_noalias(ctx, fn, 3);
@@ -1192,7 +1217,8 @@ static LLVMModuleRef build_matmul_kernel(LLVMContextRef ctx, const char* fn_name
     LLVMValueRef o64 = LLVMConstInt(i64, 1, 0);
     LLVMValueRef zf  = LLVMConstReal(f32, 0.0);
 
-    LLVMPositionBuilderAtEnd(bld, entry);  LLVMBuildBr(bld, m_hdr);
+    LLVMPositionBuilderAtEnd(bld, entry);
+    LLVMBuildBr(bld, m_hdr);
 
     LLVMPositionBuilderAtEnd(bld, m_hdr);
     LLVMValueRef mi = LLVMBuildPhi(bld, i64, "m");
@@ -1208,20 +1234,18 @@ static LLVMModuleRef build_matmul_kernel(LLVMContextRef ctx, const char* fn_name
     LLVMBuildCondBr(bld, LLVMBuildICmp(bld, LLVMIntULT, ki, K, "kc"), k_body, k_exit);
 
     LLVMPositionBuilderAtEnd(bld, k_body);
-    LLVMValueRef mK    = LLVMBuildAdd(bld, LLVMBuildMul(bld, mi, K, "mK"), ki, "mKk");
-    LLVMValueRef av    = LLVMBuildLoad2(bld, f32,
-        LLVMBuildGEP2(bld, f32, A, &mK, 1, "Ap"), "av");
-    LLVMValueRef kN    = LLVMBuildAdd(bld, LLVMBuildMul(bld, ki, N, "kN"), ni, "kNn");
-    LLVMValueRef bv    = LLVMBuildLoad2(bld, f32,
-        LLVMBuildGEP2(bld, f32, B, &kN, 1, "Bp"), "bv");
-    LLVMValueRef nacc  = LLVMBuildFAdd(bld, acc, LLVMBuildFMul(bld, av, bv, "p"), "na");
-    LLVMValueRef kn    = LLVMBuildAdd(bld, ki, o64, "k.next");
+    LLVMValueRef mK   = LLVMBuildAdd(bld, LLVMBuildMul(bld, mi, K, "mK"), ki, "mKk");
+    LLVMValueRef av   = LLVMBuildLoad2(bld, f32, LLVMBuildGEP2(bld, f32, A, &mK, 1, "Ap"), "av");
+    LLVMValueRef kN   = LLVMBuildAdd(bld, LLVMBuildMul(bld, ki, N, "kN"), ni, "kNn");
+    LLVMValueRef bv   = LLVMBuildLoad2(bld, f32, LLVMBuildGEP2(bld, f32, B, &kN, 1, "Bp"), "bv");
+    LLVMValueRef nacc = LLVMBuildFAdd(bld, acc, LLVMBuildFMul(bld, av, bv, "p"), "na");
+    LLVMValueRef kn   = LLVMBuildAdd(bld, ki, o64, "k.next");
     LLVMBuildBr(bld, k_hdr);
 
     LLVMPositionBuilderAtEnd(bld, k_exit);
-    LLVMValueRef mN  = LLVMBuildAdd(bld, LLVMBuildMul(bld, mi, N, "mN"), ni, "mNn");
+    LLVMValueRef mN = LLVMBuildAdd(bld, LLVMBuildMul(bld, mi, N, "mN"), ni, "mNn");
     LLVMBuildStore(bld, acc, LLVMBuildGEP2(bld, f32, C, &mN, 1, "Cp"));
-    LLVMValueRef nn  = LLVMBuildAdd(bld, ni, o64, "n.next");
+    LLVMValueRef nn = LLVMBuildAdd(bld, ni, o64, "n.next");
     LLVMBuildBr(bld, n_hdr);
 
     LLVMPositionBuilderAtEnd(bld, n_exit);
@@ -1231,13 +1255,17 @@ static LLVMModuleRef build_matmul_kernel(LLVMContextRef ctx, const char* fn_name
     LLVMPositionBuilderAtEnd(bld, m_exit);
     LLVMBuildRetVoid(bld);
 
-    LLVMValueRef kv[]  = {z64, kn};  LLVMBasicBlockRef kb[] = {n_hdr, k_body};
-    LLVMAddIncoming(ki,  kv, kb, 2);
-    LLVMValueRef av2[] = {zf,  nacc}; LLVMAddIncoming(acc, av2, kb, 2);
-    LLVMValueRef nv[]  = {z64, nn};  LLVMBasicBlockRef nb[] = {m_hdr, k_exit};
-    LLVMAddIncoming(ni,  nv, nb, 2);
-    LLVMValueRef mv[]  = {z64, mn2}; LLVMBasicBlockRef mb[] = {entry, n_exit};
-    LLVMAddIncoming(mi,  mv, mb, 2);
+    LLVMValueRef kv[]      = {z64, kn};
+    LLVMBasicBlockRef kb[] = {n_hdr, k_body};
+    LLVMAddIncoming(ki, kv, kb, 2);
+    LLVMValueRef av2[] = {zf, nacc};
+    LLVMAddIncoming(acc, av2, kb, 2);
+    LLVMValueRef nv[]      = {z64, nn};
+    LLVMBasicBlockRef nb[] = {m_hdr, k_exit};
+    LLVMAddIncoming(ni, nv, nb, 2);
+    LLVMValueRef mv[]      = {z64, mn2};
+    LLVMBasicBlockRef mb[] = {entry, n_exit};
+    LLVMAddIncoming(mi, mv, mb, 2);
 
     LLVMDisposeBuilder(bld);
     return mod;
@@ -1250,12 +1278,13 @@ static LLVMModuleRef build_matmul_kernel(LLVMContextRef ctx, const char* fn_name
  * ownership to the TSC; the JIT then owns TSM→TSC→context.
  * ---------------------------------------------------------------------- */
 #if !defined(CML_HAVE_ORC_FROM_LLVM_CONTEXT) && !defined(CML_HAVE_ORC_TSC_GET_CONTEXT)
-#  ifdef CML_ORC_DETECTED
-#    error "No usable ORC ThreadSafeContext C API on this LLVM (neither LLVMOrcCreateNewThreadSafeContextFromLLVMContext nor LLVMOrcThreadSafeContextGetContext compiled cleanly)"
-#  else
+#ifdef CML_ORC_DETECTED
+#error                                                                                             \
+    "No usable ORC ThreadSafeContext C API on this LLVM (neither LLVMOrcCreateNewThreadSafeContextFromLLVMContext nor LLVMOrcThreadSafeContextGetContext compiled cleanly)"
+#else
 /* No detection ran (e.g. non-CMake build): assume the modern adopt API. */
-#    define CML_HAVE_ORC_FROM_LLVM_CONTEXT 1
-#  endif
+#define CML_HAVE_ORC_FROM_LLVM_CONTEXT 1
+#endif
 #endif
 
 /* Open a per-kernel LLVM context to build a module in, plus the ThreadSafeContext
@@ -1266,23 +1295,24 @@ static LLVMModuleRef build_matmul_kernel(LLVMContextRef ctx, const char* fn_name
  * context via LLVMOrcThreadSafeContextGetContext. */
 static LLVMContextRef open_kernel_ctx(LLVMOrcThreadSafeContextRef* out_tsc) {
 #if defined(CML_HAVE_ORC_FROM_LLVM_CONTEXT)
-    *out_tsc = NULL;                 /* created in compile_and_lookup from the module ctx */
+    *out_tsc = NULL; /* created in compile_and_lookup from the module ctx */
     return LLVMContextCreate();
 #else
     LLVMOrcThreadSafeContextRef tsc = LLVMOrcCreateNewThreadSafeContext();
-    *out_tsc = tsc;
-    if (!tsc) return NULL;
+    *out_tsc                        = tsc;
+    if (!tsc)
+        return NULL;
     /* GetContext is deprecated on LLVM 18; it is the only pairing API there, so
      * silence just this call rather than fail the -Werror build. */
     LLVMContextRef c;
-#  if defined(__GNUC__) || defined(__clang__)
-#    pragma GCC diagnostic push
-#    pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#  endif
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     c = LLVMOrcThreadSafeContextGetContext(tsc);
-#  if defined(__GNUC__) || defined(__clang__)
-#    pragma GCC diagnostic pop
-#  endif
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
     return c;
 #endif
 }
@@ -1293,23 +1323,24 @@ static LLVMContextRef open_kernel_ctx(LLVMOrcThreadSafeContextRef* out_tsc) {
 static void dispose_kernel_ctx(LLVMContextRef ctx, LLVMOrcThreadSafeContextRef tsc) {
 #if defined(CML_HAVE_ORC_FROM_LLVM_CONTEXT)
     (void)tsc;
-    if (ctx) LLVMContextDispose(ctx);
+    if (ctx)
+        LLVMContextDispose(ctx);
 #else
     (void)ctx;
-    if (tsc) LLVMOrcDisposeThreadSafeContext(tsc);
+    if (tsc)
+        LLVMOrcDisposeThreadSafeContext(tsc);
 #endif
 }
 
-static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
-                                      LLVMModuleRef mod,
-                                      LLVMOrcThreadSafeContextRef tsc,
-                                      const char* fn_name) {
+static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend, LLVMModuleRef mod,
+                                      LLVMOrcThreadSafeContextRef tsc, const char* fn_name) {
     char* err = NULL;
     if (LLVMVerifyModule(mod, LLVMReturnStatusAction, &err) != 0) {
         LOG_ERROR("LLVM: Module verification failed: %s", err ? err : "?");
         LLVMDisposeMessage(err);
         LLVMDisposeModule(mod);
-        if (tsc) LLVMOrcDisposeThreadSafeContext(tsc);
+        if (tsc)
+            LLVMOrcDisposeThreadSafeContext(tsc);
         return NULL;
     }
     LLVMDisposeMessage(err);
@@ -1329,7 +1360,10 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
 #ifdef CML_PROCESS_REPLAY_LLVM
     {
         char* ir = LLVMPrintModuleToString(mod);
-        if (ir) { cml_process_replay_record(fn_name, ir, strlen(ir)); LLVMDisposeMessage(ir); }
+        if (ir) {
+            cml_process_replay_record(fn_name, ir, strlen(ir));
+            LLVMDisposeMessage(ir);
+        }
     }
 #endif
 
@@ -1352,7 +1386,7 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
     }
 
     LLVMOrcExecutorAddress addr = 0;
-    LLVMErrorRef lkp_err = LLVMOrcLLJITLookup(backend->jit, &addr, fn_name);
+    LLVMErrorRef lkp_err        = LLVMOrcLLJITLookup(backend->jit, &addr, fn_name);
     if (lkp_err) {
         char* msg = LLVMGetErrorMessage(lkp_err);
         LOG_ERROR("LLVM: Lookup '%s' failed: %s", fn_name, msg);
@@ -1379,66 +1413,96 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend,
 
 /* Emit the scalar result of one primitive elementwise op. Mirrors fused_eval_block
  * (execution.c) and the per-op emission in build_binary_op/build_unary_op. */
-static LLVMValueRef fe_emit_op(LLVMBuilderRef bld, LLVMModuleRef mod,
-                               LLVMTypeRef f32, UOpType op,
+static LLVMValueRef fe_emit_op(LLVMBuilderRef bld, LLVMModuleRef mod, LLVMTypeRef f32, UOpType op,
                                LLVMValueRef a, LLVMValueRef b, LLVMValueRef c, float konst) {
     LLVMValueRef zero = LLVMConstReal(f32, 0.0);
     switch (op) {
-    case UOP_ADD:     return LLVMBuildFAdd(bld, a, b, "r");
-    case UOP_SUB:     return LLVMBuildFSub(bld, a, b, "r");
-    case UOP_MUL:     return LLVMBuildFMul(bld, a, b, "r");
-    case UOP_DIV:     return LLVMBuildFDiv(bld, a, b, "r");
+    case UOP_ADD:
+        return LLVMBuildFAdd(bld, a, b, "r");
+    case UOP_SUB:
+        return LLVMBuildFSub(bld, a, b, "r");
+    case UOP_MUL:
+        return LLVMBuildFMul(bld, a, b, "r");
+    case UOP_DIV:
+        return LLVMBuildFDiv(bld, a, b, "r");
     /* The fused-chain emitter needs the same NaN rule as the standalone kernels
      * above: an ordered compare is false for NaN, so a plain select returns the
      * other operand and the NaN disappears mid-chain. */
-    case UOP_MAX:     { LLVMValueRef c1=LLVMBuildFCmp(bld,LLVMRealOGT,a,b,"gt");
-                        LLVMValueRef m=LLVMBuildSelect(bld,c1,a,b,"m");
-                        LLVMValueRef u=LLVMBuildFCmp(bld,LLVMRealUNO,a,b,"uno");
-                        return LLVMBuildSelect(bld,u,LLVMBuildFAdd(bld,a,b,"np"),m,"r"); }
-    case UOP_MINIMUM: { LLVMValueRef c1=LLVMBuildFCmp(bld,LLVMRealOLT,a,b,"lt");
-                        LLVMValueRef m=LLVMBuildSelect(bld,c1,a,b,"m");
-                        LLVMValueRef u=LLVMBuildFCmp(bld,LLVMRealUNO,a,b,"uno");
-                        return LLVMBuildSelect(bld,u,LLVMBuildFAdd(bld,a,b,"np"),m,"r"); }
-    case UOP_POW:     { LLVMValueRef f=INTR1(mod,"llvm.pow",8,f32);
-                        LLVMTypeRef ft=LLVMFunctionType(f32,(LLVMTypeRef[]){f32,f32},2,0);
-                        return LLVMBuildCall2(bld,ft,f,(LLVMValueRef[]){a,b},2,"r"); }
-    case UOP_RELU:    { LLVMValueRef c1=LLVMBuildFCmp(bld,LLVMRealOLT,a,zero,"lt");
-                        return LLVMBuildSelect(bld,c1,zero,a,"r"); }
-    case UOP_NEG:     return LLVMBuildFNeg(bld, a, "r");
-    case UOP_RECIP:   return LLVMBuildFDiv(bld, LLVMConstReal(f32,1.0), a, "r");
-    case UOP_EXP:     return call1(bld,f32,INTR1(mod,"llvm.exp",8,f32),a,"r");
-    case UOP_LOG:     return call1(bld,f32,INTR1(mod,"llvm.log",8,f32),a,"r");
-    case UOP_SQRT:    return call1(bld,f32,INTR1(mod,"llvm.sqrt",9,f32),a,"r");
-    case UOP_SIN:     return call1(bld,f32,INTR1(mod,"llvm.sin",8,f32),a,"r");
-    case UOP_COS:     return call1(bld,f32,INTR1(mod,"llvm.cos",8,f32),a,"r");
-    case UOP_ABS:     return call1(bld,f32,INTR1(mod,"llvm.fabs",9,f32),a,"r");
-    case UOP_CMPLT:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOLT,a,b,"c"), f32, "r");
-    case UOP_CMPLE:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOLE,a,b,"c"), f32, "r");
-    case UOP_CMPGT:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOGT,a,b,"c"), f32, "r");
-    case UOP_CMPGE:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOGE,a,b,"c"), f32, "r");
-    case UOP_CMPEQ:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealOEQ,a,b,"c"), f32, "r");
-    case UOP_CMPNE:   return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld,LLVMRealUNE,a,b,"c"), f32, "r");
-    case UOP_WHERE:   { LLVMValueRef nz=LLVMBuildFCmp(bld,LLVMRealONE,a,zero,"nz"); return LLVMBuildSelect(bld,nz,b,c,"r"); }
-    case UOP_FILL:    return LLVMConstReal(f32, (double)konst);
+    case UOP_MAX: {
+        LLVMValueRef c1 = LLVMBuildFCmp(bld, LLVMRealOGT, a, b, "gt");
+        LLVMValueRef m  = LLVMBuildSelect(bld, c1, a, b, "m");
+        LLVMValueRef u  = LLVMBuildFCmp(bld, LLVMRealUNO, a, b, "uno");
+        return LLVMBuildSelect(bld, u, LLVMBuildFAdd(bld, a, b, "np"), m, "r");
+    }
+    case UOP_MINIMUM: {
+        LLVMValueRef c1 = LLVMBuildFCmp(bld, LLVMRealOLT, a, b, "lt");
+        LLVMValueRef m  = LLVMBuildSelect(bld, c1, a, b, "m");
+        LLVMValueRef u  = LLVMBuildFCmp(bld, LLVMRealUNO, a, b, "uno");
+        return LLVMBuildSelect(bld, u, LLVMBuildFAdd(bld, a, b, "np"), m, "r");
+    }
+    case UOP_POW: {
+        LLVMValueRef f = INTR1(mod, "llvm.pow", 8, f32);
+        LLVMTypeRef ft = LLVMFunctionType(f32, (LLVMTypeRef[]){f32, f32}, 2, 0);
+        return LLVMBuildCall2(bld, ft, f, (LLVMValueRef[]){a, b}, 2, "r");
+    }
+    case UOP_RELU: {
+        LLVMValueRef c1 = LLVMBuildFCmp(bld, LLVMRealOLT, a, zero, "lt");
+        return LLVMBuildSelect(bld, c1, zero, a, "r");
+    }
+    case UOP_NEG:
+        return LLVMBuildFNeg(bld, a, "r");
+    case UOP_RECIP:
+        return LLVMBuildFDiv(bld, LLVMConstReal(f32, 1.0), a, "r");
+    case UOP_EXP:
+        return call1(bld, f32, INTR1(mod, "llvm.exp", 8, f32), a, "r");
+    case UOP_LOG:
+        return call1(bld, f32, INTR1(mod, "llvm.log", 8, f32), a, "r");
+    case UOP_SQRT:
+        return call1(bld, f32, INTR1(mod, "llvm.sqrt", 9, f32), a, "r");
+    case UOP_SIN:
+        return call1(bld, f32, INTR1(mod, "llvm.sin", 8, f32), a, "r");
+    case UOP_COS:
+        return call1(bld, f32, INTR1(mod, "llvm.cos", 8, f32), a, "r");
+    case UOP_ABS:
+        return call1(bld, f32, INTR1(mod, "llvm.fabs", 9, f32), a, "r");
+    case UOP_CMPLT:
+        return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld, LLVMRealOLT, a, b, "c"), f32, "r");
+    case UOP_CMPLE:
+        return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld, LLVMRealOLE, a, b, "c"), f32, "r");
+    case UOP_CMPGT:
+        return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld, LLVMRealOGT, a, b, "c"), f32, "r");
+    case UOP_CMPGE:
+        return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld, LLVMRealOGE, a, b, "c"), f32, "r");
+    case UOP_CMPEQ:
+        return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld, LLVMRealOEQ, a, b, "c"), f32, "r");
+    case UOP_CMPNE:
+        return LLVMBuildUIToFP(bld, LLVMBuildFCmp(bld, LLVMRealUNE, a, b, "c"), f32, "r");
+    case UOP_WHERE: {
+        LLVMValueRef nz = LLVMBuildFCmp(bld, LLVMRealONE, a, zero, "nz");
+        return LLVMBuildSelect(bld, nz, b, c, "r");
+    }
+    case UOP_FILL:
+        return LLVMConstReal(f32, (double)konst);
     /* Unknown op: refuse to emit rather than folding it to a constant. Returning
      * zero here silently produced an all-zero result for any op the fuser admits
      * but this switch has not learned yet (UOP_RELU did exactly that), and the
      * node was still marked executed, so nothing downstream could notice. The
      * caller drops the whole kernel and lets the interpreter run the chain. */
-    default:          return NULL;
+    default:
+        return NULL;
     }
 }
 
 static LLVMModuleRef build_fused_elementwise(LLVMContextRef ctx, const char* fn_name,
-        const FusedElementwiseParams* fp, int64_t out_numel,
-        const int64_t* in_numel, int num_inputs) {
+                                             const FusedElementwiseParams* fp, int64_t out_numel,
+                                             const int64_t* in_numel, int num_inputs) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
     LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
     LLVMTypeRef i64    = LLVMInt64TypeInContext(ctx);
     LLVMTypeRef void_t = LLVMVoidTypeInContext(ctx);
 
-    LLVMTypeRef params[] = { ptr /* const float** in */, ptr /* float* out */ };
+    LLVMTypeRef params[] = {ptr /* const float** in */, ptr /* float* out */};
     LLVMTypeRef fn_type  = LLVMFunctionType(void_t, params, 2, 0);
     LLVMValueRef fn      = LLVMAddFunction(mod, fn_name, fn_type);
 
@@ -1447,7 +1511,7 @@ static LLVMModuleRef build_fused_elementwise(LLVMContextRef ctx, const char* fn_
     LLVMValueRef out_n  = LLVMConstInt(i64, (unsigned long long)out_numel, 0);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
-    LLVMBuilderRef bld = LLVMCreateBuilderInContext(ctx);
+    LLVMBuilderRef bld      = LLVMCreateBuilderInContext(ctx);
     LLVMPositionBuilderAtEnd(bld, entry);
 
     /* Load each input base pointer once from the float** array (loop-invariant). */
@@ -1455,7 +1519,7 @@ static LLVMModuleRef build_fused_elementwise(LLVMContextRef ctx, const char* fn_
     for (int k = 0; k < num_inputs && k < 32; k++) {
         LLVMValueRef idxk = LLVMConstInt(i64, (unsigned long long)k, 0);
         LLVMValueRef gepk = LLVMBuildGEP2(bld, ptr, in_arr, &idxk, 1, "pp");
-        inptr[k] = LLVMBuildLoad2(bld, ptr, gepk, "inp");
+        inptr[k]          = LLVMBuildLoad2(bld, ptr, gepk, "inp");
     }
 
     LoopInfo loop = emit_loop(bld, ctx, fn, LLVMConstInt(i64, 0, 0), out_n, "fe");
@@ -1463,16 +1527,25 @@ static LLVMModuleRef build_fused_elementwise(LLVMContextRef ctx, const char* fn_
     int ns = fp->num_steps;
     LLVMValueRef reg[256];
     for (int s = 0; s < ns; s++) {
-        int refs[3] = { fp->a[s], fp->b[s], fp->c[s] };
+        int refs[3] = {fp->a[s], fp->b[s], fp->c[s]};
         LLVMValueRef ops[3];
         for (int t = 0; t < 3; t++) {
             int ref = refs[t];
-            if (ref == FE_UNUSED_REF)      { ops[t] = LLVMConstReal(f32, 0.0); continue; }
-            if (ref < 0)                   { ops[t] = reg[-ref - 1]; continue; }
-            if (ref >= num_inputs || ref >= 32) { ops[t] = LLVMConstReal(f32, 0.0); continue; }
+            if (ref == FE_UNUSED_REF) {
+                ops[t] = LLVMConstReal(f32, 0.0);
+                continue;
+            }
+            if (ref < 0) {
+                ops[t] = reg[-ref - 1];
+                continue;
+            }
+            if (ref >= num_inputs || ref >= 32) {
+                ops[t] = LLVMConstReal(f32, 0.0);
+                continue;
+            }
             LLVMValueRef idx = bcast_index(bld, ctx, loop.i, in_numel[ref], out_numel);
             LLVMValueRef gep = LLVMBuildGEP2(bld, f32, inptr[ref], &idx, 1, "pin");
-            ops[t] = LLVMBuildLoad2(bld, f32, gep, "v");
+            ops[t]           = LLVMBuildLoad2(bld, f32, gep, "v");
         }
         reg[s] = fe_emit_op(bld, mod, f32, fp->op[s], ops[0], ops[1], ops[2], fp->konst[s]);
         if (!reg[s]) { /* op this backend can't emit -- abandon the kernel */
@@ -1496,29 +1569,46 @@ static LLVMModuleRef build_fused_elementwise(LLVMContextRef ctx, const char* fn_
  * Op classification
  * ---------------------------------------------------------------------- */
 static bool is_binary_op(UOpType t) {
-    return t == UOP_ADD || t == UOP_SUB || t == UOP_MUL || t == UOP_DIV ||
-           t == UOP_MAX || t == UOP_CMPLT || t == UOP_POW;
+    return t == UOP_ADD || t == UOP_SUB || t == UOP_MUL || t == UOP_DIV || t == UOP_MAX ||
+           t == UOP_CMPLT || t == UOP_POW;
 }
 
 static bool is_unary_op(UOpType t) {
     switch (t) {
-    case UOP_NEG: case UOP_EXP: case UOP_EXP2: case UOP_LOG: case UOP_LOG2:
-    case UOP_SQRT: case UOP_RSQRT: case UOP_SQUARE:
-    case UOP_ABS: case UOP_SIGN:
-    case UOP_SIN: case UOP_COS: case UOP_TAN:
-    case UOP_ASIN: case UOP_ACOS: case UOP_ATAN:
-    case UOP_TANH: case UOP_SIGMOID: case UOP_RECIP:
-    case UOP_RELU: case UOP_RELU6: case UOP_SILU: case UOP_QUICK_GELU:
-    case UOP_FLOOR: case UOP_CEIL: case UOP_ROUND: case UOP_ERF:
+    case UOP_NEG:
+    case UOP_EXP:
+    case UOP_EXP2:
+    case UOP_LOG:
+    case UOP_LOG2:
+    case UOP_SQRT:
+    case UOP_RSQRT:
+    case UOP_SQUARE:
+    case UOP_ABS:
+    case UOP_SIGN:
+    case UOP_SIN:
+    case UOP_COS:
+    case UOP_TAN:
+    case UOP_ASIN:
+    case UOP_ACOS:
+    case UOP_ATAN:
+    case UOP_TANH:
+    case UOP_SIGMOID:
+    case UOP_RECIP:
+    case UOP_RELU:
+    case UOP_RELU6:
+    case UOP_SILU:
+    case UOP_QUICK_GELU:
+    case UOP_FLOOR:
+    case UOP_CEIL:
+    case UOP_ROUND:
+    case UOP_ERF:
         return true;
     default:
         return false;
     }
 }
 
-static bool is_reduction(UOpType t) {
-    return t == UOP_SUM || t == UOP_MEAN || t == UOP_MAX_REDUCE;
-}
+static bool is_reduction(UOpType t) { return t == UOP_SUM || t == UOP_MEAN || t == UOP_MAX_REDUCE; }
 
 /* -------------------------------------------------------------------------
  * Per-node JIT execution
@@ -1532,34 +1622,39 @@ static bool is_reduction(UOpType t) {
 #define JIT_PARALLEL_MIN_ELEMS (1 << 16)
 
 typedef struct {
-    void (*fn)(const float*, const float*, float*,
-               int64_t, int64_t, int64_t, int64_t, int64_t);
-    const float* a; const float* b; float* out;
+    void (*fn)(const float*, const float*, float*, int64_t, int64_t, int64_t, int64_t, int64_t);
+    const float* a;
+    const float* b;
+    float* out;
     int64_t n, na, nb;
 } JBTaskCtx;
 
 static void jb_task(void* d, size_t start, size_t end) {
     JBTaskCtx* t = (JBTaskCtx*)d;
-    t->fn(t->a, t->b, t->out, t->n, t->na, t->nb,
-          (int64_t)start, (int64_t)end);
+    t->fn(t->a, t->b, t->out, t->n, t->na, t->nb, (int64_t)start, (int64_t)end);
 }
 
-static void jb_run(void* fnv, float* a, float* b, float* out,
-                   int64_t n, int64_t na, int64_t nb) {
+static void jb_run(void* fnv, float* a, float* b, float* out, int64_t n, int64_t na, int64_t nb) {
     if (n >= JIT_PARALLEL_MIN_ELEMS) {
-        JBTaskCtx ctx = { (void (*)(const float*, const float*, float*,
-                                    int64_t, int64_t, int64_t, int64_t, int64_t))fnv,
-                          a, b, out, n, na, nb };
+        JBTaskCtx ctx = {(void (*)(const float*, const float*, float*, int64_t, int64_t, int64_t,
+                                   int64_t, int64_t))fnv,
+                         a,
+                         b,
+                         out,
+                         n,
+                         na,
+                         nb};
         threadpool_parallel_for(threadpool_get_global(), jb_task, &ctx, (size_t)n);
         return;
     }
-    ((void (*)(const float*, const float*, float*, int64_t, int64_t, int64_t,
-               int64_t, int64_t))(void*)fnv)(a, b, out, n, na, nb, 0, n);
+    ((void (*)(const float*, const float*, float*, int64_t, int64_t, int64_t, int64_t, int64_t))(
+        void*)fnv)(a, b, out, n, na, nb, 0, n);
 }
 
 typedef struct {
     void (*fn)(const float*, float*, int64_t, int64_t, int64_t, int64_t);
-    const float* a; float* out;
+    const float* a;
+    float* out;
     int64_t n, na;
 } JUTaskCtx;
 
@@ -1570,14 +1665,13 @@ static void ju_task(void* d, size_t start, size_t end) {
 
 static void ju_run(void* fnv, float* a, float* out, int64_t n, int64_t na) {
     if (n >= JIT_PARALLEL_MIN_ELEMS) {
-        JUTaskCtx ctx = { (void (*)(const float*, float*, int64_t, int64_t,
-                                    int64_t, int64_t))fnv,
-                          a, out, n, na };
+        JUTaskCtx ctx = {(void (*)(const float*, float*, int64_t, int64_t, int64_t, int64_t))fnv, a,
+                         out, n, na};
         threadpool_parallel_for(threadpool_get_global(), ju_task, &ctx, (size_t)n);
         return;
     }
-    ((void (*)(const float*, float*, int64_t, int64_t, int64_t,
-               int64_t))(void*)fnv)(a, out, n, na, 0, n);
+    ((void (*)(const float*, float*, int64_t, int64_t, int64_t, int64_t))(void*)fnv)(a, out, n, na,
+                                                                                     0, n);
 }
 
 typedef struct {
@@ -1592,7 +1686,7 @@ static void jf_task(void* d, size_t start, size_t end) {
 
 __attribute__((unused)) static void jf_run(void* fnv, float* out, int64_t n) {
     if (n >= JIT_PARALLEL_MIN_ELEMS) {
-        JFTaskCtx ctx = { *(void (**)(float*, int64_t))&fnv, out };
+        JFTaskCtx ctx = {*(void (**)(float*, int64_t))&fnv, out};
         threadpool_parallel_for(threadpool_get_global(), jf_task, &ctx, (size_t)n);
         return;
     }
@@ -1613,7 +1707,7 @@ static void jv_task(void* d, size_t start, size_t end) {
 
 static void jv_run(void* fnv, float* out, int64_t n, float v) {
     if (n >= JIT_PARALLEL_MIN_ELEMS) {
-        JVTaskCtx ctx = { *(void (**)(float*, int64_t, float))&fnv, out, n, v };
+        JVTaskCtx ctx = {*(void (**)(float*, int64_t, float))&fnv, out, n, v};
         threadpool_parallel_for(threadpool_get_global(), jv_task, &ctx, (size_t)n);
         return;
     }
@@ -1621,34 +1715,43 @@ static void jv_run(void* fnv, float* out, int64_t n, float v) {
 }
 
 typedef struct {
-    void (*fn)(const float*, const float*, const float*, float*,
-               int64_t, int64_t, int64_t, int64_t, int64_t, int64_t);
-    const float* c; const float* a; const float* b; float* out;
+    void (*fn)(const float*, const float*, const float*, float*, int64_t, int64_t, int64_t, int64_t,
+               int64_t, int64_t);
+    const float* c;
+    const float* a;
+    const float* b;
+    float* out;
     int64_t n, nc, na, nb;
 } JWTaskCtx;
 
 static void jw_task(void* d, size_t start, size_t end) {
     JWTaskCtx* t = (JWTaskCtx*)d;
-    t->fn(t->c, t->a, t->b, t->out, t->n, t->nc, t->na, t->nb,
-          (int64_t)start, (int64_t)end);
+    t->fn(t->c, t->a, t->b, t->out, t->n, t->nc, t->na, t->nb, (int64_t)start, (int64_t)end);
 }
 
-static void jw_run(void* fnv, float* cond, float* a, float* b, float* out,
-                   int64_t n, int64_t nc, int64_t na, int64_t nb) {
+static void jw_run(void* fnv, float* cond, float* a, float* b, float* out, int64_t n, int64_t nc,
+                   int64_t na, int64_t nb) {
     if (n >= JIT_PARALLEL_MIN_ELEMS) {
-        JWTaskCtx ctx = { (void (*)(const float*, const float*, const float*, float*,
-                                    int64_t, int64_t, int64_t, int64_t, int64_t, int64_t))fnv,
-                          cond, a, b, out, n, nc, na, nb };
+        JWTaskCtx ctx = {(void (*)(const float*, const float*, const float*, float*, int64_t,
+                                   int64_t, int64_t, int64_t, int64_t, int64_t))fnv,
+                         cond,
+                         a,
+                         b,
+                         out,
+                         n,
+                         nc,
+                         na,
+                         nb};
         threadpool_parallel_for(threadpool_get_global(), jw_task, &ctx, (size_t)n);
         return;
     }
-    ((void (*)(const float*, const float*, const float*, float*, int64_t, int64_t,
-               int64_t, int64_t, int64_t, int64_t))(void*)fnv)(
-        cond, a, b, out, n, nc, na, nb, 0, n);
+    ((void (*)(const float*, const float*, const float*, float*, int64_t, int64_t, int64_t, int64_t,
+               int64_t, int64_t))(void*)fnv)(cond, a, b, out, n, nc, na, nb, 0, n);
 }
 
 static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
-    if (!node || !node->output) return -1;
+    if (!node || !node->output)
+        return -1;
 
     Tensor* out = node->output;
 
@@ -1666,7 +1769,10 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         /* Size by the actual dtype — f64/int kernels write 8 bytes/elem, not 4;
          * sizeof(float) under-allocated and the kernel overflowed its output. */
         out->data = cml_buffer_cache_alloc(out->numel * cml_dtype_size(out->dtype));
-        if (!out->data) { LOG_ERROR("LLVM: OOM for output tensor"); return -1; }
+        if (!out->data) {
+            LOG_ERROR("LLVM: OOM for output tensor");
+            return -1;
+        }
         out->owns_data         = true;
         out->from_buffer_cache = true; /* mirror interpreter: route free to cml_buffer_cache_free */
     }
@@ -1677,12 +1783,11 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
      * binary/unary), and int32/int64 (a restricted elementwise set: add/sub/mul/
      * div/max, neg/abs/square). Any other dtype/op, or mixed-dtype operands, go to
      * the interpreter's dtype-generic path. */
-    DType edt = out->dtype;
+    DType edt  = out->dtype;
     int f64_ok = (edt == DTYPE_FLOAT64) && (is_binary_op(type) || is_unary_op(type));
     int int_ok = (edt == DTYPE_INT32 || edt == DTYPE_INT64) &&
-                 (type == UOP_ADD || type == UOP_SUB || type == UOP_MUL ||
-                  type == UOP_DIV || type == UOP_MAX ||
-                  type == UOP_NEG || type == UOP_ABS || type == UOP_SQUARE);
+                 (type == UOP_ADD || type == UOP_SUB || type == UOP_MUL || type == UOP_DIV ||
+                  type == UOP_MAX || type == UOP_NEG || type == UOP_ABS || type == UOP_SQUARE);
     if (edt != DTYPE_FLOAT32 && !f64_ok && !int_ok)
         return cpu_execute_node(node);
     for (int _i = 0; _i < node->num_inputs && node->inputs; _i++) {
@@ -1726,8 +1831,8 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
      * handled here rather than in the shape-keyed path below. */
     if (type == UOP_FUSED_ELEMENTWISE) {
         FusedElementwiseParams* fp = (FusedElementwiseParams*)node->params;
-        if (!fp || fp->num_steps <= 0 || fp->num_steps > 256 ||
-            node->num_inputs < 0 || node->num_inputs > 32)
+        if (!fp || fp->num_steps <= 0 || fp->num_steps > 256 || node->num_inputs < 0 ||
+            node->num_inputs > 32)
             return cpu_execute_node(node);
         int64_t in_numel[32];
         for (int k = 0; k < node->num_inputs; k++) {
@@ -1740,31 +1845,48 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
 
         /* FNV-1a content hash: chain ops/refs/consts + output & input shapes. */
         uint64_t key = 1469598103934665603ULL;
-        #define FEH(x) do { key ^= (uint64_t)(x); key *= 1099511628211ULL; } while (0)
-        FEH(UOP_FUSED_ELEMENTWISE); FEH(out_numel);
-        FEH((unsigned)node->num_inputs); FEH((unsigned)fp->num_steps);
+#define FEH(x)                                                                                     \
+    do {                                                                                           \
+        key ^= (uint64_t)(x);                                                                      \
+        key *= 1099511628211ULL;                                                                   \
+    } while (0)
+        FEH(UOP_FUSED_ELEMENTWISE);
+        FEH(out_numel);
+        FEH((unsigned)node->num_inputs);
+        FEH((unsigned)fp->num_steps);
         for (int s = 0; s < fp->num_steps; s++) {
-            FEH((unsigned)fp->op[s]); FEH((uint32_t)fp->a[s]);
-            FEH((uint32_t)fp->b[s]);  FEH((uint32_t)fp->c[s]);
-            uint32_t kb; memcpy(&kb, &fp->konst[s], sizeof(kb)); FEH(kb);
+            FEH((unsigned)fp->op[s]);
+            FEH((uint32_t)fp->a[s]);
+            FEH((uint32_t)fp->b[s]);
+            FEH((uint32_t)fp->c[s]);
+            uint32_t kb;
+            memcpy(&kb, &fp->konst[s], sizeof(kb));
+            FEH(kb);
         }
-        for (int k = 0; k < node->num_inputs; k++) FEH(in_numel[k]);
-        #undef FEH
-        if (key == 0) key = 0x9E3779B97F4A7C15ULL;  /* 0 marks an empty slot */
+        for (int k = 0; k < node->num_inputs; k++)
+            FEH(in_numel[k]);
+#undef FEH
+        if (key == 0)
+            key = 0x9E3779B97F4A7C15ULL; /* 0 marks an empty slot */
 
-        unsigned fslot = 0;
+        unsigned fslot  = 0;
         kernel_fn_t ffn = cache_lookup(backend, key, &fslot);
         if (!ffn) {
             char fn_name[64];
             snprintf(fn_name, sizeof(fn_name), "cml_fe%d", backend->kernel_count++);
             LLVMOrcThreadSafeContextRef tsc = NULL;
-            LLVMContextRef kern_ctx = open_kernel_ctx(&tsc);
-            if (!kern_ctx) return cpu_execute_node(node);
-            LLVMModuleRef mod = build_fused_elementwise(kern_ctx, fn_name, fp,
-                                                        out_numel, in_numel, node->num_inputs);
-            if (!mod) { dispose_kernel_ctx(kern_ctx, tsc); return cpu_execute_node(node); }
+            LLVMContextRef kern_ctx         = open_kernel_ctx(&tsc);
+            if (!kern_ctx)
+                return cpu_execute_node(node);
+            LLVMModuleRef mod = build_fused_elementwise(kern_ctx, fn_name, fp, out_numel, in_numel,
+                                                        node->num_inputs);
+            if (!mod) {
+                dispose_kernel_ctx(kern_ctx, tsc);
+                return cpu_execute_node(node);
+            }
             ffn = compile_and_lookup(backend, mod, tsc, fn_name);
-            if (!ffn) return cpu_execute_node(node);
+            if (!ffn)
+                return cpu_execute_node(node);
             backend->op_cache[fslot].key = key;
             backend->op_cache[fslot].fn  = ffn;
             LOG_DEBUG("LLVM: compiled fused elementwise kernel steps=%d inputs=%d n=%lld ('%s')",
@@ -1809,33 +1931,40 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         ReduceParams* rp = (ReduceParams*)node->params;
         if (rp && rp->num_dims == 1 && inp->ndim >= 1) {
             int rdim = rp->dims[0];
-            if (rdim < 0) rdim += inp->ndim;
+            if (rdim < 0)
+                rdim += inp->ndim;
             if (rdim >= 0 && rdim < inp->ndim) {
                 count = (int64_t)inp->shape[rdim];
                 inner = 1;
-                for (int d = rdim + 1; d < inp->ndim; d++) inner *= (int64_t)inp->shape[d];
+                for (int d = rdim + 1; d < inp->ndim; d++)
+                    inner *= (int64_t)inp->shape[d];
                 outer = 1;
-                for (int d = 0; d < rdim; d++) outer *= (int64_t)inp->shape[d];
+                for (int d = 0; d < rdim; d++)
+                    outer *= (int64_t)inp->shape[d];
             }
         }
         /* If the derived layout doesn't match the output size, fall back. */
         if ((int64_t)out->numel != outer * inner)
             return cpu_execute_node(node);
         s0 = (int64_t)inp->numel;
-        s1 = outer; s2 = inner; s3 = count;
+        s1 = outer;
+        s2 = inner;
+        s3 = count;
     } else if (type == UOP_MATMUL) {
         if (node->num_inputs < 2 || !node->inputs[0]->data || !node->inputs[1]->data)
             return cpu_execute_node(node);
-        Tensor* a = node->inputs[0]; Tensor* b = node->inputs[1];
-        if (a->ndim < 2 || b->ndim < 2) return cpu_execute_node(node);
-        s0 = (int64_t)a->shape[a->ndim-2];
-        s1 = (int64_t)b->shape[b->ndim-1];
-        s2 = (int64_t)a->shape[a->ndim-1];
+        Tensor* a = node->inputs[0];
+        Tensor* b = node->inputs[1];
+        if (a->ndim < 2 || b->ndim < 2)
+            return cpu_execute_node(node);
+        s0 = (int64_t)a->shape[a->ndim - 2];
+        s1 = (int64_t)b->shape[b->ndim - 1];
+        s2 = (int64_t)a->shape[a->ndim - 1];
     } else if (type == UOP_FILL) {
         s0 = (int64_t)out->numel;
     } else if (type == UOP_WHERE) {
-        if (node->num_inputs < 3 || !node->inputs[0]->data ||
-            !node->inputs[1]->data || !node->inputs[2]->data)
+        if (node->num_inputs < 3 || !node->inputs[0]->data || !node->inputs[1]->data ||
+            !node->inputs[2]->data)
             return cpu_execute_node(node);
         s0 = (int64_t)out->numel;
         s1 = (int64_t)node->inputs[0]->numel;
@@ -1844,23 +1973,23 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     } else if (type == UOP_GATHER) {
         if (node->num_inputs < 2 || !node->inputs[0]->data || !node->inputs[1]->data)
             return cpu_execute_node(node);
-        Tensor* inp  = node->inputs[0];
-        Tensor* idx  = node->inputs[1];
+        Tensor* inp = node->inputs[0];
+        Tensor* idx = node->inputs[1];
         /* The JIT kernel implements exactly out[i] = input[i*C + idx[i]] for a 2D
          * input [R,C], 1D indices [R], gathering the LAST dim, output [R]. Any
          * other config (generic N-d gather, non-last dim) uses the interpreter,
          * which also bounds-checks indices. */
         GatherParams* gp = (GatherParams*)node->params;
-        int dim = gp ? gp->dim : -1;
-        if (dim < 0) dim += inp->ndim;
+        int dim          = gp ? gp->dim : -1;
+        if (dim < 0)
+            dim += inp->ndim;
         if (inp->ndim != 2 || idx->ndim != 1 || dim != inp->ndim - 1 ||
             out->numel != (size_t)inp->shape[0] || idx->numel != (size_t)inp->shape[0])
             return cpu_execute_node(node);
         s0 = (int64_t)out->numel;
-        s1 = (int64_t)inp->shape[inp->ndim-1];
+        s1 = (int64_t)inp->shape[inp->ndim - 1];
     } else if (type == UOP_PERMUTE) {
-        if (node->num_inputs < 1 || !node->inputs[0]->data ||
-            node->inputs[0]->ndim != 2)
+        if (node->num_inputs < 1 || !node->inputs[0]->data || node->inputs[0]->ndim != 2)
             return cpu_execute_node(node);
         s0 = (int64_t)node->inputs[0]->shape[0];
         s1 = (int64_t)node->inputs[0]->shape[1];
@@ -1876,8 +2005,8 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
 
     /* ---- Shape-keyed kernel cache lookup ----------------------------- */
     /* Fold the element dtype into the key so f32 and f64 kernels are distinct. */
-    uint64_t key = shape_key(type, s0, s1, s2, s3) ^ ((uint64_t)edt * 0x9E3779B97F4A7C15ULL);
-    unsigned slot = 0;
+    uint64_t key   = shape_key(type, s0, s1, s2, s3) ^ ((uint64_t)edt * 0x9E3779B97F4A7C15ULL);
+    unsigned slot  = 0;
     kernel_fn_t fn = cache_lookup(backend, key, &slot);
 
     if (!fn) {
@@ -1887,8 +2016,9 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         /* Fresh per-kernel context (see open_kernel_ctx); compile_and_lookup
          * transfers its ownership to ORC (TSC → TSM → JIT). */
         LLVMOrcThreadSafeContextRef tsc = NULL;
-        LLVMContextRef kern_ctx = open_kernel_ctx(&tsc);
-        if (!kern_ctx) return cpu_execute_node(node);
+        LLVMContextRef kern_ctx         = open_kernel_ctx(&tsc);
+        if (!kern_ctx)
+            return cpu_execute_node(node);
 
         LLVMModuleRef mod = NULL;
 
@@ -1898,7 +2028,7 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
             mod = build_unary_op(kern_ctx, type, fn_name, s0, s1, edt);
         } else if (is_reduction(type)) {
             if (out->numel == 1)
-                mod = build_reduction(kern_ctx, type, fn_name, s0);           /* global */
+                mod = build_reduction(kern_ctx, type, fn_name, s0); /* global */
             else
                 mod = build_reduction_axis(kern_ctx, type, fn_name, s1, s2, s3); /* per-axis */
         } else if (type == UOP_MATMUL) {
@@ -1920,119 +2050,105 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
             return cpu_execute_node(node);
         }
 
-        if (!mod) { dispose_kernel_ctx(kern_ctx, tsc); return cpu_execute_node(node); }
+        if (!mod) {
+            dispose_kernel_ctx(kern_ctx, tsc);
+            return cpu_execute_node(node);
+        }
 
         fn = compile_and_lookup(backend, mod, tsc, fn_name);
         /* context/tsc ownership transferred to JIT via compile_and_lookup; do not free. */
-        if (!fn) return cpu_execute_node(node);
+        if (!fn)
+            return cpu_execute_node(node);
 
         backend->op_cache[slot].key = key;
         backend->op_cache[slot].fn  = fn;
-        LOG_DEBUG("LLVM: Compiled shape-specialized kernel op=%d shape=[%lld,%lld,%lld,%lld] ('%s')",
-                  type, (long long)s0, (long long)s1, (long long)s2, (long long)s3, fn_name);
+        LOG_DEBUG(
+            "LLVM: Compiled shape-specialized kernel op=%d shape=[%lld,%lld,%lld,%lld] ('%s')",
+            type, (long long)s0, (long long)s1, (long long)s2, (long long)s3, fn_name);
     }
 
     /* ---- Dispatch ----------------------------------------------------- */
     if (is_binary_op(type)) {
         if (node->num_inputs < 2 || !node->inputs[0]->data || !node->inputs[1]->data)
             return cpu_execute_node(node);
-        jb_run((void*)fn,
-               (float*)node->inputs[0]->data,
-               (float*)node->inputs[1]->data,
-               (float*)out->data,
-               (int64_t)out->numel,
-               (int64_t)node->inputs[0]->numel,
+        jb_run((void*)fn, (float*)node->inputs[0]->data, (float*)node->inputs[1]->data,
+               (float*)out->data, (int64_t)out->numel, (int64_t)node->inputs[0]->numel,
                (int64_t)node->inputs[1]->numel);
 
     } else if (is_unary_op(type)) {
         if (node->num_inputs < 1 || !node->inputs[0]->data)
             return cpu_execute_node(node);
-        ju_run((void*)fn,
-               (float*)node->inputs[0]->data,
-               (float*)out->data,
-               (int64_t)out->numel,
+        ju_run((void*)fn, (float*)node->inputs[0]->data, (float*)out->data, (int64_t)out->numel,
                (int64_t)node->inputs[0]->numel);
 
     } else if (is_reduction(type)) {
         if (node->num_inputs < 1 || !node->inputs[0]->data)
             return cpu_execute_node(node);
         typedef void (*rfn_t)(float*, float*, int64_t);
-        ((rfn_t)(void*)fn)(
-            (float*)node->inputs[0]->data,
-            (float*)out->data,
-            (int64_t)node->inputs[0]->numel);
+        ((rfn_t)(void*)fn)((float*)node->inputs[0]->data, (float*)out->data,
+                           (int64_t)node->inputs[0]->numel);
 
     } else if (type == UOP_MATMUL) {
         if (node->num_inputs < 2 || !node->inputs[0]->data || !node->inputs[1]->data)
             return cpu_execute_node(node);
-        Tensor* a = node->inputs[0]; Tensor* b = node->inputs[1];
-        if (a->ndim < 2 || b->ndim < 2) return cpu_execute_node(node);
+        Tensor* a = node->inputs[0];
+        Tensor* b = node->inputs[1];
+        if (a->ndim < 2 || b->ndim < 2)
+            return cpu_execute_node(node);
         /* The JIT kernel computes a single [M,K]x[K,N] GEMM. Batched matmuls
          * (out->numel != M*N, leading dims broadcast) must take the
          * interpreter's batch-aware path instead of silently computing one
          * wrong 2-D GEMM over the whole buffer. */
-        size_t mn = (size_t)a->shape[a->ndim-2] * (size_t)b->shape[b->ndim-1];
-        if (out->numel != mn) return cpu_execute_node(node);
+        size_t mn = (size_t)a->shape[a->ndim - 2] * (size_t)b->shape[b->ndim - 1];
+        if (out->numel != mn)
+            return cpu_execute_node(node);
         typedef void (*mfn_t)(float*, float*, float*, int64_t, int64_t, int64_t);
-        ((mfn_t)(void*)fn)(
-            (float*)a->data, (float*)b->data, (float*)out->data,
-            (int64_t)a->shape[a->ndim-2],
-            (int64_t)b->shape[b->ndim-1],
-            (int64_t)a->shape[a->ndim-1]);
+        ((mfn_t)(void*)fn)((float*)a->data, (float*)b->data, (float*)out->data,
+                           (int64_t)a->shape[a->ndim - 2], (int64_t)b->shape[b->ndim - 1],
+                           (int64_t)a->shape[a->ndim - 1]);
 
     } else if (type == UOP_FILL) {
         FillParams* p = (FillParams*)node->params;
-        float fv = p ? p->value : 0.0f;
+        float fv      = p ? p->value : 0.0f;
         jv_run((void*)fn, (float*)out->data, (int64_t)out->numel, fv);
 
     } else if (type == UOP_WHERE) {
-        if (node->num_inputs < 3 || !node->inputs[0]->data ||
-            !node->inputs[1]->data || !node->inputs[2]->data)
+        if (node->num_inputs < 3 || !node->inputs[0]->data || !node->inputs[1]->data ||
+            !node->inputs[2]->data)
             return cpu_execute_node(node);
-        jw_run((void*)fn,
-               (float*)node->inputs[0]->data,
-               (float*)node->inputs[1]->data,
-               (float*)node->inputs[2]->data,
-               (float*)out->data,
-               (int64_t)out->numel,
-               (int64_t)node->inputs[0]->numel,
-               (int64_t)node->inputs[1]->numel,
+        jw_run((void*)fn, (float*)node->inputs[0]->data, (float*)node->inputs[1]->data,
+               (float*)node->inputs[2]->data, (float*)out->data, (int64_t)out->numel,
+               (int64_t)node->inputs[0]->numel, (int64_t)node->inputs[1]->numel,
                (int64_t)node->inputs[2]->numel);
 
     } else if (type == UOP_GATHER) {
         if (node->num_inputs < 2 || !node->inputs[0]->data || !node->inputs[1]->data)
             return cpu_execute_node(node);
         Tensor* inp = node->inputs[0];
-        if (inp->ndim < 2) return cpu_execute_node(node);
+        if (inp->ndim < 2)
+            return cpu_execute_node(node);
         typedef void (*gfn_t)(float*, float*, float*, int64_t, int64_t);
-        ((gfn_t)(void*)fn)(
-            (float*)inp->data, (float*)node->inputs[1]->data,
-            (float*)out->data,
-            (int64_t)out->numel,
-            (int64_t)inp->shape[inp->ndim-1]);
+        ((gfn_t)(void*)fn)((float*)inp->data, (float*)node->inputs[1]->data, (float*)out->data,
+                           (int64_t)out->numel, (int64_t)inp->shape[inp->ndim - 1]);
 
     } else if (type == UOP_PERMUTE) {
         if (node->num_inputs < 1 || !node->inputs[0]->data)
             return cpu_execute_node(node);
         Tensor* inp = node->inputs[0];
         typedef void (*pfn_t)(float*, float*, int64_t, int64_t);
-        ((pfn_t)(void*)fn)(
-            (float*)inp->data, (float*)out->data,
-            (int64_t)inp->shape[0], (int64_t)inp->shape[1]);
+        ((pfn_t)(void*)fn)((float*)inp->data, (float*)out->data, (int64_t)inp->shape[0],
+                           (int64_t)inp->shape[1]);
 
     } else if (type == UOP_RESHAPE || type == UOP_EXPAND) {
         if (node->num_inputs < 1 || !node->inputs[0]->data)
             return cpu_execute_node(node);
         typedef void (*cfn_t)(float*, float*, int64_t, int64_t);
-        ((cfn_t)(void*)fn)(
-            (float*)node->inputs[0]->data,
-            (float*)out->data,
-            (int64_t)out->numel,
-            (int64_t)node->inputs[0]->numel);
+        ((cfn_t)(void*)fn)((float*)node->inputs[0]->data, (float*)out->data, (int64_t)out->numel,
+                           (int64_t)node->inputs[0]->numel);
     }
 
-    node->is_executed  = true;
-    out->is_executed   = true;
+    node->is_executed = true;
+    out->is_executed  = true;
     return 0;
 }
 
@@ -2042,19 +2158,22 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
 /* Execute a single node via the JIT (falls back to the interpreter internally
  * for unsupported ops / shapes). Public entry for the default execution path. */
 int cml_llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
-    if (!backend || !node) return -1;
+    if (!backend || !node)
+        return -1;
     return llvm_execute_node(backend, node);
 }
 
 int cml_llvm_execute(CMLLLVMBackend* backend, CMLGraph_t ir) {
-    if (!backend || !ir) return -1;
+    if (!backend || !ir)
+        return -1;
     struct IRNode* node = ir->head;
     while (node) {
         if (!node->is_executed) {
             if (llvm_execute_node(backend, node) != 0) {
                 cpu_execute_node(node);
                 node->is_executed = true;
-                if (node->output) node->output->is_executed = true;
+                if (node->output)
+                    node->output->is_executed = true;
             }
         }
         node = node->next;
@@ -2063,19 +2182,21 @@ int cml_llvm_execute(CMLLLVMBackend* backend, CMLGraph_t ir) {
     return 0;
 }
 
-int cml_llvm_execute_up_to(CMLLLVMBackend* backend, CMLGraph_t ir,
-                           struct IRNode* target_node) {
-    if (!backend || !ir || !target_node) return -1;
+int cml_llvm_execute_up_to(CMLLLVMBackend* backend, CMLGraph_t ir, struct IRNode* target_node) {
+    if (!backend || !ir || !target_node)
+        return -1;
     struct IRNode* node = ir->head;
     while (node) {
         if (!node->is_executed) {
             if (llvm_execute_node(backend, node) != 0) {
                 cpu_execute_node(node);
                 node->is_executed = true;
-                if (node->output) node->output->is_executed = true;
+                if (node->output)
+                    node->output->is_executed = true;
             }
         }
-        if (node == target_node) break;
+        if (node == target_node)
+            break;
         node = node->next;
     }
     return 0;

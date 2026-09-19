@@ -16,11 +16,12 @@
 AutogradEngine* global_autograd_engine = NULL;
 
 static pthread_mutex_t g_autograd_init_mutex = PTHREAD_MUTEX_INITIALIZER;
-static bool g_autograd_initialized = false;
-static pthread_mutex_t g_hook_lock = PTHREAD_MUTEX_INITIALIZER;
+static bool g_autograd_initialized           = false;
+static pthread_mutex_t g_hook_lock           = PTHREAD_MUTEX_INITIALIZER;
 
 static void autograd_init_once(void) {
-    if (global_autograd_engine) return;
+    if (global_autograd_engine)
+        return;
 
     global_autograd_engine = cml_malloc(sizeof(AutogradEngine));
     if (!global_autograd_engine) {
@@ -70,9 +71,11 @@ AutogradEngine* autograd_get_engine(void) {
 
 void autograd_set_grad_mode(bool enabled) {
     AutogradEngine* engine = autograd_get_engine();
-    if (engine->lock_initialized) pthread_mutex_lock(&engine->lock);
+    if (engine->lock_initialized)
+        pthread_mutex_lock(&engine->lock);
     engine->grad_mode = enabled;
-    if (engine->lock_initialized) pthread_mutex_unlock(&engine->lock);
+    if (engine->lock_initialized)
+        pthread_mutex_unlock(&engine->lock);
 }
 
 bool autograd_is_grad_enabled(void) {
@@ -86,9 +89,11 @@ void autograd_no_grad_exit(void) { autograd_set_grad_mode(true); }
 
 void autograd_set_anomaly_detection(bool enabled) {
     AutogradEngine* engine = autograd_get_engine();
-    if (engine->lock_initialized) pthread_mutex_lock(&engine->lock);
+    if (engine->lock_initialized)
+        pthread_mutex_lock(&engine->lock);
     engine->anomaly_detection = enabled;
-    if (engine->lock_initialized) pthread_mutex_unlock(&engine->lock);
+    if (engine->lock_initialized)
+        pthread_mutex_unlock(&engine->lock);
     LOG_INFO("Anomaly detection %s", enabled ? "enabled" : "disabled");
 }
 
@@ -101,10 +106,12 @@ void tensor_set_requires_grad(Tensor* t, bool requires_grad) {
 }
 
 bool tensor_is_leaf(Tensor* t) {
-    if (!t) return false;
+    if (!t)
+        return false;
     /* A leaf tensor has no IR node, or is a zero-input creation op
      * (FILL, CONST, RAND, etc.) — i.e., not computed from other tensors. */
-    if (!t->ir_node) return true;
+    if (!t->ir_node)
+        return true;
     struct IRNode* node = (struct IRNode*)t->ir_node;
     return node->num_inputs == 0;
 }
@@ -282,7 +289,8 @@ void tensor_zero_grad(Tensor* tensor) {
     }
 }
 
-void tensor_accumulate_grad(Tensor* tensor, Tensor* new_grad) {    if (!tensor || !new_grad)
+void tensor_accumulate_grad(Tensor* tensor, Tensor* new_grad) {
+    if (!tensor || !new_grad)
         return;
 
     if (!tensor->requires_grad)
@@ -361,7 +369,7 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
                                                      .device     = tensor->device,
                                                      .has_dtype  = true,
                                                      .has_device = true};
-                tensor->grad = tensor_empty(tensor->shape, tensor->ndim, &config);
+                tensor->grad        = tensor_empty(tensor->shape, tensor->ndim, &config);
                 if (tensor->grad && tensor->grad->data)
                     memset(tensor->grad->data, 0,
                            tensor->grad->numel * cml_dtype_size(tensor->grad->dtype));
@@ -374,7 +382,7 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
                                                  .device     = tensor->device,
                                                  .has_dtype  = true,
                                                  .has_device = true};
-            Tensor* ones_grad = tensor_ones(tensor->shape, tensor->ndim, &config);
+            Tensor* ones_grad   = tensor_ones(tensor->shape, tensor->ndim, &config);
             if (!ones_grad) {
                 LOG_ERROR("Failed to initialize gradient");
                 return;
@@ -469,7 +477,7 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
              * step rewrote the same files hundreds of times; do it once per
              * distinct graph shape instead. */
             static uint64_t last_exported_hash = 0;
-            uint64_t graph_hash = cml_ir_graph_hash(viz_ir);
+            uint64_t graph_hash                = cml_ir_graph_hash(viz_ir);
 
             if (graph_hash != last_exported_hash) {
                 last_exported_hash = graph_hash;
@@ -704,7 +712,6 @@ void tensor_compute_grad_for_broadcast(Tensor* grad_output, int* original_shape,
 
     cml_free(out_strides);
     cml_free(in_strides);
-
 }
 
 void autograd_check_anomaly(Tensor* tensor, const char* operation) {
@@ -778,10 +785,12 @@ static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
     if (m->size >= m->cap) {
         int ncap           = m->cap ? m->cap * 2 : 64;
         const void** nkeys = realloc(m->keys, (size_t)ncap * sizeof(const void*));
-        if (!nkeys) return -1;
-        m->keys = nkeys;
+        if (!nkeys)
+            return -1;
+        m->keys   = nkeys;
         int* nids = realloc(m->ids, (size_t)ncap * sizeof(int));
-        if (!nids) return -1;
+        if (!nids)
+            return -1;
         m->ids = nids;
         m->cap = ncap;
     }
@@ -790,7 +799,6 @@ static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
     m->size++;
     return next_id;
 }
-
 
 int autograd_export_json(Tensor* root, const char* path) {
     if (!root || !path)
@@ -805,8 +813,7 @@ int autograd_export_json(Tensor* root, const char* path) {
      * (e.g. fusion rewires outputs and clears ->ir_node) when execution ran
      * inside backward. Fall back to the graph tail: exporting the graph the
      * tensor belongs to is still meaningful. */
-    struct IRNode* export_root = root->ir_node ? root->ir_node
-                                               : root->ir_context->tail;
+    struct IRNode* export_root = root->ir_node ? root->ir_node : root->ir_context->tail;
     if (!export_root) {
         LOG_WARNING("Cannot export graph: empty IR context");
         return -2;
@@ -847,7 +854,8 @@ int autograd_export_json(Tensor* root, const char* path) {
                 if (already == 1) {
                     if (stack_size >= stack_cap) {
                         stack_cap *= 2;
-                        struct IRNode** new_stack = cml_realloc(stack, stack_cap * sizeof(struct IRNode*));
+                        struct IRNode** new_stack =
+                            cml_realloc(stack, stack_cap * sizeof(struct IRNode*));
                         if (!new_stack) {
                             stack_ok = false;
                             break;

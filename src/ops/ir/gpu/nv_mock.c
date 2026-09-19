@@ -13,9 +13,9 @@
 #include <sys/mman.h>
 #include "alloc/cml_allocator.h"
 
-#define MOCK_FD_CTL  100
-#define MOCK_FD_DEV  101
-#define MOCK_FD_UVM  102
+#define MOCK_FD_CTL 100
+#define MOCK_FD_DEV 101
+#define MOCK_FD_UVM 102
 
 #define MOCK_INITIAL_ALLOC_CAP 64
 
@@ -26,35 +26,36 @@ typedef struct {
 
 typedef struct {
     uint32_t gpuInfoListSize;
-    NV_GPU_INFO_ENTRY *gpuInfoList;
+    NV_GPU_INFO_ENTRY* gpuInfoList;
 } NV2080_CTRL_GPU_GET_INFO_PARAMS_M;
 
 typedef struct {
     uint32_t gpuNameStringFlags;
-    char     gpuNameString[256];
+    char gpuNameString[256];
 } NV2080_CTRL_GPU_GET_NAME_STRING_PARAMS_M;
 
 #define NV2080_GPU_INFO_INDEX_GPU_ARCH 52
 
-#define MOCK_NV_IOCTL_RM_ALLOC   _IOWR('F', NV_ESC_RM_ALLOC,   NV_RM_ALLOC_PARAMS)
-#define MOCK_NV_IOCTL_RM_CONTROL _IOWR('F', NV_ESC_RM_CONTROL,  NV_RM_CONTROL_PARAMS)
-#define MOCK_NV_IOCTL_RM_FREE    _IOWR('F', NV_ESC_RM_FREE,     NV_RM_FREE_PARAMS)
+#define MOCK_NV_IOCTL_RM_ALLOC _IOWR('F', NV_ESC_RM_ALLOC, NV_RM_ALLOC_PARAMS)
+#define MOCK_NV_IOCTL_RM_CONTROL _IOWR('F', NV_ESC_RM_CONTROL, NV_RM_CONTROL_PARAMS)
+#define MOCK_NV_IOCTL_RM_FREE _IOWR('F', NV_ESC_RM_FREE, NV_RM_FREE_PARAMS)
 
 static CMLNVMockGPU g_mock;
 static bool g_mock_active = false;
 
-static void mock_track_alloc(void *ptr) {
+static void mock_track_alloc(void* ptr) {
     if (g_mock.num_allocs >= g_mock.alloc_capacity) {
-        int new_cap = g_mock.alloc_capacity * 2;
-        void **new_table = (void **)cml_realloc(g_mock.alloc_table, (size_t)new_cap * sizeof(void *));
-        if (!new_table) return;
-        g_mock.alloc_table = new_table;
+        int new_cap      = g_mock.alloc_capacity * 2;
+        void** new_table = (void**)cml_realloc(g_mock.alloc_table, (size_t)new_cap * sizeof(void*));
+        if (!new_table)
+            return;
+        g_mock.alloc_table    = new_table;
         g_mock.alloc_capacity = new_cap;
     }
     g_mock.alloc_table[g_mock.num_allocs++] = ptr;
 }
 
-static bool mock_untrack_alloc(void *ptr) {
+static bool mock_untrack_alloc(void* ptr) {
     for (int i = 0; i < g_mock.num_allocs; i++) {
         if (g_mock.alloc_table[i] == ptr) {
             g_mock.alloc_table[i] = g_mock.alloc_table[--g_mock.num_allocs];
@@ -64,16 +65,16 @@ static bool mock_untrack_alloc(void *ptr) {
     return false;
 }
 
-void cml_nv_mock_init(CMLNVMockGPU *config) {
+void cml_nv_mock_init(CMLNVMockGPU* config) {
     memset(&g_mock, 0, sizeof(g_mock));
 
     if (config) {
-        g_mock.gpu_arch         = config->gpu_arch;
+        g_mock.gpu_arch          = config->gpu_arch;
         g_mock.compute_cap_major = config->compute_cap_major;
         g_mock.compute_cap_minor = config->compute_cap_minor;
-        g_mock.vram_size        = config->vram_size;
+        g_mock.vram_size         = config->vram_size;
         memcpy(g_mock.name, config->name, sizeof(g_mock.name));
-        g_mock.auto_complete    = config->auto_complete;
+        g_mock.auto_complete = config->auto_complete;
     }
 
     if (g_mock.gpu_arch == 0)
@@ -87,18 +88,19 @@ void cml_nv_mock_init(CMLNVMockGPU *config) {
     if (g_mock.name[0] == '\0')
         snprintf(g_mock.name, sizeof(g_mock.name), "CML Mock GPU (Turing)");
 
-    g_mock.next_handle = 1;
-    g_mock.alloc_capacity = MOCK_INITIAL_ALLOC_CAP;
-    g_mock.alloc_table = (void **)cml_calloc((size_t)g_mock.alloc_capacity, sizeof(void *));
-    g_mock.num_allocs = 0;
-    g_mock.last_semaphore = NULL;
+    g_mock.next_handle          = 1;
+    g_mock.alloc_capacity       = MOCK_INITIAL_ALLOC_CAP;
+    g_mock.alloc_table          = (void**)cml_calloc((size_t)g_mock.alloc_capacity, sizeof(void*));
+    g_mock.num_allocs           = 0;
+    g_mock.last_semaphore       = NULL;
     g_mock.last_semaphore_value = 0;
 
     g_mock_active = true;
 }
 
 void cml_nv_mock_shutdown(void) {
-    if (!g_mock_active) return;
+    if (!g_mock_active)
+        return;
 
     for (int i = 0; i < g_mock.num_allocs; i++)
         free(g_mock.alloc_table[i]); /* aligned_alloc'd in cml_nv_mock_mmap — not cml_malloc */
@@ -108,12 +110,11 @@ void cml_nv_mock_shutdown(void) {
     g_mock_active = false;
 }
 
-CMLNVMockGPU* cml_nv_mock_get(void) {
-    return g_mock_active ? &g_mock : NULL;
-}
+CMLNVMockGPU* cml_nv_mock_get(void) { return g_mock_active ? &g_mock : NULL; }
 
 void cml_nv_mock_complete_kernel(void) {
-    if (!g_mock_active) return;
+    if (!g_mock_active)
+        return;
     if (g_mock.last_semaphore) {
         *g_mock.last_semaphore = g_mock.last_semaphore_value;
         __sync_synchronize();
@@ -124,7 +125,7 @@ static bool is_mock_fd(int fd) {
     return fd == MOCK_FD_CTL || fd == MOCK_FD_DEV || fd == MOCK_FD_UVM;
 }
 
-int cml_nv_mock_open(const char *path, int flags, ...) {
+int cml_nv_mock_open(const char* path, int flags, ...) {
     if (!g_mock_active || !path)
         goto real_open;
 
@@ -153,38 +154,48 @@ int cml_nv_mock_close(int fd) {
 
 static uint32_t mock_handle_for_class(uint32_t nv_class) {
     switch (nv_class) {
-    case NV01_ROOT_CLIENT:        return 1;
-    case NV01_DEVICE_0:           return 2;
-    case NV20_SUBDEVICE_0:        return 3;
-    case FERMI_VASPACE_A:         return 4;
-    case KEPLER_CHANNEL_GROUP_A:  return 5;
+    case NV01_ROOT_CLIENT:
+        return 1;
+    case NV01_DEVICE_0:
+        return 2;
+    case NV20_SUBDEVICE_0:
+        return 3;
+    case FERMI_VASPACE_A:
+        return 4;
+    case KEPLER_CHANNEL_GROUP_A:
+        return 5;
     case KEPLER_CHANNEL_GPFIFO_A:
     case TURING_CHANNEL_GPFIFO_A:
     case AMPERE_CHANNEL_GPFIFO_A:
-    case HOPPER_CHANNEL_GPFIFO_A: return 6;
+    case HOPPER_CHANNEL_GPFIFO_A:
+        return 6;
     case TURING_COMPUTE_A:
     case AMPERE_COMPUTE_A:
-    case HOPPER_COMPUTE_A:        return 7;
+    case HOPPER_COMPUTE_A:
+        return 7;
     case TURING_DMA_COPY_A:
     case AMPERE_DMA_COPY_A:
-    case HOPPER_DMA_COPY_A:       return 8;
-    default:                      return g_mock.next_handle++;
+    case HOPPER_DMA_COPY_A:
+        return 8;
+    default:
+        return g_mock.next_handle++;
     }
 }
 
-static int mock_ioctl_rm_alloc(NV_RM_ALLOC_PARAMS *p) {
+static int mock_ioctl_rm_alloc(NV_RM_ALLOC_PARAMS* p) {
     p->hObjectNew = mock_handle_for_class(p->hClass);
-    p->status = 0;
+    p->status     = 0;
     return 0;
 }
 
-static int mock_ioctl_rm_control(NV_RM_CONTROL_PARAMS *p) {
+static int mock_ioctl_rm_control(NV_RM_CONTROL_PARAMS* p) {
     p->status = 0;
 
     switch (p->cmd) {
     case NV2080_CTRL_CMD_GPU_GET_INFO: {
-        if (!p->params) break;
-        NV2080_CTRL_GPU_GET_INFO_PARAMS_M *info = (NV2080_CTRL_GPU_GET_INFO_PARAMS_M *)p->params;
+        if (!p->params)
+            break;
+        NV2080_CTRL_GPU_GET_INFO_PARAMS_M* info = (NV2080_CTRL_GPU_GET_INFO_PARAMS_M*)p->params;
         for (uint32_t i = 0; i < info->gpuInfoListSize; i++) {
             if (info->gpuInfoList[i].type == NV2080_GPU_INFO_INDEX_GPU_ARCH)
                 info->gpuInfoList[i].data = g_mock.gpu_arch;
@@ -192,9 +203,10 @@ static int mock_ioctl_rm_control(NV_RM_CONTROL_PARAMS *p) {
         break;
     }
     case NV2080_CTRL_CMD_GPU_GET_NAME_STRING: {
-        if (!p->params) break;
-        NV2080_CTRL_GPU_GET_NAME_STRING_PARAMS_M *name =
-            (NV2080_CTRL_GPU_GET_NAME_STRING_PARAMS_M *)p->params;
+        if (!p->params)
+            break;
+        NV2080_CTRL_GPU_GET_NAME_STRING_PARAMS_M* name =
+            (NV2080_CTRL_GPU_GET_NAME_STRING_PARAMS_M*)p->params;
         strncpy(name->gpuNameString, g_mock.name, sizeof(name->gpuNameString) - 1);
         name->gpuNameString[sizeof(name->gpuNameString) - 1] = '\0';
         break;
@@ -206,29 +218,29 @@ static int mock_ioctl_rm_control(NV_RM_CONTROL_PARAMS *p) {
     return 0;
 }
 
-static int mock_ioctl_rm_free(NV_RM_FREE_PARAMS *p) {
+static int mock_ioctl_rm_free(NV_RM_FREE_PARAMS* p) {
     p->status = 0;
     return 0;
 }
 
-int cml_nv_mock_ioctl(int fd, unsigned long request, void *arg) {
+int cml_nv_mock_ioctl(int fd, unsigned long request, void* arg) {
     if (!g_mock_active || !is_mock_fd(fd))
         return ioctl(fd, request, arg);
 
-    if (!arg) return 0;
+    if (!arg)
+        return 0;
 
     if (request == MOCK_NV_IOCTL_RM_ALLOC)
-        return mock_ioctl_rm_alloc((NV_RM_ALLOC_PARAMS *)arg);
+        return mock_ioctl_rm_alloc((NV_RM_ALLOC_PARAMS*)arg);
     if (request == MOCK_NV_IOCTL_RM_CONTROL)
-        return mock_ioctl_rm_control((NV_RM_CONTROL_PARAMS *)arg);
+        return mock_ioctl_rm_control((NV_RM_CONTROL_PARAMS*)arg);
     if (request == MOCK_NV_IOCTL_RM_FREE)
-        return mock_ioctl_rm_free((NV_RM_FREE_PARAMS *)arg);
+        return mock_ioctl_rm_free((NV_RM_FREE_PARAMS*)arg);
 
     return 0;
 }
 
-void* cml_nv_mock_mmap(void *addr, size_t length, int prot, int flags,
-                        int fd, off_t offset) {
+void* cml_nv_mock_mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {
     (void)addr;
     (void)prot;
     (void)offset;
@@ -238,15 +250,16 @@ void* cml_nv_mock_mmap(void *addr, size_t length, int prot, int flags,
     }
 
     size_t aligned = (length + 4095) & ~(size_t)4095;
-    void *ptr = aligned_alloc(4096, aligned);
-    if (!ptr) return MAP_FAILED;
+    void* ptr      = aligned_alloc(4096, aligned);
+    if (!ptr)
+        return MAP_FAILED;
 
     memset(ptr, 0, aligned);
     mock_track_alloc(ptr);
     return ptr;
 }
 
-int cml_nv_mock_munmap(void *addr, size_t length) {
+int cml_nv_mock_munmap(void* addr, size_t length) {
     if (!g_mock_active)
         return munmap(addr, length);
 

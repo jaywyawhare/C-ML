@@ -1,6 +1,6 @@
 #include "ops/ir/gpu/webgpu_backend.h"
 #include "core/logging.h"
-#include "alloc/cml_allocator.h"   /* cml_calloc/cml_free used on all platforms */
+#include "alloc/cml_allocator.h" /* cml_calloc/cml_free used on all platforms */
 
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +19,6 @@
 #define WGPU_LIB_NAME "wgpu_native.dll"
 #endif
 
-
 #if defined(__linux__) || defined(__APPLE__)
 static void* wgpu_load_library(const char* name) {
     void* lib = dlopen(name, RTLD_LAZY | RTLD_LOCAL);
@@ -29,12 +28,11 @@ static void* wgpu_load_library(const char* name) {
     return lib;
 }
 
-static void* wgpu_get_symbol(void* lib, const char* name) {
-    return dlsym(lib, name);
-}
+static void* wgpu_get_symbol(void* lib, const char* name) { return dlsym(lib, name); }
 
 static void wgpu_unload_library(void* lib) {
-    if (lib) dlclose(lib);
+    if (lib)
+        dlclose(lib);
 }
 #elif defined(_WIN32)
 static void* wgpu_load_library(const char* name) {
@@ -50,34 +48,39 @@ static void* wgpu_get_symbol(void* lib, const char* name) {
 }
 
 static void wgpu_unload_library(void* lib) {
-    if (lib) FreeLibrary((HMODULE)lib);
+    if (lib)
+        FreeLibrary((HMODULE)lib);
 }
 #else
-static void* wgpu_load_library(const char* name) { (void)name; return NULL; }
+static void* wgpu_load_library(const char* name) {
+    (void)name;
+    return NULL;
+}
 static void* wgpu_get_symbol(void* lib, const char* name) {
-    (void)lib; (void)name; return NULL;
+    (void)lib;
+    (void)name;
+    return NULL;
 }
 static void wgpu_unload_library(void* lib) { (void)lib; }
 #endif
 
-
-typedef void*    WGPUInstance;
-typedef void*    WGPUAdapter;
-typedef void*    WGPUDevice;
-typedef void*    WGPUQueue;
-typedef void*    WGPUShaderModule;
-typedef void*    WGPUComputePipeline;
-typedef void*    WGPUBindGroupLayout;
-typedef void*    WGPUBindGroup;
-typedef void*    WGPUPipelineLayout;
-typedef void*    WGPUBuffer;
-typedef void*    WGPUCommandEncoder;
-typedef void*    WGPUComputePassEncoder;
-typedef void*    WGPUCommandBuffer;
+typedef void* WGPUInstance;
+typedef void* WGPUAdapter;
+typedef void* WGPUDevice;
+typedef void* WGPUQueue;
+typedef void* WGPUShaderModule;
+typedef void* WGPUComputePipeline;
+typedef void* WGPUBindGroupLayout;
+typedef void* WGPUBindGroup;
+typedef void* WGPUPipelineLayout;
+typedef void* WGPUBuffer;
+typedef void* WGPUCommandEncoder;
+typedef void* WGPUComputePassEncoder;
+typedef void* WGPUCommandBuffer;
 typedef uint32_t WGPUBufferUsageFlags;
 typedef uint64_t WGPUMapModeFlags;
 
-#define WGPU_BUFFER_USAGE_STORAGE  0x0080
+#define WGPU_BUFFER_USAGE_STORAGE 0x0080
 #define WGPU_BUFFER_USAGE_COPY_SRC 0x0004
 #define WGPU_BUFFER_USAGE_COPY_DST 0x0008
 #define WGPU_BUFFER_USAGE_MAP_READ 0x0001
@@ -94,16 +97,13 @@ typedef enum {
     WGPUBufferMapAsyncStatus_Success = 0,
 } WGPUBufferMapAsyncStatus;
 
-
 typedef struct {
     WGPUAdapter adapter;
     bool done;
 } AdapterUserData;
 
-static void adapter_request_cb(WGPURequestAdapterStatus status,
-                                WGPUAdapter adapter,
-                                const char* message,
-                                void* userdata) {
+static void adapter_request_cb(WGPURequestAdapterStatus status, WGPUAdapter adapter,
+                               const char* message, void* userdata) {
     AdapterUserData* ud = (AdapterUserData*)userdata;
     if (status == WGPURequestAdapterStatus_Success) {
         ud->adapter = adapter;
@@ -114,16 +114,13 @@ static void adapter_request_cb(WGPURequestAdapterStatus status,
     ud->done = true;
 }
 
-
 typedef struct {
     WGPUDevice device;
     bool done;
 } DeviceUserData;
 
-static void device_request_cb(WGPURequestDeviceStatus status,
-                               WGPUDevice device,
-                               const char* message,
-                               void* userdata) {
+static void device_request_cb(WGPURequestDeviceStatus status, WGPUDevice device,
+                              const char* message, void* userdata) {
     DeviceUserData* ud = (DeviceUserData*)userdata;
     if (status == WGPURequestDeviceStatus_Success) {
         ud->device = device;
@@ -134,7 +131,6 @@ static void device_request_cb(WGPURequestDeviceStatus status,
     ud->done = true;
 }
 
-
 typedef struct {
     bool success;
     bool done;
@@ -142,24 +138,23 @@ typedef struct {
 
 static void buffer_map_cb(WGPUBufferMapAsyncStatus status, void* userdata) {
     MapUserData* ud = (MapUserData*)userdata;
-    ud->success = (status == WGPUBufferMapAsyncStatus_Success);
-    ud->done = true;
+    ud->success     = (status == WGPUBufferMapAsyncStatus_Success);
+    ud->done        = true;
 }
-
 
 bool cml_webgpu_available(void) {
 #ifndef WGPU_LIB_NAME
     return false;
 #else
     void* lib = wgpu_load_library(WGPU_LIB_NAME);
-    if (!lib) return false;
+    if (!lib)
+        return false;
 
     void* sym = wgpu_get_symbol(lib, "wgpuCreateInstance");
     wgpu_unload_library(lib);
     return sym != NULL;
 #endif
 }
-
 
 CMLWebGPUBackend* cml_webgpu_backend_create(void) {
     CMLWebGPUBackend* backend = (CMLWebGPUBackend*)cml_calloc(1, sizeof(CMLWebGPUBackend));
@@ -180,39 +175,37 @@ CMLWebGPUBackend* cml_webgpu_backend_create(void) {
         return NULL;
     }
 
-#define WGPU_LOAD(field, sym_name)                                        \
-    backend->field = wgpu_get_symbol(backend->lib_handle, sym_name);      \
-    if (!backend->field) {                                                \
-        LOG_WARNING("WebGPU: missing symbol %s", sym_name);               \
+#define WGPU_LOAD(field, sym_name)                                                                 \
+    backend->field = wgpu_get_symbol(backend->lib_handle, sym_name);                               \
+    if (!backend->field) {                                                                         \
+        LOG_WARNING("WebGPU: missing symbol %s", sym_name);                                        \
     }
 
-    WGPU_LOAD(fn_create_instance,                "wgpuCreateInstance");
-    WGPU_LOAD(fn_instance_request_adapter,       "wgpuInstanceRequestAdapter");
-    WGPU_LOAD(fn_adapter_request_device,         "wgpuAdapterRequestDevice");
-    WGPU_LOAD(fn_device_get_queue,               "wgpuDeviceGetQueue");
-    WGPU_LOAD(fn_device_create_shader_module,    "wgpuDeviceCreateShaderModule");
+    WGPU_LOAD(fn_create_instance, "wgpuCreateInstance");
+    WGPU_LOAD(fn_instance_request_adapter, "wgpuInstanceRequestAdapter");
+    WGPU_LOAD(fn_adapter_request_device, "wgpuAdapterRequestDevice");
+    WGPU_LOAD(fn_device_get_queue, "wgpuDeviceGetQueue");
+    WGPU_LOAD(fn_device_create_shader_module, "wgpuDeviceCreateShaderModule");
     WGPU_LOAD(fn_device_create_compute_pipeline, "wgpuDeviceCreateComputePipeline");
-    WGPU_LOAD(fn_device_create_bind_group_layout,"wgpuDeviceCreateBindGroupLayout");
-    WGPU_LOAD(fn_device_create_bind_group,       "wgpuDeviceCreateBindGroup");
-    WGPU_LOAD(fn_device_create_pipeline_layout,  "wgpuDeviceCreatePipelineLayout");
-    WGPU_LOAD(fn_device_create_buffer,           "wgpuDeviceCreateBuffer");
-    WGPU_LOAD(fn_device_create_command_encoder,  "wgpuDeviceCreateCommandEncoder");
-    WGPU_LOAD(fn_command_encoder_begin_compute_pass,
-                                                  "wgpuCommandEncoderBeginComputePass");
-    WGPU_LOAD(fn_compute_pass_set_pipeline,      "wgpuComputePassEncoderSetPipeline");
-    WGPU_LOAD(fn_compute_pass_set_bind_group,    "wgpuComputePassEncoderSetBindGroup");
-    WGPU_LOAD(fn_compute_pass_dispatch_workgroups,
-                                                  "wgpuComputePassEncoderDispatchWorkgroups");
-    WGPU_LOAD(fn_compute_pass_end,               "wgpuComputePassEncoderEnd");
-    WGPU_LOAD(fn_command_encoder_finish,         "wgpuCommandEncoderFinish");
-    WGPU_LOAD(fn_queue_submit,                   "wgpuQueueSubmit");
-    WGPU_LOAD(fn_queue_write_buffer,             "wgpuQueueWriteBuffer");
-    WGPU_LOAD(fn_buffer_map_async,               "wgpuBufferMapAsync");
-    WGPU_LOAD(fn_buffer_get_mapped_range,        "wgpuBufferGetMappedRange");
-    WGPU_LOAD(fn_buffer_unmap,                   "wgpuBufferUnmap");
-    WGPU_LOAD(fn_buffer_destroy,                 "wgpuBufferDestroy");
-    WGPU_LOAD(fn_device_poll,                    "wgpuDevicePoll");
-    WGPU_LOAD(fn_instance_release,               "wgpuInstanceRelease");
+    WGPU_LOAD(fn_device_create_bind_group_layout, "wgpuDeviceCreateBindGroupLayout");
+    WGPU_LOAD(fn_device_create_bind_group, "wgpuDeviceCreateBindGroup");
+    WGPU_LOAD(fn_device_create_pipeline_layout, "wgpuDeviceCreatePipelineLayout");
+    WGPU_LOAD(fn_device_create_buffer, "wgpuDeviceCreateBuffer");
+    WGPU_LOAD(fn_device_create_command_encoder, "wgpuDeviceCreateCommandEncoder");
+    WGPU_LOAD(fn_command_encoder_begin_compute_pass, "wgpuCommandEncoderBeginComputePass");
+    WGPU_LOAD(fn_compute_pass_set_pipeline, "wgpuComputePassEncoderSetPipeline");
+    WGPU_LOAD(fn_compute_pass_set_bind_group, "wgpuComputePassEncoderSetBindGroup");
+    WGPU_LOAD(fn_compute_pass_dispatch_workgroups, "wgpuComputePassEncoderDispatchWorkgroups");
+    WGPU_LOAD(fn_compute_pass_end, "wgpuComputePassEncoderEnd");
+    WGPU_LOAD(fn_command_encoder_finish, "wgpuCommandEncoderFinish");
+    WGPU_LOAD(fn_queue_submit, "wgpuQueueSubmit");
+    WGPU_LOAD(fn_queue_write_buffer, "wgpuQueueWriteBuffer");
+    WGPU_LOAD(fn_buffer_map_async, "wgpuBufferMapAsync");
+    WGPU_LOAD(fn_buffer_get_mapped_range, "wgpuBufferGetMappedRange");
+    WGPU_LOAD(fn_buffer_unmap, "wgpuBufferUnmap");
+    WGPU_LOAD(fn_buffer_destroy, "wgpuBufferDestroy");
+    WGPU_LOAD(fn_device_poll, "wgpuDevicePoll");
+    WGPU_LOAD(fn_instance_release, "wgpuInstanceRelease");
 
 #undef WGPU_LOAD
 
@@ -221,16 +214,19 @@ CMLWebGPUBackend* cml_webgpu_backend_create(void) {
 }
 
 int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
-    if (!backend) return -1;
+    if (!backend)
+        return -1;
     if (backend->initialized) {
         return 0;
     }
 
     typedef WGPUInstance (*PFN_wgpuCreateInstance)(const void*);
     typedef void (*PFN_wgpuInstanceRequestAdapter)(
-        WGPUInstance, const void*, void (*)(WGPURequestAdapterStatus, WGPUAdapter, const char*, void*), void*);
+        WGPUInstance, const void*,
+        void (*)(WGPURequestAdapterStatus, WGPUAdapter, const char*, void*), void*);
     typedef void (*PFN_wgpuAdapterRequestDevice)(
-        WGPUAdapter, const void*, void (*)(WGPURequestDeviceStatus, WGPUDevice, const char*, void*), void*);
+        WGPUAdapter, const void*, void (*)(WGPURequestDeviceStatus, WGPUDevice, const char*, void*),
+        void*);
     typedef WGPUQueue (*PFN_wgpuDeviceGetQueue)(WGPUDevice);
     typedef bool (*PFN_wgpuDevicePoll)(WGPUDevice, bool, const void*);
 
@@ -239,9 +235,8 @@ int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
         return -1;
     }
 
-    PFN_wgpuCreateInstance createInst =
-        (PFN_wgpuCreateInstance)backend->fn_create_instance;
-    backend->instance = createInst(NULL);
+    PFN_wgpuCreateInstance createInst = (PFN_wgpuCreateInstance)backend->fn_create_instance;
+    backend->instance                 = createInst(NULL);
     if (!backend->instance) {
         LOG_ERROR("wgpuCreateInstance failed");
         return -1;
@@ -287,8 +282,7 @@ int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
     }
     backend->device = device_ud.device;
 
-    PFN_wgpuDeviceGetQueue getQueue =
-        (PFN_wgpuDeviceGetQueue)backend->fn_device_get_queue;
+    PFN_wgpuDeviceGetQueue getQueue = (PFN_wgpuDeviceGetQueue)backend->fn_device_get_queue;
     if (getQueue) {
         backend->queue = getQueue(backend->device);
     }
@@ -297,8 +291,7 @@ int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
         return -1;
     }
 
-    strncpy(backend->device_name, "WebGPU (wgpu-native)",
-            sizeof(backend->device_name) - 1);
+    strncpy(backend->device_name, "WebGPU (wgpu-native)", sizeof(backend->device_name) - 1);
     backend->initialized = true;
 
     LOG_INFO("WebGPU backend initialized: %s", backend->device_name);
@@ -306,7 +299,8 @@ int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
 }
 
 void cml_webgpu_backend_free(CMLWebGPUBackend* backend) {
-    if (!backend) return;
+    if (!backend)
+        return;
 
     /*
      * WebGPU objects are reference-counted internally; we release only what
@@ -320,10 +314,10 @@ void cml_webgpu_backend_free(CMLWebGPUBackend* backend) {
             rel(backend->instance);
         }
         /* adapter, device, queue are owned by instance/adapter lifetime */
-        backend->instance = NULL;
-        backend->adapter  = NULL;
-        backend->device   = NULL;
-        backend->queue    = NULL;
+        backend->instance    = NULL;
+        backend->adapter     = NULL;
+        backend->device      = NULL;
+        backend->queue       = NULL;
         backend->initialized = false;
     }
 
@@ -335,10 +329,8 @@ void cml_webgpu_backend_free(CMLWebGPUBackend* backend) {
     cml_free(backend);
 }
 
-
-CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
-                                           const char* wgsl_source,
-                                           const char* entry_point) {
+CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend, const char* wgsl_source,
+                                         const char* entry_point) {
     if (!backend || !backend->initialized || !wgsl_source || !entry_point) {
         LOG_ERROR("Invalid arguments to cml_webgpu_compile_wgsl");
         return NULL;
@@ -361,9 +353,9 @@ CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
      * This is ABI-compatible with the webgpu.h definitions used by wgpu-native.
      */
     struct {
-        const void* next;   /* WGPUChainedStruct.next */
-        uint32_t sType;     /* WGPUChainedStruct.sType */
-        uint32_t pad;       /* alignment padding */
+        const void* next; /* WGPUChainedStruct.next */
+        uint32_t sType;   /* WGPUChainedStruct.sType */
+        uint32_t pad;     /* alignment padding */
         const char* code;
     } wgsl_desc;
 
@@ -407,7 +399,7 @@ CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
      * on pointer size.  Using a simple struct with explicit fields:
      */
     struct {
-        const void* nextInChain;   /* NULL */
+        const void* nextInChain; /* NULL */
         const char* label;
         WGPUPipelineLayout layout; /* NULL = auto */
         /* WGPUProgrammableStageDescriptor compute: */
@@ -419,18 +411,17 @@ CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
     } pipeline_desc;
 
     memset(&pipeline_desc, 0, sizeof(pipeline_desc));
-    pipeline_desc.nextInChain       = NULL;
-    pipeline_desc.label             = entry_point;
-    pipeline_desc.layout            = NULL; /* auto layout */
-    pipeline_desc.compute_next      = NULL;
-    pipeline_desc.compute_module    = shaderMod;
+    pipeline_desc.nextInChain        = NULL;
+    pipeline_desc.label              = entry_point;
+    pipeline_desc.layout             = NULL; /* auto layout */
+    pipeline_desc.compute_next       = NULL;
+    pipeline_desc.compute_module     = shaderMod;
     pipeline_desc.compute_entryPoint = entry_point;
-    pipeline_desc.constant_count    = 0;
-    pipeline_desc.constants         = NULL;
+    pipeline_desc.constant_count     = 0;
+    pipeline_desc.constants          = NULL;
 
     typedef WGPUComputePipeline (*PFN_createPipeline)(WGPUDevice, const void*);
-    PFN_createPipeline createPL =
-        (PFN_createPipeline)backend->fn_device_create_compute_pipeline;
+    PFN_createPipeline createPL = (PFN_createPipeline)backend->fn_device_create_compute_pipeline;
     if (!createPL) {
         LOG_ERROR("WebGPU: wgpuDeviceCreateComputePipeline not loaded");
         return NULL;
@@ -460,7 +451,8 @@ CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
 }
 
 void cml_webgpu_kernel_free(CMLWebGPUKernel* kernel) {
-    if (!kernel) return;
+    if (!kernel)
+        return;
     /* The pipeline and shader module are reference-counted internally by
      * wgpu-native; dropping our handle is sufficient.  We do not call
      * explicit release here to avoid double-free in case the caller
@@ -468,12 +460,8 @@ void cml_webgpu_kernel_free(CMLWebGPUKernel* kernel) {
     cml_free(kernel);
 }
 
-
-int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
-                             CMLWebGPUKernel* kernel,
-                             size_t workgroup_count[3],
-                             void** buffers,
-                             size_t* buffer_sizes,
+int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend, CMLWebGPUKernel* kernel,
+                             size_t workgroup_count[3], void** buffers, size_t* buffer_sizes,
                              int num_buffers) {
     if (!backend || !backend->initialized || !kernel || !kernel->pipeline) {
         LOG_ERROR("Invalid arguments to cml_webgpu_launch_kernel");
@@ -485,8 +473,8 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
     typedef WGPUCommandEncoder (*PFN_createCmdEnc)(WGPUDevice, const void*);
     typedef WGPUComputePassEncoder (*PFN_beginPass)(WGPUCommandEncoder, const void*);
     typedef void (*PFN_setPipeline)(WGPUComputePassEncoder, WGPUComputePipeline);
-    typedef void (*PFN_setBindGroup)(WGPUComputePassEncoder, uint32_t, WGPUBindGroup,
-                                      size_t, const uint32_t*);
+    typedef void (*PFN_setBindGroup)(WGPUComputePassEncoder, uint32_t, WGPUBindGroup, size_t,
+                                     const uint32_t*);
     typedef void (*PFN_dispatch)(WGPUComputePassEncoder, uint32_t, uint32_t, uint32_t);
     typedef void (*PFN_endPass)(WGPUComputePassEncoder);
     typedef WGPUCommandBuffer (*PFN_finish)(WGPUCommandEncoder, const void*);
@@ -494,17 +482,16 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
     typedef bool (*PFN_poll)(WGPUDevice, bool, const void*);
 
     PFN_createCmdEnc createEnc = (PFN_createCmdEnc)backend->fn_device_create_command_encoder;
-    PFN_beginPass    beginPass = (PFN_beginPass)backend->fn_command_encoder_begin_compute_pass;
-    PFN_setPipeline  setPipe   = (PFN_setPipeline)backend->fn_compute_pass_set_pipeline;
+    PFN_beginPass beginPass    = (PFN_beginPass)backend->fn_command_encoder_begin_compute_pass;
+    PFN_setPipeline setPipe    = (PFN_setPipeline)backend->fn_compute_pass_set_pipeline;
     PFN_setBindGroup setBG     = (PFN_setBindGroup)backend->fn_compute_pass_set_bind_group;
-    PFN_dispatch     dispatch  = (PFN_dispatch)backend->fn_compute_pass_dispatch_workgroups;
-    PFN_endPass      endPass   = (PFN_endPass)backend->fn_compute_pass_end;
-    PFN_finish       finish    = (PFN_finish)backend->fn_command_encoder_finish;
-    PFN_submit       submit    = (PFN_submit)backend->fn_queue_submit;
-    PFN_poll         poll      = (PFN_poll)backend->fn_device_poll;
+    PFN_dispatch dispatch      = (PFN_dispatch)backend->fn_compute_pass_dispatch_workgroups;
+    PFN_endPass endPass        = (PFN_endPass)backend->fn_compute_pass_end;
+    PFN_finish finish          = (PFN_finish)backend->fn_command_encoder_finish;
+    PFN_submit submit          = (PFN_submit)backend->fn_queue_submit;
+    PFN_poll poll              = (PFN_poll)backend->fn_device_poll;
 
-    if (!createEnc || !beginPass || !setPipe || !dispatch || !endPass ||
-        !finish || !submit) {
+    if (!createEnc || !beginPass || !setPipe || !dispatch || !endPass || !finish || !submit) {
         LOG_ERROR("WebGPU: required function pointers are NULL");
         return -1;
     }
@@ -512,8 +499,8 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
     typedef WGPUBindGroupLayout (*PFN_getBindGroupLayout)(WGPUComputePipeline, uint32_t);
     typedef WGPUBindGroup (*PFN_createBindGroup)(WGPUDevice, const void*);
 
-    PFN_getBindGroupLayout getBGL = (PFN_getBindGroupLayout)
-        wgpu_get_symbol(backend->lib_handle, "wgpuComputePipelineGetBindGroupLayout");
+    PFN_getBindGroupLayout getBGL = (PFN_getBindGroupLayout)wgpu_get_symbol(
+        backend->lib_handle, "wgpuComputePipelineGetBindGroupLayout");
     PFN_createBindGroup createBG = (PFN_createBindGroup)backend->fn_device_create_bind_group;
 
     WGPUBindGroup bind_group = NULL;
@@ -538,11 +525,11 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
             if (entries) {
                 for (int i = 0; i < num_buffers; i++) {
                     entries[i].nextInChain = NULL;
-                    entries[i].binding = (uint32_t)i;
-                    entries[i].buffer = (WGPUBuffer)buffers[i];
-                    entries[i].offset = 0;
-                    entries[i].size = buffer_sizes ? buffer_sizes[i] : 0;
-                    entries[i].sampler = NULL;
+                    entries[i].binding     = (uint32_t)i;
+                    entries[i].buffer      = (WGPUBuffer)buffers[i];
+                    entries[i].offset      = 0;
+                    entries[i].size        = buffer_sizes ? buffer_sizes[i] : 0;
+                    entries[i].sampler     = NULL;
                     entries[i].textureView = NULL;
                 }
 
@@ -554,10 +541,10 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
                     const void* entries;
                 } bg_desc;
                 memset(&bg_desc, 0, sizeof(bg_desc));
-                bg_desc.label = "cml_bind_group";
-                bg_desc.layout = layout;
+                bg_desc.label      = "cml_bind_group";
+                bg_desc.layout     = layout;
                 bg_desc.entryCount = (size_t)num_buffers;
-                bg_desc.entries = entries;
+                bg_desc.entries    = entries;
 
                 bind_group = createBG(backend->device, &bg_desc);
                 cml_free(entries);
@@ -586,9 +573,7 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
         setBG(pass, 0, bg, 0, NULL);
     }
 
-    dispatch(pass,
-             (uint32_t)workgroup_count[0],
-             (uint32_t)workgroup_count[1],
+    dispatch(pass, (uint32_t)workgroup_count[0], (uint32_t)workgroup_count[1],
              (uint32_t)workgroup_count[2]);
 
     endPass(pass);
@@ -608,13 +593,12 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
     return 0;
 }
 
-
 void* cml_webgpu_alloc(CMLWebGPUBackend* backend, size_t size) {
-    if (!backend || !backend->initialized || size == 0) return NULL;
+    if (!backend || !backend->initialized || size == 0)
+        return NULL;
 
     typedef WGPUBuffer (*PFN_createBuffer)(WGPUDevice, const void*);
-    PFN_createBuffer createBuf =
-        (PFN_createBuffer)backend->fn_device_create_buffer;
+    PFN_createBuffer createBuf = (PFN_createBuffer)backend->fn_device_create_buffer;
     if (!createBuf) {
         LOG_ERROR("WebGPU: wgpuDeviceCreateBuffer not loaded");
         return NULL;
@@ -630,9 +614,9 @@ void* cml_webgpu_alloc(CMLWebGPUBackend* backend, size_t size) {
 
     memset(&desc, 0, sizeof(desc));
     desc.label = "cml_buffer";
-    desc.usage = WGPU_BUFFER_USAGE_STORAGE | WGPU_BUFFER_USAGE_COPY_SRC |
-                 WGPU_BUFFER_USAGE_COPY_DST;
-    desc.size  = (uint64_t)size;
+    desc.usage =
+        WGPU_BUFFER_USAGE_STORAGE | WGPU_BUFFER_USAGE_COPY_SRC | WGPU_BUFFER_USAGE_COPY_DST;
+    desc.size             = (uint64_t)size;
     desc.mappedAtCreation = false;
 
     WGPUBuffer buffer = createBuf(backend->device, &desc);
@@ -644,7 +628,8 @@ void* cml_webgpu_alloc(CMLWebGPUBackend* backend, size_t size) {
 }
 
 void cml_webgpu_free(CMLWebGPUBackend* backend, void* buffer) {
-    if (!backend || !buffer) return;
+    if (!backend || !buffer)
+        return;
 
     typedef void (*PFN_bufferDestroy)(WGPUBuffer);
     PFN_bufferDestroy destroy = (PFN_bufferDestroy)backend->fn_buffer_destroy;
@@ -653,17 +638,13 @@ void cml_webgpu_free(CMLWebGPUBackend* backend, void* buffer) {
     }
 }
 
-int cml_webgpu_upload(CMLWebGPUBackend* backend,
-                      void* dst_buffer,
-                      const void* src_host,
+int cml_webgpu_upload(CMLWebGPUBackend* backend, void* dst_buffer, const void* src_host,
                       size_t size) {
     if (!backend || !backend->initialized || !dst_buffer || !src_host || size == 0)
         return -1;
 
-    typedef void (*PFN_writeBuffer)(WGPUQueue, WGPUBuffer, uint64_t,
-                                     const void*, size_t);
-    PFN_writeBuffer writeBuf =
-        (PFN_writeBuffer)backend->fn_queue_write_buffer;
+    typedef void (*PFN_writeBuffer)(WGPUQueue, WGPUBuffer, uint64_t, const void*, size_t);
+    PFN_writeBuffer writeBuf = (PFN_writeBuffer)backend->fn_queue_write_buffer;
     if (!writeBuf) {
         LOG_ERROR("WebGPU: wgpuQueueWriteBuffer not loaded");
         return -1;
@@ -673,10 +654,7 @@ int cml_webgpu_upload(CMLWebGPUBackend* backend,
     return 0;
 }
 
-int cml_webgpu_download(CMLWebGPUBackend* backend,
-                        void* dst_host,
-                        void* src_buffer,
-                        size_t size) {
+int cml_webgpu_download(CMLWebGPUBackend* backend, void* dst_host, void* src_buffer, size_t size) {
     if (!backend || !backend->initialized || !dst_host || !src_buffer || size == 0)
         return -1;
 
@@ -693,29 +671,28 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
 
     typedef WGPUBuffer (*PFN_createBuffer)(WGPUDevice, const void*);
     typedef WGPUCommandEncoder (*PFN_createCmdEnc)(WGPUDevice, const void*);
-    typedef void (*PFN_copyBufToBuf)(WGPUCommandEncoder, WGPUBuffer, uint64_t,
-                                      WGPUBuffer, uint64_t, uint64_t);
+    typedef void (*PFN_copyBufToBuf)(WGPUCommandEncoder, WGPUBuffer, uint64_t, WGPUBuffer, uint64_t,
+                                     uint64_t);
     typedef WGPUCommandBuffer (*PFN_finish)(WGPUCommandEncoder, const void*);
     typedef void (*PFN_submit)(WGPUQueue, size_t, const WGPUCommandBuffer*);
     typedef void (*PFN_mapAsync)(WGPUBuffer, WGPUMapModeFlags, size_t, size_t,
-                                  void (*)(WGPUBufferMapAsyncStatus, void*), void*);
+                                 void (*)(WGPUBufferMapAsyncStatus, void*), void*);
     typedef void* (*PFN_getMappedRange)(WGPUBuffer, size_t, size_t);
     typedef void (*PFN_unmap)(WGPUBuffer);
     typedef void (*PFN_bufferDestroy)(WGPUBuffer);
     typedef bool (*PFN_poll)(WGPUDevice, bool, const void*);
 
-    PFN_createBuffer  createBuf = (PFN_createBuffer)backend->fn_device_create_buffer;
-    PFN_createCmdEnc  createEnc = (PFN_createCmdEnc)backend->fn_device_create_command_encoder;
-    PFN_finish        finishEnc = (PFN_finish)backend->fn_command_encoder_finish;
-    PFN_submit        submitQ   = (PFN_submit)backend->fn_queue_submit;
-    PFN_mapAsync      mapAsync  = (PFN_mapAsync)backend->fn_buffer_map_async;
+    PFN_createBuffer createBuf   = (PFN_createBuffer)backend->fn_device_create_buffer;
+    PFN_createCmdEnc createEnc   = (PFN_createCmdEnc)backend->fn_device_create_command_encoder;
+    PFN_finish finishEnc         = (PFN_finish)backend->fn_command_encoder_finish;
+    PFN_submit submitQ           = (PFN_submit)backend->fn_queue_submit;
+    PFN_mapAsync mapAsync        = (PFN_mapAsync)backend->fn_buffer_map_async;
     PFN_getMappedRange getMapped = (PFN_getMappedRange)backend->fn_buffer_get_mapped_range;
-    PFN_unmap         unmap     = (PFN_unmap)backend->fn_buffer_unmap;
+    PFN_unmap unmap              = (PFN_unmap)backend->fn_buffer_unmap;
     PFN_bufferDestroy destroyBuf = (PFN_bufferDestroy)backend->fn_buffer_destroy;
-    PFN_poll          poll       = (PFN_poll)backend->fn_device_poll;
+    PFN_poll poll                = (PFN_poll)backend->fn_device_poll;
 
-    if (!createBuf || !createEnc || !finishEnc || !submitQ ||
-        !mapAsync || !getMapped || !unmap) {
+    if (!createBuf || !createEnc || !finishEnc || !submitQ || !mapAsync || !getMapped || !unmap) {
         LOG_ERROR("WebGPU: missing required symbols for download");
         return -1;
     }
@@ -729,9 +706,9 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
     } stg_desc;
 
     memset(&stg_desc, 0, sizeof(stg_desc));
-    stg_desc.label = "cml_staging";
-    stg_desc.usage = WGPU_BUFFER_USAGE_MAP_READ | WGPU_BUFFER_USAGE_COPY_DST;
-    stg_desc.size  = (uint64_t)size;
+    stg_desc.label            = "cml_staging";
+    stg_desc.usage            = WGPU_BUFFER_USAGE_MAP_READ | WGPU_BUFFER_USAGE_COPY_DST;
+    stg_desc.size             = (uint64_t)size;
     stg_desc.mappedAtCreation = false;
 
     WGPUBuffer staging = createBuf(backend->device, &stg_desc);
@@ -742,16 +719,17 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
 
     WGPUCommandEncoder enc = createEnc(backend->device, NULL);
     if (!enc) {
-        if (destroyBuf) destroyBuf(staging);
+        if (destroyBuf)
+            destroyBuf(staging);
         return -1;
     }
 
-    PFN_copyBufToBuf copyBuf =
-        (PFN_copyBufToBuf)wgpu_get_symbol(backend->lib_handle,
-                                            "wgpuCommandEncoderCopyBufferToBuffer");
+    PFN_copyBufToBuf copyBuf = (PFN_copyBufToBuf)wgpu_get_symbol(
+        backend->lib_handle, "wgpuCommandEncoderCopyBufferToBuffer");
     if (!copyBuf) {
         LOG_ERROR("WebGPU: wgpuCommandEncoderCopyBufferToBuffer not found");
-        if (destroyBuf) destroyBuf(staging);
+        if (destroyBuf)
+            destroyBuf(staging);
         return -1;
     }
     copyBuf(enc, (WGPUBuffer)src_buffer, 0, staging, 0, (uint64_t)size);
@@ -759,7 +737,8 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
     WGPUCommandBuffer cmdBuf = finishEnc(enc, NULL);
     submitQ(backend->queue, 1, &cmdBuf);
 
-    if (poll) poll(backend->device, true, NULL);
+    if (poll)
+        poll(backend->device, true, NULL);
 
     MapUserData map_ud = {false, false};
     mapAsync(staging, 0x0001 /* MAP_READ */, 0, size, buffer_map_cb, &map_ud);
@@ -774,7 +753,8 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
 
     if (!map_ud.success) {
         LOG_ERROR("WebGPU buffer map failed");
-        if (destroyBuf) destroyBuf(staging);
+        if (destroyBuf)
+            destroyBuf(staging);
         return -1;
     }
 
@@ -784,12 +764,14 @@ int cml_webgpu_download(CMLWebGPUBackend* backend,
     } else {
         LOG_ERROR("wgpuBufferGetMappedRange returned NULL");
         unmap(staging);
-        if (destroyBuf) destroyBuf(staging);
+        if (destroyBuf)
+            destroyBuf(staging);
         return -1;
     }
 
     unmap(staging);
-    if (destroyBuf) destroyBuf(staging);
+    if (destroyBuf)
+        destroyBuf(staging);
 
     return 0;
 }
@@ -801,56 +783,59 @@ bool cml_webgpu_available(void) { return false; }
 CMLWebGPUBackend* cml_webgpu_backend_create(void) { return NULL; }
 
 int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
-    (void)backend; return -1;
-}
-
-void cml_webgpu_backend_free(CMLWebGPUBackend* backend) {
     (void)backend;
+    return -1;
 }
 
-CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
-                                           const char* wgsl_source,
-                                           const char* entry_point) {
-    (void)backend; (void)wgsl_source; (void)entry_point;
+void cml_webgpu_backend_free(CMLWebGPUBackend* backend) { (void)backend; }
+
+CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend, const char* wgsl_source,
+                                         const char* entry_point) {
+    (void)backend;
+    (void)wgsl_source;
+    (void)entry_point;
     return NULL;
 }
 
-void cml_webgpu_kernel_free(CMLWebGPUKernel* kernel) {
-    (void)kernel;
-}
+void cml_webgpu_kernel_free(CMLWebGPUKernel* kernel) { (void)kernel; }
 
-int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend,
-                             CMLWebGPUKernel* kernel,
-                             size_t workgroup_count[3],
-                             void** buffers,
-                             size_t* buffer_sizes,
+int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend, CMLWebGPUKernel* kernel,
+                             size_t workgroup_count[3], void** buffers, size_t* buffer_sizes,
                              int num_buffers) {
-    (void)backend; (void)kernel; (void)workgroup_count;
-    (void)buffers; (void)buffer_sizes; (void)num_buffers;
+    (void)backend;
+    (void)kernel;
+    (void)workgroup_count;
+    (void)buffers;
+    (void)buffer_sizes;
+    (void)num_buffers;
     return -1;
 }
 
 void* cml_webgpu_alloc(CMLWebGPUBackend* backend, size_t size) {
-    (void)backend; (void)size; return NULL;
+    (void)backend;
+    (void)size;
+    return NULL;
 }
 
 void cml_webgpu_free(CMLWebGPUBackend* backend, void* buffer) {
-    (void)backend; (void)buffer;
+    (void)backend;
+    (void)buffer;
 }
 
-int cml_webgpu_upload(CMLWebGPUBackend* backend,
-                      void* dst_buffer,
-                      const void* src_host,
+int cml_webgpu_upload(CMLWebGPUBackend* backend, void* dst_buffer, const void* src_host,
                       size_t size) {
-    (void)backend; (void)dst_buffer; (void)src_host; (void)size;
+    (void)backend;
+    (void)dst_buffer;
+    (void)src_host;
+    (void)size;
     return -1;
 }
 
-int cml_webgpu_download(CMLWebGPUBackend* backend,
-                        void* dst_host,
-                        void* src_buffer,
-                        size_t size) {
-    (void)backend; (void)dst_host; (void)src_buffer; (void)size;
+int cml_webgpu_download(CMLWebGPUBackend* backend, void* dst_host, void* src_buffer, size_t size) {
+    (void)backend;
+    (void)dst_host;
+    (void)src_buffer;
+    (void)size;
     return -1;
 }
 

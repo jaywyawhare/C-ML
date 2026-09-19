@@ -42,7 +42,7 @@ static void scalar_matmul(const void* a, const void* b, void* out, int m, int n,
         const float* b_f = (const float*)b;
         float* out_f     = (float*)out;
 
-            for (int i = 0; i < m; i++) {
+        for (int i = 0; i < m; i++) {
             for (int j = 0; j < n; j++) {
                 float sum = 0.0f;
                 for (int l = 0; l < k; l++) {
@@ -123,7 +123,7 @@ static void scalar_sigmoid(const void* a, void* out, size_t n, DType dtype) {
         float* out_f     = (float*)out;
 
         for (size_t i = 0; i < n; i++) {
-                    float x  = a_f[i];
+            float x  = a_f[i];
             out_f[i] = 1.0f / (1.0f + expf(-x));
         }
     } else {
@@ -363,7 +363,8 @@ int backend_init(BackendType type) {
          * the SSE build). Loud, not silent. */
         LOG_ERROR("backend_init(%d): the legacy backend API does not perform GPU "
                   "compute on this platform; use cml_dispatch_execute_on / cml_ir_execute. "
-                  "Falling back to host scalar ops.", (int)type);
+                  "Falling back to host scalar ops.",
+                  (int)type);
         g_current_backend->ops = scalar_ops;
         break;
     case BACKEND_OPENCL:

@@ -8,12 +8,10 @@
 #define DEFAULT_BUCKET_SIZE (25 * 1024 * 1024) /* 25MB in bytes */
 
 DDPConfig cml_ddp_default_config(void) {
-    DDPConfig config = {
-        .bucket_size_bytes = DEFAULT_BUCKET_SIZE,
-        .broadcast_buffers = true,
-        .find_unused_parameters = false,
-        .gradient_as_bucket_view = 0
-    };
+    DDPConfig config = {.bucket_size_bytes       = DEFAULT_BUCKET_SIZE,
+                        .broadcast_buffers       = true,
+                        .find_unused_parameters  = false,
+                        .gradient_as_bucket_view = 0};
     return config;
 }
 
@@ -33,12 +31,11 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
         return NULL;
 
     ddp->module = module;
-    ddp->group = cml_dist_get_default_group();
+    ddp->group  = cml_dist_get_default_group();
     ddp->config = config ? *config : cml_ddp_default_config();
 
     /* Collect all parameters */
-    int result = module_collect_parameters(module, &ddp->all_params,
-                                           &ddp->num_params, true);
+    int result = module_collect_parameters(module, &ddp->all_params, &ddp->num_params, true);
     if (result != 0 || ddp->num_params == 0) {
         LOG_WARNING("DDP: no parameters found in module");
         cml_free(ddp);
@@ -55,7 +52,7 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
 
     /* Setup gradient buckets */
     size_t bucket_size_floats = ddp->config.bucket_size_bytes / sizeof(float);
-    size_t total_params_size = 0;
+    size_t total_params_size  = 0;
 
     for (int i = 0; i < ddp->num_params; i++) {
         if (ddp->all_params[i] && ddp->all_params[i]->tensor)
@@ -66,8 +63,8 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
     if (ddp->num_buckets < 1)
         ddp->num_buckets = 1;
 
-    ddp->buckets = cml_calloc(ddp->num_buckets, sizeof(float*));
-    ddp->bucket_sizes = cml_calloc(ddp->num_buckets, sizeof(size_t));
+    ddp->buckets         = cml_calloc(ddp->num_buckets, sizeof(float*));
+    ddp->bucket_sizes    = cml_calloc(ddp->num_buckets, sizeof(size_t));
     ddp->param_to_bucket = cml_calloc(ddp->num_params, sizeof(int));
 
     if (!ddp->buckets || !ddp->bucket_sizes || !ddp->param_to_bucket) {
@@ -77,7 +74,7 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
 
     /* Assign parameters to buckets */
     size_t current_size = 0;
-    int current_bucket = 0;
+    int current_bucket  = 0;
 
     for (int i = 0; i < ddp->num_params; i++) {
         ddp->param_to_bucket[i] = current_bucket;
@@ -106,8 +103,8 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
 
     ddp->initialized = true;
 
-    LOG_INFO("DDP initialized: %d params, %d buckets, world_size=%d",
-             ddp->num_params, ddp->num_buckets, ddp->group->world_size);
+    LOG_INFO("DDP initialized: %d params, %d buckets, world_size=%d", ddp->num_params,
+             ddp->num_buckets, ddp->group->world_size);
 
     return ddp;
 }
@@ -149,42 +146,46 @@ Tensor* cml_ddp_shard_input(CMLDataParallel* ddp, Tensor* full_batch) {
     int ws   = ddp->group ? ddp->group->world_size : 1;
     int rank = ddp->group ? ddp->group->rank : 0;
     if (ws <= 1)
-        return full_batch;   /* nothing to shard */
+        return full_batch; /* nothing to shard */
 
     /* Split the batch (dim 0) across ranks; the first `rem` ranks take one extra
      * row so all rows are covered when B isn't divisible by world_size. Returns
      * a fresh materialized tensor holding just this rank's rows — the caller owns
      * it and should free it. Without this every rank trained on the full batch. */
-    int B    = full_batch->shape[0];
-    int base = B / ws;
-    int rem  = B % ws;
+    int B     = full_batch->shape[0];
+    int base  = B / ws;
+    int rem   = B % ws;
     int start = rank * base + (rank < rem ? rank : rem);
     int count = base + (rank < rem ? 1 : 0);
     if (count <= 0) {
-        LOG_WARNING("DDP: rank %d has no rows for batch size %d / world_size %d",
-                    rank, B, ws);
+        LOG_WARNING("DDP: rank %d has no rows for batch size %d / world_size %d", rank, B, ws);
         return NULL;
     }
 
     tensor_ensure_executed(full_batch);
     const float* src = (const float*)tensor_data_ptr(full_batch);
-    if (!src) return NULL;
+    if (!src)
+        return NULL;
 
     size_t row = 1;
     for (int d = 1; d < full_batch->ndim; d++)
         row *= (size_t)full_batch->shape[d];
 
     float* dst = (float*)cml_malloc((size_t)count * row * sizeof(float));
-    int*   shape = (int*)cml_malloc((size_t)full_batch->ndim * sizeof(int));
-    if (!dst || !shape) { cml_free(dst); cml_free(shape); return NULL; }
+    int* shape = (int*)cml_malloc((size_t)full_batch->ndim * sizeof(int));
+    if (!dst || !shape) {
+        cml_free(dst);
+        cml_free(shape);
+        return NULL;
+    }
 
     memcpy(dst, src + (size_t)start * row, (size_t)count * row * sizeof(float));
     shape[0] = count;
     for (int d = 1; d < full_batch->ndim; d++)
         shape[d] = full_batch->shape[d];
 
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* shard = tensor_from_data(dst, shape, full_batch->ndim, &cfg);
     cml_free(dst);
     cml_free(shape);
@@ -199,7 +200,7 @@ static size_t ddp_bucket_copy(CMLDataParallel* ddp, int b, bool pack) {
     /* find_unused_parameters keeps a zero-filled slot for a gradient-less param
      * so every rank's bucket layout matches; otherwise the all-reduce would sum
      * mismatched elements. */
-    bool reserve = ddp->config.find_unused_parameters;
+    bool reserve  = ddp->config.find_unused_parameters;
     size_t offset = 0;
     for (int i = 0; i < ddp->num_params; i++) {
         if (ddp->param_to_bucket[i] != b)
@@ -259,16 +260,14 @@ int cml_ddp_sync_gradients(CMLDataParallel* ddp) {
         /* All-reduce the bucket */
         if (ddp->buckets[b] && offset > 0) {
             /* Create a temporary tensor for the bucket */
-            int shape[1] = {(int)offset};
-            Tensor bucket_tensor = {
-                .data = ddp->buckets[b],
-                .shape = shape,
-                .ndim = 1,
-                .numel = offset,
-                .dtype = DTYPE_FLOAT32,
-                .device = DEVICE_CPU,
-                .owns_data = false
-            };
+            int shape[1]         = {(int)offset};
+            Tensor bucket_tensor = {.data      = ddp->buckets[b],
+                                    .shape     = shape,
+                                    .ndim      = 1,
+                                    .numel     = offset,
+                                    .dtype     = DTYPE_FLOAT32,
+                                    .device    = DEVICE_CPU,
+                                    .owns_data = false};
 
             cml_dist_allreduce(&bucket_tensor, DIST_REDUCE_SUM);
 

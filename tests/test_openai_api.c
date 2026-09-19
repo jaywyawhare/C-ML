@@ -19,11 +19,12 @@ static void* server_thread(void* arg) {
 
 static int http_get(int port, const char* path, char* resp_buf, size_t buf_size) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) return -1;
+    if (fd < 0)
+        return -1;
 
     struct sockaddr_in addr = {0};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons((uint16_t)port);
+    addr.sin_family         = AF_INET;
+    addr.sin_port           = htons((uint16_t)port);
     inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
 
     if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
@@ -33,14 +34,14 @@ static int http_get(int port, const char* path, char* resp_buf, size_t buf_size)
 
     char req[512];
     int req_len = snprintf(req, sizeof(req),
-                           "GET %s HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
-                           path);
+                           "GET %s HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n", path);
     send(fd, req, (size_t)req_len, 0);
 
     size_t total = 0;
     while (total < buf_size - 1) {
         ssize_t n = recv(fd, resp_buf + total, buf_size - 1 - total, 0);
-        if (n <= 0) break;
+        if (n <= 0)
+            break;
         total += (size_t)n;
     }
     resp_buf[total] = '\0';

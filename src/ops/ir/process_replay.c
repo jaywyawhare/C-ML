@@ -22,11 +22,11 @@
 #define KERNEL_FILE_EXT ".kernel"
 
 static pthread_mutex_t g_replay_lock = PTHREAD_MUTEX_INITIALIZER;
-static bool g_replay_enabled = false;
+static bool g_replay_enabled         = false;
 static char g_output_dir[4096];
 
 static uint64_t fnv1a(const void* data, size_t len) {
-    uint64_t hash = FNV_OFFSET_BASIS;
+    uint64_t hash        = FNV_OFFSET_BASIS;
     const uint8_t* bytes = (const uint8_t*)data;
     for (size_t i = 0; i < len; i++) {
         hash ^= bytes[i];
@@ -66,14 +66,17 @@ void cml_process_replay_disable(void) {
 
 static void check_env_init(void) {
     static bool checked = false;
-    if (checked) return;
+    if (checked)
+        return;
     checked = true;
 
     const char* env = getenv("PROCESS_REPLAY");
-    if (!env || env[0] == '\0') return;
+    if (!env || env[0] == '\0')
+        return;
 
     const char* dir = getenv("PROCESS_REPLAY_DIR");
-    if (!dir || dir[0] == '\0') dir = "/tmp/cml_process_replay";
+    if (!dir || dir[0] == '\0')
+        dir = "/tmp/cml_process_replay";
 
     cml_process_replay_enable(dir);
 }
@@ -90,8 +93,8 @@ void cml_process_replay_record(const char* kernel_name, const char* source, size
     uint64_t hash = fnv1a(source, source_len);
 
     char path[4224];
-    snprintf(path, sizeof(path), "%s/%016llx%s",
-             g_output_dir, (unsigned long long)hash, KERNEL_FILE_EXT);
+    snprintf(path, sizeof(path), "%s/%016llx%s", g_output_dir, (unsigned long long)hash,
+             KERNEL_FILE_EXT);
 
     FILE* f = fopen(path, "wb");
     if (!f) {
@@ -115,7 +118,8 @@ void cml_process_replay_record(const char* kernel_name, const char* source, size
 
 static int read_kernel_file(const char* path, char** out_source, size_t* out_len) {
     FILE* f = fopen(path, "rb");
-    if (!f) return -1;
+    if (!f)
+        return -1;
 
     fseek(f, 0, SEEK_END);
     long total = ftell(f);
@@ -142,7 +146,7 @@ static int read_kernel_file(const char* path, char** out_source, size_t* out_len
         return -1;
     }
 
-    char* body = sep + 4;
+    char* body      = sep + 4;
     size_t body_len = read - (size_t)(body - buf);
 
     *out_source = cml_malloc(body_len + 1);
@@ -152,14 +156,15 @@ static int read_kernel_file(const char* path, char** out_source, size_t* out_len
     }
     memcpy(*out_source, body, body_len);
     (*out_source)[body_len] = '\0';
-    *out_len = body_len;
+    *out_len                = body_len;
 
     cml_free(buf);
     return 0;
 }
 
 int cml_process_replay_compare(const char* output_dir, const char* baseline_dir) {
-    if (!output_dir || !baseline_dir) return -1;
+    if (!output_dir || !baseline_dir)
+        return -1;
 
     DIR* dir = opendir(baseline_dir);
     if (!dir) {
@@ -168,24 +173,26 @@ int cml_process_replay_compare(const char* output_dir, const char* baseline_dir)
     }
 
     int mismatches = 0;
-    int compared = 0;
+    int compared   = 0;
     struct dirent* ent;
 
     while ((ent = readdir(dir)) != NULL) {
         size_t namelen = strlen(ent->d_name);
-        size_t extlen = strlen(KERNEL_FILE_EXT);
-        if (namelen <= extlen) continue;
-        if (strcmp(ent->d_name + namelen - extlen, KERNEL_FILE_EXT) != 0) continue;
+        size_t extlen  = strlen(KERNEL_FILE_EXT);
+        if (namelen <= extlen)
+            continue;
+        if (strcmp(ent->d_name + namelen - extlen, KERNEL_FILE_EXT) != 0)
+            continue;
 
         char baseline_path[4224];
         char output_path[4224];
         snprintf(baseline_path, sizeof(baseline_path), "%s/%s", baseline_dir, ent->d_name);
         snprintf(output_path, sizeof(output_path), "%s/%s", output_dir, ent->d_name);
 
-        char* baseline_src = NULL;
-        char* output_src = NULL;
+        char* baseline_src  = NULL;
+        char* output_src    = NULL;
         size_t baseline_len = 0;
-        size_t output_len = 0;
+        size_t output_len   = 0;
 
         if (read_kernel_file(baseline_path, &baseline_src, &baseline_len) != 0) {
             LOG_WARNING("Process replay: cannot read baseline %s", baseline_path);

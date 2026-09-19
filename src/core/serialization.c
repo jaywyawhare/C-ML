@@ -226,7 +226,7 @@ int module_load_stream(Module* module, FILE* file) {
         LOG_ERROR("Failed to read number of parameters");
         return -1;
     }
-    int num_params = (int)num_params_int;
+    int num_params                = (int)num_params_int;
     NamedParameter* module_params = NULL;
     int module_num_params         = 0;
     if (module_named_parameters(module, &module_params, &module_num_params) != 0) {
@@ -241,7 +241,7 @@ int module_load_stream(Module* module, FILE* file) {
             return -1;
         }
         int name_len = (int)name_len_int;
-        char* name = NULL;
+        char* name   = NULL;
         if (name_len > 0) {
             name = cml_malloc((size_t)name_len + 1);
             if (!name) {

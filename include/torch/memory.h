@@ -22,19 +22,19 @@ struct CMLGraph;
 typedef struct CMLGraph* CMLGraph_t;
 
 typedef struct TorchMemoryManager {
-    void*              arena_buffer;
-    size_t             arena_size;
-    size_t             used_bytes;
-    size_t             peak_bytes;
-    CMLContext_t       context;
+    void* arena_buffer;
+    size_t arena_size;
+    size_t used_bytes;
+    size_t peak_bytes;
+    CMLContext_t context;
     CMLGraphAllocator_t graph_allocator;
-    bool               owns_buffer;
-    uint8_t*           bump_ptr;
+    bool owns_buffer;
+    uint8_t* bump_ptr;
 } TorchMemoryManager;
 
 typedef struct TorchMemoryOptions {
     size_t alignment; /* default 64 */
-    bool   track_peak;
+    bool track_peak;
 } TorchMemoryOptions;
 
 CML_API TorchMemoryOptions torch_memory_default_options(void);
@@ -45,12 +45,12 @@ CML_API TorchMemoryManager* torch_memory_create(size_t size);
 /* Wrap a caller-supplied buffer (not freed on destroy). */
 CML_API TorchMemoryManager* torch_memory_from_buffer(void* buffer, size_t size);
 
-CML_API void   torch_memory_free(TorchMemoryManager* mgr);
+CML_API void torch_memory_free(TorchMemoryManager* mgr);
 
 /* Bump-allocate `size` bytes from the arena.
  * Returns NULL when mgr is NULL, size is 0, or the arena is exhausted
  * (used + aligned(size) > arena_size). Does not grow the arena. */
-CML_API void*  torch_memory_alloc(TorchMemoryManager* mgr, size_t size);
+CML_API void* torch_memory_alloc(TorchMemoryManager* mgr, size_t size);
 
 CML_API size_t torch_memory_used(const TorchMemoryManager* mgr);
 CML_API size_t torch_memory_peak(const TorchMemoryManager* mgr);
@@ -59,7 +59,7 @@ CML_API size_t torch_memory_remaining(const TorchMemoryManager* mgr);
 /* Rewind the bump pointer to the start of the arena.
  * Pointers previously returned by torch_memory_alloc() are invalidated and
  * must not be dereferenced after this call. peak_bytes is preserved. */
-CML_API void   torch_memory_reset(TorchMemoryManager* mgr);
+CML_API void torch_memory_reset(TorchMemoryManager* mgr);
 
 /* Reserve graph buffers from a worst-case IR graph. */
 CML_API bool torch_memory_reserve_graph(TorchMemoryManager* mgr, CMLGraph_t graph);

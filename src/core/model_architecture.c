@@ -117,8 +117,9 @@ int model_architecture_extract(Module* module, ModelArchitecture* arch) {
         }
     } else {
         if (arch->num_layers >= arch->capacity) {
-            size_t new_capacity   = arch->capacity == 0 ? 8 : arch->capacity * 2;
-            LayerInfo* new_layers = cml_realloc(arch->layers, (size_t)new_capacity * sizeof(LayerInfo));
+            size_t new_capacity = arch->capacity == 0 ? 8 : arch->capacity * 2;
+            LayerInfo* new_layers =
+                cml_realloc(arch->layers, (size_t)new_capacity * sizeof(LayerInfo));
             if (!new_layers)
                 return -1;
             arch->layers   = new_layers;

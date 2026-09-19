@@ -28,7 +28,7 @@ void simd_transpose_2d_f32(const float* src, float* dst, int rows, int cols) {
 void simd_transpose_inplace_f32(float* data, int n) {
     for (int i = 0; i < n; i++)
         for (int j = i + 1; j < n; j++) {
-            float tmp = data[i * n + j];
+            float tmp       = data[i * n + j];
             data[i * n + j] = data[j * n + i];
             data[j * n + i] = tmp;
         }
@@ -56,12 +56,10 @@ void simd_scatter_add_f32(const float* src, const int32_t* indices, float* dst, 
         dst[indices[i]] += src[i];
 }
 
-void simd_copy_f32(const float* src, float* dst, size_t n) {
-    memcpy(dst, src, n * sizeof(float));
-}
+void simd_copy_f32(const float* src, float* dst, size_t n) { memcpy(dst, src, n * sizeof(float)); }
 
-void simd_strided_copy_f32(const float* src, float* dst, size_t n,
-                           size_t src_stride, size_t dst_stride) {
+void simd_strided_copy_f32(const float* src, float* dst, size_t n, size_t src_stride,
+                           size_t dst_stride) {
     if (src_stride == 1 && dst_stride == 1) {
         simd_copy_f32(src, dst, n);
         return;
@@ -93,9 +91,9 @@ void simd_broadcast_copy_f32(const float* src, size_t src_n, float* dst, size_t 
     }
 }
 
-void simd_permute_nd_f32(const float* src, float* dst, const int* shape,
-                         const size_t* strides, const int* perm, int ndim, size_t numel) {
-    int* dst_shape = (int*)cml_malloc(ndim * sizeof(int));
+void simd_permute_nd_f32(const float* src, float* dst, const int* shape, const size_t* strides,
+                         const int* perm, int ndim, size_t numel) {
+    int* dst_shape      = (int*)cml_malloc(ndim * sizeof(int));
     size_t* dst_strides = (size_t*)cml_malloc(ndim * sizeof(size_t));
     if (!dst_shape || !dst_strides) {
         cml_free(dst_shape);

@@ -10,9 +10,9 @@ extern "C" {
 #endif
 
 typedef enum {
-    DIST_BACKEND_NCCL = 0,  /* NVIDIA NCCL (GPU) */
-    DIST_BACKEND_MPI,       /* MPI (CPU/GPU) */
-    DIST_BACKEND_GLOO,      /* Gloo (CPU fallback) */
+    DIST_BACKEND_NCCL = 0, /* NVIDIA NCCL (GPU) */
+    DIST_BACKEND_MPI,      /* MPI (CPU/GPU) */
+    DIST_BACKEND_GLOO,     /* Gloo (CPU fallback) */
     DIST_BACKEND_COUNT
 } DistBackendType;
 
@@ -25,9 +25,9 @@ typedef enum {
 } DistReduceOp;
 
 typedef struct DistWork {
-    void* internal;       /* Backend-specific handle */
-    bool completed;       /* Whether operation is done */
-    int error_code;       /* 0 on success */
+    void* internal; /* Backend-specific handle */
+    bool completed; /* Whether operation is done */
+    int error_code; /* 0 on success */
 } DistWork;
 
 typedef struct DistCommOps {
@@ -52,12 +52,12 @@ typedef struct DistCommOps {
 } DistCommOps;
 
 typedef struct DistProcessGroup {
-    int rank;               /* This process's rank */
-    int world_size;         /* Total number of processes */
-    DistBackendType backend;/* Communication backend */
-    DistCommOps* ops;       /* Backend operations */
-    void* backend_ctx;      /* Backend-specific context */
-    bool initialized;       /* Whether group is initialized */
+    int rank;                /* This process's rank */
+    int world_size;          /* Total number of processes */
+    DistBackendType backend; /* Communication backend */
+    DistCommOps* ops;        /* Backend operations */
+    void* backend_ctx;       /* Backend-specific context */
+    bool initialized;        /* Whether group is initialized */
 } DistProcessGroup;
 
 int cml_dist_init(DistBackendType backend, int world_size, int rank);

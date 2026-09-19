@@ -10,7 +10,7 @@
 #include "autograd/loss_functions.h"
 #include "autograd/autograd.h"
 #include "ops/ir/context.h"
-#include "ops/ir/execution.h"   /* cml_ir_reexecute for the static-graph mode */
+#include "ops/ir/execution.h" /* cml_ir_reexecute for the static-graph mode */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,10 +28,10 @@ LRScheduler* lr_scheduler_step(Optimizer* optimizer, int step_size, float gamma)
         return NULL;
     }
 
-    scheduler->type       = LR_SCHEDULER_STEP;
-    scheduler->optimizer  = optimizer;
-    scheduler->step_size  = step_size;
-    scheduler->gamma      = gamma;
+    scheduler->type        = LR_SCHEDULER_STEP;
+    scheduler->optimizer   = optimizer;
+    scheduler->step_size   = step_size;
+    scheduler->gamma       = gamma;
     scheduler->best_metric = INFINITY;
 
     return scheduler;
@@ -48,12 +48,12 @@ LRScheduler* lr_scheduler_reduce_on_plateau(Optimizer* optimizer, float factor, 
         return NULL;
     }
 
-    scheduler->type          = LR_SCHEDULER_REDUCE_ON_PLATEAU;
-    scheduler->optimizer     = optimizer;
-    scheduler->factor        = factor;
-    scheduler->patience      = patience;
-    scheduler->min_lr        = min_lr;
-    scheduler->best_metric   = INFINITY;
+    scheduler->type        = LR_SCHEDULER_REDUCE_ON_PLATEAU;
+    scheduler->optimizer   = optimizer;
+    scheduler->factor      = factor;
+    scheduler->patience    = patience;
+    scheduler->min_lr      = min_lr;
+    scheduler->best_metric = INFINITY;
 
     return scheduler;
 }
@@ -68,9 +68,9 @@ LRScheduler* lr_scheduler_exponential(Optimizer* optimizer, float gamma) {
         return NULL;
     }
 
-    scheduler->type       = LR_SCHEDULER_EXPONENTIAL;
-    scheduler->optimizer  = optimizer;
-    scheduler->exp_gamma  = gamma;
+    scheduler->type        = LR_SCHEDULER_EXPONENTIAL;
+    scheduler->optimizer   = optimizer;
+    scheduler->exp_gamma   = gamma;
     scheduler->best_metric = INFINITY;
 
     return scheduler;
@@ -86,11 +86,11 @@ LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min)
         return NULL;
     }
 
-    scheduler->type       = LR_SCHEDULER_COSINE;
-    scheduler->optimizer  = optimizer;
-    scheduler->T_max      = T_max;
-    scheduler->eta_min    = eta_min;
-    scheduler->min_lr     = eta_min;
+    scheduler->type        = LR_SCHEDULER_COSINE;
+    scheduler->optimizer   = optimizer;
+    scheduler->T_max       = T_max;
+    scheduler->eta_min     = eta_min;
+    scheduler->min_lr      = eta_min;
     scheduler->best_metric = INFINITY;
     if (optimizer->num_param_groups > 0) {
         scheduler->initial_lr = optimizer->param_groups[0].lr;
@@ -102,7 +102,7 @@ LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min)
 }
 
 LRScheduler* lr_scheduler_polynomial(Optimizer* optimizer, int total_iters, float power,
-                                      float min_lr) {
+                                     float min_lr) {
     if (!optimizer || total_iters <= 0) {
         return NULL;
     }
@@ -232,11 +232,11 @@ float lr_scheduler_update(LRScheduler* scheduler, float metric) {
             new_lr  = init_lr + (scheduler->max_lr - init_lr) * t;
         } else {
             int anneal_steps = scheduler->total_steps - warmup_end;
-            float t = anneal_steps > 0
-                          ? (float)(epoch - warmup_end) / (float)anneal_steps
-                          : 1.0f;
-            if (t > 1.0f) t = 1.0f;
-            new_lr = final_lr + (scheduler->max_lr - final_lr) * (1.0f + cosf((float)M_PI * t)) / 2.0f;
+            float t = anneal_steps > 0 ? (float)(epoch - warmup_end) / (float)anneal_steps : 1.0f;
+            if (t > 1.0f)
+                t = 1.0f;
+            new_lr =
+                final_lr + (scheduler->max_lr - final_lr) * (1.0f + cosf((float)M_PI * t)) / 2.0f;
         }
 
         for (int i = 0; i < scheduler->optimizer->num_param_groups; i++) {
@@ -257,7 +257,8 @@ float lr_scheduler_update(LRScheduler* scheduler, float metric) {
     }
     case LR_SCHEDULER_POLYNOMIAL: {
         float progress = (float)scheduler->last_epoch / (float)scheduler->total_iters;
-        if (progress > 1.0f) progress = 1.0f;
+        if (progress > 1.0f)
+            progress = 1.0f;
 
         float decay  = powf(1.0f - progress, scheduler->power);
         float new_lr = (scheduler->initial_lr - scheduler->min_lr) * decay + scheduler->min_lr;
@@ -270,7 +271,8 @@ float lr_scheduler_update(LRScheduler* scheduler, float metric) {
     case LR_SCHEDULER_WARMUP: {
         if (scheduler->last_epoch <= scheduler->warmup_steps) {
             float t = (float)scheduler->last_epoch / (float)scheduler->warmup_steps;
-            float factor = scheduler->warmup_start_factor + (1.0f - scheduler->warmup_start_factor) * t;
+            float factor =
+                scheduler->warmup_start_factor + (1.0f - scheduler->warmup_start_factor) * t;
             float new_lr = scheduler->initial_lr * factor;
 
             for (int i = 0; i < scheduler->optimizer->num_param_groups; i++) {
@@ -438,8 +440,8 @@ static void clip_gradients_by_norm(Module* model, float max_norm) {
                 for (size_t j = 0; j < num_elements; j++)
                     grad_data[j] *= clip_factor;
             }
-            LOG_DEBUG("Gradient clipped: norm=%.6f, threshold=%.6f, factor=%.6f",
-                      (double)grad_norm, (double)max_norm, (double)clip_factor);
+            LOG_DEBUG("Gradient clipped: norm=%.6f, threshold=%.6f, factor=%.6f", (double)grad_norm,
+                      (double)max_norm, (double)clip_factor);
         }
     }
     cml_free(params);
@@ -463,7 +465,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
     LRScheduler* scheduler      = config->scheduler;
     TrainingCallbacks callbacks = config->callbacks;
     float grad_clip_norm        = config->grad_clip_norm;
-    TrainingMetrics* metrics = NULL;
+    TrainingMetrics* metrics    = NULL;
     if (optimizer->training_metrics) {
         metrics = (TrainingMetrics*)optimizer->training_metrics;
     }
@@ -475,11 +477,11 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
      * batch) around fixed input buffers, then every later batch of the same shape
      * memcpys new data into those buffers, cml_ir_reexecute()s the graph (no
      * rebuild, no node allocation), and applies an in-place SGD step. */
-    bool  sg_mode     = config->static_graph;
-    bool  sg_captured = false;
-    CMLGraph_t sg_ir  = NULL;
-    Tensor* sg_X = NULL, *sg_Y = NULL, *sg_loss = NULL;
-    size_t  sg_xn = 0, sg_yn = 0;
+    bool sg_mode     = config->static_graph;
+    bool sg_captured = false;
+    CMLGraph_t sg_ir = NULL;
+    Tensor *sg_X = NULL, *sg_Y = NULL, *sg_loss = NULL;
+    size_t sg_xn = 0, sg_yn = 0;
 
     for (int epoch = 0; epoch < epochs; epoch++) {
         if (callbacks.on_epoch_begin) {
@@ -489,7 +491,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
 
         float epoch_loss = 0.0f;
         int num_batches  = 0;
-        Batch* batch = NULL;
+        Batch* batch     = NULL;
         while ((batch = dataloader_next_batch(train_loader)) != NULL) {
             if (callbacks.on_batch_begin) {
                 callbacks.on_batch_begin(epoch, batch->batch_index, callbacks.user_data);
@@ -497,45 +499,55 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
 
             /* ---- static-graph fast path (after the first batch is captured) ---- */
             if (sg_mode && sg_captured) {
-                if (batch->X) tensor_realize(batch->X);
-                if (batch->y) tensor_realize(batch->y);
-                if (!batch->X || !batch->y ||
-                    batch->X->numel != sg_xn || batch->y->numel != sg_yn ||
-                    !batch->X->data || !batch->y->data) {
+                if (batch->X)
+                    tensor_realize(batch->X);
+                if (batch->y)
+                    tensor_realize(batch->y);
+                if (!batch->X || !batch->y || batch->X->numel != sg_xn ||
+                    batch->y->numel != sg_yn || !batch->X->data || !batch->y->data) {
                     /* shape changed (e.g. a smaller trailing batch) — skip it */
                     batch_free(batch);
                     continue;
                 }
                 memcpy(sg_X->data, batch->X->data, sg_xn * sizeof(float));
                 memcpy(sg_Y->data, batch->y->data, sg_yn * sizeof(float));
-                cml_ir_reexecute(sg_ir);                 /* re-run fwd+bwd, no rebuild */
+                cml_ir_reexecute(sg_ir); /* re-run fwd+bwd, no rebuild */
                 float loss_value = tensor_get_float(sg_loss, 0);
                 epoch_loss += loss_value;
                 num_batches++;
-                optimizer_step_inplace(optimizer);       /* in-place SGD, no nodes */
+                optimizer_step_inplace(optimizer); /* in-place SGD, no nodes */
                 if (callbacks.on_batch_end)
-                    callbacks.on_batch_end(epoch, batch->batch_index, loss_value, callbacks.user_data);
+                    callbacks.on_batch_end(epoch, batch->batch_index, loss_value,
+                                           callbacks.user_data);
                 batch_free(batch);
                 continue;
             }
 
             /* Realize batch tensors so they survive the graph reset, then
              * clear the previous iteration's computation graph. */
-            if (batch->X) tensor_realize(batch->X);
-            if (batch->y) tensor_realize(batch->y);
+            if (batch->X)
+                tensor_realize(batch->X);
+            if (batch->y)
+                tensor_realize(batch->y);
             if (!(sg_mode && !sg_captured))
                 cml_ir_reset_global_context();
             /* In static mode the first batch builds the graph around persistent
              * clones of X/y so it can be reused (batch tensors are freed below). */
-            Tensor* fwd_input = batch->X;
+            Tensor* fwd_input   = batch->X;
             Tensor* loss_target = batch->y;
             if (sg_mode && !sg_captured) {
                 cml_ir_reset_global_context();
                 sg_X = tensor_clone(batch->X);
                 sg_Y = tensor_clone(batch->y);
-                if (!sg_X || !sg_Y) { LOG_ERROR("static_graph: clone failed"); batch_free(batch); return -1; }
-                sg_xn = batch->X->numel; sg_yn = batch->y->numel;
-                fwd_input = sg_X; loss_target = sg_Y;
+                if (!sg_X || !sg_Y) {
+                    LOG_ERROR("static_graph: clone failed");
+                    batch_free(batch);
+                    return -1;
+                }
+                sg_xn       = batch->X->numel;
+                sg_yn       = batch->y->numel;
+                fwd_input   = sg_X;
+                loss_target = sg_Y;
             }
             Tensor* output = module_forward(model, fwd_input);
             if (!output) {
@@ -562,8 +574,8 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
              * we use the in-place update on the first batch too. */
             if (sg_mode && !sg_captured) {
                 optimizer_step_inplace(optimizer);
-                sg_ir     = cml_ir_get_or_create_context();
-                sg_loss   = loss;              /* kept: part of the static graph */
+                sg_ir       = cml_ir_get_or_create_context();
+                sg_loss     = loss; /* kept: part of the static graph */
                 sg_captured = true;
             } else {
                 optimizer->step(optimizer);
@@ -604,8 +616,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
                    (double)current_lr);
         }
         if (callbacks.on_epoch_end) {
-            callbacks.on_epoch_end(epoch, avg_loss, 0.0f,
-                                   callbacks.user_data);
+            callbacks.on_epoch_end(epoch, avg_loss, 0.0f, callbacks.user_data);
         }
         if (use_progress_bar) {
             float progress = 100.0f * (float)(epoch + 1) / (float)epochs;
@@ -627,8 +638,10 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
      * (frees the kept output/loss tensors with it). */
     if (sg_mode && sg_captured) {
         cml_ir_reset_global_context();
-        if (sg_X) tensor_free(sg_X);
-        if (sg_Y) tensor_free(sg_Y);
+        if (sg_X)
+            tensor_free(sg_X);
+        if (sg_Y)
+            tensor_free(sg_Y);
     }
 
     return 0;
@@ -656,7 +669,7 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
     bool early_stopping            = config->early_stopping;
     int early_stopping_patience    = config->early_stopping_patience;
     float early_stopping_min_delta = config->early_stopping_min_delta;
-    TrainingMetrics* metrics = NULL;
+    TrainingMetrics* metrics       = NULL;
     if (optimizer->training_metrics) {
         metrics = (TrainingMetrics*)optimizer->training_metrics;
     }
@@ -673,15 +686,17 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
 
         float train_loss      = 0.0f;
         int num_train_batches = 0;
-        Batch* batch = NULL;
+        Batch* batch          = NULL;
         while ((batch = dataloader_next_batch(train_loader)) != NULL) {
             if (callbacks.on_batch_begin) {
                 callbacks.on_batch_begin(epoch, batch->batch_index, callbacks.user_data);
             }
             /* Realize batch tensors so they survive the graph reset, then
              * clear the previous iteration's computation graph. */
-            if (batch->X) tensor_realize(batch->X);
-            if (batch->y) tensor_realize(batch->y);
+            if (batch->X)
+                tensor_realize(batch->X);
+            if (batch->y)
+                tensor_realize(batch->y);
             cml_ir_reset_global_context();
             Tensor* output = module_forward(model, batch->X);
             if (!output) {
@@ -726,8 +741,10 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
         float val_loss      = 0.0f;
         int num_val_batches = 0;
         while ((batch = dataloader_next_batch(val_loader)) != NULL) {
-            if (batch->X) tensor_realize(batch->X);
-            if (batch->y) tensor_realize(batch->y);
+            if (batch->X)
+                tensor_realize(batch->X);
+            if (batch->y)
+                tensor_realize(batch->y);
             cml_ir_reset_global_context();
             Tensor* output = module_forward(model, batch->X);
             if (!output) {

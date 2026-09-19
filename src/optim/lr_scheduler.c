@@ -9,14 +9,15 @@ LRScheduler* lr_scheduler_cosine_annealing(Optimizer* optimizer, int T_max, floa
 }
 
 LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int num_milestones,
-                                      float gamma) {
+                                     float gamma) {
     if (!optimizer || !milestones || num_milestones <= 0) {
         LOG_ERROR("Invalid parameters for lr_scheduler_multi_step");
         return NULL;
     }
 
     LRScheduler* scheduler = cml_malloc(sizeof(LRScheduler));
-    if (!scheduler) return NULL;
+    if (!scheduler)
+        return NULL;
 
     memset(scheduler, 0, sizeof(LRScheduler));
 
@@ -42,24 +43,27 @@ LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int 
 }
 
 void lr_scheduler_step_epoch(LRScheduler* scheduler) {
-    if (!scheduler) return;
+    if (!scheduler)
+        return;
     lr_scheduler_update(scheduler, 0.0f);
 }
 
 void lr_scheduler_step_metric(LRScheduler* scheduler, float metric) {
-    if (!scheduler) return;
+    if (!scheduler)
+        return;
     lr_scheduler_update(scheduler, metric);
 }
 
 LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int total_steps,
-                                     float pct_start, float div_factor, float final_div_factor) {
+                                    float pct_start, float div_factor, float final_div_factor) {
     if (!optimizer || total_steps <= 0) {
         LOG_ERROR("Invalid parameters for lr_scheduler_one_cycle");
         return NULL;
     }
 
     LRScheduler* scheduler = cml_malloc(sizeof(LRScheduler));
-    if (!scheduler) return NULL;
+    if (!scheduler)
+        return NULL;
 
     memset(scheduler, 0, sizeof(LRScheduler));
 
@@ -72,7 +76,7 @@ LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int tota
     scheduler->final_div_factor = final_div_factor > 0.0f ? final_div_factor : 1e4f;
     scheduler->last_epoch       = 0;
 
-    float init_lr = max_lr / scheduler->div_factor;
+    float init_lr         = max_lr / scheduler->div_factor;
     scheduler->initial_lr = init_lr;
     scheduler->current_lr = init_lr;
     optimizer_set_lr(optimizer, init_lr);

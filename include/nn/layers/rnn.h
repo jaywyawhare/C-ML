@@ -18,8 +18,8 @@ typedef struct RNNCell {
     Parameter* bias_hh;   // [hidden_size]
 } RNNCell;
 
-RNNCell* nn_rnn_cell(int input_size, int hidden_size, bool use_bias,
-                     DType dtype, DeviceType device);
+RNNCell* nn_rnn_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                     DeviceType device);
 Tensor* rnn_cell_forward(RNNCell* cell, Tensor* input, Tensor* hidden);
 
 typedef struct LSTMCell {
@@ -33,8 +33,8 @@ typedef struct LSTMCell {
     Parameter* bias_hh;   // [4*hidden_size]
 } LSTMCell;
 
-LSTMCell* nn_lstm_cell(int input_size, int hidden_size, bool use_bias,
-                       DType dtype, DeviceType device);
+LSTMCell* nn_lstm_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                       DeviceType device);
 void lstm_cell_forward(LSTMCell* cell, Tensor* input, Tensor* h_prev, Tensor* c_prev,
                        Tensor** h_out, Tensor** c_out);
 
@@ -49,8 +49,8 @@ typedef struct GRUCell {
     Parameter* bias_hh;   // [3*hidden_size]
 } GRUCell;
 
-GRUCell* nn_gru_cell(int input_size, int hidden_size, bool use_bias,
-                     DType dtype, DeviceType device);
+GRUCell* nn_gru_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
+                     DeviceType device);
 Tensor* gru_cell_forward(GRUCell* cell, Tensor* input, Tensor* hidden);
 
 /* Input:  [seq_len, batch, input_size]  (or [batch, seq_len, input_size] if batch_first)
@@ -67,14 +67,13 @@ typedef struct RNN {
     bool use_bias;
     DType dtype;
     DeviceType device;
-    RNNCell** cells;    // [num_layers * num_directions]
+    RNNCell** cells; // [num_layers * num_directions]
     int num_directions;
 } RNN;
 
-RNN* nn_rnn(int input_size, int hidden_size, int num_layers, bool bidirectional,
-            bool batch_first, float dropout, bool use_bias, DType dtype, DeviceType device);
-void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0,
-                 Tensor** output, Tensor** h_n);
+RNN* nn_rnn(int input_size, int hidden_size, int num_layers, bool bidirectional, bool batch_first,
+            float dropout, bool use_bias, DType dtype, DeviceType device);
+void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0, Tensor** output, Tensor** h_n);
 
 typedef struct LSTM {
     Module base;
@@ -87,14 +86,14 @@ typedef struct LSTM {
     bool use_bias;
     DType dtype;
     DeviceType device;
-    LSTMCell** cells;   // [num_layers * num_directions]
+    LSTMCell** cells; // [num_layers * num_directions]
     int num_directions;
 } LSTM;
 
-LSTM* nn_lstm(int input_size, int hidden_size, int num_layers, bool bidirectional,
-              bool batch_first, float dropout, bool use_bias, DType dtype, DeviceType device);
-void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0,
-                  Tensor** output, Tensor** h_n, Tensor** c_n);
+LSTM* nn_lstm(int input_size, int hidden_size, int num_layers, bool bidirectional, bool batch_first,
+              float dropout, bool use_bias, DType dtype, DeviceType device);
+void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0, Tensor** output,
+                  Tensor** h_n, Tensor** c_n);
 
 typedef struct GRU {
     Module base;
@@ -107,14 +106,13 @@ typedef struct GRU {
     bool use_bias;
     DType dtype;
     DeviceType device;
-    GRUCell** cells;    // [num_layers * num_directions]
+    GRUCell** cells; // [num_layers * num_directions]
     int num_directions;
 } GRU;
 
-GRU* nn_gru(int input_size, int hidden_size, int num_layers, bool bidirectional,
-            bool batch_first, float dropout, bool use_bias, DType dtype, DeviceType device);
-void gru_forward(GRU* gru, Tensor* input, Tensor* h_0,
-                 Tensor** output, Tensor** h_n);
+GRU* nn_gru(int input_size, int hidden_size, int num_layers, bool bidirectional, bool batch_first,
+            float dropout, bool use_bias, DType dtype, DeviceType device);
+void gru_forward(GRU* gru, Tensor* input, Tensor* h_0, Tensor** output, Tensor** h_n);
 
 #ifdef __cplusplus
 }

@@ -27,7 +27,7 @@ typedef enum {
 } FusionType;
 
 typedef struct FusedKernel {
-    struct IRNode** ops;    // Operations in this fused kernel
+    struct IRNode** ops; // Operations in this fused kernel
     int num_ops;
     int capacity;
     FusionType fusion_type;
@@ -81,14 +81,14 @@ struct IRNode {
     bool is_executed;
     void* execution_result;
 
-    bool is_used;              // For dead code elimination
-    bool is_fused;             // For operation fusion
+    bool is_used;  // For dead code elimination
+    bool is_fused; // For operation fusion
     FusionType fusion_type;
     FusedKernel* fused_kernel;
-    int use_count;             // Number of nodes using this output
+    int use_count; // Number of nodes using this output
     struct IRNode** users;
     int users_capacity;
-    int chain_id;              // ID for chained callables
+    int chain_id; // ID for chained callables
 };
 
 void cml_ir_free_node_params(struct IRNode* node);
@@ -100,7 +100,7 @@ struct CMLGraph {
     IRTarget target;
     struct IRNode* head; // Forward graph (lazy)
     struct IRNode* tail;
-    struct IRNode* last_result; // Last node from cml_ir_add_uop (may be interned)
+    struct IRNode* last_result;   // Last node from cml_ir_add_uop (may be interned)
     struct IRNode* backward_head; // Backward graph (lazy)
     int node_count;
 
@@ -138,7 +138,7 @@ struct CMLGraph {
 
 /* FNV-1a, shared by the graph hash and the node intern table. */
 #define CML_FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
-#define CML_FNV_PRIME        0x100000001b3ULL
+#define CML_FNV_PRIME 0x100000001b3ULL
 
 uint64_t cml_fnv1a_bytes(uint64_t hash, const void* data, size_t len);
 

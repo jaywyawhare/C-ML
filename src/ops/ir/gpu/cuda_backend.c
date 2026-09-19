@@ -144,8 +144,7 @@ static int load_cuda_functions(CMLCUDABackend* backend) {
     LOAD_FUNC(cuCtxSynchronize);
 
     /* Event and async transfer functions (best-effort, non-fatal) */
-#define LOAD_FUNC_OPTIONAL(name) \
-    backend->name = get_symbol(backend->cuda_lib, #name);
+#define LOAD_FUNC_OPTIONAL(name) backend->name = get_symbol(backend->cuda_lib, #name);
 
     LOAD_FUNC_OPTIONAL(cuEventCreate);
     LOAD_FUNC_OPTIONAL(cuEventDestroy);
@@ -172,7 +171,6 @@ static int load_cuda_functions(CMLCUDABackend* backend) {
             backend->nvrtcGetProgramLog  = get_symbol(backend->nvrtc_lib, "nvrtcGetProgramLog");
             backend->nvrtcGetProgramLogSize =
                 get_symbol(backend->nvrtc_lib, "nvrtcGetProgramLogSize");
-
         }
     }
 

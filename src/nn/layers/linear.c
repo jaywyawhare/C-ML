@@ -97,7 +97,7 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
     linear->out_features     = out_features;
     linear->use_bias         = use_bias;
     linear->transpose_weight = false;
-    int weight_shape[] = {out_features, in_features};
+    int weight_shape[]       = {out_features, in_features};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* weight = tensor_empty(weight_shape, 2, &config);

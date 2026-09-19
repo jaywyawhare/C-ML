@@ -9,25 +9,25 @@ extern "C" {
 #endif
 
 typedef struct PipelineStage {
-    Module* module;         /* Module for this stage (not owned) */
-    int device_id;          /* Device for this stage */
-    DeviceType device;      /* Device type */
-    int stage_id;           /* Stage index */
+    Module* module;    /* Module for this stage (not owned) */
+    int device_id;     /* Device for this stage */
+    DeviceType device; /* Device type */
+    int stage_id;      /* Stage index */
 } PipelineStage;
 
 typedef struct {
-    int num_micro_batches;  /* Number of micro-batches (default: 4) */
-    int num_stages;         /* Number of pipeline stages */
-    bool interleaved;       /* NOT YET HONORED: the schedule is always the
-                             * GPipe all-forwards-then-all-backwards order;
-                             * setting this has no effect yet. */
+    int num_micro_batches; /* Number of micro-batches (default: 4) */
+    int num_stages;        /* Number of pipeline stages */
+    bool interleaved;      /* NOT YET HONORED: the schedule is always the
+                            * GPipe all-forwards-then-all-backwards order;
+                            * setting this has no effect yet. */
 } PipelineConfig;
 
 typedef struct CMLPipelineParallel {
-    PipelineStage* stages;       /* Array of stages */
-    int num_stages;              /* Number of stages */
-    PipelineConfig config;       /* Configuration */
-    DistProcessGroup* group;     /* Process group */
+    PipelineStage* stages;   /* Array of stages */
+    int num_stages;          /* Number of stages */
+    PipelineConfig config;   /* Configuration */
+    DistProcessGroup* group; /* Process group */
 
     /* Micro-batch buffers */
     Tensor*** micro_batch_outputs; /* [stage][micro_batch] */
@@ -37,12 +37,12 @@ typedef struct CMLPipelineParallel {
      * (stage_id == rank). These cache the per-micro-batch input/output tensors
      * of THIS rank's stage so the distributed backward can back-propagate and
      * stream input-gradients upstream. */
-    Tensor** dist_stage_inputs;   /* [micro_batch] — recv'd (or sliced on rank 0) */
-    Tensor** dist_stage_outputs;  /* [micro_batch] — this stage's forward output */
+    Tensor** dist_stage_inputs;  /* [micro_batch] — recv'd (or sliced on rank 0) */
+    Tensor** dist_stage_outputs; /* [micro_batch] — this stage's forward output */
 } CMLPipelineParallel;
 
 CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
-                                          const PipelineConfig* config);
+                                         const PipelineConfig* config);
 
 Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input);
 

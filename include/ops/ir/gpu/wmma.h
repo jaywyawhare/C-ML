@@ -22,8 +22,8 @@ typedef enum {
 
 typedef struct {
     WMMAFragmentSize fragment;
-    int M, N, K;           /* fragment dimensions */
-    int warp_m, warp_n;    /* number of warps in M and N */
+    int M, N, K;                   /* fragment dimensions */
+    int warp_m, warp_n;            /* number of warps in M and N */
     int block_m, block_n, block_k; /* tile sizes */
 } WMMAConfig;
 

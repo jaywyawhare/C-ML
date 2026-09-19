@@ -18,7 +18,8 @@ static Tensor* dropout_forward(Module* module, Tensor* input) {
 
         if (dropout->p <= 0.0f) {
             Tensor* ones = tensor_ones(input->shape, input->ndim, &config);
-            if (!ones) return NULL;
+            if (!ones)
+                return NULL;
             Tensor* out = uop_mul(input, ones);
             tensor_free(ones);
             return out;
@@ -27,7 +28,7 @@ static Tensor* dropout_forward(Module* module, Tensor* input) {
             return tensor_zeros(input->shape, input->ndim, &config);
         }
 
-        Tensor* rand = tensor_rand(input->shape, input->ndim, &config);
+        Tensor* rand      = tensor_rand(input->shape, input->ndim, &config);
         Tensor* threshold = tensor_full(input->shape, input->ndim, &config, dropout->p);
         Tensor* scale = tensor_full(input->shape, input->ndim, &config, 1.0f / (1.0f - dropout->p));
         if (!rand || !threshold || !scale) {

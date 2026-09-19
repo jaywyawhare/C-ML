@@ -26,9 +26,10 @@ static int checks = 0, failures = 0;
 
 static Tensor* make(DType dt, const int* shape, int ndim, const float* v) {
     TensorConfig c = {.dtype = dt, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
-    Tensor* t = tensor_zeros((int*)shape, ndim, &c);
+    Tensor* t      = tensor_zeros((int*)shape, ndim, &c);
     if (t && v)
-        for (size_t i = 0; i < t->numel; i++) tensor_set_float(t, i, v[i]);
+        for (size_t i = 0; i < t->numel; i++)
+            tensor_set_float(t, i, v[i]);
     return t;
 }
 
@@ -85,7 +86,8 @@ int main(void) {
             const int as[3] = {2, 2, 2}, bs[3] = {2, 1, 2};
             const float av[8] = {1, 2, 3, 4, 5, 6, 7, 8}, bv[4] = {10, 20, 30, 40};
             const float want[8] = {11, 22, 13, 24, 35, 46, 37, 48};
-            expect("[2,2,2] + [2,1,2]", dt, uop_add(make(dt, as, 3, av), make(dt, bs, 3, bv)), want, 8);
+            expect("[2,2,2] + [2,1,2]", dt, uop_add(make(dt, as, 3, av), make(dt, bs, 3, bv)), want,
+                   8);
         }
         /* Trailing broadcast and scalar: these were always right, keep them so. */
         {

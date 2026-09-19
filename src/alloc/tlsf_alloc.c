@@ -20,97 +20,61 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-static inline int tlsf_fls(uint32_t x)
-{
-    if (x == 0) return -1;
+static inline int tlsf_fls(uint32_t x) {
+    if (x == 0)
+        return -1;
     return 31 - __builtin_clz(x);
 }
 
-static inline int tlsf_ffs(uint32_t x)
-{
-    if (x == 0) return -1;
+static inline int tlsf_ffs(uint32_t x) {
+    if (x == 0)
+        return -1;
     return __builtin_ctz(x);
 }
 
-
-
-#define BLOCK_HEADER_SIZE  ((size_t)offsetof(TLSFBlock, next_free))
-#define MIN_USER_SIZE      (sizeof(void*) * 2)  /* Space for next_free + prev_free */
-#define MIN_BLOCK_TOTAL    (BLOCK_HEADER_SIZE + MIN_USER_SIZE)
+#define BLOCK_HEADER_SIZE ((size_t)offsetof(TLSFBlock, next_free))
+#define MIN_USER_SIZE (sizeof(void*) * 2) /* Space for next_free + prev_free */
+#define MIN_BLOCK_TOTAL (BLOCK_HEADER_SIZE + MIN_USER_SIZE)
 
 /* Flags stored in the 2 LSBs of the size field */
-#define FLAG_FREE     ((size_t)1)
+#define FLAG_FREE ((size_t)1)
 #define FLAG_PREVFREE ((size_t)2)
-#define FLAG_MASK     (FLAG_FREE | FLAG_PREVFREE)
+#define FLAG_MASK (FLAG_FREE | FLAG_PREVFREE)
 
-static inline size_t block_get_size(const TLSFBlock* b)
-{
-    return b->size & ~FLAG_MASK;
-}
+static inline size_t block_get_size(const TLSFBlock* b) { return b->size & ~FLAG_MASK; }
 
-static inline void block_set_size(TLSFBlock* b, size_t sz)
-{
-    b->size = sz | (b->size & FLAG_MASK);
-}
+static inline void block_set_size(TLSFBlock* b, size_t sz) { b->size = sz | (b->size & FLAG_MASK); }
 
-static inline bool block_is_free(const TLSFBlock* b)
-{
-    return (b->size & FLAG_FREE) != 0;
-}
+static inline bool block_is_free(const TLSFBlock* b) { return (b->size & FLAG_FREE) != 0; }
 
-static inline void block_mark_free(TLSFBlock* b)
-{
-    b->size |= FLAG_FREE;
-}
+static inline void block_mark_free(TLSFBlock* b) { b->size |= FLAG_FREE; }
 
-static inline void block_mark_used(TLSFBlock* b)
-{
-    b->size &= ~FLAG_FREE;
-}
+static inline void block_mark_used(TLSFBlock* b) { b->size &= ~FLAG_FREE; }
 
-static inline bool block_prev_is_free(const TLSFBlock* b)
-{
-    return (b->size & FLAG_PREVFREE) != 0;
-}
+static inline bool block_prev_is_free(const TLSFBlock* b) { return (b->size & FLAG_PREVFREE) != 0; }
 
-static inline void block_set_prev_free(TLSFBlock* b)
-{
-    b->size |= FLAG_PREVFREE;
-}
+static inline void block_set_prev_free(TLSFBlock* b) { b->size |= FLAG_PREVFREE; }
 
-static inline void block_set_prev_used(TLSFBlock* b)
-{
-    b->size &= ~FLAG_PREVFREE;
-}
+static inline void block_set_prev_used(TLSFBlock* b) { b->size &= ~FLAG_PREVFREE; }
 
-static inline void* block_to_user(TLSFBlock* b)
-{
-    return (char*)b + BLOCK_HEADER_SIZE;
-}
+static inline void* block_to_user(TLSFBlock* b) { return (char*)b + BLOCK_HEADER_SIZE; }
 
-static inline TLSFBlock* user_to_block(void* ptr)
-{
+static inline TLSFBlock* user_to_block(void* ptr) {
     return (TLSFBlock*)((char*)ptr - BLOCK_HEADER_SIZE);
 }
 
-static inline TLSFBlock* block_next_phys(TLSFBlock* b)
-{
+static inline TLSFBlock* block_next_phys(TLSFBlock* b) {
     return (TLSFBlock*)((char*)b + BLOCK_HEADER_SIZE + block_get_size(b));
 }
 
-static inline bool block_in_pool(const CMLTLSFAllocator* a, const TLSFBlock* b)
-{
+static inline bool block_in_pool(const CMLTLSFAllocator* a, const TLSFBlock* b) {
     return (const char*)b >= (const char*)a->pool &&
            (const char*)b < (const char*)a->pool + a->pool_size;
 }
 
-static inline size_t align_up(size_t x, size_t a)
-{
-    return (x + a - 1) & ~(a - 1);
-}
+static inline size_t align_up(size_t x, size_t a) { return (x + a - 1) & ~(a - 1); }
 
-static void mapping_insert(size_t size, int* fl, int* sl)
-{
+static void mapping_insert(size_t size, int* fl, int* sl) {
     int f;
     if (size < (size_t)(1 << (TLSF_FL_INDEX_SHIFT + 1))) {
         f = TLSF_FL_INDEX_SHIFT;
@@ -119,32 +83,33 @@ static void mapping_insert(size_t size, int* fl, int* sl)
     }
     int s = (int)((size >> (f > 4 ? f - 4 : 0)) & (TLSF_SL_INDEX_COUNT - 1));
 
-    if (f >= TLSF_FL_INDEX_COUNT) f = TLSF_FL_INDEX_COUNT - 1;
-    if (s >= TLSF_SL_INDEX_COUNT) s = TLSF_SL_INDEX_COUNT - 1;
+    if (f >= TLSF_FL_INDEX_COUNT)
+        f = TLSF_FL_INDEX_COUNT - 1;
+    if (s >= TLSF_SL_INDEX_COUNT)
+        s = TLSF_SL_INDEX_COUNT - 1;
 
     *fl = f;
     *sl = s;
 }
 
-static void mapping_search(size_t size, int* fl, int* sl)
-{
+static void mapping_search(size_t size, int* fl, int* sl) {
     if (size >= (size_t)(1 << (TLSF_FL_INDEX_SHIFT + 1))) {
-        int f = tlsf_fls((uint32_t)size);
+        int f        = tlsf_fls((uint32_t)size);
         size_t round = ((size_t)1 << (f > 4 ? f - 4 : 0)) - 1;
         size += round;
     }
     mapping_insert(size, fl, sl);
 }
 
-static void freelist_insert(CMLTLSFAllocator* a, TLSFBlock* block)
-{
+static void freelist_insert(CMLTLSFAllocator* a, TLSFBlock* block) {
     int fl, sl;
     mapping_insert(block_get_size(block), &fl, &sl);
 
-    TLSFBlock* head = a->blocks[fl][sl];
+    TLSFBlock* head  = a->blocks[fl][sl];
     block->next_free = head;
     block->prev_free = NULL;
-    if (head) head->prev_free = block;
+    if (head)
+        head->prev_free = block;
     a->blocks[fl][sl] = block;
 
     a->fl_bitmap |= (1U << fl);
@@ -153,8 +118,7 @@ static void freelist_insert(CMLTLSFAllocator* a, TLSFBlock* block)
     block_mark_free(block);
 }
 
-static void freelist_remove(CMLTLSFAllocator* a, TLSFBlock* block)
-{
+static void freelist_remove(CMLTLSFAllocator* a, TLSFBlock* block) {
     int fl, sl;
     mapping_insert(block_get_size(block), &fl, &sl);
 
@@ -178,9 +142,7 @@ static void freelist_remove(CMLTLSFAllocator* a, TLSFBlock* block)
     block->prev_free = NULL;
 }
 
-
-static TLSFBlock* try_split(CMLTLSFAllocator* a, TLSFBlock* block, size_t wanted)
-{
+static TLSFBlock* try_split(CMLTLSFAllocator* a, TLSFBlock* block, size_t wanted) {
     size_t cur = block_get_size(block);
     if (cur < wanted + MIN_BLOCK_TOTAL) {
         /* Not enough room for a remainder block */
@@ -195,7 +157,7 @@ static TLSFBlock* try_split(CMLTLSFAllocator* a, TLSFBlock* block, size_t wanted
     /* Create remainder block right after */
     TLSFBlock* rest = block_next_phys(block);
     rest->prev_phys = block;
-    rest->size = 0;
+    rest->size      = 0;
     block_set_size(rest, remain_user);
     rest->next_free = NULL;
     rest->prev_free = NULL;
@@ -210,11 +172,12 @@ static TLSFBlock* try_split(CMLTLSFAllocator* a, TLSFBlock* block, size_t wanted
     return rest;
 }
 
-static TLSFBlock* merge_prev(CMLTLSFAllocator* a, TLSFBlock* block)
-{
-    if (!block_prev_is_free(block)) return block;
+static TLSFBlock* merge_prev(CMLTLSFAllocator* a, TLSFBlock* block) {
+    if (!block_prev_is_free(block))
+        return block;
     TLSFBlock* prev = block->prev_phys;
-    if (!prev || !block_is_free(prev)) return block;
+    if (!prev || !block_is_free(prev))
+        return block;
 
     freelist_remove(a, prev);
 
@@ -230,11 +193,12 @@ static TLSFBlock* merge_prev(CMLTLSFAllocator* a, TLSFBlock* block)
     return prev;
 }
 
-static TLSFBlock* merge_next(CMLTLSFAllocator* a, TLSFBlock* block)
-{
+static TLSFBlock* merge_next(CMLTLSFAllocator* a, TLSFBlock* block) {
     TLSFBlock* next = block_next_phys(block);
-    if (!block_in_pool(a, next)) return block;
-    if (!block_is_free(next)) return block;
+    if (!block_in_pool(a, next))
+        return block;
+    if (!block_is_free(next))
+        return block;
 
     freelist_remove(a, next);
 
@@ -250,8 +214,7 @@ static TLSFBlock* merge_next(CMLTLSFAllocator* a, TLSFBlock* block)
     return block;
 }
 
-static TLSFBlock* find_suitable(CMLTLSFAllocator* a, size_t size)
-{
+static TLSFBlock* find_suitable(CMLTLSFAllocator* a, size_t size) {
     int fl, sl;
     mapping_search(size, &fl, &sl);
 
@@ -260,10 +223,12 @@ static TLSFBlock* find_suitable(CMLTLSFAllocator* a, size_t size)
     if (sl_map == 0) {
         /* Nothing at this FL level; try higher FL */
         uint32_t fl_map = a->fl_bitmap & (~0U << (fl + 1));
-        if (fl_map == 0) return NULL;
-        fl = tlsf_ffs(fl_map);
+        if (fl_map == 0)
+            return NULL;
+        fl     = tlsf_ffs(fl_map);
         sl_map = a->sl_bitmap[fl];
-        if (sl_map == 0) return NULL;
+        if (sl_map == 0)
+            return NULL;
     }
     sl = tlsf_ffs(sl_map);
 
@@ -275,9 +240,7 @@ static TLSFBlock* find_suitable(CMLTLSFAllocator* a, size_t size)
     return block;
 }
 
-
-static int init_pool(CMLTLSFAllocator* a)
-{
+static int init_pool(CMLTLSFAllocator* a) {
     /* We need at least: one real block (header + min user) + sentinel (header only) */
     if (a->pool_size < MIN_BLOCK_TOTAL + BLOCK_HEADER_SIZE) {
         return -1;
@@ -300,7 +263,7 @@ static int init_pool(CMLTLSFAllocator* a)
     /* First (and only) free block */
     TLSFBlock* first = (TLSFBlock*)a->pool;
     first->prev_phys = NULL;
-    first->size = 0;
+    first->size      = 0;
     block_set_size(first, user_size);
     first->next_free = NULL;
     first->prev_free = NULL;
@@ -308,7 +271,7 @@ static int init_pool(CMLTLSFAllocator* a)
     /* Sentinel block: zero-size, marked used, sits right after the first block */
     TLSFBlock* sentinel = block_next_phys(first);
     sentinel->prev_phys = first;
-    sentinel->size = 0; /* Zero size, used (FLAG_FREE not set) */
+    sentinel->size      = 0; /* Zero size, used (FLAG_FREE not set) */
     /* Mark sentinel as having a free previous block */
     /* (will be updated properly by freelist_insert) */
 
@@ -321,8 +284,7 @@ static int init_pool(CMLTLSFAllocator* a)
     return 0;
 }
 
-CMLTLSFAllocator* cml_tlsf_create(size_t pool_size)
-{
+CMLTLSFAllocator* cml_tlsf_create(size_t pool_size) {
     if (pool_size < MIN_BLOCK_TOTAL + BLOCK_HEADER_SIZE) {
         return NULL;
     }
@@ -331,7 +293,8 @@ CMLTLSFAllocator* cml_tlsf_create(size_t pool_size)
      * malloc's bookkeeping (the pool contains our own block headers
      * which could alias malloc metadata if placed in the same allocation). */
     CMLTLSFAllocator* a = (CMLTLSFAllocator*)cml_calloc(1, sizeof(CMLTLSFAllocator));
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
 
     a->pool = cml_malloc(pool_size);
     if (!a->pool) {
@@ -350,16 +313,16 @@ CMLTLSFAllocator* cml_tlsf_create(size_t pool_size)
     return a;
 }
 
-CMLTLSFAllocator* cml_tlsf_create_with_pool(void* pool, size_t pool_size)
-{
+CMLTLSFAllocator* cml_tlsf_create_with_pool(void* pool, size_t pool_size) {
     if (!pool || pool_size < MIN_BLOCK_TOTAL + BLOCK_HEADER_SIZE) {
         return NULL;
     }
 
     CMLTLSFAllocator* a = (CMLTLSFAllocator*)cml_calloc(1, sizeof(CMLTLSFAllocator));
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
 
-    a->pool = pool;
+    a->pool      = pool;
     a->pool_size = pool_size;
     a->owns_pool = false;
 
@@ -371,25 +334,27 @@ CMLTLSFAllocator* cml_tlsf_create_with_pool(void* pool, size_t pool_size)
     return a;
 }
 
-void cml_tlsf_destroy(CMLTLSFAllocator* a)
-{
-    if (!a) return;
+void cml_tlsf_destroy(CMLTLSFAllocator* a) {
+    if (!a)
+        return;
     if (a->owns_pool) {
         cml_free(a->pool);
     }
     cml_free(a);
 }
 
-void* cml_tlsf_alloc(CMLTLSFAllocator* a, size_t size)
-{
-    if (!a || size == 0) return NULL;
+void* cml_tlsf_alloc(CMLTLSFAllocator* a, size_t size) {
+    if (!a || size == 0)
+        return NULL;
 
     /* Round up and enforce minimum */
     size = align_up(size, TLSF_ALIGN);
-    if (size < MIN_USER_SIZE) size = MIN_USER_SIZE;
+    if (size < MIN_USER_SIZE)
+        size = MIN_USER_SIZE;
 
     TLSFBlock* block = find_suitable(a, size);
-    if (!block) return NULL;
+    if (!block)
+        return NULL;
 
     freelist_remove(a, block);
 
@@ -417,18 +382,20 @@ void* cml_tlsf_alloc(CMLTLSFAllocator* a, size_t size)
     /* Stats */
     size_t alloc_sz = block_get_size(block);
     a->used_bytes += alloc_sz;
-    if (a->used_bytes > a->peak_bytes) a->peak_bytes = a->used_bytes;
+    if (a->used_bytes > a->peak_bytes)
+        a->peak_bytes = a->used_bytes;
     a->num_allocs++;
 
     return block_to_user(block);
 }
 
-void* cml_tlsf_alloc_aligned(CMLTLSFAllocator* a, size_t size, size_t alignment)
-{
-    if (!a || size == 0) return NULL;
+void* cml_tlsf_alloc_aligned(CMLTLSFAllocator* a, size_t size, size_t alignment) {
+    if (!a || size == 0)
+        return NULL;
 
     /* Ensure alignment is at least TLSF_ALIGN and a power of two */
-    if (alignment < TLSF_ALIGN) alignment = TLSF_ALIGN;
+    if (alignment < TLSF_ALIGN)
+        alignment = TLSF_ALIGN;
     if ((alignment & (alignment - 1)) != 0) {
         alignment--;
         alignment |= alignment >> 1;
@@ -440,26 +407,28 @@ void* cml_tlsf_alloc_aligned(CMLTLSFAllocator* a, size_t size, size_t alignment)
     }
 
     size = align_up(size, TLSF_ALIGN);
-    if (size < MIN_USER_SIZE) size = MIN_USER_SIZE;
+    if (size < MIN_USER_SIZE)
+        size = MIN_USER_SIZE;
 
     /* Over-allocate to guarantee alignment.
      * Worst case: we need (alignment - 1) extra bytes for alignment
      * plus space for a gap block header. */
     size_t padded = size + alignment + MIN_BLOCK_TOTAL;
-    padded = align_up(padded, TLSF_ALIGN);
+    padded        = align_up(padded, TLSF_ALIGN);
 
     TLSFBlock* block = find_suitable(a, padded);
-    if (!block) return NULL;
+    if (!block)
+        return NULL;
 
     freelist_remove(a, block);
 
-    void* user_ptr = block_to_user(block);
+    void* user_ptr      = block_to_user(block);
     uintptr_t user_addr = (uintptr_t)user_ptr;
 
     if ((user_addr & (alignment - 1)) != 0) {
         /* Need to align forward.
          * Find the next aligned address that leaves enough room for a gap block. */
-        uintptr_t base = (uintptr_t)block;
+        uintptr_t base         = (uintptr_t)block;
         uintptr_t aligned_user = align_up(user_addr, alignment);
 
         /* Make sure there's room for a gap block between block and aligned_user */
@@ -470,9 +439,9 @@ void* cml_tlsf_alloc_aligned(CMLTLSFAllocator* a, size_t size, size_t alignment)
         /* The aligned block header sits BLOCK_HEADER_SIZE before aligned_user */
         TLSFBlock* aligned_block = (TLSFBlock*)(aligned_user - BLOCK_HEADER_SIZE);
 
-        size_t gap_bytes = (uintptr_t)aligned_block - (uintptr_t)block;
-        size_t gap_user = gap_bytes - BLOCK_HEADER_SIZE;
-        size_t orig_size = block_get_size(block);
+        size_t gap_bytes         = (uintptr_t)aligned_block - (uintptr_t)block;
+        size_t gap_user          = gap_bytes - BLOCK_HEADER_SIZE;
+        size_t orig_size         = block_get_size(block);
         size_t aligned_user_size = orig_size - gap_bytes;
 
         /* Set up the gap block (the original block shrinks) */
@@ -480,7 +449,7 @@ void* cml_tlsf_alloc_aligned(CMLTLSFAllocator* a, size_t size, size_t alignment)
 
         /* Set up the aligned block */
         aligned_block->prev_phys = block;
-        aligned_block->size = 0;
+        aligned_block->size      = 0;
         block_set_size(aligned_block, aligned_user_size);
         aligned_block->next_free = NULL;
         aligned_block->prev_free = NULL;
@@ -512,18 +481,20 @@ void* cml_tlsf_alloc_aligned(CMLTLSFAllocator* a, size_t size, size_t alignment)
 
     size_t alloc_sz = block_get_size(block);
     a->used_bytes += alloc_sz;
-    if (a->used_bytes > a->peak_bytes) a->peak_bytes = a->used_bytes;
+    if (a->used_bytes > a->peak_bytes)
+        a->peak_bytes = a->used_bytes;
     a->num_allocs++;
 
     return block_to_user(block);
 }
 
-void cml_tlsf_free(CMLTLSFAllocator* a, void* ptr)
-{
-    if (!a || !ptr) return;
+void cml_tlsf_free(CMLTLSFAllocator* a, void* ptr) {
+    if (!a || !ptr)
+        return;
 
     TLSFBlock* block = user_to_block(ptr);
-    if (block_is_free(block)) return; /* Double-free guard */
+    if (block_is_free(block))
+        return; /* Double-free guard */
 
     size_t freed = block_get_size(block);
 
@@ -552,17 +523,22 @@ void cml_tlsf_free(CMLTLSFAllocator* a, void* ptr)
     a->num_frees++;
 }
 
-void* cml_tlsf_realloc(CMLTLSFAllocator* a, void* ptr, size_t new_size)
-{
-    if (!a) return NULL;
-    if (!ptr) return cml_tlsf_alloc(a, new_size);
-    if (new_size == 0) { cml_tlsf_free(a, ptr); return NULL; }
+void* cml_tlsf_realloc(CMLTLSFAllocator* a, void* ptr, size_t new_size) {
+    if (!a)
+        return NULL;
+    if (!ptr)
+        return cml_tlsf_alloc(a, new_size);
+    if (new_size == 0) {
+        cml_tlsf_free(a, ptr);
+        return NULL;
+    }
 
     TLSFBlock* block = user_to_block(ptr);
-    size_t old_size = block_get_size(block);
+    size_t old_size  = block_get_size(block);
 
     new_size = align_up(new_size, TLSF_ALIGN);
-    if (new_size < MIN_USER_SIZE) new_size = MIN_USER_SIZE;
+    if (new_size < MIN_USER_SIZE)
+        new_size = MIN_USER_SIZE;
 
     /* Already big enough? */
     if (old_size >= new_size) {
@@ -604,46 +580,53 @@ void* cml_tlsf_realloc(CMLTLSFAllocator* a, void* ptr, size_t new_size)
             }
 
             a->used_bytes += (block_get_size(block) - old_size);
-            if (a->used_bytes > a->peak_bytes) a->peak_bytes = a->used_bytes;
+            if (a->used_bytes > a->peak_bytes)
+                a->peak_bytes = a->used_bytes;
             return ptr;
         }
     }
 
     /* Allocate new, copy, free old */
     void* new_ptr = cml_tlsf_alloc(a, new_size);
-    if (!new_ptr) return NULL;
+    if (!new_ptr)
+        return NULL;
     memcpy(new_ptr, ptr, old_size < new_size ? old_size : new_size);
     cml_tlsf_free(a, ptr);
     return new_ptr;
 }
 
-size_t cml_tlsf_alloc_size(CMLTLSFAllocator* a, void* ptr)
-{
-    if (!a || !ptr) return 0;
+size_t cml_tlsf_alloc_size(CMLTLSFAllocator* a, void* ptr) {
+    if (!a || !ptr)
+        return 0;
     TLSFBlock* block = user_to_block(ptr);
     return block_get_size(block);
 }
 
-void cml_tlsf_stats(const CMLTLSFAllocator* a, size_t* used, size_t* peak,
-                     size_t* num_allocs, size_t* num_frees)
-{
-    if (!a) return;
-    if (used)       *used = a->used_bytes;
-    if (peak)       *peak = a->peak_bytes;
-    if (num_allocs) *num_allocs = a->num_allocs;
-    if (num_frees)  *num_frees = a->num_frees;
+void cml_tlsf_stats(const CMLTLSFAllocator* a, size_t* used, size_t* peak, size_t* num_allocs,
+                    size_t* num_frees) {
+    if (!a)
+        return;
+    if (used)
+        *used = a->used_bytes;
+    if (peak)
+        *peak = a->peak_bytes;
+    if (num_allocs)
+        *num_allocs = a->num_allocs;
+    if (num_frees)
+        *num_frees = a->num_frees;
 }
 
-bool cml_tlsf_check(const CMLTLSFAllocator* a)
-{
-    if (!a || !a->pool) return false;
+bool cml_tlsf_check(const CMLTLSFAllocator* a) {
+    if (!a || !a->pool)
+        return false;
 
     /* Walk the physical block chain */
     TLSFBlock* block = (TLSFBlock*)a->pool;
-    TLSFBlock* prev = NULL;
+    TLSFBlock* prev  = NULL;
 
     while (block_in_pool(a, block)) {
-        if (block->prev_phys != prev) return false;
+        if (block->prev_phys != prev)
+            return false;
 
         size_t bsz = block_get_size(block);
 
@@ -660,7 +643,7 @@ bool cml_tlsf_check(const CMLTLSFAllocator* a)
             }
         }
 
-        prev = block;
+        prev  = block;
         block = block_next_phys(block);
     }
 
@@ -669,96 +652,108 @@ bool cml_tlsf_check(const CMLTLSFAllocator* a)
         bool fl_set = (a->fl_bitmap & (1U << fl)) != 0;
 
         if (!fl_set) {
-            if (a->sl_bitmap[fl] != 0) return false;
+            if (a->sl_bitmap[fl] != 0)
+                return false;
             continue;
         }
-        if (a->sl_bitmap[fl] == 0) return false;
+        if (a->sl_bitmap[fl] == 0)
+            return false;
 
         for (int sl = 0; sl < TLSF_SL_INDEX_COUNT; sl++) {
             bool sl_set = (a->sl_bitmap[fl] & (1U << sl)) != 0;
-            if (sl_set && !a->blocks[fl][sl]) return false;
-            if (!sl_set && a->blocks[fl][sl]) return false;
+            if (sl_set && !a->blocks[fl][sl])
+                return false;
+            if (!sl_set && a->blocks[fl][sl])
+                return false;
         }
     }
 
     return true;
 }
 
-CMLTimelinePlanner* cml_timeline_planner_create(int initial_capacity)
-{
-    if (initial_capacity <= 0) initial_capacity = 16;
+CMLTimelinePlanner* cml_timeline_planner_create(int initial_capacity) {
+    if (initial_capacity <= 0)
+        initial_capacity = 16;
 
     CMLTimelinePlanner* p = (CMLTimelinePlanner*)cml_calloc(1, sizeof(CMLTimelinePlanner));
-    if (!p) return NULL;
+    if (!p)
+        return NULL;
 
-    p->records = (CMLTimelineRecord*)cml_calloc((size_t)initial_capacity, sizeof(CMLTimelineRecord));
-    if (!p->records) { cml_free(p); return NULL; }
+    p->records =
+        (CMLTimelineRecord*)cml_calloc((size_t)initial_capacity, sizeof(CMLTimelineRecord));
+    if (!p->records) {
+        cml_free(p);
+        return NULL;
+    }
 
     p->record_capacity = initial_capacity;
     return p;
 }
 
-void cml_timeline_planner_destroy(CMLTimelinePlanner* p)
-{
-    if (!p) return;
+void cml_timeline_planner_destroy(CMLTimelinePlanner* p) {
+    if (!p)
+        return;
     cml_free(p->records);
     cml_free(p);
 }
 
-int cml_timeline_planner_add(CMLTimelinePlanner* p, int tensor_id,
-                              size_t size, int alloc_time, int free_time)
-{
-    if (!p) return -1;
-    if (alloc_time > free_time) return -1;
+int cml_timeline_planner_add(CMLTimelinePlanner* p, int tensor_id, size_t size, int alloc_time,
+                             int free_time) {
+    if (!p)
+        return -1;
+    if (alloc_time > free_time)
+        return -1;
 
     if (p->num_records >= p->record_capacity) {
-        int new_cap = p->record_capacity * 2;
+        int new_cap            = p->record_capacity * 2;
         CMLTimelineRecord* tmp = (CMLTimelineRecord*)cml_realloc(
             p->records, (size_t)new_cap * sizeof(CMLTimelineRecord));
-        if (!tmp) return -1;
-        p->records = tmp;
+        if (!tmp)
+            return -1;
+        p->records         = tmp;
         p->record_capacity = new_cap;
     }
 
     CMLTimelineRecord* r = &p->records[p->num_records];
-    r->tensor_id = tensor_id;
-    r->size = align_up(size, TLSF_ALIGN);
-    r->offset = 0;
-    r->alloc_time = alloc_time;
-    r->free_time = free_time;
+    r->tensor_id         = tensor_id;
+    r->size              = align_up(size, TLSF_ALIGN);
+    r->offset            = 0;
+    r->alloc_time        = alloc_time;
+    r->free_time         = free_time;
     p->num_records++;
 
-    if (free_time + 1 > p->num_steps) p->num_steps = free_time + 1;
+    if (free_time + 1 > p->num_steps)
+        p->num_steps = free_time + 1;
 
     return 0;
 }
 
-static int timeline_cmp(const void* a, const void* b)
-{
+static int timeline_cmp(const void* a, const void* b) {
     const CMLTimelineRecord* ra = (const CMLTimelineRecord*)a;
     const CMLTimelineRecord* rb = (const CMLTimelineRecord*)b;
-    if (ra->alloc_time != rb->alloc_time) return ra->alloc_time - rb->alloc_time;
-    if (rb->size > ra->size) return 1;
-    if (rb->size < ra->size) return -1;
+    if (ra->alloc_time != rb->alloc_time)
+        return ra->alloc_time - rb->alloc_time;
+    if (rb->size > ra->size)
+        return 1;
+    if (rb->size < ra->size)
+        return -1;
     return 0;
 }
 
-static bool time_overlaps(const CMLTimelineRecord* a, const CMLTimelineRecord* b)
-{
+static bool time_overlaps(const CMLTimelineRecord* a, const CMLTimelineRecord* b) {
     return a->alloc_time <= b->free_time && b->alloc_time <= a->free_time;
 }
 
 static bool space_conflicts(const CMLTimelineRecord* rec, size_t offset,
-                             const CMLTimelineRecord* placed)
-{
-    if (!time_overlaps(rec, placed)) return false;
-    return offset < placed->offset + placed->size &&
-           placed->offset < offset + rec->size;
+                            const CMLTimelineRecord* placed) {
+    if (!time_overlaps(rec, placed))
+        return false;
+    return offset < placed->offset + placed->size && placed->offset < offset + rec->size;
 }
 
-int cml_timeline_planner_solve(CMLTimelinePlanner* p)
-{
-    if (!p || p->num_records == 0) return -1;
+int cml_timeline_planner_solve(CMLTimelinePlanner* p) {
+    if (!p || p->num_records == 0)
+        return -1;
 
     qsort(p->records, (size_t)p->num_records, sizeof(CMLTimelineRecord), timeline_cmp);
 
@@ -766,25 +761,28 @@ int cml_timeline_planner_solve(CMLTimelinePlanner* p)
 
     for (int i = 0; i < p->num_records; i++) {
         CMLTimelineRecord* rec = &p->records[i];
-        size_t offset = 0;
-        bool placed = false;
+        size_t offset          = 0;
+        bool placed            = false;
 
         while (!placed) {
             bool conflict = false;
             for (int j = 0; j < i; j++) {
                 if (space_conflicts(rec, offset, &p->records[j])) {
                     size_t past = align_up(p->records[j].offset + p->records[j].size, TLSF_ALIGN);
-                    if (past > offset) offset = past;
+                    if (past > offset)
+                        offset = past;
                     conflict = true;
                     break;
                 }
             }
-            if (!conflict) placed = true;
+            if (!conflict)
+                placed = true;
         }
 
         rec->offset = offset;
-        size_t end = offset + rec->size;
-        if (end > p->total_required) p->total_required = end;
+        size_t end  = offset + rec->size;
+        if (end > p->total_required)
+            p->total_required = end;
     }
 
     /* Compute peak concurrent usage */
@@ -796,34 +794,36 @@ int cml_timeline_planner_solve(CMLTimelinePlanner* p)
                 usage += p->records[i].size;
             }
         }
-        if (usage > p->peak_usage) p->peak_usage = usage;
+        if (usage > p->peak_usage)
+            p->peak_usage = usage;
     }
 
     return 0;
 }
 
-const CMLTimelineRecord* cml_timeline_planner_get(const CMLTimelinePlanner* p, int tensor_id)
-{
-    if (!p) return NULL;
+const CMLTimelineRecord* cml_timeline_planner_get(const CMLTimelinePlanner* p, int tensor_id) {
+    if (!p)
+        return NULL;
     for (int i = 0; i < p->num_records; i++) {
-        if (p->records[i].tensor_id == tensor_id) return &p->records[i];
+        if (p->records[i].tensor_id == tensor_id)
+            return &p->records[i];
     }
     return NULL;
 }
 
-size_t cml_timeline_planner_total_memory(const CMLTimelinePlanner* p)
-{
+size_t cml_timeline_planner_total_memory(const CMLTimelinePlanner* p) {
     return p ? p->total_required : 0;
 }
 
-size_t cml_timeline_planner_peak_usage(const CMLTimelinePlanner* p)
-{
+size_t cml_timeline_planner_peak_usage(const CMLTimelinePlanner* p) {
     return p ? p->peak_usage : 0;
 }
 
-void cml_timeline_planner_print(const CMLTimelinePlanner* p)
-{
-    if (!p) { printf("Timeline planner: (null)\n"); return; }
+void cml_timeline_planner_print(const CMLTimelinePlanner* p) {
+    if (!p) {
+        printf("Timeline planner: (null)\n");
+        return;
+    }
 
     printf("Timeline Memory Plan\n");
     printf("Records: %d, Steps: %d\n", p->num_records, p->num_steps);
@@ -831,15 +831,13 @@ void cml_timeline_planner_print(const CMLTimelinePlanner* p)
     printf("Peak concurrent usage: %zu bytes\n", p->peak_usage);
     printf("\n");
 
-    printf("  %-10s %-12s %-12s %-10s %-10s\n",
-           "TensorID", "Size", "Offset", "Alloc", "Free");
-    printf("  %-10s %-12s %-12s %-10s %-10s\n",
-           "--------", "----", "------", "-----", "----");
+    printf("  %-10s %-12s %-12s %-10s %-10s\n", "TensorID", "Size", "Offset", "Alloc", "Free");
+    printf("  %-10s %-12s %-12s %-10s %-10s\n", "--------", "----", "------", "-----", "----");
 
     for (int i = 0; i < p->num_records; i++) {
         const CMLTimelineRecord* r = &p->records[i];
-        printf("  %-10d %-12zu %-12zu %-10d %-10d\n",
-               r->tensor_id, r->size, r->offset, r->alloc_time, r->free_time);
+        printf("  %-10d %-12zu %-12zu %-10d %-10d\n", r->tensor_id, r->size, r->offset,
+               r->alloc_time, r->free_time);
     }
 
     if (p->num_steps > 0 && p->num_steps <= 100 && p->total_required > 0) {

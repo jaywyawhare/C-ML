@@ -13,20 +13,22 @@ static void test_creation_aliases(void) {
     printf("  test_creation_aliases...");
 
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    opts = torch_options_device(opts, DEVICE_CPU);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts                    = torch_options_device(opts, DEVICE_CPU);
 
     int shape[] = {2, 3};
-    Tensor* z = torch_zeros(shape, 2, &opts);
+    Tensor* z   = torch_zeros(shape, 2, &opts);
     REQUIRE(z != NULL);
     float* zd = realize(z);
-    for (int i = 0; i < 6; i++) REQUIRE(zd[i] == 0.0f);
+    for (int i = 0; i < 6; i++)
+        REQUIRE(zd[i] == 0.0f);
     torch_tensor_free(z);
 
     Tensor* o = torch_ones(shape, 2, &opts);
     REQUIRE(o != NULL);
     float* od = realize(o);
-    for (int i = 0; i < 6; i++) REQUIRE(od[i] == 1.0f);
+    for (int i = 0; i < 6; i++)
+        REQUIRE(od[i] == 1.0f);
     torch_tensor_free(o);
 
     Tensor* r = torch_randn(shape, 2, &opts);
@@ -44,18 +46,19 @@ static void test_op_aliases(void) {
     printf("  test_op_aliases...");
 
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    opts = torch_options_device(opts, DEVICE_CPU);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts                    = torch_options_device(opts, DEVICE_CPU);
 
     int shape[] = {2, 2};
-    Tensor* a = torch_ones(shape, 2, &opts);
-    Tensor* b = torch_ones(shape, 2, &opts);
+    Tensor* a   = torch_ones(shape, 2, &opts);
+    Tensor* b   = torch_ones(shape, 2, &opts);
     REQUIRE(a && b);
 
     Tensor* c = torch_add(a, b);
     REQUIRE(c != NULL);
     float* cd = realize(c);
-    for (int i = 0; i < 4; i++) REQUIRE(cd[i] == 2.0f);
+    for (int i = 0; i < 4; i++)
+        REQUIRE(cd[i] == 2.0f);
 
     Tensor* d = torch_mul(a, b);
     REQUIRE(d != NULL);
@@ -76,17 +79,17 @@ static void test_activation_aliases(void) {
     printf("  test_activation_aliases...");
 
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    opts = torch_options_device(opts, DEVICE_CPU);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts                    = torch_options_device(opts, DEVICE_CPU);
 
     int shape[] = {4};
-    Tensor* x = torch_ones(shape, 1, &opts);
+    Tensor* x   = torch_ones(shape, 1, &opts);
     REQUIRE(x != NULL);
     float* xd = realize(x);
-    xd[0] = -1.0f;
-    xd[1] = 0.0f;
-    xd[2] = 1.0f;
-    xd[3] = 2.0f;
+    xd[0]     = -1.0f;
+    xd[1]     = 0.0f;
+    xd[2]     = 1.0f;
+    xd[3]     = 2.0f;
 
     Tensor* r = torch_relu(x);
     REQUIRE(r != NULL);

@@ -16,8 +16,8 @@
 #include <unistd.h>
 #include "alloc/cml_allocator.h"
 
-#define HTTP_BUF_SIZE  (256 * 1024)
-#define MAX_MESSAGES   64
+#define HTTP_BUF_SIZE (256 * 1024)
+#define MAX_MESSAGES 64
 
 /* Minimal JSON helpers */
 
@@ -25,25 +25,38 @@ static const char* json_find_key(const char* json, const char* key) {
     char pattern[256];
     snprintf(pattern, sizeof(pattern), "\"%s\"", key);
     const char* p = strstr(json, pattern);
-    if (!p) return NULL;
+    if (!p)
+        return NULL;
     p += strlen(pattern);
-    while (*p == ' ' || *p == ':' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+    while (*p == ' ' || *p == ':' || *p == '\t' || *p == '\n' || *p == '\r')
+        p++;
     return p;
 }
 
 static int json_read_string(const char* p, char* out, size_t out_size) {
-    if (!p || *p != '"') return -1;
+    if (!p || *p != '"')
+        return -1;
     p++;
     size_t i = 0;
     while (*p && *p != '"' && i < out_size - 1) {
         if (*p == '\\' && *(p + 1)) {
             p++;
             switch (*p) {
-            case 'n': out[i++] = '\n'; break;
-            case 't': out[i++] = '\t'; break;
-            case '\\': out[i++] = '\\'; break;
-            case '"': out[i++] = '"'; break;
-            default: out[i++] = *p; break;
+            case 'n':
+                out[i++] = '\n';
+                break;
+            case 't':
+                out[i++] = '\t';
+                break;
+            case '\\':
+                out[i++] = '\\';
+                break;
+            case '"':
+                out[i++] = '"';
+                break;
+            default:
+                out[i++] = *p;
+                break;
             }
         } else {
             out[i++] = *p;
@@ -55,23 +68,28 @@ static int json_read_string(const char* p, char* out, size_t out_size) {
 }
 
 static float json_read_float(const char* p, float def) {
-    if (!p) return def;
+    if (!p)
+        return def;
     char* end;
     float v = strtof(p, &end);
     return (end != p) ? v : def;
 }
 
 static int json_read_int(const char* p, int def) {
-    if (!p) return def;
+    if (!p)
+        return def;
     char* end;
     long v = strtol(p, &end, 10);
     return (end != p) ? (int)v : def;
 }
 
 static bool json_read_bool(const char* p, bool def) {
-    if (!p) return def;
-    if (strncmp(p, "true", 4) == 0) return true;
-    if (strncmp(p, "false", 5) == 0) return false;
+    if (!p)
+        return def;
+    if (strncmp(p, "true", 4) == 0)
+        return true;
+    if (strncmp(p, "false", 5) == 0)
+        return false;
     return def;
 }
 
@@ -82,23 +100,29 @@ typedef struct {
 
 static int parse_messages(const char* json, ChatMessage* msgs, int max_msgs) {
     const char* arr = json_find_key(json, "messages");
-    if (!arr || *arr != '[') return 0;
+    if (!arr || *arr != '[')
+        return 0;
     arr++;
 
     int count = 0;
     while (*arr && count < max_msgs) {
         const char* obj = strchr(arr, '{');
-        if (!obj) break;
+        if (!obj)
+            break;
         const char* obj_end = strchr(obj, '}');
-        if (!obj_end) break;
+        if (!obj_end)
+            break;
 
         size_t obj_len = (size_t)(obj_end - obj + 1);
         char buf[16384];
-        if (obj_len >= sizeof(buf)) { arr = obj_end + 1; continue; }
+        if (obj_len >= sizeof(buf)) {
+            arr = obj_end + 1;
+            continue;
+        }
         memcpy(buf, obj, obj_len);
         buf[obj_len] = '\0';
 
-        const char* role_p = json_find_key(buf, "role");
+        const char* role_p    = json_find_key(buf, "role");
         const char* content_p = json_find_key(buf, "content");
 
         json_read_string(role_p, msgs[count].role, sizeof(msgs[count].role));
@@ -116,19 +140,22 @@ static int recv_http_request(int fd, char* buf, size_t buf_size) {
     size_t total = 0;
     while (total < buf_size - 1) {
         ssize_t n = recv(fd, buf + total, buf_size - 1 - total, 0);
-        if (n <= 0) return (total > 0) ? (int)total : -1;
+        if (n <= 0)
+            return (total > 0) ? (int)total : -1;
         total += (size_t)n;
         buf[total] = '\0';
         if (strstr(buf, "\r\n\r\n")) {
             char* cl = strstr(buf, "Content-Length:");
-            if (!cl) cl = strstr(buf, "content-length:");
+            if (!cl)
+                cl = strstr(buf, "content-length:");
             if (cl) {
-                int content_len = atoi(cl + 15);
-                char* body = strstr(buf, "\r\n\r\n") + 4;
+                int content_len      = atoi(cl + 15);
+                char* body           = strstr(buf, "\r\n\r\n") + 4;
                 size_t body_received = total - (size_t)(body - buf);
                 while ((int)body_received < content_len && total < buf_size - 1) {
                     n = recv(fd, buf + total, buf_size - 1 - total, 0);
-                    if (n <= 0) break;
+                    if (n <= 0)
+                        break;
                     total += (size_t)n;
                     body_received += (size_t)n;
                 }
@@ -144,14 +171,14 @@ static void send_http_response(int fd, int status_code, const char* status_text,
                                const char* content_type, const char* body) {
     char header[1024];
     size_t body_len = body ? strlen(body) : 0;
-    int hdr_len = snprintf(header, sizeof(header),
-                           "HTTP/1.1 %d %s\r\n"
-                           "Content-Type: %s\r\n"
-                           "Content-Length: %zu\r\n"
-                           "Access-Control-Allow-Origin: *\r\n"
-                           "Connection: close\r\n"
-                           "\r\n",
-                           status_code, status_text, content_type, body_len);
+    int hdr_len     = snprintf(header, sizeof(header),
+                               "HTTP/1.1 %d %s\r\n"
+                                   "Content-Type: %s\r\n"
+                                   "Content-Length: %zu\r\n"
+                                   "Access-Control-Allow-Origin: *\r\n"
+                                   "Connection: close\r\n"
+                                   "\r\n",
+                               status_code, status_text, content_type, body_len);
     send(fd, header, (size_t)hdr_len, MSG_NOSIGNAL);
     if (body && body_len > 0) {
         send(fd, body, body_len, MSG_NOSIGNAL);
@@ -187,7 +214,7 @@ static void handle_models(int fd, CMLOpenAIServer* srv) {
 }
 
 static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json) {
-    CMLLLaMAModel* model = (CMLLLaMAModel*)srv->model;
+    CMLLLaMAModel* model    = (CMLLLaMAModel*)srv->model;
     CMLTokenizer* tokenizer = (CMLTokenizer*)srv->tokenizer;
 
     ChatMessage msgs[MAX_MESSAGES];
@@ -197,9 +224,9 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
     (void)model_p;
 
     float temperature = json_read_float(json_find_key(body_json, "temperature"), srv->temperature);
-    float top_p = json_read_float(json_find_key(body_json, "top_p"), srv->top_p);
-    int max_tokens = json_read_int(json_find_key(body_json, "max_tokens"), srv->max_tokens);
-    bool stream = json_read_bool(json_find_key(body_json, "stream"), false);
+    float top_p       = json_read_float(json_find_key(body_json, "top_p"), srv->top_p);
+    int max_tokens    = json_read_int(json_find_key(body_json, "max_tokens"), srv->max_tokens);
+    bool stream       = json_read_bool(json_find_key(body_json, "stream"), false);
 
     if (!model || !tokenizer || num_msgs == 0) {
         const char* err = "{\"error\":{\"message\":\"Model not loaded or empty messages\","
@@ -209,18 +236,19 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
     }
 
     char prompt[32768] = {0};
-    size_t prompt_off = 0;
+    size_t prompt_off  = 0;
     for (int i = 0; i < num_msgs; i++) {
-        int written = snprintf(prompt + prompt_off, sizeof(prompt) - prompt_off,
-                               "[%s]: %s\n", msgs[i].role, msgs[i].content);
-        if (written > 0) prompt_off += (size_t)written;
+        int written = snprintf(prompt + prompt_off, sizeof(prompt) - prompt_off, "[%s]: %s\n",
+                               msgs[i].role, msgs[i].content);
+        if (written > 0)
+            prompt_off += (size_t)written;
     }
 
     CMLGenerationConfig gen_config = cml_generation_default_config();
-    gen_config.temperature = temperature;
-    gen_config.top_p = top_p;
-    gen_config.max_new_tokens = max_tokens;
-    gen_config.do_sample = (temperature > 0.0f);
+    gen_config.temperature         = temperature;
+    gen_config.top_p               = top_p;
+    gen_config.max_new_tokens      = max_tokens;
+    gen_config.do_sample           = (temperature > 0.0f);
 
     char comp_id[64];
     generate_id(comp_id, sizeof(comp_id));
@@ -238,7 +266,7 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
         send(fd, hdr, (size_t)hdr_len, MSG_NOSIGNAL);
 
         int num_prompt_tokens = 0;
-        int* prompt_tokens = cml_tokenizer_encode(tokenizer, prompt, &num_prompt_tokens);
+        int* prompt_tokens    = cml_tokenizer_encode(tokenizer, prompt, &num_prompt_tokens);
         if (!prompt_tokens || num_prompt_tokens == 0) {
             send_sse_chunk(fd, "[DONE]");
             cml_free(prompt_tokens);
@@ -249,18 +277,22 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
 
         for (int i = 0; i < max_tokens; i++) {
             int seq_len = (i == 0) ? num_prompt_tokens : 1;
-            const int* input_tokens = (i == 0) ? prompt_tokens : &prompt_tokens[num_prompt_tokens + i - 1];
+            const int* input_tokens =
+                (i == 0) ? prompt_tokens : &prompt_tokens[num_prompt_tokens + i - 1];
 
             Tensor* logits = cml_llama_forward(model, input_tokens, seq_len);
-            if (!logits) break;
+            if (!logits)
+                break;
 
             int token_id = cml_llama_sample_token(logits, &gen_config);
             tensor_free(logits);
 
-            if (token_id == gen_config.eos_token_id) break;
+            if (token_id == gen_config.eos_token_id)
+                break;
 
             char* token_text = cml_tokenizer_decode(tokenizer, &token_id, 1);
-            if (!token_text) break;
+            if (!token_text)
+                break;
 
             char chunk_json[16384];
             char escaped[8192];
@@ -270,7 +302,9 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
                     escaped[ei++] = '\\';
                 }
                 if (token_text[ti] == '\n') {
-                    escaped[ei++] = '\\'; escaped[ei++] = 'n'; continue;
+                    escaped[ei++] = '\\';
+                    escaped[ei++] = 'n';
+                    continue;
                 }
                 escaped[ei++] = token_text[ti];
             }
@@ -281,8 +315,7 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
                      "\"created\":%ld,\"model\":\"%s\","
                      "\"choices\":[{\"index\":0,\"delta\":{\"content\":\"%s\"},"
                      "\"finish_reason\":null}]}",
-                     comp_id, created,
-                     srv->model_name[0] ? srv->model_name : "cml-default",
+                     comp_id, created, srv->model_name[0] ? srv->model_name : "cml-default",
                      escaped);
 
             send_sse_chunk(fd, chunk_json);
@@ -295,8 +328,7 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
                  "\"created\":%ld,\"model\":\"%s\","
                  "\"choices\":[{\"index\":0,\"delta\":{},"
                  "\"finish_reason\":\"stop\"}]}",
-                 comp_id, created,
-                 srv->model_name[0] ? srv->model_name : "cml-default");
+                 comp_id, created, srv->model_name[0] ? srv->model_name : "cml-default");
         send_sse_chunk(fd, done_json);
         send_sse_chunk(fd, "[DONE]");
 
@@ -307,7 +339,8 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
             const char* err = "{\"error\":{\"message\":\"Generation failed\","
                               "\"type\":\"server_error\"}}";
             send_http_response(fd, 500, "Internal Server Error", "application/json", err);
-            if (result) cml_generation_result_free(result);
+            if (result)
+                cml_generation_result_free(result);
             return;
         }
 
@@ -318,14 +351,16 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
                 escaped[ei++] = '\\';
             }
             if (result->text[i] == '\n') {
-                escaped[ei++] = '\\'; escaped[ei++] = 'n'; continue;
+                escaped[ei++] = '\\';
+                escaped[ei++] = 'n';
+                continue;
             }
             escaped[ei++] = result->text[i];
         }
         escaped[ei] = '\0';
 
         int prompt_tokens_count = 0;
-        int* pt = cml_tokenizer_encode(tokenizer, prompt, &prompt_tokens_count);
+        int* pt                 = cml_tokenizer_encode(tokenizer, prompt, &prompt_tokens_count);
         cml_free(pt);
 
         char resp[65536];
@@ -336,11 +371,8 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
                  "\"content\":\"%s\"},\"finish_reason\":\"stop\"}],"
                  "\"usage\":{\"prompt_tokens\":%d,\"completion_tokens\":%d,"
                  "\"total_tokens\":%d}}",
-                 comp_id, created,
-                 srv->model_name[0] ? srv->model_name : "cml-default",
-                 escaped,
-                 prompt_tokens_count, result->num_tokens,
-                 prompt_tokens_count + result->num_tokens);
+                 comp_id, created, srv->model_name[0] ? srv->model_name : "cml-default", escaped,
+                 prompt_tokens_count, result->num_tokens, prompt_tokens_count + result->num_tokens);
 
         send_http_response(fd, 200, "OK", "application/json", resp);
         cml_generation_result_free(result);
@@ -351,7 +383,8 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
 
 static void handle_request(int fd, CMLOpenAIServer* srv, const char* request) {
     const char* body = strstr(request, "\r\n\r\n");
-    if (body) body += 4;
+    if (body)
+        body += 4;
 
     if (strncmp(request, "GET /health", 11) == 0) {
         handle_health(fd);
@@ -384,31 +417,34 @@ static void handle_request(int fd, CMLOpenAIServer* srv, const char* request) {
 /* Server lifecycle */
 
 CMLOpenAIServer* cml_openai_server_create(int port) {
-    if (port <= 0) return NULL;
+    if (port <= 0)
+        return NULL;
 
     CMLOpenAIServer* srv = (CMLOpenAIServer*)cml_calloc(1, sizeof(CMLOpenAIServer));
-    if (!srv) return NULL;
+    if (!srv)
+        return NULL;
 
-    srv->port = port;
-    srv->listen_fd = -1;
-    srv->max_tokens = 256;
+    srv->port        = port;
+    srv->listen_fd   = -1;
+    srv->max_tokens  = 256;
     srv->temperature = 0.8f;
-    srv->top_p = 0.9f;
+    srv->top_p       = 0.9f;
 
     return srv;
 }
 
 int cml_openai_server_load_model(CMLOpenAIServer* srv, const char* model_path) {
-    if (!srv || !model_path) return -1;
+    if (!srv || !model_path)
+        return -1;
 
     strncpy(srv->model_path, model_path, sizeof(srv->model_path) - 1);
 
     const char* basename = strrchr(model_path, '/');
-    basename = basename ? basename + 1 : model_path;
+    basename             = basename ? basename + 1 : model_path;
     strncpy(srv->model_name, basename, sizeof(srv->model_name) - 1);
 
     CMLLLaMAConfig config = cml_llama_config_7b();
-    CMLLLaMAModel* model = cml_llama_create(&config);
+    CMLLLaMAModel* model  = cml_llama_create(&config);
     if (!model) {
         LOG_ERROR("openai_api: failed to create model");
         return -1;
@@ -420,14 +456,14 @@ int cml_openai_server_load_model(CMLOpenAIServer* srv, const char* model_path) {
         return -1;
     }
 
-    srv->model = model;
+    srv->model     = model;
     srv->tokenizer = model->tokenizer;
 
     CMLServingConfig scfg = cml_serving_default_config();
-    scfg.max_batch_size = 4;
-    srv->serving = cml_serving_create(&scfg);
+    scfg.max_batch_size   = 4;
+    srv->serving          = cml_serving_create(&scfg);
     if (srv->serving) {
-        int head_dim = model->config.hidden_size / model->config.num_heads;
+        int head_dim  = model->config.hidden_size / model->config.num_heads;
         srv->kv_cache = cml_paged_kv_cache_create(512, 64, model->config.num_kv_heads, head_dim);
         if (srv->kv_cache) {
             cml_serving_set_kv_cache(srv->serving, srv->kv_cache);
@@ -440,7 +476,8 @@ int cml_openai_server_load_model(CMLOpenAIServer* srv, const char* model_path) {
 }
 
 int cml_openai_server_run(CMLOpenAIServer* srv) {
-    if (!srv) return -1;
+    if (!srv)
+        return -1;
 
     srv->listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (srv->listen_fd < 0) {
@@ -452,9 +489,9 @@ int cml_openai_server_run(CMLOpenAIServer* srv) {
     setsockopt(srv->listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
     struct sockaddr_in addr = {0};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons((uint16_t)srv->port);
+    addr.sin_family         = AF_INET;
+    addr.sin_addr.s_addr    = INADDR_ANY;
+    addr.sin_port           = htons((uint16_t)srv->port);
 
     if (bind(srv->listen_fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         LOG_ERROR("openai_api: bind() port %d failed: %s", srv->port, strerror(errno));
@@ -485,10 +522,12 @@ int cml_openai_server_run(CMLOpenAIServer* srv) {
     while (srv->running) {
         struct sockaddr_in client_addr;
         socklen_t addr_len = sizeof(client_addr);
-        int client_fd = accept(srv->listen_fd, (struct sockaddr*)&client_addr, &addr_len);
+        int client_fd      = accept(srv->listen_fd, (struct sockaddr*)&client_addr, &addr_len);
         if (client_fd < 0) {
-            if (!srv->running) break;
-            if (errno == EINTR) continue;
+            if (!srv->running)
+                break;
+            if (errno == EINTR)
+                continue;
             LOG_ERROR("openai_api: accept() failed: %s", strerror(errno));
             continue;
         }
@@ -509,7 +548,8 @@ int cml_openai_server_run(CMLOpenAIServer* srv) {
 }
 
 void cml_openai_server_stop(CMLOpenAIServer* srv) {
-    if (!srv) return;
+    if (!srv)
+        return;
     srv->running = false;
     if (srv->listen_fd >= 0) {
         shutdown(srv->listen_fd, SHUT_RDWR);
@@ -517,7 +557,8 @@ void cml_openai_server_stop(CMLOpenAIServer* srv) {
 }
 
 void cml_openai_server_free(CMLOpenAIServer* srv) {
-    if (!srv) return;
+    if (!srv)
+        return;
     cml_openai_server_stop(srv);
     if (srv->listen_fd >= 0) {
         close(srv->listen_fd);

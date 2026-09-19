@@ -10,18 +10,18 @@ extern "C" {
 #endif
 
 /** TLSF configuration */
-#define TLSF_FL_INDEX_COUNT  32  /* First-level: log2 of size */
-#define TLSF_SL_INDEX_COUNT  16  /* Second-level: subdivisions per FL */
-#define TLSF_FL_INDEX_SHIFT  4   /* Minimum block size = 2^4 = 16 bytes */
-#define TLSF_MIN_BLOCK_SIZE  16
-#define TLSF_ALIGN           16  /* Allocation alignment */
+#define TLSF_FL_INDEX_COUNT 32 /* First-level: log2 of size */
+#define TLSF_SL_INDEX_COUNT 16 /* Second-level: subdivisions per FL */
+#define TLSF_FL_INDEX_SHIFT 4  /* Minimum block size = 2^4 = 16 bytes */
+#define TLSF_MIN_BLOCK_SIZE 16
+#define TLSF_ALIGN 16 /* Allocation alignment */
 
 /** Block header */
 typedef struct TLSFBlock {
-    struct TLSFBlock* prev_phys;  /* Previous physical block */
-    size_t size;                   /* Block size (includes header) */
-    struct TLSFBlock* next_free;   /* Next free block in segregated list */
-    struct TLSFBlock* prev_free;   /* Previous free block */
+    struct TLSFBlock* prev_phys; /* Previous physical block */
+    size_t size;                 /* Block size (includes header) */
+    struct TLSFBlock* next_free; /* Next free block in segregated list */
+    struct TLSFBlock* prev_free; /* Previous free block */
 } TLSFBlock;
 
 /** TLSF allocator */
@@ -34,9 +34,9 @@ typedef struct CMLTLSFAllocator {
     TLSFBlock* blocks[TLSF_FL_INDEX_COUNT][TLSF_SL_INDEX_COUNT];
 
     /* Pool management */
-    void* pool;                /* Backing memory pool */
-    size_t pool_size;          /* Total pool size */
-    bool owns_pool;            /* Whether we allocated the pool */
+    void* pool;       /* Backing memory pool */
+    size_t pool_size; /* Total pool size */
+    bool owns_pool;   /* Whether we allocated the pool */
 
     /* Statistics */
     size_t used_bytes;
@@ -51,9 +51,9 @@ typedef struct CMLTLSFAllocator {
 typedef struct {
     int tensor_id;
     size_t size;
-    size_t offset;     /* Assigned offset in memory pool */
-    int alloc_time;    /* Step when tensor is first needed */
-    int free_time;     /* Step when tensor is last used */
+    size_t offset;  /* Assigned offset in memory pool */
+    int alloc_time; /* Step when tensor is first needed */
+    int free_time;  /* Step when tensor is last used */
 } CMLTimelineRecord;
 
 /** Timeline memory planner */
@@ -62,9 +62,9 @@ typedef struct CMLTimelinePlanner {
     int num_records;
     int record_capacity;
 
-    size_t total_required;     /* Minimum memory needed */
-    size_t peak_usage;         /* Peak concurrent memory */
-    int num_steps;             /* Total computation steps */
+    size_t total_required; /* Minimum memory needed */
+    size_t peak_usage;     /* Peak concurrent memory */
+    int num_steps;         /* Total computation steps */
 } CMLTimelinePlanner;
 
 CMLTLSFAllocator* cml_tlsf_create(size_t pool_size);
@@ -83,8 +83,8 @@ void* cml_tlsf_realloc(CMLTLSFAllocator* alloc, void* ptr, size_t new_size);
 
 size_t cml_tlsf_alloc_size(CMLTLSFAllocator* alloc, void* ptr);
 
-void cml_tlsf_stats(const CMLTLSFAllocator* alloc, size_t* used, size_t* peak,
-                     size_t* num_allocs, size_t* num_frees);
+void cml_tlsf_stats(const CMLTLSFAllocator* alloc, size_t* used, size_t* peak, size_t* num_allocs,
+                    size_t* num_frees);
 
 bool cml_tlsf_check(const CMLTLSFAllocator* alloc);
 
@@ -92,8 +92,8 @@ CMLTimelinePlanner* cml_timeline_planner_create(int initial_capacity);
 
 void cml_timeline_planner_destroy(CMLTimelinePlanner* planner);
 
-int cml_timeline_planner_add(CMLTimelinePlanner* planner, int tensor_id,
-                              size_t size, int alloc_time, int free_time);
+int cml_timeline_planner_add(CMLTimelinePlanner* planner, int tensor_id, size_t size,
+                             int alloc_time, int free_time);
 
 int cml_timeline_planner_solve(CMLTimelinePlanner* planner);
 

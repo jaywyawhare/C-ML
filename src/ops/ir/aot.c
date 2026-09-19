@@ -20,14 +20,13 @@
  * arbitrary command execution when passed to popen/system. */
 static bool aot_validate_path(const char* path) __attribute__((unused));
 static bool aot_validate_path(const char* path) {
-    if (!path) return false;
+    if (!path)
+        return false;
     for (const char* p = path; *p; p++) {
         /* Reject shell metacharacters */
-        if (*p == ';' || *p == '|' || *p == '&' || *p == '$' ||
-            *p == '`' || *p == '\n' || *p == '\r' ||
-            *p == '(' || *p == ')' || *p == '{' || *p == '}' ||
-            *p == '<' || *p == '>' || *p == '!' || *p == '\\' ||
-            *p == '\'' || *p == '"') {
+        if (*p == ';' || *p == '|' || *p == '&' || *p == '$' || *p == '`' || *p == '\n' ||
+            *p == '\r' || *p == '(' || *p == ')' || *p == '{' || *p == '}' || *p == '<' ||
+            *p == '>' || *p == '!' || *p == '\\' || *p == '\'' || *p == '"') {
             LOG_ERROR("Unsafe character '%c' in path: %s", *p, path);
             return false;
         }
@@ -36,17 +35,15 @@ static bool aot_validate_path(const char* path) {
 }
 
 AOTCompileOptions cml_aot_default_options(void) {
-    AOTCompileOptions opts = {
-        .target_triple = NULL,
-        .cpu = NULL,
-        .features = NULL,
-        .opt_level = AOT_OPT_O3,
-        .include_weights = false,
-        .generate_header = true,
-        .function_name = "cml_model_forward",
-        .format = AOT_FORMAT_SHARED_LIB,
-        .position_independent = true
-    };
+    AOTCompileOptions opts = {.target_triple        = NULL,
+                              .cpu                  = NULL,
+                              .features             = NULL,
+                              .opt_level            = AOT_OPT_O3,
+                              .include_weights      = false,
+                              .generate_header      = true,
+                              .function_name        = "cml_model_forward",
+                              .format               = AOT_FORMAT_SHARED_LIB,
+                              .position_independent = true};
     return opts;
 }
 
@@ -65,32 +62,34 @@ enum { AOT_KIND_INPUT = 0, AOT_KIND_OUTPUT = 1, AOT_KIND_INTERMEDIATE = 2 };
 
 typedef struct {
     Tensor* t;
-    int     kind;
-    int     index; /* input index, or intermediate index */
+    int kind;
+    int index; /* input index, or intermediate index */
 } AotBuf;
 
 typedef struct {
     AotBuf* items;
-    int     count;
-    int     cap;
+    int count;
+    int cap;
 } AotBufMap;
 
 static AotBuf* aot_map_find(AotBufMap* m, Tensor* t) {
     for (int i = 0; i < m->count; i++)
-        if (m->items[i].t == t) return &m->items[i];
+        if (m->items[i].t == t)
+            return &m->items[i];
     return NULL;
 }
 
 static AotBuf* aot_map_add(AotBufMap* m, Tensor* t, int kind, int index) {
     if (m->count == m->cap) {
-        int nc = m->cap ? m->cap * 2 : 16;
+        int nc     = m->cap ? m->cap * 2 : 16;
         AotBuf* ni = realloc(m->items, (size_t)nc * sizeof(AotBuf));
-        if (!ni) return NULL;
+        if (!ni)
+            return NULL;
         m->items = ni;
-        m->cap = nc;
+        m->cap   = nc;
     }
-    m->items[m->count].t = t;
-    m->items[m->count].kind = kind;
+    m->items[m->count].t     = t;
+    m->items[m->count].kind  = kind;
     m->items[m->count].index = index;
     return &m->items[m->count++];
 }
@@ -103,9 +102,15 @@ static void aot_ptr_expr(AotBufMap* m, Tensor* t, char* buf, size_t n) {
         return;
     }
     switch (b->kind) {
-    case AOT_KIND_INPUT:  snprintf(buf, n, "inputs[%d]->aligned", b->index); break;
-    case AOT_KIND_OUTPUT: snprintf(buf, n, "outputs[0]->aligned"); break;
-    default:              snprintf(buf, n, "t%d", b->index); break;
+    case AOT_KIND_INPUT:
+        snprintf(buf, n, "inputs[%d]->aligned", b->index);
+        break;
+    case AOT_KIND_OUTPUT:
+        snprintf(buf, n, "outputs[0]->aligned");
+        break;
+    default:
+        snprintf(buf, n, "t%d", b->index);
+        break;
     }
 }
 
@@ -128,45 +133,54 @@ static const char* aot_f32(char* buf, size_t cap, float v) {
         /* Needs a decimal point or exponent before the f suffix is legal. */
         if (!strpbrk(buf, ".eE")) {
             size_t len = strlen(buf);
-            if (len + 3 < cap) { buf[len] = '.'; buf[len+1] = '0'; buf[len+2] = '\0'; }
+            if (len + 3 < cap) {
+                buf[len]     = '.';
+                buf[len + 1] = '0';
+                buf[len + 2] = '\0';
+            }
         }
         size_t len = strlen(buf);
-        if (len + 2 < cap) { buf[len] = 'f'; buf[len+1] = '\0'; }
+        if (len + 2 < cap) {
+            buf[len]     = 'f';
+            buf[len + 1] = '\0';
+        }
     }
     return buf;
 }
 
-static void aot_emit_unary(FILE* cf, const char* name, const char* O,
-                           const char* A, int64_t n, const char* expr) {
+static void aot_emit_unary(FILE* cf, const char* name, const char* O, const char* A, int64_t n,
+                           const char* expr) {
     fprintf(cf, "    /* %s */\n", name);
-    fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) "
-                "{ float x = %s[i]; %s[i] = %s; }\n",
+    fprintf(cf,
+            "    for (int64_t i = 0; i < %lld; i++) "
+            "{ float x = %s[i]; %s[i] = %s; }\n",
             (long long)n, A, O, expr);
 }
 
 /* Emit an elementwise binary op with numpy-style scalar broadcasting: a
  * numel-1 operand is read as [0], otherwise as [i]. */
-static void aot_emit_binary(FILE* cf, const char* name, const char* O, const char* A,
-                            const char* B, int64_t na, int64_t nb, int64_t n,
-                            const char* expr) {
+static void aot_emit_binary(FILE* cf, const char* name, const char* O, const char* A, const char* B,
+                            int64_t na, int64_t nb, int64_t n, const char* expr) {
     const char* ai = (na == 1) ? "0" : "i";
     const char* bi = (nb == 1) ? "0" : "i";
     fprintf(cf, "    /* %s */\n", name);
-    fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) "
-                "{ float a = %s[%s]; float b = %s[%s]; %s[i] = %s; }\n",
+    fprintf(cf,
+            "    for (int64_t i = 0; i < %lld; i++) "
+            "{ float a = %s[%s]; float b = %s[%s]; %s[i] = %s; }\n",
             (long long)n, A, ai, B, bi, O, expr);
 }
 
 /* Emit a reduction over `outer x dim x inner` (contiguous input). */
-static void aot_emit_reduce(FILE* cf, const char* name, const char* O, const char* A,
-                            int64_t outer, int64_t dim, int64_t inner,
-                            const char* init, const char* acc, const char* final_) {
+static void aot_emit_reduce(FILE* cf, const char* name, const char* O, const char* A, int64_t outer,
+                            int64_t dim, int64_t inner, const char* init, const char* acc,
+                            const char* final_) {
     fprintf(cf, "    /* %s */\n", name);
     fprintf(cf, "    for (int64_t o = 0; o < %lld; o++)\n", (long long)outer);
     fprintf(cf, "      for (int64_t k = 0; k < %lld; k++) {\n", (long long)inner);
     fprintf(cf, "        float acc = %s;\n", init);
-    fprintf(cf, "        for (int64_t j = 0; j < %lld; j++) "
-                "{ float v = %s[(o * %lld + j) * %lld + k]; acc = %s; }\n",
+    fprintf(cf,
+            "        for (int64_t j = 0; j < %lld; j++) "
+            "{ float v = %s[(o * %lld + j) * %lld + k]; acc = %s; }\n",
             (long long)dim, A, (long long)dim, (long long)inner, acc);
     fprintf(cf, "        %s[o * %lld + k] = %s;\n", O, (long long)inner, final_);
     fprintf(cf, "      }\n");
@@ -245,7 +259,8 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
     AotBufMap map = {0};
 
     struct IRNode* tail = NULL;
-    for (struct IRNode* nd = ir->head; nd; nd = nd->next) tail = nd;
+    for (struct IRNode* nd = ir->head; nd; nd = nd->next)
+        tail = nd;
     if (!tail || !tail->output) {
         LOG_ERROR("AOT: empty graph or tail node has no output tensor");
         fclose(cf);
@@ -273,7 +288,10 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
     /* The tail node's output is the single graph output. */
     {
         AotBuf* ob = aot_map_find(&map, tail->output);
-        if (ob) { ob->kind = AOT_KIND_OUTPUT; ob->index = 0; }
+        if (ob) {
+            ob->kind  = AOT_KIND_OUTPUT;
+            ob->index = 0;
+        }
     }
 
     /* Number the remaining intermediates. */
@@ -298,12 +316,11 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
     fprintf(cf, "} MemRef;\n\n");
 
     fprintf(cf, "static inline float _cml_sigmoid(float x){ return 1.0f/(1.0f+expf(-x)); }\n");
-    fprintf(cf,
-            "/* max(x,0) + log1p(exp(-|x|)): log1pf(expf(x)) alone overflows to inf\n"
-            "   for x beyond ~88, where softplus(x) is simply x. */\n"
-            "static inline float _cml_softplus(float x){\n"
-            "    return fmaxf(x, 0.0f) + log1pf(expf(-fabsf(x)));\n"
-            "}\n\n");
+    fprintf(cf, "/* max(x,0) + log1p(exp(-|x|)): log1pf(expf(x)) alone overflows to inf\n"
+                "   for x beyond ~88, where softplus(x) is simply x. */\n"
+                "static inline float _cml_softplus(float x){\n"
+                "    return fmaxf(x, 0.0f) + log1pf(expf(-fabsf(x)));\n"
+                "}\n\n");
 
     /* --- Function signature --------------------------------------------- */
     fprintf(cf, "void %s(MemRef** inputs, MemRef** outputs) {\n", func_name);
@@ -311,17 +328,20 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
 
     /* Allocate intermediate buffers. */
     for (int i = 0; i < map.count; i++) {
-        if (map.items[i].kind != AOT_KIND_INTERMEDIATE) continue;
+        if (map.items[i].kind != AOT_KIND_INTERMEDIATE)
+            continue;
         int64_t nm = map.items[i].t ? (int64_t)map.items[i].t->numel : 0;
-        if (nm < 1) nm = 1;
-        fprintf(cf, "    float* t%d = (float*)malloc(%lld * sizeof(float));\n",
-                map.items[i].index, (long long)nm);
+        if (nm < 1)
+            nm = 1;
+        fprintf(cf, "    float* t%d = (float*)malloc(%lld * sizeof(float));\n", map.items[i].index,
+                (long long)nm);
     }
     if (num_intermediates > 0) {
         fprintf(cf, "    if (");
         int first = 1;
         for (int i = 0; i < map.count; i++) {
-            if (map.items[i].kind != AOT_KIND_INTERMEDIATE) continue;
+            if (map.items[i].kind != AOT_KIND_INTERMEDIATE)
+                continue;
             fprintf(cf, "%s!t%d", first ? "" : " || ", map.items[i].index);
             first = 0;
         }
@@ -331,7 +351,8 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
     /* --- Emit one statement per node ------------------------------------ */
     bool emit_ok = true;
     for (struct IRNode* node = ir->head; node && emit_ok; node = node->next) {
-        if (!node->output) continue;
+        if (!node->output)
+            continue;
 
         char o[64], a[64], b[64];
         aot_ptr_expr(&map, node->output, o, sizeof(o));
@@ -339,19 +360,35 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
 
         Tensor* in0 = (node->num_inputs > 0 && node->inputs) ? node->inputs[0] : NULL;
         Tensor* in1 = (node->num_inputs > 1 && node->inputs) ? node->inputs[1] : NULL;
-        int64_t na = in0 ? (int64_t)in0->numel : 0;
-        int64_t nb = in1 ? (int64_t)in1->numel : 0;
-        if (in0) aot_ptr_expr(&map, in0, a, sizeof(a));
-        if (in1) aot_ptr_expr(&map, in1, b, sizeof(b));
+        int64_t na  = in0 ? (int64_t)in0->numel : 0;
+        int64_t nb  = in1 ? (int64_t)in1->numel : 0;
+        if (in0)
+            aot_ptr_expr(&map, in0, a, sizeof(a));
+        if (in1)
+            aot_ptr_expr(&map, in1, b, sizeof(b));
 
         /* Binary elementwise ops require two inputs. */
         bool needs_binary = false;
         switch (node->type) {
-        case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV:
-        case UOP_MAX: case UOP_MINIMUM: case UOP_POW: case UOP_MOD:
-        case UOP_IDIV: case UOP_COPYSIGN: case UOP_LOGADDEXP:
-        case UOP_CMPLT: case UOP_CMPLE: case UOP_CMPGT: case UOP_CMPGE:
-        case UOP_CMPEQ: case UOP_CMPNE: case UOP_LOGICAL_AND: case UOP_LOGICAL_OR:
+        case UOP_ADD:
+        case UOP_SUB:
+        case UOP_MUL:
+        case UOP_DIV:
+        case UOP_MAX:
+        case UOP_MINIMUM:
+        case UOP_POW:
+        case UOP_MOD:
+        case UOP_IDIV:
+        case UOP_COPYSIGN:
+        case UOP_LOGADDEXP:
+        case UOP_CMPLT:
+        case UOP_CMPLE:
+        case UOP_CMPGT:
+        case UOP_CMPGE:
+        case UOP_CMPEQ:
+        case UOP_CMPNE:
+        case UOP_LOGICAL_AND:
+        case UOP_LOGICAL_OR:
             needs_binary = true;
             break;
         default:
@@ -365,86 +402,221 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
 
         switch (node->type) {
         /* ---- Binary elementwise ---- */
-        case UOP_ADD:      aot_emit_binary(cf, "ADD",      o, a, b, na, nb, n, "a + b"); break;
-        case UOP_SUB:      aot_emit_binary(cf, "SUB",      o, a, b, na, nb, n, "a - b"); break;
-        case UOP_MUL:      aot_emit_binary(cf, "MUL",      o, a, b, na, nb, n, "a * b"); break;
-        case UOP_DIV:      aot_emit_binary(cf, "DIV",      o, a, b, na, nb, n, "a / b"); break;
-        case UOP_MAX:      aot_emit_binary(cf, "MAX",      o, a, b, na, nb, n,
-                                           /* NaN propagates: an ordered compare is false on NaN,
-                                            * so `a > b ? a : b` returns the other operand. */
-                                           "((a != a) || (b != b)) ? (a + b) : (a > b ? a : b)"); break;
-        case UOP_MINIMUM:  aot_emit_binary(cf, "MINIMUM",  o, a, b, na, nb, n,
-                                           "((a != a) || (b != b)) ? (a + b) : (a < b ? a : b)"); break;
-        case UOP_POW:      aot_emit_binary(cf, "POW",      o, a, b, na, nb, n, "powf(a, b)"); break;
-        case UOP_MOD:      aot_emit_binary(cf, "MOD",      o, a, b, na, nb, n, "fmodf(a, b)"); break;
-        case UOP_IDIV:     aot_emit_binary(cf, "IDIV",     o, a, b, na, nb, n, "floorf(a / b)"); break;
-        case UOP_COPYSIGN: aot_emit_binary(cf, "COPYSIGN", o, a, b, na, nb, n, "copysignf(a, b)"); break;
-        case UOP_LOGADDEXP:aot_emit_binary(cf, "LOGADDEXP",o, a, b, na, nb, n,
-                                           "fmaxf(a, b) + log1pf(expf(-fabsf(a - b)))"); break;
-        case UOP_CMPLT:    aot_emit_binary(cf, "CMPLT",    o, a, b, na, nb, n, "a < b ? 1.0f : 0.0f"); break;
-        case UOP_CMPLE:    aot_emit_binary(cf, "CMPLE",    o, a, b, na, nb, n, "a <= b ? 1.0f : 0.0f"); break;
-        case UOP_CMPGT:    aot_emit_binary(cf, "CMPGT",    o, a, b, na, nb, n, "a > b ? 1.0f : 0.0f"); break;
-        case UOP_CMPGE:    aot_emit_binary(cf, "CMPGE",    o, a, b, na, nb, n, "a >= b ? 1.0f : 0.0f"); break;
-        case UOP_CMPEQ:    aot_emit_binary(cf, "CMPEQ",    o, a, b, na, nb, n, "a == b ? 1.0f : 0.0f"); break;
-        case UOP_CMPNE:    aot_emit_binary(cf, "CMPNE",    o, a, b, na, nb, n, "a != b ? 1.0f : 0.0f"); break;
-        case UOP_LOGICAL_AND: aot_emit_binary(cf, "LOGICAL_AND", o, a, b, na, nb, n,
-                                              "(a != 0.0f && b != 0.0f) ? 1.0f : 0.0f"); break;
-        case UOP_LOGICAL_OR:  aot_emit_binary(cf, "LOGICAL_OR",  o, a, b, na, nb, n,
-                                              "(a != 0.0f || b != 0.0f) ? 1.0f : 0.0f"); break;
+        case UOP_ADD:
+            aot_emit_binary(cf, "ADD", o, a, b, na, nb, n, "a + b");
+            break;
+        case UOP_SUB:
+            aot_emit_binary(cf, "SUB", o, a, b, na, nb, n, "a - b");
+            break;
+        case UOP_MUL:
+            aot_emit_binary(cf, "MUL", o, a, b, na, nb, n, "a * b");
+            break;
+        case UOP_DIV:
+            aot_emit_binary(cf, "DIV", o, a, b, na, nb, n, "a / b");
+            break;
+        case UOP_MAX:
+            aot_emit_binary(cf, "MAX", o, a, b, na, nb, n,
+                            /* NaN propagates: an ordered compare is false on NaN,
+                             * so `a > b ? a : b` returns the other operand. */
+                            "((a != a) || (b != b)) ? (a + b) : (a > b ? a : b)");
+            break;
+        case UOP_MINIMUM:
+            aot_emit_binary(cf, "MINIMUM", o, a, b, na, nb, n,
+                            "((a != a) || (b != b)) ? (a + b) : (a < b ? a : b)");
+            break;
+        case UOP_POW:
+            aot_emit_binary(cf, "POW", o, a, b, na, nb, n, "powf(a, b)");
+            break;
+        case UOP_MOD:
+            aot_emit_binary(cf, "MOD", o, a, b, na, nb, n, "fmodf(a, b)");
+            break;
+        case UOP_IDIV:
+            aot_emit_binary(cf, "IDIV", o, a, b, na, nb, n, "floorf(a / b)");
+            break;
+        case UOP_COPYSIGN:
+            aot_emit_binary(cf, "COPYSIGN", o, a, b, na, nb, n, "copysignf(a, b)");
+            break;
+        case UOP_LOGADDEXP:
+            aot_emit_binary(cf, "LOGADDEXP", o, a, b, na, nb, n,
+                            "fmaxf(a, b) + log1pf(expf(-fabsf(a - b)))");
+            break;
+        case UOP_CMPLT:
+            aot_emit_binary(cf, "CMPLT", o, a, b, na, nb, n, "a < b ? 1.0f : 0.0f");
+            break;
+        case UOP_CMPLE:
+            aot_emit_binary(cf, "CMPLE", o, a, b, na, nb, n, "a <= b ? 1.0f : 0.0f");
+            break;
+        case UOP_CMPGT:
+            aot_emit_binary(cf, "CMPGT", o, a, b, na, nb, n, "a > b ? 1.0f : 0.0f");
+            break;
+        case UOP_CMPGE:
+            aot_emit_binary(cf, "CMPGE", o, a, b, na, nb, n, "a >= b ? 1.0f : 0.0f");
+            break;
+        case UOP_CMPEQ:
+            aot_emit_binary(cf, "CMPEQ", o, a, b, na, nb, n, "a == b ? 1.0f : 0.0f");
+            break;
+        case UOP_CMPNE:
+            aot_emit_binary(cf, "CMPNE", o, a, b, na, nb, n, "a != b ? 1.0f : 0.0f");
+            break;
+        case UOP_LOGICAL_AND:
+            aot_emit_binary(cf, "LOGICAL_AND", o, a, b, na, nb, n,
+                            "(a != 0.0f && b != 0.0f) ? 1.0f : 0.0f");
+            break;
+        case UOP_LOGICAL_OR:
+            aot_emit_binary(cf, "LOGICAL_OR", o, a, b, na, nb, n,
+                            "(a != 0.0f || b != 0.0f) ? 1.0f : 0.0f");
+            break;
 
         /* ---- Unary elementwise ---- */
-        case UOP_NEG:    aot_emit_unary(cf, "NEG",    o, a, n, "-x"); break;
-        case UOP_EXP:    aot_emit_unary(cf, "EXP",    o, a, n, "expf(x)"); break;
-        case UOP_LOG:    aot_emit_unary(cf, "LOG",    o, a, n, "logf(x)"); break;
-        case UOP_SQRT:   aot_emit_unary(cf, "SQRT",   o, a, n, "sqrtf(x)"); break;
-        case UOP_RECIP:  aot_emit_unary(cf, "RECIP",  o, a, n, "1.0f / x"); break;
-        case UOP_ABS:    aot_emit_unary(cf, "ABS",    o, a, n, "fabsf(x)"); break;
-        case UOP_SIN:    aot_emit_unary(cf, "SIN",    o, a, n, "sinf(x)"); break;
-        case UOP_COS:    aot_emit_unary(cf, "COS",    o, a, n, "cosf(x)"); break;
-        case UOP_TAN:    aot_emit_unary(cf, "TAN",    o, a, n, "tanf(x)"); break;
-        case UOP_TANH:   aot_emit_unary(cf, "TANH",   o, a, n, "tanhf(x)"); break;
-        case UOP_SIGMOID:aot_emit_unary(cf, "SIGMOID",o, a, n, "_cml_sigmoid(x)"); break;
-        case UOP_SIGN:   aot_emit_unary(cf, "SIGN",   o, a, n, "(float)((x > 0.0f) - (x < 0.0f))"); break;
-        case UOP_FLOOR:  aot_emit_unary(cf, "FLOOR",  o, a, n, "floorf(x)"); break;
-        case UOP_CEIL:   aot_emit_unary(cf, "CEIL",   o, a, n, "ceilf(x)"); break;
-        case UOP_ROUND:  aot_emit_unary(cf, "ROUND",  o, a, n, "rintf(x)")  /* ties-to-even */; break;
-        case UOP_LOG2:   aot_emit_unary(cf, "LOG2",   o, a, n, "log2f(x)"); break;
-        case UOP_EXP2:   aot_emit_unary(cf, "EXP2",   o, a, n, "exp2f(x)"); break;
-        case UOP_ASIN:   aot_emit_unary(cf, "ASIN",   o, a, n, "asinf(x)"); break;
-        case UOP_ACOS:   aot_emit_unary(cf, "ACOS",   o, a, n, "acosf(x)"); break;
-        case UOP_ATAN:   aot_emit_unary(cf, "ATAN",   o, a, n, "atanf(x)"); break;
-        case UOP_SQUARE: aot_emit_unary(cf, "SQUARE", o, a, n, "x * x"); break;
-        case UOP_RSQRT:  aot_emit_unary(cf, "RSQRT",  o, a, n, "1.0f / sqrtf(x)"); break;
-        case UOP_ERF:    aot_emit_unary(cf, "ERF",    o, a, n, "erff(x)"); break;
-        case UOP_ERFC:   aot_emit_unary(cf, "ERFC",   o, a, n, "erfcf(x)"); break;
-        case UOP_LOG10:  aot_emit_unary(cf, "LOG10",  o, a, n, "log10f(x)"); break;
-        case UOP_SINH:   aot_emit_unary(cf, "SINH",   o, a, n, "sinhf(x)"); break;
-        case UOP_COSH:   aot_emit_unary(cf, "COSH",   o, a, n, "coshf(x)"); break;
-        case UOP_ASINH:  aot_emit_unary(cf, "ASINH",  o, a, n, "asinhf(x)"); break;
-        case UOP_ACOSH:  aot_emit_unary(cf, "ACOSH",  o, a, n, "acoshf(x)"); break;
-        case UOP_ATANH:  aot_emit_unary(cf, "ATANH",  o, a, n, "atanhf(x)"); break;
-        case UOP_TRUNC:  aot_emit_unary(cf, "TRUNC",  o, a, n, "truncf(x)"); break;
-        case UOP_ISINF:  aot_emit_unary(cf, "ISINF",  o, a, n, "isinf(x) ? 1.0f : 0.0f"); break;
-        case UOP_ISNAN:  aot_emit_unary(cf, "ISNAN",  o, a, n, "isnan(x) ? 1.0f : 0.0f"); break;
-        case UOP_ISFINITE:aot_emit_unary(cf,"ISFINITE",o,a, n, "isfinite(x) ? 1.0f : 0.0f"); break;
-        case UOP_LOGICAL_NOT: aot_emit_unary(cf, "LOGICAL_NOT", o, a, n, "x == 0.0f ? 1.0f : 0.0f"); break;
+        case UOP_NEG:
+            aot_emit_unary(cf, "NEG", o, a, n, "-x");
+            break;
+        case UOP_EXP:
+            aot_emit_unary(cf, "EXP", o, a, n, "expf(x)");
+            break;
+        case UOP_LOG:
+            aot_emit_unary(cf, "LOG", o, a, n, "logf(x)");
+            break;
+        case UOP_SQRT:
+            aot_emit_unary(cf, "SQRT", o, a, n, "sqrtf(x)");
+            break;
+        case UOP_RECIP:
+            aot_emit_unary(cf, "RECIP", o, a, n, "1.0f / x");
+            break;
+        case UOP_ABS:
+            aot_emit_unary(cf, "ABS", o, a, n, "fabsf(x)");
+            break;
+        case UOP_SIN:
+            aot_emit_unary(cf, "SIN", o, a, n, "sinf(x)");
+            break;
+        case UOP_COS:
+            aot_emit_unary(cf, "COS", o, a, n, "cosf(x)");
+            break;
+        case UOP_TAN:
+            aot_emit_unary(cf, "TAN", o, a, n, "tanf(x)");
+            break;
+        case UOP_TANH:
+            aot_emit_unary(cf, "TANH", o, a, n, "tanhf(x)");
+            break;
+        case UOP_SIGMOID:
+            aot_emit_unary(cf, "SIGMOID", o, a, n, "_cml_sigmoid(x)");
+            break;
+        case UOP_SIGN:
+            aot_emit_unary(cf, "SIGN", o, a, n, "(float)((x > 0.0f) - (x < 0.0f))");
+            break;
+        case UOP_FLOOR:
+            aot_emit_unary(cf, "FLOOR", o, a, n, "floorf(x)");
+            break;
+        case UOP_CEIL:
+            aot_emit_unary(cf, "CEIL", o, a, n, "ceilf(x)");
+            break;
+        case UOP_ROUND:
+            aot_emit_unary(cf, "ROUND", o, a, n, "rintf(x)") /* ties-to-even */;
+            break;
+        case UOP_LOG2:
+            aot_emit_unary(cf, "LOG2", o, a, n, "log2f(x)");
+            break;
+        case UOP_EXP2:
+            aot_emit_unary(cf, "EXP2", o, a, n, "exp2f(x)");
+            break;
+        case UOP_ASIN:
+            aot_emit_unary(cf, "ASIN", o, a, n, "asinf(x)");
+            break;
+        case UOP_ACOS:
+            aot_emit_unary(cf, "ACOS", o, a, n, "acosf(x)");
+            break;
+        case UOP_ATAN:
+            aot_emit_unary(cf, "ATAN", o, a, n, "atanf(x)");
+            break;
+        case UOP_SQUARE:
+            aot_emit_unary(cf, "SQUARE", o, a, n, "x * x");
+            break;
+        case UOP_RSQRT:
+            aot_emit_unary(cf, "RSQRT", o, a, n, "1.0f / sqrtf(x)");
+            break;
+        case UOP_ERF:
+            aot_emit_unary(cf, "ERF", o, a, n, "erff(x)");
+            break;
+        case UOP_ERFC:
+            aot_emit_unary(cf, "ERFC", o, a, n, "erfcf(x)");
+            break;
+        case UOP_LOG10:
+            aot_emit_unary(cf, "LOG10", o, a, n, "log10f(x)");
+            break;
+        case UOP_SINH:
+            aot_emit_unary(cf, "SINH", o, a, n, "sinhf(x)");
+            break;
+        case UOP_COSH:
+            aot_emit_unary(cf, "COSH", o, a, n, "coshf(x)");
+            break;
+        case UOP_ASINH:
+            aot_emit_unary(cf, "ASINH", o, a, n, "asinhf(x)");
+            break;
+        case UOP_ACOSH:
+            aot_emit_unary(cf, "ACOSH", o, a, n, "acoshf(x)");
+            break;
+        case UOP_ATANH:
+            aot_emit_unary(cf, "ATANH", o, a, n, "atanhf(x)");
+            break;
+        case UOP_TRUNC:
+            aot_emit_unary(cf, "TRUNC", o, a, n, "truncf(x)");
+            break;
+        case UOP_ISINF:
+            aot_emit_unary(cf, "ISINF", o, a, n, "isinf(x) ? 1.0f : 0.0f");
+            break;
+        case UOP_ISNAN:
+            aot_emit_unary(cf, "ISNAN", o, a, n, "isnan(x) ? 1.0f : 0.0f");
+            break;
+        case UOP_ISFINITE:
+            aot_emit_unary(cf, "ISFINITE", o, a, n, "isfinite(x) ? 1.0f : 0.0f");
+            break;
+        case UOP_LOGICAL_NOT:
+            aot_emit_unary(cf, "LOGICAL_NOT", o, a, n, "x == 0.0f ? 1.0f : 0.0f");
+            break;
 
         /* ---- Activations ---- */
-        case UOP_RELU:       aot_emit_unary(cf, "RELU",       o, a, n,
-                                          /* `x < 0 ? 0 : x`, not `x > 0 ? x : 0`: NaN fails both
-                                           * comparisons, so the latter silently returns 0. */
-                                          "x < 0.0f ? 0.0f : x"); break;
-        case UOP_RELU6:      aot_emit_unary(cf, "RELU6",      o, a, n, "x < 0.0f ? 0.0f : (x > 6.0f ? 6.0f : x)"); break;
-        case UOP_HARD_SIGMOID:aot_emit_unary(cf,"HARD_SIGMOID",o,a, n, "x < -3.0f ? 0.0f : (x > 3.0f ? 1.0f : (x + 3.0f) / 6.0f)"); break;
-        case UOP_HARD_TANH:  aot_emit_unary(cf, "HARD_TANH",  o, a, n, "x < -1.0f ? -1.0f : (x > 1.0f ? 1.0f : x)"); break;
-        case UOP_SOFTPLUS:   aot_emit_unary(cf, "SOFTPLUS",   o, a, n, "_cml_softplus(x)"); break;
-        case UOP_SOFTSIGN:   aot_emit_unary(cf, "SOFTSIGN",   o, a, n, "x / (1.0f + fabsf(x))"); break;
-        case UOP_LOGSIGMOID: aot_emit_unary(cf, "LOGSIGMOID", o, a, n, "-_cml_softplus(-x)"); break;
-        case UOP_QUICK_GELU: aot_emit_unary(cf, "QUICK_GELU", o, a, n, "x * _cml_sigmoid(1.702f * x)"); break;
-        case UOP_MISH:       aot_emit_unary(cf, "MISH",       o, a, n, "x * tanhf(_cml_softplus(x))"); break;
-        case UOP_SILU:       aot_emit_unary(cf, "SILU",       o, a, n, "x * _cml_sigmoid(x)"); break;
-        case UOP_HARDSWISH:  aot_emit_unary(cf, "HARDSWISH",  o, a, n, "x < -3.0f ? 0.0f : (x > 3.0f ? x : x * (x + 3.0f) / 6.0f)"); break;
-        case UOP_SELU:       aot_emit_unary(cf, "SELU",       o, a, n, "1.05070098f * (x > 0.0f ? x : 1.67326324f * (expf(x) - 1.0f))"); break;
+        case UOP_RELU:
+            aot_emit_unary(cf, "RELU", o, a, n,
+                           /* `x < 0 ? 0 : x`, not `x > 0 ? x : 0`: NaN fails both
+                            * comparisons, so the latter silently returns 0. */
+                           "x < 0.0f ? 0.0f : x");
+            break;
+        case UOP_RELU6:
+            aot_emit_unary(cf, "RELU6", o, a, n, "x < 0.0f ? 0.0f : (x > 6.0f ? 6.0f : x)");
+            break;
+        case UOP_HARD_SIGMOID:
+            aot_emit_unary(cf, "HARD_SIGMOID", o, a, n,
+                           "x < -3.0f ? 0.0f : (x > 3.0f ? 1.0f : (x + 3.0f) / 6.0f)");
+            break;
+        case UOP_HARD_TANH:
+            aot_emit_unary(cf, "HARD_TANH", o, a, n, "x < -1.0f ? -1.0f : (x > 1.0f ? 1.0f : x)");
+            break;
+        case UOP_SOFTPLUS:
+            aot_emit_unary(cf, "SOFTPLUS", o, a, n, "_cml_softplus(x)");
+            break;
+        case UOP_SOFTSIGN:
+            aot_emit_unary(cf, "SOFTSIGN", o, a, n, "x / (1.0f + fabsf(x))");
+            break;
+        case UOP_LOGSIGMOID:
+            aot_emit_unary(cf, "LOGSIGMOID", o, a, n, "-_cml_softplus(-x)");
+            break;
+        case UOP_QUICK_GELU:
+            aot_emit_unary(cf, "QUICK_GELU", o, a, n, "x * _cml_sigmoid(1.702f * x)");
+            break;
+        case UOP_MISH:
+            aot_emit_unary(cf, "MISH", o, a, n, "x * tanhf(_cml_softplus(x))");
+            break;
+        case UOP_SILU:
+            aot_emit_unary(cf, "SILU", o, a, n, "x * _cml_sigmoid(x)");
+            break;
+        case UOP_HARDSWISH:
+            aot_emit_unary(cf, "HARDSWISH", o, a, n,
+                           "x < -3.0f ? 0.0f : (x > 3.0f ? x : x * (x + 3.0f) / 6.0f)");
+            break;
+        case UOP_SELU:
+            aot_emit_unary(cf, "SELU", o, a, n,
+                           "1.05070098f * (x > 0.0f ? x : 1.67326324f * (expf(x) - 1.0f))");
+            break;
 
         /* ---- Param unary ---- */
         case UOP_CLAMP: {
@@ -452,7 +624,8 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             float lo = p ? p->min_val : 0.0f, hi = p ? p->max_val : 0.0f;
             char expr[192];
             char lb[40], hb[40];
-            aot_f32(lb, sizeof lb, lo); aot_f32(hb, sizeof hb, hi);
+            aot_f32(lb, sizeof lb, lo);
+            aot_f32(hb, sizeof hb, hi);
             snprintf(expr, sizeof(expr), "x < %s ? %s : (x > %s ? %s : x)", lb, lb, hb, hb);
             aot_emit_unary(cf, "CLAMP", o, a, n, expr);
             break;
@@ -460,7 +633,7 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         case UOP_ELU: {
             /* alpha stored in ClampParams.min_val (see uop_elu) */
             ClampParams* p = (ClampParams*)node->params;
-            float alpha = p ? p->min_val : 1.0f;
+            float alpha    = p ? p->min_val : 1.0f;
             char expr[128];
             char ab[40];
             snprintf(expr, sizeof(expr), "x > 0.0f ? x : %s * (expf(x) - 1.0f)",
@@ -471,10 +644,9 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         case UOP_CELU: {
             /* alpha stored in ClampParams.min_val (see uop_celu) */
             ClampParams* p = (ClampParams*)node->params;
-            float alpha = p ? p->min_val : 1.0f;
+            float alpha    = p ? p->min_val : 1.0f;
             char expr[160], ab1[40], ab2[40];
-            snprintf(expr, sizeof(expr),
-                     "x > 0.0f ? x : %s * (expf(x / %s) - 1.0f)",
+            snprintf(expr, sizeof(expr), "x > 0.0f ? x : %s * (expf(x / %s) - 1.0f)",
                      aot_f32(ab1, sizeof ab1, alpha), aot_f32(ab2, sizeof ab2, alpha));
             aot_emit_unary(cf, "CELU", o, a, n, expr);
             break;
@@ -483,11 +655,11 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         /* ---- Zero-input creation ---- */
         case UOP_FILL: {
             FillParams* p = (FillParams*)node->params;
-            float v = p ? p->value : 0.0f;
+            float v       = p ? p->value : 0.0f;
             fprintf(cf, "    /* FILL */\n");
             char vb[40];
-            fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) %s[i] = %s;\n",
-                    (long long)n, o, aot_f32(vb, sizeof vb, v));
+            fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) %s[i] = %s;\n", (long long)n, o,
+                    aot_f32(vb, sizeof vb, v));
             break;
         }
         case UOP_CONST: {
@@ -497,18 +669,18 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
                 emit_ok = false;
                 break;
             }
-            int64_t cn = (int64_t)(p->data_size / sizeof(float));
+            int64_t cn      = (int64_t)(p->data_size / sizeof(float));
             const float* cd = (const float*)p->data;
-            int64_t copy_n = cn < n ? cn : n;
+            int64_t copy_n  = cn < n ? cn : n;
             fprintf(cf, "    /* CONST */\n");
-            fprintf(cf, "    {\n        static const float _c[%lld] = {", (long long)(cn > 0 ? cn : 1));
-            for (int64_t i = 0; i < cn; i++)
-            {
+            fprintf(cf, "    {\n        static const float _c[%lld] = {",
+                    (long long)(cn > 0 ? cn : 1));
+            for (int64_t i = 0; i < cn; i++) {
                 char eb[40];
                 fprintf(cf, "%s%s", i ? ", " : "", aot_f32(eb, sizeof eb, cd[i]));
             }
-            fprintf(cf, "};\n        memcpy(%s, _c, %lld * sizeof(float));\n    }\n",
-                    o, (long long)copy_n);
+            fprintf(cf, "};\n        memcpy(%s, _c, %lld * sizeof(float));\n    }\n", o,
+                    (long long)copy_n);
             break;
         }
 
@@ -516,20 +688,29 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         case UOP_RESHAPE:
         case UOP_FLATTEN:
         case UOP_UNFLATTEN:
-            if (!in0) { LOG_ERROR("AOT: movement op missing input"); emit_ok = false; break; }
+            if (!in0) {
+                LOG_ERROR("AOT: movement op missing input");
+                emit_ok = false;
+                break;
+            }
             fprintf(cf, "    /* %s (copy) */\n",
-                    node->type == UOP_RESHAPE ? "RESHAPE" :
-                    node->type == UOP_FLATTEN ? "FLATTEN" : "UNFLATTEN");
-            fprintf(cf, "    memcpy(%s, %s, %lld * sizeof(float));\n",
-                    o, a, (long long)(na < n ? na : n));
+                    node->type == UOP_RESHAPE   ? "RESHAPE"
+                    : node->type == UOP_FLATTEN ? "FLATTEN"
+                                                : "UNFLATTEN");
+            fprintf(cf, "    memcpy(%s, %s, %lld * sizeof(float));\n", o, a,
+                    (long long)(na < n ? na : n));
             break;
 
         case UOP_EXPAND:
-            if (!in0) { LOG_ERROR("AOT: EXPAND missing input"); emit_ok = false; break; }
+            if (!in0) {
+                LOG_ERROR("AOT: EXPAND missing input");
+                emit_ok = false;
+                break;
+            }
             if (na == 1) {
                 fprintf(cf, "    /* EXPAND (scalar) */\n");
-                fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) %s[i] = %s[0];\n",
-                        (long long)n, o, a);
+                fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) %s[i] = %s[0];\n", (long long)n,
+                        o, a);
             } else if (na == n) {
                 fprintf(cf, "    /* EXPAND (copy) */\n");
                 fprintf(cf, "    memcpy(%s, %s, %lld * sizeof(float));\n", o, a, (long long)n);
@@ -546,21 +727,25 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
                 int64_t istr[16], bstr[16];
                 if (id > 0) {
                     istr[id - 1] = 1;
-                    for (int d = id - 2; d >= 0; d--) istr[d] = istr[d + 1] * in0->shape[d + 1];
+                    for (int d = id - 2; d >= 0; d--)
+                        istr[d] = istr[d + 1] * in0->shape[d + 1];
                 }
                 int off = od - id;
                 for (int d = 0; d < od; d++) {
-                    int sd = d - off; /* input dim aligned to out dim d, or <0 if absent */
+                    int sd  = d - off; /* input dim aligned to out dim d, or <0 if absent */
                     bstr[d] = (sd >= 0 && in0->shape[sd] == out_t->shape[d]) ? istr[sd] : 0;
                 }
                 int64_t ostr[16];
                 ostr[od - 1] = 1;
-                for (int d = od - 2; d >= 0; d--) ostr[d] = ostr[d + 1] * out_t->shape[d + 1];
+                for (int d = od - 2; d >= 0; d--)
+                    ostr[d] = ostr[d + 1] * out_t->shape[d + 1];
                 fprintf(cf, "    /* EXPAND (broadcast) */\n");
                 fprintf(cf, "    for (int64_t idx = 0; idx < %lld; idx++) {\n", (long long)n);
                 fprintf(cf, "        int64_t rem = idx, in_off = 0;\n");
                 for (int d = 0; d < od; d++) {
-                    fprintf(cf, "        { int64_t c = rem / %lld; rem -= c * %lld; in_off += c * %lld; }\n",
+                    fprintf(cf,
+                            "        { int64_t c = rem / %lld; rem -= c * %lld; in_off += c * "
+                            "%lld; }\n",
                             (long long)ostr[d], (long long)ostr[d], (long long)bstr[d]);
                 }
                 fprintf(cf, "        %s[idx] = %s[in_off];\n", o, a);
@@ -576,22 +761,31 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
                 break;
             }
             int nd = in0->ndim;
-            if (nd > 16) { LOG_ERROR("AOT: PERMUTE ndim > 16 unsupported"); emit_ok = false; break; }
+            if (nd > 16) {
+                LOG_ERROR("AOT: PERMUTE ndim > 16 unsupported");
+                emit_ok = false;
+                break;
+            }
             /* Contiguous input strides; output shape/strides follow perm. */
             int64_t istr[16], osh[16], ostr[16];
             istr[nd - 1] = 1;
-            for (int d = nd - 2; d >= 0; d--) istr[d] = istr[d + 1] * in0->shape[d + 1];
-            for (int d = 0; d < nd; d++) osh[d] = in0->shape[p->perm[d]];
+            for (int d = nd - 2; d >= 0; d--)
+                istr[d] = istr[d + 1] * in0->shape[d + 1];
+            for (int d = 0; d < nd; d++)
+                osh[d] = in0->shape[p->perm[d]];
             ostr[nd - 1] = 1;
-            for (int d = nd - 2; d >= 0; d--) ostr[d] = ostr[d + 1] * osh[d + 1];
+            for (int d = nd - 2; d >= 0; d--)
+                ostr[d] = ostr[d + 1] * osh[d + 1];
 
             fprintf(cf, "    /* PERMUTE */\n");
             fprintf(cf, "    for (int64_t idx = 0; idx < %lld; idx++) {\n", (long long)n);
             fprintf(cf, "        int64_t rem = idx, in_off = 0;\n");
             for (int d = 0; d < nd; d++) {
                 int64_t in_axis_stride = istr[p->perm[d]];
-                fprintf(cf, "        { int64_t c = rem / %lld; rem -= c * %lld; in_off += c * %lld; }\n",
-                        (long long)ostr[d], (long long)ostr[d], (long long)in_axis_stride);
+                fprintf(
+                    cf,
+                    "        { int64_t c = rem / %lld; rem -= c * %lld; in_off += c * %lld; }\n",
+                    (long long)ostr[d], (long long)ostr[d], (long long)in_axis_stride);
             }
             fprintf(cf, "        %s[idx] = %s[in_off];\n", o, a);
             fprintf(cf, "    }\n");
@@ -599,57 +793,113 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         }
 
         /* ---- Reductions ---- */
-        case UOP_SUM: case UOP_MEAN: case UOP_PROD:
-        case UOP_MAX_REDUCE: case UOP_MIN_REDUCE: {
-            if (!in0) { LOG_ERROR("AOT: reduction missing input"); emit_ok = false; break; }
+        case UOP_SUM:
+        case UOP_MEAN:
+        case UOP_PROD:
+        case UOP_MAX_REDUCE:
+        case UOP_MIN_REDUCE: {
+            if (!in0) {
+                LOG_ERROR("AOT: reduction missing input");
+                emit_ok = false;
+                break;
+            }
             ReduceParams* p = (ReduceParams*)node->params;
-            int nd = in0->ndim;
+            int nd          = in0->ndim;
             int64_t outer = 1, dim = na, inner = 1;
             bool full = (!p || p->num_dims == 0 || p->num_dims == nd);
             if (!full && p->num_dims == 1) {
                 int d = p->dims[0];
-                if (d < 0) d += nd;
-                if (d < 0 || d >= nd) { LOG_ERROR("AOT: bad reduce dim"); emit_ok = false; break; }
-                for (int i = 0; i < d; i++) outer *= in0->shape[i];
+                if (d < 0)
+                    d += nd;
+                if (d < 0 || d >= nd) {
+                    LOG_ERROR("AOT: bad reduce dim");
+                    emit_ok = false;
+                    break;
+                }
+                for (int i = 0; i < d; i++)
+                    outer *= in0->shape[i];
                 dim = in0->shape[d];
-                for (int i = d + 1; i < nd; i++) inner *= in0->shape[i];
+                for (int i = d + 1; i < nd; i++)
+                    inner *= in0->shape[i];
             } else if (!full) {
                 /* Reduce over an arbitrary set of dims. Handled inline below
                  * rather than through aot_emit_reduce's outer/dim/inner form. */
-                if (nd > 16) { LOG_ERROR("AOT: reduce ndim > 16 unsupported"); emit_ok = false; break; }
+                if (nd > 16) {
+                    LOG_ERROR("AOT: reduce ndim > 16 unsupported");
+                    emit_ok = false;
+                    break;
+                }
                 bool reduced[16] = {false};
                 for (int i = 0; i < p->num_dims; i++) {
                     int d = p->dims[i];
-                    if (d < 0) d += nd;
-                    if (d < 0 || d >= nd) { LOG_ERROR("AOT: bad reduce dim"); emit_ok = false; break; }
+                    if (d < 0)
+                        d += nd;
+                    if (d < 0 || d >= nd) {
+                        LOG_ERROR("AOT: bad reduce dim");
+                        emit_ok = false;
+                        break;
+                    }
                     reduced[d] = true;
                 }
-                if (!emit_ok) break;
+                if (!emit_ok)
+                    break;
                 int64_t istr[16], ostr_kept[16], count = 1;
                 istr[nd - 1] = 1;
-                for (int d = nd - 2; d >= 0; d--) istr[d] = istr[d + 1] * in0->shape[d + 1];
+                for (int d = nd - 2; d >= 0; d--)
+                    istr[d] = istr[d + 1] * in0->shape[d + 1];
                 /* Compact output strides over the non-reduced dims, in order. */
                 int64_t s = 1;
                 for (int d = nd - 1; d >= 0; d--) {
-                    if (reduced[d]) { ostr_kept[d] = 0; count *= in0->shape[d]; }
-                    else { ostr_kept[d] = s; s *= in0->shape[d]; }
+                    if (reduced[d]) {
+                        ostr_kept[d] = 0;
+                        count *= in0->shape[d];
+                    } else {
+                        ostr_kept[d] = s;
+                        s *= in0->shape[d];
+                    }
                 }
                 const char *mname, *minit, *macc;
                 switch (node->type) {
-                case UOP_SUM: case UOP_MEAN: mname = "SUM"; minit = "0.0f"; macc = "acc + v"; break;
-                case UOP_PROD:       mname = "PROD";       minit = "1.0f";      macc = "acc * v"; break;
-                case UOP_MAX_REDUCE: mname = "MAX_REDUCE"; minit = "-INFINITY"; macc = "(v != v || v > acc) ? v : acc"; break;
-                case UOP_MIN_REDUCE: mname = "MIN_REDUCE"; minit = "INFINITY";  macc = "(v != v || v < acc) ? v : acc"; break;
-                default: LOG_ERROR("AOT: unhandled reduction"); emit_ok = false; mname=""; minit=""; macc=""; break;
+                case UOP_SUM:
+                case UOP_MEAN:
+                    mname = "SUM";
+                    minit = "0.0f";
+                    macc  = "acc + v";
+                    break;
+                case UOP_PROD:
+                    mname = "PROD";
+                    minit = "1.0f";
+                    macc  = "acc * v";
+                    break;
+                case UOP_MAX_REDUCE:
+                    mname = "MAX_REDUCE";
+                    minit = "-INFINITY";
+                    macc  = "(v != v || v > acc) ? v : acc";
+                    break;
+                case UOP_MIN_REDUCE:
+                    mname = "MIN_REDUCE";
+                    minit = "INFINITY";
+                    macc  = "(v != v || v < acc) ? v : acc";
+                    break;
+                default:
+                    LOG_ERROR("AOT: unhandled reduction");
+                    emit_ok = false;
+                    mname   = "";
+                    minit   = "";
+                    macc    = "";
+                    break;
                 }
-                if (!emit_ok) break;
+                if (!emit_ok)
+                    break;
                 fprintf(cf, "    /* %s (multi-dim) */\n", mname);
-                fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) %s[i] = %s;\n",
-                        (long long)n, o, minit);
+                fprintf(cf, "    for (int64_t i = 0; i < %lld; i++) %s[i] = %s;\n", (long long)n, o,
+                        minit);
                 fprintf(cf, "    for (int64_t idx = 0; idx < %lld; idx++) {\n", (long long)na);
                 fprintf(cf, "        int64_t rem = idx, out_off = 0;\n");
                 for (int d = 0; d < nd; d++) {
-                    fprintf(cf, "        { int64_t c = rem / %lld; rem -= c * %lld; out_off += c * %lld; }\n",
+                    fprintf(cf,
+                            "        { int64_t c = rem / %lld; rem -= c * %lld; out_off += c * "
+                            "%lld; }\n",
                             (long long)istr[d], (long long)istr[d], (long long)ostr_kept[d]);
                 }
                 fprintf(cf, "        float v = %s[idx];\n", a);
@@ -664,18 +914,40 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
             }
             const char *name, *init, *acc, *fin = "acc";
             switch (node->type) {
-            case UOP_SUM:        name = "SUM";        init = "0.0f";      acc = "acc + v"; break;
-            case UOP_MEAN:       name = "MEAN";       init = "0.0f";      acc = "acc + v"; break;
-            case UOP_PROD:       name = "PROD";       init = "1.0f";      acc = "acc * v"; break;
-            case UOP_MAX_REDUCE: name = "MAX_REDUCE"; init = "-INFINITY"; acc = "(v != v || v > acc) ? v : acc"   /* NaN propagates */; break;
-            case UOP_MIN_REDUCE: name = "MIN_REDUCE"; init = "INFINITY";  acc = "(v != v || v < acc) ? v : acc"   /* NaN propagates */; break;
+            case UOP_SUM:
+                name = "SUM";
+                init = "0.0f";
+                acc  = "acc + v";
+                break;
+            case UOP_MEAN:
+                name = "MEAN";
+                init = "0.0f";
+                acc  = "acc + v";
+                break;
+            case UOP_PROD:
+                name = "PROD";
+                init = "1.0f";
+                acc  = "acc * v";
+                break;
+            case UOP_MAX_REDUCE:
+                name = "MAX_REDUCE";
+                init = "-INFINITY";
+                acc  = "(v != v || v > acc) ? v : acc" /* NaN propagates */;
+                break;
+            case UOP_MIN_REDUCE:
+                name = "MIN_REDUCE";
+                init = "INFINITY";
+                acc  = "(v != v || v < acc) ? v : acc" /* NaN propagates */;
+                break;
             default:
                 /* Spelling MIN_REDUCE as the default was correct only while it
                  * was the last unhandled member of the label group above; adding
                  * another reduction there would have silently emitted a min. */
                 LOG_ERROR("AOT: unhandled reduction %s", uop_type_to_string(node->type));
                 emit_ok = false;
-                name = "SUM"; init = "0.0f"; acc = "acc + v";
+                name    = "SUM";
+                init    = "0.0f";
+                acc     = "acc + v";
                 break;
             }
             if (node->type == UOP_MEAN) {
@@ -690,15 +962,27 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
 
         /* ---- Matmul / Linear ---- */
         case UOP_MATMUL: {
-            if (!in0 || !in1) { LOG_ERROR("AOT: MATMUL missing inputs"); emit_ok = false; break; }
+            if (!in0 || !in1) {
+                LOG_ERROR("AOT: MATMUL missing inputs");
+                emit_ok = false;
+                break;
+            }
             int64_t M = 1, K = 1, N = 1;
-            if (in0->ndim >= 2) { M = in0->shape[in0->ndim - 2]; K = in0->shape[in0->ndim - 1]; }
-            else if (in0->ndim == 1) { M = 1; K = in0->shape[0]; }
-            if (in1->ndim >= 2) { N = in1->shape[in1->ndim - 1]; }
-            else if (in1->ndim == 1) { N = 1; }
+            if (in0->ndim >= 2) {
+                M = in0->shape[in0->ndim - 2];
+                K = in0->shape[in0->ndim - 1];
+            } else if (in0->ndim == 1) {
+                M = 1;
+                K = in0->shape[0];
+            }
+            if (in1->ndim >= 2) {
+                N = in1->shape[in1->ndim - 1];
+            } else if (in1->ndim == 1) {
+                N = 1;
+            }
             fprintf(cf, "    /* MATMUL */\n    {\n");
-            fprintf(cf, "        int64_t M = %lld, K = %lld, N = %lld;\n",
-                    (long long)M, (long long)K, (long long)N);
+            fprintf(cf, "        int64_t M = %lld, K = %lld, N = %lld;\n", (long long)M,
+                    (long long)K, (long long)N);
             fprintf(cf, "        for (int64_t m = 0; m < M; m++)\n");
             fprintf(cf, "            for (int64_t nn = 0; nn < N; nn++) {\n");
             fprintf(cf, "                float acc = 0.0f;\n");
@@ -710,16 +994,21 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
         }
         case UOP_LINEAR: {
             /* inputs: [input, weight(N,K), bias(N)?]; out = input @ weight^T + bias */
-            if (!in0 || !in1) { LOG_ERROR("AOT: LINEAR missing inputs"); emit_ok = false; break; }
-            Tensor* bias = (node->num_inputs > 2 && node->inputs) ? node->inputs[2] : NULL;
-            int64_t N = in1->shape[0];
-            int64_t K = in1->ndim >= 2 ? in1->shape[1] : in1->shape[0];
-            int64_t M = K > 0 ? (int64_t)in0->numel / K : 0;
+            if (!in0 || !in1) {
+                LOG_ERROR("AOT: LINEAR missing inputs");
+                emit_ok = false;
+                break;
+            }
+            Tensor* bias   = (node->num_inputs > 2 && node->inputs) ? node->inputs[2] : NULL;
+            int64_t N      = in1->shape[0];
+            int64_t K      = in1->ndim >= 2 ? in1->shape[1] : in1->shape[0];
+            int64_t M      = K > 0 ? (int64_t)in0->numel / K : 0;
             char bexpr[64] = "";
-            if (bias) aot_ptr_expr(&map, bias, bexpr, sizeof(bexpr));
+            if (bias)
+                aot_ptr_expr(&map, bias, bexpr, sizeof(bexpr));
             fprintf(cf, "    /* LINEAR */\n    {\n");
-            fprintf(cf, "        int64_t M = %lld, K = %lld, N = %lld;\n",
-                    (long long)M, (long long)K, (long long)N);
+            fprintf(cf, "        int64_t M = %lld, K = %lld, N = %lld;\n", (long long)M,
+                    (long long)K, (long long)N);
             fprintf(cf, "        for (int64_t m = 0; m < M; m++)\n");
             fprintf(cf, "            for (int64_t nn = 0; nn < N; nn++) {\n");
             fprintf(cf, "                float acc = 0.0f;\n");
@@ -791,8 +1080,7 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
 
     if (opts.format == AOT_FORMAT_SHARED_LIB) {
         char cmd[1024];
-        snprintf(cmd, sizeof(cmd), "cc -O2 -fPIC -shared -o %s %s -lm",
-                 output_path, tmp_c_path);
+        snprintf(cmd, sizeof(cmd), "cc -O2 -fPIC -shared -o %s %s -lm", output_path, tmp_c_path);
         if (aot_run_tool("cc", cmd, tmp_c_path) != 0)
             return -1;
         LOG_INFO("AOT: compiled shared library %s", output_path);
@@ -828,14 +1116,16 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
     return -1;
 
 #else
-    (void)ir; (void)output_path; (void)options;
+    (void)ir;
+    (void)output_path;
+    (void)options;
     LOG_ERROR("AOT compilation requires LLVM backend support");
     return -1;
 #endif
 }
 
-int cml_aot_compile_module(struct Module* module, Tensor* sample_input,
-                           const char* output_path, const AOTCompileOptions* options) {
+int cml_aot_compile_module(struct Module* module, Tensor* sample_input, const char* output_path,
+                           const AOTCompileOptions* options) {
     if (!module || !sample_input || !output_path) {
         LOG_ERROR("Invalid arguments to cml_aot_compile_module");
         return -1;
@@ -891,16 +1181,16 @@ CMLAOTModel* cml_aot_load(const char* path) {
         return NULL;
     }
 
-    model->handle = handle;
+    model->handle     = handle;
     model->forward_fn = forward_fn;
-    model->path = strdup(path);
+    model->path       = strdup(path);
 
     LOG_INFO("AOT model loaded from: %s", path);
     return model;
 }
 
-int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs,
-                    Tensor** outputs, int num_outputs) {
+int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs, Tensor** outputs,
+                    int num_outputs) {
     if (!model || !model->forward_fn || !inputs || !outputs) {
         LOG_ERROR("Invalid arguments to cml_aot_execute");
         return -1;
@@ -915,12 +1205,14 @@ int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs,
         int64_t strides[8];
     } MemRef;
 
-    int total = num_inputs + num_outputs;
-    MemRef* descs = calloc((size_t)total, sizeof(MemRef));
-    MemRef** in_ptrs = calloc((size_t)(num_inputs > 0 ? num_inputs : 1), sizeof(MemRef*));
+    int total         = num_inputs + num_outputs;
+    MemRef* descs     = calloc((size_t)total, sizeof(MemRef));
+    MemRef** in_ptrs  = calloc((size_t)(num_inputs > 0 ? num_inputs : 1), sizeof(MemRef*));
     MemRef** out_ptrs = calloc((size_t)(num_outputs > 0 ? num_outputs : 1), sizeof(MemRef*));
     if (!descs || !in_ptrs || !out_ptrs) {
-        free(descs); free(in_ptrs); free(out_ptrs);
+        free(descs);
+        free(in_ptrs);
+        free(out_ptrs);
         return -1;
     }
 
@@ -928,17 +1220,19 @@ int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs,
         Tensor* t = i < num_inputs ? inputs[i] : outputs[i - num_inputs];
         /* Allocate output data lazily if the caller left it NULL. */
         if (t && !t->data && t->numel > 0) {
-            t->data = calloc(t->numel, sizeof(float));
+            t->data      = calloc(t->numel, sizeof(float));
             t->owns_data = true;
         }
         if (!t || !t->data) {
-            free(descs); free(in_ptrs); free(out_ptrs);
+            free(descs);
+            free(in_ptrs);
+            free(out_ptrs);
             return -1;
         }
-        descs[i].allocated = (float*)t->data;
-        descs[i].aligned = (float*)t->data;
-        descs[i].offset = 0;
-        descs[i].sizes[0] = (int64_t)t->numel;
+        descs[i].allocated  = (float*)t->data;
+        descs[i].aligned    = (float*)t->data;
+        descs[i].offset     = 0;
+        descs[i].sizes[0]   = (int64_t)t->numel;
         descs[i].strides[0] = 1;
         if (i < num_inputs)
             in_ptrs[i] = &descs[i];
@@ -999,11 +1293,13 @@ int cml_aot_generate_header(CMLGraph_t ir, const char* header_path, const char* 
         int produced_cap = 0, produced_cnt = 0;
         Tensor** produced = NULL;
         for (struct IRNode* nd = ir->head; nd; nd = nd->next) {
-            if (!nd->output) continue;
+            if (!nd->output)
+                continue;
             if (produced_cnt == produced_cap) {
                 produced_cap = produced_cap ? produced_cap * 2 : 16;
-                Tensor** np = realloc(produced, (size_t)produced_cap * sizeof(Tensor*));
-                if (!np) break;
+                Tensor** np  = realloc(produced, (size_t)produced_cap * sizeof(Tensor*));
+                if (!np)
+                    break;
                 produced = np;
             }
             produced[produced_cnt++] = nd->output;
@@ -1013,19 +1309,29 @@ int cml_aot_generate_header(CMLGraph_t ir, const char* header_path, const char* 
         for (struct IRNode* nd = ir->head; nd; nd = nd->next) {
             for (int k = 0; k < nd->num_inputs; k++) {
                 Tensor* in = nd->inputs ? nd->inputs[k] : NULL;
-                if (!in) continue;
+                if (!in)
+                    continue;
                 bool is_produced = false;
                 for (int i = 0; i < produced_cnt; i++)
-                    if (produced[i] == in) { is_produced = true; break; }
-                if (is_produced) continue;
+                    if (produced[i] == in) {
+                        is_produced = true;
+                        break;
+                    }
+                if (is_produced)
+                    continue;
                 bool already = false;
                 for (int i = 0; i < seen_cnt; i++)
-                    if (seen[i] == in) { already = true; break; }
-                if (already) continue;
+                    if (seen[i] == in) {
+                        already = true;
+                        break;
+                    }
+                if (already)
+                    continue;
                 if (seen_cnt == seen_cap) {
-                    seen_cap = seen_cap ? seen_cap * 2 : 16;
+                    seen_cap    = seen_cap ? seen_cap * 2 : 16;
                     Tensor** ns = realloc(seen, (size_t)seen_cap * sizeof(Tensor*));
-                    if (!ns) break;
+                    if (!ns)
+                        break;
                     seen = ns;
                 }
                 seen[seen_cnt++] = in;
@@ -1053,8 +1359,8 @@ int cml_aot_generate_header(CMLGraph_t ir, const char* header_path, const char* 
     fprintf(f, "    int64_t strides[8];\n");
     fprintf(f, "} CMLMemRef;\n\n");
 
-    fprintf(f, "/* Forward pass. inputs[] has %d entries, outputs[] has %d entry. */\n",
-            num_inputs, num_outputs);
+    fprintf(f, "/* Forward pass. inputs[] has %d entries, outputs[] has %d entry. */\n", num_inputs,
+            num_outputs);
     fprintf(f, "void %s(CMLMemRef** inputs, CMLMemRef** outputs);\n\n", fname);
 
     fprintf(f, "#ifdef __cplusplus\n");

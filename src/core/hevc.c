@@ -6,8 +6,8 @@
 #include "alloc/cml_allocator.h"
 
 #define HEVC_RING_INITIAL_CAP (256 * 1024)
-#define HEVC_START_CODE_3     3
-#define HEVC_START_CODE_4     4
+#define HEVC_START_CODE_3 3
+#define HEVC_START_CODE_4 4
 
 struct CMLHEVCParser {
     uint8_t* ring;
@@ -24,15 +24,16 @@ typedef struct {
 } BitstreamReader;
 
 static void bs_init(BitstreamReader* bs, const uint8_t* data, size_t size) {
-    bs->data = data;
-    bs->size = size;
+    bs->data    = data;
+    bs->size    = size;
     bs->bit_pos = 0;
 }
 
 static int bs_read_bit(BitstreamReader* bs) {
-    if (bs->bit_pos / 8 >= bs->size) return -1;
+    if (bs->bit_pos / 8 >= bs->size)
+        return -1;
     int byte_idx = (int)(bs->bit_pos / 8);
-    int bit_idx = 7 - (int)(bs->bit_pos % 8);
+    int bit_idx  = 7 - (int)(bs->bit_pos % 8);
     bs->bit_pos++;
     return (bs->data[byte_idx] >> bit_idx) & 1;
 }
@@ -41,7 +42,8 @@ static uint32_t bs_read_bits(BitstreamReader* bs, int n) {
     uint32_t val = 0;
     for (int i = 0; i < n; i++) {
         int bit = bs_read_bit(bs);
-        if (bit < 0) return 0;
+        if (bit < 0)
+            return 0;
         val = (val << 1) | (uint32_t)bit;
     }
     return val;
@@ -51,14 +53,16 @@ static uint32_t bs_read_ue(BitstreamReader* bs) {
     int leading_zeros = 0;
     while (bs_read_bit(bs) == 0 && leading_zeros < 31)
         leading_zeros++;
-    if (leading_zeros == 0) return 0;
+    if (leading_zeros == 0)
+        return 0;
     uint32_t val = bs_read_bits(bs, leading_zeros);
     return (1u << leading_zeros) - 1 + val;
 }
 
 static uint8_t* rbsp_from_nal(const uint8_t* nal, size_t nal_size, size_t* rbsp_size) {
     uint8_t* rbsp = (uint8_t*)cml_malloc(nal_size);
-    if (!rbsp) return NULL;
+    if (!rbsp)
+        return NULL;
 
     size_t j = 0;
     for (size_t i = 0; i < nal_size; i++) {
@@ -75,7 +79,8 @@ static uint8_t* rbsp_from_nal(const uint8_t* nal, size_t nal_size, size_t* rbsp_
     return rbsp;
 }
 
-static int find_start_code(const uint8_t* buf, size_t len, size_t start, size_t* sc_pos, int* sc_len) {
+static int find_start_code(const uint8_t* buf, size_t len, size_t start, size_t* sc_pos,
+                           int* sc_len) {
     for (size_t i = start; i + 2 < len; i++) {
         if (buf[i] == 0x00 && buf[i + 1] == 0x00) {
             if (i + 3 < len && buf[i + 2] == 0x00 && buf[i + 3] == 0x01) {
@@ -95,39 +100,43 @@ static int find_start_code(const uint8_t* buf, size_t len, size_t start, size_t*
 
 CMLHEVCParser* cml_hevc_parser_create(void) {
     CMLHEVCParser* p = (CMLHEVCParser*)cml_calloc(1, sizeof(CMLHEVCParser));
-    if (!p) return NULL;
+    if (!p)
+        return NULL;
 
     p->ring = (uint8_t*)cml_malloc(HEVC_RING_INITIAL_CAP);
     if (!p->ring) {
         cml_free(p);
         return NULL;
     }
-    p->ring_cap = HEVC_RING_INITIAL_CAP;
-    p->ring_len = 0;
-    p->scan_pos = 0;
+    p->ring_cap    = HEVC_RING_INITIAL_CAP;
+    p->ring_len    = 0;
+    p->scan_pos    = 0;
     p->frame_count = 0;
     return p;
 }
 
 void cml_hevc_parser_free(CMLHEVCParser* parser) {
-    if (!parser) return;
+    if (!parser)
+        return;
     cml_free(parser->ring);
     cml_free(parser);
 }
 
 int cml_hevc_parser_feed(CMLHEVCParser* parser, const uint8_t* data, size_t size) {
-    if (!parser || !data || size == 0) return -1;
+    if (!parser || !data || size == 0)
+        return -1;
 
     size_t needed = parser->ring_len + size;
     if (needed > parser->ring_cap) {
         size_t new_cap = parser->ring_cap;
-        while (new_cap < needed) new_cap *= 2;
+        while (new_cap < needed)
+            new_cap *= 2;
         uint8_t* new_ring = (uint8_t*)cml_realloc(parser->ring, new_cap);
         if (!new_ring) {
             LOG_ERROR("HEVC: ring buffer realloc failed (%zu bytes)", new_cap);
             return -1;
         }
-        parser->ring = new_ring;
+        parser->ring     = new_ring;
         parser->ring_cap = new_cap;
     }
 
@@ -137,7 +146,8 @@ int cml_hevc_parser_feed(CMLHEVCParser* parser, const uint8_t* data, size_t size
 }
 
 CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser) {
-    if (!parser || parser->ring_len < 4) return NULL;
+    if (!parser || parser->ring_len < 4)
+        return NULL;
 
     size_t first_pos, second_pos;
     int first_len, second_len;
@@ -158,7 +168,8 @@ CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser) {
     }
 
     CMLHEVCNalUnit* nal = (CMLHEVCNalUnit*)cml_calloc(1, sizeof(CMLHEVCNalUnit));
-    if (!nal) return NULL;
+    if (!nal)
+        return NULL;
 
     uint8_t* nal_data = (uint8_t*)cml_malloc(nal_size);
     if (!nal_data) {
@@ -167,18 +178,18 @@ CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser) {
     }
     memcpy(nal_data, parser->ring + nal_start, nal_size);
 
-    uint8_t byte0 = nal_data[0];
-    uint8_t byte1 = nal_data[1];
-    int forbidden = (byte0 >> 7) & 1;
-    int nal_type = (byte0 >> 1) & 0x3F;
-    int nuh_layer_id = ((byte0 & 1) << 5) | ((byte1 >> 3) & 0x1F);
+    uint8_t byte0             = nal_data[0];
+    uint8_t byte1             = nal_data[1];
+    int forbidden             = (byte0 >> 7) & 1;
+    int nal_type              = (byte0 >> 1) & 0x3F;
+    int nuh_layer_id          = ((byte0 & 1) << 5) | ((byte1 >> 3) & 0x1F);
     int nuh_temporal_id_plus1 = byte1 & 0x07;
     (void)forbidden;
     (void)nuh_layer_id;
 
-    nal->data = nal_data;
-    nal->size = nal_size;
-    nal->type = nal_type;
+    nal->data        = nal_data;
+    nal->size        = nal_size;
+    nal->type        = nal_type;
     nal->temporal_id = nuh_temporal_id_plus1 > 0 ? nuh_temporal_id_plus1 - 1 : 0;
 
     parser->scan_pos = second_pos;
@@ -194,28 +205,32 @@ CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser) {
 }
 
 void cml_hevc_nal_free(CMLHEVCNalUnit* nal) {
-    if (!nal) return;
+    if (!nal)
+        return;
     cml_free((void*)nal->data);
     cml_free(nal);
 }
 
 int cml_hevc_parse_sps(const uint8_t* sps_data, size_t sps_size, int* width, int* height) {
-    if (!sps_data || sps_size < 4 || !width || !height) return -1;
+    if (!sps_data || sps_size < 4 || !width || !height)
+        return -1;
 
     size_t rbsp_size = 0;
-    uint8_t* rbsp = rbsp_from_nal(sps_data + 2, sps_size - 2, &rbsp_size);
-    if (!rbsp) return -1;
+    uint8_t* rbsp    = rbsp_from_nal(sps_data + 2, sps_size - 2, &rbsp_size);
+    if (!rbsp)
+        return -1;
 
     BitstreamReader bs;
     bs_init(&bs, rbsp, rbsp_size);
 
-    uint32_t sps_video_parameter_set_id = bs_read_bits(&bs, 4);
-    uint32_t sps_max_sub_layers_minus1 = bs_read_bits(&bs, 3);
+    uint32_t sps_video_parameter_set_id   = bs_read_bits(&bs, 4);
+    uint32_t sps_max_sub_layers_minus1    = bs_read_bits(&bs, 3);
     uint32_t sps_temporal_id_nesting_flag = bs_read_bits(&bs, 1);
     (void)sps_video_parameter_set_id;
     (void)sps_temporal_id_nesting_flag;
 
-    /* profile_tier_level: general_profile_space(2) + general_tier_flag(1) + general_profile_idc(5) */
+    /* profile_tier_level: general_profile_space(2) + general_tier_flag(1) + general_profile_idc(5)
+     */
     bs_read_bits(&bs, 8);
     /* general_profile_compatibility_flags (32 bits) */
     bs_read_bits(&bs, 32);
@@ -227,7 +242,7 @@ int cml_hevc_parse_sps(const uint8_t* sps_data, size_t sps_size, int* width, int
 
     for (uint32_t i = 0; i < sps_max_sub_layers_minus1; i++) {
         uint32_t sub_layer_profile_present = bs_read_bits(&bs, 1);
-        uint32_t sub_layer_level_present = bs_read_bits(&bs, 1);
+        uint32_t sub_layer_level_present   = bs_read_bits(&bs, 1);
         (void)sub_layer_profile_present;
         (void)sub_layer_level_present;
     }
@@ -253,24 +268,24 @@ int cml_hevc_parse_sps(const uint8_t* sps_data, size_t sps_size, int* width, int
         bs_read_bits(&bs, 1); /* separate_colour_plane_flag */
     }
 
-    uint32_t pic_width = bs_read_ue(&bs);
+    uint32_t pic_width  = bs_read_ue(&bs);
     uint32_t pic_height = bs_read_ue(&bs);
 
     uint32_t conformance_window_flag = bs_read_bits(&bs, 1);
     if (conformance_window_flag) {
-        uint32_t left = bs_read_ue(&bs);
-        uint32_t right = bs_read_ue(&bs);
-        uint32_t top = bs_read_ue(&bs);
+        uint32_t left   = bs_read_ue(&bs);
+        uint32_t right  = bs_read_ue(&bs);
+        uint32_t top    = bs_read_ue(&bs);
         uint32_t bottom = bs_read_ue(&bs);
 
-        int sub_width_c = (chroma_format_idc == 1 || chroma_format_idc == 2) ? 2 : 1;
+        int sub_width_c  = (chroma_format_idc == 1 || chroma_format_idc == 2) ? 2 : 1;
         int sub_height_c = (chroma_format_idc == 1) ? 2 : 1;
 
         pic_width -= (left + right) * (uint32_t)sub_width_c;
         pic_height -= (top + bottom) * (uint32_t)sub_height_c;
     }
 
-    *width = (int)pic_width;
+    *width  = (int)pic_width;
     *height = (int)pic_height;
 
     cml_free(rbsp);
@@ -278,19 +293,22 @@ int cml_hevc_parse_sps(const uint8_t* sps_data, size_t sps_size, int* width, int
 }
 
 CMLHEVCFrame* cml_hevc_decode_iframe(CMLHEVCParser* parser, CMLHEVCNalUnit* nal) {
-    if (!parser || !nal) return NULL;
+    if (!parser || !nal)
+        return NULL;
 
     if (nal->type != HEVC_NAL_IDR_W_RADL && nal->type != HEVC_NAL_IDR_N_LP)
         return NULL;
 
-    if (nal->size < 3) return NULL;
+    if (nal->size < 3)
+        return NULL;
 
     size_t payload_offset = 2;
-    size_t payload_size = nal->size - payload_offset;
+    size_t payload_size   = nal->size - payload_offset;
 
     size_t rbsp_size = 0;
-    uint8_t* rbsp = rbsp_from_nal(nal->data + payload_offset, payload_size, &rbsp_size);
-    if (!rbsp) return NULL;
+    uint8_t* rbsp    = rbsp_from_nal(nal->data + payload_offset, payload_size, &rbsp_size);
+    if (!rbsp)
+        return NULL;
 
     /* Frame reconstruction (slice header parsing, intra prediction, transform,
      * deblocking) is not implemented — fail loudly instead of returning a
@@ -299,12 +317,12 @@ CMLHEVCFrame* cml_hevc_decode_iframe(CMLHEVCParser* parser, CMLHEVCNalUnit* nal)
     cml_free(rbsp);
     LOG_ERROR("[hevc] intra frame decoding is not implemented; NAL was parsed "
               "but no pixels can be produced");
-    CML_ERR_RET(CM_NOT_IMPLEMENTED,
-                "hevc: frame decoding not implemented", NULL);
+    CML_ERR_RET(CM_NOT_IMPLEMENTED, "hevc: frame decoding not implemented", NULL);
 }
 
 void cml_hevc_frame_free(CMLHEVCFrame* frame) {
-    if (!frame) return;
+    if (!frame)
+        return;
     cml_free(frame->data);
     cml_free(frame);
 }

@@ -6,8 +6,8 @@
 static void test_ref_count_api(void) {
     printf("  test_ref_count_api...");
     TorchTensorOptions opts = torch_options();
-    int shape[] = {1};
-    Tensor* t = torch_ones(shape, 1, &opts);
+    int shape[]             = {1};
+    Tensor* t               = torch_ones(shape, 1, &opts);
     REQUIRE(torch_tensor_ref_count(t) == 1);
     torch_tensor_retain(t);
     REQUIRE(torch_tensor_ref_count(t) == 2);
@@ -20,10 +20,10 @@ static void test_ref_count_api(void) {
 static void test_data_ptr_f32(void) {
     printf("  test_data_ptr_f32...");
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    int shape[] = {2};
-    Tensor* t = torch_ones(shape, 1, &opts);
-    float* data = torch_tensor_data_ptr_f32(t);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    int shape[]             = {2};
+    Tensor* t               = torch_ones(shape, 1, &opts);
+    float* data             = torch_tensor_data_ptr_f32(t);
     REQUIRE(data != NULL);
     REQUIRE(data[0] == 1.0f && data[1] == 1.0f);
     torch_tensor_free(t);
@@ -33,9 +33,9 @@ static void test_data_ptr_f32(void) {
 static void test_data_ptr_f32_rejects_wrong_dtype(void) {
     printf("  test_data_ptr_f32_rejects_wrong_dtype...");
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_INT32);
-    int shape[] = {2};
-    Tensor* t = torch_zeros(shape, 1, &opts);
+    opts                    = torch_options_dtype(opts, DTYPE_INT32);
+    int shape[]             = {2};
+    Tensor* t               = torch_zeros(shape, 1, &opts);
     REQUIRE(torch_tensor_data_ptr_f32(t) == NULL);
     REQUIRE(torch_has_error());
     torch_tensor_free(t);
@@ -47,12 +47,12 @@ static void test_materialized_vs_lazy_ir(void) {
     torch_set_eager_mode(true);
     torch_no_grad();
 
-    float vals[] = {1, 2, 3, 4};
+    float vals[]            = {1, 2, 3, 4};
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    int shape[] = {2, 2};
-    Tensor* a = torch_empty(shape, 2, &opts);
-    float* ad = torch_tensor_data_ptr_f32(a);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    int shape[]             = {2, 2};
+    Tensor* a               = torch_empty(shape, 2, &opts);
+    float* ad               = torch_tensor_data_ptr_f32(a);
     memcpy(ad, vals, sizeof(vals));
 
     Tensor* b = torch_empty(shape, 2, &opts);
@@ -65,7 +65,7 @@ static void test_materialized_vs_lazy_ir(void) {
 
     torch_set_eager_mode(false);
     torch_enable_grad();
-    opts = torch_options_requires_grad(opts, true);
+    opts      = torch_options_requires_grad(opts, true);
     Tensor* x = torch_ones(shape, 2, &opts);
     Tensor* y = torch_mul(x, x);
     REQUIRE(torch_tensor_has_lazy_ir(y));
@@ -146,9 +146,9 @@ static void test_inference_mode_restores_grad(void) {
 static void test_clear_error(void) {
     printf("  test_clear_error...");
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_INT32);
-    int shape[] = {2};
-    Tensor* t = torch_zeros(shape, 1, &opts);
+    opts                    = torch_options_dtype(opts, DTYPE_INT32);
+    int shape[]             = {2};
+    Tensor* t               = torch_zeros(shape, 1, &opts);
     REQUIRE(torch_tensor_data_ptr_f32(t) == NULL);
     REQUIRE(torch_has_error());
     torch_clear_error();
@@ -160,7 +160,7 @@ static void test_clear_error(void) {
 static void test_from_blob_null_rejected(void) {
     printf("  test_from_blob_null_rejected...");
     TorchTensorOptions opts = torch_options();
-    int shape[] = {2, 2};
+    int shape[]             = {2, 2};
     REQUIRE(torch_from_blob(NULL, shape, 2, &opts) == NULL);
     REQUIRE(torch_has_error());
     torch_clear_error();
@@ -170,16 +170,16 @@ static void test_from_blob_null_rejected(void) {
 static void test_item_float_scalar(void) {
     printf("  test_item_float_scalar...");
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    int shape[] = {1};
-    Tensor* t = torch_full(shape, 1, &opts, 3.5f);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    int shape[]             = {1};
+    Tensor* t               = torch_full(shape, 1, &opts, 3.5f);
     REQUIRE(torch_tensor_item_float(t) == 3.5f);
     torch_tensor_set_item_float(t, -1.0f);
     REQUIRE(torch_tensor_item_float(t) == -1.0f);
     torch_tensor_free(t);
 
     int shape2[] = {2};
-    Tensor* bad = torch_zeros(shape2, 1, &opts);
+    Tensor* bad  = torch_zeros(shape2, 1, &opts);
     REQUIRE(torch_tensor_item_float(bad) == 0.0f);
     REQUIRE(torch_has_error());
     torch_clear_error();

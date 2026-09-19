@@ -6,13 +6,14 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
-static Module* conv_bn_relu(int in_ch, int out_ch, int kernel, int stride, int padding,
-                             DType dtype, DeviceType device) {
+static Module* conv_bn_relu(int in_ch, int out_ch, int kernel, int stride, int padding, DType dtype,
+                            DeviceType device) {
     Sequential* block = nn_sequential();
     if (!block)
         return NULL;
 
-    sequential_add(block, (Module*)nn_conv2d(in_ch, out_ch, kernel, stride, padding, 1, false, dtype, device));
+    sequential_add(
+        block, (Module*)nn_conv2d(in_ch, out_ch, kernel, stride, padding, 1, false, dtype, device));
     sequential_add(block, (Module*)nn_batchnorm2d(out_ch, 1e-3f, 0.1f, true, true, dtype, device));
     sequential_add(block, (Module*)nn_relu(false));
 

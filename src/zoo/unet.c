@@ -7,12 +7,7 @@
 #include "alloc/cml_allocator.h"
 
 CMLUNetConfig cml_zoo_unet_config_default(void) {
-    return (CMLUNetConfig){
-        .in_channels  = 1,
-        .num_classes  = 2,
-        .depth        = 4,
-        .base_filters = 64
-    };
+    return (CMLUNetConfig){.in_channels = 1, .num_classes = 2, .depth = 4, .base_filters = 64};
 }
 
 /* Conv3x3 -> BN -> ReLU -> Conv3x3 -> BN -> ReLU */
@@ -42,32 +37,39 @@ typedef struct {
 
 static Tensor* unet_forward(Module* module, Tensor* input) {
     UNetModel* unet = (UNetModel*)module;
-    if (!unet || !input) return NULL;
+    if (!unet || !input)
+        return NULL;
 
     Tensor* skips[UNET_MAX_DEPTH];
     Tensor* x = input;
 
     for (int i = 0; i < unet->depth; i++) {
         x = module_forward((Module*)unet->enc_blocks[i], x);
-        if (!x) return NULL;
+        if (!x)
+            return NULL;
         skips[i] = x;
-        x = module_forward((Module*)unet->pools[i], x);
-        if (!x) return NULL;
+        x        = module_forward((Module*)unet->pools[i], x);
+        if (!x)
+            return NULL;
     }
 
     x = module_forward((Module*)unet->bottleneck, x);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
 
     for (int i = unet->depth - 1; i >= 0; i--) {
         Tensor* up = module_forward((Module*)unet->ups[i], x);
-        if (!up) return NULL;
+        if (!up)
+            return NULL;
 
         Tensor* cat_tensors[] = {up, skips[i]};
-        x = tensor_concat(cat_tensors, 2, 1);
-        if (!x) return NULL;
+        x                     = tensor_concat(cat_tensors, 2, 1);
+        if (!x)
+            return NULL;
 
         x = module_forward((Module*)unet->dec_blocks[i], x);
-        if (!x) return NULL;
+        if (!x)
+            return NULL;
     }
 
     return module_forward((Module*)unet->final_conv, x);
@@ -75,16 +77,23 @@ static Tensor* unet_forward(Module* module, Tensor* input) {
 
 static void unet_free(Module* module) {
     UNetModel* unet = (UNetModel*)module;
-    if (!unet) return;
+    if (!unet)
+        return;
 
     for (int i = 0; i < unet->depth; i++) {
-        if (unet->enc_blocks[i]) module_free((Module*)unet->enc_blocks[i]);
-        if (unet->pools[i]) module_free((Module*)unet->pools[i]);
-        if (unet->ups[i]) module_free((Module*)unet->ups[i]);
-        if (unet->dec_blocks[i]) module_free((Module*)unet->dec_blocks[i]);
+        if (unet->enc_blocks[i])
+            module_free((Module*)unet->enc_blocks[i]);
+        if (unet->pools[i])
+            module_free((Module*)unet->pools[i]);
+        if (unet->ups[i])
+            module_free((Module*)unet->ups[i]);
+        if (unet->dec_blocks[i])
+            module_free((Module*)unet->dec_blocks[i]);
     }
-    if (unet->bottleneck) module_free((Module*)unet->bottleneck);
-    if (unet->final_conv) module_free((Module*)unet->final_conv);
+    if (unet->bottleneck)
+        module_free((Module*)unet->bottleneck);
+    if (unet->final_conv)
+        module_free((Module*)unet->final_conv);
     cml_free(unet);
 }
 
@@ -108,28 +117,28 @@ Module* cml_zoo_unet_create(CMLUNetConfig* config, DType dtype, DeviceType devic
     unet->depth = depth;
 
     int filters = config->base_filters;
-    int in_ch = config->in_channels;
+    int in_ch   = config->in_channels;
 
     for (int i = 0; i < depth; i++) {
         unet->enc_blocks[i] = create_conv_block(in_ch, filters, dtype, device);
-        unet->pools[i] = nn_maxpool2d(2, 2, 0, 1, false);
-        in_ch = filters;
+        unet->pools[i]      = nn_maxpool2d(2, 2, 0, 1, false);
+        in_ch               = filters;
         filters *= 2;
     }
 
     unet->bottleneck = create_conv_block(in_ch, filters, dtype, device);
 
     for (int i = depth - 1; i >= 0; i--) {
-        int dec_out = filters / 2;
-        unet->ups[i] = nn_upsample(2.0f, NULL, 0, UPSAMPLE_BILINEAR, false);
+        int dec_out         = filters / 2;
+        unet->ups[i]        = nn_upsample(2.0f, NULL, 0, UPSAMPLE_BILINEAR, false);
         unet->dec_blocks[i] = create_conv_block(filters + dec_out, dec_out, dtype, device);
-        filters = dec_out;
+        filters             = dec_out;
     }
 
-    unet->final_conv = nn_conv2d(config->base_filters, config->num_classes,
-                                  1, 1, 0, 1, true, dtype, device);
+    unet->final_conv =
+        nn_conv2d(config->base_filters, config->num_classes, 1, 1, 0, 1, true, dtype, device);
 
-    LOG_INFO("Created U-Net (depth=%d, base_filters=%d, in=%d, classes=%d)",
-             depth, config->base_filters, config->in_channels, config->num_classes);
+    LOG_INFO("Created U-Net (depth=%d, base_filters=%d, in=%d, classes=%d)", depth,
+             config->base_filters, config->in_channels, config->num_classes);
     return (Module*)unet;
 }

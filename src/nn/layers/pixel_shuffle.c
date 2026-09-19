@@ -23,14 +23,14 @@ Tensor* f_pixel_shuffle(Tensor* input, int upscale_factor) {
         return NULL;
     }
 
-    int batch      = input->shape[0];
+    int batch       = input->shape[0];
     int in_channels = input->shape[1];
-    int in_h       = input->shape[2];
-    int in_w       = input->shape[3];
+    int in_h        = input->shape[2];
+    int in_w        = input->shape[3];
 
     if (in_channels % (r * r) != 0) {
-        LOG_ERROR("f_pixel_shuffle: input channels (%d) must be divisible by r^2 (%d)",
-                  in_channels, r * r);
+        LOG_ERROR("f_pixel_shuffle: input channels (%d) must be divisible by r^2 (%d)", in_channels,
+                  r * r);
         return NULL;
     }
 
@@ -39,17 +39,19 @@ Tensor* f_pixel_shuffle(Tensor* input, int upscale_factor) {
     /* Pure rearrange = reshape -> permute -> reshape (lazy, so it builds IR and
      * is graph-autodiff differentiable — was an eager ->data loop).
      * input[n, c*r*r+r1*r+r2, h, w] -> out[n, c, h*r+r1, w*r+r2]. */
-    int s6[6] = {batch, out_channels, r, r, in_h, in_w};   /* split C -> (c,r1,r2) */
+    int s6[6]         = {batch, out_channels, r, r, in_h, in_w}; /* split C -> (c,r1,r2) */
     ReshapeParams rs1 = {s6, 6};
-    Tensor* t1 = uop_reshape(input, &rs1);
-    if (!t1) return NULL;
+    Tensor* t1        = uop_reshape(input, &rs1);
+    if (!t1)
+        return NULL;
 
-    int perm[6] = {0, 1, 4, 2, 5, 3};                      /* -> [N,C,H,r1,W,r2] */
+    int perm[6]      = {0, 1, 4, 2, 5, 3}; /* -> [N,C,H,r1,W,r2] */
     PermuteParams pp = {perm, 6};
-    Tensor* t2 = uop_permute(t1, &pp);
-    if (!t2) return NULL;
+    Tensor* t2       = uop_permute(t1, &pp);
+    if (!t2)
+        return NULL;
 
-    int s4[4] = {batch, out_channels, in_h * r, in_w * r};
+    int s4[4]         = {batch, out_channels, in_h * r, in_w * r};
     ReshapeParams rs2 = {s4, 4};
     return uop_reshape(t2, &rs2);
 }
@@ -77,8 +79,8 @@ Tensor* f_pixel_unshuffle(Tensor* input, int downscale_factor) {
     int in_w        = input->shape[3];
 
     if (in_h % r != 0 || in_w % r != 0) {
-        LOG_ERROR("f_pixel_unshuffle: spatial dims (%d, %d) must be divisible by r (%d)",
-                  in_h, in_w, r);
+        LOG_ERROR("f_pixel_unshuffle: spatial dims (%d, %d) must be divisible by r (%d)", in_h,
+                  in_w, r);
         return NULL;
     }
 
@@ -88,17 +90,19 @@ Tensor* f_pixel_unshuffle(Tensor* input, int downscale_factor) {
 
     /* Inverse rearrange (lazy): reshape -> permute -> reshape.
      * input[n, c, h*r+r1, w*r+r2] -> out[n, c*r*r+r1*r+r2, h, w]. */
-    int s6[6] = {batch, in_channels, out_h, r, out_w, r};  /* split H*r->(h,r1), W*r->(w,r2) */
+    int s6[6] = {batch, in_channels, out_h, r, out_w, r}; /* split H*r->(h,r1), W*r->(w,r2) */
     ReshapeParams rs1 = {s6, 6};
-    Tensor* t1 = uop_reshape(input, &rs1);
-    if (!t1) return NULL;
+    Tensor* t1        = uop_reshape(input, &rs1);
+    if (!t1)
+        return NULL;
 
-    int perm[6] = {0, 1, 3, 5, 2, 4};                      /* -> [N,C,r1,r2,h,w] */
+    int perm[6]      = {0, 1, 3, 5, 2, 4}; /* -> [N,C,r1,r2,h,w] */
     PermuteParams pp = {perm, 6};
-    Tensor* t2 = uop_permute(t1, &pp);
-    if (!t2) return NULL;
+    Tensor* t2       = uop_permute(t1, &pp);
+    if (!t2)
+        return NULL;
 
-    int s4[4] = {batch, out_channels, out_h, out_w};
+    int s4[4]         = {batch, out_channels, out_h, out_w};
     ReshapeParams rs2 = {s4, 4};
     return uop_reshape(t2, &rs2);
 }
@@ -143,8 +147,8 @@ PixelShuffle* nn_pixel_shuffle(int upscale_factor) {
         return NULL;
     }
 
-    if (module_init((Module*)layer, "PixelShuffle", pixel_shuffle_forward,
-                    pixel_shuffle_free) != 0) {
+    if (module_init((Module*)layer, "PixelShuffle", pixel_shuffle_forward, pixel_shuffle_free) !=
+        0) {
         cml_free(layer);
         return NULL;
     }

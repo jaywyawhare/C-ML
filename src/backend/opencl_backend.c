@@ -21,36 +21,38 @@ static pthread_mutex_t g_opencl_lock;
 static bool g_lock_initialized = false;
 
 static inline void opencl_lock(void) {
-    if (g_lock_initialized) pthread_mutex_lock(&g_opencl_lock);
+    if (g_lock_initialized)
+        pthread_mutex_lock(&g_opencl_lock);
 }
 static inline void opencl_unlock(void) {
-    if (g_lock_initialized) pthread_mutex_unlock(&g_opencl_lock);
+    if (g_lock_initialized)
+        pthread_mutex_unlock(&g_opencl_lock);
 }
 
 #define GPU_POOL_MAX_ENTRIES 128
 
 typedef struct {
-    cl_mem  buffer;
-    size_t  size;
-    bool    in_use;
+    cl_mem buffer;
+    size_t size;
+    bool in_use;
 } GPUPoolEntry;
 
 typedef struct {
     GPUPoolEntry entries[GPU_POOL_MAX_ENTRIES];
-    int          count;
+    int count;
 } GPUBufferPool;
 
-static GPUBufferPool g_gpu_pool = { .count = 0 };
+static GPUBufferPool g_gpu_pool = {.count = 0};
 
 static cl_mem gpu_pool_alloc(cl_context ctx, cl_mem_flags flags, size_t size, void* host_ptr,
                              cl_int* errcode) {
     /* Best-fit reuse: find smallest free buffer >= size */
-    int best = -1;
+    int best         = -1;
     size_t best_size = (size_t)-1;
     for (int i = 0; i < g_gpu_pool.count; i++) {
         GPUPoolEntry* e = &g_gpu_pool.entries[i];
         if (!e->in_use && e->size >= size && e->size < best_size) {
-            best = i;
+            best      = i;
             best_size = e->size;
         }
     }
@@ -60,22 +62,25 @@ static cl_mem gpu_pool_alloc(cl_context ctx, cl_mem_flags flags, size_t size, vo
      * host-ptr path, permanently leaking the slot and defeating pooling. */
     if (best >= 0 && !(host_ptr && (flags & CL_MEM_COPY_HOST_PTR))) {
         g_gpu_pool.entries[best].in_use = true;
-        if (errcode) *errcode = CL_SUCCESS;
+        if (errcode)
+            *errcode = CL_SUCCESS;
         return g_gpu_pool.entries[best].buffer;
     }
 
     /* No suitable buffer found — allocate a new one */
     cl_int err;
     cl_mem buf = clCreateBuffer(ctx, flags, size, host_ptr, &err);
-    if (errcode) *errcode = err;
-    if (err != CL_SUCCESS) return NULL;
+    if (errcode)
+        *errcode = err;
+    if (err != CL_SUCCESS)
+        return NULL;
 
     /* Register in pool */
     if (g_gpu_pool.count < GPU_POOL_MAX_ENTRIES) {
         GPUPoolEntry* e = &g_gpu_pool.entries[g_gpu_pool.count++];
-        e->buffer = buf;
-        e->size   = size;
-        e->in_use = true;
+        e->buffer       = buf;
+        e->size         = size;
+        e->in_use       = true;
     }
     return buf;
 }
@@ -101,12 +106,12 @@ static void gpu_pool_cleanup(void) {
     g_gpu_pool.count = 0;
 }
 
-static cl_platform_id   g_platform   = NULL;
-static cl_device_id     g_device     = NULL;
-static cl_context        g_context   = NULL;
-static cl_command_queue  g_queue     = NULL;
-static cl_program        g_program   = NULL;
-static bool              g_initialized = false;
+static cl_platform_id g_platform = NULL;
+static cl_device_id g_device     = NULL;
+static cl_context g_context      = NULL;
+static cl_command_queue g_queue  = NULL;
+static cl_program g_program      = NULL;
+static bool g_initialized        = false;
 
 static const char* g_kernels_src =
     "__kernel void cl_add(__global const float* a, __global const float* b,\n"
@@ -151,9 +156,10 @@ static cl_kernel g_k_sigmoid = NULL;
 static cl_kernel g_k_matmul  = NULL;
 static cl_kernel g_k_sum     = NULL;
 
-static void opencl_elementwise(cl_kernel kernel, const void* a, const void* b,
-                                void* out, size_t n, DType dtype) {
-    if (dtype != DTYPE_FLOAT32 || !g_initialized) return;
+static void opencl_elementwise(cl_kernel kernel, const void* a, const void* b, void* out, size_t n,
+                               DType dtype) {
+    if (dtype != DTYPE_FLOAT32 || !g_initialized)
+        return;
     (void)b; // b may be NULL for unary ops
 
     opencl_lock();
@@ -161,20 +167,21 @@ static void opencl_elementwise(cl_kernel kernel, const void* a, const void* b,
     cl_int err;
     size_t byte_size = n * sizeof(float);
 
-    cl_mem buf_a   = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                     byte_size, (void*)a, &err);
+    cl_mem buf_a   = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, byte_size,
+                                    (void*)a, &err);
     cl_mem buf_out = gpu_pool_alloc(g_context, CL_MEM_WRITE_ONLY, byte_size, NULL, &err);
     cl_mem buf_b   = NULL;
 
     if (b) {
-        buf_b = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                byte_size, (void*)b, &err);
+        buf_b = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, byte_size,
+                               (void*)b, &err);
     }
 
     int n_int = (int)n;
-    int arg = 0;
+    int arg   = 0;
     clSetKernelArg(kernel, arg++, sizeof(cl_mem), &buf_a);
-    if (b) clSetKernelArg(kernel, arg++, sizeof(cl_mem), &buf_b);
+    if (b)
+        clSetKernelArg(kernel, arg++, sizeof(cl_mem), &buf_b);
     clSetKernelArg(kernel, arg++, sizeof(cl_mem), &buf_out);
     clSetKernelArg(kernel, arg++, sizeof(int), &n_int);
 
@@ -184,7 +191,8 @@ static void opencl_elementwise(cl_kernel kernel, const void* a, const void* b,
 
     gpu_pool_release(buf_a);
     gpu_pool_release(buf_out);
-    if (buf_b) gpu_pool_release(buf_b);
+    if (buf_b)
+        gpu_pool_release(buf_b);
 
     opencl_unlock();
 }
@@ -206,18 +214,19 @@ static void opencl_sigmoid(const void* x, void* out, size_t n, DType dtype) {
 }
 
 static void opencl_matmul(const void* a, const void* b, void* out, int m, int n, int k,
-                           DType dtype) {
-    if (dtype != DTYPE_FLOAT32 || !g_initialized) return;
+                          DType dtype) {
+    if (dtype != DTYPE_FLOAT32 || !g_initialized)
+        return;
 
     opencl_lock();
 
     cl_int err;
-    cl_mem buf_a   = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                     (size_t)(m * k) * sizeof(float), (void*)a, &err);
-    cl_mem buf_b   = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                     (size_t)(k * n) * sizeof(float), (void*)b, &err);
-    cl_mem buf_out = gpu_pool_alloc(g_context, CL_MEM_WRITE_ONLY,
-                                     (size_t)(m * n) * sizeof(float), NULL, &err);
+    cl_mem buf_a = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                  (size_t)(m * k) * sizeof(float), (void*)a, &err);
+    cl_mem buf_b = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                  (size_t)(k * n) * sizeof(float), (void*)b, &err);
+    cl_mem buf_out =
+        gpu_pool_alloc(g_context, CL_MEM_WRITE_ONLY, (size_t)(m * n) * sizeof(float), NULL, &err);
 
     clSetKernelArg(g_k_matmul, 0, sizeof(cl_mem), &buf_a);
     clSetKernelArg(g_k_matmul, 1, sizeof(cl_mem), &buf_b);
@@ -228,8 +237,8 @@ static void opencl_matmul(const void* a, const void* b, void* out, int m, int n,
 
     size_t global_size[2] = {(size_t)m, (size_t)n};
     clEnqueueNDRangeKernel(g_queue, g_k_matmul, 2, NULL, global_size, NULL, 0, NULL, NULL);
-    clEnqueueReadBuffer(g_queue, buf_out, CL_TRUE, 0,
-                        (size_t)(m * n) * sizeof(float), out, 0, NULL, NULL);
+    clEnqueueReadBuffer(g_queue, buf_out, CL_TRUE, 0, (size_t)(m * n) * sizeof(float), out, 0, NULL,
+                        NULL);
 
     gpu_pool_release(buf_a);
     gpu_pool_release(buf_b);
@@ -239,13 +248,14 @@ static void opencl_matmul(const void* a, const void* b, void* out, int m, int n,
 }
 
 static void opencl_sum(const void* x, void* out, size_t n, DType dtype) {
-    if (dtype != DTYPE_FLOAT32 || !g_initialized) return;
+    if (dtype != DTYPE_FLOAT32 || !g_initialized)
+        return;
 
     opencl_lock();
 
     cl_int err;
     cl_mem buf_x   = gpu_pool_alloc(g_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                     n * sizeof(float), (void*)x, &err);
+                                    n * sizeof(float), (void*)x, &err);
     cl_mem buf_out = gpu_pool_alloc(g_context, CL_MEM_WRITE_ONLY, sizeof(float), NULL, &err);
 
     int n_int = (int)n;
@@ -270,11 +280,11 @@ static void opencl_mean(const void* x, void* out, size_t n, DType dtype) {
     }
 }
 
-static void opencl_matmul_add(const void* a, const void* b, const void* bias, void* out,
-                               int m, int n, int k, DType dtype) {
+static void opencl_matmul_add(const void* a, const void* b, const void* bias, void* out, int m,
+                              int n, int k, DType dtype) {
     opencl_matmul(a, b, out, m, n, k, dtype);
     if (dtype == DTYPE_FLOAT32 && bias) {
-        float* o = (float*)out;
+        float* o        = (float*)out;
         const float* bv = (const float*)bias;
         for (int i = 0; i < m; i++)
             for (int j = 0; j < n; j++)
@@ -298,7 +308,7 @@ int opencl_backend_init(void) {
     cl_int err;
 
     cl_uint num_platforms = 0;
-    err = clGetPlatformIDs(0, NULL, &num_platforms);
+    err                   = clGetPlatformIDs(0, NULL, &num_platforms);
     if (err != CL_SUCCESS || num_platforms == 0) {
         LOG_ERROR("OpenCL: no platforms found");
         opencl_unlock();
@@ -340,7 +350,7 @@ int opencl_backend_init(void) {
     }
 
     size_t src_len = strlen(g_kernels_src);
-    g_program = clCreateProgramWithSource(g_context, 1, &g_kernels_src, &src_len, &err);
+    g_program      = clCreateProgramWithSource(g_context, 1, &g_kernels_src, &src_len, &err);
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL: failed to create program");
         opencl_backend_cleanup();
@@ -377,21 +387,30 @@ void opencl_backend_cleanup(void) {
 
     gpu_pool_cleanup();
 
-    if (g_k_add)     clReleaseKernel(g_k_add);
-    if (g_k_mul)     clReleaseKernel(g_k_mul);
-    if (g_k_relu)    clReleaseKernel(g_k_relu);
-    if (g_k_sigmoid) clReleaseKernel(g_k_sigmoid);
-    if (g_k_matmul)  clReleaseKernel(g_k_matmul);
-    if (g_k_sum)     clReleaseKernel(g_k_sum);
-    if (g_program)   clReleaseProgram(g_program);
-    if (g_queue)     clReleaseCommandQueue(g_queue);
-    if (g_context)   clReleaseContext(g_context);
+    if (g_k_add)
+        clReleaseKernel(g_k_add);
+    if (g_k_mul)
+        clReleaseKernel(g_k_mul);
+    if (g_k_relu)
+        clReleaseKernel(g_k_relu);
+    if (g_k_sigmoid)
+        clReleaseKernel(g_k_sigmoid);
+    if (g_k_matmul)
+        clReleaseKernel(g_k_matmul);
+    if (g_k_sum)
+        clReleaseKernel(g_k_sum);
+    if (g_program)
+        clReleaseProgram(g_program);
+    if (g_queue)
+        clReleaseCommandQueue(g_queue);
+    if (g_context)
+        clReleaseContext(g_context);
 
     g_k_add = g_k_mul = g_k_relu = g_k_sigmoid = g_k_matmul = g_k_sum = NULL;
-    g_program = NULL;
-    g_queue = NULL;
-    g_context = NULL;
-    g_initialized = false;
+    g_program                                                         = NULL;
+    g_queue                                                           = NULL;
+    g_context                                                         = NULL;
+    g_initialized                                                     = false;
 
     opencl_unlock();
 
@@ -403,7 +422,7 @@ void opencl_backend_cleanup(void) {
 
 bool opencl_backend_is_available(void) {
     cl_uint num_platforms = 0;
-    cl_int err = clGetPlatformIDs(0, NULL, &num_platforms);
+    cl_int err            = clGetPlatformIDs(0, NULL, &num_platforms);
     return (err == CL_SUCCESS && num_platforms > 0);
 }
 
@@ -428,16 +447,16 @@ int opencl_backend_get_device_info(char* buffer, size_t buffer_size) {
         return -1;
     }
 
-    char name[256] = {0};
-    char vendor[256] = {0};
+    char name[256]    = {0};
+    char vendor[256]  = {0};
     cl_ulong mem_size = 0;
 
     clGetDeviceInfo(g_device, CL_DEVICE_NAME, sizeof(name), name, NULL);
     clGetDeviceInfo(g_device, CL_DEVICE_VENDOR, sizeof(vendor), vendor, NULL);
     clGetDeviceInfo(g_device, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(mem_size), &mem_size, NULL);
 
-    snprintf(buffer, buffer_size, "OpenCL Device: %s (%s), Memory: %lu MB",
-             name, vendor, (unsigned long)(mem_size / (1024 * 1024)));
+    snprintf(buffer, buffer_size, "OpenCL Device: %s (%s), Memory: %lu MB", name, vendor,
+             (unsigned long)(mem_size / (1024 * 1024)));
 
     opencl_unlock();
     return 0;
@@ -452,9 +471,7 @@ int opencl_backend_init(void) {
 
 void opencl_backend_cleanup(void) {}
 
-bool opencl_backend_is_available(void) {
-    return false;
-}
+bool opencl_backend_is_available(void) { return false; }
 
 BackendOps opencl_backend_get_ops(void) {
     BackendOps ops = {0};
@@ -462,7 +479,8 @@ BackendOps opencl_backend_get_ops(void) {
 }
 
 int opencl_backend_get_device_info(char* buffer, size_t buffer_size) {
-    if (buffer && buffer_size > 0) buffer[0] = '\0';
+    if (buffer && buffer_size > 0)
+        buffer[0] = '\0';
     return -1;
 }
 

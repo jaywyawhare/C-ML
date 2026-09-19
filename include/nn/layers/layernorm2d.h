@@ -19,7 +19,7 @@ typedef struct LayerNorm2d {
 } LayerNorm2d;
 
 LayerNorm2d* nn_layernorm2d(int num_channels, float eps, bool affine, DType dtype,
-                             DeviceType device);
+                            DeviceType device);
 
 #ifdef __cplusplus
 }

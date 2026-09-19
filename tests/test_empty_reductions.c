@@ -20,8 +20,8 @@
 static int checks = 0, failures = 0;
 
 static Tensor* empty_tensor(void) {
-    TensorConfig c = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                      .has_dtype = true, .has_device = true};
+    TensorConfig c = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     int shape[1] = {0};
     return tensor_zeros(shape, 1, &c);
 }
@@ -35,9 +35,9 @@ static void expect_value(const char* name, Tensor* r, double want) {
     }
     tensor_ensure_executed(r);
     double got = (double)tensor_get_float(r, 0);
-    int ok = isnan(want) ? isnan(got)
-           : isinf(want) ? (isinf(got) && ((got > 0) == (want > 0)))
-                         : (got == want);
+    int ok     = isnan(want)   ? isnan(got)
+                 : isinf(want) ? (isinf(got) && ((got > 0) == (want > 0)))
+                               : (got == want);
     if (!ok) {
         printf("  %-12s got %g, expected %g\n", name, got, want);
         failures++;
@@ -64,11 +64,11 @@ int main(void) {
     cml_init();
     printf("Reductions over an empty tensor:\n");
 
-    expect_value("sum",       uop_sum(empty_tensor(), NULL),       0.0);
-    expect_value("prod",      uop_prod(empty_tensor(), NULL),      1.0);
-    expect_value("mean",      uop_mean(empty_tensor(), NULL),      NAN);
-    expect_value("any",       uop_any(empty_tensor(), NULL),       0.0);
-    expect_value("all",       uop_all(empty_tensor(), NULL),       1.0);
+    expect_value("sum", uop_sum(empty_tensor(), NULL), 0.0);
+    expect_value("prod", uop_prod(empty_tensor(), NULL), 1.0);
+    expect_value("mean", uop_mean(empty_tensor(), NULL), NAN);
+    expect_value("any", uop_any(empty_tensor(), NULL), 0.0);
+    expect_value("all", uop_all(empty_tensor(), NULL), 1.0);
     expect_value("logsumexp", uop_logsumexp(empty_tensor(), NULL), -INFINITY);
 
     expect_rejected("max_reduce", uop_max_reduce(empty_tensor(), NULL));
@@ -76,11 +76,12 @@ int main(void) {
 
     /* Non-empty reductions must be unaffected. */
     {
-        TensorConfig c = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                          .has_dtype = true, .has_device = true};
+        TensorConfig c = {
+            .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
         int shape[1] = {3};
-        Tensor* t = tensor_zeros(shape, 1, &c);
-        for (int i = 0; i < 3; i++) tensor_set_float(t, i, (float)(i + 2));  /* 2,3,4 */
+        Tensor* t    = tensor_zeros(shape, 1, &c);
+        for (int i = 0; i < 3; i++)
+            tensor_set_float(t, i, (float)(i + 2)); /* 2,3,4 */
         expect_value("prod(2,3,4)", uop_prod(t, NULL), 24.0);
     }
 

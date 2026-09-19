@@ -12,9 +12,12 @@
 #define MAX_LABELS 64
 
 static int is_numeric(const char* s) {
-    if (!s || !*s) return 0;
-    while (*s == ' ') s++;
-    if (*s == '-' || *s == '+') s++;
+    if (!s || !*s)
+        return 0;
+    while (*s == ' ')
+        s++;
+    if (*s == '-' || *s == '+')
+        s++;
     int has_digit = 0;
     while (*s) {
         if (*s == '.' || *s == 'e' || *s == 'E' || *s == '+' || *s == '-') {
@@ -36,33 +39,39 @@ static int is_numeric(const char* s) {
 static char detect_delimiter(const char* line) {
     int commas = 0, semicolons = 0, tabs = 0;
     for (const char* p = line; *p; p++) {
-        if (*p == ',') commas++;
-        else if (*p == ';') semicolons++;
-        else if (*p == '\t') tabs++;
+        if (*p == ',')
+            commas++;
+        else if (*p == ';')
+            semicolons++;
+        else if (*p == '\t')
+            tabs++;
     }
-    if (tabs > commas && tabs > semicolons) return '\t';
-    if (semicolons > commas) return ';';
+    if (tabs > commas && tabs > semicolons)
+        return '\t';
+    if (semicolons > commas)
+        return ';';
     return ',';
 }
 
 /* Split a line by delimiter, return field count. Fields written into fields[] */
 static int split_line(char* line, char delim, char** fields, int max_fields) {
     int count = 0;
-    char* p = line;
+    char* p   = line;
 
     /* Strip trailing newline/carriage return */
     size_t len = strlen(line);
     while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
         line[--len] = '\0';
 
-    if (len == 0) return 0;
+    if (len == 0)
+        return 0;
 
     while (p && count < max_fields) {
         fields[count++] = p;
-        char* next = strchr(p, delim);
+        char* next      = strchr(p, delim);
         if (next) {
             *next = '\0';
-            p = next + 1;
+            p     = next + 1;
         } else {
             break;
         }
@@ -77,29 +86,31 @@ typedef struct {
 
 static int label_map_get_or_add(LabelMap* lm, const char* s) {
     /* Trim whitespace */
-    while (*s == ' ') s++;
+    while (*s == ' ')
+        s++;
     char trimmed[128];
     strncpy(trimmed, s, 127);
     trimmed[127] = '\0';
-    size_t tlen = strlen(trimmed);
-    while (tlen > 0 && (trimmed[tlen - 1] == ' ' || trimmed[tlen - 1] == '\r' || trimmed[tlen - 1] == '\n'))
+    size_t tlen  = strlen(trimmed);
+    while (tlen > 0 &&
+           (trimmed[tlen - 1] == ' ' || trimmed[tlen - 1] == '\r' || trimmed[tlen - 1] == '\n'))
         trimmed[--tlen] = '\0';
 
-    if (tlen == 0) return -1;
+    if (tlen == 0)
+        return -1;
 
     for (int i = 0; i < lm->count; i++) {
         if (strcmp(lm->labels[i], trimmed) == 0)
             return i;
     }
-    if (lm->count >= MAX_LABELS) return -1;
+    if (lm->count >= MAX_LABELS)
+        return -1;
     strcpy(lm->labels[lm->count], trimmed);
     return lm->count++;
 }
 
-int cml_csv_parse(const char* filepath, int target_col,
-                  float** X_out, float** y_out,
-                  int* num_samples, int* num_features, int* num_classes,
-                  char*** class_names_out) {
+int cml_csv_parse(const char* filepath, int target_col, float** X_out, float** y_out,
+                  int* num_samples, int* num_features, int* num_classes, char*** class_names_out) {
     FILE* f = fopen(filepath, "r");
     if (!f) {
         LOG_ERROR("[csv] Cannot open: %s", filepath);
@@ -120,7 +131,7 @@ int cml_csv_parse(const char* filepath, int target_col,
     /* Detect if first line is a header (first field non-numeric) */
     char header_check[MAX_LINE];
     snprintf(header_check, sizeof(header_check), "%s", line);
-    int hcount = split_line(header_check, delim, fields, MAX_COLS);
+    int hcount     = split_line(header_check, delim, fields, MAX_COLS);
     int has_header = (hcount > 0 && !is_numeric(fields[0]));
 
     /* Count total columns from first data line */
@@ -147,7 +158,8 @@ int cml_csv_parse(const char* filepath, int target_col,
 
     /* Resolve target column */
     int tgt = target_col;
-    if (tgt < 0) tgt = total_cols + tgt; /* -1 = last */
+    if (tgt < 0)
+        tgt = total_cols + tgt; /* -1 = last */
     if (tgt < 0 || tgt >= total_cols) {
         LOG_ERROR("[csv] Invalid target column: %d (total: %d)", target_col, total_cols);
         fclose(f);
@@ -161,23 +173,29 @@ int cml_csv_parse(const char* filepath, int target_col,
     /* We need to account for the first data line we already read */
     int line_count = 1; /* We already have data_line */
     while (fgets(line, sizeof(line), f)) {
-        if (strlen(line) > 1) line_count++;
+        if (strlen(line) > 1)
+            line_count++;
     }
 
     /* Allocate */
     float* X = cml_malloc(sizeof(float) * line_count * nfeat);
     float* y = cml_malloc(sizeof(float) * line_count);
-    if (!X || !y) { cml_free(X); cml_free(y); fclose(f); return -1; }
+    if (!X || !y) {
+        cml_free(X);
+        cml_free(y);
+        fclose(f);
+        return -1;
+    }
 
     LabelMap lm = {.count = 0};
-    int row = 0;
+    int row     = 0;
 
     /* Parse first data line */
     {
         char parse_buf[MAX_LINE];
         strncpy(parse_buf, data_line, MAX_LINE - 1);
         parse_buf[MAX_LINE - 1] = '\0';
-        int nc = split_line(parse_buf, delim, fields, MAX_COLS);
+        int nc                  = split_line(parse_buf, delim, fields, MAX_COLS);
         if (nc >= total_cols) {
             int fi = 0;
             for (int j = 0; j < total_cols; j++) {
@@ -199,21 +217,25 @@ int cml_csv_parse(const char* filepath, int target_col,
     if (has_header) {
         fseek(f, data_start, SEEK_SET);
         /* Skip the first data line we already processed */
-        if (!fgets(line, sizeof(line), f)) { /* no data line to skip */ }
+        if (!fgets(line, sizeof(line), f)) { /* no data line to skip */
+        }
     } else {
         rewind(f);
         /* Skip the first data line */
-        if (!fgets(line, sizeof(line), f)) { /* no data line to skip */ }
+        if (!fgets(line, sizeof(line), f)) { /* no data line to skip */
+        }
     }
 
     while (fgets(line, sizeof(line), f) && row < line_count) {
-        if (strlen(line) < 2) continue;
+        if (strlen(line) < 2)
+            continue;
         char parse_buf[MAX_LINE];
         strncpy(parse_buf, line, MAX_LINE - 1);
         parse_buf[MAX_LINE - 1] = '\0';
 
         int nc = split_line(parse_buf, delim, fields, MAX_COLS);
-        if (nc < total_cols) continue;
+        if (nc < total_cols)
+            continue;
 
         int fi = 0;
         for (int j = 0; j < total_cols; j++) {
@@ -232,11 +254,11 @@ int cml_csv_parse(const char* filepath, int target_col,
     fclose(f);
 
     /* Output */
-    *X_out = X;
-    *y_out = y;
-    *num_samples = row;
+    *X_out        = X;
+    *y_out        = y;
+    *num_samples  = row;
     *num_features = nfeat;
-    *num_classes = lm.count > 0 ? lm.count : 0;
+    *num_classes  = lm.count > 0 ? lm.count : 0;
 
     if (class_names_out && lm.count > 0) {
         char** names = cml_malloc(sizeof(char*) * lm.count);
@@ -248,15 +270,17 @@ int cml_csv_parse(const char* filepath, int target_col,
         *class_names_out = NULL;
     }
 
-    LOG_INFO("[csv] Parsed %s: %d samples, %d features, %d classes",
-             filepath, row, nfeat, lm.count);
+    LOG_INFO("[csv] Parsed %s: %d samples, %d features, %d classes", filepath, row, nfeat,
+             lm.count);
     return 0;
 }
 
 Dataset* cml_dataset_from_csv(const char* filepath, int target_col) {
-    if (!filepath) return NULL;
+    if (!filepath)
+        return NULL;
 
-    float* X = NULL; float* y = NULL;
+    float* X = NULL;
+    float* y = NULL;
     int n = 0, nf = 0, nc = 0;
     char** class_names = NULL;
 
@@ -269,6 +293,7 @@ Dataset* cml_dataset_from_csv(const char* filepath, int target_col) {
         ds->class_names = class_names;
         cml_dataset_compute_stats(ds);
     }
-    cml_free(X); cml_free(y);
+    cml_free(X);
+    cml_free(y);
     return ds;
 }

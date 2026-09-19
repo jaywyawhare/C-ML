@@ -7,11 +7,11 @@
 extern "C" {
 #endif
 
-#define RDNA3_NUM_VGPR  256
-#define RDNA3_NUM_SGPR  106
-#define RDNA3_WAVE_SIZE  32
-#define RDNA3_LDS_SIZE   65536
-#define RDNA3_MEM_SIZE   (1ULL << 32)
+#define RDNA3_NUM_VGPR 256
+#define RDNA3_NUM_SGPR 106
+#define RDNA3_WAVE_SIZE 32
+#define RDNA3_LDS_SIZE 65536
+#define RDNA3_MEM_SIZE (1ULL << 32)
 
 typedef struct CMLRDNA3Wave {
     uint32_t vgpr[RDNA3_NUM_VGPR][RDNA3_WAVE_SIZE];
@@ -20,20 +20,20 @@ typedef struct CMLRDNA3Wave {
     uint64_t vcc;
     uint32_t pc;
     uint32_t scc;
-    int      wave_id;
-    bool     halted;
+    int wave_id;
+    bool halted;
 } CMLRDNA3Wave;
 
 typedef struct CMLRDNA3Emu {
     uint8_t* memory;
-    size_t   mem_size;
+    size_t mem_size;
     uint8_t* lds;
-    size_t   lds_size;
+    size_t lds_size;
     CMLRDNA3Wave* waves;
-    int      num_waves;
-    int      wave_capacity;
+    int num_waves;
+    int wave_capacity;
     uint64_t cycle_count;
-    int      instructions_executed;
+    int instructions_executed;
 } CMLRDNA3Emu;
 
 CMLRDNA3Emu* cml_rdna3_emu_create(size_t mem_size);

@@ -10,19 +10,19 @@ extern "C" {
 #endif
 
 typedef struct CMLColumnParallelLinear {
-    Tensor* weight;     /* [out_features / tp_size, in_features] - local shard */
-    Tensor* bias;       /* [out_features / tp_size] or NULL */
+    Tensor* weight; /* [out_features / tp_size, in_features] - local shard */
+    Tensor* bias;   /* [out_features / tp_size] or NULL */
     int in_features;
-    int out_features;   /* global out_features */
+    int out_features; /* global out_features */
     int tp_size;
     int tp_rank;
 } CMLColumnParallelLinear;
 
 /* Caller must perform an all-reduce sum across ranks after forward. */
 typedef struct CMLRowParallelLinear {
-    Tensor* weight;     /* [out_features, in_features / tp_size] - local shard */
-    Tensor* bias;       /* [out_features] or NULL (only rank 0 has bias) */
-    int in_features;    /* global in_features */
+    Tensor* weight;  /* [out_features, in_features / tp_size] - local shard */
+    Tensor* bias;    /* [out_features] or NULL (only rank 0 has bias) */
+    int in_features; /* global in_features */
     int out_features;
     int tp_size;
     int tp_rank;
@@ -33,19 +33,15 @@ typedef struct CMLTensorParallelConfig {
     int tp_rank;
 } CMLTensorParallelConfig;
 
-CMLColumnParallelLinear* cml_column_parallel_create(Tensor* full_weight,
-                                                     Tensor* full_bias,
-                                                     int tp_size,
-                                                     int tp_rank);
+CMLColumnParallelLinear* cml_column_parallel_create(Tensor* full_weight, Tensor* full_bias,
+                                                    int tp_size, int tp_rank);
 
 void cml_column_parallel_free(CMLColumnParallelLinear* cp);
 
 Tensor* cml_column_parallel_forward(CMLColumnParallelLinear* cp, Tensor* input);
 
-CMLRowParallelLinear* cml_row_parallel_create(Tensor* full_weight,
-                                               Tensor* full_bias,
-                                               int tp_size,
-                                               int tp_rank);
+CMLRowParallelLinear* cml_row_parallel_create(Tensor* full_weight, Tensor* full_bias, int tp_size,
+                                              int tp_rank);
 
 void cml_row_parallel_free(CMLRowParallelLinear* rp);
 

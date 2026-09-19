@@ -28,18 +28,18 @@ static Tensor* conv_transpose2d_forward(Module* module, Tensor* input) {
     int in_channels = input->shape[1];
 
     if (in_channels != layer->in_channels) {
-        LOG_ERROR("ConvTranspose2d: input channels (%d) doesn't match expected (%d)",
-                  in_channels, layer->in_channels);
+        LOG_ERROR("ConvTranspose2d: input channels (%d) doesn't match expected (%d)", in_channels,
+                  layer->in_channels);
         return NULL;
     }
 
     ConvTranspose2DParams params = {
-        .kernel_size = {layer->kernel_size[0], layer->kernel_size[1]},
-        .stride = {layer->stride[0], layer->stride[1]},
-        .padding = {layer->padding[0], layer->padding[1]},
+        .kernel_size    = {layer->kernel_size[0], layer->kernel_size[1]},
+        .stride         = {layer->stride[0], layer->stride[1]},
+        .padding        = {layer->padding[0], layer->padding[1]},
         .output_padding = {layer->output_padding[0], layer->output_padding[1]},
-        .dilation = {layer->dilation[0], layer->dilation[1]},
-        .use_bias = layer->use_bias,
+        .dilation       = {layer->dilation[0], layer->dilation[1]},
+        .use_bias       = layer->use_bias,
     };
     Tensor* bias = (layer->use_bias && layer->bias) ? layer->bias->tensor : NULL;
     return uop_conv_transpose2d(input, layer->weight->tensor, bias, &params);
@@ -56,9 +56,9 @@ static void kaiming_init_transpose(Tensor* tensor, int in_channels, int kernel_s
     nn_init_kaiming(tensor, in_channels, kernel_size * kernel_size);
 }
 
-ConvTranspose2d* nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size,
-                                      int stride, int padding, int output_padding,
-                                      bool use_bias, DType dtype, DeviceType device) {
+ConvTranspose2d* nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size, int stride,
+                                     int padding, int output_padding, bool use_bias, DType dtype,
+                                     DeviceType device) {
     ConvTranspose2d* layer = cml_malloc(sizeof(ConvTranspose2d));
     if (!layer)
         return NULL;
@@ -82,7 +82,7 @@ ConvTranspose2d* nn_conv_transpose2d(int in_channels, int out_channels, int kern
     layer->dilation[0]       = 1;
     layer->dilation[1]       = 1;
     layer->use_bias          = use_bias;
-    int weight_shape[] = {in_channels, out_channels, kernel_size, kernel_size};
+    int weight_shape[]       = {in_channels, out_channels, kernel_size, kernel_size};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* weight = tensor_empty(weight_shape, 4, &config);

@@ -28,7 +28,7 @@ typedef enum {
 
 typedef struct CMLCapturedNode {
     UOpType op;
-    void* kernel_handle;       /* Backend-specific compiled kernel */
+    void* kernel_handle; /* Backend-specific compiled kernel */
     size_t grid[3];
     size_t block[3];
     void** kernel_args;
@@ -49,8 +49,8 @@ typedef struct CMLCapturedGraph {
     Tensor** output_bindings;
     int num_output_bindings;
 
-    void* backend_graph;       /* e.g., cudaGraph_t */
-    void* backend_instance;    /* e.g., cudaGraphExec_t */
+    void* backend_graph;    /* e.g., cudaGraph_t */
+    void* backend_instance; /* e.g., cudaGraphExec_t */
 
     /* Backend teardown hooks captured alongside the handles so the graph can be
      * destroyed without holding a reference to the backend. Each takes the
@@ -66,10 +66,9 @@ typedef struct CMLCapturedGraph {
 CMLCapturedGraph* cml_graph_capture_create(void);
 void cml_graph_capture_free(CMLCapturedGraph* graph);
 int cml_graph_capture_begin(CMLCapturedGraph* graph);
-int cml_graph_capture_record(CMLCapturedGraph* graph, UOpType op,
-                              void* kernel_handle,
-                              const size_t grid[3], const size_t block[3],
-                              void** args, int num_args, size_t shared_mem);
+int cml_graph_capture_record(CMLCapturedGraph* graph, UOpType op, void* kernel_handle,
+                             const size_t grid[3], const size_t block[3], void** args, int num_args,
+                             size_t shared_mem);
 int cml_graph_capture_end(CMLCapturedGraph* graph);
 int cml_graph_capture_replay(CMLCapturedGraph* graph);
 int cml_graph_capture_bind_input(CMLCapturedGraph* graph, int index, Tensor* tensor);
@@ -77,8 +76,8 @@ int cml_graph_capture_bind_output(CMLCapturedGraph* graph, int index, Tensor* te
 int cml_graph_capture_reset(CMLCapturedGraph* graph);
 CMLCaptureState cml_graph_capture_state(const CMLCapturedGraph* graph);
 int cml_graph_capture_num_nodes(const CMLCapturedGraph* graph);
-void cml_graph_capture_stats(const CMLCapturedGraph* graph,
-                              int* replay_count, double* avg_replay_ms);
+void cml_graph_capture_stats(const CMLCapturedGraph* graph, int* replay_count,
+                             double* avg_replay_ms);
 void cml_graph_capture_print(const CMLCapturedGraph* graph);
 
 #ifdef __cplusplus

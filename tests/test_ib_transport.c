@@ -13,9 +13,12 @@ static bool test_availability_check(void) {
 }
 
 static bool test_create_invalid_params(void) {
-    if (cml_ib_create(-1, 2) != NULL) return false;
-    if (cml_ib_create(0, 0) != NULL) return false;
-    if (cml_ib_create(3, 2) != NULL) return false;
+    if (cml_ib_create(-1, 2) != NULL)
+        return false;
+    if (cml_ib_create(0, 0) != NULL)
+        return false;
+    if (cml_ib_create(3, 2) != NULL)
+        return false;
     return true;
 }
 
@@ -28,8 +31,9 @@ static bool test_send_not_connected(void) {
     CMLIBTransport dummy;
     memset(&dummy, 0, sizeof(dummy));
     dummy.connected = false;
-    char buf[16] = {0};
-    if (cml_ib_send(&dummy, 0, buf, sizeof(buf)) == 0) return false;
+    char buf[16]    = {0};
+    if (cml_ib_send(&dummy, 0, buf, sizeof(buf)) == 0)
+        return false;
     return true;
 }
 
@@ -37,8 +41,9 @@ static bool test_recv_not_connected(void) {
     CMLIBTransport dummy;
     memset(&dummy, 0, sizeof(dummy));
     dummy.connected = false;
-    char buf[16] = {0};
-    if (cml_ib_recv(&dummy, 0, buf, sizeof(buf)) == 0) return false;
+    char buf[16]    = {0};
+    if (cml_ib_recv(&dummy, 0, buf, sizeof(buf)) == 0)
+        return false;
     return true;
 }
 
@@ -46,17 +51,20 @@ static bool test_barrier_not_connected(void) {
     CMLIBTransport dummy;
     memset(&dummy, 0, sizeof(dummy));
     dummy.connected = false;
-    if (cml_ib_barrier(&dummy) == 0) return false;
+    if (cml_ib_barrier(&dummy) == 0)
+        return false;
     return true;
 }
 
 static bool test_allreduce_null(void) {
-    if (cml_ib_allreduce(NULL, NULL, 0, 0) == 0) return false;
+    if (cml_ib_allreduce(NULL, NULL, 0, 0) == 0)
+        return false;
     return true;
 }
 
 static bool test_register_null(void) {
-    if (cml_ib_register_memory(NULL, NULL, 0) != NULL) return false;
+    if (cml_ib_register_memory(NULL, NULL, 0) != NULL)
+        return false;
     return true;
 }
 
@@ -66,7 +74,8 @@ static bool test_deregister_null(void) {
 }
 
 static bool test_connect_invalid(void) {
-    if (cml_ib_connect(NULL, NULL, 0) == 0) return false;
+    if (cml_ib_connect(NULL, NULL, 0) == 0)
+        return false;
     return true;
 }
 

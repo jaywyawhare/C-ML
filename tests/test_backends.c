@@ -20,7 +20,6 @@ static int test_cuda_detection(void) {
     return 1;
 }
 
-
 static int test_cuda_lifecycle(void) {
     if (!cml_cuda_available()) {
         printf("(skipped - CUDA not available) ");
@@ -28,22 +27,21 @@ static int test_cuda_lifecycle(void) {
     }
 
     CMLCUDABackend* backend = cml_cuda_backend_create();
-    if (!backend) return 0;
+    if (!backend)
+        return 0;
 
-    int result = cml_cuda_backend_init(backend, 0);  // device 0
+    int result = cml_cuda_backend_init(backend, 0); // device 0
     printf("(init=%s) ", result == 0 ? "ok" : "failed");
 
     cml_cuda_backend_free(backend);
     return 1;
 }
 
-
 static int test_rocm_detection(void) {
     bool available = cml_rocm_available();
     printf("(available=%s) ", available ? "yes" : "no");
     return 1;
 }
-
 
 static int test_rocm_lifecycle(void) {
     if (!cml_rocm_available()) {
@@ -52,22 +50,21 @@ static int test_rocm_lifecycle(void) {
     }
 
     CMLROCmBackend* backend = cml_rocm_backend_create();
-    if (!backend) return 0;
+    if (!backend)
+        return 0;
 
-    int result = cml_rocm_backend_init(backend, 0);  // device 0
+    int result = cml_rocm_backend_init(backend, 0); // device 0
     printf("(init=%s) ", result == 0 ? "ok" : "failed");
 
     cml_rocm_backend_free(backend);
     return 1;
 }
 
-
 static int test_blas_detection(void) {
     bool available = cml_blas_available();
     printf("(available=%s) ", available ? "yes" : "no");
     return 1;
 }
-
 
 static int test_blas_lifecycle(void) {
     CMLBlasContext* ctx = cml_blas_init();
@@ -82,7 +79,6 @@ static int test_blas_lifecycle(void) {
     return 1;
 }
 
-
 static int test_blas_sgemm(void) {
     CMLBlasContext* ctx = cml_blas_init();
     if (!ctx) {
@@ -91,9 +87,9 @@ static int test_blas_sgemm(void) {
     }
 
     // Test 2x2 matrix multiplication
-    float A[] = {1.0f, 2.0f, 3.0f, 4.0f};  // 2x2
-    float B[] = {5.0f, 6.0f, 7.0f, 8.0f};  // 2x2
-    float C[] = {0.0f, 0.0f, 0.0f, 0.0f};  // 2x2
+    float A[] = {1.0f, 2.0f, 3.0f, 4.0f}; // 2x2
+    float B[] = {5.0f, 6.0f, 7.0f, 8.0f}; // 2x2
+    float C[] = {0.0f, 0.0f, 0.0f, 0.0f}; // 2x2
 
     // C = 1.0 * A @ B + 0.0 * C
     int result = cml_blas_sgemm(ctx, A, B, C, 2, 2, 2, 1.0f, 0.0f);
@@ -106,7 +102,7 @@ static int test_blas_sgemm(void) {
     // Expected: [[1*5+2*7, 1*6+2*8], [3*5+4*7, 3*6+4*8]]
     //         = [[19, 22], [43, 50]]
     float expected[] = {19.0f, 22.0f, 43.0f, 50.0f};
-    int success = 1;
+    int success      = 1;
     for (int i = 0; i < 4; i++) {
         if (C[i] != expected[i]) {
             printf("(C[%d]=%.1f expected %.1f) ", i, C[i], expected[i]);
@@ -114,12 +110,12 @@ static int test_blas_sgemm(void) {
         }
     }
 
-    if (success) printf("(correct) ");
+    if (success)
+        printf("(correct) ");
 
     cml_blas_free(ctx);
     return success;
 }
-
 
 static int test_blas_vector_ops(void) {
     CMLBlasContext* ctx = cml_blas_init();
@@ -154,18 +150,16 @@ static int test_blas_vector_ops(void) {
     return 1;
 }
 
-
 static int test_device_detection(void) {
-    printf("(cuda=%s, rocm=%s) ",
-           device_cuda_available() ? "yes" : "no",
+    printf("(cuda=%s, rocm=%s) ", device_cuda_available() ? "yes" : "no",
            device_rocm_available() ? "yes" : "no");
     return 1;
 }
 
-
 static int test_all_backends_summary(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     int num = cml_dispatch_detect_backends(ctx);
     printf("(%d backends detected) ", num);
@@ -181,9 +175,8 @@ static int test_all_backends_summary(void) {
     printf("\n    ");
 
     cml_dispatch_free(ctx);
-    return (num >= 1);  // At least CPU fallback
+    return (num >= 1); // At least CPU fallback
 }
-
 
 int main(void) {
     printf("\nBackend Detection Unit Tests\n\n");

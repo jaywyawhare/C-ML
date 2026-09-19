@@ -18,18 +18,18 @@ extern "C" {
 #endif
 
 typedef enum {
-    CML_DISK_SYNC = 0,     /* Synchronous read/write */
-    CML_DISK_MMAP,          /* Memory-mapped I/O */
-    CML_DISK_ASYNC,         /* Async I/O (io_uring on Linux, fallback sync) */
+    CML_DISK_SYNC = 0, /* Synchronous read/write */
+    CML_DISK_MMAP,     /* Memory-mapped I/O */
+    CML_DISK_ASYNC,    /* Async I/O (io_uring on Linux, fallback sync) */
 } CMLDiskIOMode;
 
 typedef struct CMLDiskBackend {
-    char* base_path;          /* Base directory for tensor storage */
+    char* base_path; /* Base directory for tensor storage */
     CMLDiskIOMode io_mode;
     bool read_only;
 
     /* io_uring state (Linux only) */
-    void* ring;               /* struct io_uring* */
+    void* ring; /* struct io_uring* */
     bool has_io_uring;
 
     uint64_t bytes_read;
@@ -41,9 +41,9 @@ typedef struct CMLDiskBackend {
 
 typedef struct CMLDiskTensor {
     char* file_path;
-    size_t file_offset;        /* Offset within file */
-    size_t data_size;          /* Size of tensor data in bytes */
-    int shape[8];              /* Tensor shape (max 8 dims) */
+    size_t file_offset; /* Offset within file */
+    size_t data_size;   /* Size of tensor data in bytes */
+    int shape[8];       /* Tensor shape (max 8 dims) */
     int ndim;
     DType dtype;
 
@@ -65,13 +65,11 @@ void cml_disk_tensor_free(CMLDiskTensor* dt);
 Tensor* cml_disk_tensor_to_tensor(CMLDiskTensor* dt);
 
 /* Returns immediately, use cml_disk_wait to complete */
-int cml_disk_async_read(CMLDiskBackend* backend, const char* name,
-                         void* buffer, size_t size);
+int cml_disk_async_read(CMLDiskBackend* backend, const char* name, void* buffer, size_t size);
 int cml_disk_wait(CMLDiskBackend* backend);
 
-void cml_disk_backend_stats(const CMLDiskBackend* backend,
-                             uint64_t* bytes_read, uint64_t* bytes_written,
-                             uint64_t* num_reads, uint64_t* num_writes);
+void cml_disk_backend_stats(const CMLDiskBackend* backend, uint64_t* bytes_read,
+                            uint64_t* bytes_written, uint64_t* num_reads, uint64_t* num_writes);
 void cml_disk_backend_print(const CMLDiskBackend* backend);
 
 #ifdef __cplusplus

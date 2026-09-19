@@ -14,7 +14,8 @@ static Tensor* module_list_forward(Module* module, Tensor* input) {
 
 static void module_list_free(Module* module) {
     ModuleList* list = (ModuleList*)module;
-    if (!list) return;
+    if (!list)
+        return;
 
     if (list->modules) {
         for (int i = 0; i < list->num_modules; i++) {
@@ -31,9 +32,8 @@ static void module_list_free(Module* module) {
 ModuleList* nn_module_list(void) {
     ModuleList* list = cml_malloc(sizeof(ModuleList));
     if (!list) {
-        error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
-                         "Failed to allocate memory for ModuleList", __FILE__, __LINE__,
-                         __func__);
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for ModuleList",
+                         __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -78,12 +78,14 @@ static void module_list_adopt_params(ModuleList* list, Module* module, int index
 }
 
 int module_list_append(ModuleList* list, Module* module) {
-    if (!list || !module) return -1;
+    if (!list || !module)
+        return -1;
 
     if (list->num_modules >= list->capacity) {
-        int new_cap = list->capacity == 0 ? 8 : list->capacity * 2;
+        int new_cap       = list->capacity == 0 ? 8 : list->capacity * 2;
         Module** new_mods = cml_realloc(list->modules, (size_t)new_cap * sizeof(Module*));
-        if (!new_mods) return -1;
+        if (!new_mods)
+            return -1;
         list->modules  = new_mods;
         list->capacity = new_cap;
     }
@@ -93,7 +95,7 @@ int module_list_append(ModuleList* list, Module* module) {
     cml_untrack_module(module);
 
     list->modules[list->num_modules] = module;
-    int module_index = list->num_modules;
+    int module_index                 = list->num_modules;
     list->num_modules++;
     module_list_adopt_params(list, module, module_index);
 
@@ -101,13 +103,15 @@ int module_list_append(ModuleList* list, Module* module) {
 }
 
 int module_list_insert(ModuleList* list, int index, Module* module) {
-    if (!list || !module || index < 0 || index > list->num_modules) return -1;
+    if (!list || !module || index < 0 || index > list->num_modules)
+        return -1;
 
     /* Ensure capacity */
     if (list->num_modules >= list->capacity) {
-        int new_cap = list->capacity == 0 ? 8 : list->capacity * 2;
+        int new_cap       = list->capacity == 0 ? 8 : list->capacity * 2;
         Module** new_mods = cml_realloc(list->modules, (size_t)new_cap * sizeof(Module*));
-        if (!new_mods) return -1;
+        if (!new_mods)
+            return -1;
         list->modules  = new_mods;
         list->capacity = new_cap;
     }
@@ -128,12 +132,14 @@ int module_list_insert(ModuleList* list, int index, Module* module) {
 }
 
 Module* module_list_get(ModuleList* list, int index) {
-    if (!list || index < 0 || index >= list->num_modules) return NULL;
+    if (!list || index < 0 || index >= list->num_modules)
+        return NULL;
     return list->modules[index];
 }
 
 int module_list_remove(ModuleList* list, int index) {
-    if (!list || index < 0 || index >= list->num_modules) return -1;
+    if (!list || index < 0 || index >= list->num_modules)
+        return -1;
 
     /* Shift left (don't free the module - caller's responsibility) */
     for (int i = index; i < list->num_modules - 1; i++) {
@@ -143,9 +149,7 @@ int module_list_remove(ModuleList* list, int index) {
     return 0;
 }
 
-int module_list_length(ModuleList* list) {
-    return list ? list->num_modules : 0;
-}
+int module_list_length(ModuleList* list) { return list ? list->num_modules : 0; }
 
 static Tensor* module_dict_forward(Module* module, Tensor* input) {
     (void)module;
@@ -154,7 +158,8 @@ static Tensor* module_dict_forward(Module* module, Tensor* input) {
 
 static void module_dict_free(Module* module) {
     ModuleDict* dict = (ModuleDict*)module;
-    if (!dict) return;
+    if (!dict)
+        return;
 
     if (dict->entries) {
         for (int i = 0; i < dict->num_entries; i++) {
@@ -172,9 +177,8 @@ static void module_dict_free(Module* module) {
 ModuleDict* nn_module_dict(void) {
     ModuleDict* dict = cml_malloc(sizeof(ModuleDict));
     if (!dict) {
-        error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
-                         "Failed to allocate memory for ModuleDict", __FILE__, __LINE__,
-                         __func__);
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for ModuleDict",
+                         __FILE__, __LINE__, __func__);
         return NULL;
     }
 
@@ -195,7 +199,8 @@ ModuleDict* nn_module_dict(void) {
 }
 
 int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
-    if (!dict || !key || !module) return -1;
+    if (!dict || !key || !module)
+        return -1;
 
     /* Transfer ownership: the dict is now responsible for freeing this child. */
     extern void cml_untrack_module(Module*);
@@ -210,16 +215,18 @@ int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
     }
     if (dict->num_entries >= dict->capacity) {
         int new_cap = dict->capacity == 0 ? 8 : dict->capacity * 2;
-        ModuleDictEntry* new_entries = cml_realloc(dict->entries,
-                                               (size_t)new_cap * sizeof(ModuleDictEntry));
-        if (!new_entries) return -1;
+        ModuleDictEntry* new_entries =
+            cml_realloc(dict->entries, (size_t)new_cap * sizeof(ModuleDictEntry));
+        if (!new_entries)
+            return -1;
         dict->entries  = new_entries;
         dict->capacity = new_cap;
     }
 
     dict->entries[dict->num_entries].key    = cml_strdup(key);
     dict->entries[dict->num_entries].module = module;
-    if (!dict->entries[dict->num_entries].key) return -1;
+    if (!dict->entries[dict->num_entries].key)
+        return -1;
     dict->num_entries++;
     Parameter** params = NULL;
     int num_params     = 0;
@@ -231,19 +238,21 @@ int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
                          params[i]->name ? params[i]->name : "unnamed");
                 Tensor* pt = params[i]->tensor;
                 nn_tensor_param_alias(pt);
-                if (module_add_parameter((Module*)dict, pt, param_name,
-                                         params[i]->requires_grad) != 0)
+                if (module_add_parameter((Module*)dict, pt, param_name, params[i]->requires_grad) !=
+                    0)
                     pt->ref_count--;
             }
         }
-        if (params) cml_free(params);
+        if (params)
+            cml_free(params);
     }
 
     return 0;
 }
 
 Module* module_dict_get(ModuleDict* dict, const char* key) {
-    if (!dict || !key) return NULL;
+    if (!dict || !key)
+        return NULL;
     for (int i = 0; i < dict->num_entries; i++) {
         if (strcmp(dict->entries[i].key, key) == 0) {
             return dict->entries[i].module;
@@ -253,7 +262,8 @@ Module* module_dict_get(ModuleDict* dict, const char* key) {
 }
 
 int module_dict_remove(ModuleDict* dict, const char* key) {
-    if (!dict || !key) return -1;
+    if (!dict || !key)
+        return -1;
 
     for (int i = 0; i < dict->num_entries; i++) {
         if (strcmp(dict->entries[i].key, key) == 0) {
@@ -269,17 +279,18 @@ int module_dict_remove(ModuleDict* dict, const char* key) {
     return -1;
 }
 
-int module_dict_size(ModuleDict* dict) {
-    return dict ? dict->num_entries : 0;
-}
+int module_dict_size(ModuleDict* dict) { return dict ? dict->num_entries : 0; }
 
 const char** module_dict_keys(ModuleDict* dict, int* num_keys) {
-    if (!dict || !num_keys) return NULL;
+    if (!dict || !num_keys)
+        return NULL;
     *num_keys = dict->num_entries;
-    if (dict->num_entries == 0) return NULL;
+    if (dict->num_entries == 0)
+        return NULL;
 
     const char** keys = cml_malloc((size_t)dict->num_entries * sizeof(const char*));
-    if (!keys) return NULL;
+    if (!keys)
+        return NULL;
 
     for (int i = 0; i < dict->num_entries; i++) {
         keys[i] = dict->entries[i].key;

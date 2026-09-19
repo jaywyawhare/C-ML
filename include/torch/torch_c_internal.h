@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 /* Cached defaults (synced in torch_set_default_*). Use accessors for thread-safe reads. */
-DType      torch_default_dtype_cached(void);
+DType torch_default_dtype_cached(void);
 DeviceType torch_default_device_cached(void);
 
 static inline void torch_opts_sync_config(TorchTensorOptions* opts) {
@@ -29,10 +29,10 @@ static inline void torch_opts_sync_config(TorchTensorOptions* opts) {
 
 static inline TensorConfig torch_config_default(void) {
     TensorConfig cfg = {
-        .dtype       = torch_default_dtype_cached(),
-        .device      = torch_default_device_cached(),
-        .has_dtype   = true,
-        .has_device  = true,
+        .dtype      = torch_default_dtype_cached(),
+        .device     = torch_default_device_cached(),
+        .has_dtype  = true,
+        .has_device = true,
     };
     return cfg;
 }

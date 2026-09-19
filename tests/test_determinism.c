@@ -21,17 +21,19 @@ static int checks = 0, failures = 0;
 static void draw(uint64_t seed, float* out, int kind) {
     cml_manual_seed(seed);
     int shape[1] = {N};
-    Tensor* t = (kind == 0) ? uop_rand_uniform(shape, 1, DTYPE_FLOAT32, DEVICE_CPU)
-              : (kind == 1) ? uop_rand_normal(shape, 1, DTYPE_FLOAT32, DEVICE_CPU)
-                            : uop_rand_int(0, 100, shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* t    = (kind == 0)   ? uop_rand_uniform(shape, 1, DTYPE_FLOAT32, DEVICE_CPU)
+                   : (kind == 1) ? uop_rand_normal(shape, 1, DTYPE_FLOAT32, DEVICE_CPU)
+                                 : uop_rand_int(0, 100, shape, 1, DTYPE_FLOAT32, DEVICE_CPU);
     tensor_ensure_executed(t);
-    for (int i = 0; i < N; i++) out[i] = tensor_get_float(t, (size_t)i);
+    for (int i = 0; i < N; i++)
+        out[i] = tensor_get_float(t, (size_t)i);
     cml_reset_ir_context();
 }
 
 static int identical(const float* a, const float* b) {
     for (int i = 0; i < N; i++)
-        if (a[i] != b[i]) return 0;
+        if (a[i] != b[i])
+            return 0;
     return 1;
 }
 
@@ -60,7 +62,7 @@ int main(void) {
     printf("Seed determinism:\n");
 
     check_kind("uniform", 0);
-    check_kind("normal",  1);
+    check_kind("normal", 1);
     check_kind("randint", 2);
 
     /* Layer init draws from the same global RNG and must also be reproducible. */
@@ -69,15 +71,16 @@ int main(void) {
         int got[2] = {0, 0};
         for (int pass = 0; pass < 2; pass++) {
             cml_manual_seed(777);
-            Linear* l = cml_nn_linear(4, 4, DTYPE_FLOAT32, DEVICE_CPU, false);
+            Linear* l      = cml_nn_linear(4, 4, DTYPE_FLOAT32, DEVICE_CPU, false);
             Parameter** ps = NULL;
-            int np = 0;
-            if (l && module_collect_parameters((Module*)l, &ps, &np, NULL) == 0 &&
-                ps && np > 0 && ps[0] && ps[0]->tensor) {
+            int np         = 0;
+            if (l && module_collect_parameters((Module*)l, &ps, &np, NULL) == 0 && ps && np > 0 &&
+                ps[0] && ps[0]->tensor) {
                 Tensor* t = ps[0]->tensor;
                 tensor_ensure_executed(t);
                 int n = (int)(t->numel < 16 ? t->numel : 16);
-                for (int i = 0; i < n; i++) w[pass][i] = tensor_get_float(t, (size_t)i);
+                for (int i = 0; i < n; i++)
+                    w[pass][i] = tensor_get_float(t, (size_t)i);
                 got[pass] = n;
             }
             cml_reset_ir_context();

@@ -11,30 +11,25 @@
 /* Minimal shim so the rest of the file compiles on Windows. */
 #include <windows.h>
 #define dlopen(path, flags) ((void*)LoadLibraryA(path))
-#define dlsym(handle, sym)  ((void*)GetProcAddress((HMODULE)(handle), (sym)))
-#define dlclose(handle)     FreeLibrary((HMODULE)(handle))
-#define dlerror()           "dlopen not available"
+#define dlsym(handle, sym) ((void*)GetProcAddress((HMODULE)(handle), (sym)))
+#define dlclose(handle) FreeLibrary((HMODULE)(handle))
+#define dlerror() "dlopen not available"
 #define RTLD_LAZY 0
 #endif
 
 static const char* nir_target_names[] = {
-    "radeonsi",   /* NIR_TARGET_RADEONSI */
-    "iris",       /* NIR_TARGET_IRIS     */
-    "turnip",     /* NIR_TARGET_TURNIP   */
-    "panfrost",   /* NIR_TARGET_PANFROST */
-    "freedreno",  /* NIR_TARGET_FREEDRENO */
-    "nvk",        /* NIR_TARGET_NVK      */
-    "radv",       /* NIR_TARGET_RADV     */
-    "llvmpipe",   /* NIR_TARGET_LLVMPIPE */
+    "radeonsi",  /* NIR_TARGET_RADEONSI */
+    "iris",      /* NIR_TARGET_IRIS     */
+    "turnip",    /* NIR_TARGET_TURNIP   */
+    "panfrost",  /* NIR_TARGET_PANFROST */
+    "freedreno", /* NIR_TARGET_FREEDRENO */
+    "nvk",       /* NIR_TARGET_NVK      */
+    "radv",      /* NIR_TARGET_RADV     */
+    "llvmpipe",  /* NIR_TARGET_LLVMPIPE */
 };
 
-static const char* mesa_lib_names[] = {
-    "libmesa_nir.so",
-    "libmesa-nir.so",
-    "libmesa_nir.so.0",
-    "libmesa-nir.so.0",
-    NULL
-};
+static const char* mesa_lib_names[] = {"libmesa_nir.so", "libmesa-nir.so", "libmesa_nir.so.0",
+                                       "libmesa-nir.so.0", NULL};
 
 static void* try_open_mesa(void) {
     for (int i = 0; mesa_lib_names[i]; i++) {
@@ -55,25 +50,27 @@ static void* resolve(void* lib, const char* name) {
 
 static int load_nir_symbols(CMLNIRCompiler* c) {
     void* lib = c->mesa_lib;
-    if (!lib) return -1;
+    if (!lib)
+        return -1;
 
     /* Cast through a union to avoid pedantic -Wpedantic warnings about
      * converting between dlsym's void* and function pointers.           */
-#define LOAD_SYM(field, name)                                           \
-    do {                                                                 \
-        void* _s = resolve(lib, name);                                   \
-        if (!_s) return -1;                                              \
-        memcpy(&c->field, &_s, sizeof(_s));                              \
+#define LOAD_SYM(field, name)                                                                      \
+    do {                                                                                           \
+        void* _s = resolve(lib, name);                                                             \
+        if (!_s)                                                                                   \
+            return -1;                                                                             \
+        memcpy(&c->field, &_s, sizeof(_s));                                                        \
     } while (0)
 
     LOAD_SYM(nir_builder_init_simple_shader, "nir_builder_init_simple_shader");
-    LOAD_SYM(nir_fadd,                       "nir_fadd");
-    LOAD_SYM(nir_fmul,                       "nir_fmul");
-    LOAD_SYM(nir_fexp2,                      "nir_fexp2");
-    LOAD_SYM(nir_load_ssbo,                  "nir_intrinsic_load_ssbo");
-    LOAD_SYM(nir_store_ssbo,                 "nir_intrinsic_store_ssbo");
-    LOAD_SYM(nir_load_global_invocation_id,  "nir_load_global_invocation_id");
-    LOAD_SYM(nir_shader_to_spirv,            "nir_shader_to_spirv");
+    LOAD_SYM(nir_fadd, "nir_fadd");
+    LOAD_SYM(nir_fmul, "nir_fmul");
+    LOAD_SYM(nir_fexp2, "nir_fexp2");
+    LOAD_SYM(nir_load_ssbo, "nir_intrinsic_load_ssbo");
+    LOAD_SYM(nir_store_ssbo, "nir_intrinsic_store_ssbo");
+    LOAD_SYM(nir_load_global_invocation_id, "nir_load_global_invocation_id");
+    LOAD_SYM(nir_shader_to_spirv, "nir_shader_to_spirv");
 
 #undef LOAD_SYM
     return 0;
@@ -81,7 +78,8 @@ static int load_nir_symbols(CMLNIRCompiler* c) {
 
 bool cml_nir_available(void) {
     void* lib = try_open_mesa();
-    if (!lib) return false;
+    if (!lib)
+        return false;
 
     /* Check for at least one key symbol that proves this is a real Mesa
      * NIR library and not some unrelated libmesa.                        */
@@ -97,7 +95,8 @@ CMLNIRCompiler* cml_nir_compiler_create(CMLNIRTarget target) {
     }
 
     CMLNIRCompiler* c = (CMLNIRCompiler*)cml_calloc(1, sizeof(CMLNIRCompiler));
-    if (!c) return NULL;
+    if (!c)
+        return NULL;
 
     c->target = target;
 
@@ -117,13 +116,14 @@ CMLNIRCompiler* cml_nir_compiler_create(CMLNIRTarget target) {
     }
 
     c->initialized = true;
-    c->version = 1; /* NIR version marker */
+    c->version     = 1; /* NIR version marker */
     LOG_INFO("NIR: compiler ready for target %s", cml_nir_target_name(target));
     return c;
 }
 
 void cml_nir_compiler_free(CMLNIRCompiler* compiler) {
-    if (!compiler) return;
+    if (!compiler)
+        return;
 
     if (compiler->spirv_output) {
         cml_free(compiler->spirv_output);
@@ -143,7 +143,8 @@ void cml_nir_compiler_free(CMLNIRCompiler* compiler) {
 }
 
 int cml_nir_emit_uop(CMLNIRCompiler* compiler, UOpType op, int num_inputs) {
-    if (!compiler || !compiler->initialized) return -1;
+    if (!compiler || !compiler->initialized)
+        return -1;
     if (!compiler->nir_shader) {
         LOG_ERROR("NIR: no active shader -- call cml_nir_compile first");
         return -1;
@@ -159,19 +160,21 @@ int cml_nir_emit_uop(CMLNIRCompiler* compiler, UOpType op, int num_inputs) {
      * builder; we model them as void* here.
      */
     void* builder = compiler->nir_shader; /* nir_builder* */
-    (void)builder;     /* used by NIR calls when wired up */
-    (void)num_inputs;  /* validated per-op below */
+    (void)builder;                        /* used by NIR calls when wired up */
+    (void)num_inputs;                     /* validated per-op below */
 
     switch (op) {
     case UOP_ADD:
-        if (!compiler->nir_fadd) return -1;
+        if (!compiler->nir_fadd)
+            return -1;
         /* Caller must have pushed two SSA defs; we use placeholders here
          * because the real integration would wire up the SSA value stack. */
         /* compiler->nir_fadd(builder, a, b); */
         return 0;
 
     case UOP_MUL:
-        if (!compiler->nir_fmul) return -1;
+        if (!compiler->nir_fmul)
+            return -1;
         return 0;
 
     case UOP_EXP:
@@ -180,21 +183,25 @@ int cml_nir_emit_uop(CMLNIRCompiler* compiler, UOpType op, int num_inputs) {
          *   exp(x) = exp2(x * log2(e))
          * where log2(e) = 1.4426950408889634.
          */
-        if (!compiler->nir_fexp2 || !compiler->nir_fmul) return -1;
+        if (!compiler->nir_fexp2 || !compiler->nir_fmul)
+            return -1;
         return 0;
 
     case UOP_EXP2:
-        if (!compiler->nir_fexp2) return -1;
+        if (!compiler->nir_fexp2)
+            return -1;
         return 0;
 
     case UOP_GATHER:
         /* Maps to nir_intrinsic_load_ssbo */
-        if (!compiler->nir_load_ssbo) return -1;
+        if (!compiler->nir_load_ssbo)
+            return -1;
         return 0;
 
     case UOP_FILL:
         /* Maps to nir_intrinsic_store_ssbo */
-        if (!compiler->nir_store_ssbo) return -1;
+        if (!compiler->nir_store_ssbo)
+            return -1;
         return 0;
 
     default:
@@ -204,7 +211,8 @@ int cml_nir_emit_uop(CMLNIRCompiler* compiler, UOpType op, int num_inputs) {
 }
 
 int cml_nir_compile(CMLNIRCompiler* compiler, CMLGraph_t ir) {
-    if (!compiler) return -1;
+    if (!compiler)
+        return -1;
     if (!compiler->initialized) {
         LOG_ERROR("NIR: compiler not initialised (Mesa unavailable?)");
         return -1;
@@ -218,7 +226,7 @@ int cml_nir_compile(CMLNIRCompiler* compiler, CMLGraph_t ir) {
     if (compiler->spirv_output) {
         cml_free(compiler->spirv_output);
         compiler->spirv_output = NULL;
-        compiler->spirv_size = 0;
+        compiler->spirv_size   = 0;
     }
 
     /* MESA_SHADER_COMPUTE = 5 in Mesa's gl_shader_stage enum */
@@ -238,7 +246,7 @@ int cml_nir_compile(CMLNIRCompiler* compiler, CMLGraph_t ir) {
     (void)gid;
 
     size_t spirv_size = 0;
-    void* spirv = compiler->nir_shader_to_spirv(builder, &spirv_size);
+    void* spirv       = compiler->nir_shader_to_spirv(builder, &spirv_size);
     if (!spirv || spirv_size == 0) {
         LOG_ERROR("NIR: SPIR-V lowering failed");
         compiler->nir_shader = NULL;
@@ -247,25 +255,28 @@ int cml_nir_compile(CMLNIRCompiler* compiler, CMLGraph_t ir) {
 
     /* Take ownership of the SPIR-V blob */
     compiler->spirv_output = (uint32_t*)spirv;
-    compiler->spirv_size = spirv_size;
-    compiler->nir_shader = NULL;
+    compiler->spirv_size   = spirv_size;
+    compiler->nir_shader   = NULL;
 
-    LOG_INFO("NIR: compiled %zu bytes of SPIR-V for target %s",
-             spirv_size, cml_nir_target_name(compiler->target));
+    LOG_INFO("NIR: compiled %zu bytes of SPIR-V for target %s", spirv_size,
+             cml_nir_target_name(compiler->target));
     return 0;
 }
 
 size_t cml_nir_binary_size(const CMLNIRCompiler* compiler) {
-    if (!compiler) return 0;
+    if (!compiler)
+        return 0;
     return compiler->spirv_size;
 }
 
 const void* cml_nir_binary_data(const CMLNIRCompiler* compiler) {
-    if (!compiler) return NULL;
+    if (!compiler)
+        return NULL;
     return compiler->spirv_output;
 }
 
 const char* cml_nir_target_name(CMLNIRTarget target) {
-    if (target < 0 || target >= NIR_TARGET_COUNT) return "unknown";
+    if (target < 0 || target >= NIR_TARGET_COUNT)
+        return "unknown";
     return nir_target_names[target];
 }

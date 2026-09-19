@@ -44,9 +44,13 @@ DistCommOps* cml_dist_auto_select_backend(void) {
 
 const char* cml_dist_backend_name(DistBackendType type) {
     switch (type) {
-    case DIST_BACKEND_NCCL: return "NCCL";
-    case DIST_BACKEND_MPI:  return "MPI";
-    case DIST_BACKEND_GLOO: return "Gloo";
-    default:                return "Unknown";
+    case DIST_BACKEND_NCCL:
+        return "NCCL";
+    case DIST_BACKEND_MPI:
+        return "MPI";
+    case DIST_BACKEND_GLOO:
+        return "Gloo";
+    default:
+        return "Unknown";
     }
 }

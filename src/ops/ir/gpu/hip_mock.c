@@ -33,8 +33,8 @@
 #define MOCK_MEMCPY_D2H 2
 
 #define MOCK_MAX_ALLOC_TRACKED 4096
-#define MOCK_JOURNAL_CAP       1024
-#define MOCK_DEVICE_NAME       "Mock-RDNA3"
+#define MOCK_JOURNAL_CAP 1024
+#define MOCK_DEVICE_NAME "Mock-RDNA3"
 
 typedef enum {
     MOCK_OP_INIT = 0,
@@ -54,9 +54,9 @@ typedef enum {
 
 typedef struct {
     MockOpKind kind;
-    size_t bytes;        /* memcpy/malloc payload */
-    uint32_t grid[3];    /* launch geometry */
-    char name[32];       /* kernel name / label */
+    size_t bytes;     /* memcpy/malloc payload */
+    uint32_t grid[3]; /* launch geometry */
+    char name[32];    /* kernel name / label */
 } MockJournalEntry;
 
 typedef struct {
@@ -75,8 +75,8 @@ static void journal(MockOpKind kind, size_t bytes, const char* name) {
     if (g_mock.journal_len >= MOCK_JOURNAL_CAP)
         return;
     MockJournalEntry* e = &g_mock.journal[g_mock.journal_len++];
-    e->kind = kind;
-    e->bytes = bytes;
+    e->kind             = kind;
+    e->bytes            = bytes;
     if (name) {
         strncpy(e->name, name, sizeof(e->name) - 1);
         e->name[sizeof(e->name) - 1] = '\0';
@@ -109,7 +109,8 @@ static hipError_t m_hipInit(unsigned int flags) {
 }
 
 static hipError_t m_hipGetDeviceCount(int* count) {
-    if (!count || !g_mock.initialized) return HIP_ERROR_NOT_INITIALIZED;
+    if (!count || !g_mock.initialized)
+        return HIP_ERROR_NOT_INITIALIZED;
     *count = 1;
     return HIP_SUCCESS;
 }
@@ -128,9 +129,11 @@ static hipError_t m_hipGetDeviceProperties(void* prop, int deviceId) {
 }
 
 static hipError_t m_hipMalloc(void** ptr, size_t size) {
-    if (!ptr || !size) return HIP_ERROR_INVALID_VALUE;
+    if (!ptr || !size)
+        return HIP_ERROR_INVALID_VALUE;
     void* p = cml_malloc(size);
-    if (!p) return HIP_ERROR_OUT_OF_MEMORY;
+    if (!p)
+        return HIP_ERROR_OUT_OF_MEMORY;
     track_alloc(p);
     *ptr = p;
     journal(MOCK_OP_MALLOC, size, NULL);
@@ -138,7 +141,8 @@ static hipError_t m_hipMalloc(void** ptr, size_t size) {
 }
 
 static hipError_t m_hipFree(void* ptr) {
-    if (!ptr) return HIP_ERROR_INVALID_VALUE;
+    if (!ptr)
+        return HIP_ERROR_INVALID_VALUE;
     untrack_alloc(ptr);
     cml_free(ptr);
     journal(MOCK_OP_FREE, 0, NULL);
@@ -147,7 +151,8 @@ static hipError_t m_hipFree(void* ptr) {
 
 /* Device memory is host-backed, so both directions are plain copies. */
 static hipError_t m_hipMemcpy(void* dst, const void* src, size_t bytes, int kind) {
-    if (!dst || !src || !bytes) return HIP_ERROR_INVALID_VALUE;
+    if (!dst || !src || !bytes)
+        return HIP_ERROR_INVALID_VALUE;
     if (kind == MOCK_MEMCPY_H2D) {
         memcpy(dst, src, bytes);
         journal(MOCK_OP_MEMCPY_H2D, bytes, NULL);
@@ -161,9 +166,10 @@ static hipError_t m_hipMemcpy(void* dst, const void* src, size_t bytes, int kind
 }
 
 static hipError_t m_hipStreamCreate(hipStream_t* s) {
-    if (!s || !g_mock.initialized) return HIP_ERROR_NOT_INITIALIZED;
+    if (!s || !g_mock.initialized)
+        return HIP_ERROR_NOT_INITIALIZED;
     static int dummy_stream;
-    *s = &dummy_stream;
+    *s                    = &dummy_stream;
     g_mock.stream_created = true;
     journal(MOCK_OP_STREAM_CREATE, 0, NULL);
     return HIP_SUCCESS;
@@ -190,7 +196,8 @@ static hipError_t m_hipDeviceSynchronize(void) {
  * (validating the mapping/lifetime path) while launches are journaled with
  * their geometry instead of executed. */
 static hipError_t m_hipModuleLoadData(hipModule_t* module, const void* image) {
-    if (!module || !image) return HIP_ERROR_INVALID_VALUE;
+    if (!module || !image)
+        return HIP_ERROR_INVALID_VALUE;
     static int dummy_module;
     *module = &dummy_module;
     journal(MOCK_OP_MODULE_LOAD, 0, NULL);
@@ -198,7 +205,8 @@ static hipError_t m_hipModuleLoadData(hipModule_t* module, const void* image) {
 }
 
 static hipError_t m_hipModuleLoad(hipModule_t* module, const char* fname) {
-    if (!module || !fname) return HIP_ERROR_INVALID_VALUE;
+    if (!module || !fname)
+        return HIP_ERROR_INVALID_VALUE;
     return m_hipModuleLoadData(module, fname);
 }
 
@@ -207,9 +215,9 @@ static hipError_t m_hipModuleUnload(hipModule_t module) {
     return HIP_SUCCESS;
 }
 
-static hipError_t m_hipModuleGetFunction(hipFunction_t* fn, hipModule_t module,
-                                         const char* kname) {
-    if (!fn || !kname) return HIP_ERROR_INVALID_VALUE;
+static hipError_t m_hipModuleGetFunction(hipFunction_t* fn, hipModule_t module, const char* kname) {
+    if (!fn || !kname)
+        return HIP_ERROR_INVALID_VALUE;
     (void)module;
     static char fn_storage[64];
     memset(fn_storage, 0, sizeof(fn_storage));
@@ -219,34 +227,42 @@ static hipError_t m_hipModuleGetFunction(hipFunction_t* fn, hipModule_t module,
     return HIP_SUCCESS;
 }
 
-static hipError_t m_hipModuleLaunchKernel(hipFunction_t f, unsigned gx, unsigned gy,
-                                          unsigned gz, unsigned bx, unsigned by,
-                                          unsigned bz, unsigned shared, hipStream_t stream,
-                                          void** kernelParams, void** extra) {
-    (void)f; (void)stream; (void)shared; (void)extra;
-    if (!kernelParams) return HIP_ERROR_INVALID_VALUE;
+static hipError_t m_hipModuleLaunchKernel(hipFunction_t f, unsigned gx, unsigned gy, unsigned gz,
+                                          unsigned bx, unsigned by, unsigned bz, unsigned shared,
+                                          hipStream_t stream, void** kernelParams, void** extra) {
+    (void)f;
+    (void)stream;
+    (void)shared;
+    (void)extra;
+    if (!kernelParams)
+        return HIP_ERROR_INVALID_VALUE;
     for (int i = 0; kernelParams[i]; i++) {
-        if (!kernelParams[i]) return HIP_ERROR_INVALID_VALUE;
+        if (!kernelParams[i])
+            return HIP_ERROR_INVALID_VALUE;
     }
-    MockJournalEntry* e = &g_mock.journal[g_mock.journal_len < MOCK_JOURNAL_CAP
-                                              ? g_mock.journal_len
-                                              : MOCK_JOURNAL_CAP - 1];
+    MockJournalEntry* e =
+        &g_mock.journal[g_mock.journal_len < MOCK_JOURNAL_CAP ? g_mock.journal_len
+                                                              : MOCK_JOURNAL_CAP - 1];
     (void)e;
     journal(MOCK_OP_LAUNCH, 0, f ? (const char*)f : "kernel");
     if (g_mock.journal_len > 0 && g_mock.journal[g_mock.journal_len - 1].kind == MOCK_OP_LAUNCH) {
         MockJournalEntry* last = &g_mock.journal[g_mock.journal_len - 1];
-        last->grid[0] = gx; last->grid[1] = gy; last->grid[2] = gz;
-        last->bytes = ((size_t)bx << 16) | ((size_t)by << 8) | bz; /* stash block dims */
+        last->grid[0]          = gx;
+        last->grid[1]          = gy;
+        last->grid[2]          = gz;
+        last->bytes            = ((size_t)bx << 16) | ((size_t)by << 8) | bz; /* stash block dims */
     }
     g_mock.launches++;
     return HIP_SUCCESS;
 }
 
 static hipError_t m_hipEventCreate(void** event) {
-    if (!event) return HIP_ERROR_INVALID_VALUE;
+    if (!event)
+        return HIP_ERROR_INVALID_VALUE;
     static char event_storage[16];
     static int event_counter;
-    if (event_counter >= 16) event_counter = 0;
+    if (event_counter >= 16)
+        event_counter = 0;
     *event = &event_storage[event_counter++ * 4];
     journal(MOCK_OP_EVENT_CREATE, 0, NULL);
     return HIP_SUCCESS;
@@ -258,7 +274,8 @@ static hipError_t m_hipEventDestroy(void* event) {
 }
 
 static hipError_t m_hipEventRecord(void* event, hipStream_t stream) {
-    (void)event; (void)stream;
+    (void)event;
+    (void)stream;
     journal(MOCK_OP_EVENT_RECORD, 0, NULL);
     return HIP_SUCCESS;
 }
@@ -271,9 +288,7 @@ static hipError_t m_hipEventSynchronize(void* event) {
 
 /* --- public mock API ----------------------------------------------------- */
 
-void cml_hip_mock_reset(void) {
-    memset(&g_mock, 0, sizeof(g_mock));
-}
+void cml_hip_mock_reset(void) { memset(&g_mock, 0, sizeof(g_mock)); }
 
 int cml_rocm_backend_init_mock(CMLROCmBackend* backend) {
     if (!backend)
@@ -305,8 +320,8 @@ int cml_rocm_backend_init_mock(CMLROCmBackend* backend) {
     backend->hipEventSynchronize    = m_hipEventSynchronize;
     backend->hip_lib                = NULL; /* no dlopen */
     snprintf(backend->device_name, sizeof(backend->device_name), "%s", MOCK_DEVICE_NAME);
-    backend->total_memory     = 1ull << 30;
-    backend->multiprocessor_count = 1;
+    backend->total_memory          = 1ull << 30;
+    backend->multiprocessor_count  = 1;
     backend->max_threads_per_block = 1024;
 
     hipError_t err = backend->hipInit(0);
@@ -336,8 +351,8 @@ const CMLHIPMockEntry* cml_hip_mock_journal_at(int i) {
     if (i < 0 || i >= g_mock.journal_len || i >= MOCK_JOURNAL_CAP)
         return NULL;
     static CMLHIPMockEntry out;
-    out.kind  = (CMLHIPMockOpKind)g_mock.journal[i].kind;
-    out.bytes = g_mock.journal[i].bytes;
+    out.kind            = (CMLHIPMockOpKind)g_mock.journal[i].kind;
+    out.bytes           = g_mock.journal[i].bytes;
     out.launches_grid_x = g_mock.journal[i].grid[0];
     snprintf(out.name, sizeof(out.name), "%s", g_mock.journal[i].name);
     return &out;

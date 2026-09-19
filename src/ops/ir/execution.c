@@ -66,12 +66,15 @@ CMLLLVMBackend* cml_get_llvm_backend(void) {
 static int cml_ir_use_jit(void) {
     static int checked = 0, enabled = 1;
     if (!checked) {
-        if (cml_flag_enabled(CML_FLAG_DISABLE_JIT)) enabled = 0;
+        if (cml_flag_enabled(CML_FLAG_DISABLE_JIT))
+            enabled = 0;
         /* JIT=0 disables JIT (like DISABLE_JIT); 1/2 keep it on. */
-        if (cml_flag(CML_FLAG_JIT) == 0) enabled = 0;
+        if (cml_flag(CML_FLAG_JIT) == 0)
+            enabled = 0;
         /* VALIDATE_WITH_CPU routes execution through the CPU reference path so
          * results can be trusted as a baseline for the accelerated backends. */
-        if (cml_flag_enabled(CML_FLAG_VALIDATE_WITH_CPU)) enabled = 0;
+        if (cml_flag_enabled(CML_FLAG_VALIDATE_WITH_CPU))
+            enabled = 0;
         const char* be = getenv("BACKEND");
         if (be && (strcasecmp(be, "interp") == 0 || strcasecmp(be, "interpreter") == 0))
             enabled = 0;
@@ -88,7 +91,7 @@ static int cml_ir_use_vulkan(void) {
     static int cached = -1;
     if (cached < 0) {
         const char* e = getenv("USE_VULKAN");
-        cached = (e && e[0] == '1') ? 1 : 0;
+        cached        = (e && e[0] == '1') ? 1 : 0;
     }
     return cached;
 }
@@ -119,9 +122,11 @@ typedef struct {
     bool initialized;
 } BufferCache;
 
-static BufferCache g_buffer_cache = {0};
+static BufferCache g_buffer_cache    = {0};
 static CMLTLSFAllocator* g_exec_tlsf = NULL;
-static bool g_exec_tlsf_destroyed = false;  /* true after cml_tlsf_destroy is called; keeps exec_pool_alloc from re-creating the pool after shutdown */
+static bool g_exec_tlsf_destroyed =
+    false; /* true after cml_tlsf_destroy is called; keeps exec_pool_alloc from re-creating the pool
+              after shutdown */
 static pthread_mutex_t g_exec_alloc_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void* exec_pool_alloc(size_t size) {
@@ -141,8 +146,7 @@ static void exec_pool_free(void* ptr, size_t size) {
     if (!ptr)
         return;
     pthread_mutex_lock(&g_exec_alloc_lock);
-    if (g_exec_tlsf && g_exec_tlsf->pool &&
-        (char*)ptr >= (char*)g_exec_tlsf->pool &&
+    if (g_exec_tlsf && g_exec_tlsf->pool && (char*)ptr >= (char*)g_exec_tlsf->pool &&
         (char*)ptr < (char*)g_exec_tlsf->pool + g_exec_tlsf->pool_size) {
         cml_tlsf_free(g_exec_tlsf, ptr);
         pthread_mutex_unlock(&g_exec_alloc_lock);
@@ -310,13 +314,13 @@ void cml_print_buffer_cache_stats(void) {
         return;
     }
 
-    size_t total_cached  = 0;
-    int    total_buffers = 0;
+    size_t total_cached = 0;
+    int total_buffers   = 0;
     for (int i = 0; i < BUFFER_CACHE_NUM_BUCKETS; i++) {
         if (g_buffer_cache.buckets[i].count > 0) {
             total_buffers += g_buffer_cache.buckets[i].count;
-            total_cached  += (size_t)g_buffer_cache.buckets[i].count *
-                             g_buffer_cache.buckets[i].bucket_size;
+            total_cached +=
+                (size_t)g_buffer_cache.buckets[i].count * g_buffer_cache.buckets[i].bucket_size;
         }
     }
     size_t hits   = g_buffer_cache.cache_hits;
@@ -325,8 +329,7 @@ void cml_print_buffer_cache_stats(void) {
     pthread_mutex_unlock(&g_exec_alloc_lock);
 
     size_t total_requests = hits + misses;
-    float  hit_rate       = total_requests > 0
-                            ? (100.0f * (float)hits / (float)total_requests) : 0.0f;
+    float hit_rate = total_requests > 0 ? (100.0f * (float)hits / (float)total_requests) : 0.0f;
 
     printf("Buffer Cache Stats:\n");
     printf("  Cache hits:    %zu\n", hits);
@@ -462,18 +465,28 @@ static inline void wino_f23_output_transform(const float M[16], float Y[4]) {
  * into 0 -- silently gathering row 0 and scattering gradients to row 0. */
 static int cml_index_read(const Tensor* t, size_t i) {
     const void* d = t ? t->data : NULL;
-    if (!d) return 0;
+    if (!d)
+        return 0;
     switch (t->dtype) {
-    case DTYPE_INT32:  return ((const int32_t*)d)[i];
-    case DTYPE_INT64:  return (int)((const int64_t*)d)[i];
-    case DTYPE_INT16:  return ((const int16_t*)d)[i];
-    case DTYPE_INT8:   return ((const int8_t*)d)[i];
-    case DTYPE_UINT8:  return (int)((const uint8_t*)d)[i];
-    case DTYPE_UINT16: return (int)((const uint16_t*)d)[i];
-    case DTYPE_UINT32: return (int)((const uint32_t*)d)[i];
-    case DTYPE_FLOAT64:return (int)((const double*)d)[i];
+    case DTYPE_INT32:
+        return ((const int32_t*)d)[i];
+    case DTYPE_INT64:
+        return (int)((const int64_t*)d)[i];
+    case DTYPE_INT16:
+        return ((const int16_t*)d)[i];
+    case DTYPE_INT8:
+        return ((const int8_t*)d)[i];
+    case DTYPE_UINT8:
+        return (int)((const uint8_t*)d)[i];
+    case DTYPE_UINT16:
+        return (int)((const uint16_t*)d)[i];
+    case DTYPE_UINT32:
+        return (int)((const uint32_t*)d)[i];
+    case DTYPE_FLOAT64:
+        return (int)((const double*)d)[i];
     case DTYPE_FLOAT32:
-    default:           return (int)((const float*)d)[i];
+    default:
+        return (int)((const float*)d)[i];
     }
 }
 
@@ -709,7 +722,8 @@ static inline int _detect_broadcast_2d(Tensor* a, Tensor* b, Tensor* out, size_t
 #define BROADCAST_COL_ADDSCALAR(sgn)                                                               \
     do {                                                                                           \
         for (size_t r = 0; r < rows; r++)                                                          \
-            simd_add_scalar_f32(in1_data + r * cols, (sgn) * in2_data[r], out_data + r * cols, cols); \
+            simd_add_scalar_f32(in1_data + r * cols, (sgn) * in2_data[r], out_data + r * cols,     \
+                                cols);                                                             \
     } while (0)
 
 /* Fast broadcast binary op for 2D: [R,C] * [R,1] via SIMD scalar multiply. */
@@ -728,64 +742,94 @@ static inline int _detect_broadcast_2d(Tensor* a, Tensor* b, Tensor* out, size_t
  * the first increment of real multi-dtype compute — the executor was formerly
  * float32-only. Returns 0 on success, -1 if (dtype, op) isn't handled here.
  * ---------------------------------------------------------------------- */
-static int is_half_dtype(DType d) {
-    return d == DTYPE_FLOAT16 || d == DTYPE_BFLOAT16;
-}
+static int is_half_dtype(DType d) { return d == DTYPE_FLOAT16 || d == DTYPE_BFLOAT16; }
 
 static int is_comparison_op(UOpType t) {
-    return t == UOP_CMPLT || t == UOP_CMPGT || t == UOP_CMPLE ||
-           t == UOP_CMPGE || t == UOP_CMPEQ || t == UOP_CMPNE;
+    return t == UOP_CMPLT || t == UOP_CMPGT || t == UOP_CMPLE || t == UOP_CMPGE || t == UOP_CMPEQ ||
+           t == UOP_CMPNE;
 }
 
 static int is_elementwise_binary(UOpType t) {
-    return t == UOP_ADD || t == UOP_SUB || t == UOP_MUL || t == UOP_DIV ||
-           t == UOP_MAX ||
-           t == UOP_CMPLT || t == UOP_CMPGT || t == UOP_CMPLE ||
-           t == UOP_CMPGE || t == UOP_CMPEQ || t == UOP_CMPNE;
+    return t == UOP_ADD || t == UOP_SUB || t == UOP_MUL || t == UOP_DIV || t == UOP_MAX ||
+           t == UOP_CMPLT || t == UOP_CMPGT || t == UOP_CMPLE || t == UOP_CMPGE || t == UOP_CMPEQ ||
+           t == UOP_CMPNE;
 }
 
-#define CML_BCAST_BINARY(CTYPE, EXPR)                                          \
-    do {                                                                       \
-        const CTYPE* A = (const CTYPE*)in1;                                    \
-        const CTYPE* B = (const CTYPE*)in2;                                    \
-        CTYPE* O       = (CTYPE*)out;                                          \
-        for (size_t i = 0; i < n; i++) {                                       \
-            size_t i1 = bmap1 ? bmap1[i] : i;                                  \
-            size_t i2 = bmap2 ? bmap2[i] : i;                                  \
-            CTYPE x = A[i1], y = B[i2];                                        \
-            O[i] = (EXPR);                                                     \
-        }                                                                      \
+#define CML_BCAST_BINARY(CTYPE, EXPR)                                                              \
+    do {                                                                                           \
+        const CTYPE* A = (const CTYPE*)in1;                                                        \
+        const CTYPE* B = (const CTYPE*)in2;                                                        \
+        CTYPE* O       = (CTYPE*)out;                                                              \
+        for (size_t i = 0; i < n; i++) {                                                           \
+            size_t i1 = bmap1 ? bmap1[i] : i;                                                      \
+            size_t i2 = bmap2 ? bmap2[i] : i;                                                      \
+            CTYPE x = A[i1], y = B[i2];                                                            \
+            O[i] = (EXPR);                                                                         \
+        }                                                                                          \
     } while (0)
 
-#define CML_CMP_CASES(CTYPE)                                                   \
-    case UOP_CMPLT: CML_BCAST_BINARY(CTYPE, (CTYPE)(x <  y)); return 0;        \
-    case UOP_CMPGT: CML_BCAST_BINARY(CTYPE, (CTYPE)(x >  y)); return 0;        \
-    case UOP_CMPLE: CML_BCAST_BINARY(CTYPE, (CTYPE)(x <= y)); return 0;        \
-    case UOP_CMPGE: CML_BCAST_BINARY(CTYPE, (CTYPE)(x >= y)); return 0;        \
-    case UOP_CMPEQ: CML_BCAST_BINARY(CTYPE, (CTYPE)(x == y)); return 0;        \
-    case UOP_CMPNE: CML_BCAST_BINARY(CTYPE, (CTYPE)(x != y)); return 0;
+#define CML_CMP_CASES(CTYPE)                                                                       \
+    case UOP_CMPLT:                                                                                \
+        CML_BCAST_BINARY(CTYPE, (CTYPE)(x < y));                                                   \
+        return 0;                                                                                  \
+    case UOP_CMPGT:                                                                                \
+        CML_BCAST_BINARY(CTYPE, (CTYPE)(x > y));                                                   \
+        return 0;                                                                                  \
+    case UOP_CMPLE:                                                                                \
+        CML_BCAST_BINARY(CTYPE, (CTYPE)(x <= y));                                                  \
+        return 0;                                                                                  \
+    case UOP_CMPGE:                                                                                \
+        CML_BCAST_BINARY(CTYPE, (CTYPE)(x >= y));                                                  \
+        return 0;                                                                                  \
+    case UOP_CMPEQ:                                                                                \
+        CML_BCAST_BINARY(CTYPE, (CTYPE)(x == y));                                                  \
+        return 0;                                                                                  \
+    case UOP_CMPNE:                                                                                \
+        CML_BCAST_BINARY(CTYPE, (CTYPE)(x != y));                                                  \
+        return 0;
 
-#define CML_BINARY_FLOAT(CTYPE)                                                \
-    switch (type) {                                                            \
-    case UOP_ADD: CML_BCAST_BINARY(CTYPE, x + y); return 0;                    \
-    case UOP_SUB: CML_BCAST_BINARY(CTYPE, x - y); return 0;                    \
-    case UOP_MUL: CML_BCAST_BINARY(CTYPE, x * y); return 0;                    \
-    case UOP_DIV: CML_BCAST_BINARY(CTYPE, x / y); return 0;  /* IEEE: /0 = inf */ \
-    case UOP_MAX: CML_BCAST_BINARY(CTYPE,                                      \
-        ((x != x) || (y != y)) ? (x + y) : (x > y ? x : y)); return 0;         \
-    CML_CMP_CASES(CTYPE)                                                       \
-    default: return -1;                                                        \
+#define CML_BINARY_FLOAT(CTYPE)                                                                    \
+    switch (type) {                                                                                \
+    case UOP_ADD:                                                                                  \
+        CML_BCAST_BINARY(CTYPE, x + y);                                                            \
+        return 0;                                                                                  \
+    case UOP_SUB:                                                                                  \
+        CML_BCAST_BINARY(CTYPE, x - y);                                                            \
+        return 0;                                                                                  \
+    case UOP_MUL:                                                                                  \
+        CML_BCAST_BINARY(CTYPE, x * y);                                                            \
+        return 0;                                                                                  \
+    case UOP_DIV:                                                                                  \
+        CML_BCAST_BINARY(CTYPE, x / y);                                                            \
+        return 0; /* IEEE: /0 = inf */                                                             \
+    case UOP_MAX:                                                                                  \
+        CML_BCAST_BINARY(CTYPE, ((x != x) || (y != y)) ? (x + y) : (x > y ? x : y));               \
+        return 0;                                                                                  \
+        CML_CMP_CASES(CTYPE)                                                                       \
+    default:                                                                                       \
+        return -1;                                                                                 \
     }
 
-#define CML_BINARY_INT(CTYPE)                                                  \
-    switch (type) {                                                            \
-    case UOP_ADD: CML_BCAST_BINARY(CTYPE, x + y); return 0;                    \
-    case UOP_SUB: CML_BCAST_BINARY(CTYPE, x - y); return 0;                    \
-    case UOP_MUL: CML_BCAST_BINARY(CTYPE, x * y); return 0;                    \
-    case UOP_DIV: CML_BCAST_BINARY(CTYPE, y != 0 ? x / y : 0); return 0;       \
-    case UOP_MAX: CML_BCAST_BINARY(CTYPE, x > y ? x : y); return 0;            \
-    CML_CMP_CASES(CTYPE)                                                       \
-    default: return -1;                                                        \
+#define CML_BINARY_INT(CTYPE)                                                                      \
+    switch (type) {                                                                                \
+    case UOP_ADD:                                                                                  \
+        CML_BCAST_BINARY(CTYPE, x + y);                                                            \
+        return 0;                                                                                  \
+    case UOP_SUB:                                                                                  \
+        CML_BCAST_BINARY(CTYPE, x - y);                                                            \
+        return 0;                                                                                  \
+    case UOP_MUL:                                                                                  \
+        CML_BCAST_BINARY(CTYPE, x * y);                                                            \
+        return 0;                                                                                  \
+    case UOP_DIV:                                                                                  \
+        CML_BCAST_BINARY(CTYPE, y != 0 ? x / y : 0);                                               \
+        return 0;                                                                                  \
+    case UOP_MAX:                                                                                  \
+        CML_BCAST_BINARY(CTYPE, x > y ? x : y);                                                    \
+        return 0;                                                                                  \
+        CML_CMP_CASES(CTYPE)                                                                       \
+    default:                                                                                       \
+        return -1;                                                                                 \
     }
 
 /* Broadcast index map for one operand, or NULL when the operand is already
@@ -798,101 +842,184 @@ static int is_elementwise_binary(UOpType t) {
  * rows. _broadcast_idx is shape-aware; precomputing it once per operand keeps
  * the inner loop a plain load. */
 static size_t* build_bcast_map(Tensor* in, Tensor* out) {
-    if (!in || !out || in->numel == out->numel) return NULL;
+    if (!in || !out || in->numel == out->numel)
+        return NULL;
     size_t* m = (size_t*)cml_malloc(out->numel * sizeof(size_t));
-    if (!m) return NULL;
-    for (size_t i = 0; i < out->numel; i++) m[i] = _broadcast_idx(in, out, i);
+    if (!m)
+        return NULL;
+    for (size_t i = 0; i < out->numel; i++)
+        m[i] = _broadcast_idx(in, out, i);
     return m;
 }
 
-static int cpu_binary_generic(UOpType type, const void* in1, size_t in1_n,
-                              const void* in2, size_t in2_n, void* out, size_t n,
-                              DType dt, const size_t* bmap1, const size_t* bmap2) {
-    (void)in1_n; (void)in2_n;
+static int cpu_binary_generic(UOpType type, const void* in1, size_t in1_n, const void* in2,
+                              size_t in2_n, void* out, size_t n, DType dt, const size_t* bmap1,
+                              const size_t* bmap2) {
+    (void)in1_n;
+    (void)in2_n;
     switch (dt) {
-    case DTYPE_FLOAT32: CML_BINARY_FLOAT(float);
-    case DTYPE_FLOAT64: CML_BINARY_FLOAT(double);
-    case DTYPE_INT64:   CML_BINARY_INT(int64_t);
-    case DTYPE_INT32:   CML_BINARY_INT(int32_t);
-    case DTYPE_INT16:   CML_BINARY_INT(int16_t);
-    case DTYPE_INT8:    CML_BINARY_INT(int8_t);
-    case DTYPE_UINT8:   CML_BINARY_INT(uint8_t);
-    default:            return -1;
+    case DTYPE_FLOAT32:
+        CML_BINARY_FLOAT(float);
+    case DTYPE_FLOAT64:
+        CML_BINARY_FLOAT(double);
+    case DTYPE_INT64:
+        CML_BINARY_INT(int64_t);
+    case DTYPE_INT32:
+        CML_BINARY_INT(int32_t);
+    case DTYPE_INT16:
+        CML_BINARY_INT(int16_t);
+    case DTYPE_INT8:
+        CML_BINARY_INT(int8_t);
+    case DTYPE_UINT8:
+        CML_BINARY_INT(uint8_t);
+    default:
+        return -1;
     }
 }
 
 static int is_elementwise_unary(UOpType t) {
     switch (t) {
-    case UOP_NEG: case UOP_ABS: case UOP_SQUARE:
-    case UOP_EXP: case UOP_LOG: case UOP_SQRT: case UOP_RSQRT: case UOP_RECIP:
-    case UOP_SIN: case UOP_COS: case UOP_TANH: case UOP_SIGMOID:
+    case UOP_NEG:
+    case UOP_ABS:
+    case UOP_SQUARE:
+    case UOP_EXP:
+    case UOP_LOG:
+    case UOP_SQRT:
+    case UOP_RSQRT:
+    case UOP_RECIP:
+    case UOP_SIN:
+    case UOP_COS:
+    case UOP_TANH:
+    case UOP_SIGMOID:
         return true;
     default:
         return false;
     }
 }
 
-#define CML_UNARY_MAP(CTYPE, EXPR)                                             \
-    do {                                                                       \
-        const CTYPE* A = (const CTYPE*)in;                                     \
-        CTYPE* O       = (CTYPE*)out;                                          \
-        for (size_t i = 0; i < n; i++) {                                       \
-            size_t ii = (in_n == n) ? i : (in_n <= 1 ? 0 : i % in_n);          \
-            CTYPE x = A[ii];                                                   \
-            O[i] = (EXPR);                                                     \
-        }                                                                      \
+#define CML_UNARY_MAP(CTYPE, EXPR)                                                                 \
+    do {                                                                                           \
+        const CTYPE* A = (const CTYPE*)in;                                                         \
+        CTYPE* O       = (CTYPE*)out;                                                              \
+        for (size_t i = 0; i < n; i++) {                                                           \
+            size_t ii = (in_n == n) ? i : (in_n <= 1 ? 0 : i % in_n);                              \
+            CTYPE x   = A[ii];                                                                     \
+            O[i]      = (EXPR);                                                                    \
+        }                                                                                          \
     } while (0)
 
-#define CML_UNARY_INT(CTYPE)                                                   \
-    switch (type) {                                                            \
-    case UOP_NEG:    CML_UNARY_MAP(CTYPE, -x);          return 0;              \
-    case UOP_ABS:    CML_UNARY_MAP(CTYPE, x < 0 ? -x : x); return 0;           \
-    case UOP_SQUARE: CML_UNARY_MAP(CTYPE, x * x);       return 0;              \
-    default: return -1;                                                        \
+#define CML_UNARY_INT(CTYPE)                                                                       \
+    switch (type) {                                                                                \
+    case UOP_NEG:                                                                                  \
+        CML_UNARY_MAP(CTYPE, -x);                                                                  \
+        return 0;                                                                                  \
+    case UOP_ABS:                                                                                  \
+        CML_UNARY_MAP(CTYPE, x < 0 ? -x : x);                                                      \
+        return 0;                                                                                  \
+    case UOP_SQUARE:                                                                               \
+        CML_UNARY_MAP(CTYPE, x * x);                                                               \
+        return 0;                                                                                  \
+    default:                                                                                       \
+        return -1;                                                                                 \
     }
 
-static int cpu_unary_generic(UOpType type, const void* in, size_t in_n,
-                             void* out, size_t n, DType dt) {
-    if (dt == DTYPE_FLOAT32) {  /* used for half-precision compute-in-f32 */
+static int cpu_unary_generic(UOpType type, const void* in, size_t in_n, void* out, size_t n,
+                             DType dt) {
+    if (dt == DTYPE_FLOAT32) { /* used for half-precision compute-in-f32 */
         switch (type) {
-        case UOP_NEG:     CML_UNARY_MAP(float, -x);                     return 0;
-        case UOP_ABS:     CML_UNARY_MAP(float, fabsf(x));               return 0;
-        case UOP_SQUARE:  CML_UNARY_MAP(float, x * x);                  return 0;
-        case UOP_EXP:     CML_UNARY_MAP(float, expf(x));                return 0;
-        case UOP_LOG:     CML_UNARY_MAP(float, logf(x));               return 0;
-        case UOP_SQRT:    CML_UNARY_MAP(float, sqrtf(x));              return 0;
-        case UOP_RSQRT:   CML_UNARY_MAP(float, 1.0f / sqrtf(x));       return 0;
-        case UOP_RECIP:   CML_UNARY_MAP(float, 1.0f / x);              return 0;
-        case UOP_SIN:     CML_UNARY_MAP(float, sinf(x));               return 0;
-        case UOP_COS:     CML_UNARY_MAP(float, cosf(x));               return 0;
-        case UOP_TANH:    CML_UNARY_MAP(float, tanhf(x));              return 0;
-        case UOP_SIGMOID: CML_UNARY_MAP(float, 1.0f / (1.0f + expf(-x))); return 0;
-        default: return -1;
+        case UOP_NEG:
+            CML_UNARY_MAP(float, -x);
+            return 0;
+        case UOP_ABS:
+            CML_UNARY_MAP(float, fabsf(x));
+            return 0;
+        case UOP_SQUARE:
+            CML_UNARY_MAP(float, x* x);
+            return 0;
+        case UOP_EXP:
+            CML_UNARY_MAP(float, expf(x));
+            return 0;
+        case UOP_LOG:
+            CML_UNARY_MAP(float, logf(x));
+            return 0;
+        case UOP_SQRT:
+            CML_UNARY_MAP(float, sqrtf(x));
+            return 0;
+        case UOP_RSQRT:
+            CML_UNARY_MAP(float, 1.0f / sqrtf(x));
+            return 0;
+        case UOP_RECIP:
+            CML_UNARY_MAP(float, 1.0f / x);
+            return 0;
+        case UOP_SIN:
+            CML_UNARY_MAP(float, sinf(x));
+            return 0;
+        case UOP_COS:
+            CML_UNARY_MAP(float, cosf(x));
+            return 0;
+        case UOP_TANH:
+            CML_UNARY_MAP(float, tanhf(x));
+            return 0;
+        case UOP_SIGMOID:
+            CML_UNARY_MAP(float, 1.0f / (1.0f + expf(-x)));
+            return 0;
+        default:
+            return -1;
         }
     }
     if (dt == DTYPE_FLOAT64) {
         switch (type) {
-        case UOP_NEG:     CML_UNARY_MAP(double, -x);                    return 0;
-        case UOP_ABS:     CML_UNARY_MAP(double, fabs(x));               return 0;
-        case UOP_SQUARE:  CML_UNARY_MAP(double, x * x);                 return 0;
-        case UOP_EXP:     CML_UNARY_MAP(double, exp(x));                return 0;
-        case UOP_LOG:     CML_UNARY_MAP(double, log(x));               return 0;
-        case UOP_SQRT:    CML_UNARY_MAP(double, sqrt(x));              return 0;
-        case UOP_RSQRT:   CML_UNARY_MAP(double, 1.0 / sqrt(x));        return 0;
-        case UOP_RECIP:   CML_UNARY_MAP(double, 1.0 / x);              return 0;
-        case UOP_SIN:     CML_UNARY_MAP(double, sin(x));               return 0;
-        case UOP_COS:     CML_UNARY_MAP(double, cos(x));               return 0;
-        case UOP_TANH:    CML_UNARY_MAP(double, tanh(x));              return 0;
-        case UOP_SIGMOID: CML_UNARY_MAP(double, 1.0 / (1.0 + exp(-x))); return 0;
-        default: return -1;
+        case UOP_NEG:
+            CML_UNARY_MAP(double, -x);
+            return 0;
+        case UOP_ABS:
+            CML_UNARY_MAP(double, fabs(x));
+            return 0;
+        case UOP_SQUARE:
+            CML_UNARY_MAP(double, x* x);
+            return 0;
+        case UOP_EXP:
+            CML_UNARY_MAP(double, exp(x));
+            return 0;
+        case UOP_LOG:
+            CML_UNARY_MAP(double, log(x));
+            return 0;
+        case UOP_SQRT:
+            CML_UNARY_MAP(double, sqrt(x));
+            return 0;
+        case UOP_RSQRT:
+            CML_UNARY_MAP(double, 1.0 / sqrt(x));
+            return 0;
+        case UOP_RECIP:
+            CML_UNARY_MAP(double, 1.0 / x);
+            return 0;
+        case UOP_SIN:
+            CML_UNARY_MAP(double, sin(x));
+            return 0;
+        case UOP_COS:
+            CML_UNARY_MAP(double, cos(x));
+            return 0;
+        case UOP_TANH:
+            CML_UNARY_MAP(double, tanh(x));
+            return 0;
+        case UOP_SIGMOID:
+            CML_UNARY_MAP(double, 1.0 / (1.0 + exp(-x)));
+            return 0;
+        default:
+            return -1;
         }
     }
-    switch (dt) {  /* integer types: only sign/abs/square are meaningful */
-    case DTYPE_INT64: CML_UNARY_INT(int64_t);
-    case DTYPE_INT32: CML_UNARY_INT(int32_t);
-    case DTYPE_INT16: CML_UNARY_INT(int16_t);
-    case DTYPE_INT8:  CML_UNARY_INT(int8_t);
-    default: return -1;
+    switch (dt) { /* integer types: only sign/abs/square are meaningful */
+    case DTYPE_INT64:
+        CML_UNARY_INT(int64_t);
+    case DTYPE_INT32:
+        CML_UNARY_INT(int32_t);
+    case DTYPE_INT16:
+        CML_UNARY_INT(int16_t);
+    case DTYPE_INT8:
+        CML_UNARY_INT(int8_t);
+    default:
+        return -1;
     }
 }
 
@@ -907,64 +1034,99 @@ static int is_reduction_op(UOpType t) {
  * type (int mean truncates, matching the same-dtype output convention). */
 static int cpu_reduce_generic(struct IRNode* node, const void* in, void* outp, DType dt) {
     Tensor* inp = node->inputs[0];
-    if (!inp || !in || !outp) return -1;
+    if (!inp || !in || !outp)
+        return -1;
 
     UOpType type = node->type;
     int op; /* 0 sum, 1 mean, 2 max, 3 min */
-    if      (type == UOP_SUM)        op = 0;
-    else if (type == UOP_MEAN)       op = 1;
-    else if (type == UOP_MAX_REDUCE) op = 2;
-    else if (type == UOP_MIN_REDUCE) op = 3;
-    else return -1;
+    if (type == UOP_SUM)
+        op = 0;
+    else if (type == UOP_MEAN)
+        op = 1;
+    else if (type == UOP_MAX_REDUCE)
+        op = 2;
+    else if (type == UOP_MIN_REDUCE)
+        op = 3;
+    else
+        return -1;
 
     size_t outer = 1, inner = 1, count = inp->numel;
     ReduceParams* rp = (ReduceParams*)node->params;
     if (rp && rp->num_dims == 1 && inp->ndim >= 1) {
         int rdim = rp->dims[0];
-        if (rdim < 0) rdim += inp->ndim;
+        if (rdim < 0)
+            rdim += inp->ndim;
         if (rdim >= 0 && rdim < inp->ndim) {
             count = (size_t)inp->shape[rdim];
             inner = 1;
-            for (int d = rdim + 1; d < inp->ndim; d++) inner *= (size_t)inp->shape[d];
+            for (int d = rdim + 1; d < inp->ndim; d++)
+                inner *= (size_t)inp->shape[d];
             outer = 1;
-            for (int d = 0; d < rdim; d++) outer *= (size_t)inp->shape[d];
+            for (int d = 0; d < rdim; d++)
+                outer *= (size_t)inp->shape[d];
         }
     }
     size_t nout = outer * inner;
-    if (count == 0) return -1;
+    if (count == 0)
+        return -1;
 
-#define CML_REDUCE_T(CTYPE)                                                       \
-    do {                                                                          \
-        const CTYPE* A = (const CTYPE*)in;                                        \
-        CTYPE* O       = (CTYPE*)outp;                                            \
-        for (size_t p = 0; p < nout; p++) {                                       \
-            size_t start = (p / inner) * count * inner + (p % inner);             \
-            if (op == 2) {                                                        \
-                CTYPE m = A[start];                                               \
-                for (size_t r = 1; r < count; r++) { CTYPE v = A[start + r * inner]; if (v > m) m = v; } \
-                O[p] = m;                                                         \
-            } else if (op == 3) {                                                 \
-                CTYPE m = A[start];                                               \
-                for (size_t r = 1; r < count; r++) { CTYPE v = A[start + r * inner]; if (v < m) m = v; } \
-                O[p] = m;                                                         \
-            } else {                                                              \
-                double s = 0;                                                     \
-                for (size_t r = 0; r < count; r++) s += (double)A[start + r * inner]; \
-                if (op == 1) s /= (double)count;                                  \
-                O[p] = (CTYPE)s;                                                  \
-            }                                                                     \
-        }                                                                         \
+#define CML_REDUCE_T(CTYPE)                                                                        \
+    do {                                                                                           \
+        const CTYPE* A = (const CTYPE*)in;                                                         \
+        CTYPE* O       = (CTYPE*)outp;                                                             \
+        for (size_t p = 0; p < nout; p++) {                                                        \
+            size_t start = (p / inner) * count * inner + (p % inner);                              \
+            if (op == 2) {                                                                         \
+                CTYPE m = A[start];                                                                \
+                for (size_t r = 1; r < count; r++) {                                               \
+                    CTYPE v = A[start + r * inner];                                                \
+                    if (v > m)                                                                     \
+                        m = v;                                                                     \
+                }                                                                                  \
+                O[p] = m;                                                                          \
+            } else if (op == 3) {                                                                  \
+                CTYPE m = A[start];                                                                \
+                for (size_t r = 1; r < count; r++) {                                               \
+                    CTYPE v = A[start + r * inner];                                                \
+                    if (v < m)                                                                     \
+                        m = v;                                                                     \
+                }                                                                                  \
+                O[p] = m;                                                                          \
+            } else {                                                                               \
+                double s = 0;                                                                      \
+                for (size_t r = 0; r < count; r++)                                                 \
+                    s += (double)A[start + r * inner];                                             \
+                if (op == 1)                                                                       \
+                    s /= (double)count;                                                            \
+                O[p] = (CTYPE)s;                                                                   \
+            }                                                                                      \
+        }                                                                                          \
     } while (0)
 
     switch (dt) {
-    case DTYPE_FLOAT32: CML_REDUCE_T(float);   return 0;
-    case DTYPE_FLOAT64: CML_REDUCE_T(double);  return 0;
-    case DTYPE_INT64:   CML_REDUCE_T(int64_t); return 0;
-    case DTYPE_INT32:   CML_REDUCE_T(int32_t); return 0;
-    case DTYPE_INT16:   CML_REDUCE_T(int16_t); return 0;
-    case DTYPE_INT8:    CML_REDUCE_T(int8_t);  return 0;
-    case DTYPE_UINT8:   CML_REDUCE_T(uint8_t); return 0;
-    default:            return -1;
+    case DTYPE_FLOAT32:
+        CML_REDUCE_T(float);
+        return 0;
+    case DTYPE_FLOAT64:
+        CML_REDUCE_T(double);
+        return 0;
+    case DTYPE_INT64:
+        CML_REDUCE_T(int64_t);
+        return 0;
+    case DTYPE_INT32:
+        CML_REDUCE_T(int32_t);
+        return 0;
+    case DTYPE_INT16:
+        CML_REDUCE_T(int16_t);
+        return 0;
+    case DTYPE_INT8:
+        CML_REDUCE_T(int8_t);
+        return 0;
+    case DTYPE_UINT8:
+        CML_REDUCE_T(uint8_t);
+        return 0;
+    default:
+        return -1;
     }
 #undef CML_REDUCE_T
 }
@@ -973,59 +1135,75 @@ static int cpu_reduce_generic(struct IRNode* node, const void* in, void* outp, D
  * a_stride/b_stride are per-batch element offsets (0 = operand shared across the
  * batch, enabling A- or B-broadcast). Float accumulates in double, integers in
  * int64, then cast to the output type. Returns 0 on success, -1 on bad dtype. */
-static int cpu_matmul_generic(const void* A, const void* B, void* C, int batch,
-                              size_t a_stride, size_t b_stride,
-                              int M, int K, int N, DType dt) {
-#define CML_MATMUL_T(CTYPE, ACC)                                               \
-    do {                                                                       \
-        const CTYPE* a = (const CTYPE*)A;                                      \
-        const CTYPE* b = (const CTYPE*)B;                                      \
-        CTYPE* c       = (CTYPE*)C;                                            \
-        for (int bt = 0; bt < batch; bt++) {                                  \
-            const CTYPE* ab = a + (size_t)bt * a_stride;                       \
-            const CTYPE* bb = b + (size_t)bt * b_stride;                       \
-            CTYPE* cb       = c + (size_t)bt * (size_t)M * N;                  \
-            for (int m = 0; m < M; m++)                                        \
-                for (int n = 0; n < N; n++) {                                  \
-                    ACC s = 0;                                                 \
-                    for (int k = 0; k < K; k++)                                \
-                        s += (ACC)ab[(size_t)m * K + k] * (ACC)bb[(size_t)k * N + n]; \
-                    cb[(size_t)m * N + n] = (CTYPE)s;                          \
-                }                                                              \
-        }                                                                      \
+static int cpu_matmul_generic(const void* A, const void* B, void* C, int batch, size_t a_stride,
+                              size_t b_stride, int M, int K, int N, DType dt) {
+#define CML_MATMUL_T(CTYPE, ACC)                                                                   \
+    do {                                                                                           \
+        const CTYPE* a = (const CTYPE*)A;                                                          \
+        const CTYPE* b = (const CTYPE*)B;                                                          \
+        CTYPE* c       = (CTYPE*)C;                                                                \
+        for (int bt = 0; bt < batch; bt++) {                                                       \
+            const CTYPE* ab = a + (size_t)bt * a_stride;                                           \
+            const CTYPE* bb = b + (size_t)bt * b_stride;                                           \
+            CTYPE* cb       = c + (size_t)bt * (size_t)M * N;                                      \
+            for (int m = 0; m < M; m++)                                                            \
+                for (int n = 0; n < N; n++) {                                                      \
+                    ACC s = 0;                                                                     \
+                    for (int k = 0; k < K; k++)                                                    \
+                        s += (ACC)ab[(size_t)m * K + k] * (ACC)bb[(size_t)k * N + n];              \
+                    cb[(size_t)m * N + n] = (CTYPE)s;                                              \
+                }                                                                                  \
+        }                                                                                          \
     } while (0)
 
     /* Half types compute in f32 and round back into the storage format, the
      * same convention the elementwise/reduce paths use. */
-#define CML_MATMUL_HALF(STYPE, LOAD, STORE)                                    \
-    do {                                                                       \
-        const STYPE* a = (const STYPE*)A;                                      \
-        const STYPE* b = (const STYPE*)B;                                      \
-        STYPE* c       = (STYPE*)C;                                            \
-        for (int bt = 0; bt < batch; bt++) {                                  \
-            const STYPE* ab = a + (size_t)bt * a_stride;                       \
-            const STYPE* bb = b + (size_t)bt * b_stride;                       \
-            STYPE* cb       = c + (size_t)bt * (size_t)M * N;                  \
-            for (int m = 0; m < M; m++)                                        \
-                for (int n = 0; n < N; n++) {                                  \
-                    float s = 0;                                               \
-                    for (int k = 0; k < K; k++)                                \
-                        s += LOAD(ab[(size_t)m * K + k]) * LOAD(bb[(size_t)k * N + n]); \
-                    cb[(size_t)m * N + n] = STORE(s);                          \
-                }                                                              \
-        }                                                                      \
+#define CML_MATMUL_HALF(STYPE, LOAD, STORE)                                                        \
+    do {                                                                                           \
+        const STYPE* a = (const STYPE*)A;                                                          \
+        const STYPE* b = (const STYPE*)B;                                                          \
+        STYPE* c       = (STYPE*)C;                                                                \
+        for (int bt = 0; bt < batch; bt++) {                                                       \
+            const STYPE* ab = a + (size_t)bt * a_stride;                                           \
+            const STYPE* bb = b + (size_t)bt * b_stride;                                           \
+            STYPE* cb       = c + (size_t)bt * (size_t)M * N;                                      \
+            for (int m = 0; m < M; m++)                                                            \
+                for (int n = 0; n < N; n++) {                                                      \
+                    float s = 0;                                                                   \
+                    for (int k = 0; k < K; k++)                                                    \
+                        s += LOAD(ab[(size_t)m * K + k]) * LOAD(bb[(size_t)k * N + n]);            \
+                    cb[(size_t)m * N + n] = STORE(s);                                              \
+                }                                                                                  \
+        }                                                                                          \
     } while (0)
 
     switch (dt) {
-    case DTYPE_FLOAT32: CML_MATMUL_T(float,   float);   return 0;
-    case DTYPE_FLOAT64: CML_MATMUL_T(double,  double);  return 0;
-    case DTYPE_FLOAT16: CML_MATMUL_HALF(uint16_t, fp16_to_float, float_to_fp16);   return 0;
-    case DTYPE_BFLOAT16:CML_MATMUL_HALF(uint16_t, bf16_to_float, float_to_bf16);   return 0;
-    case DTYPE_INT64:   CML_MATMUL_T(int64_t, int64_t); return 0;
-    case DTYPE_INT32:   CML_MATMUL_T(int32_t, int64_t); return 0;
-    case DTYPE_INT16:   CML_MATMUL_T(int16_t, int64_t); return 0;
-    case DTYPE_INT8:    CML_MATMUL_T(int8_t,  int64_t); return 0;
-    default:            return -1;
+    case DTYPE_FLOAT32:
+        CML_MATMUL_T(float, float);
+        return 0;
+    case DTYPE_FLOAT64:
+        CML_MATMUL_T(double, double);
+        return 0;
+    case DTYPE_FLOAT16:
+        CML_MATMUL_HALF(uint16_t, fp16_to_float, float_to_fp16);
+        return 0;
+    case DTYPE_BFLOAT16:
+        CML_MATMUL_HALF(uint16_t, bf16_to_float, float_to_bf16);
+        return 0;
+    case DTYPE_INT64:
+        CML_MATMUL_T(int64_t, int64_t);
+        return 0;
+    case DTYPE_INT32:
+        CML_MATMUL_T(int32_t, int64_t);
+        return 0;
+    case DTYPE_INT16:
+        CML_MATMUL_T(int16_t, int64_t);
+        return 0;
+    case DTYPE_INT8:
+        CML_MATMUL_T(int8_t, int64_t);
+        return 0;
+    default:
+        return -1;
     }
 #undef CML_MATMUL_T
 #undef CML_MATMUL_HALF
@@ -1039,95 +1217,119 @@ static int cpu_conv2d_generic(struct IRNode* node, DType dt) {
     Tensor* input_t  = node->inputs[0];
     Tensor* weight_t = node->inputs[1];
     Tensor* out      = node->output;
-    if (!input_t || !weight_t || !out) return -1;
-    if (!input_t->data || !weight_t->data || !out->data) return -1;
-    if (input_t->ndim != 4 || weight_t->ndim != 4) return -1;
-    if (input_t->dtype != dt || weight_t->dtype != dt) return -1;
+    if (!input_t || !weight_t || !out)
+        return -1;
+    if (!input_t->data || !weight_t->data || !out->data)
+        return -1;
+    if (input_t->ndim != 4 || weight_t->ndim != 4)
+        return -1;
+    if (input_t->dtype != dt || weight_t->dtype != dt)
+        return -1;
 
     const void* bias = NULL;
     if (node->num_inputs >= 3 && node->inputs[2]) {
-        if (node->inputs[2]->dtype != dt) return -1;
+        if (node->inputs[2]->dtype != dt)
+            return -1;
         bias = node->inputs[2]->data;
     }
 
     Conv2DParams* p = (Conv2DParams*)node->params;
-    int batch  = input_t->shape[0], in_ch = input_t->shape[1];
-    int in_h   = input_t->shape[2], in_w  = input_t->shape[3];
+    int batch = input_t->shape[0], in_ch = input_t->shape[1];
+    int in_h = input_t->shape[2], in_w = input_t->shape[3];
     int out_ch = weight_t->shape[0], kh = weight_t->shape[2], kw = weight_t->shape[3];
-    int sh = p && p->stride   ? p->stride[0]   : 1, sw = p && p->stride   ? p->stride[1]   : 1;
-    int ph = p && p->padding  ? p->padding[0]  : 0, pw = p && p->padding  ? p->padding[1]  : 0;
+    int sh = p && p->stride ? p->stride[0] : 1, sw = p && p->stride ? p->stride[1] : 1;
+    int ph = p && p->padding ? p->padding[0] : 0, pw = p && p->padding ? p->padding[1] : 0;
     int dh = p && p->dilation ? p->dilation[0] : 1, dw = p && p->dilation ? p->dilation[1] : 1;
-    int groups = p ? p->groups : 1; if (groups < 1) groups = 1;
+    int groups = p ? p->groups : 1;
+    if (groups < 1)
+        groups = 1;
     int out_h = out->shape[2], out_w = out->shape[3];
     int icg = in_ch / groups, ocg = out_ch / groups;
-    if (icg <= 0 || ocg <= 0) return -1;
+    if (icg <= 0 || ocg <= 0)
+        return -1;
 
-#define CML_CONV_T(CTYPE, ACC)                                                        \
-    do {                                                                              \
-        const CTYPE* I = (const CTYPE*)input_t->data;                                 \
-        const CTYPE* W = (const CTYPE*)weight_t->data;                                \
-        const CTYPE* B = (const CTYPE*)bias;                                          \
-        CTYPE* O = (CTYPE*)out->data;                                                 \
-        for (int b = 0; b < batch; b++)                                               \
-            for (int oc = 0; oc < out_ch; oc++) {                                     \
-                int g = oc / ocg;                                                     \
-                for (int oh = 0; oh < out_h; oh++)                                    \
-                    for (int ow = 0; ow < out_w; ow++) {                              \
-                        ACC acc = B ? (ACC)B[oc] : (ACC)0;                            \
-                        for (int ci = 0; ci < icg; ci++) {                            \
-                            int ic = g * icg + ci;                                    \
-                            for (int r = 0; r < kh; r++)                              \
-                                for (int s = 0; s < kw; s++) {                        \
-                                    int ih = oh * sh - ph + r * dh;                   \
-                                    int iw = ow * sw - pw + s * dw;                   \
-                                    if (ih < 0 || ih >= in_h || iw < 0 || iw >= in_w) continue; \
-                                    ACC iv = (ACC)I[(((size_t)b * in_ch + ic) * in_h + ih) * in_w + iw]; \
-                                    ACC wv = (ACC)W[(((size_t)oc * icg + ci) * kh + r) * kw + s]; \
-                                    acc += iv * wv;                                   \
-                                }                                                     \
-                        }                                                             \
-                        O[(((size_t)b * out_ch + oc) * out_h + oh) * out_w + ow] = (CTYPE)acc; \
-                    }                                                                 \
-            }                                                                         \
+#define CML_CONV_T(CTYPE, ACC)                                                                     \
+    do {                                                                                           \
+        const CTYPE* I = (const CTYPE*)input_t->data;                                              \
+        const CTYPE* W = (const CTYPE*)weight_t->data;                                             \
+        const CTYPE* B = (const CTYPE*)bias;                                                       \
+        CTYPE* O       = (CTYPE*)out->data;                                                        \
+        for (int b = 0; b < batch; b++)                                                            \
+            for (int oc = 0; oc < out_ch; oc++) {                                                  \
+                int g = oc / ocg;                                                                  \
+                for (int oh = 0; oh < out_h; oh++)                                                 \
+                    for (int ow = 0; ow < out_w; ow++) {                                           \
+                        ACC acc = B ? (ACC)B[oc] : (ACC)0;                                         \
+                        for (int ci = 0; ci < icg; ci++) {                                         \
+                            int ic = g * icg + ci;                                                 \
+                            for (int r = 0; r < kh; r++)                                           \
+                                for (int s = 0; s < kw; s++) {                                     \
+                                    int ih = oh * sh - ph + r * dh;                                \
+                                    int iw = ow * sw - pw + s * dw;                                \
+                                    if (ih < 0 || ih >= in_h || iw < 0 || iw >= in_w)              \
+                                        continue;                                                  \
+                                    ACC iv = (ACC)                                                 \
+                                        I[(((size_t)b * in_ch + ic) * in_h + ih) * in_w + iw];     \
+                                    ACC wv = (ACC)W[(((size_t)oc * icg + ci) * kh + r) * kw + s];  \
+                                    acc += iv * wv;                                                \
+                                }                                                                  \
+                        }                                                                          \
+                        O[(((size_t)b * out_ch + oc) * out_h + oh) * out_w + ow] = (CTYPE)acc;     \
+                    }                                                                              \
+            }                                                                                      \
     } while (0)
 
     /* Half types compute in f32 and round back into the storage format. */
-#define CML_CONV_HALF(STYPE, LOAD, STORE)                                             \
-    do {                                                                              \
-        const STYPE* I = (const STYPE*)input_t->data;                                 \
-        const STYPE* W = (const STYPE*)weight_t->data;                                \
-        const STYPE* B = (const STYPE*)bias;                                          \
-        STYPE* O = (STYPE*)out->data;                                                 \
-        for (int b = 0; b < batch; b++)                                               \
-            for (int oc = 0; oc < out_ch; oc++) {                                     \
-                int g = oc / ocg;                                                     \
-                for (int oh = 0; oh < out_h; oh++)                                    \
-                    for (int ow = 0; ow < out_w; ow++) {                              \
-                        float acc = B ? LOAD(B[oc]) : 0.0f;                           \
-                        for (int ci = 0; ci < icg; ci++) {                            \
-                            int ic = g * icg + ci;                                    \
-                            for (int r = 0; r < kh; r++)                              \
-                                for (int s = 0; s < kw; s++) {                        \
-                                    int ih = oh * sh - ph + r * dh;                   \
-                                    int iw = ow * sw - pw + s * dw;                   \
-                                    if (ih < 0 || ih >= in_h || iw < 0 || iw >= in_w) continue; \
-                                    float iv = (float)LOAD(I[(((size_t)b * in_ch + ic) * in_h + ih) * in_w + iw]); \
-                                    float wv = (float)LOAD(W[(((size_t)oc * icg + ci) * kh + r) * kw + s]); \
-                                    acc += iv * wv;                                   \
-                                }                                                     \
-                        }                                                             \
-                        O[(((size_t)b * out_ch + oc) * out_h + oh) * out_w + ow] = STORE(acc); \
-                    }                                                                 \
-            }                                                                         \
+#define CML_CONV_HALF(STYPE, LOAD, STORE)                                                          \
+    do {                                                                                           \
+        const STYPE* I = (const STYPE*)input_t->data;                                              \
+        const STYPE* W = (const STYPE*)weight_t->data;                                             \
+        const STYPE* B = (const STYPE*)bias;                                                       \
+        STYPE* O       = (STYPE*)out->data;                                                        \
+        for (int b = 0; b < batch; b++)                                                            \
+            for (int oc = 0; oc < out_ch; oc++) {                                                  \
+                int g = oc / ocg;                                                                  \
+                for (int oh = 0; oh < out_h; oh++)                                                 \
+                    for (int ow = 0; ow < out_w; ow++) {                                           \
+                        float acc = B ? LOAD(B[oc]) : 0.0f;                                        \
+                        for (int ci = 0; ci < icg; ci++) {                                         \
+                            int ic = g * icg + ci;                                                 \
+                            for (int r = 0; r < kh; r++)                                           \
+                                for (int s = 0; s < kw; s++) {                                     \
+                                    int ih = oh * sh - ph + r * dh;                                \
+                                    int iw = ow * sw - pw + s * dw;                                \
+                                    if (ih < 0 || ih >= in_h || iw < 0 || iw >= in_w)              \
+                                        continue;                                                  \
+                                    float iv = (float)LOAD(                                        \
+                                        I[(((size_t)b * in_ch + ic) * in_h + ih) * in_w + iw]);    \
+                                    float wv = (float)LOAD(                                        \
+                                        W[(((size_t)oc * icg + ci) * kh + r) * kw + s]);           \
+                                    acc += iv * wv;                                                \
+                                }                                                                  \
+                        }                                                                          \
+                        O[(((size_t)b * out_ch + oc) * out_h + oh) * out_w + ow] = STORE(acc);     \
+                    }                                                                              \
+            }                                                                                      \
     } while (0)
 
     switch (dt) {
-    case DTYPE_FLOAT64: CML_CONV_T(double,  double);  return 0;
-    case DTYPE_FLOAT16: CML_CONV_HALF(uint16_t, fp16_to_float, float_to_fp16); return 0;
-    case DTYPE_BFLOAT16:CML_CONV_HALF(uint16_t, bf16_to_float, float_to_bf16); return 0;
-    case DTYPE_INT64:   CML_CONV_T(int64_t, int64_t); return 0;
-    case DTYPE_INT32:   CML_CONV_T(int32_t, int64_t); return 0;
-    default:            return -1;
+    case DTYPE_FLOAT64:
+        CML_CONV_T(double, double);
+        return 0;
+    case DTYPE_FLOAT16:
+        CML_CONV_HALF(uint16_t, fp16_to_float, float_to_fp16);
+        return 0;
+    case DTYPE_BFLOAT16:
+        CML_CONV_HALF(uint16_t, bf16_to_float, float_to_bf16);
+        return 0;
+    case DTYPE_INT64:
+        CML_CONV_T(int64_t, int64_t);
+        return 0;
+    case DTYPE_INT32:
+        CML_CONV_T(int32_t, int64_t);
+        return 0;
+    default:
+        return -1;
     }
 #undef CML_CONV_T
 #undef CML_CONV_HALF
@@ -1153,57 +1355,149 @@ static int cpu_conv2d_generic(struct IRNode* node, DType dt) {
  *   ref >= 0, numel==1      -> scalar splat into `splat`
  *   ref >= 0, else          -> defensive modulo-broadcast into `splat` */
 static inline const float* fused_operand_block(int ref, const float* const* ind,
-                                               const size_t* innum, const float* tmp,
-                                               size_t i0, int bs, float* splat) {
-    if (ref == FUSED_UNUSED_REF) return NULL;
-    if (ref < 0) return tmp + (size_t)(-ref - 1) * FE_BLK;
+                                               const size_t* innum, const float* tmp, size_t i0,
+                                               int bs, float* splat) {
+    if (ref == FUSED_UNUSED_REF)
+        return NULL;
+    if (ref < 0)
+        return tmp + (size_t)(-ref - 1) * FE_BLK;
     const float* d = ind[ref];
-    size_t n = innum[ref];
-    if (!d || n == 0) { for (int j = 0; j < bs; j++) splat[j] = 0.0f; return splat; }
-    if (n == 1)       { float v = d[0]; for (int j = 0; j < bs; j++) splat[j] = v; return splat; }
+    size_t n       = innum[ref];
+    if (!d || n == 0) {
+        for (int j = 0; j < bs; j++)
+            splat[j] = 0.0f;
+        return splat;
+    }
+    if (n == 1) {
+        float v = d[0];
+        for (int j = 0; j < bs; j++)
+            splat[j] = v;
+        return splat;
+    }
     /* The fusion pass guarantees external inputs are full-size or scalar, so
      * full-size is the fast contiguous path. Defensive modulo-broadcast covers
      * any other size without reading out of bounds. */
-    if (i0 + (size_t)bs <= n) return d + i0;
-    for (int j = 0; j < bs; j++) splat[j] = d[(i0 + (size_t)j) % n];
+    if (i0 + (size_t)bs <= n)
+        return d + i0;
+    for (int j = 0; j < bs; j++)
+        splat[j] = d[(i0 + (size_t)j) % n];
     return splat;
 }
 
 /* Evaluate one primitive elementwise op over a block. Operand block pointers
  * pa/pb/pc are broadcast-resolved (or NULL if unused). Tight per-op loops. */
-static void fused_eval_block(UOpType t, const float* pa, const float* pb,
-                             const float* pc, float k, float* dst, int bs) {
+static void fused_eval_block(UOpType t, const float* pa, const float* pb, const float* pc, float k,
+                             float* dst, int bs) {
     switch (t) {
-    case UOP_ADD:     for (int j=0;j<bs;j++) dst[j] = pa[j] + pb[j]; break;
-    case UOP_SUB:     for (int j=0;j<bs;j++) dst[j] = pa[j] - pb[j]; break;
-    case UOP_MUL:     for (int j=0;j<bs;j++) dst[j] = pa[j] * pb[j]; break;
-    case UOP_DIV:     for (int j=0;j<bs;j++) dst[j] = pa[j] / pb[j]; break;
-    case UOP_MAX:     for (int j=0;j<bs;j++) { float a=pa[j],b=pb[j];
-                      dst[j]=((a!=a)||(b!=b))?(a+b):(a>b?a:b); } break;
-    case UOP_MINIMUM: for (int j=0;j<bs;j++) { float a=pa[j],b=pb[j];
-                      dst[j]=((a!=a)||(b!=b))?(a+b):(a<b?a:b); } break;
-    case UOP_POW:     for (int j=0;j<bs;j++) dst[j] = powf(pa[j], pb[j]); break;
-    case UOP_NEG:     for (int j=0;j<bs;j++) dst[j] = -pa[j]; break;
-    case UOP_RECIP:   for (int j=0;j<bs;j++) dst[j] = 1.0f / pa[j]; break;
-    case UOP_EXP:     for (int j=0;j<bs;j++) dst[j] = expf(pa[j]); break;
-    case UOP_LOG:     for (int j=0;j<bs;j++) dst[j] = logf(pa[j]); break;
-    case UOP_SQRT:    for (int j=0;j<bs;j++) dst[j] = sqrtf(pa[j]); break;
-    case UOP_SIN:     for (int j=0;j<bs;j++) dst[j] = sinf(pa[j]); break;
-    case UOP_COS:     for (int j=0;j<bs;j++) dst[j] = cosf(pa[j]); break;
-    case UOP_ABS:     for (int j=0;j<bs;j++) dst[j] = fabsf(pa[j]); break;
-    /* `a < 0 ? 0 : a` rather than `a > 0 ? a : 0`: identical for every finite
- * value, but NaN fails the comparison and is returned instead of becoming
- * 0. Free NaN propagation. */
-case UOP_RELU:    for (int j=0;j<bs;j++) { float a=pa[j]; dst[j]=a<0.0f?0.0f:a; } break;
-    case UOP_CMPLT:   for (int j=0;j<bs;j++) dst[j] = pa[j] <  pb[j] ? 1.0f : 0.0f; break;
-    case UOP_CMPLE:   for (int j=0;j<bs;j++) dst[j] = pa[j] <= pb[j] ? 1.0f : 0.0f; break;
-    case UOP_CMPGT:   for (int j=0;j<bs;j++) dst[j] = pa[j] >  pb[j] ? 1.0f : 0.0f; break;
-    case UOP_CMPGE:   for (int j=0;j<bs;j++) dst[j] = pa[j] >= pb[j] ? 1.0f : 0.0f; break;
-    case UOP_CMPEQ:   for (int j=0;j<bs;j++) dst[j] = pa[j] == pb[j] ? 1.0f : 0.0f; break;
-    case UOP_CMPNE:   for (int j=0;j<bs;j++) dst[j] = pa[j] != pb[j] ? 1.0f : 0.0f; break;
-    case UOP_WHERE:   for (int j=0;j<bs;j++) dst[j] = pa[j] != 0.0f ? pb[j] : pc[j]; break;
-    case UOP_FILL:    for (int j=0;j<bs;j++) dst[j] = k; break;
-    default:          for (int j=0;j<bs;j++) dst[j] = 0.0f; break;
+    case UOP_ADD:
+        for (int j = 0; j < bs; j++)
+            dst[j] = pa[j] + pb[j];
+        break;
+    case UOP_SUB:
+        for (int j = 0; j < bs; j++)
+            dst[j] = pa[j] - pb[j];
+        break;
+    case UOP_MUL:
+        for (int j = 0; j < bs; j++)
+            dst[j] = pa[j] * pb[j];
+        break;
+    case UOP_DIV:
+        for (int j = 0; j < bs; j++)
+            dst[j] = pa[j] / pb[j];
+        break;
+    case UOP_MAX:
+        for (int j = 0; j < bs; j++) {
+            float a = pa[j], b = pb[j];
+            dst[j] = ((a != a) || (b != b)) ? (a + b) : (a > b ? a : b);
+        }
+        break;
+    case UOP_MINIMUM:
+        for (int j = 0; j < bs; j++) {
+            float a = pa[j], b = pb[j];
+            dst[j] = ((a != a) || (b != b)) ? (a + b) : (a < b ? a : b);
+        }
+        break;
+    case UOP_POW:
+        for (int j = 0; j < bs; j++)
+            dst[j] = powf(pa[j], pb[j]);
+        break;
+    case UOP_NEG:
+        for (int j = 0; j < bs; j++)
+            dst[j] = -pa[j];
+        break;
+    case UOP_RECIP:
+        for (int j = 0; j < bs; j++)
+            dst[j] = 1.0f / pa[j];
+        break;
+    case UOP_EXP:
+        for (int j = 0; j < bs; j++)
+            dst[j] = expf(pa[j]);
+        break;
+    case UOP_LOG:
+        for (int j = 0; j < bs; j++)
+            dst[j] = logf(pa[j]);
+        break;
+    case UOP_SQRT:
+        for (int j = 0; j < bs; j++)
+            dst[j] = sqrtf(pa[j]);
+        break;
+    case UOP_SIN:
+        for (int j = 0; j < bs; j++)
+            dst[j] = sinf(pa[j]);
+        break;
+    case UOP_COS:
+        for (int j = 0; j < bs; j++)
+            dst[j] = cosf(pa[j]);
+        break;
+    case UOP_ABS:
+        for (int j = 0; j < bs; j++)
+            dst[j] = fabsf(pa[j]);
+        break;
+        /* `a < 0 ? 0 : a` rather than `a > 0 ? a : 0`: identical for every finite
+         * value, but NaN fails the comparison and is returned instead of becoming
+         * 0. Free NaN propagation. */
+    case UOP_RELU:
+        for (int j = 0; j < bs; j++) {
+            float a = pa[j];
+            dst[j]  = a < 0.0f ? 0.0f : a;
+        }
+        break;
+    case UOP_CMPLT:
+        for (int j = 0; j < bs; j++)
+            dst[j] = pa[j] < pb[j] ? 1.0f : 0.0f;
+        break;
+    case UOP_CMPLE:
+        for (int j = 0; j < bs; j++)
+            dst[j] = pa[j] <= pb[j] ? 1.0f : 0.0f;
+        break;
+    case UOP_CMPGT:
+        for (int j = 0; j < bs; j++)
+            dst[j] = pa[j] > pb[j] ? 1.0f : 0.0f;
+        break;
+    case UOP_CMPGE:
+        for (int j = 0; j < bs; j++)
+            dst[j] = pa[j] >= pb[j] ? 1.0f : 0.0f;
+        break;
+    case UOP_CMPEQ:
+        for (int j = 0; j < bs; j++)
+            dst[j] = pa[j] == pb[j] ? 1.0f : 0.0f;
+        break;
+    case UOP_CMPNE:
+        for (int j = 0; j < bs; j++)
+            dst[j] = pa[j] != pb[j] ? 1.0f : 0.0f;
+        break;
+    case UOP_WHERE:
+        for (int j = 0; j < bs; j++)
+            dst[j] = pa[j] != 0.0f ? pb[j] : pc[j];
+        break;
+    case UOP_FILL:
+        for (int j = 0; j < bs; j++)
+            dst[j] = k;
+        break;
+    default:
+        for (int j = 0; j < bs; j++)
+            dst[j] = 0.0f;
+        break;
     }
 }
 
@@ -1211,20 +1505,56 @@ case UOP_RELU:    for (int j=0;j<bs;j++) { float a=pa[j]; dst[j]=a<0.0f?0.0f:a; 
  * after the gemm). Mirrors fused_eval_block. */
 static inline float fe_scalar_eval(UOpType t, float a, float b, float c, float k) {
     switch (t) {
-    case UOP_ADD: return a + b;         case UOP_SUB: return a - b;
-    case UOP_MUL: return a * b;         case UOP_DIV: return a / b;
-    case UOP_MAX: return ((a!=a)||(b!=b)) ? (a+b) : (a > b ? a : b);
-    case UOP_MINIMUM: return ((a!=a)||(b!=b)) ? (a+b) : (a < b ? a : b);
-    case UOP_POW: return powf(a, b);    case UOP_NEG: return -a;
-    case UOP_RECIP: return 1.0f / a;    case UOP_EXP: return expf(a);
-    case UOP_LOG: return logf(a);       case UOP_SQRT: return sqrtf(a);
-    case UOP_SIN: return sinf(a);       case UOP_COS: return cosf(a);
-    case UOP_ABS: return fabsf(a);              case UOP_RELU: return a < 0.0f ? 0.0f : a;
-    case UOP_CMPLT: return a <  b ? 1.0f : 0.0f; case UOP_CMPLE: return a <= b ? 1.0f : 0.0f;
-    case UOP_CMPGT: return a >  b ? 1.0f : 0.0f; case UOP_CMPGE: return a >= b ? 1.0f : 0.0f;
-    case UOP_CMPEQ: return a == b ? 1.0f : 0.0f; case UOP_CMPNE: return a != b ? 1.0f : 0.0f;
-    case UOP_WHERE: return a != 0.0f ? b : c;    case UOP_FILL: return k;
-    default: return 0.0f;
+    case UOP_ADD:
+        return a + b;
+    case UOP_SUB:
+        return a - b;
+    case UOP_MUL:
+        return a * b;
+    case UOP_DIV:
+        return a / b;
+    case UOP_MAX:
+        return ((a != a) || (b != b)) ? (a + b) : (a > b ? a : b);
+    case UOP_MINIMUM:
+        return ((a != a) || (b != b)) ? (a + b) : (a < b ? a : b);
+    case UOP_POW:
+        return powf(a, b);
+    case UOP_NEG:
+        return -a;
+    case UOP_RECIP:
+        return 1.0f / a;
+    case UOP_EXP:
+        return expf(a);
+    case UOP_LOG:
+        return logf(a);
+    case UOP_SQRT:
+        return sqrtf(a);
+    case UOP_SIN:
+        return sinf(a);
+    case UOP_COS:
+        return cosf(a);
+    case UOP_ABS:
+        return fabsf(a);
+    case UOP_RELU:
+        return a < 0.0f ? 0.0f : a;
+    case UOP_CMPLT:
+        return a < b ? 1.0f : 0.0f;
+    case UOP_CMPLE:
+        return a <= b ? 1.0f : 0.0f;
+    case UOP_CMPGT:
+        return a > b ? 1.0f : 0.0f;
+    case UOP_CMPGE:
+        return a >= b ? 1.0f : 0.0f;
+    case UOP_CMPEQ:
+        return a == b ? 1.0f : 0.0f;
+    case UOP_CMPNE:
+        return a != b ? 1.0f : 0.0f;
+    case UOP_WHERE:
+        return a != 0.0f ? b : c;
+    case UOP_FILL:
+        return k;
+    default:
+        return 0.0f;
     }
 }
 
@@ -1233,27 +1563,35 @@ static inline float fe_scalar_eval(UOpType t, float a, float b, float c, float k
  * >=0 -> epilogue input node->inputs[2+ref] (broadcast); <0 -> prior step. */
 void cml_apply_matmul_epilogue(struct IRNode* node, float* out_data, size_t total) {
     FusedElementwiseParams* fp = (FusedElementwiseParams*)node->params;
-    if (!fp || fp->num_steps <= 0 || fp->num_steps > 256 || !out_data) return;
+    if (!fp || fp->num_steps <= 0 || fp->num_steps > 256 || !out_data)
+        return;
     int ne = node->num_inputs - 2;
-    const float* ein[33]; size_t enm[33];
+    const float* ein[33];
+    size_t enm[33];
     for (int k = 0; k < ne && k < 33; k++) {
         Tensor* it = node->inputs[2 + k];
-        ein[k] = it ? (const float*)it->data : NULL;
-        enm[k] = it ? it->numel : 0;
+        ein[k]     = it ? (const float*)it->data : NULL;
+        enm[k]     = it ? it->numel : 0;
     }
     int ns = fp->num_steps;
     for (size_t i = 0; i < total; i++) {
         float reg[256];
         for (int s = 0; s < ns; s++) {
-            int refs[3] = { fp->a[s], fp->b[s], fp->c[s] };
+            int refs[3] = {fp->a[s], fp->b[s], fp->c[s]};
             float v[3];
             for (int t = 0; t < 3; t++) {
                 int r = refs[t];
-                if (r == FUSED_UNUSED_REF)    v[t] = 0.0f;
-                else if (r == MATMUL_ACC_REF) v[t] = out_data[i];
-                else if (r < 0)               v[t] = reg[-r - 1];
-                else { const float* d = (r < ne) ? ein[r] : NULL; size_t nn = (r < ne) ? enm[r] : 0;
-                       v[t] = (d && nn) ? d[i % nn] : 0.0f; }
+                if (r == FUSED_UNUSED_REF)
+                    v[t] = 0.0f;
+                else if (r == MATMUL_ACC_REF)
+                    v[t] = out_data[i];
+                else if (r < 0)
+                    v[t] = reg[-r - 1];
+                else {
+                    const float* d = (r < ne) ? ein[r] : NULL;
+                    size_t nn      = (r < ne) ? enm[r] : 0;
+                    v[t]           = (d && nn) ? d[i % nn] : 0.0f;
+                }
             }
             reg[s] = fe_scalar_eval(fp->op[s], v[0], v[1], v[2], fp->konst[s]);
         }
@@ -1265,7 +1603,10 @@ void cml_apply_matmul_epilogue(struct IRNode* node, float* out_data, size_t tota
  * (batch, out_channel) tiles, whose output regions are disjoint (race-free). See
  * the UOP_CONV2D case for the algorithm rationale (shallow-input fast path). */
 typedef struct {
-    const float* in; const float* w; const float* bias; float* out;
+    const float* in;
+    const float* w;
+    const float* bias;
+    float* out;
     int batch, in_channels, out_channels, in_h, in_w, out_h, out_w;
     int kernel_h, kernel_w, stride_h, stride_w, pad_h, pad_w, dilation_h, dilation_w;
 } DirectConvData;
@@ -1282,21 +1623,31 @@ typedef struct {
  * the product of every element, and var/std returned uninitialised memory.
  * dim < 0 (or out of range) means reduce everything. */
 typedef enum {
-    RAX_PROD, RAX_ANY, RAX_ALL, RAX_LOGSUMEXP, RAX_VAR, RAX_STD, RAX_MIN,
-    RAX_ARGMAX, RAX_ARGMIN
+    RAX_PROD,
+    RAX_ANY,
+    RAX_ALL,
+    RAX_LOGSUMEXP,
+    RAX_VAR,
+    RAX_STD,
+    RAX_MIN,
+    RAX_ARGMAX,
+    RAX_ARGMIN
 } ReduceAxisKind;
 
-static void reduce_axis_f32(const float* in, const Tensor* inp, int dim,
-                            float* out, ReduceAxisKind kind) {
+static void reduce_axis_f32(const float* in, const Tensor* inp, int dim, float* out,
+                            ReduceAxisKind kind) {
     size_t outer = 1, inner = 1, count;
     if (dim < 0 || dim >= inp->ndim) {
         count = inp->numel;
     } else {
-        for (int i = 0; i < dim; i++)             outer *= (size_t)inp->shape[i];
-        for (int i = dim + 1; i < inp->ndim; i++) inner *= (size_t)inp->shape[i];
+        for (int i = 0; i < dim; i++)
+            outer *= (size_t)inp->shape[i];
+        for (int i = dim + 1; i < inp->ndim; i++)
+            inner *= (size_t)inp->shape[i];
         count = (size_t)inp->shape[dim];
     }
-    if (count == 0) return;
+    if (count == 0)
+        return;
 
     for (size_t o = 0; o < outer; o++) {
         for (size_t m = 0; m < inner; m++) {
@@ -1305,27 +1656,38 @@ static void reduce_axis_f32(const float* in, const Tensor* inp, int dim,
             switch (kind) {
             case RAX_PROD:
                 acc = 1.0;
-                for (size_t j = 0; j < count; j++) acc *= in[base + j * inner];
+                for (size_t j = 0; j < count; j++)
+                    acc *= in[base + j * inner];
                 break;
             case RAX_ANY:
                 acc = 0.0;
                 for (size_t j = 0; j < count; j++)
-                    if (in[base + j * inner] != 0.0f) { acc = 1.0; break; }
+                    if (in[base + j * inner] != 0.0f) {
+                        acc = 1.0;
+                        break;
+                    }
                 break;
             case RAX_ALL:
                 acc = 1.0;
                 for (size_t j = 0; j < count; j++)
-                    if (in[base + j * inner] == 0.0f) { acc = 0.0; break; }
+                    if (in[base + j * inner] == 0.0f) {
+                        acc = 0.0;
+                        break;
+                    }
                 break;
-            case RAX_ARGMAX: case RAX_ARGMIN: {
+            case RAX_ARGMAX:
+            case RAX_ARGMIN: {
                 /* Index WITHIN the lane. reduce_argextreme handled only ndim==2
                  * and otherwise returned a flat index into the whole tensor. */
                 double best = in[base];
-                size_t bi = 0;
+                size_t bi   = 0;
                 for (size_t j = 1; j < count; j++) {
-                    double v = in[base + j * inner];
+                    double v   = in[base + j * inner];
                     int better = (kind == RAX_ARGMAX) ? (v > best) : (v < best);
-                    if (better) { best = v; bi = j; }
+                    if (better) {
+                        best = v;
+                        bi   = j;
+                    }
                 }
                 acc = (double)bi;
                 break;
@@ -1335,7 +1697,8 @@ static void reduce_axis_f32(const float* in, const Tensor* inp, int dim,
                 double mn = in[base];
                 for (size_t j = 1; j < count; j++) {
                     double v = in[base + j * inner];
-                    if (v != v || v < mn) mn = v;
+                    if (v != v || v < mn)
+                        mn = v;
                 }
                 acc = mn;
                 break;
@@ -1343,15 +1706,18 @@ static void reduce_axis_f32(const float* in, const Tensor* inp, int dim,
             case RAX_LOGSUMEXP: {
                 double mx = in[base];
                 for (size_t j = 1; j < count; j++)
-                    if (in[base + j * inner] > mx) mx = in[base + j * inner];
+                    if (in[base + j * inner] > mx)
+                        mx = in[base + j * inner];
                 double sum = 0.0;
-                for (size_t j = 0; j < count; j++) sum += exp(in[base + j * inner] - mx);
+                for (size_t j = 0; j < count; j++)
+                    sum += exp(in[base + j * inner] - mx);
                 acc = isinf(mx) ? mx : mx + log(sum);
                 break;
             }
-            default: {                        /* VAR / STD, biased (population) */
+            default: { /* VAR / STD, biased (population) */
                 double mean = 0.0;
-                for (size_t j = 0; j < count; j++) mean += in[base + j * inner];
+                for (size_t j = 0; j < count; j++)
+                    mean += in[base + j * inner];
                 mean /= (double)count;
                 double v = 0.0;
                 for (size_t j = 0; j < count; j++) {
@@ -1368,7 +1734,6 @@ static void reduce_axis_f32(const float* in, const Tensor* inp, int dim,
     }
 }
 
-
 /* General per-axis cumulative scan over (outer, count, inner).
  *
  * CUMSUM/CUMPROD/CUMMAX/CUMMIN/LOGCUMSUMEXP each implemented only ndim 1 and 2
@@ -1376,33 +1741,47 @@ static void reduce_axis_f32(const float* in, const Tensor* inp, int dim,
  * rank-3 tensor was a no-op along every axis. */
 typedef enum { CAX_SUM, CAX_PROD, CAX_MAX, CAX_MIN, CAX_LOGSUMEXP } CumAxisKind;
 
-static void cum_axis_f32(const float* in, const Tensor* inp, int dim,
-                         float* out, CumAxisKind kind) {
-    if (dim < 0) dim += inp->ndim;
-    if (dim < 0 || dim >= inp->ndim) dim = inp->ndim - 1;
+static void cum_axis_f32(const float* in, const Tensor* inp, int dim, float* out,
+                         CumAxisKind kind) {
+    if (dim < 0)
+        dim += inp->ndim;
+    if (dim < 0 || dim >= inp->ndim)
+        dim = inp->ndim - 1;
     size_t outer = 1, inner = 1, count = (size_t)inp->shape[dim];
-    for (int i = 0; i < dim; i++)             outer *= (size_t)inp->shape[i];
-    for (int i = dim + 1; i < inp->ndim; i++) inner *= (size_t)inp->shape[i];
+    for (int i = 0; i < dim; i++)
+        outer *= (size_t)inp->shape[i];
+    for (int i = dim + 1; i < inp->ndim; i++)
+        inner *= (size_t)inp->shape[i];
 
     for (size_t o = 0; o < outer; o++) {
         for (size_t m = 0; m < inner; m++) {
             size_t base = o * count * inner + m;
-            double run = (kind == CAX_PROD) ? 1.0
-                       : (kind == CAX_MAX) ? -INFINITY
-                       : (kind == CAX_MIN) ?  INFINITY
-                       : (kind == CAX_LOGSUMEXP) ? -INFINITY : 0.0;
+            double run  = (kind == CAX_PROD)        ? 1.0
+                          : (kind == CAX_MAX)       ? -INFINITY
+                          : (kind == CAX_MIN)       ? INFINITY
+                          : (kind == CAX_LOGSUMEXP) ? -INFINITY
+                                                    : 0.0;
             for (size_t j = 0; j < count; j++) {
                 size_t idx = base + j * inner;
-                double v = in[idx];
+                double v   = in[idx];
                 switch (kind) {
-                case CAX_SUM:  run += v; break;
-                case CAX_PROD: run *= v; break;
-                case CAX_MAX:  if (v != v || v > run) run = v; break;
-                case CAX_MIN:  if (v != v || v < run) run = v; break;
+                case CAX_SUM:
+                    run += v;
+                    break;
+                case CAX_PROD:
+                    run *= v;
+                    break;
+                case CAX_MAX:
+                    if (v != v || v > run)
+                        run = v;
+                    break;
+                case CAX_MIN:
+                    if (v != v || v < run)
+                        run = v;
+                    break;
                 default: {
                     double mx = (run > v) ? run : v;
-                    run = (isinf(mx) && mx < 0) ? mx
-                                                : mx + log(exp(run - mx) + exp(v - mx));
+                    run       = (isinf(mx) && mx < 0) ? mx : mx + log(exp(run - mx) + exp(v - mx));
                     break;
                 }
                 }
@@ -1412,97 +1791,109 @@ static void cum_axis_f32(const float* in, const Tensor* inp, int dim,
     }
 }
 
-
 /* General per-axis sort over (outer, count, inner), producing either the sorted
  * values or the permutation. SORT/ARGSORT implemented only ndim 1 and 2 and
  * memcpy'd the input first, so for rank 3+ they returned an unsorted copy.
  * Ties keep the earlier index, matching a stable sort. */
-static int sort_axis_f32(const float* in, const Tensor* inp, int dim, bool descending,
-                         float* out, bool want_indices) {
-    if (dim < 0) dim += inp->ndim;
-    if (dim < 0 || dim >= inp->ndim) return -1;
+static int sort_axis_f32(const float* in, const Tensor* inp, int dim, bool descending, float* out,
+                         bool want_indices) {
+    if (dim < 0)
+        dim += inp->ndim;
+    if (dim < 0 || dim >= inp->ndim)
+        return -1;
     size_t outer = 1, inner = 1, count = (size_t)inp->shape[dim];
-    for (int i = 0; i < dim; i++)             outer *= (size_t)inp->shape[i];
-    for (int i = dim + 1; i < inp->ndim; i++) inner *= (size_t)inp->shape[i];
-    if (count == 0) return 0;
+    for (int i = 0; i < dim; i++)
+        outer *= (size_t)inp->shape[i];
+    for (int i = dim + 1; i < inp->ndim; i++)
+        inner *= (size_t)inp->shape[i];
+    if (count == 0)
+        return 0;
 
     size_t* idx = (size_t*)cml_malloc(count * sizeof(size_t));
-    if (!idx) return -1;
+    if (!idx)
+        return -1;
 
     for (size_t o = 0; o < outer; o++) {
         for (size_t m = 0; m < inner; m++) {
             size_t base = o * count * inner + m;
-            for (size_t j = 0; j < count; j++) idx[j] = j;
+            for (size_t j = 0; j < count; j++)
+                idx[j] = j;
             /* insertion sort on the index array: stable, and count is small */
             for (size_t x = 1; x < count; x++) {
                 size_t cur = idx[x];
-                float cv = in[base + cur * inner];
-                size_t y = x;
+                float cv   = in[base + cur * inner];
+                size_t y   = x;
                 while (y > 0) {
-                    float pv = in[base + idx[y - 1] * inner];
+                    float pv   = in[base + idx[y - 1] * inner];
                     int before = descending ? (cv > pv) : (cv < pv);
-                    if (!before) break;
+                    if (!before)
+                        break;
                     idx[y] = idx[y - 1];
                     y--;
                 }
                 idx[y] = cur;
             }
             for (size_t j = 0; j < count; j++)
-                out[base + j * inner] = want_indices ? (float)idx[j]
-                                                     : in[base + idx[j] * inner];
+                out[base + j * inner] = want_indices ? (float)idx[j] : in[base + idx[j] * inner];
         }
     }
     cml_free(idx);
     return 0;
 }
 
-
 /* General movement kernels over (outer, count, inner).
  *
  * ROLL, REPEAT_INTERLEAVE and CAT implemented only ndim 1 and 2 and wrote
  * nothing at all for rank 3+ -- roll and cat returned an all-zero tensor and
  * repeat_interleave a partially written one. */
-static void movement_lanes(const Tensor* t, int dim, size_t* outer, size_t* count,
-                           size_t* inner) {
+static void movement_lanes(const Tensor* t, int dim, size_t* outer, size_t* count, size_t* inner) {
     size_t o = 1, n = 1;
-    for (int i = 0; i < dim; i++)          o *= (size_t)t->shape[i];
-    for (int i = dim + 1; i < t->ndim; i++) n *= (size_t)t->shape[i];
+    for (int i = 0; i < dim; i++)
+        o *= (size_t)t->shape[i];
+    for (int i = dim + 1; i < t->ndim; i++)
+        n *= (size_t)t->shape[i];
     *outer = o;
     *count = (size_t)t->shape[dim];
     *inner = n;
 }
 
 static void roll_axis_f32(const float* in, const Tensor* inp, int shift, int dim, float* out) {
-    if (dim < 0) dim += inp->ndim;
-    if (dim < 0 || dim >= inp->ndim) return;
+    if (dim < 0)
+        dim += inp->ndim;
+    if (dim < 0 || dim >= inp->ndim)
+        return;
     size_t outer, count, inner;
     movement_lanes(inp, dim, &outer, &count, &inner);
-    if (count == 0) return;
+    if (count == 0)
+        return;
     size_t s = (size_t)(((shift % (int)count) + (int)count) % (int)count);
     for (size_t o = 0; o < outer; o++)
         for (size_t j = 0; j < count; j++)
             for (size_t m = 0; m < inner; m++)
-                out[(o * count + (j + s) % count) * inner + m] =
-                    in[(o * count + j) * inner + m];
+                out[(o * count + (j + s) % count) * inner + m] = in[(o * count + j) * inner + m];
 }
 
 static void flip_axis_f32(const float* in, const Tensor* inp, int dim, float* out) {
-    if (dim < 0) dim += inp->ndim;
-    if (dim < 0 || dim >= inp->ndim) return;
+    if (dim < 0)
+        dim += inp->ndim;
+    if (dim < 0 || dim >= inp->ndim)
+        return;
     size_t outer, count, inner;
     movement_lanes(inp, dim, &outer, &count, &inner);
-    if (count == 0) return;
+    if (count == 0)
+        return;
     for (size_t o = 0; o < outer; o++)
         for (size_t j = 0; j < count; j++)
             for (size_t m = 0; m < inner; m++)
-                out[(o * count + (count - 1 - j)) * inner + m] =
-                    in[(o * count + j) * inner + m];
+                out[(o * count + (count - 1 - j)) * inner + m] = in[(o * count + j) * inner + m];
 }
 
-static void repeat_interleave_axis_f32(const float* in, const Tensor* inp, int reps,
-                                       int dim, float* out) {
-    if (dim < 0) dim += inp->ndim;
-    if (dim < 0 || dim >= inp->ndim || reps <= 0) return;
+static void repeat_interleave_axis_f32(const float* in, const Tensor* inp, int reps, int dim,
+                                       float* out) {
+    if (dim < 0)
+        dim += inp->ndim;
+    if (dim < 0 || dim >= inp->ndim || reps <= 0)
+        return;
     size_t outer, count, inner;
     movement_lanes(inp, dim, &outer, &count, &inner);
     for (size_t o = 0; o < outer; o++)
@@ -1513,7 +1904,6 @@ static void repeat_interleave_axis_f32(const float* in, const Tensor* inp, int r
                         in[(o * count + j) * inner + m];
 }
 
-
 /* General N-dimensional pad. The previous kernel implemented 1-D and 2-D and
  * fell back to `out[i] = in[i]` for rank 3+ -- a flat copy that ignored the pad
  * widths entirely and left the tail as whatever the buffer held.
@@ -1521,12 +1911,19 @@ static void repeat_interleave_axis_f32(const float* in, const Tensor* inp, int r
 static void pad_nd_f32(const float* in, const Tensor* inp, const Tensor* out_t,
                        const int* pad_widths, PadMode mode, float value, float* out) {
     int nd = inp->ndim;
-    if (nd <= 0 || nd > 8) return;
+    if (nd <= 0 || nd > 8)
+        return;
     size_t in_str[8], out_str[8];
     size_t acc = 1;
-    for (int d = nd - 1; d >= 0; d--) { in_str[d] = acc; acc *= (size_t)inp->shape[d]; }
+    for (int d = nd - 1; d >= 0; d--) {
+        in_str[d] = acc;
+        acc *= (size_t)inp->shape[d];
+    }
     acc = 1;
-    for (int d = out_t->ndim - 1; d >= 0; d--) { out_str[d] = acc; acc *= (size_t)out_t->shape[d]; }
+    for (int d = out_t->ndim - 1; d >= 0; d--) {
+        out_str[d] = acc;
+        acc *= (size_t)out_t->shape[d];
+    }
 
     for (size_t i = 0; i < out_t->numel; i++) {
         size_t rem = i, src = 0;
@@ -1539,8 +1936,10 @@ static void pad_nd_f32(const float* in, const Tensor* inp, const Tensor* out_t,
             if (sc < 0 || sc >= n) {
                 if (mode == PAD_REFLECT) {
                     sc = (sc < 0) ? -sc : 2 * n - 2 - sc;
-                    if (sc < 0) sc = 0;
-                    if (sc >= n) sc = n - 1;
+                    if (sc < 0)
+                        sc = 0;
+                    if (sc >= n)
+                        sc = n - 1;
                 } else if (mode == PAD_REPLICATE) {
                     sc = (sc < 0) ? 0 : n - 1;
                 } else {
@@ -1563,18 +1962,25 @@ static void pad_nd_f32(const float* in, const Tensor* inp, const Tensor* out_t,
 static void diagonal_nd_f32(const float* in, const Tensor* inp, const Tensor* out_t, int offset,
                             int dim1, int dim2, float* out) {
     int nd = inp->ndim;
-    if (nd < 2 || nd > 8 || dim1 == dim2) return;
-    if (dim1 < 0 || dim1 >= nd || dim2 < 0 || dim2 >= nd) return;
+    if (nd < 2 || nd > 8 || dim1 == dim2)
+        return;
+    if (dim1 < 0 || dim1 >= nd || dim2 < 0 || dim2 >= nd)
+        return;
 
     size_t in_str[8];
     size_t acc = 1;
-    for (int d = nd - 1; d >= 0; d--) { in_str[d] = acc; acc *= (size_t)inp->shape[d]; }
+    for (int d = nd - 1; d >= 0; d--) {
+        in_str[d] = acc;
+        acc *= (size_t)inp->shape[d];
+    }
 
     /* out slot j reads input dim map[j]; diag_slot is where dim1 landed. */
     int map[8], diag_slot = 0, oi = 0;
     for (int d = 0; d < nd; d++) {
-        if (d == dim2) continue;
-        if (d == dim1) diag_slot = oi;
+        if (d == dim2)
+            continue;
+        if (d == dim1)
+            diag_slot = oi;
         map[oi++] = d;
     }
     int ond = oi;
@@ -1584,12 +1990,17 @@ static void diagonal_nd_f32(const float* in, const Tensor* inp, const Tensor* ou
         for (int j = ond - 1; j >= 0; j--) {
             size_t c = rem % (size_t)out_t->shape[j];
             rem /= (size_t)out_t->shape[j];
-            if (j == diag_slot) k = c;
-            else src += c * in_str[map[j]];
+            if (j == diag_slot)
+                k = c;
+            else
+                src += c * in_str[map[j]];
         }
         size_t r = (offset >= 0) ? k : k + (size_t)(-offset);
         size_t c = (offset >= 0) ? k + (size_t)offset : k;
-        if (r >= (size_t)inp->shape[dim1] || c >= (size_t)inp->shape[dim2]) { out[i] = 0.0f; continue; }
+        if (r >= (size_t)inp->shape[dim1] || c >= (size_t)inp->shape[dim2]) {
+            out[i] = 0.0f;
+            continue;
+        }
         out[i] = in[src + r * in_str[dim1] + c * in_str[dim2]];
     }
 }
@@ -1600,12 +2011,16 @@ static void diagonal_nd_f32(const float* in, const Tensor* inp, const Tensor* ou
 static void scatter_nd_f32(const float* base, const float* idx, const float* src,
                            const Tensor* idx_t, const Tensor* out_t, int dim, float* out) {
     int nd = out_t->ndim;
-    if (nd <= 0 || nd > 8 || dim < 0 || dim >= nd) return;
+    if (nd <= 0 || nd > 8 || dim < 0 || dim >= nd)
+        return;
     memcpy(out, base, out_t->numel * sizeof(float));
 
     size_t out_str[8];
     size_t acc = 1;
-    for (int d = nd - 1; d >= 0; d--) { out_str[d] = acc; acc *= (size_t)out_t->shape[d]; }
+    for (int d = nd - 1; d >= 0; d--) {
+        out_str[d] = acc;
+        acc *= (size_t)out_t->shape[d];
+    }
 
     for (size_t j = 0; j < idx_t->numel; j++) {
         /* index coords -> output offset, substituting index[j] on `dim` */
@@ -1614,12 +2029,20 @@ static void scatter_nd_f32(const float* base, const float* idx, const float* src
         for (int d = idx_t->ndim - 1; d >= 0; d--) {
             size_t c = rem % (size_t)idx_t->shape[d];
             rem /= (size_t)idx_t->shape[d];
-            if (d >= nd) { ok = 0; break; }
-            if (d == dim) c = (size_t)(int)idx[j];
-            if (c >= (size_t)out_t->shape[d]) { ok = 0; break; }
+            if (d >= nd) {
+                ok = 0;
+                break;
+            }
+            if (d == dim)
+                c = (size_t)(int)idx[j];
+            if (c >= (size_t)out_t->shape[d]) {
+                ok = 0;
+                break;
+            }
             off += c * out_str[d];
         }
-        if (ok && off < out_t->numel) out[off] = src[j];
+        if (ok && off < out_t->numel)
+            out[off] = src[j];
     }
 }
 
@@ -1627,11 +2050,14 @@ static void scatter_nd_f32(const float* base, const float* idx, const float* src
  * filled with -1. Returns the number of elements written. */
 static size_t nonzero_nd_f32(const float* in, const Tensor* inp, size_t out_numel, float* out) {
     int nd = inp->ndim;
-    if (nd <= 0 || nd > 8) return 0;
+    if (nd <= 0 || nd > 8)
+        return 0;
     size_t w = 0;
     for (size_t i = 0; i < inp->numel; i++) {
-        if (in[i] == 0.0f) continue;
-        if (w + (size_t)nd > out_numel) break;
+        if (in[i] == 0.0f)
+            continue;
+        if (w + (size_t)nd > out_numel)
+            break;
         size_t rem = i;
         for (int d = nd - 1; d >= 0; d--) {
             out[w + (size_t)d] = (float)(rem % (size_t)inp->shape[d]);
@@ -1639,10 +2065,10 @@ static size_t nonzero_nd_f32(const float* in, const Tensor* inp, size_t out_nume
         }
         w += (size_t)nd;
     }
-    for (size_t i = w; i < out_numel; i++) out[i] = -1.0f;
+    for (size_t i = w; i < out_numel; i++)
+        out[i] = -1.0f;
     return w;
 }
-
 
 /* Elementwise unary cases of the CPU interpreter: `expr` computes one output
  * from the input element `x`, broadcast-cycled over a smaller input. */
@@ -1656,7 +2082,6 @@ static size_t nonzero_nd_f32(const float* in, const Tensor* inp, size_t out_nume
         }                                                                                          \
         break;
 
-
 static void direct_conv_task(void* vd, size_t start, size_t end) {
     /* Work is flattened over (batch, out_channel, out_row) — a fine enough
      * granularity that even small batch×channel counts exceed the thread pool's
@@ -1666,29 +2091,32 @@ static void direct_conv_task(void* vd, size_t start, size_t end) {
     int OC = d->out_channels, OH = d->out_h, OW = d->out_w, IC = d->in_channels;
     int IH = d->in_h, IW = d->in_w, KH = d->kernel_h, KW = d->kernel_w;
     for (size_t idx = start; idx < end; idx++) {
-        int oh  = (int)(idx % (size_t)OH);
-        size_t t = idx / (size_t)OH;
-        int oc  = (int)(t % (size_t)OC);
-        int n   = (int)(t / (size_t)OC);
+        int oh           = (int)(idx % (size_t)OH);
+        size_t t         = idx / (size_t)OH;
+        int oc           = (int)(t % (size_t)OC);
+        int n            = (int)(t / (size_t)OC);
         const float* woc = d->w + (size_t)oc * IC * KH * KW;
-        float b0 = d->bias ? d->bias[oc] : 0.0f;
-        float* orow = d->out + (((size_t)n * OC + oc) * OH + oh) * OW;
-        for (int ow = 0; ow < OW; ow++) orow[ow] = b0;
+        float b0         = d->bias ? d->bias[oc] : 0.0f;
+        float* orow      = d->out + (((size_t)n * OC + oc) * OH + oh) * OW;
+        for (int ow = 0; ow < OW; ow++)
+            orow[ow] = b0;
         for (int ic = 0; ic < IC; ic++) {
             const float* inb = d->in + ((size_t)n * IC + ic) * IH * IW;
             const float* win = woc + (size_t)ic * KH * KW;
             for (int kh_i = 0; kh_i < KH; kh_i++) {
                 int ih = oh * d->stride_h + kh_i * d->dilation_h - d->pad_h;
-                if (ih < 0 || ih >= IH) continue;
+                if (ih < 0 || ih >= IH)
+                    continue;
                 const float* irow = inb + (size_t)ih * IW;
                 const float* wrow = win + (size_t)kh_i * KW;
                 for (int kw_i = 0; kw_i < KW; kw_i++) {
                     float wv = wrow[kw_i];
                     if (d->stride_w == 1 && d->dilation_w == 1) {
-                        int off   = kw_i - d->pad_w;   /* iw = ow + off */
+                        int off   = kw_i - d->pad_w; /* iw = ow + off */
                         int ow_lo = off < 0 ? -off : 0;
                         int ow_hi = IW - off;
-                        if (ow_hi > OW) ow_hi = OW;
+                        if (ow_hi > OW)
+                            ow_hi = OW;
                         for (int ow = ow_lo; ow < ow_hi; ow++)
                             orow[ow] += wv * irow[ow + off];
                     } else {
@@ -1812,18 +2240,32 @@ int cpu_execute_node(struct IRNode* node) {
      * Supply each reduction's identity explicitly. The four that have no
      * identity fail instead -- there is no defensible value to invent, and
      * inventing one is what caused this. */
-    if (node->num_inputs >= 1 && node->inputs && node->inputs[0] &&
-        node->inputs[0]->numel == 0 && out->numel > 0 && out->data) {
+    if (node->num_inputs >= 1 && node->inputs && node->inputs[0] && node->inputs[0]->numel == 0 &&
+        out->numel > 0 && out->data) {
         double ident;
         switch (node->type) {
-        case UOP_SUM:       ident = 0.0;       break;
-        case UOP_MEAN:      ident = NAN;       break;  /* 0/0 */
-        case UOP_PROD:      ident = 1.0;       break;
-        case UOP_ANY:       ident = 0.0;       break;
-        case UOP_ALL:       ident = 1.0;       break;  /* vacuously true */
-        case UOP_LOGSUMEXP: ident = -INFINITY; break;  /* log(0) */
-        case UOP_MAX_REDUCE: case UOP_MIN_REDUCE:
-        case UOP_ARGMAX:     case UOP_ARGMIN:
+        case UOP_SUM:
+            ident = 0.0;
+            break;
+        case UOP_MEAN:
+            ident = NAN;
+            break; /* 0/0 */
+        case UOP_PROD:
+            ident = 1.0;
+            break;
+        case UOP_ANY:
+            ident = 0.0;
+            break;
+        case UOP_ALL:
+            ident = 1.0;
+            break; /* vacuously true */
+        case UOP_LOGSUMEXP:
+            ident = -INFINITY;
+            break; /* log(0) */
+        case UOP_MAX_REDUCE:
+        case UOP_MIN_REDUCE:
+        case UOP_ARGMAX:
+        case UOP_ARGMIN:
             LOG_ERROR("%s over an empty tensor has no defined result",
                       uop_type_to_string(node->type));
             return -1;
@@ -1846,8 +2288,7 @@ not_empty_reduction:;
      * ops keep the SIMD path below. */
     int _mdt_binary = is_elementwise_binary(node->type) && node->num_inputs >= 2 &&
                       node->inputs[0] && node->inputs[1] &&
-                      (out->dtype != DTYPE_FLOAT32 ||
-                       node->inputs[0]->dtype != DTYPE_FLOAT32 ||
+                      (out->dtype != DTYPE_FLOAT32 || node->inputs[0]->dtype != DTYPE_FLOAT32 ||
                        node->inputs[1]->dtype != DTYPE_FLOAT32);
     if (_mdt_binary && node->inputs[0]->data && node->inputs[1]->data) {
         DType odt = out->dtype;
@@ -1857,87 +2298,112 @@ not_empty_reduction:;
         DType cdt;
         if (is_comparison_op(node->type)) {
             cdt = cml_promote_dtype(node->inputs[0]->dtype, node->inputs[1]->dtype);
-            if (is_half_dtype(cdt)) cdt = DTYPE_FLOAT32;
+            if (is_half_dtype(cdt))
+                cdt = DTYPE_FLOAT32;
         } else {
             cdt = is_half_dtype(odt) ? DTYPE_FLOAT32 : odt;
         }
-        size_t cesz = cml_dtype_size(cdt);
+        size_t cesz   = cml_dtype_size(cdt);
         const void* a = node->inputs[0]->data;
         const void* b = node->inputs[1]->data;
-        void* tmpa = NULL, *tmpb = NULL;
+        void *tmpa = NULL, *tmpb = NULL;
         int ok = 1;
         if (node->inputs[0]->dtype != cdt) {
             tmpa = cml_malloc(in1_numel * cesz);
-            if (!tmpa || cml_cast_buffer(node->inputs[0]->data, node->inputs[0]->dtype,
-                                         tmpa, cdt, in1_numel) != 0) ok = 0;
+            if (!tmpa || cml_cast_buffer(node->inputs[0]->data, node->inputs[0]->dtype, tmpa, cdt,
+                                         in1_numel) != 0)
+                ok = 0;
             a = tmpa;
         }
         if (ok && node->inputs[1]->dtype != cdt) {
             tmpb = cml_malloc(in2_numel * cesz);
-            if (!tmpb || cml_cast_buffer(node->inputs[1]->data, node->inputs[1]->dtype,
-                                         tmpb, cdt, in2_numel) != 0) ok = 0;
+            if (!tmpb || cml_cast_buffer(node->inputs[1]->data, node->inputs[1]->dtype, tmpb, cdt,
+                                         in2_numel) != 0)
+                ok = 0;
             b = tmpb;
         }
         int need_conv = (cdt != odt);
-        void* obuf = out->data;
-        if (ok && need_conv) { obuf = cml_malloc(out->numel * cesz); if (!obuf) ok = 0; }
+        void* obuf    = out->data;
+        if (ok && need_conv) {
+            obuf = cml_malloc(out->numel * cesz);
+            if (!obuf)
+                ok = 0;
+        }
         size_t* bmap1 = ok ? build_bcast_map(node->inputs[0], out) : NULL;
         size_t* bmap2 = ok ? build_bcast_map(node->inputs[1], out) : NULL;
         if (ok && ((node->inputs[0]->numel != out->numel && !bmap1) ||
-                   (node->inputs[1]->numel != out->numel && !bmap2))) ok = 0;
-        int rc = ok ? cpu_binary_generic(node->type, a, in1_numel, b, in2_numel,
-                                         obuf, out->numel, cdt, bmap1, bmap2) : -1;
+                   (node->inputs[1]->numel != out->numel && !bmap2)))
+            ok = 0;
+        int rc = ok ? cpu_binary_generic(node->type, a, in1_numel, b, in2_numel, obuf, out->numel,
+                                         cdt, bmap1, bmap2)
+                    : -1;
         cml_free(bmap1);
         cml_free(bmap2);
         if (rc == 0 && need_conv)
             rc = cml_cast_buffer(obuf, cdt, out->data, odt, out->numel);
         cml_free(tmpa);
         cml_free(tmpb);
-        if (need_conv && obuf != out->data) cml_free(obuf);
-        if (rc == 0) { node->is_executed = true; out->is_executed = true; return 0; }
+        if (need_conv && obuf != out->data)
+            cml_free(obuf);
+        if (rc == 0) {
+            node->is_executed = true;
+            out->is_executed  = true;
+            return 0;
+        }
         /* Not handled natively (e.g. an integer dtype this table has no entry
          * for): fall through to the typed kernels below, never to the f32 SIMD
          * path. */
     }
-    if (out->dtype != DTYPE_FLOAT32 && is_elementwise_unary(node->type) &&
-        node->num_inputs >= 1 && node->inputs[0]->data &&
-        node->inputs[0]->dtype == out->dtype) {
-        DType odt   = out->dtype;
-        DType cdt   = is_half_dtype(odt) ? DTYPE_FLOAT32 : odt;
+    if (out->dtype != DTYPE_FLOAT32 && is_elementwise_unary(node->type) && node->num_inputs >= 1 &&
+        node->inputs[0]->data && node->inputs[0]->dtype == out->dtype) {
+        DType odt      = out->dtype;
+        DType cdt      = is_half_dtype(odt) ? DTYPE_FLOAT32 : odt;
         const void* in = node->inputs[0]->data;
-        void* tmpin = NULL, *obuf = out->data;
+        void *tmpin = NULL, *obuf = out->data;
         int ok = 1;
         if (node->inputs[0]->dtype != cdt) {
             tmpin = cml_malloc(in1_numel * cml_dtype_size(cdt));
-            if (!tmpin || cml_cast_buffer(node->inputs[0]->data, node->inputs[0]->dtype,
-                                          tmpin, cdt, in1_numel) != 0) ok = 0;
+            if (!tmpin || cml_cast_buffer(node->inputs[0]->data, node->inputs[0]->dtype, tmpin, cdt,
+                                          in1_numel) != 0)
+                ok = 0;
             in = tmpin;
         }
-        if (ok && is_half_dtype(odt)) { obuf = cml_malloc(out->numel * sizeof(float)); if (!obuf) ok = 0; }
+        if (ok && is_half_dtype(odt)) {
+            obuf = cml_malloc(out->numel * sizeof(float));
+            if (!obuf)
+                ok = 0;
+        }
         int rc = ok ? cpu_unary_generic(node->type, in, in1_numel, obuf, out->numel, cdt) : -1;
         if (rc == 0 && is_half_dtype(odt))
             rc = cml_cast_buffer(obuf, DTYPE_FLOAT32, out->data, odt, out->numel);
         cml_free(tmpin);
-        if (is_half_dtype(odt) && obuf != out->data) cml_free(obuf);
-        if (rc == 0) { node->is_executed = true; out->is_executed = true; return 0; }
+        if (is_half_dtype(odt) && obuf != out->data)
+            cml_free(obuf);
+        if (rc == 0) {
+            node->is_executed = true;
+            out->is_executed  = true;
+            return 0;
+        }
         /* Falls through to the typed kernels, which evaluate the whole float
          * unary set in double and store through the output dtype. */
     }
-    if (out->dtype != DTYPE_FLOAT32 && is_reduction_op(node->type) &&
-        node->num_inputs >= 1 && node->inputs[0]->data &&
-        node->inputs[0]->dtype == out->dtype) {
+    if (out->dtype != DTYPE_FLOAT32 && is_reduction_op(node->type) && node->num_inputs >= 1 &&
+        node->inputs[0]->data && node->inputs[0]->dtype == out->dtype) {
         /* Handle here or fail cleanly — never fall through to the f32 path. */
         DType odt = out->dtype;
         int rc;
         if (is_half_dtype(odt)) {
             /* compute in f32: convert input, reduce, convert output back to half */
-            float* fin = cml_malloc(in1_numel * sizeof(float));
+            float* fin  = cml_malloc(in1_numel * sizeof(float));
             float* fout = cml_malloc(out->numel * sizeof(float));
-            rc = (fin && fout &&
+            rc          = (fin && fout &&
                   cml_cast_buffer(node->inputs[0]->data, odt, fin, DTYPE_FLOAT32, in1_numel) == 0)
-                     ? cpu_reduce_generic(node, fin, fout, DTYPE_FLOAT32) : -1;
-            if (rc == 0) rc = cml_cast_buffer(fout, DTYPE_FLOAT32, out->data, odt, out->numel);
-            cml_free(fin); cml_free(fout);
+                              ? cpu_reduce_generic(node, fin, fout, DTYPE_FLOAT32)
+                              : -1;
+            if (rc == 0)
+                rc = cml_cast_buffer(fout, DTYPE_FLOAT32, out->data, odt, out->numel);
+            cml_free(fin);
+            cml_free(fout);
         } else {
             rc = cpu_reduce_generic(node, node->inputs[0]->data, out->data, odt);
         }
@@ -1959,8 +2425,8 @@ not_empty_reduction:;
             out->is_executed  = true;
             return 0;
         }
-        LOG_ERROR("no typed kernel for %s (out dtype %d)",
-                  uop_type_to_string(node->type), (int)out->dtype);
+        LOG_ERROR("no typed kernel for %s (out dtype %d)", uop_type_to_string(node->type),
+                  (int)out->dtype);
         return -1;
     }
 
@@ -1968,31 +2434,34 @@ not_empty_reduction:;
 /* Elementwise binary f32 op with 2-D broadcast fast paths: exact-size runs the
  * parallel SIMD kernel; row/col broadcasts run ROW/COL; otherwise a generic
  * modulo-indexed scalar loop applies `op`. */
-#define BINARY_BCAST(OP, PAR_FN, ROW, COL, op)                                  \
-    case OP:                                                                    \
-        if (!in1_data || !in2_data) return -1;                                  \
-        if (in1_numel == in2_numel && in1_numel == out->numel) {                \
-            PAR_FN(in1_data, in2_data, out_data, out->numel);                   \
-        } else {                                                                \
-            size_t rows, cols;                                                  \
-            int bcast = _detect_broadcast_2d(node->inputs[0], node->inputs[1],  \
-                                             out, &rows, &cols);                 \
-            if (bcast == 1) { ROW; }                                            \
-            else if (bcast == 2) { COL; }                                       \
-            else for (size_t i = 0; i < out->numel; i++) {                      \
-                size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);             \
-                size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);             \
-                out_data[i] = in1_data[i1] op in2_data[i2];                     \
-            }                                                                   \
-        }                                                                       \
+#define BINARY_BCAST(OP, PAR_FN, ROW, COL, op)                                                     \
+    case OP:                                                                                       \
+        if (!in1_data || !in2_data)                                                                \
+            return -1;                                                                             \
+        if (in1_numel == in2_numel && in1_numel == out->numel) {                                   \
+            PAR_FN(in1_data, in2_data, out_data, out->numel);                                      \
+        } else {                                                                                   \
+            size_t rows, cols;                                                                     \
+            int bcast = _detect_broadcast_2d(node->inputs[0], node->inputs[1], out, &rows, &cols); \
+            if (bcast == 1) {                                                                      \
+                ROW;                                                                               \
+            } else if (bcast == 2) {                                                               \
+                COL;                                                                               \
+            } else                                                                                 \
+                for (size_t i = 0; i < out->numel; i++) {                                          \
+                    size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);                          \
+                    size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);                          \
+                    out_data[i] = in1_data[i1] op in2_data[i2];                                    \
+                }                                                                                  \
+        }                                                                                          \
         break;
 
-    BINARY_BCAST(UOP_ADD, simd_add_f32_parallel, BROADCAST_ROW_SIMD(simd_add_f32),
-                 BROADCAST_COL_ADDSCALAR(1.0f), +)
-    BINARY_BCAST(UOP_SUB, simd_sub_f32_parallel, BROADCAST_ROW_SIMD(simd_sub_f32),
-                 BROADCAST_COL_ADDSCALAR(-1.0f), -)
-    BINARY_BCAST(UOP_MUL, simd_mul_f32_parallel, BROADCAST_ROW_SIMD(simd_mul_f32),
-                 BROADCAST_COL_MULSCALAR(), *)
+        BINARY_BCAST(UOP_ADD, simd_add_f32_parallel, BROADCAST_ROW_SIMD(simd_add_f32),
+                     BROADCAST_COL_ADDSCALAR(1.0f), +)
+        BINARY_BCAST(UOP_SUB, simd_sub_f32_parallel, BROADCAST_ROW_SIMD(simd_sub_f32),
+                     BROADCAST_COL_ADDSCALAR(-1.0f), -)
+        BINARY_BCAST(UOP_MUL, simd_mul_f32_parallel, BROADCAST_ROW_SIMD(simd_mul_f32),
+                     BROADCAST_COL_MULSCALAR(), *)
 #undef BINARY_BCAST
 
     case UOP_DIV:
@@ -2011,32 +2480,33 @@ not_empty_reduction:;
 
 /* Elementwise unary f32 op: exact-size runs the SIMD kernel, broadcast falls
  * back to a modulo-indexed scalar loop. `expr` computes one output from `_x`. */
-#define UNARY_ACT(OP, SIMD_FN, expr)                                            \
-    case OP:                                                                    \
-        if (!in1_data) return -1;                                               \
-        if (in1_numel == out->numel) {                                          \
-            SIMD_FN(in1_data, out_data, out->numel);                           \
-        } else {                                                                \
-            for (size_t i = 0; i < out->numel; i++) {                          \
-                float _x = in1_data[i % in1_numel];                            \
-                out_data[i] = (expr);                                          \
-            }                                                                   \
-        }                                                                       \
+#define UNARY_ACT(OP, SIMD_FN, expr)                                                               \
+    case OP:                                                                                       \
+        if (!in1_data)                                                                             \
+            return -1;                                                                             \
+        if (in1_numel == out->numel) {                                                             \
+            SIMD_FN(in1_data, out_data, out->numel);                                               \
+        } else {                                                                                   \
+            for (size_t i = 0; i < out->numel; i++) {                                              \
+                float _x    = in1_data[i % in1_numel];                                             \
+                out_data[i] = (expr);                                                              \
+            }                                                                                      \
+        }                                                                                          \
         break;
 
-    /* Exact-size elementwise unaries route through the threadpool-parallel
-     * variants (threshold-gated inside; broadcast still takes the scalar path). */
-    UNARY_ACT(UOP_NEG,     simd_neg_f32_parallel,     -_x)
-    UNARY_ACT(UOP_EXP,     simd_exp_f32_parallel,     expf(_x))
-    UNARY_ACT(UOP_LOG,     simd_log_f32_parallel,     logf(_x))
-    UNARY_ACT(UOP_SQRT,    simd_sqrt_f32_parallel,    sqrtf(_x))
-    UNARY_ACT(UOP_ABS,     simd_abs_f32_parallel,     fabsf(_x))
-    UNARY_ACT(UOP_SIGMOID, simd_sigmoid_f32_parallel, 1.0f / (1.0f + expf(-_x)))
-    UNARY_ACT(UOP_TANH,    simd_tanh_f32_parallel,    tanhf(_x))
-    UNARY_ACT(UOP_SIN,     simd_sin_f32_parallel,     sinf(_x))
-    UNARY_ACT(UOP_COS,     simd_cos_f32_parallel,     cosf(_x))
-    UNARY_ACT(UOP_TAN,     simd_tan_f32_parallel,     tanf(_x))
-    UNARY_ACT(UOP_RECIP,   simd_recip_f32,   (_x != 0.0f) ? (1.0f / _x) : 0.0f)
+        /* Exact-size elementwise unaries route through the threadpool-parallel
+         * variants (threshold-gated inside; broadcast still takes the scalar path). */
+        UNARY_ACT(UOP_NEG, simd_neg_f32_parallel, -_x)
+        UNARY_ACT(UOP_EXP, simd_exp_f32_parallel, expf(_x))
+        UNARY_ACT(UOP_LOG, simd_log_f32_parallel, logf(_x))
+        UNARY_ACT(UOP_SQRT, simd_sqrt_f32_parallel, sqrtf(_x))
+        UNARY_ACT(UOP_ABS, simd_abs_f32_parallel, fabsf(_x))
+        UNARY_ACT(UOP_SIGMOID, simd_sigmoid_f32_parallel, 1.0f / (1.0f + expf(-_x)))
+        UNARY_ACT(UOP_TANH, simd_tanh_f32_parallel, tanhf(_x))
+        UNARY_ACT(UOP_SIN, simd_sin_f32_parallel, sinf(_x))
+        UNARY_ACT(UOP_COS, simd_cos_f32_parallel, cosf(_x))
+        UNARY_ACT(UOP_TAN, simd_tan_f32_parallel, tanf(_x))
+        UNARY_ACT(UOP_RECIP, simd_recip_f32, (_x != 0.0f) ? (1.0f / _x) : 0.0f)
 #undef UNARY_ACT
 
     case UOP_POW:
@@ -2071,7 +2541,8 @@ not_empty_reduction:;
                 int cols = inp->shape[1];
                 if (reduce_dim == 1) {
                     for (int r = 0; r < rows; r++) {
-                        float acc = simd_sum_float(in1_data + (size_t)r * (size_t)cols, (size_t)cols);
+                        float acc =
+                            simd_sum_float(in1_data + (size_t)r * (size_t)cols, (size_t)cols);
                         if (node->type == UOP_MEAN && cols > 0)
                             acc /= (float)cols;
                         out_data[r] = acc;
@@ -2145,7 +2616,7 @@ not_empty_reduction:;
                         for (int c = 1; c < cols; c++) {
                             float v = in1_data[r * cols + c];
                             if (v != v || v > mx)
-                                mx = v;   /* NaN propagates */
+                                mx = v; /* NaN propagates */
                         }
                         out_data[r] = mx;
                     }
@@ -2156,7 +2627,7 @@ not_empty_reduction:;
                         for (int r = 1; r < rows; r++) {
                             float v = in1_data[r * cols + c];
                             if (v != v || v > mx)
-                                mx = v;   /* NaN propagates */
+                                mx = v; /* NaN propagates */
                         }
                         out_data[c] = mx;
                     }
@@ -2164,7 +2635,7 @@ not_empty_reduction:;
             } else {
                 /* Generic N-dim per-dimension max (mirrors UOP_SUM) */
                 int reduce_size = inp->shape[reduce_dim];
-                size_t inner = 1;
+                size_t inner    = 1;
                 for (int d = reduce_dim + 1; d < inp->ndim; d++)
                     inner *= (size_t)inp->shape[d];
                 size_t outer = 1;
@@ -2173,11 +2644,11 @@ not_empty_reduction:;
                 for (size_t o = 0; o < outer; o++) {
                     for (size_t i = 0; i < inner; i++) {
                         size_t base = o * (size_t)reduce_size * inner + i;
-                        float mx = in1_data[base];
+                        float mx    = in1_data[base];
                         for (int r = 1; r < reduce_size; r++) {
                             float v = in1_data[base + (size_t)r * inner];
                             if (v != v || v > mx)
-                                mx = v;   /* NaN propagates */
+                                mx = v; /* NaN propagates */
                         }
                         out_data[o * inner + i] = mx;
                     }
@@ -2215,14 +2686,15 @@ not_empty_reduction:;
                 return -1;
             size_t mn = (size_t)M * (size_t)N;
             int batch = (mn > 0) ? (int)(out->numel / mn) : 1;
-            if (batch < 1) batch = 1;
+            if (batch < 1)
+                batch = 1;
             size_t a_stride = (a->numel == (size_t)M * (size_t)K) ? 0 : (size_t)M * (size_t)K;
             size_t b_stride = (b->numel == (size_t)K * (size_t)N) ? 0 : (size_t)K * (size_t)N;
 
             /* f64: route 2-D GEMM through cblas_dgemm when available. */
             CMLBlasContext* dctx = get_blas_context();
-            if (out->dtype == DTYPE_FLOAT64 && batch == 1 && !a_stride && !b_stride &&
-                dctx && dctx->initialized &&
+            if (out->dtype == DTYPE_FLOAT64 && batch == 1 && !a_stride && !b_stride && dctx &&
+                dctx->initialized &&
                 cml_blas_dgemm(dctx, (const double*)a->data, (const double*)b->data,
                                (double*)out->data, M, N, K, 1.0, 0.0) == 0) {
                 node->is_executed = true;
@@ -2230,8 +2702,8 @@ not_empty_reduction:;
                 return 0;
             }
 
-            if (cpu_matmul_generic(a->data, b->data, out->data, batch,
-                                   a_stride, b_stride, M, K, N, out->dtype) == 0) {
+            if (cpu_matmul_generic(a->data, b->data, out->data, batch, a_stride, b_stride, M, K, N,
+                                   out->dtype) == 0) {
                 node->is_executed = true;
                 out->is_executed  = true;
                 return 0;
@@ -2247,26 +2719,23 @@ not_empty_reduction:;
                 break;
         } else if (b->quant_type == CML_QUANT_AFFINE_INT8 && b->data) {
             /* Weight-only int8: int8 weights stay compressed, x/y are f32. */
-            if (cml_qmatmul_affine_int8(in1_data, (const int8_t*)b->data,
-                                        b->quant_scale, b->quant_zero_point,
-                                        out_data, M, K, N) == 0)
+            if (cml_qmatmul_affine_int8(in1_data, (const int8_t*)b->data, b->quant_scale,
+                                        b->quant_zero_point, out_data, M, K, N) == 0)
                 break;
         } else if (b->quant_type == CML_QUANT_AFFINE_INT4 && b->quant_data) {
             /* Weight-only packed int4: nibbles stay compressed, x/y are f32. */
-            if (cml_qmatmul_affine_int4(in1_data, (const uint8_t*)b->quant_data,
-                                        b->quant_scale, b->quant_zero_point,
-                                        out_data, M, K, N) == 0)
+            if (cml_qmatmul_affine_int4(in1_data, (const uint8_t*)b->quant_data, b->quant_scale,
+                                        b->quant_zero_point, out_data, M, K, N) == 0)
                 break;
-        } else if (b->quant_type == CML_QUANT_NF4 && b->quant_data &&
-                   b->quant_block_size > 0) {
+        } else if (b->quant_type == CML_QUANT_NF4 && b->quant_data && b->quant_block_size > 0) {
             /* Block-wise NF4: payload is [num_scales floats][packed nibbles]. */
-            size_t wn         = (size_t)K * (size_t)N;
-            int num_scales    = (int)((wn + (size_t)b->quant_block_size - 1) /
-                                      (size_t)b->quant_block_size);
+            size_t wn = (size_t)K * (size_t)N;
+            int num_scales =
+                (int)((wn + (size_t)b->quant_block_size - 1) / (size_t)b->quant_block_size);
             const uint8_t* blob = (const uint8_t*)b->quant_data;
             if (cml_qmatmul_nf4(in1_data, blob + (size_t)num_scales * sizeof(float),
-                                (const float*)blob, num_scales, b->quant_block_size,
-                                out_data, M, K, N) == 0)
+                                (const float*)blob, num_scales, b->quant_block_size, out_data, M, K,
+                                N) == 0)
                 break;
         }
 
@@ -2275,21 +2744,23 @@ not_empty_reduction:;
          * code fed the WHOLE buffers to sgemm as one 2-D GEMM, which produced
          * correct results only for batch 1. */
         {
-            size_t mn    = (size_t)M * (size_t)N;
-            int batch    = (mn > 0) ? (int)(out->numel / mn) : 1;
-            if (batch < 1) batch = 1;
+            size_t mn = (size_t)M * (size_t)N;
+            int batch = (mn > 0) ? (int)(out->numel / mn) : 1;
+            if (batch < 1)
+                batch = 1;
             size_t a_slice = (size_t)M * (size_t)K;
             size_t b_slice = (size_t)K * (size_t)N;
-            bool a_bcast = (a->numel == a_slice);
-            bool b_bcast = (b->numel == b_slice);
+            bool a_bcast   = (a->numel == a_slice);
+            bool b_bcast   = (b->numel == b_slice);
 #ifdef CML_TRACE_MM
-            fprintf(stderr, "TRACE-MM cpu node=%p M=%d N=%d K=%d batch=%d "
-                    "out=%p a=%p b=%p\n", (void*)node, M, N, K, batch,
-                    (void*)out_data, (void*)in1_data, (void*)in2_data);
+            fprintf(stderr,
+                    "TRACE-MM cpu node=%p M=%d N=%d K=%d batch=%d "
+                    "out=%p a=%p b=%p\n",
+                    (void*)node, M, N, K, batch, (void*)out_data, (void*)in1_data, (void*)in2_data);
 #endif
 
             CMLBlasContext* blas = get_blas_context();
-            bool use_blas = blas && blas->initialized;
+            bool use_blas        = blas && blas->initialized;
 
             if (use_blas && batch == 1 && !a_bcast && !b_bcast) {
                 /* Fuse a trailing transpose of a 2-D B into sgemm. */
@@ -2300,13 +2771,11 @@ not_empty_reduction:;
                     float* b_orig_data = (float*)b_orig->data;
                     if (!b_orig_data)
                         b_orig_data = (float*)tensor_data_ptr(b_orig);
-                    if (b_orig_data &&
-                        cml_blas_sgemm_ex(blas, in1_data, b_orig_data, out_data, M, N, K,
-                                          1.0f, 0.0f, false, true) == 0)
+                    if (b_orig_data && cml_blas_sgemm_ex(blas, in1_data, b_orig_data, out_data, M,
+                                                         N, K, 1.0f, 0.0f, false, true) == 0)
                         break;
                 }
-                if (cml_blas_sgemm(blas, in1_data, in2_data, out_data, M, N, K,
-                                   1.0f, 0.0f) != 0)
+                if (cml_blas_sgemm(blas, in1_data, in2_data, out_data, M, N, K, 1.0f, 0.0f) != 0)
                     LOG_WARNING("BLAS sgemm failed, falling back to naive matmul");
                 else
                     break;
@@ -2319,8 +2788,7 @@ not_empty_reduction:;
                 const float* bp = in2_data + (size_t)bi * (b_bcast ? 0 : b_slice);
                 float* op_      = out_data + (size_t)bi * mn;
 
-                if (use_blas &&
-                    cml_blas_sgemm(blas, ap, bp, op_, M, N, K, 1.0f, 0.0f) == 0)
+                if (use_blas && cml_blas_sgemm(blas, ap, bp, op_, M, N, K, 1.0f, 0.0f) == 0)
                     continue;
 
                 memset(op_, 0, mn * sizeof(float));
@@ -2334,8 +2802,9 @@ not_empty_reduction:;
 
                             for (int m = m0; m < m_end; m++) {
                                 float acc[CML_MATMUL_MAX_BLOCK];
-                                int   n_len = n_end - n0;
-                                for (int n = 0; n < n_len; n++) acc[n] = 0.0f;
+                                int n_len = n_end - n0;
+                                for (int n = 0; n < n_len; n++)
+                                    acc[n] = 0.0f;
                                 for (int k = k0; k < k_end; k++) {
                                     float a_mk = ap[m * K + k];
                                     for (int n = 0; n < n_len; n++) {
@@ -2405,9 +2874,8 @@ not_empty_reduction:;
         float* cond_f32 = NULL;
         if (node->inputs[0]->dtype != DTYPE_FLOAT32) {
             cond_f32 = (float*)cml_malloc(cond_numel * sizeof(float));
-            if (!cond_f32 ||
-                cml_cast_buffer(node->inputs[0]->data, node->inputs[0]->dtype,
-                                cond_f32, DTYPE_FLOAT32, cond_numel) != 0) {
+            if (!cond_f32 || cml_cast_buffer(node->inputs[0]->data, node->inputs[0]->dtype,
+                                             cond_f32, DTYPE_FLOAT32, cond_numel) != 0) {
                 cml_free(cond_f32);
                 return -1;
             }
@@ -2435,7 +2903,8 @@ not_empty_reduction:;
         Tensor* in = node->inputs[0];
         if (!in || !in->data) {
             LOG_WARNING("CPU fallback: UOP_PERMUTE missing input");
-            for (size_t i = 0; i < out->numel; i++) out_data[i] = 0.0f;
+            for (size_t i = 0; i < out->numel; i++)
+                out_data[i] = 0.0f;
             break;
         }
         float* in_data_perm = (float*)in->data;
@@ -2449,15 +2918,19 @@ not_empty_reduction:;
         // General N-D permute: out_shape[i] = in_shape[perm[i]], so for each
         // output element, in_coord[perm[i]] = out_coord[i].
         PermuteParams* pp = (PermuteParams*)node->params;
-        int nd = in->ndim;
+        int nd            = in->ndim;
         if (!pp || !pp->perm || nd > 16) {
             LOG_WARNING("CPU fallback: UOP_PERMUTE bad params (ndim=%d)", nd);
-            for (size_t i = 0; i < out->numel; i++) out_data[i] = 0.0f;
+            for (size_t i = 0; i < out->numel; i++)
+                out_data[i] = 0.0f;
             break;
         }
         size_t in_strides[16];
         size_t s = 1;
-        for (int i = nd - 1; i >= 0; i--) { in_strides[i] = s; s *= (size_t)in->shape[i]; }
+        for (int i = nd - 1; i >= 0; i--) {
+            in_strides[i] = s;
+            s *= (size_t)in->shape[i];
+        }
         /* Walk the output in row-major order while carrying the matching input
          * offset as an incremental odometer: for each output dim precompute the
          * input stride it maps to (perm_stride[i] = in_strides[perm[i]]), then
@@ -2465,20 +2938,22 @@ not_empty_reduction:;
          * full in_lin recomputation the naive form paid on every element — a big
          * win for the deep (5-D/6-D) permutes the conv im2col path emits. */
         size_t perm_stride[16];
-        int    out_dim[16];
+        int out_dim[16];
         for (int i = 0; i < nd; i++) {
             perm_stride[i] = in_strides[pp->perm[i]];
             out_dim[i]     = out->shape[i];
         }
         int coord[16];
-        for (int i = 0; i < nd; i++) coord[i] = 0;
+        for (int i = 0; i < nd; i++)
+            coord[i] = 0;
         size_t in_lin = 0;
         size_t numel  = out->numel;
         for (size_t o = 0; o < numel; o++) {
             out_data[o] = in_data_perm[in_lin];
             for (int i = nd - 1; i >= 0; i--) {
                 in_lin += perm_stride[i];
-                if (++coord[i] < out_dim[i]) break;
+                if (++coord[i] < out_dim[i])
+                    break;
                 coord[i] = 0;
                 in_lin -= perm_stride[i] * (size_t)out_dim[i];
             }
@@ -2612,8 +3087,9 @@ not_empty_reduction:;
             return -1;
         {
             ReduceParams* rp = (ReduceParams*)node->params;
-            int dim = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
-            if (rp && rp->dims && rp->num_dims > 0 && dim < 0) dim += node->inputs[0]->ndim;
+            int dim          = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
+            if (rp && rp->dims && rp->num_dims > 0 && dim < 0)
+                dim += node->inputs[0]->ndim;
             reduce_axis_f32(in1_data, node->inputs[0], dim, out_data, RAX_PROD);
         }
         break;
@@ -2625,8 +3101,9 @@ not_empty_reduction:;
             return -1;
         {
             ReduceParams* rp = (ReduceParams*)node->params;
-            int dim = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
-            if (rp && rp->dims && rp->num_dims > 0 && dim < 0) dim += node->inputs[0]->ndim;
+            int dim          = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
+            if (rp && rp->dims && rp->num_dims > 0 && dim < 0)
+                dim += node->inputs[0]->ndim;
             reduce_axis_f32(in1_data, node->inputs[0], dim, out_data,
                             node->type == UOP_ARGMIN ? RAX_ARGMIN : RAX_ARGMAX);
         }
@@ -2638,7 +3115,7 @@ not_empty_reduction:;
             return -1;
         {
             CumsumParams* cp = (CumsumParams*)node->params;
-            int dim = cp ? cp->dim : (node->inputs[0]->ndim - 1);
+            int dim          = cp ? cp->dim : (node->inputs[0]->ndim - 1);
             cum_axis_f32(in1_data, node->inputs[0], dim, out_data, CAX_SUM);
         }
         break;
@@ -2691,8 +3168,8 @@ not_empty_reduction:;
             return -1;
         {
             PadParams* pp = (PadParams*)node->params;
-            pad_nd_f32(in1_data, node->inputs[0], out, pp->pad_widths,
-                       pp->mode, pp->value, out_data);
+            pad_nd_f32(in1_data, node->inputs[0], out, pp->pad_widths, pp->mode, pp->value,
+                       out_data);
         }
         break;
     }
@@ -2702,8 +3179,8 @@ not_empty_reduction:;
             return -1;
         {
             SortParams* sp = (SortParams*)node->params;
-            int dim = sp ? sp->dim : (node->inputs[0]->ndim - 1);
-            bool desc = sp ? sp->descending : false;
+            int dim        = sp ? sp->dim : (node->inputs[0]->ndim - 1);
+            bool desc      = sp ? sp->descending : false;
             if (sort_axis_f32(in1_data, node->inputs[0], dim, desc, out_data, false) != 0)
                 return -1;
         }
@@ -2715,8 +3192,8 @@ not_empty_reduction:;
             return -1;
         {
             SortParams* sp = (SortParams*)node->params;
-            int dim = sp ? sp->dim : (node->inputs[0]->ndim - 1);
-            bool desc = sp ? sp->descending : false;
+            int dim        = sp ? sp->dim : (node->inputs[0]->ndim - 1);
+            bool desc      = sp ? sp->descending : false;
             if (sort_axis_f32(in1_data, node->inputs[0], dim, desc, out_data, true) != 0)
                 return -1;
         }
@@ -2761,18 +3238,27 @@ not_empty_reduction:;
              * Selection runs per lane over (outer, inner), the same decompo-
              * sition the reduce kernels use, so it works for any axis. */
             int dim = tp ? tp->dim : inp->ndim - 1;
-            if (dim < 0) dim += inp->ndim;
-            if (dim < 0 || dim >= inp->ndim) return -1;
+            if (dim < 0)
+                dim += inp->ndim;
+            if (dim < 0 || dim >= inp->ndim)
+                return -1;
 
             size_t outer = 1, inner = 1;
-            for (int d = 0; d < dim; d++)            outer *= (size_t)inp->shape[d];
-            for (int d = dim + 1; d < inp->ndim; d++) inner *= (size_t)inp->shape[d];
+            for (int d = 0; d < dim; d++)
+                outer *= (size_t)inp->shape[d];
+            for (int d = dim + 1; d < inp->ndim; d++)
+                inner *= (size_t)inp->shape[d];
             int count = inp->shape[dim];
-            if (k > count) k = count;
+            if (k > count)
+                k = count;
 
             float* lane = (float*)cml_malloc((size_t)count * sizeof(float));
-            int*   ord  = (int*)cml_malloc((size_t)count * sizeof(int));
-            if (!lane || !ord) { cml_free(lane); cml_free(ord); return -1; }
+            int* ord    = (int*)cml_malloc((size_t)count * sizeof(int));
+            if (!lane || !ord) {
+                cml_free(lane);
+                cml_free(ord);
+                return -1;
+            }
 
             for (size_t o = 0; o < outer; o++) {
                 for (size_t i = 0; i < inner; i++) {
@@ -2787,7 +3273,9 @@ not_empty_reduction:;
                             if (largest ? lane[ord[j]] > lane[ord[best]]
                                         : lane[ord[j]] < lane[ord[best]])
                                 best = j;
-                        int sw = ord[t]; ord[t] = ord[best]; ord[best] = sw;
+                        int sw                                            = ord[t];
+                        ord[t]                                            = ord[best];
+                        ord[best]                                         = sw;
                         out_data[(o * (size_t)k + (size_t)t) * inner + i] = lane[ord[t]];
                     }
                 }
@@ -2803,7 +3291,7 @@ not_empty_reduction:;
             return -1;
         {
             CumsumParams* cp = (CumsumParams*)node->params;
-            int dim = cp ? cp->dim : (node->inputs[0]->ndim - 1);
+            int dim          = cp ? cp->dim : (node->inputs[0]->ndim - 1);
             cum_axis_f32(in1_data, node->inputs[0], dim, out_data, CAX_PROD);
         }
         break;
@@ -2917,8 +3405,8 @@ not_empty_reduction:;
         if (!in1_data || !in2_data)
             return -1;
         for (size_t i = 0; i < out->numel; i++) {
-            size_t i1   = BROADCAST_IDX(node->inputs[0], out, i);
-            size_t i2   = BROADCAST_IDX(node->inputs[1], out, i);
+            size_t i1 = BROADCAST_IDX(node->inputs[0], out, i);
+            size_t i2 = BROADCAST_IDX(node->inputs[1], out, i);
             /* fminf returns the non-NaN operand (IEEE minNum); propagate
              * instead, matching torch.minimum. */
             float a = in1_data[i1], b = in2_data[i2];
@@ -3043,8 +3531,9 @@ not_empty_reduction:;
             return -1;
         {
             ReduceParams* rp = (ReduceParams*)node->params;
-            int dim = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
-            if (rp && rp->dims && rp->num_dims > 0 && dim < 0) dim += node->inputs[0]->ndim;
+            int dim          = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
+            if (rp && rp->dims && rp->num_dims > 0 && dim < 0)
+                dim += node->inputs[0]->ndim;
             reduce_axis_f32(in1_data, node->inputs[0], dim, out_data, RAX_MIN);
         }
         break;
@@ -3058,8 +3547,9 @@ not_empty_reduction:;
             /* reduce_variance only implemented ndim 1 and 2 and returned without
              * writing anything for rank 3+, leaving the output uninitialised. */
             ReduceParams* rp = (ReduceParams*)node->params;
-            int dim = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
-            if (rp && rp->dims && rp->num_dims > 0 && dim < 0) dim += node->inputs[0]->ndim;
+            int dim          = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
+            if (rp && rp->dims && rp->num_dims > 0 && dim < 0)
+                dim += node->inputs[0]->ndim;
             reduce_axis_f32(in1_data, node->inputs[0], dim, out_data,
                             node->type == UOP_STD ? RAX_STD : RAX_VAR);
         }
@@ -3071,8 +3561,9 @@ not_empty_reduction:;
             return -1;
         {
             ReduceParams* rp = (ReduceParams*)node->params;
-            int dim = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
-            if (rp && rp->dims && rp->num_dims > 0 && dim < 0) dim += node->inputs[0]->ndim;
+            int dim          = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
+            if (rp && rp->dims && rp->num_dims > 0 && dim < 0)
+                dim += node->inputs[0]->ndim;
             reduce_axis_f32(in1_data, node->inputs[0], dim, out_data, RAX_ANY);
         }
         break;
@@ -3083,8 +3574,9 @@ not_empty_reduction:;
             return -1;
         {
             ReduceParams* rp = (ReduceParams*)node->params;
-            int dim = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
-            if (rp && rp->dims && rp->num_dims > 0 && dim < 0) dim += node->inputs[0]->ndim;
+            int dim          = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
+            if (rp && rp->dims && rp->num_dims > 0 && dim < 0)
+                dim += node->inputs[0]->ndim;
             reduce_axis_f32(in1_data, node->inputs[0], dim, out_data, RAX_ALL);
         }
         break;
@@ -3095,8 +3587,9 @@ not_empty_reduction:;
             return -1;
         {
             ReduceParams* rp = (ReduceParams*)node->params;
-            int dim = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
-            if (rp && rp->dims && rp->num_dims > 0 && dim < 0) dim += node->inputs[0]->ndim;
+            int dim          = (rp && rp->dims && rp->num_dims > 0) ? rp->dims[0] : -1;
+            if (rp && rp->dims && rp->num_dims > 0 && dim < 0)
+                dim += node->inputs[0]->ndim;
             reduce_axis_f32(in1_data, node->inputs[0], dim, out_data, RAX_LOGSUMEXP);
         }
         break;
@@ -3107,7 +3600,7 @@ not_empty_reduction:;
             return -1;
         {
             CumsumParams* cp = (CumsumParams*)node->params;
-            int dim = cp ? cp->dim : (node->inputs[0]->ndim - 1);
+            int dim          = cp ? cp->dim : (node->inputs[0]->ndim - 1);
             cum_axis_f32(in1_data, node->inputs[0], dim, out_data, CAX_MAX);
         }
         break;
@@ -3118,7 +3611,7 @@ not_empty_reduction:;
             return -1;
         {
             CumsumParams* cp = (CumsumParams*)node->params;
-            int dim = cp ? cp->dim : (node->inputs[0]->ndim - 1);
+            int dim          = cp ? cp->dim : (node->inputs[0]->ndim - 1);
             cum_axis_f32(in1_data, node->inputs[0], dim, out_data, CAX_MIN);
         }
         break;
@@ -3127,22 +3620,27 @@ not_empty_reduction:;
     case UOP_CAT: {
         {
             CatParams* cp = (CatParams*)node->params;
-            int dim = cp ? cp->dim : 0;
-            if (dim < 0) dim += out->ndim;
-            if (dim < 0 || dim >= out->ndim) return -1;
+            int dim       = cp ? cp->dim : 0;
+            if (dim < 0)
+                dim += out->ndim;
+            if (dim < 0 || dim >= out->ndim)
+                return -1;
             size_t outer = 1, inner = 1;
-            for (int i = 0; i < dim; i++)            outer *= (size_t)out->shape[i];
-            for (int i = dim + 1; i < out->ndim; i++) inner *= (size_t)out->shape[i];
+            for (int i = 0; i < dim; i++)
+                outer *= (size_t)out->shape[i];
+            for (int i = dim + 1; i < out->ndim; i++)
+                inner *= (size_t)out->shape[i];
             size_t out_dim = (size_t)out->shape[dim];
-            size_t off = 0;
+            size_t off     = 0;
             for (int t = 0; t < node->num_inputs; t++) {
                 Tensor* it = node->inputs[t];
-                if (!it || !it->data) return -1;
-                size_t cnt = (size_t)it->shape[dim];
+                if (!it || !it->data)
+                    return -1;
+                size_t cnt       = (size_t)it->shape[dim];
                 const float* src = (const float*)it->data;
                 for (size_t o = 0; o < outer; o++)
-                    memcpy(out_data + (o * out_dim + off) * inner,
-                           src + o * cnt * inner, cnt * inner * sizeof(float));
+                    memcpy(out_data + (o * out_dim + off) * inner, src + o * cnt * inner,
+                           cnt * inner * sizeof(float));
                 off += cnt;
             }
         }
@@ -3198,7 +3696,8 @@ not_empty_reduction:;
         if (!src_data)
             return -1;
 
-        if (sdim < 0) sdim += out->ndim;
+        if (sdim < 0)
+            sdim += out->ndim;
         scatter_nd_f32(in1_data, in2_data, src_data, node->inputs[1], out, sdim, out_data);
         break;
     }
@@ -3208,8 +3707,8 @@ not_empty_reduction:;
             return -1;
         {
             RollParams* rp = (RollParams*)node->params;
-            roll_axis_f32(in1_data, node->inputs[0], rp ? rp->shift : 0,
-                          rp ? rp->dim : 0, out_data);
+            roll_axis_f32(in1_data, node->inputs[0], rp ? rp->shift : 0, rp ? rp->dim : 0,
+                          out_data);
         }
         break;
     }
@@ -3335,8 +3834,7 @@ not_empty_reduction:;
             return -1;
         {
             RepeatInterleaveParams* rip = (RepeatInterleaveParams*)node->params;
-            repeat_interleave_axis_f32(in1_data, node->inputs[0],
-                                       rip ? rip->repeats : 1,
+            repeat_interleave_axis_f32(in1_data, node->inputs[0], rip ? rip->repeats : 1,
                                        rip ? rip->dim : 0, out_data);
         }
         break;
@@ -3377,12 +3875,15 @@ not_empty_reduction:;
             int nd = inp->ndim;
             size_t in_str[16];
             size_t st = 1;
-            for (int d = nd - 1; d >= 0; d--) { in_str[d] = st; st *= (size_t)inp->shape[d]; }
+            for (int d = nd - 1; d >= 0; d--) {
+                in_str[d] = st;
+                st *= (size_t)inp->shape[d];
+            }
             for (size_t i = 0; i < out->numel; i++) {
                 size_t rem = i, src = 0;
                 for (int d = nd - 1; d >= 0; d--) {
                     int osz = out->shape[d];
-                    int c = (int)(rem % (size_t)osz);
+                    int c   = (int)(rem % (size_t)osz);
                     rem /= (size_t)osz;
                     src += (size_t)(sp->starts[d] + c) * in_str[d];
                 }
@@ -3397,7 +3898,7 @@ not_empty_reduction:;
             return -1;
         {
             CumsumParams* cp = (CumsumParams*)node->params;
-            int dim = cp ? cp->dim : (node->inputs[0]->ndim - 1);
+            int dim          = cp ? cp->dim : (node->inputs[0]->ndim - 1);
             cum_axis_f32(in1_data, node->inputs[0], dim, out_data, CAX_LOGSUMEXP);
         }
         break;
@@ -3439,7 +3940,7 @@ not_empty_reduction:;
         ClampParams* cp = (ClampParams*)node->params;
         float alpha     = cp ? cp->min_val : 1.0f;
         for (size_t i = 0; i < out->numel; i++) {
-            float x     = in1_data[i % in1_numel];
+            float x = in1_data[i % in1_numel];
             /* Branch rather than fmaxf/fminf: those are IEEE maxNum/minNum and
              * return the non-NaN operand, which turned celu(NaN) into 0. Same
              * function for every alpha != 0, and NaN survives. */
@@ -3625,12 +4126,12 @@ not_empty_reduction:;
         if (!in1_data || !node->params)
             return -1;
         Im2colParams* ip = (Im2colParams*)node->params;
-        Tensor* xin = node->inputs[0];
+        Tensor* xin      = node->inputs[0];
         int N = xin->shape[0], C = xin->shape[1], H = xin->shape[2], W = xin->shape[3];
         int kh = ip->kh, kw = ip->kw, sh = ip->sh, sw = ip->sw;
         int ph = ip->ph, pw = ip->pw, dh = ip->dh, dw = ip->dw;
-        int OH = (H + 2 * ph - dh * (kh - 1) - 1) / sh + 1;
-        int OW = (W + 2 * pw - dw * (kw - 1) - 1) / sw + 1;
+        int OH   = (H + 2 * ph - dh * (kh - 1) - 1) / sh + 1;
+        int OW   = (W + 2 * pw - dw * (kw - 1) - 1) / sw + 1;
         size_t K = (size_t)C * kh * kw;
         if (ph == 0 && pw == 0 && sh == 1 && sw == 1 && dh == 1 && dw == 1) {
             /* Fast path: contiguous source rows (iw = ow + kj). */
@@ -3657,14 +4158,14 @@ not_empty_reduction:;
                         for (int kj = 0; kj < kw; kj++) {
                             size_t col = ((size_t)c * kh + ki) * kw + kj;
                             for (int oh = 0; oh < OH; oh++) {
-                                int ih = oh * sh + ki * dh - ph;
+                                int ih      = oh * sh + ki * dh - ph;
                                 bool row_ok = (ih >= 0 && ih < H);
                                 for (int ow = 0; ow < OW; ow++) {
-                                    int iw = ow * sw + kj * dw - pw;
-                                    size_t row = (size_t)(n * OH + oh) * OW + ow;
-                                    out_data[row * K + col] =
-                                        (row_ok && iw >= 0 && iw < W) ? xch[(size_t)ih * W + iw]
-                                                                      : 0.0f;
+                                    int iw                  = ow * sw + kj * dw - pw;
+                                    size_t row              = (size_t)(n * OH + oh) * OW + ow;
+                                    out_data[row * K + col] = (row_ok && iw >= 0 && iw < W)
+                                                                  ? xch[(size_t)ih * W + iw]
+                                                                  : 0.0f;
                                 }
                             }
                         }
@@ -3681,10 +4182,10 @@ not_empty_reduction:;
         int C = cp->C, H = cp->H, W = cp->W;
         int kh = cp->kh, kw = cp->kw, sh = cp->sh, sw = cp->sw;
         int ph = cp->ph, pw = cp->pw, dh = cp->dh, dw = cp->dw;
-        int OH = (H + 2 * ph - dh * (kh - 1) - 1) / sh + 1;
-        int OW = (W + 2 * pw - dw * (kw - 1) - 1) / sw + 1;
+        int OH   = (H + 2 * ph - dh * (kh - 1) - 1) / sh + 1;
+        int OW   = (W + 2 * pw - dw * (kw - 1) - 1) / sw + 1;
         size_t K = (size_t)C * kh * kw;
-        int N = (OH * OW > 0) ? (int)(node->inputs[0]->shape[0] / (OH * OW)) : 0;
+        int N    = (OH * OW > 0) ? (int)(node->inputs[0]->shape[0] / (OH * OW)) : 0;
         memset(out_data, 0, out->numel * sizeof(float));
         for (int n = 0; n < N; n++)
             for (int c = 0; c < C; c++) {
@@ -3694,10 +4195,12 @@ not_empty_reduction:;
                         size_t col = ((size_t)c * kh + ki) * kw + kj;
                         for (int oh = 0; oh < OH; oh++) {
                             int ih = oh * sh + ki * dh - ph;
-                            if (ih < 0 || ih >= H) continue;
+                            if (ih < 0 || ih >= H)
+                                continue;
                             for (int ow = 0; ow < OW; ow++) {
                                 int iw = ow * sw + kj * dw - pw;
-                                if (iw < 0 || iw >= W) continue;
+                                if (iw < 0 || iw >= W)
+                                    continue;
                                 size_t row = (size_t)(n * OH + oh) * OW + ow;
                                 och[(size_t)ih * W + iw] += in1_data[row * K + col];
                             }
@@ -3713,13 +4216,14 @@ not_empty_reduction:;
         if (!in1_data || !node->params)
             return -1;
         FoldParams* fp = (FoldParams*)node->params;
-        int ks     = fp->kernel_size;
-        int stride = fp->stride;
-        int L      = fp->output_len;
-        int ndim_in = node->inputs[0]->ndim;   /* [..., nw, ks] */
-        int nw      = node->inputs[0]->shape[ndim_in - 2];
-        size_t batch = 1;
-        for (int d = 0; d < ndim_in - 2; d++) batch *= (size_t)node->inputs[0]->shape[d];
+        int ks         = fp->kernel_size;
+        int stride     = fp->stride;
+        int L          = fp->output_len;
+        int ndim_in    = node->inputs[0]->ndim; /* [..., nw, ks] */
+        int nw         = node->inputs[0]->shape[ndim_in - 2];
+        size_t batch   = 1;
+        for (int d = 0; d < ndim_in - 2; d++)
+            batch *= (size_t)node->inputs[0]->shape[d];
         memset(out_data, 0, out->numel * sizeof(float));
         for (size_t b = 0; b < batch; b++)
             for (int w = 0; w < nw; w++)
@@ -3730,23 +4234,28 @@ not_empty_reduction:;
     }
 
     case UOP_SCATTER_ADD: {
-        if (node->num_inputs < 2 || !node->params) return -1;
+        if (node->num_inputs < 2 || !node->params)
+            return -1;
         float* src_data = (float*)node->inputs[1]->data;
-        if (!node->inputs[0]->data || !src_data) return -1;
-        Tensor* idx_tensor = node->inputs[0];
+        if (!node->inputs[0]->data || !src_data)
+            return -1;
+        Tensor* idx_tensor   = node->inputs[0];
         ScatterAddParams* sp = (ScatterAddParams*)node->params;
-        Tensor* src = node->inputs[1];
-        int dim = sp->dim;
+        Tensor* src          = node->inputs[1];
+        int dim              = sp->dim;
         size_t outer = 1, inner = 1;
-        for (int d = 0; d < dim; d++) outer *= (size_t)src->shape[d];
-        for (int d = dim + 1; d < src->ndim; d++) inner *= (size_t)src->shape[d];
+        for (int d = 0; d < dim; d++)
+            outer *= (size_t)src->shape[d];
+        for (int d = dim + 1; d < src->ndim; d++)
+            inner *= (size_t)src->shape[d];
         size_t src_dim = (size_t)src->shape[dim];
         size_t out_dim = (size_t)sp->dim_size;
         memset(out_data, 0, out->numel * sizeof(float));
         for (size_t o = 0; o < outer; o++)
             for (size_t j = 0; j < src_dim; j++) {
                 int idx = cml_index_read(idx_tensor, dim == 0 ? j : (o * src_dim + j));
-                if (idx < 0 || idx >= (int)out_dim) continue;
+                if (idx < 0 || idx >= (int)out_dim)
+                    continue;
                 for (size_t k = 0; k < inner; k++)
                     out_data[(o * out_dim + (size_t)idx) * inner + k] +=
                         src_data[(o * src_dim + j) * inner + k];
@@ -3859,11 +4368,10 @@ not_empty_reduction:;
          * Reached only when the conv graph was NOT decomposed — i.e. under
          * no_grad inference; training still lowers to im2col+matmul for autodiff. */
         if (groups == 1 && in_channels < 16 && out->dtype == DTYPE_FLOAT32) {
-            DirectConvData dcd = {in1_data,   in2_data,   bias_data,  out_data,
-                                  batch,      in_channels, out_channels, in_h,
-                                  in_w,       out_h,      out_w,      kernel_h,
-                                  kernel_w,   stride_h,   stride_w,   pad_h,
-                                  pad_w,      dilation_h, dilation_w};
+            DirectConvData dcd = {in1_data,    in2_data,     bias_data,  out_data,  batch,
+                                  in_channels, out_channels, in_h,       in_w,      out_h,
+                                  out_w,       kernel_h,     kernel_w,   stride_h,  stride_w,
+                                  pad_h,       pad_w,        dilation_h, dilation_w};
             /* Parallelise over (batch, out_channel, out_row) — disjoint output
              * rows, so no synchronisation. threadpool_parallel_for runs inline
              * for a 1-thread pool; we additionally keep small convs inline so
@@ -4658,8 +5166,7 @@ not_empty_reduction:;
             exp_avg_sq[j] = b2 * exp_avg_sq[j] + (1.0f - b2) * g * g;
             float denom;
             if (max_sq) {
-                max_sq[j] = isnan(exp_avg_sq[j]) ? exp_avg_sq[j]
-                                                 : fmaxf(max_sq[j], exp_avg_sq[j]);
+                max_sq[j] = isnan(exp_avg_sq[j]) ? exp_avg_sq[j] : fmaxf(max_sq[j], exp_avg_sq[j]);
                 denom     = sqrtf(max_sq[j]) + eps;
             } else {
                 denom = sqrtf(exp_avg_sq[j]) + eps;
@@ -4674,20 +5181,22 @@ not_empty_reduction:;
          * per output element, keeping intermediates in registers — no
          * intermediate tensor buffers are materialized. */
         FusedElementwiseParams* fp = (FusedElementwiseParams*)node->params;
-        if (!fp || fp->num_steps <= 0 || fp->num_steps > 256) return -1;
+        if (!fp || fp->num_steps <= 0 || fp->num_steps > 256)
+            return -1;
         int ni = node->num_inputs;
         const float* ind[32];
         size_t innum[32];
         for (int k = 0; k < ni && k < 32; k++) {
             Tensor* it = node->inputs[k];
-            ind[k]   = it ? (const float*)it->data : NULL;
-            innum[k] = it ? it->numel : 0;
+            ind[k]     = it ? (const float*)it->data : NULL;
+            innum[k]   = it ? it->numel : 0;
         }
-        int ns = fp->num_steps;
+        int ns       = fp->num_steps;
         size_t total = out->numel;
         /* per-step block scratch (block-local intermediates) + 3 scalar-splat bufs */
         float* tmp = (float*)cml_malloc((size_t)ns * FE_BLK * sizeof(float));
-        if (!tmp) return -1;
+        if (!tmp)
+            return -1;
         float sa[FE_BLK], sb[FE_BLK], sc[FE_BLK];
         for (size_t i0 = 0; i0 < total; i0 += FE_BLK) {
             int bs = (int)((total - i0) < FE_BLK ? (total - i0) : (size_t)FE_BLK);
@@ -4715,8 +5224,7 @@ not_empty_reduction:;
     /* Matmul epilogue: bias-add + activation folded onto the gemm, applied
      * in-place to the M*N output (f32 only; the fusion pass never attaches an
      * epilogue to a non-f32 matmul). No extra buffer or pass. */
-    if (node->type == UOP_MATMUL && node->params &&
-        out->dtype == DTYPE_FLOAT32 && out_data) {
+    if (node->type == UOP_MATMUL && node->params && out->dtype == DTYPE_FLOAT32 && out_data) {
         cml_apply_matmul_epilogue(node, out_data, out->numel);
     }
 
@@ -4816,7 +5324,7 @@ int cpu_execute_ir(CMLGraph_t ir) {
          * (a fused chain is a single node here). Opt-in via FLAMEGRAPH; the
          * enabled check is a cached bool so the off-path cost is ~nil. GPU-path
          * nodes take their own `continue` above and aren't timed in this slice. */
-        const int    _flame = cml_flame_enabled();
+        const int _flame       = cml_flame_enabled();
         const double _flame_t0 = _flame ? cml_flame_now_ms() : 0.0;
 
         int _rc;
@@ -4837,7 +5345,8 @@ int cpu_execute_ir(CMLGraph_t ir) {
 #ifdef CML_HAS_LLVM_BACKEND
         if (jit) {
             _rc = cml_llvm_execute_node(jit, node);
-            if (_rc != 0) _rc = cpu_execute_node(node); /* interpreter fallback */
+            if (_rc != 0)
+                _rc = cpu_execute_node(node); /* interpreter fallback */
         } else {
             _rc = cpu_execute_node(node);
         }
@@ -4847,7 +5356,8 @@ int cpu_execute_ir(CMLGraph_t ir) {
         if (_rc != 0) {
             LOG_WARNING("CPU fallback: failed to execute node");
         }
-        if (_flame) cml_flame_record(node, cml_flame_now_ms() - _flame_t0);
+        if (_flame)
+            cml_flame_record(node, cml_flame_now_ms() - _flame_t0);
         g_total_nodes_executed++;
 
         node = node->next;
@@ -4865,8 +5375,7 @@ int cpu_execute_ir(CMLGraph_t ir) {
                 if (n->output && n->output->data && new_plan->buffers[idx] &&
                     new_plan->buffer_sizes[idx] ==
                         (size_t)n->output->numel * cml_dtype_size(n->output->dtype)) {
-                    memcpy(new_plan->buffers[idx], n->output->data,
-                           new_plan->buffer_sizes[idx]);
+                    memcpy(new_plan->buffers[idx], n->output->data, new_plan->buffer_sizes[idx]);
                 }
                 idx++;
                 n = n->next;
@@ -4910,7 +5419,11 @@ static __thread int g_in_jit = 0;
 
 static int cml_tinyjit_active(void) {
     static int checked = 0, on = 0;
-    if (!checked) { const char* e = getenv("TINYJIT"); on = !(e && e[0] == '0'); checked = 1; }
+    if (!checked) {
+        const char* e = getenv("TINYJIT");
+        on            = !(e && e[0] == '0');
+        checked       = 1;
+    }
     return on;
 }
 
@@ -4919,11 +5432,14 @@ static int cml_tinyjit_active(void) {
  * the existing nodes and output buffers. Leaves (num_inputs==0: inputs/weights)
  * keep their materialized data. */
 void cml_ir_clear_executed(CMLGraph_t ir) {
-    if (!ir) return;
+    if (!ir)
+        return;
     for (struct IRNode* p = ir->head; p; p = p->next) {
-        if (p->num_inputs <= 0) continue;   /* leaf/input/weight — keep realized */
+        if (p->num_inputs <= 0)
+            continue; /* leaf/input/weight — keep realized */
         p->is_executed = false;
-        if (p->output) p->output->is_executed = false;
+        if (p->output)
+            p->output->is_executed = false;
     }
     ir->is_executed = false;
 }
@@ -4936,7 +5452,8 @@ void cml_ir_clear_executed(CMLGraph_t ir) {
  * already decomposed + fused from the first execute, so this only re-runs kernels
  * — no decompose, no fusion pass, no node allocation. */
 int cml_ir_reexecute(CMLGraph_t ir) {
-    if (!ir) return -1;
+    if (!ir)
+        return -1;
     cml_ir_clear_executed(ir);
     if (cml_ir_use_fusion_scheduler())
         return cml_ir_execute_fusion(ir);
@@ -4964,14 +5481,15 @@ int cml_ir_execute_cpu(CMLGraph_t ir) {
      * dispatch so the recorded trace captures the fused execution. */
     if (cml_ir_use_fusion_scheduler()) {
         cml_ir_fuse_elementwise(ir);
-        cml_ir_fuse_matmul_epilogue(ir);   /* fold bias+activation into the gemm */
+        cml_ir_fuse_matmul_epilogue(ir); /* fold bias+activation into the gemm */
     }
 
     if (cml_tinyjit_active() && !g_in_jit) {
-        if (!g_tinyjit) g_tinyjit = cml_tinyjit_create();
+        if (!g_tinyjit)
+            g_tinyjit = cml_tinyjit_create();
         if (g_tinyjit) {
-            g_in_jit = 1;                 /* re-entrant cml_ir_execute → real path */
-            int rc = cml_tinyjit_execute(g_tinyjit, ir);
+            g_in_jit = 1; /* re-entrant cml_ir_execute → real path */
+            int rc   = cml_tinyjit_execute(g_tinyjit, ir);
             g_in_jit = 0;
             return rc;
         }
@@ -4990,11 +5508,10 @@ int cml_ir_execute_cpu(CMLGraph_t ir) {
  * metal/opencl, silently ignoring cuda/rocm/vulkan/nv/am/nir/webgpu. Returns
  * the requested backend (CML_BACKEND_CPU_FALLBACK when unset/unparseable —
  * never a GPU route) and the dispatch context to run it on. */
-static int ir_resolve_env_backend(CMLBackendType* out_backend,
-                                  CMLDispatchContext** out_ctx) {
-    static int resolved              = 0;
-    static CMLBackendType backend    = CML_BACKEND_CPU_FALLBACK;
-    static CMLDispatchContext* rctx  = NULL;
+static int ir_resolve_env_backend(CMLBackendType* out_backend, CMLDispatchContext** out_ctx) {
+    static int resolved             = 0;
+    static CMLBackendType backend   = CML_BACKEND_CPU_FALLBACK;
+    static CMLDispatchContext* rctx = NULL;
     if (!resolved) {
         const char* env = getenv("BACKEND");
         if (env) {
@@ -5069,7 +5586,7 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
             _n = _n->next;
         }
         ir->node_count = cnt;
-        int r = cml_dispatch_execute_on(s_dispatch_ctx, env_backend, ir, NULL, 0, NULL, 0);
+        int r          = cml_dispatch_execute_on(s_dispatch_ctx, env_backend, ir, NULL, 0, NULL, 0);
         target_node->next = saved_next;
         ir->tail          = saved_tail;
         ir->node_count    = saved_count;
@@ -5084,17 +5601,20 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
             /* Mark only nodes reachable from the target used, so the fusion
              * scheduler skips dead nodes (e.g. earlier ops whose tensors were
              * freed) instead of choking on them. */
-            for (struct IRNode* _n = ir->head; _n; _n = _n->next) _n->is_used = false;
+            for (struct IRNode* _n = ir->head; _n; _n = _n->next)
+                _n->is_used = false;
             struct IRNode* stk[4096];
-            int top = 0;
+            int top    = 0;
             stk[top++] = target_node;
             while (top > 0) {
                 struct IRNode* cur = stk[--top];
-                if (!cur || cur->is_used) continue;
+                if (!cur || cur->is_used)
+                    continue;
                 cur->is_used = true;
                 for (int i = 0; i < cur->num_inputs && cur->inputs; i++) {
                     Tensor* inp = cur->inputs[i];
-                    if (inp && inp->ir_node && !((struct IRNode*)inp->ir_node)->is_used && top < 4096)
+                    if (inp && inp->ir_node && !((struct IRNode*)inp->ir_node)->is_used &&
+                        top < 4096)
                         stk[top++] = (struct IRNode*)inp->ir_node;
                 }
             }

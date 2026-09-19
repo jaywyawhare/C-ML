@@ -14,19 +14,19 @@ extern "C" {
 #endif
 
 typedef enum {
-    WINOGRAD_F2x2_3x3 = 0,  /* output 2x2, kernel 3x3 -> tile 4x4 */
-    WINOGRAD_F4x4_3x3 = 1,  /* output 4x4, kernel 3x3 -> tile 6x6 */
+    WINOGRAD_F2x2_3x3 = 0, /* output 2x2, kernel 3x3 -> tile 4x4 */
+    WINOGRAD_F4x4_3x3 = 1, /* output 4x4, kernel 3x3 -> tile 6x6 */
 } WinogradVariant;
 
 typedef struct {
     WinogradVariant variant;
-    int tile_size;    /* tile dimension (4 or 6) */
-    int output_tile;  /* output tile dimension (2 or 4) */
-    int kernel_size;  /* 3 */
+    int tile_size;   /* tile dimension (4 or 6) */
+    int output_tile; /* output tile dimension (2 or 4) */
+    int kernel_size; /* 3 */
 } WinogradConfig;
 
-bool winograd_applicable(int kernel_h, int kernel_w, int stride_h, int stride_w,
-                         int dilation_h, int dilation_w);
+bool winograd_applicable(int kernel_h, int kernel_w, int stride_h, int stride_w, int dilation_h,
+                         int dilation_w);
 
 WinogradConfig winograd_select_variant(int height, int width);
 
@@ -43,10 +43,9 @@ int winograd_transform_weight(const float* weight, int out_channels, int in_chan
  * bias:   [out_channels] or NULL
  * output: [batch, out_channels, out_h, out_w]
  */
-int winograd_conv2d(const float* input, const float* weight, const float* bias,
-                    float* output, int batch, int in_channels, int out_channels,
-                    int height, int width, int padding_h, int padding_w,
-                    int groups, const WinogradConfig* config);
+int winograd_conv2d(const float* input, const float* weight, const float* bias, float* output,
+                    int batch, int in_channels, int out_channels, int height, int width,
+                    int padding_h, int padding_w, int groups, const WinogradConfig* config);
 
 #ifdef __cplusplus
 }

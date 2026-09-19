@@ -15,10 +15,10 @@ extern "C" {
 
 typedef struct CMLHexagonBackend {
     bool initialized;
-    int dsp_version;          /* e.g., V68, V69, V73 */
-    int hvx_length;           /* HVX vector length (128 bytes) */
-    bool has_hmx;             /* Has Hexagon Matrix eXtensions */
-    void* handle;             /* DSP runtime handle */
+    int dsp_version; /* e.g., V68, V69, V73 */
+    int hvx_length;  /* HVX vector length (128 bytes) */
+    bool has_hmx;    /* Has Hexagon Matrix eXtensions */
+    void* handle;    /* DSP runtime handle */
 } CMLHexagonBackend;
 
 bool cml_hexagon_available(void);

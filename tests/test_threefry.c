@@ -35,7 +35,8 @@ static int test_uniform_range(void) {
     cml_rng_uniform(&state, buf, 10000);
 
     for (int i = 0; i < 10000; i++) {
-        if (buf[i] < 0.0f || buf[i] >= 1.0f) return 0;
+        if (buf[i] < 0.0f || buf[i] >= 1.0f)
+            return 0;
     }
     return 1;
 }
@@ -48,7 +49,8 @@ static int test_uniform_mean(void) {
     cml_rng_uniform(&state, buf, 50000);
 
     double sum = 0;
-    for (int i = 0; i < 50000; i++) sum += buf[i];
+    for (int i = 0; i < 50000; i++)
+        sum += buf[i];
     double mean = sum / 50000.0;
     return fabs(mean - 0.5) < 0.01;
 }
@@ -66,7 +68,7 @@ static int test_normal_moments(void) {
         sum2 += (double)buf[i] * buf[i];
     }
     double mean = sum / 50000.0;
-    double var = sum2 / 50000.0 - mean * mean;
+    double var  = sum2 / 50000.0 - mean * mean;
 
     return fabs(mean) < 0.02 && fabs(var - 1.0) < 0.05;
 }
@@ -80,8 +82,10 @@ static int test_uint32_output(void) {
 
     int has_high = 0, has_low = 0;
     for (int i = 0; i < 1000; i++) {
-        if (buf[i] > 0x80000000U) has_high = 1;
-        if (buf[i] < 0x80000000U) has_low = 1;
+        if (buf[i] > 0x80000000U)
+            has_high = 1;
+        if (buf[i] < 0x80000000U)
+            has_low = 1;
     }
     return has_high && has_low;
 }

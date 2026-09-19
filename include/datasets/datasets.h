@@ -25,10 +25,8 @@ float* cml_idx_load_images(const char* path, int* n, int* rows, int* cols);
 
 float* cml_idx_load_labels(const char* path, int* n);
 
-int cml_csv_parse(const char* filepath, int target_col,
-                  float** X_out, float** y_out,
-                  int* num_samples, int* num_features, int* num_classes,
-                  char*** class_names_out);
+int cml_csv_parse(const char* filepath, int target_col, float** X_out, float** y_out,
+                  int* num_samples, int* num_features, int* num_classes, char*** class_names_out);
 
 const float* cml_builtin_airline_data(int* n);
 

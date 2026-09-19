@@ -38,7 +38,7 @@ CML_API void torch_inference_mode(bool enabled);
 /* GEMM backend thread tuning (MKL/OpenBLAS/BLIS/ILP64; process-global).
  * Concurrent calls race; typical usage is once at startup. */
 CML_API void torch_set_num_threads(int n);
-CML_API int  torch_get_num_threads(void);
+CML_API int torch_get_num_threads(void);
 
 /* Materialize a lazy tensor and detach it from the IR graph so it survives
  * torch_reset_ir(). Returns 0 on success, -1 if t is NULL or realize fails. */

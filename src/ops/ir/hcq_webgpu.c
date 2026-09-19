@@ -41,7 +41,7 @@ CMLHCQQueue* cml_hcq_webgpu_queue_create(void) {
         return NULL;
     }
 
-    CMLHCQQueue* queue = (CMLHCQQueue*)cml_calloc(1, sizeof(CMLHCQQueue));
+    CMLHCQQueue* queue  = (CMLHCQQueue*)cml_calloc(1, sizeof(CMLHCQQueue));
     WebGPUQueueData* qd = (WebGPUQueueData*)cml_calloc(1, sizeof(WebGPUQueueData));
     if (!queue || !qd) {
         cml_free(queue);
@@ -50,7 +50,7 @@ CMLHCQQueue* cml_hcq_webgpu_queue_create(void) {
         return NULL;
     }
 
-    qd->backend = backend;
+    qd->backend          = backend;
     queue->backend       = CML_HCQ_WEBGPU;
     queue->native_handle = qd;
     queue->active        = true;
@@ -80,8 +80,8 @@ int cml_hcq_webgpu_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* des
     size_t wg[3] = {desc->grid[0], desc->grid[1], desc->grid[2]};
     /* Buffer sizes live in the WGPUBuffer objects; the backend tolerates a
      * NULL sizes array. */
-    int rc = cml_webgpu_launch_kernel(backend, (CMLWebGPUKernel*)desc->compiled_kernel,
-                                      wg, desc->args, NULL, desc->num_args);
+    int rc = cml_webgpu_launch_kernel(backend, (CMLWebGPUKernel*)desc->compiled_kernel, wg,
+                                      desc->args, NULL, desc->num_args);
     if (rc == 0)
         ((WebGPUQueueData*)queue->native_handle)->submit_count++;
     return rc;
@@ -105,15 +105,14 @@ int cml_hcq_webgpu_queue_synchronize(CMLHCQQueue* queue) {
         return -1;
     /* Drain the queue: an empty submit is fenced by device poll. */
     if (backend->fn_queue_submit && backend->fn_device_poll) {
-        void (*queue_submit)(void*, void*) =
-            (void (*)(void*, void*))backend->fn_queue_submit;
+        void (*queue_submit)(void*, void*) = (void (*)(void*, void*))backend->fn_queue_submit;
         /* wgpuDevicePoll(device, wait, options) */
         unsigned int (*device_poll)(void*, int, const void*) =
             (unsigned int (*)(void*, int, const void*))backend->fn_device_poll;
         void* device = backend->device;
         void* queue  = backend->queue;
         if (device && queue) {
-            queue_submit(queue, NULL);   /* WGPUQueueSubmit(q, 0, NULL) — fence */
+            queue_submit(queue, NULL);         /* WGPUQueueSubmit(q, 0, NULL) — fence */
             if (!device_poll(device, 1, NULL)) /* wait for the fence */
                 return -1;
             return 0;
@@ -146,7 +145,7 @@ int cml_hcq_webgpu_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
      * queue drains. */
     if (cml_hcq_webgpu_queue_synchronize(queue) != 0)
         return -1;
-    signal->signaled       = true;
+    signal->signaled = true;
     signal->timeline_value++;
     return 0;
 }
@@ -169,27 +168,52 @@ int cml_hcq_webgpu_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
 CMLHCQQueue* cml_hcq_webgpu_queue_create(void) { return NULL; }
 void cml_hcq_webgpu_queue_destroy(CMLHCQQueue* q) { (void)q; }
 
-int cml_hcq_webgpu_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* d)
-    { (void)q; (void)d; return -1; }
+int cml_hcq_webgpu_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* d) {
+    (void)q;
+    (void)d;
+    return -1;
+}
 
-int cml_hcq_webgpu_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n)
-    { (void)q; (void)d; (void)s; (void)n; return -1; }
+int cml_hcq_webgpu_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
+    (void)q;
+    (void)d;
+    (void)s;
+    (void)n;
+    return -1;
+}
 
-int cml_hcq_webgpu_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n)
-    { (void)q; (void)d; (void)s; (void)n; return -1; }
+int cml_hcq_webgpu_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
+    (void)q;
+    (void)d;
+    (void)s;
+    (void)n;
+    return -1;
+}
 
 CMLHCQSignal* cml_hcq_webgpu_signal_create(void) { return NULL; }
-void          cml_hcq_webgpu_signal_destroy(CMLHCQSignal* s) { (void)s; }
+void cml_hcq_webgpu_signal_destroy(CMLHCQSignal* s) { (void)s; }
 
-int cml_hcq_webgpu_signal_record(CMLHCQQueue* q, CMLHCQSignal* s)
-    { (void)q; (void)s; return -1; }
+int cml_hcq_webgpu_signal_record(CMLHCQQueue* q, CMLHCQSignal* s) {
+    (void)q;
+    (void)s;
+    return -1;
+}
 
-int cml_hcq_webgpu_queue_wait(CMLHCQQueue* q, CMLHCQSignal* s)
-    { (void)q; (void)s; return -1; }
+int cml_hcq_webgpu_queue_wait(CMLHCQQueue* q, CMLHCQSignal* s) {
+    (void)q;
+    (void)s;
+    return -1;
+}
 
-int cml_hcq_webgpu_signal_wait_cpu(CMLHCQSignal* s, uint64_t t)
-    { (void)s; (void)t; return -1; }
+int cml_hcq_webgpu_signal_wait_cpu(CMLHCQSignal* s, uint64_t t) {
+    (void)s;
+    (void)t;
+    return -1;
+}
 
-int cml_hcq_webgpu_queue_synchronize(CMLHCQQueue* q) { (void)q; return -1; }
+int cml_hcq_webgpu_queue_synchronize(CMLHCQQueue* q) {
+    (void)q;
+    return -1;
+}
 
 #endif /* CML_HAS_WEBGPU */

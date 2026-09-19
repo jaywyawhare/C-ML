@@ -53,8 +53,8 @@ LayerNorm2d* nn_layernorm2d(int num_channels, float eps, bool affine, DType dtyp
     ln->affine       = affine;
 
     if (affine) {
-        if (nn_add_affine_params((Module*)ln, num_channels, dtype, device,
-                                 &ln->weight, &ln->bias) != 0)
+        if (nn_add_affine_params((Module*)ln, num_channels, dtype, device, &ln->weight,
+                                 &ln->bias) != 0)
             return NULL;
     } else {
         ln->weight = NULL;

@@ -11,48 +11,51 @@
 
 static struct CMLGraph* make_empty_graph(void) {
     struct CMLGraph* g = cml_calloc(1, sizeof(struct CMLGraph));
-    if (!g) return NULL;
+    if (!g)
+        return NULL;
     g->target = IR_TARGET_CUDA;
     return g;
 }
 
 static struct IRNode* make_matmul_node(const char* name, int m, int n, int k) {
     struct IRNode* node = cml_calloc(1, sizeof(struct IRNode));
-    if (!node) return NULL;
+    if (!node)
+        return NULL;
 
-    node->type = UOP_MATMUL;
-    node->num_inputs = 2;
-    node->input_names = cml_malloc(2 * sizeof(char*));
+    node->type           = UOP_MATMUL;
+    node->num_inputs     = 2;
+    node->input_names    = cml_malloc(2 * sizeof(char*));
     node->input_names[0] = cml_strdup("input_a");
     node->input_names[1] = cml_strdup("input_b");
-    node->output_name = cml_strdup(name);
+    node->output_name    = cml_strdup(name);
 
-    node->input_ndims = cml_malloc(2 * sizeof(int));
+    node->input_ndims    = cml_malloc(2 * sizeof(int));
     node->input_ndims[0] = 2;
     node->input_ndims[1] = 2;
 
-    node->input_shapes = cml_malloc(2 * sizeof(int*));
-    node->input_shapes[0] = cml_malloc(2 * sizeof(int));
+    node->input_shapes       = cml_malloc(2 * sizeof(int*));
+    node->input_shapes[0]    = cml_malloc(2 * sizeof(int));
     node->input_shapes[0][0] = m;
     node->input_shapes[0][1] = k;
-    node->input_shapes[1] = cml_malloc(2 * sizeof(int));
+    node->input_shapes[1]    = cml_malloc(2 * sizeof(int));
     node->input_shapes[1][0] = k;
     node->input_shapes[1][1] = n;
 
-    node->output_ndim = 2;
-    node->output_shape = cml_malloc(2 * sizeof(int));
+    node->output_ndim     = 2;
+    node->output_shape    = cml_malloc(2 * sizeof(int));
     node->output_shape[0] = m;
     node->output_shape[1] = n;
 
     return node;
 }
 
-static struct IRNode* make_simple_node(const char* name, UOpType type,
-                                       int num_inputs, const char** input_names) {
+static struct IRNode* make_simple_node(const char* name, UOpType type, int num_inputs,
+                                       const char** input_names) {
     struct IRNode* node = cml_calloc(1, sizeof(struct IRNode));
-    if (!node) return NULL;
+    if (!node)
+        return NULL;
 
-    node->type = type;
+    node->type       = type;
     node->num_inputs = num_inputs;
     if (num_inputs > 0) {
         node->input_names = cml_malloc((size_t)num_inputs * sizeof(char*));
@@ -75,7 +78,8 @@ static void append_node(struct CMLGraph* g, struct IRNode* node) {
 }
 
 static void free_graph(struct CMLGraph* g) {
-    if (!g) return;
+    if (!g)
+        return;
     struct IRNode* n = g->head;
     while (n) {
         struct IRNode* next = n->next;
@@ -102,11 +106,16 @@ static void free_graph(struct CMLGraph* g) {
 
 static int test_config_defaults(void) {
     CMLTCConfig cfg = cml_tc_get_config();
-    if (cfg.min_m != CML_TC_DEFAULT_MIN_DIM) return 0;
-    if (cfg.min_n != CML_TC_DEFAULT_MIN_DIM) return 0;
-    if (cfg.min_k != CML_TC_DEFAULT_MIN_DIM) return 0;
-    if (!cfg.allow_padding) return 0;
-    if (cfg.prefer_fp16) return 0;
+    if (cfg.min_m != CML_TC_DEFAULT_MIN_DIM)
+        return 0;
+    if (cfg.min_n != CML_TC_DEFAULT_MIN_DIM)
+        return 0;
+    if (cfg.min_k != CML_TC_DEFAULT_MIN_DIM)
+        return 0;
+    if (!cfg.allow_padding)
+        return 0;
+    if (cfg.prefer_fp16)
+        return 0;
     return 1;
 }
 
@@ -114,8 +123,11 @@ static int test_config_set_get(void) {
     CMLTCConfig original = cml_tc_get_config();
 
     CMLTCConfig cfg = {
-        .min_m = 32, .min_n = 32, .min_k = 32,
-        .allow_padding = false, .prefer_fp16 = true,
+        .min_m         = 32,
+        .min_n         = 32,
+        .min_k         = 32,
+        .allow_padding = false,
+        .prefer_fp16   = true,
     };
     cml_tc_set_config(&cfg);
 
@@ -138,13 +150,12 @@ static int test_config_null_safe(void) {
     return 1;
 }
 
-static int test_optimize_null_graph(void) {
-    return cml_tc_optimize(NULL) == 0;
-}
+static int test_optimize_null_graph(void) { return cml_tc_optimize(NULL) == 0; }
 
 static int test_optimize_empty_graph(void) {
     struct CMLGraph* g = make_empty_graph();
-    if (!g) return 0;
+    if (!g)
+        return 0;
     int ret = cml_tc_optimize(g);
     cml_free(g);
     return ret == 0;
@@ -157,19 +168,20 @@ static int test_optimize_aligned_matmul(void) {
     }
 
     struct CMLGraph* g = make_empty_graph();
-    if (!g) return 0;
+    if (!g)
+        return 0;
 
     const char* dummy_inputs[] = {"dummy_a", "dummy_b"};
-    struct IRNode* a = make_simple_node("input_a", UOP_FILL, 0, NULL);
-    struct IRNode* b = make_simple_node("input_b", UOP_FILL, 0, NULL);
-    struct IRNode* mm = make_matmul_node("mm_out", 256, 256, 256);
+    struct IRNode* a           = make_simple_node("input_a", UOP_FILL, 0, NULL);
+    struct IRNode* b           = make_simple_node("input_b", UOP_FILL, 0, NULL);
+    struct IRNode* mm          = make_matmul_node("mm_out", 256, 256, 256);
 
     append_node(g, a);
     append_node(g, b);
     append_node(g, mm);
 
     int count_before = g->node_count;
-    int rewrites = cml_tc_optimize(g);
+    int rewrites     = cml_tc_optimize(g);
 
     if (rewrites <= 0) {
         printf("(expected rewrite) ");
@@ -177,7 +189,7 @@ static int test_optimize_aligned_matmul(void) {
         return 0;
     }
 
-    int found_fused = 0;
+    int found_fused  = 0;
     struct IRNode* n = g->head;
     while (n) {
         if (n->is_fused && n->fusion_type == FUSION_FMA)
@@ -199,10 +211,11 @@ static int test_optimize_aligned_matmul(void) {
 
 static int test_optimize_small_matmul_skipped(void) {
     struct CMLGraph* g = make_empty_graph();
-    if (!g) return 0;
+    if (!g)
+        return 0;
 
-    struct IRNode* a = make_simple_node("input_a", UOP_FILL, 0, NULL);
-    struct IRNode* b = make_simple_node("input_b", UOP_FILL, 0, NULL);
+    struct IRNode* a  = make_simple_node("input_a", UOP_FILL, 0, NULL);
+    struct IRNode* b  = make_simple_node("input_b", UOP_FILL, 0, NULL);
     struct IRNode* mm = make_matmul_node("mm_out", 4, 4, 4);
 
     append_node(g, a);
@@ -222,11 +235,12 @@ static int test_optimize_small_matmul_skipped(void) {
 
 static int test_optimize_non_matmul_untouched(void) {
     struct CMLGraph* g = make_empty_graph();
-    if (!g) return 0;
+    if (!g)
+        return 0;
 
     const char* inputs[] = {"x"};
-    struct IRNode* x = make_simple_node("x", UOP_FILL, 0, NULL);
-    struct IRNode* e = make_simple_node("exp_out", UOP_EXP, 1, inputs);
+    struct IRNode* x     = make_simple_node("x", UOP_FILL, 0, NULL);
+    struct IRNode* e     = make_simple_node("exp_out", UOP_EXP, 1, inputs);
 
     append_node(g, x);
     append_node(g, e);
@@ -255,12 +269,13 @@ static int test_already_fused_skipped(void) {
     }
 
     struct CMLGraph* g = make_empty_graph();
-    if (!g) return 0;
+    if (!g)
+        return 0;
 
-    struct IRNode* a = make_simple_node("input_a", UOP_FILL, 0, NULL);
-    struct IRNode* b = make_simple_node("input_b", UOP_FILL, 0, NULL);
+    struct IRNode* a  = make_simple_node("input_a", UOP_FILL, 0, NULL);
+    struct IRNode* b  = make_simple_node("input_b", UOP_FILL, 0, NULL);
     struct IRNode* mm = make_matmul_node("mm_out", 64, 64, 64);
-    mm->is_fused = true;
+    mm->is_fused      = true;
 
     append_node(g, a);
     append_node(g, b);
@@ -284,15 +299,18 @@ static int test_padding_disabled(void) {
     }
 
     CMLTCConfig original = cml_tc_get_config();
-    CMLTCConfig cfg = original;
-    cfg.allow_padding = false;
+    CMLTCConfig cfg      = original;
+    cfg.allow_padding    = false;
     cml_tc_set_config(&cfg);
 
     struct CMLGraph* g = make_empty_graph();
-    if (!g) { cml_tc_set_config(&original); return 0; }
+    if (!g) {
+        cml_tc_set_config(&original);
+        return 0;
+    }
 
-    struct IRNode* a = make_simple_node("input_a", UOP_FILL, 0, NULL);
-    struct IRNode* b = make_simple_node("input_b", UOP_FILL, 0, NULL);
+    struct IRNode* a  = make_simple_node("input_a", UOP_FILL, 0, NULL);
+    struct IRNode* b  = make_simple_node("input_b", UOP_FILL, 0, NULL);
     struct IRNode* mm = make_matmul_node("mm_out", 20, 20, 20);
 
     append_node(g, a);

@@ -19,8 +19,8 @@
 typedef struct GlooContext {
     int rank;
     int world_size;
-    int listen_fd;         /* Listening socket for this rank */
-    int* peer_fds;         /* Array of connected socket fds, indexed by rank */
+    int listen_fd; /* Listening socket for this rank */
+    int* peer_fds; /* Array of connected socket fds, indexed by rank */
     int port_base;
     char master_addr[256];
 } GlooContext;
@@ -33,12 +33,10 @@ typedef struct GlooContext {
  */
 static GlooContext* g_gloo_ctx = NULL;
 
-static GlooContext* get_gloo_ctx(void* ctx) {
-    return ctx ? (GlooContext*)ctx : g_gloo_ctx;
-}
+static GlooContext* get_gloo_ctx(void* ctx) { return ctx ? (GlooContext*)ctx : g_gloo_ctx; }
 
 static int send_all(int fd, const void* buf, size_t len) {
-    const char* p = (const char*)buf;
+    const char* p    = (const char*)buf;
     size_t remaining = len;
     while (remaining > 0) {
         ssize_t n = send(fd, p, remaining, 0);
@@ -54,7 +52,7 @@ static int send_all(int fd, const void* buf, size_t len) {
 }
 
 static int recv_all(int fd, void* buf, size_t len) {
-    char* p = (char*)buf;
+    char* p          = (char*)buf;
     size_t remaining = len;
     while (remaining > 0) {
         ssize_t n = recv(fd, p, remaining, 0);
@@ -131,7 +129,7 @@ static int gloo_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
         return -1;
     }
 
-    int recv_tag = 0;
+    int recv_tag     = 0;
     size_t recv_size = 0;
 
     if (recv_all(fd, &recv_tag, sizeof(recv_tag)) != 0) {
@@ -139,8 +137,8 @@ static int gloo_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
         return -1;
     }
     if (recv_tag != tag) {
-        LOG_ERROR("Gloo recv: tag mismatch (expected %d, got %d) from rank %d",
-                  tag, recv_tag, src_rank);
+        LOG_ERROR("Gloo recv: tag mismatch (expected %d, got %d) from rank %d", tag, recv_tag,
+                  src_rank);
         return -1;
     }
     if (recv_all(fd, &recv_size, sizeof(recv_size)) != 0) {
@@ -150,8 +148,8 @@ static int gloo_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
 
     size_t expected_size = tensor->numel * sizeof(float);
     if (recv_size != expected_size) {
-        LOG_ERROR("Gloo recv: size mismatch (expected %zu, got %zu) from rank %d",
-                  expected_size, recv_size, src_rank);
+        LOG_ERROR("Gloo recv: size mismatch (expected %zu, got %zu) from rank %d", expected_size,
+                  recv_size, src_rank);
         return -1;
     }
 
@@ -170,13 +168,13 @@ static DistWork* gloo_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx
     if (!work)
         return NULL;
 
-    work->internal = NULL;
-    work->completed = false;
+    work->internal   = NULL;
+    work->completed  = false;
     work->error_code = 0;
 
-    int ret = gloo_allreduce(tensor, op, ctx);
+    int ret          = gloo_allreduce(tensor, op, ctx);
     work->error_code = ret;
-    work->completed = true;
+    work->completed  = true;
 
     LOG_DEBUG("Gloo allreduce_async completed synchronously (error=%d)", ret);
     return work;
@@ -212,9 +210,8 @@ static int gloo_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     }
 
     /* For multi-process: use ring all-reduce algorithm */
-    int ret = cml_ring_allreduce((float*)tensor->data, tensor->numel,
-                                  group->world_size, group->rank,
-                                  op, group->ops, group->backend_ctx);
+    int ret = cml_ring_allreduce((float*)tensor->data, tensor->numel, group->world_size,
+                                 group->rank, op, group->ops, group->backend_ctx);
     if (ret != 0) {
         LOG_ERROR("Ring allreduce failed");
         return ret;
@@ -226,8 +223,8 @@ static int gloo_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
 
 /* Tags reserved for collectives (kept distinct from user send/recv tags, which
  * callers pass explicitly; the ring-allreduce uses [0, 2*world_size)). */
-#define GLOO_TAG_BCAST   1000001
-#define GLOO_TAG_GATHER  1000002
+#define GLOO_TAG_BCAST 1000001
+#define GLOO_TAG_GATHER 1000002
 
 static int gloo_broadcast(Tensor* tensor, int src_rank, void* ctx) {
     GlooContext* gctx = get_gloo_ctx(ctx);
@@ -248,7 +245,8 @@ static int gloo_broadcast(Tensor* tensor, int src_rank, void* ctx) {
      * there is no deadlock. */
     if (gctx->rank == src_rank) {
         for (int peer = 0; peer < gctx->world_size; peer++) {
-            if (peer == gctx->rank) continue;
+            if (peer == gctx->rank)
+                continue;
             if (gloo_send(tensor, peer, GLOO_TAG_BCAST, ctx) != 0)
                 return -1;
         }
@@ -279,17 +277,22 @@ static int gloo_allgather(Tensor** output, Tensor* input, void* ctx) {
     /* Exchange with every peer; the lower rank of each pair sends first so the
      * blocking sockets never both block on send. */
     for (int peer = 0; peer < ws; peer++) {
-        if (peer == rank) continue;
+        if (peer == rank)
+            continue;
         if (!output[peer] || !output[peer]->data) {
             LOG_ERROR("Gloo allgather: output[%d] not allocated", peer);
             return -1;
         }
         if (rank < peer) {
-            if (gloo_send(input, peer, GLOO_TAG_GATHER, ctx) != 0) return -1;
-            if (gloo_recv(output[peer], peer, GLOO_TAG_GATHER, ctx) != 0) return -1;
+            if (gloo_send(input, peer, GLOO_TAG_GATHER, ctx) != 0)
+                return -1;
+            if (gloo_recv(output[peer], peer, GLOO_TAG_GATHER, ctx) != 0)
+                return -1;
         } else {
-            if (gloo_recv(output[peer], peer, GLOO_TAG_GATHER, ctx) != 0) return -1;
-            if (gloo_send(input, peer, GLOO_TAG_GATHER, ctx) != 0) return -1;
+            if (gloo_recv(output[peer], peer, GLOO_TAG_GATHER, ctx) != 0)
+                return -1;
+            if (gloo_send(input, peer, GLOO_TAG_GATHER, ctx) != 0)
+                return -1;
         }
     }
     return 0;
@@ -312,22 +315,26 @@ static int gloo_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, v
     /* Reduce the full input across all ranks, then keep this rank's slice.
      * (Reuses the ring all-reduce, which is correct and deadlock-free.) */
     DistProcessGroup* group = cml_dist_get_default_group();
-    if (!group || !group->ops) return -1;
+    if (!group || !group->ops)
+        return -1;
 
     size_t off = (size_t)rank * output->numel;
     if (off + output->numel > input->numel) {
-        LOG_ERROR("Gloo reduce_scatter: output slice [%zu,%zu) exceeds input numel %zu",
-                  off, off + output->numel, input->numel);
+        LOG_ERROR("Gloo reduce_scatter: output slice [%zu,%zu) exceeds input numel %zu", off,
+                  off + output->numel, input->numel);
         return -1;
     }
 
     float* tmp = (float*)cml_malloc(input->numel * sizeof(float));
-    if (!tmp) return -1;
+    if (!tmp)
+        return -1;
     memcpy(tmp, input->data, input->numel * sizeof(float));
 
-    int rc = cml_ring_allreduce(tmp, input->numel, ws, rank, op,
-                                group->ops, group->backend_ctx);
-    if (rc != 0) { cml_free(tmp); return -1; }
+    int rc = cml_ring_allreduce(tmp, input->numel, ws, rank, op, group->ops, group->backend_ctx);
+    if (rc != 0) {
+        cml_free(tmp);
+        return -1;
+    }
 
     memcpy(output->data, tmp + off, output->numel * sizeof(float));
     cml_free(tmp);
@@ -345,12 +352,16 @@ static int gloo_barrier(void* ctx) {
     int ws = gctx->world_size, rank = gctx->rank;
     if (rank == 0) {
         for (int p = 1; p < ws; p++)
-            if (recv_all(gctx->peer_fds[p], &token, 1) != 0) return -1;
+            if (recv_all(gctx->peer_fds[p], &token, 1) != 0)
+                return -1;
         for (int p = 1; p < ws; p++)
-            if (send_all(gctx->peer_fds[p], &token, 1) != 0) return -1;
+            if (send_all(gctx->peer_fds[p], &token, 1) != 0)
+                return -1;
     } else {
-        if (send_all(gctx->peer_fds[0], &token, 1) != 0) return -1;
-        if (recv_all(gctx->peer_fds[0], &token, 1) != 0) return -1;
+        if (send_all(gctx->peer_fds[0], &token, 1) != 0)
+            return -1;
+        if (recv_all(gctx->peer_fds[0], &token, 1) != 0)
+            return -1;
     }
     return 0;
 }
@@ -364,8 +375,8 @@ static int gloo_init(void* ctx, int world_size, int rank) {
     }
 
     GlooContext* gctx = g_gloo_ctx;
-    gctx->rank = rank;
-    gctx->world_size = world_size;
+    gctx->rank        = rank;
+    gctx->world_size  = world_size;
 
     /* Read environment configuration */
     const char* addr_env = getenv("MASTER_ADDR");
@@ -396,8 +407,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
     /* Single-process mode: skip socket setup */
     if (world_size <= 1) {
         gctx->listen_fd = -1;
-        LOG_INFO("Gloo backend initialized in single-process mode (rank %d/%d)",
-                 rank, world_size);
+        LOG_INFO("Gloo backend initialized in single-process mode (rank %d/%d)", rank, world_size);
         return 0;
     }
 
@@ -415,13 +425,13 @@ static int gloo_init(void* ctx, int world_size, int rank) {
 
     struct sockaddr_in listen_addr;
     memset(&listen_addr, 0, sizeof(listen_addr));
-    listen_addr.sin_family = AF_INET;
+    listen_addr.sin_family      = AF_INET;
     listen_addr.sin_addr.s_addr = INADDR_ANY;
-    listen_addr.sin_port = htons((uint16_t)(gctx->port_base + rank));
+    listen_addr.sin_port        = htons((uint16_t)(gctx->port_base + rank));
 
     if (bind(gctx->listen_fd, (struct sockaddr*)&listen_addr, sizeof(listen_addr)) < 0) {
-        LOG_ERROR("Gloo init: failed to bind on port %d: %s",
-                  gctx->port_base + rank, strerror(errno));
+        LOG_ERROR("Gloo init: failed to bind on port %d: %s", gctx->port_base + rank,
+                  strerror(errno));
         close(gctx->listen_fd);
         gctx->listen_fd = -1;
         cml_free(gctx->peer_fds);
@@ -451,15 +461,14 @@ static int gloo_init(void* ctx, int world_size, int rank) {
     for (int peer = rank + 1; peer < world_size; peer++) {
         int sock = socket(AF_INET, SOCK_STREAM, 0);
         if (sock < 0) {
-            LOG_ERROR("Gloo init: failed to create socket for peer %d: %s",
-                      peer, strerror(errno));
+            LOG_ERROR("Gloo init: failed to create socket for peer %d: %s", peer, strerror(errno));
             goto cleanup_error;
         }
 
         struct sockaddr_in peer_addr;
         memset(&peer_addr, 0, sizeof(peer_addr));
         peer_addr.sin_family = AF_INET;
-        peer_addr.sin_port = htons((uint16_t)(gctx->port_base + peer));
+        peer_addr.sin_port   = htons((uint16_t)(gctx->port_base + peer));
         if (inet_pton(AF_INET, gctx->master_addr, &peer_addr.sin_addr) <= 0) {
             LOG_ERROR("Gloo init: invalid master address '%s'", gctx->master_addr);
             close(sock);
@@ -477,8 +486,8 @@ static int gloo_init(void* ctx, int world_size, int rank) {
         }
 
         if (!connected) {
-            LOG_ERROR("Gloo init: failed to connect to rank %d at %s:%d: %s",
-                      peer, gctx->master_addr, gctx->port_base + peer, strerror(errno));
+            LOG_ERROR("Gloo init: failed to connect to rank %d at %s:%d: %s", peer,
+                      gctx->master_addr, gctx->port_base + peer, strerror(errno));
             close(sock);
             goto cleanup_error;
         }
@@ -498,7 +507,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
     for (int i = 0; i < rank; i++) {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
-        int client_fd = accept(gctx->listen_fd, (struct sockaddr*)&client_addr, &client_len);
+        int client_fd        = accept(gctx->listen_fd, (struct sockaddr*)&client_addr, &client_len);
         if (client_fd < 0) {
             LOG_ERROR("Gloo init: failed to accept connection: %s", strerror(errno));
             goto cleanup_error;
@@ -522,8 +531,8 @@ static int gloo_init(void* ctx, int world_size, int rank) {
         LOG_DEBUG("Gloo rank %d accepted connection from rank %d", rank, peer_rank);
     }
 
-    LOG_INFO("Gloo backend initialized (rank %d/%d, port_base=%d, addr=%s)",
-             rank, world_size, gctx->port_base, gctx->master_addr);
+    LOG_INFO("Gloo backend initialized (rank %d/%d, port_base=%d, addr=%s)", rank, world_size,
+             gctx->port_base, gctx->master_addr);
     return 0;
 
 cleanup_error:
@@ -580,21 +589,21 @@ DistCommOps* cml_dist_create_gloo_backend(void) {
         return NULL;
     }
     gctx->listen_fd = -1;
-    gctx->peer_fds = NULL;
-    g_gloo_ctx = gctx;
+    gctx->peer_fds  = NULL;
+    g_gloo_ctx      = gctx;
 
-    ops->allreduce = gloo_allreduce;
-    ops->broadcast = gloo_broadcast;
-    ops->allgather = gloo_allgather;
-    ops->reduce_scatter = gloo_reduce_scatter;
-    ops->barrier = gloo_barrier;
-    ops->send = gloo_send;
-    ops->recv = gloo_recv;
+    ops->allreduce       = gloo_allreduce;
+    ops->broadcast       = gloo_broadcast;
+    ops->allgather       = gloo_allgather;
+    ops->reduce_scatter  = gloo_reduce_scatter;
+    ops->barrier         = gloo_barrier;
+    ops->send            = gloo_send;
+    ops->recv            = gloo_recv;
     ops->allreduce_async = gloo_allreduce_async;
-    ops->wait = gloo_wait;
-    ops->init = gloo_init;
-    ops->destroy = gloo_destroy;
-    ops->backend_ctx = gctx;
+    ops->wait            = gloo_wait;
+    ops->init            = gloo_init;
+    ops->destroy         = gloo_destroy;
+    ops->backend_ctx     = gctx;
 
     return ops;
 }

@@ -41,36 +41,37 @@ typedef struct {
     FastOpKind kind;
 
     /* LINEAR only */
-    float*  weight_data;        /* stable ptr into model's weight tensor (out×in) */
-    float*  weight_transposed;  /* pre-transposed copy (in×out) for no-trans BLAS call */
-    float*  bias_data;          /* stable ptr into model's bias tensor, or NULL */
-    int     in_features;
-    int     out_features;
+    float* weight_data;       /* stable ptr into model's weight tensor (out×in) */
+    float* weight_transposed; /* pre-transposed copy (in×out) for no-trans BLAS call */
+    float* bias_data;         /* stable ptr into model's bias tensor, or NULL */
+    int in_features;
+    int out_features;
 
     /* Source of the dynamic input to this op:
      *   src_buf == NULL  →  use the function's input tensor
      *   src_buf != NULL  →  read from this buffer (previous op's output) */
-    float*  src_buf;
-    size_t  src_numel;
+    float* src_buf;
+    size_t src_numel;
 
-    float*  out_buf;       /* pre-allocated aligned output buffer */
-    size_t  out_numel;
+    float* out_buf; /* pre-allocated aligned output buffer */
+    size_t out_numel;
 } FastOp;
 
 typedef struct SequentialFastPath {
-    FastOp*  ops;
-    int      num_ops;
-    int*     input_shape;
-    int      input_ndim;
-    size_t   input_numel;
-    float*   result_buf;   /* final output (== ops[num_ops-1].out_buf) */
-    size_t   result_numel;
-    Tensor*  output_tensor; /* reused every call — avoids malloc per forward */
-    bool     valid;
+    FastOp* ops;
+    int num_ops;
+    int* input_shape;
+    int input_ndim;
+    size_t input_numel;
+    float* result_buf; /* final output (== ops[num_ops-1].out_buf) */
+    size_t result_numel;
+    Tensor* output_tensor; /* reused every call — avoids malloc per forward */
+    bool valid;
 } SequentialFastPath;
 
 static void fast_path_free(SequentialFastPath* fp) {
-    if (!fp) return;
+    if (!fp)
+        return;
     if (fp->output_tensor) {
         fp->output_tensor->owns_data = false; /* result_buf freed with ops below */
         tensor_free(fp->output_tensor);
@@ -79,8 +80,7 @@ static void fast_path_free(SequentialFastPath* fp) {
     for (int i = 0; i < fp->num_ops; i++) {
         if (fp->ops[i].weight_transposed)
             cml_free(fp->ops[i].weight_transposed);
-        if (fp->ops[i].out_buf &&
-            (i == 0 || fp->ops[i].out_buf != fp->ops[i - 1].out_buf)) {
+        if (fp->ops[i].out_buf && (i == 0 || fp->ops[i].out_buf != fp->ops[i - 1].out_buf)) {
             cml_aligned_free(fp->ops[i].out_buf);
         }
     }
@@ -92,54 +92,67 @@ static void fast_path_free(SequentialFastPath* fp) {
 /* Build a SequentialFastPath from the module list and a sample input tensor.
  * Returns NULL if any module type is unsupported (falls back to IR path). */
 static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
-    if (!seq || !input || seq->num_modules == 0) return NULL;
+    if (!seq || !input || seq->num_modules == 0)
+        return NULL;
     /* Only build when NOT in training mode (weights must be frozen). */
-    if (((Module*)seq)->training) return NULL;
+    if (((Module*)seq)->training)
+        return NULL;
 
     SequentialFastPath* fp = cml_calloc(1, sizeof(SequentialFastPath));
-    if (!fp) return NULL;
+    if (!fp)
+        return NULL;
 
     fp->ops = cml_calloc((size_t)seq->num_modules, sizeof(FastOp));
-    if (!fp->ops) { cml_free(fp); return NULL; }
+    if (!fp->ops) {
+        cml_free(fp);
+        return NULL;
+    }
 
     fp->input_shape = cml_malloc(sizeof(int) * input->ndim);
-    if (!fp->input_shape) { cml_free(fp->ops); cml_free(fp); return NULL; }
+    if (!fp->input_shape) {
+        cml_free(fp->ops);
+        cml_free(fp);
+        return NULL;
+    }
     memcpy(fp->input_shape, input->shape, sizeof(int) * input->ndim);
     fp->input_ndim  = input->ndim;
     fp->input_numel = input->numel;
 
-    float* prev_out = NULL; /* NULL = use model input */
+    float* prev_out       = NULL; /* NULL = use model input */
     size_t prev_out_numel = input->numel;
 
     for (int i = 0; i < seq->num_modules; i++) {
-        Module* m = seq->modules[i];
-        FastOp*  op = &fp->ops[fp->num_ops];
+        Module* m  = seq->modules[i];
+        FastOp* op = &fp->ops[fp->num_ops];
 
         if (strcmp(m->name, "Linear") == 0) {
             Linear* lin = (Linear*)m;
-            if (!lin->weight || !lin->weight->tensor ||
-                !lin->weight->tensor->data) {
-                fast_path_free(fp); return NULL;
+            if (!lin->weight || !lin->weight->tensor || !lin->weight->tensor->data) {
+                fast_path_free(fp);
+                return NULL;
             }
             op->kind         = FAST_LINEAR;
             op->weight_data  = (float*)lin->weight->tensor->data;
             op->bias_data    = (lin->use_bias && lin->bias && lin->bias->tensor)
-                               ? (float*)lin->bias->tensor->data : NULL;
+                                   ? (float*)lin->bias->tensor->data
+                                   : NULL;
             op->in_features  = lin->in_features;
             op->out_features = lin->out_features;
             op->src_buf      = prev_out;
             op->src_numel    = prev_out_numel;
-            op->out_numel    = (prev_out_numel / (size_t)lin->in_features)
-                               * (size_t)lin->out_features;
+            op->out_numel = (prev_out_numel / (size_t)lin->in_features) * (size_t)lin->out_features;
 
             /* Pre-transpose weight from (out×in) → (in×out) so the BLAS call
              * is NoTrans/NoTrans — enables our AVX2 microkernel for small sizes. */
-            op->weight_transposed = cml_malloc(
-                (size_t)lin->in_features * lin->out_features * sizeof(float));
-            if (!op->weight_transposed) { fast_path_free(fp); return NULL; }
+            op->weight_transposed =
+                cml_malloc((size_t)lin->in_features * lin->out_features * sizeof(float));
+            if (!op->weight_transposed) {
+                fast_path_free(fp);
+                return NULL;
+            }
             {
                 const float* W = op->weight_data;
-                float* WT = op->weight_transposed;
+                float* WT      = op->weight_transposed;
                 int in = lin->in_features, out = lin->out_features;
                 for (int o = 0; o < out; o++)
                     for (int i = 0; i < in; i++)
@@ -148,7 +161,10 @@ static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
 
             size_t nbytes = alloc_size_aligned(op->out_numel * sizeof(float), 64);
             op->out_buf   = cml_aligned_alloc(nbytes, 64);
-            if (!op->out_buf) { fast_path_free(fp); return NULL; }
+            if (!op->out_buf) {
+                fast_path_free(fp);
+                return NULL;
+            }
             prev_out       = op->out_buf;
             prev_out_numel = op->out_numel;
 
@@ -174,7 +190,8 @@ static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
             op->out_numel = prev_out_numel;
 
         } else {
-            fast_path_free(fp); return NULL;
+            fast_path_free(fp);
+            return NULL;
         }
         fp->num_ops++;
     }
@@ -184,19 +201,22 @@ static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
 
     /* Pre-build the output tensor once; reuse it every forward pass */
     int out_shape[8];
-    int out_ndim = input->ndim;
+    int out_ndim   = input->ndim;
     size_t leading = 1;
     for (int d = 0; d < input->ndim - 1; d++) {
         out_shape[d] = input->shape[d];
         leading *= (size_t)input->shape[d];
     }
     out_shape[input->ndim - 1] = (int)(fp->result_numel / leading);
-    fp->output_tensor = tensor_empty(out_shape, out_ndim, NULL);
-    if (!fp->output_tensor) { fast_path_free(fp); return NULL; }
+    fp->output_tensor          = tensor_empty(out_shape, out_ndim, NULL);
+    if (!fp->output_tensor) {
+        fast_path_free(fp);
+        return NULL;
+    }
     if (fp->output_tensor->owns_data && fp->output_tensor->data)
         cml_free(fp->output_tensor->data);
-    fp->output_tensor->data      = fp->result_buf;
-    fp->output_tensor->owns_data = false;
+    fp->output_tensor->data        = fp->result_buf;
+    fp->output_tensor->owns_data   = false;
     fp->output_tensor->is_executed = true;
 
     fp->valid = true;
@@ -204,7 +224,8 @@ static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
 }
 
 static Tensor* fast_path_run(SequentialFastPath* fp, Tensor* input) {
-    if (!fp || !fp->valid || !input) return NULL;
+    if (!fp || !fp->valid || !input)
+        return NULL;
 
     CMLBlasContext* blas = cml_blas_get_context();
 
@@ -219,37 +240,38 @@ static Tensor* fast_path_run(SequentialFastPath* fp, Tensor* input) {
             if (blas && blas->initialized) {
                 /* Use pre-transposed weight (in×out) + no-transpose BLAS call.
                  * This hits the AVX2 microkernel for small matrices. */
-                cml_blas_sgemm(blas, in_ptr, op->weight_transposed, op->out_buf,
-                               (int)batch, op->out_features, op->in_features,
-                               1.0f, 0.0f);
+                cml_blas_sgemm(blas, in_ptr, op->weight_transposed, op->out_buf, (int)batch,
+                               op->out_features, op->in_features, 1.0f, 0.0f);
             } else {
                 memset(op->out_buf, 0, op->out_numel * sizeof(float));
                 for (size_t m = 0; m < batch; m++)
                     for (int n = 0; n < op->out_features; n++) {
                         float s = 0.f;
                         for (int k = 0; k < op->in_features; k++)
-                            s += in_ptr[m * op->in_features + k]
-                                 * op->weight_data[n * op->in_features + k];
+                            s += in_ptr[m * op->in_features + k] *
+                                 op->weight_data[n * op->in_features + k];
                         op->out_buf[m * op->out_features + n] = s;
                     }
             }
             if (op->bias_data) {
                 size_t batch2 = op->out_numel / (size_t)op->out_features;
-                int N = op->out_features;
+                int N         = op->out_features;
 #if defined(__AVX2__)
                 for (size_t m = 0; m < batch2; m++) {
                     float* row = op->out_buf + m * N;
-                    int n = 0;
+                    int n      = 0;
                     for (; n + 8 <= N; n += 8)
                         _mm256_storeu_ps(row + n,
-                            _mm256_add_ps(_mm256_loadu_ps(row + n),
-                                          _mm256_loadu_ps(op->bias_data + n)));
-                    for (; n < N; n++) row[n] += op->bias_data[n];
+                                         _mm256_add_ps(_mm256_loadu_ps(row + n),
+                                                       _mm256_loadu_ps(op->bias_data + n)));
+                    for (; n < N; n++)
+                        row[n] += op->bias_data[n];
                 }
 #else
                 for (size_t m = 0; m < batch2; m++) {
                     float* row = op->out_buf + m * N;
-                    for (int n = 0; n < N; n++) row[n] += op->bias_data[n];
+                    for (int n = 0; n < N; n++)
+                        row[n] += op->bias_data[n];
                 }
 #endif
             }
@@ -258,16 +280,17 @@ static Tensor* fast_path_run(SequentialFastPath* fp, Tensor* input) {
         case FAST_RELU: {
 #if defined(__AVX2__)
             __m256 zero = _mm256_setzero_ps();
-            size_t j = 0;
+            size_t j    = 0;
             for (; j + 8 <= op->out_numel; j += 8)
-                _mm256_storeu_ps(op->out_buf + j,
-                    _mm256_max_ps(_mm256_loadu_ps(in_ptr + j), zero));
+                _mm256_storeu_ps(op->out_buf + j, _mm256_max_ps(_mm256_loadu_ps(in_ptr + j), zero));
             for (; j < op->out_numel; j++) {
-                float v = in_ptr[j]; op->out_buf[j] = v > 0.0f ? v : 0.0f;
+                float v        = in_ptr[j];
+                op->out_buf[j] = v > 0.0f ? v : 0.0f;
             }
 #else
             for (size_t j = 0; j < op->out_numel; j++) {
-                float v = in_ptr[j]; op->out_buf[j] = v > 0.0f ? v : 0.0f;
+                float v        = in_ptr[j];
+                op->out_buf[j] = v > 0.0f ? v : 0.0f;
             }
 #endif
             break;
@@ -348,7 +371,7 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
         return NULL;
     }
 
-    cache->output_numel  = output->numel;
+    cache->output_numel = output->numel;
     cache->output_buffer =
         cml_aligned_alloc(alloc_size_aligned((size_t)output->numel * sizeof(float), 32), 32);
     if (!cache->output_buffer) {
@@ -450,10 +473,13 @@ static Tensor* execute_cached_forward(Sequential* seq, Tensor* input) {
 static int g_sequential_depth = 0;
 
 static bool fast_path_shapes_match(SequentialFastPath* fp, Tensor* input) {
-    if (!fp || !fp->valid || !input) return false;
-    if (fp->input_ndim != input->ndim) return false;
+    if (!fp || !fp->valid || !input)
+        return false;
+    if (fp->input_ndim != input->ndim)
+        return false;
     for (int i = 0; i < input->ndim; i++)
-        if (fp->input_shape[i] != input->shape[i]) return false;
+        if (fp->input_shape[i] != input->shape[i])
+            return false;
     return true;
 }
 
@@ -615,8 +641,8 @@ int sequential_add(Sequential* seq, Module* module) {
                          params[i]->name ? params[i]->name : "unnamed");
                 Tensor* pt = params[i]->tensor;
                 nn_tensor_param_alias(pt);
-                int result = module_add_parameter((Module*)seq, pt, param_name,
-                                                  params[i]->requires_grad);
+                int result =
+                    module_add_parameter((Module*)seq, pt, param_name, params[i]->requires_grad);
                 if (result != 0) {
                     pt->ref_count--;
                     LOG_WARNING(

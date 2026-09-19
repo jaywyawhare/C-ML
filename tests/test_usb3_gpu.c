@@ -4,12 +4,17 @@
 #include "backend/usb3_gpu.h"
 #include "test_harness.h"
 
-#define RUN_TEST(test) do { \
-    tests_run++; \
-    printf("  [%d] %-50s ", tests_run, #test); \
-    if (test()) { tests_passed++; printf("PASS\n"); } \
-    else { printf("FAIL\n"); } \
-} while(0)
+#define RUN_TEST(test)                                                                             \
+    do {                                                                                           \
+        tests_run++;                                                                               \
+        printf("  [%d] %-50s ", tests_run, #test);                                                 \
+        if (test()) {                                                                              \
+            tests_passed++;                                                                        \
+            printf("PASS\n");                                                                      \
+        } else {                                                                                   \
+            printf("FAIL\n");                                                                      \
+        }                                                                                          \
+    } while (0)
 
 static int test_available_returns_bool(void) {
     bool avail = cml_usb3_gpu_available();
@@ -44,7 +49,7 @@ static int test_write32_null_dev(void) {
 
 static int test_upload_null_dev(void) {
     uint8_t data[16] = {0};
-    int ret = cml_usb3_gpu_upload(NULL, 0, data, sizeof(data));
+    int ret          = cml_usb3_gpu_upload(NULL, 0, data, sizeof(data));
     return ret == -1;
 }
 
@@ -57,7 +62,7 @@ static int test_download_null_dev(void) {
 static int test_scsi_cmd_null_dev(void) {
     uint8_t cdb[10] = {0};
     uint8_t data[4] = {0};
-    int ret = cml_usb3_gpu_scsi_cmd(NULL, cdb, 10, data, sizeof(data), false);
+    int ret         = cml_usb3_gpu_scsi_cmd(NULL, cdb, 10, data, sizeof(data), false);
     return ret == -1;
 }
 
@@ -75,28 +80,28 @@ static int test_download_zero_size(void) {
 static int test_struct_layout(void) {
     CMLUSB3GPU dev;
     memset(&dev, 0, sizeof(dev));
-    dev.fd = -1;
-    dev.vendor_id = 0x174c;
+    dev.fd         = -1;
+    dev.vendor_id  = 0x174c;
     dev.product_id = 0x2362;
-    dev.connected = false;
-    dev.bar0_addr = 0xDEADBEEF;
-    dev.bar0_size = 16 * 1024 * 1024;
-    dev.ep_in = 0x81;
-    dev.ep_out = 0x02;
+    dev.connected  = false;
+    dev.bar0_addr  = 0xDEADBEEF;
+    dev.bar0_size  = 16 * 1024 * 1024;
+    dev.ep_in      = 0x81;
+    dev.ep_out     = 0x02;
 
     int ok = (dev.vendor_id == 0x174c);
-    ok = ok && (dev.bar0_addr == 0xDEADBEEF);
-    ok = ok && (dev.ep_in == 0x81);
+    ok     = ok && (dev.bar0_addr == 0xDEADBEEF);
+    ok     = ok && (dev.ep_in == 0x81);
     return ok;
 }
 
 static int test_scsi_cmd_invalid_cdb_len(void) {
     CMLUSB3GPU dev;
     memset(&dev, 0, sizeof(dev));
-    dev.connected = true;
-    dev.fd = 999;
+    dev.connected  = true;
+    dev.fd         = 999;
     uint8_t cdb[1] = {0};
-    int ret = cml_usb3_gpu_scsi_cmd(&dev, cdb, 0, NULL, 0, false);
+    int ret        = cml_usb3_gpu_scsi_cmd(&dev, cdb, 0, NULL, 0, false);
     return ret == -1;
 }
 

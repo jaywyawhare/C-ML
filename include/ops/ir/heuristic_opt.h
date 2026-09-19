@@ -7,8 +7,8 @@
 extern "C" {
 #endif
 
-#define CML_HEURISTIC_DEFAULT_LOCAL_SIZE  256
-#define CML_HEURISTIC_DEFAULT_VEC_WIDTH   4
+#define CML_HEURISTIC_DEFAULT_LOCAL_SIZE 256
+#define CML_HEURISTIC_DEFAULT_VEC_WIDTH 4
 
 typedef struct CMLHeuristicConfig {
     int max_local_size;

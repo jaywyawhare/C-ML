@@ -51,8 +51,8 @@ static void test_pattern_with_inputs(void) {
     REQUIRE(cap_a != NULL);
     REQUIRE(cap_b != NULL);
 
-    CMLPatternNode* inputs[2] = { cap_a, cap_b };
-    CMLPatternNode* add_pat = cml_pattern_op(UOP_ADD, inputs, 2);
+    CMLPatternNode* inputs[2] = {cap_a, cap_b};
+    CMLPatternNode* add_pat   = cml_pattern_op(UOP_ADD, inputs, 2);
     REQUIRE(add_pat != NULL);
     REQUIRE(add_pat->kind == CML_PAT_OP);
     REQUIRE(add_pat->op_type == UOP_ADD);
@@ -102,10 +102,10 @@ static void test_register_rule(void) {
     REQUIRE(reg != NULL);
 
     /* Create a dummy pattern: MUL(any, any) */
-    CMLPatternNode* any1 = cml_pattern_any();
-    CMLPatternNode* any2 = cml_pattern_any();
-    CMLPatternNode* inputs[2] = { any1, any2 };
-    CMLPatternNode* pat = cml_pattern_op(UOP_MUL, inputs, 2);
+    CMLPatternNode* any1      = cml_pattern_any();
+    CMLPatternNode* any2      = cml_pattern_any();
+    CMLPatternNode* inputs[2] = {any1, any2};
+    CMLPatternNode* pat       = cml_pattern_op(UOP_MUL, inputs, 2);
     REQUIRE(pat != NULL);
 
     int ret = cml_rewrite_register(reg, pat, NULL, 10, "test_rule");

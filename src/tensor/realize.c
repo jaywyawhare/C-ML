@@ -7,12 +7,11 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-bool tensor_is_realized(const Tensor* t) {
-    return t != NULL && t->data != NULL;
-}
+bool tensor_is_realized(const Tensor* t) { return t != NULL && t->data != NULL; }
 
 int tensor_realize(Tensor* t) {
-    if (!t) return -1;
+    if (!t)
+        return -1;
 
     /* If already detached from the IR graph and has data, nothing to do. */
     if (!t->ir_node && t->data)
@@ -28,7 +27,7 @@ int tensor_realize(Tensor* t) {
      * by cml_graph_cache_reset_global() / cml_ir_reset_global_context(). */
     if (t->data && !t->owns_data) {
         size_t nbytes = t->numel * cml_dtype_size(t->dtype);
-        void* owned = cml_malloc(nbytes);
+        void* owned   = cml_malloc(nbytes);
         if (owned) {
             memcpy(owned, t->data, nbytes);
             t->data      = owned;
@@ -53,18 +52,22 @@ int tensor_realize(Tensor* t) {
 }
 
 int tensor_realize_all(Tensor** tensors, int num_tensors) {
-    if (!tensors || num_tensors <= 0) return -1;
+    if (!tensors || num_tensors <= 0)
+        return -1;
     int rc = 0;
     for (int i = 0; i < num_tensors; ++i) {
-        if (!tensors[i] || tensor_is_realized(tensors[i])) continue;
+        if (!tensors[i] || tensor_is_realized(tensors[i]))
+            continue;
         int r = tensor_ensure_executed(tensors[i]);
-        if (r != 0) rc = r;
+        if (r != 0)
+            rc = r;
     }
     return rc;
 }
 
 void tensor_unrealize(Tensor* t) {
-    if (!t || !t->data) return;
+    if (!t || !t->data)
+        return;
     if (t->owns_data) {
         if (t->storage) {
             /* Shared block: views may still read it after we detach. */
@@ -83,24 +86,25 @@ void tensor_unrealize(Tensor* t) {
      * Required for gradient checkpointing: free activations during the
      * forward pass, recompute on demand during backward. */
     if (t->saved_ir_node && !t->ir_node) {
-        t->saved_ir_node->output    = t;
+        t->saved_ir_node->output      = t;
         t->saved_ir_node->is_executed = false;
-        t->ir_node    = t->saved_ir_node;
-        t->ir_context = t->saved_ir_context;
+        t->ir_node                    = t->saved_ir_node;
+        t->ir_context                 = t->saved_ir_context;
     }
 }
 
 int tensor_realize_with_grads(Tensor* t) {
-    if (!t) return -1;
+    if (!t)
+        return -1;
     int rc = tensor_realize(t);
-    if (rc != 0) return rc;
-    if (t->grad) rc = tensor_realize(t->grad);
+    if (rc != 0)
+        return rc;
+    if (t->grad)
+        rc = tensor_realize(t->grad);
     return rc;
 }
 
-int tensor_schedule(Tensor* t) {
-    return tensor_realize(t);
-}
+int tensor_schedule(Tensor* t) { return tensor_realize(t); }
 
 int tensor_sync(Tensor* t) {
     (void)t;

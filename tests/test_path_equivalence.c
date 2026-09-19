@@ -31,8 +31,8 @@
 
 /* Small integers, exactly representable, so any difference is a logic bug. */
 static Tensor* mk(const int* shape, int ndim, int seed) {
-    TensorConfig c = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                      .has_dtype = true, .has_device = true};
+    TensorConfig c = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* t = tensor_zeros((int*)shape, ndim, &c);
     for (size_t i = 0; i < t->numel; i++)
         tensor_set_float(t, i, (float)(((int)i * 7 + seed * 13) % 17) - 8.0f);
@@ -40,7 +40,10 @@ static Tensor* mk(const int* shape, int ndim, int seed) {
 }
 
 static void emit(const char* name, Tensor* r) {
-    if (!r) { printf("%-22s NULL\n", name); return; }
+    if (!r) {
+        printf("%-22s NULL\n", name);
+        return;
+    }
     tensor_ensure_executed(r);
     double sum = 0, asum = 0;
     for (size_t i = 0; i < r->numel; i++) {
@@ -61,40 +64,47 @@ static void run_battery(void) {
     const int big[2]  = {256, 128};
     const int bigc[2] = {256, 1};
 
-    emit("add",           uop_add(mk(m, 2, 1), mk(m, 2, 2)));
+    emit("add", uop_add(mk(m, 2, 1), mk(m, 2, 2)));
     emit("add row-bcast", uop_add(mk(m, 2, 1), mk(row, 1, 3)));
     emit("add col-bcast", uop_add(mk(m, 2, 1), mk(col, 2, 4)));
     emit("mul col-bcast", uop_mul(mk(m, 2, 1), mk(col, 2, 4)));
-    emit("chain",         uop_relu(uop_add(uop_mul(mk(m, 2, 1), mk(m, 2, 2)), mk(m, 2, 3))));
-    emit("relu",          uop_relu(mk(m, 2, 5)));
-    emit("neg abs",       uop_abs(uop_neg(mk(m, 2, 1))));
-    emit("sum all",       uop_sum(mk(m, 2, 1), NULL));
-    emit("max all",       uop_max_reduce(mk(m, 2, 1), NULL));
+    emit("chain", uop_relu(uop_add(uop_mul(mk(m, 2, 1), mk(m, 2, 2)), mk(m, 2, 3))));
+    emit("relu", uop_relu(mk(m, 2, 5)));
+    emit("neg abs", uop_abs(uop_neg(mk(m, 2, 1))));
+    emit("sum all", uop_sum(mk(m, 2, 1), NULL));
+    emit("max all", uop_max_reduce(mk(m, 2, 1), NULL));
     {
         static int d[1] = {1};
         ReduceParams rp = {.dims = d, .num_dims = 1, .keepdim = false};
         emit("sum dim1", uop_sum(mk(m, 2, 1), &rp));
         emit("max dim1", uop_max_reduce(mk(m, 2, 1), &rp));
     }
-    emit("matmul",        uop_matmul(mk(sq, 2, 1), mk(sq, 2, 2)));
-    emit("matmul relu",   uop_relu(uop_matmul(mk(sq, 2, 1), mk(sq, 2, 2))));
-    emit("cumsum",        uop_cumsum(mk(m, 2, 1), 1));
-    emit("sort",          uop_sort(mk(m, 2, 1), 1, false));
-    emit("big add",       uop_add(mk(big, 2, 1), mk(big, 2, 2)));
+    emit("matmul", uop_matmul(mk(sq, 2, 1), mk(sq, 2, 2)));
+    emit("matmul relu", uop_relu(uop_matmul(mk(sq, 2, 1), mk(sq, 2, 2))));
+    emit("cumsum", uop_cumsum(mk(m, 2, 1), 1));
+    emit("sort", uop_sort(mk(m, 2, 1), 1, false));
+    emit("big add", uop_add(mk(big, 2, 1), mk(big, 2, 2)));
     emit("big col-bcast", uop_add(mk(big, 2, 1), mk(bigc, 2, 4)));
-    emit("big relu chain",uop_relu(uop_mul(mk(big, 2, 1), mk(big, 2, 2))));
-    emit("big sum",       uop_sum(mk(big, 2, 1), NULL));
+    emit("big relu chain", uop_relu(uop_mul(mk(big, 2, 1), mk(big, 2, 2))));
+    emit("big sum", uop_sum(mk(big, 2, 1), NULL));
     {
         const int x[4] = {2, 3, 8, 8}, w[4] = {4, 3, 3, 3};
         static int ks[2] = {3, 3}, st[2] = {1, 1}, pd[2] = {1, 1}, dl[2] = {1, 1};
-        Conv2DParams p = {.kernel_size = ks, .stride = st, .padding = pd,
-                          .dilation = dl, .groups = 1, .bias = false};
+        Conv2DParams p = {.kernel_size = ks,
+                          .stride      = st,
+                          .padding     = pd,
+                          .dilation    = dl,
+                          .groups      = 1,
+                          .bias        = false};
         emit("conv2d", uop_conv2d(mk(x, 4, 1), mk(w, 4, 2), NULL, &p));
     }
     {
         const int x[4] = {2, 3, 8, 8};
-        Pool2DParams p = {.kernel_size = {2, 2}, .stride = {2, 2}, .padding = {0, 0},
-                          .dilation = {1, 1}, .count_include_pad = false};
+        Pool2DParams p = {.kernel_size       = {2, 2},
+                          .stride            = {2, 2},
+                          .padding           = {0, 0},
+                          .dilation          = {1, 1},
+                          .count_include_pad = false};
         emit("maxpool2d", uop_maxpool2d(mk(x, 4, 1), &p));
         emit("avgpool2d", uop_avgpool2d(mk(x, 4, 1), &p));
     }
@@ -102,18 +112,30 @@ static void run_battery(void) {
 
 /* Configurations that select genuinely different implementations. */
 static const char* CONFIGS[] = {
-    "JIT=0", "DISABLE_JIT=1", "JIT=2",
-    "NOOPT=1", "DISABLE_FUSION=1", "NO_MEMORY_PLANNER=1",
-    "SPLIT_REDUCEOP=0", "WINO=0", "WINO=1", "CACHELEVEL=0",
+    "JIT=0",
+    "DISABLE_JIT=1",
+    "JIT=2",
+    "NOOPT=1",
+    "DISABLE_FUSION=1",
+    "NO_MEMORY_PLANNER=1",
+    "SPLIT_REDUCEOP=0",
+    "WINO=0",
+    "WINO=1",
+    "CACHELEVEL=0",
 };
 #define NUM_CONFIGS ((int)(sizeof(CONFIGS) / sizeof(CONFIGS[0])))
 
 /* Re-exec self with `cfg` set, capturing stdout. */
 static char* capture(const char* cfg) {
     int fds[2];
-    if (pipe(fds) != 0) return NULL;
+    if (pipe(fds) != 0)
+        return NULL;
     pid_t pid = fork();
-    if (pid < 0) { close(fds[0]); close(fds[1]); return NULL; }
+    if (pid < 0) {
+        close(fds[0]);
+        close(fds[1]);
+        return NULL;
+    }
     if (pid == 0) {
         dup2(fds[1], STDOUT_FILENO);
         close(fds[0]);
@@ -122,7 +144,10 @@ static char* capture(const char* cfg) {
             char buf[64];
             snprintf(buf, sizeof(buf), "%s", cfg);
             char* eq = strchr(buf, '=');
-            if (eq) { *eq = '\0'; setenv(buf, eq + 1, 1); }
+            if (eq) {
+                *eq = '\0';
+                setenv(buf, eq + 1, 1);
+            }
         }
         execl("/proc/self/exe", "test_path_equivalence", "--battery", (char*)NULL);
         _exit(127);
@@ -133,9 +158,16 @@ static char* capture(const char* cfg) {
     ssize_t n;
     while (out && (n = read(fds[0], out + len, cap - len - 1)) > 0) {
         len += (size_t)n;
-        if (len + 1 >= cap) { cap *= 2; char* t = realloc(out, cap); if (!t) break; out = t; }
+        if (len + 1 >= cap) {
+            cap *= 2;
+            char* t = realloc(out, cap);
+            if (!t)
+                break;
+            out = t;
+        }
     }
-    if (out) out[len] = '\0';
+    if (out)
+        out[len] = '\0';
     close(fds[0]);
     int st = 0;
     waitpid(pid, &st, 0);
@@ -167,14 +199,15 @@ int main(int argc, char** argv) {
             while (*a && *b) {
                 const char* ae = strchr(a, '\n');
                 const char* be = strchr(b, '\n');
-                size_t al = ae ? (size_t)(ae - a) : strlen(a);
-                size_t bl = be ? (size_t)(be - b) : strlen(b);
+                size_t al      = ae ? (size_t)(ae - a) : strlen(a);
+                size_t bl      = be ? (size_t)(be - b) : strlen(b);
                 if (al != bl || strncmp(a, b, al) != 0) {
                     printf("      default: %.*s\n", (int)al, a);
                     printf("      %-8s %.*s\n", CONFIGS[i], (int)bl, b);
                     break;
                 }
-                if (!ae || !be) break;
+                if (!ae || !be)
+                    break;
                 a = ae + 1;
                 b = be + 1;
             }

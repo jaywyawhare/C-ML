@@ -26,19 +26,19 @@ typedef struct {
     DType dtype;
     DeviceType device;
 
-    Module*  subsample_conv;
+    Module* subsample_conv;
     Module** encoder_lstms;
     Module** encoder_lnorms;
-    int      num_enc_layers;
+    int num_enc_layers;
 
-    Module*  pred_embedding;
+    Module* pred_embedding;
     Module** pred_lstms;
     Module** pred_lnorms;
-    int      num_pred_layers;
+    int num_pred_layers;
 
-    Module*  joint_linear1;
-    Module*  joint_relu;
-    Module*  joint_linear2;
+    Module* joint_linear1;
+    Module* joint_relu;
+    Module* joint_linear2;
 } CMLRNNT;
 
 Module* cml_zoo_rnnt_create(const CMLRNNTConfig* config, DType dtype, DeviceType device);

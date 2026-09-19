@@ -146,10 +146,10 @@ static Tensor* augment_flip(Tensor* input, float prob, bool horizontal, const ch
         for (int c = 0; c < channels; c++) {
             for (int h = 0; h < height; h++) {
                 for (int w = 0; w < width; w++) {
-                    int in_idx  = ((b * channels + c) * height + h) * width + w;
-                    int oh      = horizontal ? h : (height - 1 - h);
-                    int ow      = horizontal ? (width - 1 - w) : w;
-                    int out_idx = ((b * channels + c) * height + oh) * width + ow;
+                    int in_idx        = ((b * channels + c) * height + h) * width + w;
+                    int oh            = horizontal ? h : (height - 1 - h);
+                    int ow            = horizontal ? (width - 1 - w) : w;
+                    int out_idx       = ((b * channels + c) * height + oh) * width + ow;
                     out_data[out_idx] = in_data[in_idx];
                 }
             }

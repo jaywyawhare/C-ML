@@ -27,10 +27,11 @@ static int test_open_close(void) {
 
 static int test_put_get(void) {
     CMLDiskCache* cache = cml_disk_cache_open(tmp_path);
-    if (!cache) return 1;
+    if (!cache)
+        return 1;
 
     uint8_t data[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE};
-    uint64_t hash = 0x123456789ABCDEF0ULL;
+    uint64_t hash  = 0x123456789ABCDEF0ULL;
 
     if (cml_disk_cache_put(cache, hash, data, sizeof(data)) != 0) {
         cml_disk_cache_close(cache);
@@ -38,7 +39,7 @@ static int test_put_get(void) {
         return 0;
     }
 
-    void* out = NULL;
+    void* out       = NULL;
     size_t out_size = 0;
     if (cml_disk_cache_get(cache, hash, &out, &out_size) != 0) {
         cml_disk_cache_close(cache);
@@ -55,7 +56,8 @@ static int test_put_get(void) {
 
 static int test_has(void) {
     CMLDiskCache* cache = cml_disk_cache_open(tmp_path);
-    if (!cache) return 1;
+    if (!cache)
+        return 1;
 
     uint8_t data[] = {1, 2, 3};
     cml_disk_cache_put(cache, 42, data, sizeof(data));
@@ -68,7 +70,8 @@ static int test_has(void) {
 
 static int test_count(void) {
     CMLDiskCache* cache = cml_disk_cache_open(tmp_path);
-    if (!cache) return 1;
+    if (!cache)
+        return 1;
 
     uint8_t data[] = {0xFF};
     cml_disk_cache_put(cache, 1, data, 1);
@@ -83,7 +86,8 @@ static int test_count(void) {
 
 static int test_clear(void) {
     CMLDiskCache* cache = cml_disk_cache_open(tmp_path);
-    if (!cache) return 1;
+    if (!cache)
+        return 1;
 
     uint8_t data[] = {0xAA};
     cml_disk_cache_put(cache, 10, data, 1);
@@ -98,7 +102,8 @@ static int test_clear(void) {
 
 static int test_overwrite(void) {
     CMLDiskCache* cache = cml_disk_cache_open(tmp_path);
-    if (!cache) return 1;
+    if (!cache)
+        return 1;
 
     uint8_t data1[] = {1, 2, 3};
     uint8_t data2[] = {4, 5, 6, 7, 8};
@@ -106,7 +111,7 @@ static int test_overwrite(void) {
     cml_disk_cache_put(cache, 100, data1, sizeof(data1));
     cml_disk_cache_put(cache, 100, data2, sizeof(data2));
 
-    void* out = NULL;
+    void* out       = NULL;
     size_t out_size = 0;
     cml_disk_cache_get(cache, 100, &out, &out_size);
 
@@ -119,19 +124,20 @@ static int test_overwrite(void) {
 
 static int test_persistence(void) {
     CMLDiskCache* cache = cml_disk_cache_open(tmp_path);
-    if (!cache) return 1;
+    if (!cache)
+        return 1;
 
     uint8_t data[] = {0xBE, 0xEF};
     cml_disk_cache_put(cache, 555, data, sizeof(data));
     cml_disk_cache_close(cache);
 
     cache = cml_disk_cache_open(tmp_path);
-    if (!cache) return 0;
+    if (!cache)
+        return 0;
 
-    void* out = NULL;
+    void* out       = NULL;
     size_t out_size = 0;
-    int ok = (cml_disk_cache_get(cache, 555, &out, &out_size) == 0) &&
-             (out_size == sizeof(data)) &&
+    int ok = (cml_disk_cache_get(cache, 555, &out, &out_size) == 0) && (out_size == sizeof(data)) &&
              (memcmp(out, data, sizeof(data)) == 0);
     cml_free(out);
     cml_disk_cache_close(cache);
@@ -141,11 +147,12 @@ static int test_persistence(void) {
 
 static int test_get_missing(void) {
     CMLDiskCache* cache = cml_disk_cache_open(tmp_path);
-    if (!cache) return 1;
+    if (!cache)
+        return 1;
 
-    void* out = NULL;
+    void* out       = NULL;
     size_t out_size = 0;
-    int ok = (cml_disk_cache_get(cache, 999, &out, &out_size) != 0) && (out == NULL);
+    int ok          = (cml_disk_cache_get(cache, 999, &out, &out_size) != 0) && (out == NULL);
     cml_disk_cache_close(cache);
     unlink(tmp_path);
     return ok;
@@ -153,16 +160,17 @@ static int test_get_missing(void) {
 
 static int test_large_blob(void) {
     CMLDiskCache* cache = cml_disk_cache_open(tmp_path);
-    if (!cache) return 1;
+    if (!cache)
+        return 1;
 
-    size_t size = 1024 * 1024;
+    size_t size   = 1024 * 1024;
     uint8_t* data = cml_malloc(size);
     for (size_t i = 0; i < size; i++)
         data[i] = (uint8_t)(i & 0xFF);
 
     cml_disk_cache_put(cache, 7777, data, size);
 
-    void* out = NULL;
+    void* out       = NULL;
     size_t out_size = 0;
     cml_disk_cache_get(cache, 7777, &out, &out_size);
 

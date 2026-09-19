@@ -16,17 +16,20 @@
 
 /* `num_axes` nested loops over `extents`, wrapping one load -> compute(`uop`)
  * -> store. Returns NULL on allocation failure. */
-static inline LinearProgram* make_prog(int num_axes, const int* extents,
-                                UOpType uop) {
+static inline LinearProgram* make_prog(int num_axes, const int* extents, UOpType uop) {
     LinearProgram* prog = linear_program_create();
-    if (!prog) return NULL;
+    if (!prog)
+        return NULL;
 
     for (int i = 0; i < num_axes; i++) {
         if (prog->num_axes >= prog->axes_capacity) {
-            int nc = prog->axes_capacity * 2;
+            int nc   = prog->axes_capacity * 2;
             int* tmp = cml_realloc(prog->loop_axes, (size_t)nc * sizeof(int));
-            if (!tmp) { linear_program_free(prog); return NULL; }
-            prog->loop_axes = tmp;
+            if (!tmp) {
+                linear_program_free(prog);
+                return NULL;
+            }
+            prog->loop_axes     = tmp;
             prog->axes_capacity = nc;
         }
         prog->loop_axes[prog->num_axes++] = extents[i];
@@ -35,8 +38,8 @@ static inline LinearProgram* make_prog(int num_axes, const int* extents,
     for (int i = 0; i < num_axes; i++) {
         LinearOp loop;
         memset(&loop, 0, sizeof(loop));
-        loop.kind = LINOP_LOOP;
-        loop.loop_axis = i;
+        loop.kind        = LINOP_LOOP;
+        loop.loop_axis   = i;
         loop.loop_extent = extents[i];
         loop.loop_stride = 1;
         linear_program_emit(prog, loop);
@@ -44,29 +47,29 @@ static inline LinearProgram* make_prog(int num_axes, const int* extents,
 
     LinearOp load;
     memset(&load, 0, sizeof(load));
-    load.kind = LINOP_LOAD;
+    load.kind     = LINOP_LOAD;
     load.dest_reg = alloc_vreg(prog);
     linear_program_emit(prog, load);
 
     LinearOp compute;
     memset(&compute, 0, sizeof(compute));
-    compute.kind = LINOP_COMPUTE;
-    compute.uop = uop;
-    compute.dest_reg = alloc_vreg(prog);
+    compute.kind        = LINOP_COMPUTE;
+    compute.uop         = uop;
+    compute.dest_reg    = alloc_vreg(prog);
     compute.src_regs[0] = load.dest_reg;
-    compute.num_srcs = 1;
+    compute.num_srcs    = 1;
     linear_program_emit(prog, compute);
 
     LinearOp store;
     memset(&store, 0, sizeof(store));
-    store.kind = LINOP_STORE;
+    store.kind     = LINOP_STORE;
     store.dest_reg = compute.dest_reg;
     linear_program_emit(prog, store);
 
     for (int i = num_axes - 1; i >= 0; i--) {
         LinearOp endloop;
         memset(&endloop, 0, sizeof(endloop));
-        endloop.kind = LINOP_ENDLOOP;
+        endloop.kind      = LINOP_ENDLOOP;
         endloop.loop_axis = i;
         linear_program_emit(prog, endloop);
     }

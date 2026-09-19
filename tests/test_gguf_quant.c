@@ -10,11 +10,14 @@
 /* Helper: convert float to fp16 (IEEE 754 half-precision) stored as uint16_t */
 static uint16_t float_to_fp16(float value) {
     /* Simple conversion for small positive values */
-    union { float f; uint32_t u; } bits;
-    bits.f = value;
-    uint32_t f32 = bits.u;
-    uint32_t sign = (f32 >> 16) & 0x8000;
-    int exponent = ((f32 >> 23) & 0xFF) - 127 + 15;
+    union {
+        float f;
+        uint32_t u;
+    } bits;
+    bits.f            = value;
+    uint32_t f32      = bits.u;
+    uint32_t sign     = (f32 >> 16) & 0x8000;
+    int exponent      = ((f32 >> 23) & 0xFF) - 127 + 15;
     uint32_t mantissa = (f32 >> 13) & 0x3FF;
 
     if (exponent <= 0) {

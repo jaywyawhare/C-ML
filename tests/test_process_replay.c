@@ -21,7 +21,8 @@ static void make_tmpdir(const char* suffix) {
 
 static void rmdir_recursive(const char* path) {
     DIR* d = opendir(path);
-    if (!d) return;
+    if (!d)
+        return;
 
     struct dirent* ent;
     while ((ent = readdir(d)) != NULL) {
@@ -42,7 +43,8 @@ static void rmdir_recursive(const char* path) {
 
 static int count_kernel_files(const char* dir) {
     DIR* d = opendir(dir);
-    if (!d) return 0;
+    if (!d)
+        return 0;
 
     int count = 0;
     struct dirent* ent;
@@ -89,7 +91,8 @@ static int test_compare_match(void) {
 
     snprintf(dir_a, sizeof(dir_a), "/tmp/cml_pr_cmp_a_XXXXXX");
     snprintf(dir_b, sizeof(dir_b), "/tmp/cml_pr_cmp_b_XXXXXX");
-    if (!mkdtemp(dir_a) || !mkdtemp(dir_b)) return 0;
+    if (!mkdtemp(dir_a) || !mkdtemp(dir_b))
+        return 0;
 
     cml_process_replay_enable(dir_a);
     cml_process_replay_record("k1", "source_a", 8);
@@ -113,7 +116,8 @@ static int test_compare_mismatch(void) {
 
     snprintf(dir_a, sizeof(dir_a), "/tmp/cml_pr_mis_a_XXXXXX");
     snprintf(dir_b, sizeof(dir_b), "/tmp/cml_pr_mis_b_XXXXXX");
-    if (!mkdtemp(dir_a) || !mkdtemp(dir_b)) return 0;
+    if (!mkdtemp(dir_a) || !mkdtemp(dir_b))
+        return 0;
 
     cml_process_replay_enable(dir_a);
     cml_process_replay_record("k1", "source_a", 8);
@@ -135,7 +139,8 @@ static int test_compare_missing_output(void) {
 
     snprintf(dir_a, sizeof(dir_a), "/tmp/cml_pr_mso_a_XXXXXX");
     snprintf(dir_b, sizeof(dir_b), "/tmp/cml_pr_mso_b_XXXXXX");
-    if (!mkdtemp(dir_a) || !mkdtemp(dir_b)) return 0;
+    if (!mkdtemp(dir_a) || !mkdtemp(dir_b))
+        return 0;
 
     cml_process_replay_enable(dir_a);
     cml_process_replay_record("k1", "source_a", 8);

@@ -16,8 +16,9 @@ Tensor* conv_transpose3d_forward(Module* module, Tensor* input) {
         return NULL;
 
     if (input->ndim != 5) {
-        LOG_ERROR("ConvTranspose3d expects 5D input [batch, in_channels, depth, height, width], got %dD",
-                  input->ndim);
+        LOG_ERROR(
+            "ConvTranspose3d expects 5D input [batch, in_channels, depth, height, width], got %dD",
+            input->ndim);
         return NULL;
     }
 
@@ -29,18 +30,19 @@ Tensor* conv_transpose3d_forward(Module* module, Tensor* input) {
     int in_channels = input->shape[1];
 
     if (in_channels != layer->in_channels) {
-        LOG_ERROR("ConvTranspose3d: input channels (%d) doesn't match expected (%d)",
-                  in_channels, layer->in_channels);
+        LOG_ERROR("ConvTranspose3d: input channels (%d) doesn't match expected (%d)", in_channels,
+                  layer->in_channels);
         return NULL;
     }
 
     ConvTranspose3DParams params = {
-        .kernel_size = {layer->kernel_size[0], layer->kernel_size[1], layer->kernel_size[2]},
-        .stride = {layer->stride[0], layer->stride[1], layer->stride[2]},
-        .padding = {layer->padding[0], layer->padding[1], layer->padding[2]},
-        .output_padding = {layer->output_padding[0], layer->output_padding[1], layer->output_padding[2]},
-        .dilation = {layer->dilation[0], layer->dilation[1], layer->dilation[2]},
-        .use_bias = layer->use_bias,
+        .kernel_size    = {layer->kernel_size[0], layer->kernel_size[1], layer->kernel_size[2]},
+        .stride         = {layer->stride[0], layer->stride[1], layer->stride[2]},
+        .padding        = {layer->padding[0], layer->padding[1], layer->padding[2]},
+        .output_padding = {layer->output_padding[0], layer->output_padding[1],
+                           layer->output_padding[2]},
+        .dilation       = {layer->dilation[0], layer->dilation[1], layer->dilation[2]},
+        .use_bias       = layer->use_bias,
     };
     Tensor* bias = (layer->use_bias && layer->bias) ? layer->bias->tensor : NULL;
     return uop_conv_transpose3d(input, layer->weight->tensor, bias, &params);
@@ -53,17 +55,16 @@ static void conv_transpose3d_free(Module* module) {
     cml_free(layer);
 }
 
-static void kaiming_init_transpose3d(Tensor* tensor, int in_channels,
-                                      int kd, int kh, int kw) {
+static void kaiming_init_transpose3d(Tensor* tensor, int in_channels, int kd, int kh, int kw) {
     (void)kd;
     (void)kh;
     (void)kw;
     nn_init_kaiming(tensor, in_channels, kd * kh * kw);
 }
 
-ConvTranspose3d* nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size,
-                                      int stride, int padding, int output_padding,
-                                      bool use_bias, DType dtype, DeviceType device) {
+ConvTranspose3d* nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size, int stride,
+                                     int padding, int output_padding, bool use_bias, DType dtype,
+                                     DeviceType device) {
     ConvTranspose3d* layer = cml_calloc(1, sizeof(ConvTranspose3d));
     if (!layer) {
         LOG_ERROR("ConvTranspose3d: failed to allocate memory");

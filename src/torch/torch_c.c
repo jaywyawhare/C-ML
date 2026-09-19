@@ -155,8 +155,8 @@ const int* torch_tensor_sizes(const Tensor* t) { return torch_tensor_sizes_fast(
 
 void* torch_tensor_data_ptr(Tensor* t) {
     if (!t) {
-        error_stack_push(CM_INVALID_ARGUMENT, "torch_tensor_data_ptr: null tensor", __FILE__, __LINE__,
-                         __func__);
+        error_stack_push(CM_INVALID_ARGUMENT, "torch_tensor_data_ptr: null tensor", __FILE__,
+                         __LINE__, __func__);
         return NULL;
     }
     if (t->ir_node && tensor_realize(t) != 0) {
@@ -198,8 +198,9 @@ float torch_tensor_item_float(Tensor* t) {
 
 void torch_tensor_set_item_float(Tensor* t, float value) {
     if (!t || t->numel != 1 || t->dtype != DTYPE_FLOAT32) {
-        error_stack_push(CM_INVALID_ARGUMENT, "torch_tensor_set_item_float: requires scalar float32",
-                         __FILE__, __LINE__, __func__);
+        error_stack_push(CM_INVALID_ARGUMENT,
+                         "torch_tensor_set_item_float: requires scalar float32", __FILE__, __LINE__,
+                         __func__);
         return;
     }
     tensor_set_float(t, 0, value);
@@ -386,9 +387,7 @@ ReLU* torch_nn_relu(void) { return cml_nn_relu(false); }
 
 Sequential* torch_nn_sequential(void) { return cml_nn_sequential(); }
 
-void torch_nn_sequential_add(Sequential* seq, Module* layer) {
-    cml_nn_sequential_add(seq, layer);
-}
+void torch_nn_sequential_add(Sequential* seq, Module* layer) { cml_nn_sequential_add(seq, layer); }
 
 Tensor* torch_nn_sequential_forward(Sequential* seq, Tensor* input) {
     return cml_nn_sequential_forward(seq, input);
@@ -435,9 +434,7 @@ void torch_optim_free(Optimizer* optimizer) { optimizer_free(optimizer); }
 /* Loss functions                                                      */
 /* ------------------------------------------------------------------ */
 
-Tensor* torch_nn_mse_loss(Tensor* input, Tensor* target) {
-    return cml_nn_mse_loss(input, target);
-}
+Tensor* torch_nn_mse_loss(Tensor* input, Tensor* target) { return cml_nn_mse_loss(input, target); }
 
 Tensor* torch_nn_cross_entropy_loss(Tensor* input, Tensor* target) {
     return cml_nn_cross_entropy_loss(input, target);
@@ -531,7 +528,7 @@ __attribute__((hot)) Tensor* torch_runtime_forward(TorchRuntimeModule* runtime, 
     case TORCH_RUNTIME_AOT: {
         if (!runtime->aot_model)
             return NULL;
-        Tensor* inputs[]  = {input};
+        Tensor* inputs[] = {input};
         Tensor* outputs[1];
         if (cml_aot_execute(runtime->aot_model, inputs, 1, outputs, 1) != 0)
             return NULL;

@@ -18,11 +18,11 @@ typedef struct CMLLoRALinear {
     int out_features;
     int rank;
     float alpha;
-    float scaling;           /* alpha / rank */
-    Tensor* base_weight;     /* [out_features, in_features] - not owned */
-    Tensor* lora_A;          /* [rank, in_features] */
-    Tensor* lora_B;          /* [out_features, rank] */
-    Tensor* frozen_base;     /* Copy of base_weight before merge (for unmerge) */
+    float scaling;       /* alpha / rank */
+    Tensor* base_weight; /* [out_features, in_features] - not owned */
+    Tensor* lora_A;      /* [rank, in_features] */
+    Tensor* lora_B;      /* [out_features, rank] */
+    Tensor* frozen_base; /* Copy of base_weight before merge (for unmerge) */
     bool merged;
 } CMLLoRALinear;
 
@@ -30,7 +30,7 @@ typedef struct CMLLoRAAdapter {
     char name[64];
     int rank;
     float alpha;
-    float scaling;           /* alpha / rank */
+    float scaling; /* alpha / rank */
     int num_layers;
     struct CMLLoRALinear** layers;
     bool merged;

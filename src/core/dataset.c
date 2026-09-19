@@ -352,13 +352,13 @@ int dataset_load_file(Dataset* dataset, const char* filepath, const char* format
     }
 
     if (strcmp(format, "csv") == 0 || strcmp(format, "CSV") == 0) {
-        float* X = NULL;
-        float* y = NULL;
+        float* X        = NULL;
+        float* y        = NULL;
         int num_samples = 0, num_features = 0, num_classes = 0;
         char** class_names = NULL;
 
-        if (cml_csv_parse(filepath, -1, &X, &y, &num_samples, &num_features,
-                          &num_classes, &class_names) != 0) {
+        if (cml_csv_parse(filepath, -1, &X, &y, &num_samples, &num_features, &num_classes,
+                          &class_names) != 0) {
             LOG_ERROR("Failed to parse CSV file: %s", filepath);
             return -1;
         }
@@ -378,12 +378,12 @@ int dataset_load_file(Dataset* dataset, const char* filepath, const char* format
 
         dataset->num_classes = num_classes;
         dataset->class_names = class_names;
-        dataset->filepath = cml_strdup(filepath);
+        dataset->filepath    = cml_strdup(filepath);
 
         cml_dataset_compute_stats(dataset);
 
-        LOG_INFO("CSV file loaded: %d samples, %d features, %d classes",
-                  num_samples, num_features, num_classes);
+        LOG_INFO("CSV file loaded: %d samples, %d features, %d classes", num_samples, num_features,
+                 num_classes);
         return 0;
     }
 
@@ -403,16 +403,16 @@ int dataset_get_statistics(Dataset* dataset, void* stats) {
     }
 
     /* Compute statistics if not already present */
-    if (!dataset->feature_means || !dataset->feature_stds ||
-        !dataset->feature_mins || !dataset->feature_maxs) {
+    if (!dataset->feature_means || !dataset->feature_stds || !dataset->feature_mins ||
+        !dataset->feature_maxs) {
         cml_dataset_compute_stats(dataset);
     }
 
     /* If caller provided a stats buffer, copy the four arrays into it.
      * Layout: float[4][input_size] = { means, stds, mins, maxs } */
-    if (stats && dataset->feature_means && dataset->feature_stds &&
-        dataset->feature_mins && dataset->feature_maxs) {
-        size_t sz = (size_t)dataset->input_size * sizeof(float);
+    if (stats && dataset->feature_means && dataset->feature_stds && dataset->feature_mins &&
+        dataset->feature_maxs) {
+        size_t sz  = (size_t)dataset->input_size * sizeof(float);
         float* out = (float*)stats;
         memcpy(out, dataset->feature_means, sz);
         memcpy(out + dataset->input_size, dataset->feature_stds, sz);
@@ -564,8 +564,10 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
             *val_dataset   = NULL;
             return -1;
         }
-        float* train_X = cml_malloc((size_t)train_size * (size_t)dataset->input_size * sizeof(float));
-        float* train_y = cml_malloc((size_t)train_size * (size_t)dataset->output_size * sizeof(float));
+        float* train_X =
+            cml_malloc((size_t)train_size * (size_t)dataset->input_size * sizeof(float));
+        float* train_y =
+            cml_malloc((size_t)train_size * (size_t)dataset->output_size * sizeof(float));
 
         if (!train_X || !train_y) {
             LOG_ERROR("Failed to allocate training data");
@@ -681,7 +683,6 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
         return -1;
     }
 
-
     int train_size = (int)((float)dataset->num_samples * train_ratio);
     int val_size   = (int)((float)dataset->num_samples * val_ratio);
     int test_size  = dataset->num_samples - train_size - val_size;
@@ -717,7 +718,8 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
         float* train_X_data = (float*)tensor_data_ptr(dataset->X);
         float* train_y_data = (float*)tensor_data_ptr(dataset->y);
 
-        float* train_X = cml_malloc((size_t)train_size * (size_t)dataset->input_size * sizeof(float));
+        float* train_X =
+            cml_malloc((size_t)train_size * (size_t)dataset->input_size * sizeof(float));
         float* train_y = cml_malloc((size_t)train_size * sizeof(float));
 
         if (!train_X || !train_y) {
@@ -836,7 +838,6 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
     (*test_dataset)->device      = dataset->device;
     (*test_dataset)->is_loaded   = true;
 
-
     return 0;
 }
 
@@ -858,7 +859,6 @@ int dataset_normalize(Dataset* dataset, const char* method) {
         LOG_ERROR("Invalid parameters for dataset_normalize");
         return -1;
     }
-
 
     if (strcmp(method, "zscore") == 0) {
         // Z-score normalization: (x - mean) / std
@@ -882,7 +882,6 @@ int dataset_normalize(Dataset* dataset, const char* method) {
         }
 
         dataset->is_normalized = true;
-
 
     } else if (strcmp(method, "minmax") == 0) {
         // Min-Max normalization: (x - min) / (max - min)
@@ -908,7 +907,6 @@ int dataset_normalize(Dataset* dataset, const char* method) {
 
         dataset->is_normalized = true;
 
-
     } else {
         LOG_ERROR("Unknown normalization method: %s", method);
         return -1;
@@ -922,7 +920,6 @@ int dataset_shuffle(Dataset* dataset, unsigned int seed) {
         LOG_ERROR("Invalid dataset or indices not available for shuffling");
         return -1;
     }
-
 
     srand(seed);
     for (int i = dataset->num_samples - 1; i > 0; i--) {
@@ -1021,7 +1018,6 @@ Dataset* dataset_copy(Dataset* dataset) {
     if (!dataset)
         return NULL;
 
-
     Dataset* copy = dataset_create();
     if (!copy)
         return NULL;
@@ -1071,7 +1067,6 @@ DataLoader* dataloader_create(Dataset* dataset, int batch_size, bool shuffle) {
         LOG_ERROR("Invalid parameters for dataloader_create");
         return NULL;
     }
-
 
     DataLoader* loader = cml_malloc(sizeof(DataLoader));
     if (!loader)
@@ -1297,7 +1292,7 @@ DataLoader* dataloader_create_with_workers(Dataset* dataset, int batch_size, boo
     atomic_init((_Atomic int*)&loader->prefetch_cursor, 0);
 
     if (num_workers > 0) {
-        loader->num_workers = num_workers;
+        loader->num_workers  = num_workers;
         int queue_capacity   = loader->prefetch_factor * num_workers;
         PrefetchQueue* queue = prefetch_queue_create(queue_capacity);
         if (!queue) {
@@ -1306,7 +1301,7 @@ DataLoader* dataloader_create_with_workers(Dataset* dataset, int batch_size, boo
             return loader;
         }
 
-        loader->prefetch_queue = queue;
+        loader->prefetch_queue  = queue;
         pthread_t* threads      = cml_calloc((size_t)num_workers, sizeof(pthread_t));
         WorkerContext* contexts = cml_calloc((size_t)num_workers, sizeof(WorkerContext));
 
@@ -1374,7 +1369,7 @@ int dataloader_get_batch_tensors(DataLoader* loader, Tensor*** batch_inputs,
         }
         cml_free(*batch_inputs);
         cml_free(*batch_targets);
-        *batch_inputs = NULL;
+        *batch_inputs  = NULL;
         *batch_targets = NULL;
         batch_free(batch);
         return 0;
@@ -1517,7 +1512,6 @@ int transform_normalize(Dataset* dataset, float* mean, float* std) {
     }
 
     dataset->is_normalized = true;
-
 
     return 0;
 }

@@ -25,8 +25,8 @@ typedef struct CMLCUDAGraphBackend {
 
     CUresult (*cuStreamBeginCapture)(CUstream hStream, int mode);
     CUresult (*cuStreamEndCapture)(CUstream hStream, CUgraph* phGraph);
-    CUresult (*cuGraphInstantiate)(CUgraphExec* phExec, CUgraph hGraph,
-                                   void* logBuffer, size_t bufferSize);
+    CUresult (*cuGraphInstantiate)(CUgraphExec* phExec, CUgraph hGraph, void* logBuffer,
+                                   size_t bufferSize);
     CUresult (*cuGraphLaunch)(CUgraphExec hExec, CUstream hStream);
     CUresult (*cuGraphExecDestroy)(CUgraphExec hExec);
     CUresult (*cuGraphDestroy)(CUgraph hGraph);

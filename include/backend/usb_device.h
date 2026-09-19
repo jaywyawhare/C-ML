@@ -17,7 +17,7 @@ typedef struct CMLUSBDevice {
     int bus;
     int port;
     bool is_open;
-    void* handle;             /* libusb device handle */
+    void* handle; /* libusb device handle */
     int interface_num;
     uint8_t endpoint_in;
     uint8_t endpoint_out;

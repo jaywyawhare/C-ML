@@ -6,31 +6,42 @@
 #include "alloc/cml_allocator.h"
 
 static CMLShardedTensor* sharded_tensor_alloc(int num_shards, int ndim, int* shape,
-                                               DeviceType* devices, int axis)
-{
+                                              DeviceType* devices, int axis) {
     CMLShardedTensor* st = (CMLShardedTensor*)cml_calloc(1, sizeof(CMLShardedTensor));
-    if (!st) return NULL;
+    if (!st)
+        return NULL;
 
     st->num_shards = num_shards;
-    st->axis = axis;
-    st->ndim = ndim;
+    st->axis       = axis;
+    st->ndim       = ndim;
 
     st->shape = (int*)cml_malloc((size_t)ndim * sizeof(int));
-    if (!st->shape) { cml_free(st); return NULL; }
+    if (!st->shape) {
+        cml_free(st);
+        return NULL;
+    }
     memcpy(st->shape, shape, (size_t)ndim * sizeof(int));
 
     st->devices = (DeviceType*)cml_malloc((size_t)num_shards * sizeof(DeviceType));
-    if (!st->devices) { cml_free(st->shape); cml_free(st); return NULL; }
+    if (!st->devices) {
+        cml_free(st->shape);
+        cml_free(st);
+        return NULL;
+    }
     memcpy(st->devices, devices, (size_t)num_shards * sizeof(DeviceType));
 
     st->shards = (Tensor**)cml_calloc((size_t)num_shards, sizeof(Tensor*));
-    if (!st->shards) { cml_free(st->devices); cml_free(st->shape); cml_free(st); return NULL; }
+    if (!st->shards) {
+        cml_free(st->devices);
+        cml_free(st->shape);
+        cml_free(st);
+        return NULL;
+    }
 
     return st;
 }
 
-CMLShardedTensor* tensor_shard(Tensor* t, DeviceType* devices, int num_devices, int axis)
-{
+CMLShardedTensor* tensor_shard(Tensor* t, DeviceType* devices, int num_devices, int axis) {
     if (!t || !devices || num_devices <= 0) {
         LOG_ERROR("tensor_shard: invalid arguments");
         return NULL;
@@ -43,10 +54,11 @@ CMLShardedTensor* tensor_shard(Tensor* t, DeviceType* devices, int num_devices, 
     }
 
     int dim_size = t->shape[norm_axis];
-    int* sizes = (int*)cml_malloc((size_t)num_devices * sizeof(int));
-    if (!sizes) return NULL;
+    int* sizes   = (int*)cml_malloc((size_t)num_devices * sizeof(int));
+    if (!sizes)
+        return NULL;
 
-    int base = dim_size / num_devices;
+    int base      = dim_size / num_devices;
     int remainder = dim_size % num_devices;
     for (int i = 0; i < num_devices; i++) {
         sizes[i] = base + (i < remainder ? 1 : 0);
@@ -57,9 +69,8 @@ CMLShardedTensor* tensor_shard(Tensor* t, DeviceType* devices, int num_devices, 
     return st;
 }
 
-CMLShardedTensor* tensor_shard_with_sizes(Tensor* t, DeviceType* devices, int num_devices,
-                                           int axis, int* sizes)
-{
+CMLShardedTensor* tensor_shard_with_sizes(Tensor* t, DeviceType* devices, int num_devices, int axis,
+                                          int* sizes) {
     if (!t || !devices || !sizes || num_devices <= 0) {
         LOG_ERROR("tensor_shard_with_sizes: invalid arguments");
         return NULL;
@@ -72,9 +83,11 @@ CMLShardedTensor* tensor_shard_with_sizes(Tensor* t, DeviceType* devices, int nu
     }
 
     int total = 0;
-    for (int i = 0; i < num_devices; i++) total += sizes[i];
+    for (int i = 0; i < num_devices; i++)
+        total += sizes[i];
     if (total != t->shape[norm_axis]) {
-        LOG_ERROR("tensor_shard_with_sizes: sizes sum %d != dim size %d", total, t->shape[norm_axis]);
+        LOG_ERROR("tensor_shard_with_sizes: sizes sum %d != dim size %d", total,
+                  t->shape[norm_axis]);
         return NULL;
     }
 
@@ -86,22 +99,25 @@ CMLShardedTensor* tensor_shard_with_sizes(Tensor* t, DeviceType* devices, int nu
     }
 
     CMLShardedTensor* st = sharded_tensor_alloc(num_devices, t->ndim, t->shape, devices, norm_axis);
-    if (!st) return NULL;
+    if (!st)
+        return NULL;
 
     size_t outer = 1;
-    for (int i = 0; i < norm_axis; i++) outer *= (size_t)t->shape[i];
+    for (int i = 0; i < norm_axis; i++)
+        outer *= (size_t)t->shape[i];
 
     size_t inner = 1;
-    for (int i = norm_axis + 1; i < t->ndim; i++) inner *= (size_t)t->shape[i];
+    for (int i = norm_axis + 1; i < t->ndim; i++)
+        inner *= (size_t)t->shape[i];
 
     int full_axis_size = t->shape[norm_axis];
-    int offset = 0;
+    int offset         = 0;
 
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     for (int s = 0; s < num_devices; s++) {
-        int shard_axis = sizes[s];
+        int shard_axis     = sizes[s];
         size_t shard_elems = outer * (size_t)shard_axis * inner;
 
         float* shard_data = (float*)cml_malloc(shard_elems * sizeof(float));
@@ -112,7 +128,8 @@ CMLShardedTensor* tensor_shard_with_sizes(Tensor* t, DeviceType* devices, int nu
         }
 
         for (size_t o = 0; o < outer; o++) {
-            const float* row_src = src + o * (size_t)full_axis_size * inner + (size_t)offset * inner;
+            const float* row_src =
+                src + o * (size_t)full_axis_size * inner + (size_t)offset * inner;
             float* row_dst = shard_data + o * (size_t)shard_axis * inner;
             memcpy(row_dst, row_src, (size_t)shard_axis * inner * sizeof(float));
         }
@@ -126,7 +143,7 @@ CMLShardedTensor* tensor_shard_with_sizes(Tensor* t, DeviceType* devices, int nu
         memcpy(shard_shape, t->shape, (size_t)t->ndim * sizeof(int));
         shard_shape[norm_axis] = shard_axis;
 
-        cfg.device = devices[s];
+        cfg.device    = devices[s];
         st->shards[s] = tensor_from_data(shard_data, shard_shape, t->ndim, &cfg);
         cml_free(shard_data);
         cml_free(shard_shape);
@@ -143,8 +160,7 @@ CMLShardedTensor* tensor_shard_with_sizes(Tensor* t, DeviceType* devices, int nu
     return st;
 }
 
-Tensor* tensor_unshard(CMLShardedTensor* st)
-{
+Tensor* tensor_unshard(CMLShardedTensor* st) {
     if (!st || !st->shards || st->num_shards <= 0) {
         LOG_ERROR("tensor_unshard: invalid arguments");
         return NULL;
@@ -154,19 +170,21 @@ Tensor* tensor_unshard(CMLShardedTensor* st)
     int ndim = st->ndim;
 
     size_t outer = 1;
-    for (int i = 0; i < axis; i++) outer *= (size_t)st->shape[i];
+    for (int i = 0; i < axis; i++)
+        outer *= (size_t)st->shape[i];
 
     size_t inner = 1;
-    for (int i = axis + 1; i < ndim; i++) inner *= (size_t)st->shape[i];
+    for (int i = axis + 1; i < ndim; i++)
+        inner *= (size_t)st->shape[i];
 
     size_t total_elems = outer * (size_t)st->shape[axis] * inner;
-    float* out_data = (float*)cml_malloc(total_elems * sizeof(float));
+    float* out_data    = (float*)cml_malloc(total_elems * sizeof(float));
     if (!out_data) {
         LOG_ERROR("tensor_unshard: allocation failed");
         return NULL;
     }
 
-    int offset = 0;
+    int offset         = 0;
     int full_axis_size = st->shape[axis];
 
     for (int s = 0; s < st->num_shards; s++) {
@@ -189,19 +207,20 @@ Tensor* tensor_unshard(CMLShardedTensor* st)
         offset += shard_axis;
     }
 
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(out_data, st->shape, ndim, &cfg);
     cml_free(out_data);
     return result;
 }
 
-void sharded_tensor_free(CMLShardedTensor* st)
-{
-    if (!st) return;
+void sharded_tensor_free(CMLShardedTensor* st) {
+    if (!st)
+        return;
     if (st->shards) {
         for (int i = 0; i < st->num_shards; i++) {
-            if (st->shards[i]) tensor_free(st->shards[i]);
+            if (st->shards[i])
+                tensor_free(st->shards[i]);
         }
         cml_free(st->shards);
     }
@@ -210,8 +229,7 @@ void sharded_tensor_free(CMLShardedTensor* st)
     cml_free(st);
 }
 
-CMLShardedTensor* sharded_add(CMLShardedTensor* a, CMLShardedTensor* b)
-{
+CMLShardedTensor* sharded_add(CMLShardedTensor* a, CMLShardedTensor* b) {
     if (!a || !b) {
         LOG_ERROR("sharded_add: NULL argument");
         return NULL;
@@ -225,9 +243,10 @@ CMLShardedTensor* sharded_add(CMLShardedTensor* a, CMLShardedTensor* b)
         return NULL;
     }
 
-    CMLShardedTensor* result = sharded_tensor_alloc(a->num_shards, a->ndim, a->shape,
-                                                     a->devices, a->axis);
-    if (!result) return NULL;
+    CMLShardedTensor* result =
+        sharded_tensor_alloc(a->num_shards, a->ndim, a->shape, a->devices, a->axis);
+    if (!result)
+        return NULL;
 
     for (int s = 0; s < a->num_shards; s++) {
         Tensor* sa = a->shards[s];
@@ -243,17 +262,18 @@ CMLShardedTensor* sharded_add(CMLShardedTensor* a, CMLShardedTensor* b)
             return NULL;
         }
 
-        size_t n = sa->numel;
+        size_t n   = sa->numel;
         float* out = (float*)cml_malloc(n * sizeof(float));
         if (!out) {
             sharded_tensor_free(result);
             return NULL;
         }
 
-        for (size_t i = 0; i < n; i++) out[i] = da[i] + db[i];
+        for (size_t i = 0; i < n; i++)
+            out[i] = da[i] + db[i];
 
-        TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = a->devices[s],
-                            .has_dtype = true, .has_device = true};
+        TensorConfig cfg = {
+            .dtype = DTYPE_FLOAT32, .device = a->devices[s], .has_dtype = true, .has_device = true};
         result->shards[s] = tensor_from_data(out, sa->shape, sa->ndim, &cfg);
         cml_free(out);
 
@@ -266,8 +286,7 @@ CMLShardedTensor* sharded_add(CMLShardedTensor* a, CMLShardedTensor* b)
     return result;
 }
 
-CMLShardedTensor* sharded_allreduce_sum(CMLShardedTensor* st)
-{
+CMLShardedTensor* sharded_allreduce_sum(CMLShardedTensor* st) {
     if (!st || st->num_shards <= 0) {
         LOG_ERROR("sharded_allreduce_sum: invalid arguments");
         return NULL;
@@ -278,7 +297,8 @@ CMLShardedTensor* sharded_allreduce_sum(CMLShardedTensor* st)
     size_t numel = first->numel;
 
     float* sum_data = (float*)cml_calloc(numel, sizeof(float));
-    if (!sum_data) return NULL;
+    if (!sum_data)
+        return NULL;
 
     for (int s = 0; s < st->num_shards; s++) {
         Tensor* shard = st->shards[s];
@@ -288,16 +308,22 @@ CMLShardedTensor* sharded_allreduce_sum(CMLShardedTensor* st)
             cml_free(sum_data);
             return NULL;
         }
-        for (size_t i = 0; i < numel; i++) sum_data[i] += sd[i];
+        for (size_t i = 0; i < numel; i++)
+            sum_data[i] += sd[i];
     }
 
-    CMLShardedTensor* result = sharded_tensor_alloc(st->num_shards, first->ndim, first->shape,
-                                                     st->devices, st->axis);
-    if (!result) { cml_free(sum_data); return NULL; }
+    CMLShardedTensor* result =
+        sharded_tensor_alloc(st->num_shards, first->ndim, first->shape, st->devices, st->axis);
+    if (!result) {
+        cml_free(sum_data);
+        return NULL;
+    }
 
     for (int s = 0; s < st->num_shards; s++) {
-        TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = st->devices[s],
-                            .has_dtype = true, .has_device = true};
+        TensorConfig cfg  = {.dtype      = DTYPE_FLOAT32,
+                             .device     = st->devices[s],
+                             .has_dtype  = true,
+                             .has_device = true};
         result->shards[s] = tensor_from_data(sum_data, first->shape, first->ndim, &cfg);
         if (!result->shards[s]) {
             cml_free(sum_data);
@@ -310,8 +336,7 @@ CMLShardedTensor* sharded_allreduce_sum(CMLShardedTensor* st)
     return result;
 }
 
-static void matmul_2d(const float* a, int M, int K, const float* b, int N, float* out)
-{
+static void matmul_2d(const float* a, int M, int K, const float* b, int N, float* out) {
     for (int i = 0; i < M; i++) {
         for (int j = 0; j < N; j++) {
             float sum = 0.0f;
@@ -323,8 +348,7 @@ static void matmul_2d(const float* a, int M, int K, const float* b, int N, float
     }
 }
 
-CMLShardedTensor* sharded_matmul(CMLShardedTensor* a, CMLShardedTensor* b)
-{
+CMLShardedTensor* sharded_matmul(CMLShardedTensor* a, CMLShardedTensor* b) {
     if (!a || !b) {
         LOG_ERROR("sharded_matmul: NULL argument");
         return NULL;
@@ -339,17 +363,17 @@ CMLShardedTensor* sharded_matmul(CMLShardedTensor* a, CMLShardedTensor* b)
     }
 
     int num_shards = a->num_shards;
-    int M = a->shape[0];
-    int K = a->shape[1];
-    int N = b->shape[1];
+    int M          = a->shape[0];
+    int K          = a->shape[1];
+    int N          = b->shape[1];
 
     if (a->axis == 1 && b->axis == 0) {
         /* A sharded on columns, B sharded on rows: partial products need allreduce */
         int out_shape[2] = {M, N};
 
-        CMLShardedTensor* partial = sharded_tensor_alloc(num_shards, 2, out_shape,
-                                                          a->devices, 0);
-        if (!partial) return NULL;
+        CMLShardedTensor* partial = sharded_tensor_alloc(num_shards, 2, out_shape, a->devices, 0);
+        if (!partial)
+            return NULL;
 
         for (int s = 0; s < num_shards; s++) {
             Tensor* sa = a->shards[s];
@@ -365,13 +389,18 @@ CMLShardedTensor* sharded_matmul(CMLShardedTensor* a, CMLShardedTensor* b)
             }
 
             int local_K = sa->shape[1];
-            float* out = (float*)cml_malloc((size_t)M * N * sizeof(float));
-            if (!out) { sharded_tensor_free(partial); return NULL; }
+            float* out  = (float*)cml_malloc((size_t)M * N * sizeof(float));
+            if (!out) {
+                sharded_tensor_free(partial);
+                return NULL;
+            }
 
             matmul_2d(da, M, local_K, db, N, out);
 
-            TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = a->devices[s],
-                                .has_dtype = true, .has_device = true};
+            TensorConfig cfg   = {.dtype      = DTYPE_FLOAT32,
+                                  .device     = a->devices[s],
+                                  .has_dtype  = true,
+                                  .has_device = true};
             partial->shards[s] = tensor_from_data(out, out_shape, 2, &cfg);
             cml_free(out);
 
@@ -387,10 +416,10 @@ CMLShardedTensor* sharded_matmul(CMLShardedTensor* a, CMLShardedTensor* b)
 
     } else if (a->axis == 0) {
         /* A sharded on rows: independent matmuls, result sharded on rows */
-        int out_shape[2] = {M, N};
-        CMLShardedTensor* result = sharded_tensor_alloc(num_shards, 2, out_shape,
-                                                         a->devices, 0);
-        if (!result) return NULL;
+        int out_shape[2]         = {M, N};
+        CMLShardedTensor* result = sharded_tensor_alloc(num_shards, 2, out_shape, a->devices, 0);
+        if (!result)
+            return NULL;
 
         for (int s = 0; s < num_shards; s++) {
             Tensor* sa = a->shards[s];
@@ -405,15 +434,20 @@ CMLShardedTensor* sharded_matmul(CMLShardedTensor* a, CMLShardedTensor* b)
                 return NULL;
             }
 
-            int local_M = sa->shape[0];
+            int local_M            = sa->shape[0];
             int shard_out_shape[2] = {local_M, N};
-            float* out = (float*)cml_malloc((size_t)local_M * N * sizeof(float));
-            if (!out) { sharded_tensor_free(result); return NULL; }
+            float* out             = (float*)cml_malloc((size_t)local_M * N * sizeof(float));
+            if (!out) {
+                sharded_tensor_free(result);
+                return NULL;
+            }
 
             matmul_2d(da, local_M, K, db, N, out);
 
-            TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = a->devices[s],
-                                .has_dtype = true, .has_device = true};
+            TensorConfig cfg  = {.dtype      = DTYPE_FLOAT32,
+                                 .device     = a->devices[s],
+                                 .has_dtype  = true,
+                                 .has_device = true};
             result->shards[s] = tensor_from_data(out, shard_out_shape, 2, &cfg);
             cml_free(out);
 
@@ -426,14 +460,13 @@ CMLShardedTensor* sharded_matmul(CMLShardedTensor* a, CMLShardedTensor* b)
         return result;
 
     } else {
-        LOG_ERROR("sharded_matmul: unsupported sharding config (a.axis=%d, b.axis=%d)",
-                  a->axis, b->axis);
+        LOG_ERROR("sharded_matmul: unsupported sharding config (a.axis=%d, b.axis=%d)", a->axis,
+                  b->axis);
         return NULL;
     }
 }
 
-CMLShardedTensor* tensor_replicate(Tensor* t, DeviceType* devices, int num_devices)
-{
+CMLShardedTensor* tensor_replicate(Tensor* t, DeviceType* devices, int num_devices) {
     if (!t || !devices || num_devices <= 0) {
         LOG_ERROR("tensor_replicate: invalid arguments");
         return NULL;
@@ -447,11 +480,12 @@ CMLShardedTensor* tensor_replicate(Tensor* t, DeviceType* devices, int num_devic
     }
 
     CMLShardedTensor* st = sharded_tensor_alloc(num_devices, t->ndim, t->shape, devices, 0);
-    if (!st) return NULL;
+    if (!st)
+        return NULL;
 
     for (int i = 0; i < num_devices; i++) {
-        TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = devices[i],
-                            .has_dtype = true, .has_device = true};
+        TensorConfig cfg = {
+            .dtype = DTYPE_FLOAT32, .device = devices[i], .has_dtype = true, .has_device = true};
         st->shards[i] = tensor_from_data(src, t->shape, t->ndim, &cfg);
         if (!st->shards[i]) {
             sharded_tensor_free(st);

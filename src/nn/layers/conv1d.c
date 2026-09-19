@@ -40,14 +40,14 @@ static Tensor* conv1d_forward(Module* module, Tensor* input) {
         return NULL;
     }
 
-    int batch   = input->shape[0];
-    int in_ch   = input->shape[1];
-    int length  = input->shape[2];
-    int out_ch  = conv->out_channels;
-    int ks      = conv->kernel_size;
-    int s       = conv->stride;
-    int p       = conv->padding;
-    int d       = conv->dilation;
+    int batch  = input->shape[0];
+    int in_ch  = input->shape[1];
+    int length = input->shape[2];
+    int out_ch = conv->out_channels;
+    int ks     = conv->kernel_size;
+    int s      = conv->stride;
+    int p      = conv->padding;
+    int d      = conv->dilation;
 
     if (weight->shape[0] != out_ch || weight->shape[2] != ks) {
         LOG_ERROR("Conv1d: weight shape mismatch");
@@ -55,8 +55,8 @@ static Tensor* conv1d_forward(Module* module, Tensor* input) {
     }
 
     /* Map 1D conv to 2D: [B,C,L] -> [B,C,1,L], weight [OC,IC,K] -> [OC,IC,1,K]. */
-    int in4_shape[]  = {batch, in_ch, 1, length};
-    int w4_shape[]   = {out_ch, in_ch, 1, ks};
+    int in4_shape[]     = {batch, in_ch, 1, length};
+    int w4_shape[]      = {out_ch, in_ch, 1, ks};
     ReshapeParams rp_in = {.new_shape = in4_shape, .new_ndim = 4};
     ReshapeParams rp_w  = {.new_shape = w4_shape, .new_ndim = 4};
 
@@ -84,8 +84,8 @@ static Tensor* conv1d_forward(Module* module, Tensor* input) {
     if (!out4)
         return NULL;
 
-    int out_len = (length + 2 * p - d * (ks - 1) - 1) / s + 1;
-    int out3_shape[] = {batch, out_ch, out_len};
+    int out_len          = (length + 2 * p - d * (ks - 1) - 1) / s + 1;
+    int out3_shape[]     = {batch, out_ch, out_len};
     ReshapeParams rp_out = {.new_shape = out3_shape, .new_ndim = 3};
     return uop_reshape(out4, &rp_out);
 }

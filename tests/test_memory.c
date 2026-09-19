@@ -11,7 +11,8 @@
 
 static int test_memory_pool_create(void) {
     MemoryPool* pool = memory_pool_create(1024, 8, DTYPE_FLOAT32);
-    if (!pool) return 0;
+    if (!pool)
+        return 0;
     printf("(blocks=%d) ", pool->num_blocks);
     memory_pool_free(pool);
     return 1;
@@ -19,21 +20,34 @@ static int test_memory_pool_create(void) {
 
 static int test_memory_pool_alloc_free(void) {
     MemoryPool* pool = memory_pool_create(256, 4, DTYPE_FLOAT32);
-    if (!pool) return 0;
+    if (!pool)
+        return 0;
 
     void* block1 = memory_pool_alloc(pool);
     void* block2 = memory_pool_alloc(pool);
-    if (!block1 || !block2) { memory_pool_free(pool); return 0; }
+    if (!block1 || !block2) {
+        memory_pool_free(pool);
+        return 0;
+    }
 
     /* Blocks should be different */
-    if (block1 == block2) { memory_pool_free(pool); return 0; }
+    if (block1 == block2) {
+        memory_pool_free(pool);
+        return 0;
+    }
 
     /* Free a block and reallocate */
     int ret = memory_pool_free_block(pool, block1);
-    if (ret != 0) { memory_pool_free(pool); return 0; }
+    if (ret != 0) {
+        memory_pool_free(pool);
+        return 0;
+    }
 
     void* block3 = memory_pool_alloc(pool);
-    if (!block3) { memory_pool_free(pool); return 0; }
+    if (!block3) {
+        memory_pool_free(pool);
+        return 0;
+    }
 
     printf("(ok) ");
     memory_pool_free(pool);
@@ -42,14 +56,14 @@ static int test_memory_pool_alloc_free(void) {
 
 static int test_memory_pool_exhaustion(void) {
     MemoryPool* pool = memory_pool_create(64, 2, DTYPE_FLOAT32);
-    if (!pool) return 0;
+    if (!pool)
+        return 0;
 
     void* b1 = memory_pool_alloc(pool);
     void* b2 = memory_pool_alloc(pool);
     void* b3 = memory_pool_alloc(pool); /* Should be NULL if pool is full */
 
-    printf("(b1=%s b2=%s b3=%s) ",
-           b1 ? "ok" : "null", b2 ? "ok" : "null", b3 ? "ok" : "null");
+    printf("(b1=%s b2=%s b3=%s) ", b1 ? "ok" : "null", b2 ? "ok" : "null", b3 ? "ok" : "null");
 
     /* At least b1 and b2 should succeed */
     int ok = (b1 != NULL && b2 != NULL);
@@ -59,9 +73,10 @@ static int test_memory_pool_exhaustion(void) {
 }
 
 static int test_tensor_pool_create(void) {
-    int shape[] = {2, 3};
+    int shape[]      = {2, 3};
     TensorPool* pool = tensor_pool_create(shape, 2, 4, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!pool) return 0;
+    if (!pool)
+        return 0;
     printf("(capacity=%zu) ", pool->capacity);
     tensor_pool_free(pool);
     return 1;
@@ -80,17 +95,20 @@ static int test_graph_allocator_create(void) {
 
 static int test_cleanup_context_create(void) {
     CleanupContext* ctx = cleanup_context_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
     /* Context is auto-registered globally; don't free manually (cml_auto_cleanup handles it) */
     return 1;
 }
 
 static int test_cleanup_register_tensor(void) {
     CleanupContext* ctx = cleanup_context_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     Tensor* t = cml_ones_1d(5);
-    if (!t) return 0;
+    if (!t)
+        return 0;
 
     int ret = cleanup_register_tensor(ctx, t);
     if (ret != 0) {
@@ -104,12 +122,15 @@ static int test_cleanup_register_tensor(void) {
 
 static int test_cleanup_clear_all(void) {
     CleanupContext* ctx = cleanup_context_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     Tensor* t1 = cml_ones_1d(3);
     Tensor* t2 = cml_zeros_1d(3);
-    if (t1) cleanup_register_tensor(ctx, t1);
-    if (t2) cleanup_register_tensor(ctx, t2);
+    if (t1)
+        cleanup_register_tensor(ctx, t1);
+    if (t2)
+        cleanup_register_tensor(ctx, t2);
 
     cleanup_clear_all(ctx);
     /* After clear_all, context is still registered globally - don't double-free */

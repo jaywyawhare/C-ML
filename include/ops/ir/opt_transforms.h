@@ -37,8 +37,8 @@ void cml_opt_list_add(CMLOptList* list, CMLOptType type, int axis, int amount);
 
 int cml_opt_apply(CMLOptList* opts, struct LinearProgram* prog);
 
-int cml_opt_enumerate(struct LinearProgram* prog, CMLOptList*** out_lists,
-                      int* out_count, int max_combinations);
+int cml_opt_enumerate(struct LinearProgram* prog, CMLOptList*** out_lists, int* out_count,
+                      int max_combinations);
 
 const char* cml_opt_type_name(CMLOptType type);
 

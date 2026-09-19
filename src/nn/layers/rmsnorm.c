@@ -106,7 +106,7 @@ RMSNorm* nn_rmsnorm(int normalized_shape, float eps, DType dtype, DeviceType dev
     rn->normalized_shape = normalized_shape;
     rn->eps              = eps > 0.0f ? eps : 1e-5f;
     rn->weight           = NULL;
-    int weight_shape[] = {normalized_shape};
+    int weight_shape[]   = {normalized_shape};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* weight = tensor_ones(weight_shape, 1, &config);

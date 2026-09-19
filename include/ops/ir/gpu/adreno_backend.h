@@ -16,13 +16,13 @@ extern "C" {
 
 typedef struct CMLAdrenoBackend {
     bool initialized;
-    int gpu_version;          /* e.g., 730, 740, 750 */
+    int gpu_version; /* e.g., 730, 740, 750 */
     size_t global_mem_size;
     size_t max_alloc_size;
     int max_work_group_size;
     int compute_units;
-    void* cl_context;         /* OpenCL context (optional) */
-    void* cl_queue;           /* OpenCL command queue */
+    void* cl_context; /* OpenCL context (optional) */
+    void* cl_queue;   /* OpenCL command queue */
 } CMLAdrenoBackend;
 
 bool cml_adreno_available(void);

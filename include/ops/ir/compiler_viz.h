@@ -30,23 +30,23 @@ typedef struct CMLVizEvent {
     CMLVizEventType type;
     double timestamp_ms;
     char description[256];
-    char* ir_snapshot;        /* JSON representation of IR at this point */
+    char* ir_snapshot; /* JSON representation of IR at this point */
     struct CMLVizEvent* next;
 } CMLVizEvent;
 
 typedef struct CMLCompilerViz {
     bool enabled;
-    CMLVizEvent* events;      /* Linked list of events */
+    CMLVizEvent* events; /* Linked list of events */
     CMLVizEvent* tail;
     int num_events;
-    char output_path[256];    /* Path for JSON output */
+    char output_path[256]; /* Path for JSON output */
 } CMLCompilerViz;
 
 CMLCompilerViz* cml_compiler_viz_create(const char* output_path);
 void cml_compiler_viz_free(CMLCompilerViz* viz);
 void cml_compiler_viz_enable(CMLCompilerViz* viz, bool enable);
-int cml_compiler_viz_record(CMLCompilerViz* viz, CMLVizEventType type,
-                             const char* description, CMLGraph_t ir);
+int cml_compiler_viz_record(CMLCompilerViz* viz, CMLVizEventType type, const char* description,
+                            CMLGraph_t ir);
 int cml_compiler_viz_export(CMLCompilerViz* viz);
 int cml_compiler_viz_num_events(const CMLCompilerViz* viz);
 void cml_compiler_viz_clear(CMLCompilerViz* viz);

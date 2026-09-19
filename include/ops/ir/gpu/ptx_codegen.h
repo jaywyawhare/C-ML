@@ -18,10 +18,10 @@ extern "C" {
 struct CMLCUDABackend;
 
 typedef struct CMLPTXCodegen {
-    int sm_version;       // e.g. 50 for sm_50
+    int sm_version; // e.g. 50 for sm_50
     int kernel_count;
     bool initialized;
-    struct CMLCUDABackend* cuda;  // CUDA backend for compilation + launch
+    struct CMLCUDABackend* cuda; // CUDA backend for compilation + launch
 } CMLPTXCodegen;
 
 /* @param sm_version Target compute capability (e.g. 50 for sm_50)

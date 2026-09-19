@@ -16,7 +16,7 @@ typedef struct CMLBlasContext {
     void* lib_handle;   /* Dynamic library handle */
     char lib_name[256]; /* Name of loaded library */
     bool initialized;
-    bool is_ilp64;      /* true → all integer args are int64_t (scipy_openblas64) */
+    bool is_ilp64; /* true → all integer args are int64_t (scipy_openblas64) */
 
     /* LP64 function pointers (int arguments) */
     void (*cblas_sgemm)(int Order, int TransA, int TransB, int M, int N, int K, float alpha,
@@ -36,15 +36,14 @@ typedef struct CMLBlasContext {
                    const int* ldb, const float* beta, float* C, const int* ldc);
 
     /* ILP64 function pointers (int64_t arguments — scipy_openblas64 layout) */
-    void (*ilp64_sgemm)(int64_t Order, int64_t TransA, int64_t TransB,
-                        int64_t M, int64_t N, int64_t K, float alpha,
-                        const float* A, int64_t lda, const float* B, int64_t ldb,
-                        float beta, float* C, int64_t ldc);
-    void (*ilp64_sgemv)(int64_t Order, int64_t TransA, int64_t M, int64_t N,
-                        float alpha, const float* A, int64_t lda,
-                        const float* X, int64_t incX, float beta, float* Y, int64_t incY);
-    void (*ilp64_saxpy)(int64_t N, float alpha, const float* X, int64_t incX,
+    void (*ilp64_sgemm)(int64_t Order, int64_t TransA, int64_t TransB, int64_t M, int64_t N,
+                        int64_t K, float alpha, const float* A, int64_t lda, const float* B,
+                        int64_t ldb, float beta, float* C, int64_t ldc);
+    void (*ilp64_sgemv)(int64_t Order, int64_t TransA, int64_t M, int64_t N, float alpha,
+                        const float* A, int64_t lda, const float* X, int64_t incX, float beta,
                         float* Y, int64_t incY);
+    void (*ilp64_saxpy)(int64_t N, float alpha, const float* X, int64_t incX, float* Y,
+                        int64_t incY);
     void (*ilp64_sscal)(int64_t N, float alpha, float* X, int64_t incX);
     float (*ilp64_sdot)(int64_t N, const float* X, int64_t incX, const float* Y, int64_t incY);
     float (*ilp64_snrm2)(int64_t N, const float* X, int64_t incX);
@@ -60,10 +59,10 @@ typedef struct CMLBlasContext {
 
     /* Reusable pack scratch buffers — allocated lazily, grown as needed.
      * Eliminates per-call aligned_alloc/free in the packed GEMM hot path. */
-    float*  pack_a_buf;
-    size_t  pack_a_size;
-    float*  pack_b_buf;
-    size_t  pack_b_size;
+    float* pack_a_buf;
+    size_t pack_a_size;
+    float* pack_b_buf;
+    size_t pack_b_size;
 } CMLBlasContext;
 
 bool cml_blas_available(void);
@@ -83,8 +82,8 @@ int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float
 
 /* f64 GEMM through cblas_dgemm (row-major, no transposes). Returns -1 when
  * no BLAS is available — the caller falls back to the generic kernel. */
-int cml_blas_dgemm(CMLBlasContext* ctx, const double* A, const double* B, double* C,
-                   int M, int N, int K, double alpha, double beta);
+int cml_blas_dgemm(CMLBlasContext* ctx, const double* A, const double* B, double* C, int M, int N,
+                   int K, double alpha, double beta);
 
 /* y = alpha * A @ x + beta * y */
 int cml_blas_sgemv(CMLBlasContext* ctx, const float* A, const float* x, float* y, int M, int N,
@@ -108,7 +107,7 @@ const char* cml_blas_get_library_name(CMLBlasContext* ctx);
  * The underlying library thread pool is process-global, so this affects all
  * subsequent GEMM calls regardless of which CMLBlasContext issues them. */
 void cml_blas_set_num_threads(int n);
-int  cml_blas_get_num_threads(void);
+int cml_blas_get_num_threads(void);
 
 #ifdef __cplusplus
 }

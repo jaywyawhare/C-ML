@@ -3,18 +3,18 @@
 #include <stdlib.h>
 
 /* Raw GGUF spec type IDs (may not be in the project's GGUFTensorType enum) */
-#define GGUF_TENSOR_TYPE_Q4_0  2
-#define GGUF_TENSOR_TYPE_Q4_1  3
-#define GGUF_TENSOR_TYPE_Q8_0  7
-#define GGUF_TENSOR_TYPE_Q4_K  12
-#define GGUF_TENSOR_TYPE_Q5_K  13
-#define GGUF_TENSOR_TYPE_Q6_K  14
+#define GGUF_TENSOR_TYPE_Q4_0 2
+#define GGUF_TENSOR_TYPE_Q4_1 3
+#define GGUF_TENSOR_TYPE_Q8_0 7
+#define GGUF_TENSOR_TYPE_Q4_K 12
+#define GGUF_TENSOR_TYPE_Q5_K 13
+#define GGUF_TENSOR_TYPE_Q6_K 14
 
 /* fp16 -> fp32: pure bit manipulation, no HW intrinsics */
 static float fp16_to_fp32(uint16_t h) {
-    const uint32_t sign = (uint32_t)(h & 0x8000u) << 16;   /* bit 31          */
-    const uint32_t exp  = (h >> 10) & 0x1Fu;                /* 5-bit exponent  */
-    const uint32_t mant = h & 0x03FFu;                      /* 10-bit mantissa */
+    const uint32_t sign = (uint32_t)(h & 0x8000u) << 16; /* bit 31          */
+    const uint32_t exp  = (h >> 10) & 0x1Fu;             /* 5-bit exponent  */
+    const uint32_t mant = h & 0x03FFu;                   /* 10-bit mantissa */
 
     if (exp == 0) {
         if (mant == 0) {
@@ -27,12 +27,12 @@ static float fp16_to_fp32(uint16_t h) {
         /* Subnormal: shift mantissa until the implicit leading 1 sits at
            bit 10, counting shifts to adjust the exponent.                   */
         uint32_t m = mant;
-        int shift = 0;
+        int shift  = 0;
         while ((m & 0x0400u) == 0) {
             m <<= 1;
             shift++;
         }
-        m &= ~0x0400u;            /* remove the now-explicit leading 1      */
+        m &= ~0x0400u; /* remove the now-explicit leading 1      */
         /* fp32 exponent: stored = 127 + (1 - 15 - shift) = 113 - shift     */
         uint32_t v = sign | ((uint32_t)(113 - shift) << 23) | (m << 13);
         float r;
@@ -62,20 +62,20 @@ static float fp16_to_fp32(uint16_t h) {
  *   Byte j holds quant[j] (low nibble) and quant[j+16] (high nibble).
  *   value = (nibble - 8) * d
  */
-static void dequantize_q4_0(const void *src, float *dst, size_t num_blocks) {
-    const BlockQ4_0 *blocks = (const BlockQ4_0 *)src;
+static void dequantize_q4_0(const void* src, float* dst, size_t num_blocks) {
+    const BlockQ4_0* blocks = (const BlockQ4_0*)src;
 
     for (size_t b = 0; b < num_blocks; b++) {
-        const float d = fp16_to_fp32(blocks[b].d);
-        const uint8_t *qs = blocks[b].qs;
+        const float d     = fp16_to_fp32(blocks[b].d);
+        const uint8_t* qs = blocks[b].qs;
 
         for (int j = 0; j < QK4_0 / 2; j++) {
             const uint8_t byte = qs[j];
-            const int lo = (int)(byte & 0x0Fu);
-            const int hi = (int)(byte >> 4);
+            const int lo       = (int)(byte & 0x0Fu);
+            const int hi       = (int)(byte >> 4);
 
-            dst[b * QK4_0 + j]              = (float)(lo - 8) * d;
-            dst[b * QK4_0 + j + QK4_0 / 2]  = (float)(hi - 8) * d;
+            dst[b * QK4_0 + j]             = (float)(lo - 8) * d;
+            dst[b * QK4_0 + j + QK4_0 / 2] = (float)(hi - 8) * d;
         }
     }
 }
@@ -86,21 +86,21 @@ static void dequantize_q4_0(const void *src, float *dst, size_t num_blocks) {
  *   Same nibble packing as Q4_0.
  *   value = nibble * d + m
  */
-static void dequantize_q4_1(const void *src, float *dst, size_t num_blocks) {
-    const BlockQ4_1 *blocks = (const BlockQ4_1 *)src;
+static void dequantize_q4_1(const void* src, float* dst, size_t num_blocks) {
+    const BlockQ4_1* blocks = (const BlockQ4_1*)src;
 
     for (size_t b = 0; b < num_blocks; b++) {
-        const float d = fp16_to_fp32(blocks[b].d);
-        const float m = fp16_to_fp32(blocks[b].m);
-        const uint8_t *qs = blocks[b].qs;
+        const float d     = fp16_to_fp32(blocks[b].d);
+        const float m     = fp16_to_fp32(blocks[b].m);
+        const uint8_t* qs = blocks[b].qs;
 
         for (int j = 0; j < QK4_1 / 2; j++) {
             const uint8_t byte = qs[j];
-            const int lo = (int)(byte & 0x0Fu);
-            const int hi = (int)(byte >> 4);
+            const int lo       = (int)(byte & 0x0Fu);
+            const int hi       = (int)(byte >> 4);
 
-            dst[b * QK4_1 + j]              = (float)lo * d + m;
-            dst[b * QK4_1 + j + QK4_1 / 2]  = (float)hi * d + m;
+            dst[b * QK4_1 + j]             = (float)lo * d + m;
+            dst[b * QK4_1 + j + QK4_1 / 2] = (float)hi * d + m;
         }
     }
 }
@@ -110,12 +110,12 @@ static void dequantize_q4_1(const void *src, float *dst, size_t num_blocks) {
  *   Block: fp16 delta `d`, then 32 signed int8 quants.
  *   value = qs[i] * d
  */
-static void dequantize_q8_0(const void *src, float *dst, size_t num_blocks) {
-    const BlockQ8_0 *blocks = (const BlockQ8_0 *)src;
+static void dequantize_q8_0(const void* src, float* dst, size_t num_blocks) {
+    const BlockQ8_0* blocks = (const BlockQ8_0*)src;
 
     for (size_t b = 0; b < num_blocks; b++) {
-        const float d = fp16_to_fp32(blocks[b].d);
-        const int8_t *qs = blocks[b].qs;
+        const float d    = fp16_to_fp32(blocks[b].d);
+        const int8_t* qs = blocks[b].qs;
 
         for (int j = 0; j < QK8_0; j++) {
             dst[b * QK8_0 + j] = (float)qs[j] * d;
@@ -152,24 +152,24 @@ static void dequantize_q8_0(const void *src, float *dst, size_t num_blocks) {
  * are split between a nibble and the spare top bits of the first four. */
 static void unpack_k_scales(const uint8_t* sc_raw, uint8_t* sc, uint8_t* mn) {
     for (int i = 0; i < 4; i++) {
-        sc[i] = sc_raw[i]     & 0x3Fu;
+        sc[i] = sc_raw[i] & 0x3Fu;
         mn[i] = sc_raw[i + 4] & 0x3Fu;
     }
     for (int i = 4; i < 8; i++) {
         const int j = i - 4;
-        sc[i] = (uint8_t)((sc_raw[j + 8] & 0x0Fu) | ((sc_raw[j]     >> 6) << 4));
-        mn[i] = (uint8_t)((sc_raw[j + 8] >> 4)     | ((sc_raw[j + 4] >> 6) << 4));
+        sc[i]       = (uint8_t)((sc_raw[j + 8] & 0x0Fu) | ((sc_raw[j] >> 6) << 4));
+        mn[i]       = (uint8_t)((sc_raw[j + 8] >> 4) | ((sc_raw[j + 4] >> 6) << 4));
     }
 }
 
-static void dequantize_q4_k(const void *src, float *dst, size_t num_blocks) {
-    const BlockQ4_K *blocks = (const BlockQ4_K *)src;
+static void dequantize_q4_k(const void* src, float* dst, size_t num_blocks) {
+    const BlockQ4_K* blocks = (const BlockQ4_K*)src;
 
     for (size_t b = 0; b < num_blocks; b++) {
-        const BlockQ4_K *blk = &blocks[b];
-        const float d    = fp16_to_fp32(blk->d);
-        const float dmin = fp16_to_fp32(blk->dmin);
-        const uint8_t *sc_raw = blk->scales;
+        const BlockQ4_K* blk  = &blocks[b];
+        const float d         = fp16_to_fp32(blk->d);
+        const float dmin      = fp16_to_fp32(blk->dmin);
+        const uint8_t* sc_raw = blk->scales;
 
         /* Decode the 6-bit scales and mins for 8 sub-blocks */
         uint8_t sc[8];
@@ -178,17 +178,17 @@ static void dequantize_q4_k(const void *src, float *dst, size_t num_blocks) {
 
         /* Dequantize each of the 8 sub-blocks */
         for (int i = 0; i < 8; i++) {
-            const float scale = d    * (float)sc[i];
+            const float scale = d * (float)sc[i];
             const float min   = dmin * (float)mn[i];
-            const uint8_t *q  = blk->qs + i * 16;
+            const uint8_t* q  = blk->qs + i * 16;
 
             for (int k = 0; k < 16; k++) {
                 const uint8_t byte = q[k];
-                const int lo = (int)(byte & 0x0Fu);
-                const int hi = (int)(byte >> 4);
+                const int lo       = (int)(byte & 0x0Fu);
+                const int hi       = (int)(byte >> 4);
 
                 dst[b * QK_K + i * 32 + k]      = (float)lo * scale - min;
-                dst[b * QK_K + i * 32 + k + 16]  = (float)hi * scale - min;
+                dst[b * QK_K + i * 32 + k + 16] = (float)hi * scale - min;
             }
         }
     }
@@ -213,14 +213,14 @@ static void dequantize_q4_k(const void *src, float *dst, size_t num_blocks) {
  *     q5       = lo4 | (high_bit << 4)        (range 0..31)
  *     value    = q5 * (d * sc) - dmin * mn
  */
-static void dequantize_q5_k(const void *src, float *dst, size_t num_blocks) {
-    const BlockQ5_K *blocks = (const BlockQ5_K *)src;
+static void dequantize_q5_k(const void* src, float* dst, size_t num_blocks) {
+    const BlockQ5_K* blocks = (const BlockQ5_K*)src;
 
     for (size_t b = 0; b < num_blocks; b++) {
-        const BlockQ5_K *blk = &blocks[b];
-        const float d    = fp16_to_fp32(blk->d);
-        const float dmin = fp16_to_fp32(blk->dmin);
-        const uint8_t *sc_raw = blk->scales;
+        const BlockQ5_K* blk  = &blocks[b];
+        const float d         = fp16_to_fp32(blk->d);
+        const float dmin      = fp16_to_fp32(blk->dmin);
+        const uint8_t* sc_raw = blk->scales;
 
         /* Unpack sub-block scales and mins -- identical to Q4_K */
         uint8_t sc[8];
@@ -229,15 +229,15 @@ static void dequantize_q5_k(const void *src, float *dst, size_t num_blocks) {
 
         /* Dequantize each of the 8 sub-blocks */
         for (int i = 0; i < 8; i++) {
-            const float scale = d    * (float)sc[i];
+            const float scale = d * (float)sc[i];
             const float min   = dmin * (float)mn[i];
-            const uint8_t *q  = blk->qs + i * 16;
+            const uint8_t* q  = blk->qs + i * 16;
             const int base    = i * 32;
 
             for (int k = 0; k < 16; k++) {
                 const uint8_t byte = q[k];
-                const int lo4 = (int)(byte & 0x0Fu);
-                const int hi4 = (int)(byte >> 4);
+                const int lo4      = (int)(byte & 0x0Fu);
+                const int hi4      = (int)(byte >> 4);
 
                 /* Element indices within the super-block */
                 const int idx_lo = base + k;
@@ -276,12 +276,12 @@ static void dequantize_q5_k(const void *src, float *dst, size_t num_blocks) {
  *     signed_q = q6 - 32                      (range -32..31)
  *     value    = d * scales[e / 16] * signed_q
  */
-static void dequantize_q6_k(const void *src, float *dst, size_t num_blocks) {
-    const BlockQ6_K *blocks = (const BlockQ6_K *)src;
+static void dequantize_q6_k(const void* src, float* dst, size_t num_blocks) {
+    const BlockQ6_K* blocks = (const BlockQ6_K*)src;
 
     for (size_t b = 0; b < num_blocks; b++) {
-        const BlockQ6_K *blk = &blocks[b];
-        const float d = fp16_to_fp32(blk->d);
+        const BlockQ6_K* blk = &blocks[b];
+        const float d        = fp16_to_fp32(blk->d);
 
         for (int e = 0; e < QK_K; e++) {
             /* Lower 4 bits: nibble-packed in ql */
@@ -294,10 +294,10 @@ static void dequantize_q6_k(const void *src, float *dst, size_t num_blocks) {
 
             /* Upper 2 bits: packed 4 per byte in qh */
             const int qh_shift = 2 * (e % 4);
-            const int high2 = (int)((blk->qh[e / 4] >> qh_shift) & 0x03u);
+            const int high2    = (int)((blk->qh[e / 4] >> qh_shift) & 0x03u);
 
-            const int q6 = low4 | (high2 << 4);     /* 6-bit: 0..63       */
-            const int signed_q = q6 - 32;            /* centered: -32..31  */
+            const int q6       = low4 | (high2 << 4); /* 6-bit: 0..63       */
+            const int signed_q = q6 - 32;             /* centered: -32..31  */
 
             const float sc = (float)blk->scales[e / 16];
 
@@ -308,79 +308,93 @@ static void dequantize_q6_k(const void *src, float *dst, size_t num_blocks) {
 
 bool gguf_type_is_quantized(GGUFTensorType type) {
     switch ((int)type) {
-        case GGUF_TENSOR_TYPE_Q4_0:
-        case GGUF_TENSOR_TYPE_Q4_1:
-        case GGUF_TENSOR_TYPE_Q8_0:
-        case GGUF_TENSOR_TYPE_Q4_K:
-        case GGUF_TENSOR_TYPE_Q5_K:
-        case GGUF_TENSOR_TYPE_Q6_K:
-            return true;
-        default:
-            return false;
+    case GGUF_TENSOR_TYPE_Q4_0:
+    case GGUF_TENSOR_TYPE_Q4_1:
+    case GGUF_TENSOR_TYPE_Q8_0:
+    case GGUF_TENSOR_TYPE_Q4_K:
+    case GGUF_TENSOR_TYPE_Q5_K:
+    case GGUF_TENSOR_TYPE_Q6_K:
+        return true;
+    default:
+        return false;
     }
 }
 
 int gguf_quant_block_size(GGUFTensorType type) {
     switch ((int)type) {
-        case GGUF_TENSOR_TYPE_Q4_0: return QK4_0;   /* 32  */
-        case GGUF_TENSOR_TYPE_Q4_1: return QK4_1;   /* 32  */
-        case GGUF_TENSOR_TYPE_Q8_0: return QK8_0;   /* 32  */
-        case GGUF_TENSOR_TYPE_Q4_K: return QK_K;    /* 256 */
-        case GGUF_TENSOR_TYPE_Q5_K: return QK_K;    /* 256 */
-        case GGUF_TENSOR_TYPE_Q6_K: return QK_K;    /* 256 */
-        default:                    return 0;
+    case GGUF_TENSOR_TYPE_Q4_0:
+        return QK4_0; /* 32  */
+    case GGUF_TENSOR_TYPE_Q4_1:
+        return QK4_1; /* 32  */
+    case GGUF_TENSOR_TYPE_Q8_0:
+        return QK8_0; /* 32  */
+    case GGUF_TENSOR_TYPE_Q4_K:
+        return QK_K; /* 256 */
+    case GGUF_TENSOR_TYPE_Q5_K:
+        return QK_K; /* 256 */
+    case GGUF_TENSOR_TYPE_Q6_K:
+        return QK_K; /* 256 */
+    default:
+        return 0;
     }
 }
 
 size_t gguf_quant_type_size(GGUFTensorType type) {
     switch ((int)type) {
-        case GGUF_TENSOR_TYPE_Q4_0: return sizeof(BlockQ4_0);
-        case GGUF_TENSOR_TYPE_Q4_1: return sizeof(BlockQ4_1);
-        case GGUF_TENSOR_TYPE_Q8_0: return sizeof(BlockQ8_0);
-        case GGUF_TENSOR_TYPE_Q4_K: return sizeof(BlockQ4_K);
-        case GGUF_TENSOR_TYPE_Q5_K: return sizeof(BlockQ5_K);
-        case GGUF_TENSOR_TYPE_Q6_K: return sizeof(BlockQ6_K);
-        default:                    return 0;
+    case GGUF_TENSOR_TYPE_Q4_0:
+        return sizeof(BlockQ4_0);
+    case GGUF_TENSOR_TYPE_Q4_1:
+        return sizeof(BlockQ4_1);
+    case GGUF_TENSOR_TYPE_Q8_0:
+        return sizeof(BlockQ8_0);
+    case GGUF_TENSOR_TYPE_Q4_K:
+        return sizeof(BlockQ4_K);
+    case GGUF_TENSOR_TYPE_Q5_K:
+        return sizeof(BlockQ5_K);
+    case GGUF_TENSOR_TYPE_Q6_K:
+        return sizeof(BlockQ6_K);
+    default:
+        return 0;
     }
 }
 
-int gguf_dequantize(GGUFTensorType type, const void *src, float *dst, size_t numel) {
+int gguf_dequantize(GGUFTensorType type, const void* src, float* dst, size_t numel) {
     if (!src || !dst || numel == 0) {
         return -1;
     }
 
     const int block_size = gguf_quant_block_size(type);
     if (block_size == 0) {
-        return -1;   /* not a supported quantized type */
+        return -1; /* not a supported quantized type */
     }
 
     if (numel % (size_t)block_size != 0) {
-        return -1;   /* numel must be a multiple of block size */
+        return -1; /* numel must be a multiple of block size */
     }
 
     const size_t num_blocks = numel / (size_t)block_size;
 
     switch ((int)type) {
-        case GGUF_TENSOR_TYPE_Q4_0:
-            dequantize_q4_0(src, dst, num_blocks);
-            break;
-        case GGUF_TENSOR_TYPE_Q4_1:
-            dequantize_q4_1(src, dst, num_blocks);
-            break;
-        case GGUF_TENSOR_TYPE_Q8_0:
-            dequantize_q8_0(src, dst, num_blocks);
-            break;
-        case GGUF_TENSOR_TYPE_Q4_K:
-            dequantize_q4_k(src, dst, num_blocks);
-            break;
-        case GGUF_TENSOR_TYPE_Q5_K:
-            dequantize_q5_k(src, dst, num_blocks);
-            break;
-        case GGUF_TENSOR_TYPE_Q6_K:
-            dequantize_q6_k(src, dst, num_blocks);
-            break;
-        default:
-            return -1;
+    case GGUF_TENSOR_TYPE_Q4_0:
+        dequantize_q4_0(src, dst, num_blocks);
+        break;
+    case GGUF_TENSOR_TYPE_Q4_1:
+        dequantize_q4_1(src, dst, num_blocks);
+        break;
+    case GGUF_TENSOR_TYPE_Q8_0:
+        dequantize_q8_0(src, dst, num_blocks);
+        break;
+    case GGUF_TENSOR_TYPE_Q4_K:
+        dequantize_q4_k(src, dst, num_blocks);
+        break;
+    case GGUF_TENSOR_TYPE_Q5_K:
+        dequantize_q5_k(src, dst, num_blocks);
+        break;
+    case GGUF_TENSOR_TYPE_Q6_K:
+        dequantize_q6_k(src, dst, num_blocks);
+        break;
+    default:
+        return -1;
     }
 
     return 0;
@@ -391,7 +405,7 @@ int gguf_q8_0_matmul(const float* x, const void* w_q8, float* y, int m, int k, i
         return -1;
 
     const BlockQ8_0* blocks = (const BlockQ8_0*)w_q8;
-    const int kb = k / QK8_0;
+    const int kb            = k / QK8_0;
 
     memset(y, 0, (size_t)m * (size_t)n * sizeof(float));
     for (int mi = 0; mi < m; mi++) {
@@ -399,7 +413,7 @@ int gguf_q8_0_matmul(const float* x, const void* w_q8, float* y, int m, int k, i
             float acc = 0.0f;
             for (int b = 0; b < kb; b++) {
                 const BlockQ8_0* blk = &blocks[ni * kb + b];
-                const float d = fp16_to_fp32(blk->d);
+                const float d        = fp16_to_fp32(blk->d);
                 for (int q = 0; q < QK8_0; q++) {
                     const int kk = b * QK8_0 + q;
                     acc += x[mi * k + kk] * d * (float)blk->qs[q];
@@ -416,7 +430,7 @@ int gguf_q4_0_matmul(const float* x, const void* w_q4, float* y, int m, int k, i
         return -1;
 
     const BlockQ4_0* blocks = (const BlockQ4_0*)w_q4;
-    const int kb = k / QK4_0;
+    const int kb            = k / QK4_0;
 
     memset(y, 0, (size_t)m * (size_t)n * sizeof(float));
     for (int mi = 0; mi < m; mi++) {
@@ -424,12 +438,12 @@ int gguf_q4_0_matmul(const float* x, const void* w_q4, float* y, int m, int k, i
             float acc = 0.0f;
             for (int b = 0; b < kb; b++) {
                 const BlockQ4_0* blk = &blocks[ni * kb + b];
-                const float d = fp16_to_fp32(blk->d);
+                const float d        = fp16_to_fp32(blk->d);
                 for (int q = 0; q < QK4_0; q++) {
-                    const int kk = b * QK4_0 + q;
+                    const int kk         = b * QK4_0 + q;
                     const uint8_t packed = blk->qs[q / 2];
-                    const int q4 = (q & 1) ? (packed >> 4) : (packed & 0x0F);
-                    const float wv = d * ((float)q4 - 8.0f);
+                    const int q4         = (q & 1) ? (packed >> 4) : (packed & 0x0F);
+                    const float wv       = d * ((float)q4 - 8.0f);
                     acc += x[mi * k + kk] * wv;
                 }
             }

@@ -26,23 +26,23 @@
 #ifdef CML_NV_MOCK_GPU
 #include "ops/ir/gpu/nv_mock.h"
 #include "alloc/cml_allocator.h"
-#define open(...)   cml_nv_mock_open(__VA_ARGS__)
-#define close(...)  cml_nv_mock_close(__VA_ARGS__)
-#define ioctl(...)  cml_nv_mock_ioctl(__VA_ARGS__)
-#define mmap(...)   cml_nv_mock_mmap(__VA_ARGS__)
+#define open(...) cml_nv_mock_open(__VA_ARGS__)
+#define close(...) cml_nv_mock_close(__VA_ARGS__)
+#define ioctl(...) cml_nv_mock_ioctl(__VA_ARGS__)
+#define mmap(...) cml_nv_mock_mmap(__VA_ARGS__)
 #define munmap(...) cml_nv_mock_munmap(__VA_ARGS__)
 #endif
 
-#define NV_PUSHBUF_DWORDS  4096
-#define NV_ALIGN(x, a)     (((x) + ((a)-1)) & ~((uint64_t)(a)-1))
+#define NV_PUSHBUF_DWORDS 4096
+#define NV_ALIGN(x, a) (((x) + ((a) - 1)) & ~((uint64_t)(a) - 1))
 
 #ifdef __linux__
 
 static uint32_t g_nv_next_handle = 0x10000;
 
-#define NV_IOCTL_RM_ALLOC    _IOWR('F', NV_ESC_RM_ALLOC,   NV_RM_ALLOC_PARAMS)
-#define NV_IOCTL_RM_CONTROL  _IOWR('F', NV_ESC_RM_CONTROL,  NV_RM_CONTROL_PARAMS)
-#define NV_IOCTL_RM_FREE     _IOWR('F', NV_ESC_RM_FREE,     NV_RM_FREE_PARAMS)
+#define NV_IOCTL_RM_ALLOC _IOWR('F', NV_ESC_RM_ALLOC, NV_RM_ALLOC_PARAMS)
+#define NV_IOCTL_RM_CONTROL _IOWR('F', NV_ESC_RM_CONTROL, NV_RM_CONTROL_PARAMS)
+#define NV_IOCTL_RM_FREE _IOWR('F', NV_ESC_RM_FREE, NV_RM_FREE_PARAMS)
 
 /* RM alloc parameter structures for specific classes */
 
@@ -102,26 +102,25 @@ typedef struct {
 
 typedef struct {
     uint32_t gpuInfoListSize;
-    NV_GPU_INFO_ENTRY *gpuInfoList;
+    NV_GPU_INFO_ENTRY* gpuInfoList;
 } NV2080_CTRL_GPU_GET_INFO_PARAMS;
 
 typedef struct {
     uint32_t gpuNameStringFlags;
-    char     gpuNameString[256];
+    char gpuNameString[256];
 } NV2080_CTRL_GPU_GET_NAME_STRING_PARAMS;
 
 typedef struct {
     uint32_t grInfoListSize;
-    void     *grInfoList;
+    void* grInfoList;
 } NV2080_CTRL_GR_GET_INFO_PARAMS;
 
 #define NV2080_GPU_INFO_INDEX_GPU_FLA_CAPABILITY 48
 #define NV2080_GPU_INFO_INDEX_MINOR_REVISION_EXT 38
-#define NV2080_GPU_INFO_INDEX_GPU_ARCH           52
+#define NV2080_GPU_INFO_INDEX_GPU_ARCH 52
 
-static int nv_rm_alloc(int fd, uint32_t client, uint32_t parent,
-                       uint32_t *out_handle, uint32_t nv_class,
-                       void *alloc_params) {
+static int nv_rm_alloc(int fd, uint32_t client, uint32_t parent, uint32_t* out_handle,
+                       uint32_t nv_class, void* alloc_params) {
     NV_RM_ALLOC_PARAMS p;
     memset(&p, 0, sizeof(p));
     p.hRoot         = client;
@@ -143,8 +142,8 @@ static int nv_rm_alloc(int fd, uint32_t client, uint32_t parent,
     return 0;
 }
 
-static int nv_rm_control(int fd, uint32_t client, uint32_t object,
-                         uint32_t cmd, void *params, uint32_t params_size) {
+static int nv_rm_control(int fd, uint32_t client, uint32_t object, uint32_t cmd, void* params,
+                         uint32_t params_size) {
     NV_RM_CONTROL_PARAMS p;
     memset(&p, 0, sizeof(p));
     p.hClient    = client;
@@ -186,9 +185,9 @@ static uint64_t now_ms(void) {
     return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
 }
 
-static uint64_t nv_va_alloc(CMLNVDriver *drv, size_t size, size_t align) {
+static uint64_t nv_va_alloc(CMLNVDriver* drv, size_t size, size_t align) {
     uint64_t aligned_size = NV_ALIGN(size, align > 0 ? align : 4096);
-    uint64_t va = NV_ALIGN(drv->va_current, align > 0 ? align : 4096);
+    uint64_t va           = NV_ALIGN(drv->va_current, align > 0 ? align : 4096);
     if (va + aligned_size > drv->va_end) {
         LOG_ERROR("NV driver: GPU VA space exhausted");
         return 0;
@@ -198,33 +197,42 @@ static uint64_t nv_va_alloc(CMLNVDriver *drv, size_t size, size_t align) {
 }
 
 static uint32_t nv_gpfifo_class_for_arch(uint32_t arch) {
-    if (arch >= NV_GPU_ARCH_BLACKWELL) return BLACKWELL_CHANNEL_GPFIFO_A;
-    if (arch >= NV_GPU_ARCH_HOPPER) return HOPPER_CHANNEL_GPFIFO_A;
-    if (arch >= NV_GPU_ARCH_AMPERE) return AMPERE_CHANNEL_GPFIFO_A;
+    if (arch >= NV_GPU_ARCH_BLACKWELL)
+        return BLACKWELL_CHANNEL_GPFIFO_A;
+    if (arch >= NV_GPU_ARCH_HOPPER)
+        return HOPPER_CHANNEL_GPFIFO_A;
+    if (arch >= NV_GPU_ARCH_AMPERE)
+        return AMPERE_CHANNEL_GPFIFO_A;
     return TURING_CHANNEL_GPFIFO_A;
 }
 
 static uint32_t nv_compute_class_for_arch(uint32_t arch) {
-    if (arch >= NV_GPU_ARCH_BLACKWELL) return BLACKWELL_COMPUTE_A;
-    if (arch >= NV_GPU_ARCH_HOPPER) return HOPPER_COMPUTE_A;
-    if (arch >= NV_GPU_ARCH_AMPERE) return AMPERE_COMPUTE_A;
+    if (arch >= NV_GPU_ARCH_BLACKWELL)
+        return BLACKWELL_COMPUTE_A;
+    if (arch >= NV_GPU_ARCH_HOPPER)
+        return HOPPER_COMPUTE_A;
+    if (arch >= NV_GPU_ARCH_AMPERE)
+        return AMPERE_COMPUTE_A;
     return TURING_COMPUTE_A;
 }
 
 static uint32_t nv_copy_class_for_arch(uint32_t arch) {
-    if (arch >= NV_GPU_ARCH_BLACKWELL) return BLACKWELL_DMA_COPY_A;
-    if (arch >= NV_GPU_ARCH_HOPPER) return HOPPER_DMA_COPY_A;
-    if (arch >= NV_GPU_ARCH_AMPERE) return AMPERE_DMA_COPY_A;
+    if (arch >= NV_GPU_ARCH_BLACKWELL)
+        return BLACKWELL_DMA_COPY_A;
+    if (arch >= NV_GPU_ARCH_HOPPER)
+        return HOPPER_DMA_COPY_A;
+    if (arch >= NV_GPU_ARCH_AMPERE)
+        return AMPERE_DMA_COPY_A;
     return TURING_DMA_COPY_A;
 }
 
-static int nv_query_gpu_info(CMLNVDriver *drv) {
+static int nv_query_gpu_info(CMLNVDriver* drv) {
     NV2080_CTRL_GPU_GET_NAME_STRING_PARAMS name_params;
     memset(&name_params, 0, sizeof(name_params));
 
     if (nv_rm_control(drv->fd_ctl, drv->client_handle, drv->subdevice_handle,
-                      NV2080_CTRL_CMD_GPU_GET_NAME_STRING,
-                      &name_params, sizeof(name_params)) == 0) {
+                      NV2080_CTRL_CMD_GPU_GET_NAME_STRING, &name_params,
+                      sizeof(name_params)) == 0) {
         strncpy(drv->device_name, name_params.gpuNameString, sizeof(drv->device_name) - 1);
         drv->device_name[sizeof(drv->device_name) - 1] = '\0';
     }
@@ -236,11 +244,10 @@ static int nv_query_gpu_info(CMLNVDriver *drv) {
     NV2080_CTRL_GPU_GET_INFO_PARAMS info_params;
     memset(&info_params, 0, sizeof(info_params));
     info_params.gpuInfoListSize = 1;
-    info_params.gpuInfoList = info_list;
+    info_params.gpuInfoList     = info_list;
 
     if (nv_rm_control(drv->fd_ctl, drv->client_handle, drv->subdevice_handle,
-                      NV2080_CTRL_CMD_GPU_GET_INFO,
-                      &info_params, sizeof(info_params)) == 0) {
+                      NV2080_CTRL_CMD_GPU_GET_INFO, &info_params, sizeof(info_params)) == 0) {
         drv->gpu_arch = info_list[0].data;
     }
 
@@ -270,18 +277,18 @@ static int nv_query_gpu_info(CMLNVDriver *drv) {
     return 0;
 }
 
-static int nv_setup_vaspace(CMLNVDriver *drv) {
+static int nv_setup_vaspace(CMLNVDriver* drv) {
     NV_VASPACE_ALLOC_PARAMS va_params;
     memset(&va_params, 0, sizeof(va_params));
-    va_params.index = 0;
-    va_params.flags = 0;
-    va_params.vaSize = drv->va_end - drv->va_start;
-    va_params.vaBase = drv->va_start;
+    va_params.index       = 0;
+    va_params.flags       = 0;
+    va_params.vaSize      = drv->va_end - drv->va_start;
+    va_params.vaBase      = drv->va_start;
     va_params.bigPageSize = 0x20000;
 
     drv->vaspace_handle = g_nv_next_handle++;
-    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->device_handle,
-                    &drv->vaspace_handle, FERMI_VASPACE_A, &va_params) != 0) {
+    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->device_handle, &drv->vaspace_handle,
+                    FERMI_VASPACE_A, &va_params) != 0) {
         LOG_DEBUG("NV driver: VA space alloc via FERMI_VASPACE_A failed, using default");
         drv->vaspace_handle = 0;
     }
@@ -289,41 +296,42 @@ static int nv_setup_vaspace(CMLNVDriver *drv) {
     return 0;
 }
 
-static CMLNVBuffer *nv_alloc_gpu_buffer(CMLNVDriver *drv, size_t size, bool host_visible) {
-    CMLNVBuffer *buf = (CMLNVBuffer *)cml_calloc(1, sizeof(CMLNVBuffer));
-    if (!buf) return NULL;
+static CMLNVBuffer* nv_alloc_gpu_buffer(CMLNVDriver* drv, size_t size, bool host_visible) {
+    CMLNVBuffer* buf = (CMLNVBuffer*)cml_calloc(1, sizeof(CMLNVBuffer));
+    if (!buf)
+        return NULL;
 
-    size_t aligned = NV_ALIGN(size, 4096);
-    buf->size = aligned;
+    size_t aligned    = NV_ALIGN(size, 4096);
+    buf->size         = aligned;
     buf->host_visible = host_visible;
 
     NV_MEMORY_ALLOC_PARAMS mem_params;
     memset(&mem_params, 0, sizeof(mem_params));
-    mem_params.size = (uint32_t)aligned;
+    mem_params.size     = (uint32_t)aligned;
     mem_params.hVASpace = drv->vaspace_handle;
 
     if (host_visible) {
-        mem_params.attr = 0x00010001;  /* UNCACHED, HOST_MEMORY */
+        mem_params.attr  = 0x00010001; /* UNCACHED, HOST_MEMORY */
         mem_params.flags = 0x00000001; /* PHYSICAL */
     } else {
-        mem_params.attr = 0x00020001;  /* CACHED, VIDEO_MEMORY */
+        mem_params.attr  = 0x00020001; /* CACHED, VIDEO_MEMORY */
         mem_params.flags = 0x00000002;
-        buf->is_vram = true;
+        buf->is_vram     = true;
     }
 
-    buf->handle = g_nv_next_handle++;
+    buf->handle        = g_nv_next_handle++;
     uint32_t mem_class = host_visible ? NV01_MEMORY_SYSTEM : NV01_MEMORY_LOCAL;
 
-    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->device_handle,
-                    &buf->handle, mem_class, &mem_params) != 0) {
+    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->device_handle, &buf->handle, mem_class,
+                    &mem_params) != 0) {
         if (!host_visible) {
-            mem_params.attr = 0x00010001;
+            mem_params.attr  = 0x00010001;
             mem_params.flags = 0x00000001;
-            buf->handle = g_nv_next_handle++;
-            buf->is_vram = false;
+            buf->handle      = g_nv_next_handle++;
+            buf->is_vram     = false;
 
-            if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->device_handle,
-                            &buf->handle, NV01_MEMORY_SYSTEM, &mem_params) != 0) {
+            if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->device_handle, &buf->handle,
+                            NV01_MEMORY_SYSTEM, &mem_params) != 0) {
                 goto fallback_mmap;
             }
         } else {
@@ -339,11 +347,10 @@ static CMLNVBuffer *nv_alloc_gpu_buffer(CMLNVDriver *drv, size_t size, bool host
     }
 
     if (host_visible || !buf->is_vram) {
-        buf->cpu_addr = mmap(NULL, aligned, PROT_READ | PROT_WRITE,
-                             MAP_SHARED, drv->fd_dev, 0);
+        buf->cpu_addr = mmap(NULL, aligned, PROT_READ | PROT_WRITE, MAP_SHARED, drv->fd_dev, 0);
         if (buf->cpu_addr == MAP_FAILED) {
-            buf->cpu_addr = mmap(NULL, aligned, PROT_READ | PROT_WRITE,
-                                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            buf->cpu_addr =
+                mmap(NULL, aligned, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
             if (buf->cpu_addr == MAP_FAILED) {
                 buf->cpu_addr = NULL;
             }
@@ -362,8 +369,8 @@ fallback_mmap:
         return NULL;
     }
     if (host_visible) {
-        buf->cpu_addr = mmap(NULL, aligned, PROT_READ | PROT_WRITE,
-                             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        buf->cpu_addr =
+            mmap(NULL, aligned, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         if (buf->cpu_addr == MAP_FAILED) {
             buf->cpu_addr = NULL;
             cml_free(buf);
@@ -374,9 +381,9 @@ fallback_mmap:
     return buf;
 }
 
-static int nv_setup_channel(CMLNVDriver *drv) {
-    drv->gpfifo_buf = nv_alloc_gpu_buffer(drv,
-        (size_t)NV_GPFIFO_DEFAULT_ENTRIES * NV_GPFIFO_ENTRY_BYTES, true);
+static int nv_setup_channel(CMLNVDriver* drv) {
+    drv->gpfifo_buf =
+        nv_alloc_gpu_buffer(drv, (size_t)NV_GPFIFO_DEFAULT_ENTRIES * NV_GPFIFO_ENTRY_BYTES, true);
     if (!drv->gpfifo_buf) {
         LOG_WARNING("NV driver: failed to allocate GPFIFO buffer");
         return -1;
@@ -391,47 +398,46 @@ static int nv_setup_channel(CMLNVDriver *drv) {
     NV_CHANNEL_GROUP_ALLOC_PARAMS cg_params;
     memset(&cg_params, 0, sizeof(cg_params));
     cg_params.engineType = 0x01; /* GR/COMPUTE */
-    cg_params.hVASpace = drv->vaspace_handle;
+    cg_params.hVASpace   = drv->vaspace_handle;
 
     drv->channel_group_handle = g_nv_next_handle++;
-    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->device_handle,
-                    &drv->channel_group_handle, KEPLER_CHANNEL_GROUP_A,
-                    &cg_params) != 0) {
+    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->device_handle, &drv->channel_group_handle,
+                    KEPLER_CHANNEL_GROUP_A, &cg_params) != 0) {
         LOG_DEBUG("NV driver: channel group alloc failed");
         drv->channel_group_handle = 0;
     }
 
     NV_CHANNEL_ALLOC_PARAMS ch_params;
     memset(&ch_params, 0, sizeof(ch_params));
-    ch_params.gpFifoOffset = drv->gpfifo_buf->gpu_va;
+    ch_params.gpFifoOffset  = drv->gpfifo_buf->gpu_va;
     ch_params.gpFifoEntries = NV_GPFIFO_DEFAULT_ENTRIES;
-    ch_params.hVASpace = drv->vaspace_handle;
-    ch_params.hUserd = drv->userd_buf->handle;
-    ch_params.userdOffset = 0;
-    ch_params.engineType = 0x01;
+    ch_params.hVASpace      = drv->vaspace_handle;
+    ch_params.hUserd        = drv->userd_buf->handle;
+    ch_params.userdOffset   = 0;
+    ch_params.engineType    = 0x01;
 
     uint32_t gpfifo_class = nv_gpfifo_class_for_arch(drv->gpu_arch);
     uint32_t parent = drv->channel_group_handle ? drv->channel_group_handle : drv->device_handle;
 
     drv->channel_handle = g_nv_next_handle++;
-    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, parent,
-                    &drv->channel_handle, gpfifo_class, &ch_params) != 0) {
+    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, parent, &drv->channel_handle, gpfifo_class,
+                    &ch_params) != 0) {
         LOG_WARNING("NV driver: channel alloc failed (class 0x%04X)", gpfifo_class);
         drv->channel_handle = 0;
     }
 
-    drv->gpfifo.entries = (uint64_t *)drv->gpfifo_buf->cpu_addr;
+    drv->gpfifo.entries     = (uint64_t*)drv->gpfifo_buf->cpu_addr;
     drv->gpfifo.num_entries = NV_GPFIFO_DEFAULT_ENTRIES;
-    drv->gpfifo.put_offset = 0;
-    drv->gpfifo.get_offset = 0;
-    drv->gpfifo.gpu_va = drv->gpfifo_buf->gpu_va;
-    drv->gpfifo.handle = drv->channel_handle;
+    drv->gpfifo.put_offset  = 0;
+    drv->gpfifo.get_offset  = 0;
+    drv->gpfifo.gpu_va      = drv->gpfifo_buf->gpu_va;
+    drv->gpfifo.handle      = drv->channel_handle;
 
     if (drv->userd_buf->cpu_addr) {
-        drv->gpfifo.doorbell = (uint8_t *)drv->userd_buf->cpu_addr + NV_USERD_GP_PUT_OFFSET;
+        drv->gpfifo.doorbell = (uint8_t*)drv->userd_buf->cpu_addr + NV_USERD_GP_PUT_OFFSET;
     }
 
-    uint32_t compute_class = nv_compute_class_for_arch(drv->gpu_arch);
+    uint32_t compute_class  = nv_compute_class_for_arch(drv->gpu_arch);
     drv->compute_obj_handle = g_nv_next_handle++;
     if (drv->channel_handle) {
         if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->channel_handle,
@@ -441,11 +447,11 @@ static int nv_setup_channel(CMLNVDriver *drv) {
         }
     }
 
-    uint32_t copy_class = nv_copy_class_for_arch(drv->gpu_arch);
+    uint32_t copy_class  = nv_copy_class_for_arch(drv->gpu_arch);
     drv->copy_obj_handle = g_nv_next_handle++;
     if (drv->channel_handle) {
-        if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->channel_handle,
-                        &drv->copy_obj_handle, copy_class, NULL) != 0) {
+        if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->channel_handle, &drv->copy_obj_handle,
+                        copy_class, NULL) != 0) {
             LOG_DEBUG("NV driver: copy engine object alloc failed");
             drv->copy_obj_handle = 0;
         }
@@ -454,36 +460,35 @@ static int nv_setup_channel(CMLNVDriver *drv) {
     return 0;
 }
 
-static int nv_setup_pushbuf(CMLNVDriver *drv) {
-    drv->pushbuf.backing = nv_alloc_gpu_buffer(drv,
-        NV_PUSHBUF_DWORDS * sizeof(uint32_t), true);
+static int nv_setup_pushbuf(CMLNVDriver* drv) {
+    drv->pushbuf.backing = nv_alloc_gpu_buffer(drv, NV_PUSHBUF_DWORDS * sizeof(uint32_t), true);
     if (!drv->pushbuf.backing || !drv->pushbuf.backing->cpu_addr) {
         LOG_WARNING("NV driver: failed to allocate pushbuffer");
         return -1;
     }
 
-    drv->pushbuf.buf = (uint32_t *)drv->pushbuf.backing->cpu_addr;
-    drv->pushbuf.pos = 0;
+    drv->pushbuf.buf      = (uint32_t*)drv->pushbuf.backing->cpu_addr;
+    drv->pushbuf.pos      = 0;
     drv->pushbuf.capacity = NV_PUSHBUF_DWORDS;
-    drv->pushbuf.gpu_va = drv->pushbuf.backing->gpu_va;
+    drv->pushbuf.gpu_va   = drv->pushbuf.backing->gpu_va;
 
     return 0;
 }
 
-static int nv_setup_semaphore(CMLNVDriver *drv) {
+static int nv_setup_semaphore(CMLNVDriver* drv) {
     drv->semaphore_buf = nv_alloc_gpu_buffer(drv, 4096, true);
     if (!drv->semaphore_buf || !drv->semaphore_buf->cpu_addr) {
-        drv->semaphore = (volatile uint32_t *)mmap(NULL, 4096,
-            PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        drv->semaphore = (volatile uint32_t*)mmap(NULL, 4096, PROT_READ | PROT_WRITE,
+                                                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         if (drv->semaphore == MAP_FAILED) {
             drv->semaphore = NULL;
             return -1;
         }
     } else {
-        drv->semaphore = (volatile uint32_t *)drv->semaphore_buf->cpu_addr;
+        drv->semaphore = (volatile uint32_t*)drv->semaphore_buf->cpu_addr;
     }
 
-    *drv->semaphore = 0;
+    *drv->semaphore      = 0;
     drv->semaphore_value = 0;
 
     if (drv->semaphore_buf)
@@ -494,44 +499,43 @@ static int nv_setup_semaphore(CMLNVDriver *drv) {
     return 0;
 }
 
-static void pushbuf_reset(CMLNVPushbuf *pb) {
-    pb->pos = 0;
-}
+static void pushbuf_reset(CMLNVPushbuf* pb) { pb->pos = 0; }
 
-static void pushbuf_emit(CMLNVPushbuf *pb, uint32_t val) {
+static void pushbuf_emit(CMLNVPushbuf* pb, uint32_t val) {
     if (pb->pos < pb->capacity)
         pb->buf[pb->pos++] = val;
 }
 
-static void pushbuf_emit_method(CMLNVPushbuf *pb, int subchan, uint32_t reg, uint32_t count) {
+static void pushbuf_emit_method(CMLNVPushbuf* pb, int subchan, uint32_t reg, uint32_t count) {
     pushbuf_emit(pb, NV_FIFO_INCR(subchan, reg, count));
 }
 
-static void pushbuf_emit_data(CMLNVPushbuf *pb, const void *data, uint32_t dwords) {
-    const uint32_t *src = (const uint32_t *)data;
+static void pushbuf_emit_data(CMLNVPushbuf* pb, const void* data, uint32_t dwords) {
+    const uint32_t* src = (const uint32_t*)data;
     for (uint32_t i = 0; i < dwords; i++)
         pushbuf_emit(pb, src[i]);
 }
 
-static void nv_gpfifo_submit(CMLNVDriver *drv, uint64_t pb_gpu_va, uint32_t len_dwords) {
-    if (!drv->gpfifo.entries) return;
+static void nv_gpfifo_submit(CMLNVDriver* drv, uint64_t pb_gpu_va, uint32_t len_dwords) {
+    if (!drv->gpfifo.entries)
+        return;
 
-    uint32_t put = drv->gpfifo.put_offset;
+    uint32_t put             = drv->gpfifo.put_offset;
     drv->gpfifo.entries[put] = NV_GPFIFO_ENTRY(pb_gpu_va, len_dwords);
 
-    put = (put + 1) % drv->gpfifo.num_entries;
+    put                    = (put + 1) % drv->gpfifo.num_entries;
     drv->gpfifo.put_offset = put;
 
     __sync_synchronize();
 
     if (drv->gpfifo.doorbell) {
-        volatile uint32_t *bell = (volatile uint32_t *)drv->gpfifo.doorbell;
-        *bell = put;
+        volatile uint32_t* bell = (volatile uint32_t*)drv->gpfifo.doorbell;
+        *bell                   = put;
         __sync_synchronize();
     }
 }
 
-static void nv_push_semaphore_release(CMLNVPushbuf *pb, uint64_t sem_va, uint32_t value) {
+static void nv_push_semaphore_release(CMLNVPushbuf* pb, uint64_t sem_va, uint32_t value) {
     pushbuf_emit_method(pb, NVC0_SUBCHANNEL_COMPUTE, NVC3C0_SET_REPORT_SEMAPHORE_A, 4);
     pushbuf_emit(pb, (uint32_t)(sem_va >> 32));
     pushbuf_emit(pb, (uint32_t)(sem_va & 0xFFFFFFFF));
@@ -539,7 +543,7 @@ static void nv_push_semaphore_release(CMLNVPushbuf *pb, uint64_t sem_va, uint32_
     pushbuf_emit(pb, NV_SEMAPHORE_RELEASE_WFI);
 }
 
-static void nv_push_semaphore_acquire(CMLNVPushbuf *pb, uint64_t sem_va, uint32_t value) {
+static void nv_push_semaphore_acquire(CMLNVPushbuf* pb, uint64_t sem_va, uint32_t value) {
     pushbuf_emit_method(pb, NVC0_SUBCHANNEL_COMPUTE, NVC3C0_SET_REPORT_SEMAPHORE_A, 4);
     pushbuf_emit(pb, (uint32_t)(sem_va >> 32));
     pushbuf_emit(pb, (uint32_t)(sem_va & 0xFFFFFFFF));
@@ -547,13 +551,12 @@ static void nv_push_semaphore_acquire(CMLNVPushbuf *pb, uint64_t sem_va, uint32_
     pushbuf_emit(pb, NV_SEMAPHORE_ACQUIRE_GEQ);
 }
 
-static void nv_push_invalidate_caches(CMLNVPushbuf *pb) {
+static void nv_push_invalidate_caches(CMLNVPushbuf* pb) {
     pushbuf_emit_method(pb, NVC0_SUBCHANNEL_COMPUTE, NVC3C0_INVALIDATE_SHADER_CACHES, 1);
     pushbuf_emit(pb, 0x12);
 }
 
 #endif /* __linux__ */
-
 
 bool cml_nv_driver_available(void) {
 #ifdef CML_NV_MOCK_GPU
@@ -572,24 +575,24 @@ bool cml_nv_driver_available(void) {
 #endif
 }
 
-
 CMLNVDriver* cml_nv_driver_create(void) {
-    CMLNVDriver *drv = (CMLNVDriver *)cml_calloc(1, sizeof(CMLNVDriver));
+    CMLNVDriver* drv = (CMLNVDriver*)cml_calloc(1, sizeof(CMLNVDriver));
     if (!drv) {
         LOG_ERROR("NV driver: failed to allocate context");
         return NULL;
     }
-    drv->fd_ctl = -1;
-    drv->fd_dev = -1;
-    drv->fd_uvm = -1;
+    drv->fd_ctl     = -1;
+    drv->fd_dev     = -1;
+    drv->fd_uvm     = -1;
     drv->va_start   = 0x100000000ULL;
     drv->va_current = drv->va_start;
     drv->va_end     = 0x800000000ULL;
     return drv;
 }
 
-int cml_nv_driver_init(CMLNVDriver *drv) {
-    if (!drv) return -1;
+int cml_nv_driver_init(CMLNVDriver* drv) {
+    if (!drv)
+        return -1;
     if (drv->initialized)
         return 0;
 
@@ -619,22 +622,21 @@ int cml_nv_driver_init(CMLNVDriver *drv) {
 
     /* RM hierarchy: client -> device -> subdevice */
     drv->client_handle = g_nv_next_handle++;
-    if (nv_rm_alloc(drv->fd_ctl, 0, 0,
-                    &drv->client_handle, NV01_ROOT_CLIENT, NULL) != 0) {
+    if (nv_rm_alloc(drv->fd_ctl, 0, 0, &drv->client_handle, NV01_ROOT_CLIENT, NULL) != 0) {
         LOG_ERROR("NV driver: failed to create RM client");
         goto fail;
     }
 
     drv->device_handle = g_nv_next_handle++;
-    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->client_handle,
-                    &drv->device_handle, NV01_DEVICE_0, NULL) != 0) {
+    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->client_handle, &drv->device_handle,
+                    NV01_DEVICE_0, NULL) != 0) {
         LOG_ERROR("NV driver: failed to create RM device");
         goto fail;
     }
 
     drv->subdevice_handle = g_nv_next_handle++;
-    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->device_handle,
-                    &drv->subdevice_handle, NV20_SUBDEVICE_0, NULL) != 0) {
+    if (nv_rm_alloc(drv->fd_ctl, drv->client_handle, drv->device_handle, &drv->subdevice_handle,
+                    NV20_SUBDEVICE_0, NULL) != 0) {
         LOG_ERROR("NV driver: failed to create RM subdevice");
         goto fail;
     }
@@ -653,54 +655,63 @@ int cml_nv_driver_init(CMLNVDriver *drv) {
         LOG_WARNING("NV driver: semaphore setup incomplete");
 
     drv->initialized = true;
-    LOG_INFO("NV driver: initialized (arch=0x%X, sm_%d%d, fd_ctl=%d, fd_dev=%d)",
-             drv->gpu_arch, drv->compute_cap_major, drv->compute_cap_minor,
-             drv->fd_ctl, drv->fd_dev);
+    LOG_INFO("NV driver: initialized (arch=0x%X, sm_%d%d, fd_ctl=%d, fd_dev=%d)", drv->gpu_arch,
+             drv->compute_cap_major, drv->compute_cap_minor, drv->fd_ctl, drv->fd_dev);
     return 0;
 
 fail:
-    if (drv->fd_uvm >= 0) { close(drv->fd_uvm); drv->fd_uvm = -1; }
-    if (drv->fd_dev >= 0) { close(drv->fd_dev); drv->fd_dev = -1; }
-    if (drv->fd_ctl >= 0) { close(drv->fd_ctl); drv->fd_ctl = -1; }
+    if (drv->fd_uvm >= 0) {
+        close(drv->fd_uvm);
+        drv->fd_uvm = -1;
+    }
+    if (drv->fd_dev >= 0) {
+        close(drv->fd_dev);
+        drv->fd_dev = -1;
+    }
+    if (drv->fd_ctl >= 0) {
+        close(drv->fd_ctl);
+        drv->fd_ctl = -1;
+    }
     return -1;
 #endif
 }
 
-void cml_nv_driver_free(CMLNVDriver *drv) {
-    if (!drv) return;
+void cml_nv_driver_free(CMLNVDriver* drv) {
+    if (!drv)
+        return;
 
 #ifdef __linux__
     if (drv->initialized) {
         if (drv->semaphore_buf) {
             cml_nv_buffer_free(drv, drv->semaphore_buf);
             drv->semaphore_buf = NULL;
-            drv->semaphore = NULL;
+            drv->semaphore     = NULL;
         } else if (drv->semaphore && drv->semaphore != MAP_FAILED) {
-            munmap((void *)drv->semaphore, 4096);
+            munmap((void*)drv->semaphore, 4096);
             drv->semaphore = NULL;
         }
 
         if (drv->pushbuf.backing) {
             cml_nv_buffer_free(drv, drv->pushbuf.backing);
             drv->pushbuf.backing = NULL;
-            drv->pushbuf.buf = NULL;
+            drv->pushbuf.buf     = NULL;
         }
 
         if (drv->copy_obj_handle && drv->channel_handle) {
-            nv_rm_free(drv->fd_ctl, drv->client_handle,
-                       drv->channel_handle, drv->copy_obj_handle);
+            nv_rm_free(drv->fd_ctl, drv->client_handle, drv->channel_handle, drv->copy_obj_handle);
         }
         if (drv->compute_obj_handle && drv->channel_handle) {
-            nv_rm_free(drv->fd_ctl, drv->client_handle,
-                       drv->channel_handle, drv->compute_obj_handle);
+            nv_rm_free(drv->fd_ctl, drv->client_handle, drv->channel_handle,
+                       drv->compute_obj_handle);
         }
         if (drv->channel_handle) {
-            uint32_t parent = drv->channel_group_handle ? drv->channel_group_handle : drv->device_handle;
+            uint32_t parent =
+                drv->channel_group_handle ? drv->channel_group_handle : drv->device_handle;
             nv_rm_free(drv->fd_ctl, drv->client_handle, parent, drv->channel_handle);
         }
         if (drv->channel_group_handle) {
-            nv_rm_free(drv->fd_ctl, drv->client_handle,
-                       drv->device_handle, drv->channel_group_handle);
+            nv_rm_free(drv->fd_ctl, drv->client_handle, drv->device_handle,
+                       drv->channel_group_handle);
         }
 
         if (drv->userd_buf) {
@@ -713,33 +724,33 @@ void cml_nv_driver_free(CMLNVDriver *drv) {
         }
 
         if (drv->vaspace_handle) {
-            nv_rm_free(drv->fd_ctl, drv->client_handle,
-                       drv->device_handle, drv->vaspace_handle);
+            nv_rm_free(drv->fd_ctl, drv->client_handle, drv->device_handle, drv->vaspace_handle);
         }
         if (drv->subdevice_handle) {
-            nv_rm_free(drv->fd_ctl, drv->client_handle,
-                       drv->device_handle, drv->subdevice_handle);
+            nv_rm_free(drv->fd_ctl, drv->client_handle, drv->device_handle, drv->subdevice_handle);
         }
         if (drv->device_handle) {
-            nv_rm_free(drv->fd_ctl, drv->client_handle,
-                       drv->client_handle, drv->device_handle);
+            nv_rm_free(drv->fd_ctl, drv->client_handle, drv->client_handle, drv->device_handle);
         }
         if (drv->client_handle) {
             nv_rm_free(drv->fd_ctl, drv->client_handle, 0, drv->client_handle);
         }
 
-        if (drv->fd_uvm >= 0) close(drv->fd_uvm);
-        if (drv->fd_dev >= 0) close(drv->fd_dev);
-        if (drv->fd_ctl >= 0) close(drv->fd_ctl);
+        if (drv->fd_uvm >= 0)
+            close(drv->fd_uvm);
+        if (drv->fd_dev >= 0)
+            close(drv->fd_dev);
+        if (drv->fd_ctl >= 0)
+            close(drv->fd_ctl);
     }
 #endif
 
     cml_free(drv);
 }
 
-
-CMLNVBuffer* cml_nv_buffer_create(CMLNVDriver *drv, size_t size, bool host_visible) {
-    if (!drv || !drv->initialized || size == 0) return NULL;
+CMLNVBuffer* cml_nv_buffer_create(CMLNVDriver* drv, size_t size, bool host_visible) {
+    if (!drv || !drv->initialized || size == 0)
+        return NULL;
 
 #ifdef __linux__
     return nv_alloc_gpu_buffer(drv, size, host_visible);
@@ -749,8 +760,9 @@ CMLNVBuffer* cml_nv_buffer_create(CMLNVDriver *drv, size_t size, bool host_visib
 #endif
 }
 
-CMLNVBuffer* cml_nv_buffer_create_vram(CMLNVDriver *drv, size_t size) {
-    if (!drv || !drv->initialized || size == 0) return NULL;
+CMLNVBuffer* cml_nv_buffer_create_vram(CMLNVDriver* drv, size_t size) {
+    if (!drv || !drv->initialized || size == 0)
+        return NULL;
 
 #ifdef __linux__
     return nv_alloc_gpu_buffer(drv, size, false);
@@ -759,8 +771,9 @@ CMLNVBuffer* cml_nv_buffer_create_vram(CMLNVDriver *drv, size_t size) {
 #endif
 }
 
-void cml_nv_buffer_free(CMLNVDriver *drv, CMLNVBuffer *buf) {
-    if (!drv || !buf) return;
+void cml_nv_buffer_free(CMLNVDriver* drv, CMLNVBuffer* buf) {
+    if (!drv || !buf)
+        return;
 
 #ifdef __linux__
     if (buf->cpu_addr && buf->cpu_addr != MAP_FAILED) {
@@ -769,23 +782,23 @@ void cml_nv_buffer_free(CMLNVDriver *drv, CMLNVBuffer *buf) {
     }
 
     if (drv->initialized && buf->handle) {
-        nv_rm_free(drv->fd_ctl, drv->client_handle,
-                   drv->device_handle, buf->handle);
+        nv_rm_free(drv->fd_ctl, drv->client_handle, drv->device_handle, buf->handle);
     }
     if (drv->initialized && buf->va_handle) {
-        nv_rm_free(drv->fd_ctl, drv->client_handle,
-                   drv->device_handle, buf->va_handle);
+        nv_rm_free(drv->fd_ctl, drv->client_handle, drv->device_handle, buf->va_handle);
     }
 #endif
 
     cml_free(buf);
 }
 
-int cml_nv_buffer_upload(CMLNVDriver *drv, CMLNVBuffer *dst,
-                          const void *src, size_t n) {
-    if (!drv || !dst || !src || n == 0) return -1;
-    if (!drv->initialized) return -1;
-    if (n > dst->size) return -1;
+int cml_nv_buffer_upload(CMLNVDriver* drv, CMLNVBuffer* dst, const void* src, size_t n) {
+    if (!drv || !dst || !src || n == 0)
+        return -1;
+    if (!drv->initialized)
+        return -1;
+    if (n > dst->size)
+        return -1;
 
     if (dst->cpu_addr) {
         memcpy(dst->cpu_addr, src, n);
@@ -793,8 +806,9 @@ int cml_nv_buffer_upload(CMLNVDriver *drv, CMLNVBuffer *dst,
     }
 
     /* For device-local without host mapping, use staging + CE copy */
-    CMLNVBuffer *staging = cml_nv_buffer_create(drv, n, true);
-    if (!staging) return -1;
+    CMLNVBuffer* staging = cml_nv_buffer_create(drv, n, true);
+    if (!staging)
+        return -1;
 
     memcpy(staging->cpu_addr, src, n);
 
@@ -803,11 +817,13 @@ int cml_nv_buffer_upload(CMLNVDriver *drv, CMLNVBuffer *dst,
     return ret;
 }
 
-int cml_nv_buffer_download(CMLNVDriver *drv, CMLNVBuffer *src,
-                            void *dst, size_t n) {
-    if (!drv || !src || !dst || n == 0) return -1;
-    if (!drv->initialized) return -1;
-    if (n > src->size) return -1;
+int cml_nv_buffer_download(CMLNVDriver* drv, CMLNVBuffer* src, void* dst, size_t n) {
+    if (!drv || !src || !dst || n == 0)
+        return -1;
+    if (!drv->initialized)
+        return -1;
+    if (n > src->size)
+        return -1;
 
     if (src->cpu_addr) {
         memcpy(dst, src->cpu_addr, n);
@@ -816,8 +832,9 @@ int cml_nv_buffer_download(CMLNVDriver *drv, CMLNVBuffer *src,
 
     cml_nv_synchronize(drv);
 
-    CMLNVBuffer *staging = cml_nv_buffer_create(drv, n, true);
-    if (!staging) return -1;
+    CMLNVBuffer* staging = cml_nv_buffer_create(drv, n, true);
+    if (!staging)
+        return -1;
 
     int ret = cml_nv_buffer_copy(drv, staging, src, n);
     if (ret == 0) {
@@ -832,13 +849,14 @@ int cml_nv_buffer_download(CMLNVDriver *drv, CMLNVBuffer *src,
     return ret;
 }
 
-int cml_nv_buffer_copy(CMLNVDriver *drv, CMLNVBuffer *dst,
-                        CMLNVBuffer *src, size_t n) {
-    if (!drv || !dst || !src || n == 0) return -1;
-    if (!drv->initialized) return -1;
+int cml_nv_buffer_copy(CMLNVDriver* drv, CMLNVBuffer* dst, CMLNVBuffer* src, size_t n) {
+    if (!drv || !dst || !src || n == 0)
+        return -1;
+    if (!drv->initialized)
+        return -1;
 
 #ifdef __linux__
-    CMLNVPushbuf *pb = &drv->pushbuf;
+    CMLNVPushbuf* pb = &drv->pushbuf;
     if (!pb->buf) {
         if (dst->cpu_addr && src->cpu_addr) {
             memcpy(dst->cpu_addr, src->cpu_addr, n);
@@ -875,17 +893,18 @@ int cml_nv_buffer_copy(CMLNVDriver *drv, CMLNVBuffer *dst,
 #endif
 }
 
-
-CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
-                                         const char *kernel_name) {
-    if (!ptx_code || !kernel_name) return NULL;
+CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver* drv, const char* ptx_code,
+                                       const char* kernel_name) {
+    if (!ptx_code || !kernel_name)
+        return NULL;
 
     int sm = 75;
     if (drv && drv->compute_cap_major > 0)
         sm = drv->compute_cap_major * 10 + drv->compute_cap_minor;
 
-    CMLNVKernel *kernel = (CMLNVKernel *)cml_calloc(1, sizeof(CMLNVKernel));
-    if (!kernel) return NULL;
+    CMLNVKernel* kernel = (CMLNVKernel*)cml_calloc(1, sizeof(CMLNVKernel));
+    if (!kernel)
+        return NULL;
 
     kernel->name = cml_strdup(kernel_name);
     if (!kernel->name) {
@@ -898,7 +917,7 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
     snprintf(ptx_path, sizeof(ptx_path), "/tmp/cml_nv_%s.ptx", kernel_name);
     snprintf(cubin_path, sizeof(cubin_path), "/tmp/cml_nv_%s.cubin", kernel_name);
 
-    FILE *ptx_file = fopen(ptx_path, "w");
+    FILE* ptx_file = fopen(ptx_path, "w");
     if (!ptx_file) {
         LOG_ERROR("NV driver: failed to write PTX temp file: %s", strerror(errno));
         cml_free(kernel->name);
@@ -911,7 +930,7 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
     char cmd[1024];
     snprintf(cmd, sizeof(cmd), "ptxas -arch=sm_%d -o %s %s 2>&1", sm, cubin_path, ptx_path);
 
-    FILE *proc = popen(cmd, "r");
+    FILE* proc = popen(cmd, "r");
     if (!proc) {
         LOG_ERROR("NV driver: failed to run ptxas: %s", strerror(errno));
         unlink(ptx_path);
@@ -924,7 +943,8 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
     size_t total_read = 0;
     while (total_read < sizeof(output) - 1) {
         size_t r = fread(output + total_read, 1, sizeof(output) - 1 - total_read, proc);
-        if (r == 0) break;
+        if (r == 0)
+            break;
         total_read += r;
     }
     output[total_read] = '\0';
@@ -940,7 +960,7 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
         return NULL;
     }
 
-    FILE *cubin_file = fopen(cubin_path, "rb");
+    FILE* cubin_file = fopen(cubin_path, "rb");
     if (!cubin_file) {
         LOG_ERROR("NV driver: failed to read CUBIN file %s", cubin_path);
         cml_free(kernel->name);
@@ -981,20 +1001,19 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
     fclose(cubin_file);
     unlink(cubin_path);
 
-    if (nv_parse_cubin(kernel->cubin_data, kernel->cubin_size,
-                       kernel_name, &kernel->meta) == 0) {
-        kernel->num_regs = (int)kernel->meta.num_registers;
+    if (nv_parse_cubin(kernel->cubin_data, kernel->cubin_size, kernel_name, &kernel->meta) == 0) {
+        kernel->num_regs   = (int)kernel->meta.num_registers;
         kernel->shared_mem = (int)kernel->meta.shared_mem_size;
         kernel->param_size = (int)kernel->meta.param_size;
-        kernel->bar_count = (int)kernel->meta.bar_count;
+        kernel->bar_count  = (int)kernel->meta.bar_count;
     } else {
-        kernel->num_regs = 16;
+        kernel->num_regs  = 16;
         kernel->bar_count = 1;
     }
 
     if (drv && drv->initialized) {
-        size_t code_alloc = NV_ALIGN(kernel->cubin_size, 256);
-        CMLNVBuffer *code_buf = cml_nv_buffer_create(drv, code_alloc, true);
+        size_t code_alloc     = NV_ALIGN(kernel->cubin_size, 256);
+        CMLNVBuffer* code_buf = cml_nv_buffer_create(drv, code_alloc, true);
         if (code_buf) {
             memcpy(code_buf->cpu_addr, kernel->cubin_data, kernel->cubin_size);
 
@@ -1003,7 +1022,7 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
             else
                 kernel->gpu_addr = code_buf->gpu_va;
 
-            kernel->handle = code_buf->handle;
+            kernel->handle      = code_buf->handle;
             kernel->code_buffer = code_buf;
         }
     }
@@ -1013,12 +1032,14 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver *drv, const char *ptx_code,
     return kernel;
 }
 
-CMLNVKernel* cml_nv_kernel_load_cubin(CMLNVDriver *drv, const void *cubin, size_t size,
-                                        const char *kernel_name) {
-    if (!cubin || size == 0 || !kernel_name) return NULL;
+CMLNVKernel* cml_nv_kernel_load_cubin(CMLNVDriver* drv, const void* cubin, size_t size,
+                                      const char* kernel_name) {
+    if (!cubin || size == 0 || !kernel_name)
+        return NULL;
 
-    CMLNVKernel *kernel = (CMLNVKernel *)cml_calloc(1, sizeof(CMLNVKernel));
-    if (!kernel) return NULL;
+    CMLNVKernel* kernel = (CMLNVKernel*)cml_calloc(1, sizeof(CMLNVKernel));
+    if (!kernel)
+        return NULL;
 
     kernel->name = cml_strdup(kernel_name);
     if (!kernel->name) {
@@ -1036,25 +1057,25 @@ CMLNVKernel* cml_nv_kernel_load_cubin(CMLNVDriver *drv, const void *cubin, size_
     kernel->cubin_size = size;
 
     if (nv_parse_cubin(cubin, size, kernel_name, &kernel->meta) == 0) {
-        kernel->num_regs = (int)kernel->meta.num_registers;
+        kernel->num_regs   = (int)kernel->meta.num_registers;
         kernel->shared_mem = (int)kernel->meta.shared_mem_size;
         kernel->param_size = (int)kernel->meta.param_size;
-        kernel->bar_count = (int)kernel->meta.bar_count;
+        kernel->bar_count  = (int)kernel->meta.bar_count;
     } else {
-        kernel->num_regs = 16;
+        kernel->num_regs  = 16;
         kernel->bar_count = 1;
     }
 
     if (drv && drv->initialized) {
-        size_t code_alloc = NV_ALIGN(size, 256);
-        CMLNVBuffer *code_buf = cml_nv_buffer_create(drv, code_alloc, true);
+        size_t code_alloc     = NV_ALIGN(size, 256);
+        CMLNVBuffer* code_buf = cml_nv_buffer_create(drv, code_alloc, true);
         if (code_buf) {
             memcpy(code_buf->cpu_addr, cubin, size);
             if (kernel->meta.code_offset > 0)
                 kernel->gpu_addr = code_buf->gpu_va + kernel->meta.code_offset;
             else
                 kernel->gpu_addr = code_buf->gpu_va;
-            kernel->handle = code_buf->handle;
+            kernel->handle      = code_buf->handle;
             kernel->code_buffer = code_buf;
         }
     }
@@ -1062,8 +1083,9 @@ CMLNVKernel* cml_nv_kernel_load_cubin(CMLNVDriver *drv, const void *cubin, size_
     return kernel;
 }
 
-void cml_nv_kernel_free(CMLNVDriver *drv, CMLNVKernel *kernel) {
-    if (!kernel) return;
+void cml_nv_kernel_free(CMLNVDriver* drv, CMLNVKernel* kernel) {
+    if (!kernel)
+        return;
 
 #ifdef __linux__
     if (kernel->code_buffer) {
@@ -1071,8 +1093,7 @@ void cml_nv_kernel_free(CMLNVDriver *drv, CMLNVKernel *kernel) {
         kernel->code_buffer = NULL;
         kernel->handle      = 0;
     } else if (drv && drv->initialized && kernel->handle) {
-        nv_rm_free(drv->fd_ctl, drv->client_handle,
-                   drv->device_handle, kernel->handle);
+        nv_rm_free(drv->fd_ctl, drv->client_handle, drv->device_handle, kernel->handle);
     }
 #else
     (void)drv;
@@ -1083,17 +1104,16 @@ void cml_nv_kernel_free(CMLNVDriver *drv, CMLNVKernel *kernel) {
     cml_free(kernel);
 }
 
+int cml_nv_kernel_launch(CMLNVDriver* drv, CMLNVKernel* kernel, uint32_t grid[3], uint32_t block[3],
+                         void** args, int num_args) {
+    if (!drv || !drv->initialized || !kernel)
+        return -1;
 
-int cml_nv_kernel_launch(CMLNVDriver *drv, CMLNVKernel *kernel,
-                          uint32_t grid[3], uint32_t block[3],
-                          void **args, int num_args) {
-    if (!drv || !drv->initialized || !kernel) return -1;
-
-    LOG_DEBUG("NV driver: launching kernel '%s' grid=[%u,%u,%u] block=[%u,%u,%u]",
-              kernel->name, grid[0], grid[1], grid[2], block[0], block[1], block[2]);
+    LOG_DEBUG("NV driver: launching kernel '%s' grid=[%u,%u,%u] block=[%u,%u,%u]", kernel->name,
+              grid[0], grid[1], grid[2], block[0], block[1], block[2]);
 
 #ifdef __linux__
-    CMLNVPushbuf *pb = &drv->pushbuf;
+    CMLNVPushbuf* pb = &drv->pushbuf;
     if (!pb->buf || !drv->gpfifo.entries)
         return -1;
 
@@ -1108,13 +1128,13 @@ int cml_nv_kernel_launch(CMLNVDriver *drv, CMLNVKernel *kernel,
     nv_qmd_set_barrier_count(&qmd, (uint32_t)kernel->bar_count);
 
     /* Build CB0 (constant buffer 0) with kernel arguments */
-    CMLNVBuffer *cb0_buf = NULL;
+    CMLNVBuffer* cb0_buf = NULL;
     if (args && num_args > 0) {
         size_t cb0_size = NV_ALIGN((size_t)num_args * 8, 256);
-        cb0_buf = cml_nv_buffer_create(drv, cb0_size, true);
+        cb0_buf         = cml_nv_buffer_create(drv, cb0_size, true);
         if (cb0_buf) {
-            uint8_t *cb0_data = (uint8_t *)cb0_buf->cpu_addr;
-            size_t offset = 0;
+            uint8_t* cb0_data = (uint8_t*)cb0_buf->cpu_addr;
+            size_t offset     = 0;
             for (int i = 0; i < num_args; i++) {
                 if (args[i]) {
                     memcpy(cb0_data + offset, args[i], 8);
@@ -1126,9 +1146,10 @@ int cml_nv_kernel_launch(CMLNVDriver *drv, CMLNVKernel *kernel,
     }
 
     /* Allocate QMD in GPU-visible memory */
-    CMLNVBuffer *qmd_buf = cml_nv_buffer_create(drv, NV_ALIGN(NV_QMD_BYTES, 256), true);
+    CMLNVBuffer* qmd_buf = cml_nv_buffer_create(drv, NV_ALIGN(NV_QMD_BYTES, 256), true);
     if (!qmd_buf) {
-        if (cb0_buf) cml_nv_buffer_free(drv, cb0_buf);
+        if (cb0_buf)
+            cml_nv_buffer_free(drv, cb0_buf);
         return -1;
     }
     memcpy(qmd_buf->cpu_addr, qmd.data, NV_QMD_BYTES);
@@ -1162,7 +1183,8 @@ int cml_nv_kernel_launch(CMLNVDriver *drv, CMLNVKernel *kernel,
     nv_gpfifo_submit(drv, pb->gpu_va, pb->pos);
 
     cml_nv_buffer_free(drv, qmd_buf);
-    if (cb0_buf) cml_nv_buffer_free(drv, cb0_buf);
+    if (cb0_buf)
+        cml_nv_buffer_free(drv, cb0_buf);
 
     return 0;
 #else
@@ -1172,9 +1194,9 @@ int cml_nv_kernel_launch(CMLNVDriver *drv, CMLNVKernel *kernel,
 #endif
 }
 
-
-int cml_nv_synchronize(CMLNVDriver *drv) {
-    if (!drv || !drv->initialized) return -1;
+int cml_nv_synchronize(CMLNVDriver* drv) {
+    if (!drv || !drv->initialized)
+        return -1;
 
 #ifdef __linux__
     if (!drv->semaphore) {
@@ -1183,14 +1205,14 @@ int cml_nv_synchronize(CMLNVDriver *drv) {
     }
 
     uint64_t deadline = now_ms() + 5000;
-    uint32_t target = (uint32_t)drv->semaphore_value;
+    uint32_t target   = (uint32_t)drv->semaphore_value;
 
     while (*drv->semaphore < target) {
         __sync_synchronize();
 
         if (now_ms() >= deadline) {
-            LOG_ERROR("NV driver: synchronize timed out (current=%u, target=%u)",
-                      *drv->semaphore, target);
+            LOG_ERROR("NV driver: synchronize timed out (current=%u, target=%u)", *drv->semaphore,
+                      target);
             return -1;
         }
 
@@ -1204,18 +1226,26 @@ int cml_nv_synchronize(CMLNVDriver *drv) {
 #endif
 }
 
-
-char* cml_nv_gen_ptx_for_node(struct IRNode *node, int sm) {
-    char *ptx = NULL;
-    const char *kname = "nv_auto_kernel";
-    size_t buf_size = 4096;
+char* cml_nv_gen_ptx_for_node(struct IRNode* node, int sm) {
+    char* ptx         = NULL;
+    const char* kname = "nv_auto_kernel";
+    size_t buf_size   = 4096;
 
     switch (node->type) {
-    case UOP_NEG: case UOP_EXP: case UOP_LOG: case UOP_SQRT:
-    case UOP_ABS: case UOP_SIN: case UOP_COS: case UOP_TANH:
-    case UOP_SIGMOID: case UOP_RECIP: case UOP_SILU: {
-        ptx = (char *)cml_malloc(buf_size);
-        if (!ptx) return NULL;
+    case UOP_NEG:
+    case UOP_EXP:
+    case UOP_LOG:
+    case UOP_SQRT:
+    case UOP_ABS:
+    case UOP_SIN:
+    case UOP_COS:
+    case UOP_TANH:
+    case UOP_SIGMOID:
+    case UOP_RECIP:
+    case UOP_SILU: {
+        ptx = (char*)cml_malloc(buf_size);
+        if (!ptx)
+            return NULL;
         /* Single %, not %%: these strings are inserted through a "%s" argument,
          * so they are NOT format-processed. Written with %% they reached the
          * assembler as "%%f1", which is not valid PTX -- every kernel this
@@ -1224,126 +1254,157 @@ char* cml_nv_gen_ptx_for_node(struct IRNode *node, int sm) {
          *
          * Scratch registers %f2/%f3 are available (.reg .f32 %f<4> below); the
          * result must end up in %f1. */
-        const char *op_ptx;
+        const char* op_ptx;
         switch (node->type) {
-            case UOP_NEG:   op_ptx = "neg.f32 %f1, %f0;"; break;
-            /* ex2 is 2**x, so e**x needs the log2(e) scale first. */
-            case UOP_EXP:   op_ptx = "mul.f32 %f2, %f0, 0f3FB8AA3B;\n"
-                                     "    ex2.approx.f32 %f1, %f2;"; break;
-            /* lg2 is log2, so ln(x) = log2(x) * ln(2). */
-            case UOP_LOG:   op_ptx = "lg2.approx.f32 %f2, %f0;\n"
-                                     "    mul.f32 %f1, %f2, 0f3F317218;"; break;
-            case UOP_SQRT:  op_ptx = "sqrt.approx.f32 %f1, %f0;"; break;
-            case UOP_ABS:   op_ptx = "abs.f32 %f1, %f0;"; break;
-            case UOP_SIN:   op_ptx = "sin.approx.f32 %f1, %f0;"; break;
-            case UOP_COS:   op_ptx = "cos.approx.f32 %f1, %f0;"; break;
-            case UOP_RECIP: op_ptx = "rcp.approx.f32 %f1, %f0;"; break;
-            /* sigmoid(x) = 1/(1+exp(-x)); exp(-x) = ex2(-x*log2(e)) */
-            case UOP_SIGMOID: op_ptx =
-                "mul.f32 %f2, %f0, 0fBFB8AA3B;\n"
-                "    ex2.approx.f32 %f3, %f2;\n"
-                "    add.f32 %f2, %f3, 0f3F800000;\n"
-                "    rcp.approx.f32 %f1, %f2;"; break;
-            case UOP_SILU: op_ptx =
-                "mul.f32 %f2, %f0, 0fBFB8AA3B;\n"
-                "    ex2.approx.f32 %f3, %f2;\n"
-                "    add.f32 %f2, %f3, 0f3F800000;\n"
-                "    rcp.approx.f32 %f3, %f2;\n"
-                "    mul.f32 %f1, %f0, %f3;"; break;
-            /* tanh(x) = 2*sigmoid(2x) - 1; sm_50 has no tanh.approx. */
-            case UOP_TANH: op_ptx =
-                "add.f32 %f2, %f0, %f0;\n"
-                "    mul.f32 %f3, %f2, 0fBFB8AA3B;\n"
-                "    ex2.approx.f32 %f2, %f3;\n"
-                "    add.f32 %f3, %f2, 0f3F800000;\n"
-                "    rcp.approx.f32 %f2, %f3;\n"
-                "    add.f32 %f3, %f2, %f2;\n"
-                "    sub.f32 %f1, %f3, 0f3F800000;"; break;
-            default:
-                /* TANH/SIGMOID/SILU used to land here and compile to a copy. */
-                cml_free(ptx);
-                return NULL;
+        case UOP_NEG:
+            op_ptx = "neg.f32 %f1, %f0;";
+            break;
+        /* ex2 is 2**x, so e**x needs the log2(e) scale first. */
+        case UOP_EXP:
+            op_ptx = "mul.f32 %f2, %f0, 0f3FB8AA3B;\n"
+                     "    ex2.approx.f32 %f1, %f2;";
+            break;
+        /* lg2 is log2, so ln(x) = log2(x) * ln(2). */
+        case UOP_LOG:
+            op_ptx = "lg2.approx.f32 %f2, %f0;\n"
+                     "    mul.f32 %f1, %f2, 0f3F317218;";
+            break;
+        case UOP_SQRT:
+            op_ptx = "sqrt.approx.f32 %f1, %f0;";
+            break;
+        case UOP_ABS:
+            op_ptx = "abs.f32 %f1, %f0;";
+            break;
+        case UOP_SIN:
+            op_ptx = "sin.approx.f32 %f1, %f0;";
+            break;
+        case UOP_COS:
+            op_ptx = "cos.approx.f32 %f1, %f0;";
+            break;
+        case UOP_RECIP:
+            op_ptx = "rcp.approx.f32 %f1, %f0;";
+            break;
+        /* sigmoid(x) = 1/(1+exp(-x)); exp(-x) = ex2(-x*log2(e)) */
+        case UOP_SIGMOID:
+            op_ptx = "mul.f32 %f2, %f0, 0fBFB8AA3B;\n"
+                     "    ex2.approx.f32 %f3, %f2;\n"
+                     "    add.f32 %f2, %f3, 0f3F800000;\n"
+                     "    rcp.approx.f32 %f1, %f2;";
+            break;
+        case UOP_SILU:
+            op_ptx = "mul.f32 %f2, %f0, 0fBFB8AA3B;\n"
+                     "    ex2.approx.f32 %f3, %f2;\n"
+                     "    add.f32 %f2, %f3, 0f3F800000;\n"
+                     "    rcp.approx.f32 %f3, %f2;\n"
+                     "    mul.f32 %f1, %f0, %f3;";
+            break;
+        /* tanh(x) = 2*sigmoid(2x) - 1; sm_50 has no tanh.approx. */
+        case UOP_TANH:
+            op_ptx = "add.f32 %f2, %f0, %f0;\n"
+                     "    mul.f32 %f3, %f2, 0fBFB8AA3B;\n"
+                     "    ex2.approx.f32 %f2, %f3;\n"
+                     "    add.f32 %f3, %f2, 0f3F800000;\n"
+                     "    rcp.approx.f32 %f2, %f3;\n"
+                     "    add.f32 %f3, %f2, %f2;\n"
+                     "    sub.f32 %f1, %f3, 0f3F800000;";
+            break;
+        default:
+            /* TANH/SIGMOID/SILU used to land here and compile to a copy. */
+            cml_free(ptx);
+            return NULL;
         }
         snprintf(ptx, buf_size,
-            ".version 7.0\n.target sm_%d\n.address_size 64\n\n"
-            ".visible .entry %s(\n"
-            "    .param .u64 param_in,\n"
-            "    .param .u64 param_out,\n"
-            "    .param .u32 param_n\n"
-            ") {\n"
-            "    .reg .pred %%p<2>;\n"
-            "    .reg .b32 %%r<8>;\n"
-            "    .reg .b64 %%rd<8>;\n"
-            "    .reg .f32 %%f<4>;\n\n"
-            "    mov.u32 %%r0, %%tid.x;\n"
-            "    mov.u32 %%r1, %%ctaid.x;\n"
-            "    mov.u32 %%r2, %%ntid.x;\n"
-            "    mad.lo.u32 %%r3, %%r1, %%r2, %%r0;\n"
-            "    ld.param.u32 %%r4, [param_n];\n"
-            "    setp.ge.u32 %%p0, %%r3, %%r4;\n"
-            "    @%%p0 ret;\n\n"
-            "    ld.param.u64 %%rd0, [param_in];\n"
-            "    ld.param.u64 %%rd1, [param_out];\n"
-            "    cvt.u64.u32 %%rd2, %%r3;\n"
-            "    shl.b64 %%rd2, %%rd2, 2;\n"
-            "    add.u64 %%rd0, %%rd0, %%rd2;\n"
-            "    add.u64 %%rd1, %%rd1, %%rd2;\n"
-            "    ld.global.f32 %%f0, [%%rd0];\n"
-            "    %s\n"
-            "    st.global.f32 [%%rd1], %%f1;\n"
-            "    ret;\n}\n",
-            sm, kname, op_ptx);
+                 ".version 7.0\n.target sm_%d\n.address_size 64\n\n"
+                 ".visible .entry %s(\n"
+                 "    .param .u64 param_in,\n"
+                 "    .param .u64 param_out,\n"
+                 "    .param .u32 param_n\n"
+                 ") {\n"
+                 "    .reg .pred %%p<2>;\n"
+                 "    .reg .b32 %%r<8>;\n"
+                 "    .reg .b64 %%rd<8>;\n"
+                 "    .reg .f32 %%f<4>;\n\n"
+                 "    mov.u32 %%r0, %%tid.x;\n"
+                 "    mov.u32 %%r1, %%ctaid.x;\n"
+                 "    mov.u32 %%r2, %%ntid.x;\n"
+                 "    mad.lo.u32 %%r3, %%r1, %%r2, %%r0;\n"
+                 "    ld.param.u32 %%r4, [param_n];\n"
+                 "    setp.ge.u32 %%p0, %%r3, %%r4;\n"
+                 "    @%%p0 ret;\n\n"
+                 "    ld.param.u64 %%rd0, [param_in];\n"
+                 "    ld.param.u64 %%rd1, [param_out];\n"
+                 "    cvt.u64.u32 %%rd2, %%r3;\n"
+                 "    shl.b64 %%rd2, %%rd2, 2;\n"
+                 "    add.u64 %%rd0, %%rd0, %%rd2;\n"
+                 "    add.u64 %%rd1, %%rd1, %%rd2;\n"
+                 "    ld.global.f32 %%f0, [%%rd0];\n"
+                 "    %s\n"
+                 "    st.global.f32 [%%rd1], %%f1;\n"
+                 "    ret;\n}\n",
+                 sm, kname, op_ptx);
         break;
     }
 
-    case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV: {
-        ptx = (char *)cml_malloc(buf_size);
-        if (!ptx) return NULL;
+    case UOP_ADD:
+    case UOP_SUB:
+    case UOP_MUL:
+    case UOP_DIV: {
+        ptx = (char*)cml_malloc(buf_size);
+        if (!ptx)
+            return NULL;
         /* Single %: inserted via "%s", not format-processed. See the unary case. */
-        const char *op_ptx;
+        const char* op_ptx;
         switch (node->type) {
-            case UOP_ADD: op_ptx = "add.f32 %f2, %f0, %f1;"; break;
-            case UOP_SUB: op_ptx = "sub.f32 %f2, %f0, %f1;"; break;
-            case UOP_MUL: op_ptx = "mul.f32 %f2, %f0, %f1;"; break;
-            case UOP_DIV: op_ptx = "div.approx.f32 %f2, %f0, %f1;"; break;
-            default:
-                /* Emitting an add for an unhandled op would silently replace it. */
-                cml_free(ptx);
-                return NULL;
+        case UOP_ADD:
+            op_ptx = "add.f32 %f2, %f0, %f1;";
+            break;
+        case UOP_SUB:
+            op_ptx = "sub.f32 %f2, %f0, %f1;";
+            break;
+        case UOP_MUL:
+            op_ptx = "mul.f32 %f2, %f0, %f1;";
+            break;
+        case UOP_DIV:
+            op_ptx = "div.approx.f32 %f2, %f0, %f1;";
+            break;
+        default:
+            /* Emitting an add for an unhandled op would silently replace it. */
+            cml_free(ptx);
+            return NULL;
         }
         snprintf(ptx, buf_size,
-            ".version 7.0\n.target sm_%d\n.address_size 64\n\n"
-            ".visible .entry %s(\n"
-            "    .param .u64 param_a,\n"
-            "    .param .u64 param_b,\n"
-            "    .param .u64 param_out,\n"
-            "    .param .u32 param_n\n"
-            ") {\n"
-            "    .reg .pred %%p<2>;\n"
-            "    .reg .b32 %%r<8>;\n"
-            "    .reg .b64 %%rd<8>;\n"
-            "    .reg .f32 %%f<4>;\n\n"
-            "    mov.u32 %%r0, %%tid.x;\n"
-            "    mov.u32 %%r1, %%ctaid.x;\n"
-            "    mov.u32 %%r2, %%ntid.x;\n"
-            "    mad.lo.u32 %%r3, %%r1, %%r2, %%r0;\n"
-            "    ld.param.u32 %%r4, [param_n];\n"
-            "    setp.ge.u32 %%p0, %%r3, %%r4;\n"
-            "    @%%p0 ret;\n\n"
-            "    ld.param.u64 %%rd0, [param_a];\n"
-            "    ld.param.u64 %%rd1, [param_b];\n"
-            "    ld.param.u64 %%rd2, [param_out];\n"
-            "    cvt.u64.u32 %%rd3, %%r3;\n"
-            "    shl.b64 %%rd3, %%rd3, 2;\n"
-            "    add.u64 %%rd0, %%rd0, %%rd3;\n"
-            "    add.u64 %%rd1, %%rd1, %%rd3;\n"
-            "    add.u64 %%rd2, %%rd2, %%rd3;\n"
-            "    ld.global.f32 %%f0, [%%rd0];\n"
-            "    ld.global.f32 %%f1, [%%rd1];\n"
-            "    %s\n"
-            "    st.global.f32 [%%rd2], %%f2;\n"
-            "    ret;\n}\n",
-            sm, kname, op_ptx);
+                 ".version 7.0\n.target sm_%d\n.address_size 64\n\n"
+                 ".visible .entry %s(\n"
+                 "    .param .u64 param_a,\n"
+                 "    .param .u64 param_b,\n"
+                 "    .param .u64 param_out,\n"
+                 "    .param .u32 param_n\n"
+                 ") {\n"
+                 "    .reg .pred %%p<2>;\n"
+                 "    .reg .b32 %%r<8>;\n"
+                 "    .reg .b64 %%rd<8>;\n"
+                 "    .reg .f32 %%f<4>;\n\n"
+                 "    mov.u32 %%r0, %%tid.x;\n"
+                 "    mov.u32 %%r1, %%ctaid.x;\n"
+                 "    mov.u32 %%r2, %%ntid.x;\n"
+                 "    mad.lo.u32 %%r3, %%r1, %%r2, %%r0;\n"
+                 "    ld.param.u32 %%r4, [param_n];\n"
+                 "    setp.ge.u32 %%p0, %%r3, %%r4;\n"
+                 "    @%%p0 ret;\n\n"
+                 "    ld.param.u64 %%rd0, [param_a];\n"
+                 "    ld.param.u64 %%rd1, [param_b];\n"
+                 "    ld.param.u64 %%rd2, [param_out];\n"
+                 "    cvt.u64.u32 %%rd3, %%r3;\n"
+                 "    shl.b64 %%rd3, %%rd3, 2;\n"
+                 "    add.u64 %%rd0, %%rd0, %%rd3;\n"
+                 "    add.u64 %%rd1, %%rd1, %%rd3;\n"
+                 "    add.u64 %%rd2, %%rd2, %%rd3;\n"
+                 "    ld.global.f32 %%f0, [%%rd0];\n"
+                 "    ld.global.f32 %%f1, [%%rd1];\n"
+                 "    %s\n"
+                 "    st.global.f32 [%%rd2], %%f2;\n"
+                 "    ret;\n}\n",
+                 sm, kname, op_ptx);
         break;
     }
 
@@ -1354,12 +1415,13 @@ char* cml_nv_gen_ptx_for_node(struct IRNode *node, int sm) {
     return ptx;
 }
 
-int cml_nv_gpu_wait_semaphore(CMLNVDriver *drv, uint64_t sem_va, uint32_t value) {
+int cml_nv_gpu_wait_semaphore(CMLNVDriver* drv, uint64_t sem_va, uint32_t value) {
 #ifdef __linux__
-    if (!drv || !drv->initialized) return -1;
+    if (!drv || !drv->initialized)
+        return -1;
 
-    CMLNVPushbuf *pb = &drv->pushbuf;
-    pb->pos = 0;
+    CMLNVPushbuf* pb = &drv->pushbuf;
+    pb->pos          = 0;
 
     nv_push_semaphore_acquire(pb, sem_va, value);
 
@@ -1367,7 +1429,9 @@ int cml_nv_gpu_wait_semaphore(CMLNVDriver *drv, uint64_t sem_va, uint32_t value)
     nv_gpfifo_submit(drv, pb->gpu_va, pb->pos);
     return 0;
 #else
-    (void)drv; (void)sem_va; (void)value;
+    (void)drv;
+    (void)sem_va;
+    (void)value;
     return -1;
 #endif
 }
@@ -1405,22 +1469,23 @@ static int nv_exec_launch(CMLNVDriver* drv, CMLNVKernel* kernel, uint32_t grid[3
     CMLHCQQueue* q = nv_exec_hcq_queue();
     if (q) {
         CMLHCQKernelDesc desc = {0};
-        desc.compiled_kernel = kernel;
-        desc.grid[0]         = grid[0];
-        desc.grid[1]         = grid[1];
-        desc.grid[2]         = grid[2];
-        desc.block[0]        = block[0];
-        desc.block[1]        = block[1];
-        desc.block[2]        = block[2];
-        desc.args            = kargs;
-        desc.num_args        = num_args;
+        desc.compiled_kernel  = kernel;
+        desc.grid[0]          = grid[0];
+        desc.grid[1]          = grid[1];
+        desc.grid[2]          = grid[2];
+        desc.block[0]         = block[0];
+        desc.block[1]         = block[1];
+        desc.block[2]         = block[2];
+        desc.args             = kargs;
+        desc.num_args         = num_args;
         return cml_hcq_submit_kernel(q, &desc);
     }
     return cml_nv_kernel_launch(drv, kernel, grid, block, kargs, num_args);
 }
 
-int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
-    if (!drv || !ir) return -1;
+int cml_nv_execute_graph(CMLNVDriver* drv, CMLGraph_t ir) {
+    if (!drv || !ir)
+        return -1;
     if (!drv->initialized) {
         LOG_ERROR("NV driver: not initialized");
         return -1;
@@ -1430,44 +1495,44 @@ int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
     if (drv->compute_cap_major > 0)
         sm = drv->compute_cap_major * 10 + drv->compute_cap_minor;
 
-    struct IRNode *node = ir->head;
+    struct IRNode* node = ir->head;
     while (node) {
         if (node->is_executed) {
             node = node->next;
             continue;
         }
 
-        Tensor *output = node->output;
+        Tensor* output = node->output;
         if (!output) {
             node = node->next;
             continue;
         }
 
         bool gpu_ok = false;
-        char *ptx = cml_nv_gen_ptx_for_node(node, sm);
+        char* ptx   = cml_nv_gen_ptx_for_node(node, sm);
 
         if (ptx) {
-            CMLNVKernel *kernel = cml_nv_kernel_compile_ptx(drv, ptx, "nv_auto_kernel");
+            CMLNVKernel* kernel = cml_nv_kernel_compile_ptx(drv, ptx, "nv_auto_kernel");
             if (kernel) {
                 size_t numel = 1;
                 for (int d = 0; d < output->ndim; d++)
                     numel *= (size_t)output->shape[d];
 
-                bool is_unary = (node->num_inputs == 1);
+                bool is_unary  = (node->num_inputs == 1);
                 bool is_binary = (node->num_inputs == 2);
 
                 if (is_unary && node->inputs && node->inputs[0]) {
-                    Tensor *a = node->inputs[0];
+                    Tensor* a    = node->inputs[0];
                     size_t bytes = numel * sizeof(float);
 
-                    CMLNVBuffer *buf_in  = cml_nv_buffer_create(drv, bytes, true);
-                    CMLNVBuffer *buf_out = cml_nv_buffer_create(drv, bytes, true);
+                    CMLNVBuffer* buf_in  = cml_nv_buffer_create(drv, bytes, true);
+                    CMLNVBuffer* buf_out = cml_nv_buffer_create(drv, bytes, true);
 
                     if (buf_in && buf_out && a->data) {
                         nv_exec_upload(drv, buf_in, a->data, bytes);
 
-                        uint32_t n32 = (uint32_t)numel;
-                        void *kargs[] = { &buf_in->gpu_va, &buf_out->gpu_va, &n32 };
+                        uint32_t n32          = (uint32_t)numel;
+                        void* kargs[]         = {&buf_in->gpu_va, &buf_out->gpu_va, &n32};
                         uint32_t block_dim[3] = {256, 1, 1};
                         uint32_t grid_dim[3]  = {(uint32_t)((numel + 255) / 256), 1, 1};
 
@@ -1482,25 +1547,26 @@ int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
                         }
                     }
 
-                    if (buf_in)  cml_nv_buffer_free(drv, buf_in);
-                    if (buf_out) cml_nv_buffer_free(drv, buf_out);
+                    if (buf_in)
+                        cml_nv_buffer_free(drv, buf_in);
+                    if (buf_out)
+                        cml_nv_buffer_free(drv, buf_out);
 
                 } else if (is_binary && node->inputs && node->inputs[0] && node->inputs[1]) {
-                    Tensor *a = node->inputs[0];
-                    Tensor *b = node->inputs[1];
+                    Tensor* a    = node->inputs[0];
+                    Tensor* b    = node->inputs[1];
                     size_t bytes = numel * sizeof(float);
 
-                    CMLNVBuffer *buf_a   = cml_nv_buffer_create(drv, bytes, true);
-                    CMLNVBuffer *buf_b   = cml_nv_buffer_create(drv, bytes, true);
-                    CMLNVBuffer *buf_out = cml_nv_buffer_create(drv, bytes, true);
+                    CMLNVBuffer* buf_a   = cml_nv_buffer_create(drv, bytes, true);
+                    CMLNVBuffer* buf_b   = cml_nv_buffer_create(drv, bytes, true);
+                    CMLNVBuffer* buf_out = cml_nv_buffer_create(drv, bytes, true);
 
                     if (buf_a && buf_b && buf_out && a->data && b->data) {
                         nv_exec_upload(drv, buf_a, a->data, bytes);
                         nv_exec_upload(drv, buf_b, b->data, bytes);
 
-                        uint32_t n32 = (uint32_t)numel;
-                        void *kargs[] = { &buf_a->gpu_va, &buf_b->gpu_va,
-                                          &buf_out->gpu_va, &n32 };
+                        uint32_t n32  = (uint32_t)numel;
+                        void* kargs[] = {&buf_a->gpu_va, &buf_b->gpu_va, &buf_out->gpu_va, &n32};
                         uint32_t block_dim[3] = {256, 1, 1};
                         uint32_t grid_dim[3]  = {(uint32_t)((numel + 255) / 256), 1, 1};
 
@@ -1515,9 +1581,12 @@ int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
                         }
                     }
 
-                    if (buf_a)   cml_nv_buffer_free(drv, buf_a);
-                    if (buf_b)   cml_nv_buffer_free(drv, buf_b);
-                    if (buf_out) cml_nv_buffer_free(drv, buf_out);
+                    if (buf_a)
+                        cml_nv_buffer_free(drv, buf_a);
+                    if (buf_b)
+                        cml_nv_buffer_free(drv, buf_b);
+                    if (buf_out)
+                        cml_nv_buffer_free(drv, buf_out);
                 }
 
                 cml_nv_kernel_free(drv, kernel);
@@ -1526,13 +1595,13 @@ int cml_nv_execute_graph(CMLNVDriver *drv, CMLGraph_t ir) {
         }
 
         if (!gpu_ok) {
-            LOG_DEBUG("NV driver: GPU path failed for op %d, using CPU fallback",
-                      (int)node->type);
+            LOG_DEBUG("NV driver: GPU path failed for op %d, using CPU fallback", (int)node->type);
             cpu_execute_node(node);
         }
 
         node->is_executed = true;
-        if (output) output->is_executed = true;
+        if (output)
+            output->is_executed = true;
         node = node->next;
     }
 

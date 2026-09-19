@@ -9,13 +9,11 @@
 #include "alloc/cml_allocator.h"
 #include "test_harness.h"
 
-
-#define SKIP(reason) \
-    do { \
-        printf("SKIP (%s)\n", reason); \
-        return 1; \
-    } while(0)
-
+#define SKIP(reason)                                                                               \
+    do {                                                                                           \
+        printf("SKIP (%s)\n", reason);                                                             \
+        return 1;                                                                                  \
+    } while (0)
 
 static int test_driver_available(void) {
     bool avail = cml_nv_driver_available();
@@ -24,8 +22,9 @@ static int test_driver_available(void) {
 }
 
 static int test_create_free_no_init(void) {
-    CMLNVDriver *drv = cml_nv_driver_create();
-    if (!drv) return 0;
+    CMLNVDriver* drv = cml_nv_driver_create();
+    if (!drv)
+        return 0;
 
     if (drv->initialized) {
         cml_nv_driver_free(drv);
@@ -48,8 +47,9 @@ static int test_full_lifecycle(void) {
     if (!cml_nv_driver_available())
         SKIP("no NVIDIA device");
 
-    CMLNVDriver *drv = cml_nv_driver_create();
-    if (!drv) return 0;
+    CMLNVDriver* drv = cml_nv_driver_create();
+    if (!drv)
+        return 0;
 
     int ret = cml_nv_driver_init(drv);
     if (ret != 0) {
@@ -76,8 +76,7 @@ static int test_full_lifecycle(void) {
         return 0;
     }
 
-    printf("(arch=0x%X sm_%d%d) ", drv->gpu_arch,
-           drv->compute_cap_major, drv->compute_cap_minor);
+    printf("(arch=0x%X sm_%d%d) ", drv->gpu_arch, drv->compute_cap_major, drv->compute_cap_minor);
 
     cml_nv_driver_free(drv);
     return 1;
@@ -87,8 +86,9 @@ static int test_double_init(void) {
     if (!cml_nv_driver_available())
         SKIP("no NVIDIA device");
 
-    CMLNVDriver *drv = cml_nv_driver_create();
-    if (!drv) return 0;
+    CMLNVDriver* drv = cml_nv_driver_create();
+    if (!drv)
+        return 0;
 
     int ret1 = cml_nv_driver_init(drv);
     if (ret1 != 0) {
@@ -110,15 +110,16 @@ static int test_buffer_create_free(void) {
     if (!cml_nv_driver_available())
         SKIP("no NVIDIA device");
 
-    CMLNVDriver *drv = cml_nv_driver_create();
-    if (!drv) return 0;
+    CMLNVDriver* drv = cml_nv_driver_create();
+    if (!drv)
+        return 0;
 
     if (cml_nv_driver_init(drv) != 0) {
         cml_nv_driver_free(drv);
         SKIP("init failed");
     }
 
-    CMLNVBuffer *hbuf = cml_nv_buffer_create(drv, 4096, true);
+    CMLNVBuffer* hbuf = cml_nv_buffer_create(drv, 4096, true);
     if (!hbuf) {
         cml_nv_driver_free(drv);
         return 0;
@@ -136,14 +137,14 @@ static int test_buffer_create_free(void) {
     }
     cml_nv_buffer_free(drv, hbuf);
 
-    CMLNVBuffer *dbuf = cml_nv_buffer_create(drv, 8192, false);
+    CMLNVBuffer* dbuf = cml_nv_buffer_create(drv, 8192, false);
     if (!dbuf) {
         cml_nv_driver_free(drv);
         return 0;
     }
     cml_nv_buffer_free(drv, dbuf);
 
-    CMLNVBuffer *vbuf = cml_nv_buffer_create_vram(drv, 4096);
+    CMLNVBuffer* vbuf = cml_nv_buffer_create_vram(drv, 4096);
     if (vbuf) {
         if (vbuf->gpu_va == 0) {
             printf("(vram buf no gpu_va) ");
@@ -162,25 +163,27 @@ static int test_buffer_upload_download(void) {
     if (!cml_nv_driver_available())
         SKIP("no NVIDIA device");
 
-    CMLNVDriver *drv = cml_nv_driver_create();
-    if (!drv) return 0;
+    CMLNVDriver* drv = cml_nv_driver_create();
+    if (!drv)
+        return 0;
 
     if (cml_nv_driver_init(drv) != 0) {
         cml_nv_driver_free(drv);
         SKIP("init failed");
     }
 
-    size_t n = 256 * sizeof(float);
-    CMLNVBuffer *buf = cml_nv_buffer_create(drv, n, true);
+    size_t n         = 256 * sizeof(float);
+    CMLNVBuffer* buf = cml_nv_buffer_create(drv, n, true);
     if (!buf) {
         cml_nv_driver_free(drv);
         SKIP("buffer create failed");
     }
 
-    float *src = (float *)cml_malloc(n);
-    float *dst = (float *)cml_calloc(256, sizeof(float));
+    float* src = (float*)cml_malloc(n);
+    float* dst = (float*)cml_calloc(256, sizeof(float));
     if (!src || !dst) {
-        cml_free(src); cml_free(dst);
+        cml_free(src);
+        cml_free(dst);
         cml_nv_buffer_free(drv, buf);
         cml_nv_driver_free(drv);
         return 0;
@@ -189,14 +192,16 @@ static int test_buffer_upload_download(void) {
         src[i] = (float)i * 0.5f;
 
     if (cml_nv_buffer_upload(drv, buf, src, n) != 0) {
-        cml_free(src); cml_free(dst);
+        cml_free(src);
+        cml_free(dst);
         cml_nv_buffer_free(drv, buf);
         cml_nv_driver_free(drv);
         return 0;
     }
 
     if (cml_nv_buffer_download(drv, buf, dst, n) != 0) {
-        cml_free(src); cml_free(dst);
+        cml_free(src);
+        cml_free(dst);
         cml_nv_buffer_free(drv, buf);
         cml_nv_driver_free(drv);
         return 0;
@@ -220,9 +225,12 @@ static int test_buffer_upload_download(void) {
 
 static int test_buffer_null_safety(void) {
     cml_nv_buffer_free(NULL, NULL);
-    if (cml_nv_buffer_upload(NULL, NULL, NULL, 0) != -1) return 0;
-    if (cml_nv_buffer_download(NULL, NULL, NULL, 0) != -1) return 0;
-    if (cml_nv_buffer_copy(NULL, NULL, NULL, 0) != -1) return 0;
+    if (cml_nv_buffer_upload(NULL, NULL, NULL, 0) != -1)
+        return 0;
+    if (cml_nv_buffer_download(NULL, NULL, NULL, 0) != -1)
+        return 0;
+    if (cml_nv_buffer_copy(NULL, NULL, NULL, 0) != -1)
+        return 0;
     return 1;
 }
 
@@ -232,20 +240,25 @@ static int test_kernel_free_null(void) {
 }
 
 static int test_kernel_compile_null(void) {
-    if (cml_nv_kernel_compile_ptx(NULL, NULL, NULL) != NULL) return 0;
-    if (cml_nv_kernel_compile_ptx(NULL, "some ptx", NULL) != NULL) return 0;
+    if (cml_nv_kernel_compile_ptx(NULL, NULL, NULL) != NULL)
+        return 0;
+    if (cml_nv_kernel_compile_ptx(NULL, "some ptx", NULL) != NULL)
+        return 0;
     return 1;
 }
 
 static int test_kernel_load_cubin_null(void) {
-    if (cml_nv_kernel_load_cubin(NULL, NULL, 0, NULL) != NULL) return 0;
-    if (cml_nv_kernel_load_cubin(NULL, "data", 4, NULL) != NULL) return 0;
+    if (cml_nv_kernel_load_cubin(NULL, NULL, 0, NULL) != NULL)
+        return 0;
+    if (cml_nv_kernel_load_cubin(NULL, "data", 4, NULL) != NULL)
+        return 0;
     return 1;
 }
 
 static int test_execute_graph_stub(void) {
-    CMLNVDriver *drv = cml_nv_driver_create();
-    if (!drv) return 0;
+    CMLNVDriver* drv = cml_nv_driver_create();
+    if (!drv)
+        return 0;
 
     if (cml_nv_execute_graph(drv, NULL) != -1) {
         cml_nv_driver_free(drv);
@@ -261,8 +274,9 @@ static int test_execute_graph_stub(void) {
 }
 
 static int test_synchronize_not_init(void) {
-    CMLNVDriver *drv = cml_nv_driver_create();
-    if (!drv) return 0;
+    CMLNVDriver* drv = cml_nv_driver_create();
+    if (!drv)
+        return 0;
 
     if (cml_nv_synchronize(drv) != -1) {
         cml_nv_driver_free(drv);
@@ -274,8 +288,9 @@ static int test_synchronize_not_init(void) {
 }
 
 static int test_kernel_launch_not_init(void) {
-    CMLNVDriver *drv = cml_nv_driver_create();
-    if (!drv) return 0;
+    CMLNVDriver* drv = cml_nv_driver_create();
+    if (!drv)
+        return 0;
 
     uint32_t grid[3]  = {1, 1, 1};
     uint32_t block[3] = {256, 1, 1};
@@ -399,12 +414,17 @@ static int test_qmd_barrier_count(void) {
 
 static int test_cubin_parse_invalid(void) {
     NVKernelMeta meta;
-    if (nv_parse_cubin(NULL, 0, "test", &meta) != -1) return 0;
-    if (nv_parse_cubin("not_elf", 7, "test", &meta) != -1) return 0;
+    if (nv_parse_cubin(NULL, 0, "test", &meta) != -1)
+        return 0;
+    if (nv_parse_cubin("not_elf", 7, "test", &meta) != -1)
+        return 0;
 
     uint8_t bad_elf[64];
     memset(bad_elf, 0, sizeof(bad_elf));
-    bad_elf[0] = 0x7F; bad_elf[1] = 'E'; bad_elf[2] = 'L'; bad_elf[3] = 'F';
+    bad_elf[0] = 0x7F;
+    bad_elf[1] = 'E';
+    bad_elf[2] = 'L';
+    bad_elf[3] = 'F';
     if (nv_parse_cubin(bad_elf, sizeof(bad_elf), "test", &meta) != -1) {
         /* May succeed with defaults if ELF header is valid enough */
     }
@@ -426,9 +446,12 @@ static int test_multiple_constant_buffers(void) {
         return 0;
     }
 
-    if (qmd.data[24] != 0x1000 || qmd.data[26] != 256) return 0;
-    if (qmd.data[27] != 0x2000 || qmd.data[29] != 128) return 0;
-    if (qmd.data[30] != 0x3000 || qmd.data[32] != 64) return 0;
+    if (qmd.data[24] != 0x1000 || qmd.data[26] != 256)
+        return 0;
+    if (qmd.data[27] != 0x2000 || qmd.data[29] != 128)
+        return 0;
+    if (qmd.data[30] != 0x3000 || qmd.data[32] != 64)
+        return 0;
 
     nv_qmd_set_constant_buffer(&qmd, -1, 0, 0);
     nv_qmd_set_constant_buffer(&qmd, 8, 0, 0);
@@ -437,18 +460,19 @@ static int test_multiple_constant_buffers(void) {
 }
 
 static int test_buffer_copy_null(void) {
-    if (cml_nv_buffer_copy(NULL, NULL, NULL, 0) != -1) return 0;
+    if (cml_nv_buffer_copy(NULL, NULL, NULL, 0) != -1)
+        return 0;
     return 1;
 }
-
 
 #ifdef CML_NV_MOCK_GPU
 #include "ops/ir/gpu/nv_mock.h"
 #include "alloc/cml_allocator.h"
 
 static CMLNVDriver* mock_create_and_init(void) {
-    CMLNVDriver *drv = cml_nv_driver_create();
-    if (!drv) return NULL;
+    CMLNVDriver* drv = cml_nv_driver_create();
+    if (!drv)
+        return NULL;
     if (cml_nv_driver_init(drv) != 0) {
         cml_nv_driver_free(drv);
         return NULL;
@@ -464,7 +488,7 @@ static int test_mock_driver_init(void) {
         return 0;
     }
 
-    CMLNVDriver *drv = mock_create_and_init();
+    CMLNVDriver* drv = mock_create_and_init();
     if (!drv) {
         cml_nv_mock_shutdown();
         return 0;
@@ -484,14 +508,13 @@ static int test_mock_driver_init(void) {
     }
 
     if (drv->compute_cap_major != 7 || drv->compute_cap_minor != 5) {
-        printf("(sm_%d%d expected sm_75) ",
-               drv->compute_cap_major, drv->compute_cap_minor);
+        printf("(sm_%d%d expected sm_75) ", drv->compute_cap_major, drv->compute_cap_minor);
         cml_nv_driver_free(drv);
         cml_nv_mock_shutdown();
         return 0;
     }
 
-    CMLNVMockGPU *mock = cml_nv_mock_get();
+    CMLNVMockGPU* mock = cml_nv_mock_get();
     if (!mock) {
         cml_nv_driver_free(drv);
         cml_nv_mock_shutdown();
@@ -506,34 +529,36 @@ static int test_mock_driver_init(void) {
 static int test_mock_buffer_create(void) {
     cml_nv_mock_init(NULL);
 
-    CMLNVDriver *drv = mock_create_and_init();
+    CMLNVDriver* drv = mock_create_and_init();
     if (!drv) {
         cml_nv_mock_shutdown();
         return 0;
     }
 
-    CMLNVBuffer *buf1 = cml_nv_buffer_create(drv, 4096, true);
+    CMLNVBuffer* buf1 = cml_nv_buffer_create(drv, 4096, true);
     if (!buf1 || buf1->gpu_va == 0) {
         printf("(buf1 failed) ");
-        if (buf1) cml_nv_buffer_free(drv, buf1);
+        if (buf1)
+            cml_nv_buffer_free(drv, buf1);
         cml_nv_driver_free(drv);
         cml_nv_mock_shutdown();
         return 0;
     }
 
-    CMLNVBuffer *buf2 = cml_nv_buffer_create(drv, 8192, true);
+    CMLNVBuffer* buf2 = cml_nv_buffer_create(drv, 8192, true);
     if (!buf2 || buf2->gpu_va == 0) {
         printf("(buf2 failed) ");
         cml_nv_buffer_free(drv, buf1);
-        if (buf2) cml_nv_buffer_free(drv, buf2);
+        if (buf2)
+            cml_nv_buffer_free(drv, buf2);
         cml_nv_driver_free(drv);
         cml_nv_mock_shutdown();
         return 0;
     }
 
     if (buf2->gpu_va <= buf1->gpu_va) {
-        printf("(VA not monotonic: 0x%lX <= 0x%lX) ",
-               (unsigned long)buf2->gpu_va, (unsigned long)buf1->gpu_va);
+        printf("(VA not monotonic: 0x%lX <= 0x%lX) ", (unsigned long)buf2->gpu_va,
+               (unsigned long)buf1->gpu_va);
         cml_nv_buffer_free(drv, buf1);
         cml_nv_buffer_free(drv, buf2);
         cml_nv_driver_free(drv);
@@ -541,12 +566,13 @@ static int test_mock_buffer_create(void) {
         return 0;
     }
 
-    CMLNVBuffer *vbuf = cml_nv_buffer_create_vram(drv, 4096);
+    CMLNVBuffer* vbuf = cml_nv_buffer_create_vram(drv, 4096);
     if (!vbuf || vbuf->gpu_va == 0) {
         printf("(vram buf failed) ");
         cml_nv_buffer_free(drv, buf1);
         cml_nv_buffer_free(drv, buf2);
-        if (vbuf) cml_nv_buffer_free(drv, vbuf);
+        if (vbuf)
+            cml_nv_buffer_free(drv, vbuf);
         cml_nv_driver_free(drv);
         cml_nv_mock_shutdown();
         return 0;
@@ -563,7 +589,7 @@ static int test_mock_buffer_create(void) {
 static int test_mock_kernel_launch(void) {
     cml_nv_mock_init(NULL);
 
-    CMLNVDriver *drv = mock_create_and_init();
+    CMLNVDriver* drv = mock_create_and_init();
     if (!drv) {
         cml_nv_mock_shutdown();
         return 0;
@@ -576,9 +602,8 @@ static int test_mock_kernel_launch(void) {
     dummy_cubin[2] = 'L';
     dummy_cubin[3] = 'F';
 
-    CMLNVKernel *kernel = cml_nv_kernel_load_cubin(drv, dummy_cubin,
-                                                     sizeof(dummy_cubin),
-                                                     "mock_kernel");
+    CMLNVKernel* kernel =
+        cml_nv_kernel_load_cubin(drv, dummy_cubin, sizeof(dummy_cubin), "mock_kernel");
     if (!kernel) {
         printf("(cubin load failed) ");
         cml_nv_driver_free(drv);
@@ -590,7 +615,7 @@ static int test_mock_kernel_launch(void) {
     uint32_t block[3] = {256, 1, 1};
 
     uint64_t sem_before = drv->semaphore_value;
-    int ret = cml_nv_kernel_launch(drv, kernel, grid, block, NULL, 0);
+    int ret             = cml_nv_kernel_launch(drv, kernel, grid, block, NULL, 0);
     if (ret != 0) {
         printf("(launch failed) ");
         cml_nv_kernel_free(drv, kernel);
@@ -616,7 +641,7 @@ static int test_mock_kernel_launch(void) {
 static int test_mock_synchronize(void) {
     cml_nv_mock_init(NULL);
 
-    CMLNVDriver *drv = mock_create_and_init();
+    CMLNVDriver* drv = mock_create_and_init();
     if (!drv) {
         cml_nv_mock_shutdown();
         return 0;
@@ -629,9 +654,8 @@ static int test_mock_synchronize(void) {
     dummy_cubin[2] = 'L';
     dummy_cubin[3] = 'F';
 
-    CMLNVKernel *kernel = cml_nv_kernel_load_cubin(drv, dummy_cubin,
-                                                     sizeof(dummy_cubin),
-                                                     "sync_kernel");
+    CMLNVKernel* kernel =
+        cml_nv_kernel_load_cubin(drv, dummy_cubin, sizeof(dummy_cubin), "sync_kernel");
     if (!kernel) {
         cml_nv_driver_free(drv);
         cml_nv_mock_shutdown();
@@ -669,24 +693,26 @@ static int test_mock_synchronize(void) {
 static int test_mock_buffer_copy(void) {
     cml_nv_mock_init(NULL);
 
-    CMLNVDriver *drv = mock_create_and_init();
+    CMLNVDriver* drv = mock_create_and_init();
     if (!drv) {
         cml_nv_mock_shutdown();
         return 0;
     }
 
-    size_t n = 1024;
-    CMLNVBuffer *src = cml_nv_buffer_create(drv, n, true);
-    CMLNVBuffer *dst = cml_nv_buffer_create(drv, n, true);
+    size_t n         = 1024;
+    CMLNVBuffer* src = cml_nv_buffer_create(drv, n, true);
+    CMLNVBuffer* dst = cml_nv_buffer_create(drv, n, true);
     if (!src || !dst) {
-        if (src) cml_nv_buffer_free(drv, src);
-        if (dst) cml_nv_buffer_free(drv, dst);
+        if (src)
+            cml_nv_buffer_free(drv, src);
+        if (dst)
+            cml_nv_buffer_free(drv, dst);
         cml_nv_driver_free(drv);
         cml_nv_mock_shutdown();
         return 0;
     }
 
-    float *src_data = (float *)src->cpu_addr;
+    float* src_data = (float*)src->cpu_addr;
     for (size_t i = 0; i < n / sizeof(float); i++)
         src_data[i] = (float)i;
 
@@ -723,7 +749,7 @@ static int test_mock_buffer_copy(void) {
 static int test_mock_multi_launch(void) {
     cml_nv_mock_init(NULL);
 
-    CMLNVDriver *drv = mock_create_and_init();
+    CMLNVDriver* drv = mock_create_and_init();
     if (!drv) {
         cml_nv_mock_shutdown();
         return 0;
@@ -736,9 +762,8 @@ static int test_mock_multi_launch(void) {
     dummy_cubin[2] = 'L';
     dummy_cubin[3] = 'F';
 
-    CMLNVKernel *kernel = cml_nv_kernel_load_cubin(drv, dummy_cubin,
-                                                     sizeof(dummy_cubin),
-                                                     "multi_kernel");
+    CMLNVKernel* kernel =
+        cml_nv_kernel_load_cubin(drv, dummy_cubin, sizeof(dummy_cubin), "multi_kernel");
     if (!kernel) {
         cml_nv_driver_free(drv);
         cml_nv_mock_shutdown();
@@ -750,7 +775,7 @@ static int test_mock_multi_launch(void) {
 
     for (int i = 0; i < 5; i++) {
         uint64_t sem_before = drv->semaphore_value;
-        int ret = cml_nv_kernel_launch(drv, kernel, grid, block, NULL, 0);
+        int ret             = cml_nv_kernel_launch(drv, kernel, grid, block, NULL, 0);
         if (ret != 0) {
             printf("(launch %d failed) ", i);
             cml_nv_kernel_free(drv, kernel);
@@ -785,7 +810,6 @@ static int test_mock_multi_launch(void) {
 }
 
 #endif /* CML_NV_MOCK_GPU */
-
 
 int main(void) {
     printf("\nNV Driver Tests\n\n");

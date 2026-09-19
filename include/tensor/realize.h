@@ -28,4 +28,4 @@ int tensor_sync(Tensor* t);
 }
 #endif
 
-#endif 
+#endif

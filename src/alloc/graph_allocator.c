@@ -401,7 +401,7 @@ bool cml_graph_allocator_reserve(CMLGraphAllocator_t galloc, void* graph) {
 
     if (graph) {
         CMLComputationGraph_t cgraph = (CMLComputationGraph_t)graph;
-        size_t peak_memory = calculate_peak_memory(cgraph);
+        size_t peak_memory           = calculate_peak_memory(cgraph);
 
         if (peak_memory == 0) {
             peak_memory = 1024 * 1024; // 1MB default
@@ -725,9 +725,8 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
         return NULL;
 
     size_t numel = 0;
-    size_t size = 0;
-    if (!tensor_numel_checked(shape, ndim, &numel) ||
-        !tensor_nbytes_checked(numel, dtype, &size))
+    size_t size  = 0;
+    if (!tensor_numel_checked(shape, ndim, &numel) || !tensor_nbytes_checked(numel, dtype, &size))
         return NULL;
 
     if (ctx->no_alloc) {

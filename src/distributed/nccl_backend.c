@@ -29,21 +29,24 @@ typedef int ncclDataType_t;
 #define NCCL_FLOAT32 7
 
 typedef struct {
-    void* handle;    /* dlopen handle */
+    void* handle; /* dlopen handle */
     ncclResult_t (*ncclCommInitRank)(ncclComm_t*, int, void*, int);
-    ncclResult_t (*ncclAllReduce)(const void*, void*, size_t, ncclDataType_t, ncclRedOp_t, ncclComm_t, void*);
-    ncclResult_t (*ncclBroadcast)(const void*, void*, size_t, ncclDataType_t, int, ncclComm_t, void*);
+    ncclResult_t (*ncclAllReduce)(const void*, void*, size_t, ncclDataType_t, ncclRedOp_t,
+                                  ncclComm_t, void*);
+    ncclResult_t (*ncclBroadcast)(const void*, void*, size_t, ncclDataType_t, int, ncclComm_t,
+                                  void*);
     ncclResult_t (*ncclCommDestroy)(ncclComm_t);
     ncclResult_t (*ncclGetUniqueId)(void*);
     ncclResult_t (*ncclAllGather)(const void*, void*, size_t, ncclDataType_t, ncclComm_t, void*);
-    ncclResult_t (*ncclReduceScatter)(const void*, void*, size_t, ncclDataType_t, ncclRedOp_t, ncclComm_t, void*);
+    ncclResult_t (*ncclReduceScatter)(const void*, void*, size_t, ncclDataType_t, ncclRedOp_t,
+                                      ncclComm_t, void*);
     ncclResult_t (*ncclSend)(const void*, size_t, ncclDataType_t, int, ncclComm_t, void*);
     ncclResult_t (*ncclRecv)(void*, size_t, ncclDataType_t, int, ncclComm_t, void*);
     ncclResult_t (*ncclGroupStart)(void);
     ncclResult_t (*ncclGroupEnd)(void);
     ncclResult_t (*ncclCommGetAsyncError)(ncclComm_t, ncclResult_t*);
     ncclComm_t comm;
-    void* stream;    /* CUDA stream (NULL = default stream) */
+    void* stream; /* CUDA stream (NULL = default stream) */
 
     /* Resolved from libcudart so we can actually wait for a collective to finish
      * on the stream before the host reads the result (e.g. the AVG post-scale).
@@ -57,7 +60,7 @@ typedef struct {
 static NCCLContext* g_nccl_ctx = NULL;
 
 static int send_all_bytes(int fd, const void* buf, size_t len) {
-    const char* p = (const char*)buf;
+    const char* p    = (const char*)buf;
     size_t remaining = len;
     while (remaining > 0) {
         ssize_t n = send(fd, p, remaining, 0);
@@ -74,7 +77,7 @@ static int send_all_bytes(int fd, const void* buf, size_t len) {
 }
 
 static int recv_all_bytes(int fd, void* buf, size_t len) {
-    char* p = (char*)buf;
+    char* p          = (char*)buf;
     size_t remaining = len;
     while (remaining > 0) {
         ssize_t n = recv(fd, p, remaining, 0);
@@ -106,7 +109,7 @@ static int nccl_exchange_unique_id(NCCLContext* nccl, int world_size, int rank, 
     if (!master_addr || master_addr[0] == '\0') {
         master_addr = NCCL_BOOTSTRAP_DEFAULT_ADDR;
     }
-    int port = NCCL_BOOTSTRAP_DEFAULT_PORT;
+    int port             = NCCL_BOOTSTRAP_DEFAULT_PORT;
     const char* port_env = getenv("NCCL_PORT");
     if (port_env && port_env[0] != '\0') {
         int parsed = atoi(port_env);
@@ -132,8 +135,8 @@ static int nccl_exchange_unique_id(NCCLContext* nccl, int world_size, int rank, 
 
         struct sockaddr_in addr;
         memset(&addr, 0, sizeof(addr));
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons((uint16_t)port);
+        addr.sin_family      = AF_INET;
+        addr.sin_port        = htons((uint16_t)port);
         addr.sin_addr.s_addr = INADDR_ANY;
 
         if (bind(listen_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
@@ -184,7 +187,7 @@ static int nccl_exchange_unique_id(NCCLContext* nccl, int world_size, int rank, 
     struct sockaddr_in master;
     memset(&master, 0, sizeof(master));
     master.sin_family = AF_INET;
-    master.sin_port = htons((uint16_t)port);
+    master.sin_port   = htons((uint16_t)port);
     if (inet_pton(AF_INET, master_addr, &master.sin_addr) <= 0) {
         LOG_ERROR("NCCL bootstrap: invalid MASTER_ADDR '%s'", master_addr);
         close(sock);
@@ -229,25 +232,30 @@ static void nccl_stream_sync(NCCLContext* nccl) {
 
 static int nccl_map_reduce_op(DistReduceOp op) {
     switch (op) {
-    case DIST_REDUCE_SUM: case DIST_REDUCE_AVG: return 0; /* ncclSum */
-    case DIST_REDUCE_PRODUCT: return 1; /* ncclProd */
-    case DIST_REDUCE_MAX: return 2;     /* ncclMax */
-    case DIST_REDUCE_MIN: return 3;     /* ncclMin */
+    case DIST_REDUCE_SUM:
+    case DIST_REDUCE_AVG:
+        return 0; /* ncclSum */
+    case DIST_REDUCE_PRODUCT:
+        return 1; /* ncclProd */
+    case DIST_REDUCE_MAX:
+        return 2; /* ncclMax */
+    case DIST_REDUCE_MIN:
+        return 3; /* ncclMin */
     }
     return 0;
 }
 
 static int nccl_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
-    if (!nccl) nccl = g_nccl_ctx;
+    if (!nccl)
+        nccl = g_nccl_ctx;
     if (!nccl || !nccl->ncclAllReduce || !tensor || !tensor->data)
         return -1;
 
     int nccl_op = nccl_map_reduce_op(op);
 
-    int result = nccl->ncclAllReduce(tensor->data, tensor->data, tensor->numel,
-                                      NCCL_FLOAT32, nccl_op, nccl->comm,
-                                      nccl->stream);
+    int result = nccl->ncclAllReduce(tensor->data, tensor->data, tensor->numel, NCCL_FLOAT32,
+                                     nccl_op, nccl->comm, nccl->stream);
 
     /* Average if requested — must wait for the reduce to complete first, else
      * we'd scale stale data. */
@@ -264,18 +272,19 @@ static int nccl_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
 
 static int nccl_broadcast(Tensor* tensor, int src_rank, void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
-    if (!nccl) nccl = g_nccl_ctx;
+    if (!nccl)
+        nccl = g_nccl_ctx;
     if (!nccl || !nccl->ncclBroadcast || !tensor)
         return -1;
 
-    return nccl->ncclBroadcast(tensor->data, tensor->data, tensor->numel,
-                                NCCL_FLOAT32, src_rank, nccl->comm,
-                                nccl->stream);
+    return nccl->ncclBroadcast(tensor->data, tensor->data, tensor->numel, NCCL_FLOAT32, src_rank,
+                               nccl->comm, nccl->stream);
 }
 
 static int nccl_allgather(Tensor** output, Tensor* input, void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
-    if (!nccl) nccl = g_nccl_ctx;
+    if (!nccl)
+        nccl = g_nccl_ctx;
     if (!nccl || !nccl->ncclAllGather || !output || !input || !input->data)
         return -1;
 
@@ -291,9 +300,8 @@ static int nccl_allgather(Tensor** output, Tensor* input, void* ctx) {
         return -1;
 
     /* ncclAllGather: each rank sends chunk_size elements, receives world_size * chunk_size */
-    int result = nccl->ncclAllGather(input->data, gather_buf, chunk_size,
-                                      NCCL_FLOAT32, nccl->comm,
-                                      nccl->stream);
+    int result = nccl->ncclAllGather(input->data, gather_buf, chunk_size, NCCL_FLOAT32, nccl->comm,
+                                     nccl->stream);
 
     if (result != 0) {
         cml_free(gather_buf);
@@ -314,15 +322,15 @@ static int nccl_allgather(Tensor** output, Tensor* input, void* ctx) {
 
 static int nccl_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
-    if (!nccl) nccl = g_nccl_ctx;
+    if (!nccl)
+        nccl = g_nccl_ctx;
     if (!nccl || !nccl->ncclReduceScatter || !output || !input || !input->data || !output->data)
         return -1;
 
     int nccl_op = nccl_map_reduce_op(op);
 
-    int result = nccl->ncclReduceScatter(input->data, output->data, output->numel,
-                                          NCCL_FLOAT32, nccl_op, nccl->comm,
-                                          nccl->stream);
+    int result = nccl->ncclReduceScatter(input->data, output->data, output->numel, NCCL_FLOAT32,
+                                         nccl_op, nccl->comm, nccl->stream);
 
     /* Average if requested */
     if (op == DIST_REDUCE_AVG && result == 0) {
@@ -337,21 +345,22 @@ static int nccl_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, v
 
 static int nccl_barrier(void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
-    if (!nccl) nccl = g_nccl_ctx;
+    if (!nccl)
+        nccl = g_nccl_ctx;
     if (!nccl || !nccl->ncclAllReduce)
         return -1;
 
     /* Standard NCCL barrier pattern: allreduce a single dummy element */
     float dummy = 0.0f;
-    return nccl->ncclAllReduce(&dummy, &dummy, 1,
-                                NCCL_FLOAT32, 0 /* ncclSum */,
-                                nccl->comm, nccl->stream);
+    return nccl->ncclAllReduce(&dummy, &dummy, 1, NCCL_FLOAT32, 0 /* ncclSum */, nccl->comm,
+                               nccl->stream);
 }
 
 static int nccl_send(Tensor* tensor, int dst_rank, int tag, void* ctx) {
     (void)tag; /* NCCL does not support message tags */
     NCCLContext* nccl = (NCCLContext*)ctx;
-    if (!nccl) nccl = g_nccl_ctx;
+    if (!nccl)
+        nccl = g_nccl_ctx;
     if (!nccl || !nccl->ncclSend || !nccl->ncclGroupStart || !nccl->ncclGroupEnd)
         return -1;
     if (!tensor || !tensor->data)
@@ -362,9 +371,8 @@ static int nccl_send(Tensor* tensor, int dst_rank, int tag, void* ctx) {
     if (result != 0)
         return result;
 
-    result = nccl->ncclSend(tensor->data, tensor->numel,
-                             NCCL_FLOAT32, dst_rank,
-                             nccl->comm, nccl->stream);
+    result = nccl->ncclSend(tensor->data, tensor->numel, NCCL_FLOAT32, dst_rank, nccl->comm,
+                            nccl->stream);
     if (result != 0)
         return result;
 
@@ -374,7 +382,8 @@ static int nccl_send(Tensor* tensor, int dst_rank, int tag, void* ctx) {
 static int nccl_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
     (void)tag; /* NCCL does not support message tags */
     NCCLContext* nccl = (NCCLContext*)ctx;
-    if (!nccl) nccl = g_nccl_ctx;
+    if (!nccl)
+        nccl = g_nccl_ctx;
     if (!nccl || !nccl->ncclRecv || !nccl->ncclGroupStart || !nccl->ncclGroupEnd)
         return -1;
     if (!tensor || !tensor->data)
@@ -385,9 +394,8 @@ static int nccl_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
     if (result != 0)
         return result;
 
-    result = nccl->ncclRecv(tensor->data, tensor->numel,
-                             NCCL_FLOAT32, src_rank,
-                             nccl->comm, nccl->stream);
+    result = nccl->ncclRecv(tensor->data, tensor->numel, NCCL_FLOAT32, src_rank, nccl->comm,
+                            nccl->stream);
     if (result != 0)
         return result;
 
@@ -405,23 +413,23 @@ typedef struct NCCLPendingWork {
 
 static DistWork* nccl_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
-    if (!nccl) nccl = g_nccl_ctx;
+    if (!nccl)
+        nccl = g_nccl_ctx;
     if (!nccl || !nccl->ncclAllReduce || !tensor || !tensor->data)
         return NULL;
 
     int nccl_op = nccl_map_reduce_op(op);
 
     /* Launch the allreduce without synchronizing */
-    int result = nccl->ncclAllReduce(tensor->data, tensor->data, tensor->numel,
-                                      NCCL_FLOAT32, nccl_op, nccl->comm,
-                                      nccl->stream);
+    int result = nccl->ncclAllReduce(tensor->data, tensor->data, tensor->numel, NCCL_FLOAT32,
+                                     nccl_op, nccl->comm, nccl->stream);
 
     DistWork* work = (DistWork*)cml_calloc(1, sizeof(DistWork));
     if (!work)
         return NULL;
 
     if (result != 0) {
-        work->completed = true;
+        work->completed  = true;
         work->error_code = result;
         return work;
     }
@@ -438,13 +446,13 @@ static DistWork* nccl_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx
             for (size_t i = 0; i < tensor->numel; i++)
                 data[i] *= scale;
         }
-        work->completed = true;
+        work->completed  = true;
         work->error_code = 0;
         return work;
     }
-    pending->nccl   = nccl;
-    pending->tensor = tensor;
-    pending->op     = op;
+    pending->nccl    = nccl;
+    pending->tensor  = tensor;
+    pending->op      = op;
     work->internal   = pending;
     work->completed  = false;
     work->error_code = 0;
@@ -547,17 +555,17 @@ DistCommOps* cml_dist_create_nccl_backend(void) {
         *(void**)&nccl->cudaStreamSynchronize = dlsym(nccl->cudart_handle, "cudaStreamSynchronize");
 
     /* Load function pointers */
-    *(void**)&nccl->ncclCommInitRank = dlsym(handle, "ncclCommInitRank");
-    *(void**)&nccl->ncclAllReduce = dlsym(handle, "ncclAllReduce");
-    *(void**)&nccl->ncclBroadcast = dlsym(handle, "ncclBroadcast");
-    *(void**)&nccl->ncclCommDestroy = dlsym(handle, "ncclCommDestroy");
-    *(void**)&nccl->ncclGetUniqueId = dlsym(handle, "ncclGetUniqueId");
-    *(void**)&nccl->ncclAllGather = dlsym(handle, "ncclAllGather");
-    *(void**)&nccl->ncclReduceScatter = dlsym(handle, "ncclReduceScatter");
-    *(void**)&nccl->ncclSend = dlsym(handle, "ncclSend");
-    *(void**)&nccl->ncclRecv = dlsym(handle, "ncclRecv");
-    *(void**)&nccl->ncclGroupStart = dlsym(handle, "ncclGroupStart");
-    *(void**)&nccl->ncclGroupEnd = dlsym(handle, "ncclGroupEnd");
+    *(void**)&nccl->ncclCommInitRank      = dlsym(handle, "ncclCommInitRank");
+    *(void**)&nccl->ncclAllReduce         = dlsym(handle, "ncclAllReduce");
+    *(void**)&nccl->ncclBroadcast         = dlsym(handle, "ncclBroadcast");
+    *(void**)&nccl->ncclCommDestroy       = dlsym(handle, "ncclCommDestroy");
+    *(void**)&nccl->ncclGetUniqueId       = dlsym(handle, "ncclGetUniqueId");
+    *(void**)&nccl->ncclAllGather         = dlsym(handle, "ncclAllGather");
+    *(void**)&nccl->ncclReduceScatter     = dlsym(handle, "ncclReduceScatter");
+    *(void**)&nccl->ncclSend              = dlsym(handle, "ncclSend");
+    *(void**)&nccl->ncclRecv              = dlsym(handle, "ncclRecv");
+    *(void**)&nccl->ncclGroupStart        = dlsym(handle, "ncclGroupStart");
+    *(void**)&nccl->ncclGroupEnd          = dlsym(handle, "ncclGroupEnd");
     *(void**)&nccl->ncclCommGetAsyncError = dlsym(handle, "ncclCommGetAsyncError");
 
     if (!nccl->ncclAllReduce) {
@@ -574,18 +582,18 @@ DistCommOps* cml_dist_create_nccl_backend(void) {
         return NULL;
     }
 
-    ops->allreduce = nccl_allreduce;
-    ops->broadcast = nccl_broadcast;
-    ops->allgather = nccl_allgather;
-    ops->reduce_scatter = nccl_reduce_scatter;
-    ops->barrier = nccl_barrier;
-    ops->send = nccl_send;
-    ops->recv = nccl_recv;
+    ops->allreduce       = nccl_allreduce;
+    ops->broadcast       = nccl_broadcast;
+    ops->allgather       = nccl_allgather;
+    ops->reduce_scatter  = nccl_reduce_scatter;
+    ops->barrier         = nccl_barrier;
+    ops->send            = nccl_send;
+    ops->recv            = nccl_recv;
     ops->allreduce_async = nccl_allreduce_async;
-    ops->wait = nccl_wait;
-    ops->init = nccl_init;
-    ops->destroy = nccl_destroy;
-    ops->backend_ctx = nccl;
+    ops->wait            = nccl_wait;
+    ops->init            = nccl_init;
+    ops->destroy         = nccl_destroy;
+    ops->backend_ctx     = nccl;
 
     LOG_INFO("NCCL backend loaded successfully");
     return ops;

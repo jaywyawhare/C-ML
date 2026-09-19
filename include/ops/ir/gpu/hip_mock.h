@@ -26,9 +26,9 @@ typedef enum {
 
 typedef struct {
     CMLHIPMockOpKind kind;
-    size_t bytes;           /* memcpy/malloc payload */
+    size_t bytes;             /* memcpy/malloc payload */
     uint32_t launches_grid_x; /* grid X of the last launch */
-    char name[32];          /* kernel name where applicable */
+    char name[32];            /* kernel name where applicable */
 } CMLHIPMockEntry;
 
 /* Initialize `backend` fully against the mock driver (no dlopen). */

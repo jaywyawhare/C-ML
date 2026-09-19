@@ -11,12 +11,15 @@ static int test_assign_basic(void) {
     int shape[] = {2, 3};
     Tensor* dst = cml_zeros(shape, 2, NULL);
     Tensor* src = cml_ones(shape, 2, NULL);
-    if (!dst || !src) return 0;
+    if (!dst || !src)
+        return 0;
 
     Tensor* saved_ptr = dst;
-    int ret = tensor_assign(dst, src);
-    if (ret != 0) return 0;
-    if (dst != saved_ptr) return 0;
+    int ret           = tensor_assign(dst, src);
+    if (ret != 0)
+        return 0;
+    if (dst != saved_ptr)
+        return 0;
 
     float* data = (float*)tensor_data_ptr(dst);
     for (size_t i = 0; i < dst->numel; i++) {
@@ -32,10 +35,10 @@ static int test_assign_basic(void) {
 }
 
 static int test_assign_preserves_grad_flag(void) {
-    int shape[] = {4};
-    Tensor* dst = cml_zeros(shape, 1, NULL);
+    int shape[]        = {4};
+    Tensor* dst        = cml_zeros(shape, 1, NULL);
     dst->requires_grad = true;
-    Tensor* src = cml_ones(shape, 1, NULL);
+    Tensor* src        = cml_ones(shape, 1, NULL);
 
     tensor_assign(dst, src);
     int ok = dst->requires_grad == true;
@@ -48,8 +51,8 @@ static int test_assign_preserves_grad_flag(void) {
 static int test_assign_shape_mismatch(void) {
     int shape1[] = {2, 3};
     int shape2[] = {3, 2};
-    Tensor* dst = cml_zeros(shape1, 2, NULL);
-    Tensor* src = cml_ones(shape2, 2, NULL);
+    Tensor* dst  = cml_zeros(shape1, 2, NULL);
+    Tensor* src  = cml_ones(shape2, 2, NULL);
 
     int ret = tensor_assign(dst, src);
     tensor_free(dst);
@@ -60,8 +63,8 @@ static int test_assign_shape_mismatch(void) {
 static int test_assign_ndim_mismatch(void) {
     int shape1[] = {6};
     int shape2[] = {2, 3};
-    Tensor* dst = cml_zeros(shape1, 1, NULL);
-    Tensor* src = cml_ones(shape2, 2, NULL);
+    Tensor* dst  = cml_zeros(shape1, 1, NULL);
+    Tensor* src  = cml_ones(shape2, 2, NULL);
 
     int ret = tensor_assign(dst, src);
     tensor_free(dst);
@@ -71,33 +74,40 @@ static int test_assign_ndim_mismatch(void) {
 
 static int test_assign_null(void) {
     int shape[] = {2};
-    Tensor* t = cml_zeros(shape, 1, NULL);
-    int ret1 = tensor_assign(NULL, t);
-    int ret2 = tensor_assign(t, NULL);
+    Tensor* t   = cml_zeros(shape, 1, NULL);
+    int ret1    = tensor_assign(NULL, t);
+    int ret2    = tensor_assign(t, NULL);
     tensor_free(t);
     return ret1 != 0 && ret2 != 0;
 }
 
 static int test_assign_data_basic(void) {
     int shape[] = {4};
-    Tensor* t = cml_zeros(shape, 1, NULL);
-    if (!t) return 0;
+    Tensor* t   = cml_zeros(shape, 1, NULL);
+    if (!t)
+        return 0;
 
     float vals[] = {1.0f, 2.0f, 3.0f, 4.0f};
-    int ret = tensor_assign_data(t, vals, sizeof(vals));
-    if (ret != 0) { tensor_free(t); return 0; }
+    int ret      = tensor_assign_data(t, vals, sizeof(vals));
+    if (ret != 0) {
+        tensor_free(t);
+        return 0;
+    }
 
     float* data = (float*)t->data;
     for (int i = 0; i < 4; i++) {
-        if (!APPROX_EQ(data[i], vals[i])) { tensor_free(t); return 0; }
+        if (!APPROX_EQ(data[i], vals[i])) {
+            tensor_free(t);
+            return 0;
+        }
     }
     tensor_free(t);
     return 1;
 }
 
 static int test_assign_data_marks_executed(void) {
-    int shape[] = {3};
-    Tensor* t = cml_zeros(shape, 1, NULL);
+    int shape[]    = {3};
+    Tensor* t      = cml_zeros(shape, 1, NULL);
     t->is_executed = false;
 
     float vals[] = {1.0f, 2.0f, 3.0f};
@@ -110,15 +120,15 @@ static int test_assign_data_marks_executed(void) {
 
 static int test_assign_data_null(void) {
     int shape[] = {2};
-    Tensor* t = cml_zeros(shape, 1, NULL);
-    int ret = tensor_assign_data(t, NULL, 8);
+    Tensor* t   = cml_zeros(shape, 1, NULL);
+    int ret     = tensor_assign_data(t, NULL, 8);
     tensor_free(t);
     return ret != 0;
 }
 
 static int test_assign_data_overflow(void) {
     int shape[] = {2};
-    Tensor* t = cml_zeros(shape, 1, NULL);
+    Tensor* t   = cml_zeros(shape, 1, NULL);
     float big[100];
     int ret = tensor_assign_data(t, big, sizeof(big));
     tensor_free(t);
@@ -129,10 +139,11 @@ static int test_assign_identity_preserved(void) {
     int shape[] = {3, 3};
     Tensor* dst = cml_zeros(shape, 2, NULL);
     Tensor* src = cml_ones(shape, 2, NULL);
-    if (!dst || !src) return 0;
+    if (!dst || !src)
+        return 0;
 
     void* original_ptr = (void*)dst;
-    int original_ndim = dst->ndim;
+    int original_ndim  = dst->ndim;
 
     tensor_assign(dst, src);
 

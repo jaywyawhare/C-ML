@@ -9,10 +9,7 @@
 #include <float.h>
 #include "alloc/cml_allocator.h"
 
-static AutocastContext g_autocast_ctx = {
-    .enabled      = false,
-    .target_dtype = DTYPE_FLOAT16
-};
+static AutocastContext g_autocast_ctx = {.enabled = false, .target_dtype = DTYPE_FLOAT16};
 
 /* Target-dtype selector: read once from CML_AMP_DTYPE ("bf16"/"bfloat16"
  * selects BFLOAT16), cached like GRAD_MODE in autodiff.c. Default stays
@@ -21,9 +18,8 @@ static int autocast_env_dtype(void) {
     static int cached = -1;
     if (cached < 0) {
         const char* m = getenv("CML_AMP_DTYPE");
-        cached = (m && (strcmp(m, "bf16") == 0 || strcmp(m, "bfloat16") == 0))
-                     ? DTYPE_BFLOAT16
-                     : DTYPE_FLOAT16;
+        cached = (m && (strcmp(m, "bf16") == 0 || strcmp(m, "bfloat16") == 0)) ? DTYPE_BFLOAT16
+                                                                               : DTYPE_FLOAT16;
     }
     return cached;
 }
@@ -44,22 +40,16 @@ void autocast_enter(DType target_dtype) {
     g_dtype_resolved            = true;
 }
 
-void autocast_exit(void) {
-    g_autocast_ctx.enabled = false;
-}
+void autocast_exit(void) { g_autocast_ctx.enabled = false; }
 
-bool autocast_is_enabled(void) {
-    return g_autocast_ctx.enabled;
-}
+bool autocast_is_enabled(void) { return g_autocast_ctx.enabled; }
 
 AutocastContext* autocast_get_context(void) {
     autocast_resolve_dtype();
     return &g_autocast_ctx;
 }
 
-DType autocast_default_dtype(void) {
-    return (DType)autocast_env_dtype();
-}
+DType autocast_default_dtype(void) { return (DType)autocast_env_dtype(); }
 
 void autocast_set_dtype(DType dtype) {
     g_autocast_ctx.target_dtype = dtype;
@@ -73,26 +63,26 @@ DType autocast_get_dtype(void) {
 
 bool autocast_should_keep_float32(OpType op) {
     switch (op) {
-        /* Numerically sensitive operations that need full precision */
-        case OP_SOFTMAX:
-        case OP_LOG_SOFTMAX:
-        case OP_MSE_LOSS:
-        case OP_MAE_LOSS:
-        case OP_BCE_LOSS:
-        case OP_CROSS_ENTROPY_LOSS:
-        case OP_HUBER_LOSS:
-        case OP_KL_DIV_LOSS:
-        case OP_LOG:
-        case OP_EXP:
-        case OP_POW:
-            return true;
-        default:
-            return false;
+    /* Numerically sensitive operations that need full precision */
+    case OP_SOFTMAX:
+    case OP_LOG_SOFTMAX:
+    case OP_MSE_LOSS:
+    case OP_MAE_LOSS:
+    case OP_BCE_LOSS:
+    case OP_CROSS_ENTROPY_LOSS:
+    case OP_HUBER_LOSS:
+    case OP_KL_DIV_LOSS:
+    case OP_LOG:
+    case OP_EXP:
+    case OP_POW:
+        return true;
+    default:
+        return false;
     }
 }
 
-GradScaler* grad_scaler_create(float init_scale, float growth_factor,
-                                float backoff_factor, int growth_interval) {
+GradScaler* grad_scaler_create(float init_scale, float growth_factor, float backoff_factor,
+                               int growth_interval) {
     GradScaler* scaler = cml_calloc(1, sizeof(GradScaler));
     if (!scaler) {
         LOG_ERROR("GradScaler: failed to allocate memory");
@@ -128,7 +118,7 @@ Tensor* grad_scaler_scale(GradScaler* scaler, Tensor* loss) {
     if (autocast_get_dtype() == DTYPE_BFLOAT16)
         return loss;
 
-    int scalar_shape[] = {1};
+    int scalar_shape[]  = {1};
     TensorConfig config = (TensorConfig){
         .dtype = loss->dtype, .device = loss->device, .has_dtype = true, .has_device = true};
     Tensor* scale_tensor = tensor_full(scalar_shape, 1, &config, scaler->scale_factor);
@@ -173,9 +163,7 @@ void grad_scaler_unscale(GradScaler* scaler, Parameter** params, int num_params)
     scaler->found_inf = false;
     /* Mirror grad_scaler_scale: under bf16 the loss was never scaled, so
      * unscale by 1.0 and keep only the inf/nan detection. */
-    float inv_scale = (autocast_get_dtype() == DTYPE_BFLOAT16)
-                          ? 1.0f
-                          : 1.0f / scaler->scale_factor;
+    float inv_scale = (autocast_get_dtype() == DTYPE_BFLOAT16) ? 1.0f : 1.0f / scaler->scale_factor;
 
     for (int p = 0; p < num_params; p++) {
         if (!params[p] || !params[p]->tensor)
@@ -241,7 +229,6 @@ void grad_scaler_update(GradScaler* scaler) {
             if (scaler->scale_factor > 65536.0f * 65536.0f) {
                 scaler->scale_factor = 65536.0f * 65536.0f;
             }
-
         }
     }
 

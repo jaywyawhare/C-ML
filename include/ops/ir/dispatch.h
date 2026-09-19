@@ -96,9 +96,8 @@ void cml_dispatch_disable_cache(CMLDispatchContext* ctx);
 void cml_dispatch_clear_cache(CMLDispatchContext* ctx);
 void cml_dispatch_cache_stats(CMLDispatchContext* ctx, size_t* hits, size_t* misses, size_t* size);
 
-int cml_dispatch_execute_async(CMLDispatchContext* ctx, CMLGraph_t ir,
-                               Tensor** inputs, int num_inputs,
-                               Tensor** outputs, int num_outputs);
+int cml_dispatch_execute_async(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** inputs,
+                               int num_inputs, Tensor** outputs, int num_outputs);
 
 struct CMLCUDABackend;
 struct CMLCUDABackend* cml_dispatch_get_cuda_backend(void);
@@ -113,9 +112,8 @@ struct CMLOpenCLIRBackend* cml_dispatch_get_opencl_backend(void);
 struct CMLHCQQueue;
 struct CMLHCQQueue* cml_dispatch_get_hcq_queue(CMLBackendType backend);
 
-int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir,
-                             Tensor** inputs, int num_inputs,
-                             Tensor** outputs, int num_outputs);
+int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** inputs,
+                             int num_inputs, Tensor** outputs, int num_outputs);
 
 void cml_dispatch_print_status(CMLDispatchContext* ctx);
 void cml_dispatch_synchronize(CMLDispatchContext* ctx);

@@ -15,18 +15,28 @@
 #define FUSED_BUF_SIZE 16384
 
 CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
-    if (!g || g->num_nodes == 0) return NULL;
+    if (!g || g->num_nodes == 0)
+        return NULL;
 
     CMLLinearProgram* prog = cml_calloc(1, sizeof(CMLLinearProgram));
-    if (!prog) return NULL;
+    if (!prog)
+        return NULL;
     prog->capacity = 32;
-    prog->ops = cml_calloc((size_t)prog->capacity, sizeof(CMLLinearOp));
-    if (!prog->ops) { cml_free(prog); return NULL; }
+    prog->ops      = cml_calloc((size_t)prog->capacity, sizeof(CMLLinearOp));
+    if (!prog->ops) {
+        cml_free(prog);
+        return NULL;
+    }
 
     /* Map node index -> vreg */
     int* node_vreg = cml_calloc((size_t)g->num_nodes, sizeof(int));
-    if (!node_vreg) { cml_free(prog->ops); cml_free(prog); return NULL; }
-    for (int i = 0; i < g->num_nodes; i++) node_vreg[i] = -1;
+    if (!node_vreg) {
+        cml_free(prog->ops);
+        cml_free(prog);
+        return NULL;
+    }
+    for (int i = 0; i < g->num_nodes; i++)
+        node_vreg[i] = -1;
 
     /* Track loaded external tensors */
     Tensor* loaded_tensors[64];
@@ -35,18 +45,20 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
 
     for (int i = 0; i < g->num_nodes; i++) {
         struct IRNode* node = g->nodes[i];
-        if (!node) continue;
+        if (!node)
+            continue;
 
         CMLLinearOp compute_op;
         memset(&compute_op, 0, sizeof(compute_op));
-        compute_op.kind = LINOP_COMPUTE;
-        compute_op.uop = node->type;
+        compute_op.kind     = LINOP_COMPUTE;
+        compute_op.uop      = node->type;
         compute_op.num_srcs = 0;
 
         /* Resolve source operands */
         for (int j = 0; j < node->num_inputs && j < 8; j++) {
             Tensor* inp = (node->inputs) ? node->inputs[j] : NULL;
-            if (!inp) continue;
+            if (!inp)
+                continue;
 
             int src_reg = -1;
 
@@ -74,23 +86,24 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
 
                 CMLLinearOp load_op;
                 memset(&load_op, 0, sizeof(load_op));
-                load_op.kind = LINOP_LOAD;
+                load_op.kind     = LINOP_LOAD;
                 load_op.dest_reg = src_reg;
-                load_op.tensor = inp;
+                load_op.tensor   = inp;
 
                 /* Emit */
                 if (prog->num_ops >= prog->capacity) {
-                    int nc = prog->capacity * 2;
+                    int nc           = prog->capacity * 2;
                     CMLLinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
-                    if (!tmp) goto oom;
-                    prog->ops = tmp;
+                    if (!tmp)
+                        goto oom;
+                    prog->ops      = tmp;
                     prog->capacity = nc;
                 }
                 prog->ops[prog->num_ops++] = load_op;
 
                 if (num_loaded < 64) {
                     loaded_tensors[num_loaded] = inp;
-                    loaded_vregs[num_loaded] = src_reg;
+                    loaded_vregs[num_loaded]   = src_reg;
                     num_loaded++;
                 }
             }
@@ -99,23 +112,27 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
         }
 
         /* Dest vreg */
-        int dest = prog->next_vreg++;
+        int dest            = prog->next_vreg++;
         compute_op.dest_reg = dest;
 
         /* Check eliminated */
         bool eliminated = false;
         for (int e = 0; e < g->num_eliminated; e++) {
-            if (g->eliminated_buffers[e] == i) { eliminated = true; break; }
+            if (g->eliminated_buffers[e] == i) {
+                eliminated = true;
+                break;
+            }
         }
         compute_op.is_eliminated = eliminated;
-        node_vreg[i] = dest;
+        node_vreg[i]             = dest;
 
         /* Emit compute */
         if (prog->num_ops >= prog->capacity) {
-            int nc = prog->capacity * 2;
+            int nc           = prog->capacity * 2;
             CMLLinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
-            if (!tmp) goto oom;
-            prog->ops = tmp;
+            if (!tmp)
+                goto oom;
+            prog->ops      = tmp;
             prog->capacity = nc;
         }
         prog->ops[prog->num_ops++] = compute_op;
@@ -124,15 +141,16 @@ CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
         if (!eliminated) {
             CMLLinearOp store_op;
             memset(&store_op, 0, sizeof(store_op));
-            store_op.kind = LINOP_STORE;
+            store_op.kind     = LINOP_STORE;
             store_op.dest_reg = dest;
-            store_op.tensor = node->output;
+            store_op.tensor   = node->output;
 
             if (prog->num_ops >= prog->capacity) {
-                int nc = prog->capacity * 2;
+                int nc           = prog->capacity * 2;
                 CMLLinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(CMLLinearOp));
-                if (!tmp) goto oom;
-                prog->ops = tmp;
+                if (!tmp)
+                    goto oom;
+                prog->ops      = tmp;
                 prog->capacity = nc;
             }
             prog->ops[prog->num_ops++] = store_op;
@@ -150,35 +168,44 @@ oom:
 }
 
 void cml_linear_program_free(CMLLinearProgram* prog) {
-    if (!prog) return;
+    if (!prog)
+        return;
     cml_free(prog->ops);
     cml_free(prog);
 }
 
 static const char* linop_kind_str(CMLLinearOpKind k) {
     switch (k) {
-        case LINOP_LOAD:    return "LOAD";
-        case LINOP_COMPUTE: return "COMPUTE";
-        case LINOP_STORE:   return "STORE";
-        default:            return "???";
+    case LINOP_LOAD:
+        return "LOAD";
+    case LINOP_COMPUTE:
+        return "COMPUTE";
+    case LINOP_STORE:
+        return "STORE";
+    default:
+        return "???";
     }
 }
 
 void cml_linear_program_print(const CMLLinearProgram* prog) {
-    if (!prog) { printf("LinearProgram: (null)\n"); return; }
-    printf("CMLLinearProgram (%d ops, %d vregs)\n",
-           prog->num_ops, prog->next_vreg);
+    if (!prog) {
+        printf("LinearProgram: (null)\n");
+        return;
+    }
+    printf("CMLLinearProgram (%d ops, %d vregs)\n", prog->num_ops, prog->next_vreg);
     for (int i = 0; i < prog->num_ops; i++) {
         const CMLLinearOp* op = &prog->ops[i];
         printf("  [%d] %-8s dest=v%d", i, linop_kind_str(op->kind), op->dest_reg);
         if (op->kind == LINOP_COMPUTE) {
             printf("  uop=%d  srcs=[", (int)op->uop);
             for (int j = 0; j < op->num_srcs; j++) {
-                if (j > 0) printf(",");
+                if (j > 0)
+                    printf(",");
                 printf("v%d", op->src_regs[j]);
             }
             printf("]");
-            if (op->is_eliminated) printf(" [ELIM]");
+            if (op->is_eliminated)
+                printf(" [ELIM]");
         }
         printf("\n");
     }
@@ -186,17 +213,22 @@ void cml_linear_program_print(const CMLLinearProgram* prog) {
 
 static const char* uop_to_c_binary(UOpType uop) {
     switch (uop) {
-        case UOP_ADD: return "+";
-        case UOP_SUB: return "-";
-        case UOP_MUL: return "*";
-        case UOP_DIV: return "/";
-        default: return "+";
+    case UOP_ADD:
+        return "+";
+    case UOP_SUB:
+        return "-";
+    case UOP_MUL:
+        return "*";
+    case UOP_DIV:
+        return "/";
+    default:
+        return "+";
     }
 }
 
 static bool uop_is_binary(UOpType uop) {
-    return uop == UOP_ADD || uop == UOP_SUB || uop == UOP_MUL || uop == UOP_DIV ||
-           uop == UOP_MAX || uop == UOP_POW;
+    return uop == UOP_ADD || uop == UOP_SUB || uop == UOP_MUL || uop == UOP_DIV || uop == UOP_MAX ||
+           uop == UOP_POW;
 }
 
 static bool uop_is_unary(UOpType uop) {
@@ -207,27 +239,29 @@ static bool uop_is_unary(UOpType uop) {
 
 static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = cml_malloc(FUSED_BUF_SIZE);
-    if (!buf) return NULL;
+    if (!buf)
+        return NULL;
     int pos = 0;
 
     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-        "/* Fused kernel: %d ops, %d vregs */\n"
-        "#include <math.h>\n"
-        "void fused_kernel(", prog->num_ops, prog->next_vreg);
+                    "/* Fused kernel: %d ops, %d vregs */\n"
+                    "#include <math.h>\n"
+                    "void fused_kernel(",
+                    prog->num_ops, prog->next_vreg);
 
     /* Count input/output buffers */
     int buf_idx = 0;
     for (int i = 0; i < prog->num_ops; i++) {
         if (prog->ops[i].kind == LINOP_LOAD || prog->ops[i].kind == LINOP_STORE) {
-            if (buf_idx > 0) pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, ", ");
-            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                "float* buf%d", buf_idx);
+            if (buf_idx > 0)
+                pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, ", ");
+            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "float* buf%d", buf_idx);
             buf_idx++;
         }
     }
     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-        ", int n) {\n"
-        "    for (int i = 0; i < n; i++) {\n");
+                    ", int n) {\n"
+                    "    for (int i = 0; i < n; i++) {\n");
 
     /* Emit operations */
     buf_idx = 0;
@@ -235,8 +269,8 @@ static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
         const CMLLinearOp* op = &prog->ops[i];
         switch (op->kind) {
         case LINOP_LOAD:
-            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                "        float v%d = buf%d[i];\n", op->dest_reg, buf_idx);
+            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "        float v%d = buf%d[i];\n",
+                            op->dest_reg, buf_idx);
             buf_idx++;
             break;
 
@@ -244,90 +278,87 @@ static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
             if (uop_is_binary(op->uop) && op->num_srcs >= 2) {
                 if (op->uop == UOP_MAX) {
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = fmaxf(v%d, v%d);\n",
-                        op->dest_reg, op->src_regs[0], op->src_regs[1]);
+                                    "        float v%d = fmaxf(v%d, v%d);\n", op->dest_reg,
+                                    op->src_regs[0], op->src_regs[1]);
                 } else if (op->uop == UOP_POW) {
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = powf(v%d, v%d);\n",
-                        op->dest_reg, op->src_regs[0], op->src_regs[1]);
+                                    "        float v%d = powf(v%d, v%d);\n", op->dest_reg,
+                                    op->src_regs[0], op->src_regs[1]);
                 } else {
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = v%d %s v%d;\n",
-                        op->dest_reg, op->src_regs[0],
-                        uop_to_c_binary(op->uop), op->src_regs[1]);
+                                    "        float v%d = v%d %s v%d;\n", op->dest_reg,
+                                    op->src_regs[0], uop_to_c_binary(op->uop), op->src_regs[1]);
                 }
             } else if (uop_is_unary(op->uop) && op->num_srcs >= 1) {
                 int s = op->src_regs[0];
                 switch (op->uop) {
                 case UOP_NEG:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = -v%d;\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "        float v%d = -v%d;\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_EXP:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = expf(v%d);\n", op->dest_reg, s);
+                                    "        float v%d = expf(v%d);\n", op->dest_reg, s);
                     break;
                 case UOP_LOG:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = logf(v%d);\n", op->dest_reg, s);
+                                    "        float v%d = logf(v%d);\n", op->dest_reg, s);
                     break;
                 case UOP_SQRT:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = sqrtf(v%d);\n", op->dest_reg, s);
+                                    "        float v%d = sqrtf(v%d);\n", op->dest_reg, s);
                     break;
                 case UOP_ABS:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = fabsf(v%d);\n", op->dest_reg, s);
+                                    "        float v%d = fabsf(v%d);\n", op->dest_reg, s);
                     break;
                 case UOP_SIN:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = sinf(v%d);\n", op->dest_reg, s);
+                                    "        float v%d = sinf(v%d);\n", op->dest_reg, s);
                     break;
                 case UOP_COS:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = cosf(v%d);\n", op->dest_reg, s);
+                                    "        float v%d = cosf(v%d);\n", op->dest_reg, s);
                     break;
                 case UOP_TANH:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = tanhf(v%d);\n", op->dest_reg, s);
+                                    "        float v%d = tanhf(v%d);\n", op->dest_reg, s);
                     break;
                 case UOP_SIGMOID:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = 1.0f / (1.0f + expf(-v%d));\n",
-                        op->dest_reg, s);
+                                    "        float v%d = 1.0f / (1.0f + expf(-v%d));\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_RECIP:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = 1.0f / v%d;\n", op->dest_reg, s);
+                                    "        float v%d = 1.0f / v%d;\n", op->dest_reg, s);
                     break;
                 case UOP_SILU:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = v%d / (1.0f + expf(-v%d));\n",
-                        op->dest_reg, s, s);
+                                    "        float v%d = v%d / (1.0f + expf(-v%d));\n",
+                                    op->dest_reg, s, s);
                     break;
                 default:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "        float v%d = v%d; /* unknown unary */\n",
-                        op->dest_reg, s);
+                    pos +=
+                        snprintf(buf + pos, FUSED_BUF_SIZE - pos,
+                                 "        float v%d = v%d; /* unknown unary */\n", op->dest_reg, s);
                     break;
                 }
             } else {
                 pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                    "        float v%d = 0.0f; /* unsupported op */\n",
-                    op->dest_reg);
+                                "        float v%d = 0.0f; /* unsupported op */\n", op->dest_reg);
             }
             break;
 
         case LINOP_STORE:
-            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                "        buf%d[i] = v%d;\n", buf_idx, op->dest_reg);
+            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "        buf%d[i] = v%d;\n", buf_idx,
+                            op->dest_reg);
             buf_idx++;
             break;
         }
     }
 
-    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-        "    }\n}\n");
+    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    }\n}\n");
 
     (void)work_size;
     return buf;
@@ -335,28 +366,28 @@ static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
 
 char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = cml_malloc(FUSED_BUF_SIZE);
-    if (!buf) return NULL;
+    if (!buf)
+        return NULL;
     int pos = 0;
 
     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-        ".version 7.0\n"
-        ".target sm_50\n"
-        ".address_size 64\n\n");
+                    ".version 7.0\n"
+                    ".target sm_50\n"
+                    ".address_size 64\n\n");
 
     /* Entry point with parameters */
-    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-        ".visible .entry fused_kernel(\n");
+    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, ".visible .entry fused_kernel(\n");
 
     int param_idx = 0;
     for (int i = 0; i < prog->num_ops; i++) {
         if (prog->ops[i].kind == LINOP_LOAD || prog->ops[i].kind == LINOP_STORE) {
-            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                "    .param .u64 param_buf%d,\n", param_idx++);
+            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    .param .u64 param_buf%d,\n",
+                            param_idx++);
         }
     }
     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-        "    .param .u32 param_n\n"
-        ") {\n");
+                    "    .param .u32 param_n\n"
+                    ") {\n");
 
     /* Registers */
     int num_vregs = prog->next_vreg;
@@ -366,37 +397,35 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
      * below reserves num_vregs + 4. */
     const int t0 = num_vregs, t1 = num_vregs + 1, t2 = num_vregs + 2;
     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-        "    .reg .pred %%p<4>;\n"
-        "    .reg .b32 %%r<16>;\n"
-        "    .reg .b64 %%rd<%d>;\n"
-        "    .reg .f32 %%f<%d>;\n\n",
-        param_idx + 4, num_vregs + 4);
+                    "    .reg .pred %%p<4>;\n"
+                    "    .reg .b32 %%r<16>;\n"
+                    "    .reg .b64 %%rd<%d>;\n"
+                    "    .reg .f32 %%f<%d>;\n\n",
+                    param_idx + 4, num_vregs + 4);
 
     /* Thread ID + bounds check */
     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-        "    mov.u32 %%r0, %%tid.x;\n"
-        "    mov.u32 %%r1, %%ctaid.x;\n"
-        "    mov.u32 %%r2, %%ntid.x;\n"
-        "    mad.lo.u32 %%r3, %%r1, %%r2, %%r0;\n"
-        "    ld.param.u32 %%r4, [param_n];\n"
-        "    setp.ge.u32 %%p0, %%r3, %%r4;\n"
-        "    @%%p0 ret;\n\n");
+                    "    mov.u32 %%r0, %%tid.x;\n"
+                    "    mov.u32 %%r1, %%ctaid.x;\n"
+                    "    mov.u32 %%r2, %%ntid.x;\n"
+                    "    mad.lo.u32 %%r3, %%r1, %%r2, %%r0;\n"
+                    "    ld.param.u32 %%r4, [param_n];\n"
+                    "    setp.ge.u32 %%p0, %%r3, %%r4;\n"
+                    "    @%%p0 ret;\n\n");
 
     /* Load param pointers and compute addresses */
-    param_idx = 0;
+    param_idx  = 0;
     int rd_idx = 0;
     for (int i = 0; i < prog->num_ops; i++) {
         if (prog->ops[i].kind == LINOP_LOAD || prog->ops[i].kind == LINOP_STORE) {
             pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                "    ld.param.u64 %%rd%d, [param_buf%d];\n",
-                rd_idx, param_idx);
+                            "    ld.param.u64 %%rd%d, [param_buf%d];\n", rd_idx, param_idx);
             /* Compute byte offset: gid * 4 */
             pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                "    cvt.u64.u32 %%rd%d, %%r3;\n"
-                "    shl.b64 %%rd%d, %%rd%d, 2;\n"
-                "    add.u64 %%rd%d, %%rd%d, %%rd%d;\n",
-                rd_idx + 1, rd_idx + 1, rd_idx + 1,
-                rd_idx, rd_idx, rd_idx + 1);
+                            "    cvt.u64.u32 %%rd%d, %%r3;\n"
+                            "    shl.b64 %%rd%d, %%rd%d, 2;\n"
+                            "    add.u64 %%rd%d, %%rd%d, %%rd%d;\n",
+                            rd_idx + 1, rd_idx + 1, rd_idx + 1, rd_idx, rd_idx, rd_idx + 1);
             param_idx++;
             rd_idx += 2;
         }
@@ -405,14 +434,13 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
 
     /* Emit operations */
     param_idx = 0;
-    rd_idx = 0;
+    rd_idx    = 0;
     for (int i = 0; i < prog->num_ops; i++) {
         const CMLLinearOp* op = &prog->ops[i];
         switch (op->kind) {
         case LINOP_LOAD:
-            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                "    ld.global.f32 %%f%d, [%%rd%d];\n",
-                op->dest_reg, rd_idx);
+            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    ld.global.f32 %%f%d, [%%rd%d];\n",
+                            op->dest_reg, rd_idx);
             rd_idx += 2;
             param_idx++;
             break;
@@ -422,38 +450,36 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
                 switch (op->uop) {
                 case UOP_ADD:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    add.f32 %%f%d, %%f%d, %%f%d;\n",
-                        op->dest_reg, op->src_regs[0], op->src_regs[1]);
+                                    "    add.f32 %%f%d, %%f%d, %%f%d;\n", op->dest_reg,
+                                    op->src_regs[0], op->src_regs[1]);
                     break;
                 case UOP_SUB:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    sub.f32 %%f%d, %%f%d, %%f%d;\n",
-                        op->dest_reg, op->src_regs[0], op->src_regs[1]);
+                                    "    sub.f32 %%f%d, %%f%d, %%f%d;\n", op->dest_reg,
+                                    op->src_regs[0], op->src_regs[1]);
                     break;
                 case UOP_MUL:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    mul.f32 %%f%d, %%f%d, %%f%d;\n",
-                        op->dest_reg, op->src_regs[0], op->src_regs[1]);
+                                    "    mul.f32 %%f%d, %%f%d, %%f%d;\n", op->dest_reg,
+                                    op->src_regs[0], op->src_regs[1]);
                     break;
                 case UOP_DIV:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    div.approx.f32 %%f%d, %%f%d, %%f%d;\n",
-                        op->dest_reg, op->src_regs[0], op->src_regs[1]);
+                                    "    div.approx.f32 %%f%d, %%f%d, %%f%d;\n", op->dest_reg,
+                                    op->src_regs[0], op->src_regs[1]);
                     break;
                 case UOP_MAX:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    max.f32 %%f%d, %%f%d, %%f%d;\n",
-                        op->dest_reg, op->src_regs[0], op->src_regs[1]);
+                                    "    max.f32 %%f%d, %%f%d, %%f%d;\n", op->dest_reg,
+                                    op->src_regs[0], op->src_regs[1]);
                     break;
                 case UOP_POW:
                     /* a**b = exp2(b * log2(a)) — PTX has no pow. */
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    lg2.approx.f32 %%f%d, %%f%d;\n"
-                        "    mul.f32 %%f%d, %%f%d, %%f%d;\n"
-                        "    ex2.approx.f32 %%f%d, %%f%d;\n",
-                        t0, op->src_regs[0],
-                        t1, t0, op->src_regs[1],
-                        op->dest_reg, t1);
+                                    "    lg2.approx.f32 %%f%d, %%f%d;\n"
+                                    "    mul.f32 %%f%d, %%f%d, %%f%d;\n"
+                                    "    ex2.approx.f32 %%f%d, %%f%d;\n",
+                                    t0, op->src_regs[0], t1, t0, op->src_regs[1], op->dest_reg, t1);
                     break;
                 default:
                     /* Copying an operand would silently replace the op; leave
@@ -465,50 +491,50 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
                 int s = op->src_regs[0];
                 switch (op->uop) {
                 case UOP_NEG:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    neg.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    neg.f32 %%f%d, %%f%d;\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_EXP:
                     /* ex2 is 2**x, so e**x needs the log2(e) scale first. This
                      * emitted a bare ex2, i.e. it computed 2**x for exp(). */
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    mul.f32 %%f%d, %%f%d, 0f3FB8AA3B;\n"
-                        "    ex2.approx.f32 %%f%d, %%f%d;\n",
-                        t0, s, op->dest_reg, t0);
+                                    "    mul.f32 %%f%d, %%f%d, 0f3FB8AA3B;\n"
+                                    "    ex2.approx.f32 %%f%d, %%f%d;\n",
+                                    t0, s, op->dest_reg, t0);
                     break;
                 case UOP_LOG:
                     /* ln(x) = log2(x) * ln(2) */
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    lg2.approx.f32 %%f%d, %%f%d;\n"
-                        "    mul.f32 %%f%d, %%f%d, 0f3F317218;\n",
-                        t0, s, op->dest_reg, t0);
+                                    "    lg2.approx.f32 %%f%d, %%f%d;\n"
+                                    "    mul.f32 %%f%d, %%f%d, 0f3F317218;\n",
+                                    t0, s, op->dest_reg, t0);
                     break;
                 case UOP_SIN:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    sin.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
+                                    "    sin.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
                     break;
                 case UOP_COS:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    cos.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
+                                    "    cos.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
                     break;
                 case UOP_SIGMOID:
                     /* 1/(1+exp(-x)); exp(-x) = ex2(-x*log2(e)) */
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    mul.f32 %%f%d, %%f%d, 0fBFB8AA3B;\n"
-                        "    ex2.approx.f32 %%f%d, %%f%d;\n"
-                        "    add.f32 %%f%d, %%f%d, 0f3F800000;\n"
-                        "    rcp.approx.f32 %%f%d, %%f%d;\n",
-                        t0, s, t1, t0, t2, t1, op->dest_reg, t2);
+                                    "    mul.f32 %%f%d, %%f%d, 0fBFB8AA3B;\n"
+                                    "    ex2.approx.f32 %%f%d, %%f%d;\n"
+                                    "    add.f32 %%f%d, %%f%d, 0f3F800000;\n"
+                                    "    rcp.approx.f32 %%f%d, %%f%d;\n",
+                                    t0, s, t1, t0, t2, t1, op->dest_reg, t2);
                     break;
                 case UOP_SILU:
                     /* x * sigmoid(x) */
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    mul.f32 %%f%d, %%f%d, 0fBFB8AA3B;\n"
-                        "    ex2.approx.f32 %%f%d, %%f%d;\n"
-                        "    add.f32 %%f%d, %%f%d, 0f3F800000;\n"
-                        "    rcp.approx.f32 %%f%d, %%f%d;\n"
-                        "    mul.f32 %%f%d, %%f%d, %%f%d;\n",
-                        t0, s, t1, t0, t2, t1, t1, t2, op->dest_reg, s, t1);
+                                    "    mul.f32 %%f%d, %%f%d, 0fBFB8AA3B;\n"
+                                    "    ex2.approx.f32 %%f%d, %%f%d;\n"
+                                    "    add.f32 %%f%d, %%f%d, 0f3F800000;\n"
+                                    "    rcp.approx.f32 %%f%d, %%f%d;\n"
+                                    "    mul.f32 %%f%d, %%f%d, %%f%d;\n",
+                                    t0, s, t1, t0, t2, t1, t1, t2, op->dest_reg, s, t1);
                     break;
                 case UOP_TANH:
                     /* tanh(x) = 2*sigmoid(2x) - 1; sm_50 has no tanh.approx.
@@ -519,35 +545,32 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
                      * 1e-4, tanh(x) == x to within 3.3e-9 relative, comfortably
                      * inside float32, so take x directly there. */
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    add.f32 %%f%d, %%f%d, %%f%d;\n"
-                        "    mul.f32 %%f%d, %%f%d, 0fBFB8AA3B;\n"
-                        "    ex2.approx.f32 %%f%d, %%f%d;\n"
-                        "    add.f32 %%f%d, %%f%d, 0f3F800000;\n"
-                        "    rcp.approx.f32 %%f%d, %%f%d;\n"
-                        "    add.f32 %%f%d, %%f%d, %%f%d;\n"
-                        "    sub.f32 %%f%d, %%f%d, 0f3F800000;\n"
-                        "    abs.f32 %%f%d, %%f%d;\n"
-                        "    setp.lt.f32 %%p1, %%f%d, 0f38D1B717;\n"
-                        "    selp.f32 %%f%d, %%f%d, %%f%d, %%p1;\n",
-                        t0, s, s,
-                        t1, t0, t2, t1, t0, t2, t1, t0,
-                        t0, t1, t1,
-                        t1, t0,          /* composed result in t1 */
-                        t2, s,           /* |x| in t2 */
-                        t2,
-                        op->dest_reg, s, t1);
+                                    "    add.f32 %%f%d, %%f%d, %%f%d;\n"
+                                    "    mul.f32 %%f%d, %%f%d, 0fBFB8AA3B;\n"
+                                    "    ex2.approx.f32 %%f%d, %%f%d;\n"
+                                    "    add.f32 %%f%d, %%f%d, 0f3F800000;\n"
+                                    "    rcp.approx.f32 %%f%d, %%f%d;\n"
+                                    "    add.f32 %%f%d, %%f%d, %%f%d;\n"
+                                    "    sub.f32 %%f%d, %%f%d, 0f3F800000;\n"
+                                    "    abs.f32 %%f%d, %%f%d;\n"
+                                    "    setp.lt.f32 %%p1, %%f%d, 0f38D1B717;\n"
+                                    "    selp.f32 %%f%d, %%f%d, %%f%d, %%p1;\n",
+                                    t0, s, s, t1, t0, t2, t1, t0, t2, t1, t0, t0, t1, t1, t1,
+                                    t0,    /* composed result in t1 */
+                                    t2, s, /* |x| in t2 */
+                                    t2, op->dest_reg, s, t1);
                     break;
                 case UOP_SQRT:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    sqrt.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
+                                    "    sqrt.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
                     break;
                 case UOP_ABS:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    abs.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    abs.f32 %%f%d, %%f%d;\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_RECIP:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    rcp.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
+                                    "    rcp.approx.f32 %%f%d, %%f%d;\n", op->dest_reg, s);
                     break;
                 default:
                     cml_free(buf);
@@ -555,22 +578,20 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
                 }
             } else {
                 pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                    "    mov.f32 %%f%d, 0f00000000; // nop\n", op->dest_reg);
+                                "    mov.f32 %%f%d, 0f00000000; // nop\n", op->dest_reg);
             }
             break;
 
         case LINOP_STORE:
-            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                "    st.global.f32 [%%rd%d], %%f%d;\n",
-                rd_idx, op->dest_reg);
+            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    st.global.f32 [%%rd%d], %%f%d;\n",
+                            rd_idx, op->dest_reg);
             rd_idx += 2;
             param_idx++;
             break;
         }
     }
 
-    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-        "    ret;\n}\n");
+    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    ret;\n}\n");
 
     (void)work_size;
     return buf;
@@ -588,77 +609,77 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
 #define SPIRV_OP(opcode, word_count) (((uint32_t)(word_count) << 16) | (uint32_t)(opcode))
 
 /* Common opcodes */
-#define SpvOpCapability         17
-#define SpvOpExtInstImport      11
-#define SpvOpMemoryModel        14
-#define SpvOpEntryPoint         15
-#define SpvOpExecutionMode      16
-#define SpvOpDecorate           71
-#define SpvOpMemberDecorate     72
-#define SpvOpTypeVoid            19
-#define SpvOpTypeBool            20
-#define SpvOpTypeInt             21
-#define SpvOpTypeFloat           22
-#define SpvOpTypeVector          23
-#define SpvOpTypeArray           28
-#define SpvOpTypeRuntimeArray    29
-#define SpvOpTypeStruct          30
-#define SpvOpTypePointer         32
-#define SpvOpTypeFunction        33
-#define SpvOpConstant            43
-#define SpvOpFunction            54
-#define SpvOpFunctionEnd         56
-#define SpvOpLabel               248
-#define SpvOpReturn              253
-#define SpvOpVariable            59
-#define SpvOpLoad                61
-#define SpvOpStore               62
-#define SpvOpAccessChain         65
-#define SpvOpFAdd               129
-#define SpvOpFSub               131
-#define SpvOpFMul               133
-#define SpvOpFDiv               136
-#define SpvOpFNegate             127
-#define SpvOpCompositeExtract    81
+#define SpvOpCapability 17
+#define SpvOpExtInstImport 11
+#define SpvOpMemoryModel 14
+#define SpvOpEntryPoint 15
+#define SpvOpExecutionMode 16
+#define SpvOpDecorate 71
+#define SpvOpMemberDecorate 72
+#define SpvOpTypeVoid 19
+#define SpvOpTypeBool 20
+#define SpvOpTypeInt 21
+#define SpvOpTypeFloat 22
+#define SpvOpTypeVector 23
+#define SpvOpTypeArray 28
+#define SpvOpTypeRuntimeArray 29
+#define SpvOpTypeStruct 30
+#define SpvOpTypePointer 32
+#define SpvOpTypeFunction 33
+#define SpvOpConstant 43
+#define SpvOpFunction 54
+#define SpvOpFunctionEnd 56
+#define SpvOpLabel 248
+#define SpvOpReturn 253
+#define SpvOpVariable 59
+#define SpvOpLoad 61
+#define SpvOpStore 62
+#define SpvOpAccessChain 65
+#define SpvOpFAdd 129
+#define SpvOpFSub 131
+#define SpvOpFMul 133
+#define SpvOpFDiv 136
+#define SpvOpFNegate 127
+#define SpvOpCompositeExtract 81
 
 /* Decoration values */
-#define SpvDecorationBinding     33
+#define SpvDecorationBinding 33
 #define SpvDecorationDescriptorSet 34
-#define SpvDecorationOffset      35
+#define SpvDecorationOffset 35
 #define SpvDecorationArrayStride 6
-#define SpvDecorationBlock       2
-#define SpvDecorationBuiltIn     11
+#define SpvDecorationBlock 2
+#define SpvDecorationBuiltIn 11
 
 /* BuiltIn values */
 #define SpvBuiltInGlobalInvocationId 28
 
 /* Storage classes */
-#define SpvStorageClassUniform          2
-#define SpvStorageClassInput            1
-#define SpvStorageClassFunction         7
-#define SpvStorageClassStorageBuffer    12
+#define SpvStorageClassUniform 2
+#define SpvStorageClassInput 1
+#define SpvStorageClassFunction 7
+#define SpvStorageClassStorageBuffer 12
 
 /* Capability values */
-#define SpvCapabilityShader      1
+#define SpvCapabilityShader 1
 
 /* Execution model / mode */
 #define SpvExecutionModelGLCompute 5
-#define SpvExecutionModeLocalSize  17
+#define SpvExecutionModeLocalSize 17
 
 /* Addressing / Memory model */
 #define SpvAddressingModelLogical 0
-#define SpvMemoryModelGLSL450    1
+#define SpvMemoryModelGLSL450 1
 
 /* ExtInst GLSL.std.450 opcodes */
-#define GLSL_STD_450_Exp    27
-#define GLSL_STD_450_Log    28
-#define GLSL_STD_450_Sqrt   31
-#define GLSL_STD_450_FAbs   4
-#define GLSL_STD_450_Sin    13
-#define GLSL_STD_450_Cos    14
-#define GLSL_STD_450_Tanh   21
-#define GLSL_STD_450_Pow    26
-#define GLSL_STD_450_FMax   40
+#define GLSL_STD_450_Exp 27
+#define GLSL_STD_450_Log 28
+#define GLSL_STD_450_Sqrt 31
+#define GLSL_STD_450_FAbs 4
+#define GLSL_STD_450_Sin 13
+#define GLSL_STD_450_Cos 14
+#define GLSL_STD_450_Tanh 21
+#define GLSL_STD_450_Pow 26
+#define GLSL_STD_450_FMax 40
 
 #define SpvOpExtInst 12
 
@@ -667,20 +688,23 @@ static void emit(uint32_t** ptr, uint32_t word) {
     (*ptr)++;
 }
 
-uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
-                                      size_t work_size, int* out_num_words) {
-    if (!prog || !out_num_words) return NULL;
+uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size,
+                                     int* out_num_words) {
+    if (!prog || !out_num_words)
+        return NULL;
 
     /* Count buffers (loads + stores) */
     int num_buffers = 0;
     for (int i = 0; i < prog->num_ops; i++) {
-        if (prog->ops[i].kind == LINOP_LOAD || prog->ops[i].kind == LINOP_STORE) num_buffers++;
+        if (prog->ops[i].kind == LINOP_LOAD || prog->ops[i].kind == LINOP_STORE)
+            num_buffers++;
     }
 
     /* Allocate generous buffer for SPIR-V words */
-    int max_words = 1024 + prog->num_ops * 32 + num_buffers * 64;
+    int max_words   = 1024 + prog->num_ops * 32 + num_buffers * 64;
     uint32_t* words = cml_calloc((size_t)max_words, sizeof(uint32_t));
-    if (!words) return NULL;
+    if (!words)
+        return NULL;
 
     uint32_t* w = words;
 
@@ -692,23 +716,23 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     uint32_t next_id = 1;
 
     /* Pre-allocate key type/variable IDs */
-    uint32_t id_void_type    = next_id++;  /* 1 */
-    uint32_t id_float_type   = next_id++;  /* 2 */
-    uint32_t id_uint_type    = next_id++;  /* 3 */
-    uint32_t id_uint3_type   = next_id++;  /* 4 */
-    uint32_t id_func_type    = next_id++;  /* 5 */
-    uint32_t id_rt_array     = next_id++;  /* 6 - RuntimeArray of float */
-    uint32_t id_struct_type  = next_id++;  /* 7 - struct { RuntimeArray } */
-    uint32_t id_ptr_sb       = next_id++;  /* 8 - pointer to struct (StorageBuffer) */
-    uint32_t id_ptr_sb_float = next_id++;  /* 9 - pointer to float (StorageBuffer) */
+    uint32_t id_void_type       = next_id++; /* 1 */
+    uint32_t id_float_type      = next_id++; /* 2 */
+    uint32_t id_uint_type       = next_id++; /* 3 */
+    uint32_t id_uint3_type      = next_id++; /* 4 */
+    uint32_t id_func_type       = next_id++; /* 5 */
+    uint32_t id_rt_array        = next_id++; /* 6 - RuntimeArray of float */
+    uint32_t id_struct_type     = next_id++; /* 7 - struct { RuntimeArray } */
+    uint32_t id_ptr_sb          = next_id++; /* 8 - pointer to struct (StorageBuffer) */
+    uint32_t id_ptr_sb_float    = next_id++; /* 9 - pointer to float (StorageBuffer) */
     uint32_t id_ptr_input_uint3 = next_id++; /* 10 */
-    uint32_t id_gl_invoc     = next_id++;  /* 11 - gl_GlobalInvocationID */
-    uint32_t id_uint_zero    = next_id++;  /* 12 */
-    uint32_t id_main         = next_id++;  /* 13 */
-    uint32_t id_label        = next_id++;  /* 14 */
-    uint32_t id_ext_glsl     = next_id++;  /* 15 */
-    uint32_t id_float_one    = next_id++;  /* 16 - 1.0f, for recip/sigmoid/silu */
-    uint32_t id_float_zero   = next_id++;  /* 17 - 0.0f, fallback for a missing vreg */
+    uint32_t id_gl_invoc        = next_id++; /* 11 - gl_GlobalInvocationID */
+    uint32_t id_uint_zero       = next_id++; /* 12 */
+    uint32_t id_main            = next_id++; /* 13 */
+    uint32_t id_label           = next_id++; /* 14 */
+    uint32_t id_ext_glsl        = next_id++; /* 15 */
+    uint32_t id_float_one       = next_id++; /* 16 - 1.0f, for recip/sigmoid/silu */
+    uint32_t id_float_zero      = next_id++; /* 17 - 0.0f, fallback for a missing vreg */
 
     /* Allocate IDs for buffer variables */
     uint32_t buf_var_ids[64];
@@ -849,12 +873,12 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
     emit(&w, SPIRV_OP(SpvOpConstant, 4));
     emit(&w, id_float_type);
     emit(&w, id_float_one);
-    emit(&w, 0x3F800000u);   /* 1.0f */
+    emit(&w, 0x3F800000u); /* 1.0f */
 
     emit(&w, SPIRV_OP(SpvOpConstant, 4));
     emit(&w, id_float_type);
     emit(&w, id_float_zero);
-    emit(&w, 0x00000000u);   /* 0.0f */
+    emit(&w, 0x00000000u); /* 0.0f */
 
     for (int i = 0; i < num_buffers && i < 64; i++) {
         emit(&w, SPIRV_OP(SpvOpVariable, 4));
@@ -897,11 +921,14 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
      * numberings drifted apart and operands pointed at whatever id happened to
      * sit there -- typically an OpAccessChain pointer rather than a float,
      * which is why every generated module failed validation on operand types. */
-    int buf_idx = 0;
+    int buf_idx  = 0;
     uint32_t vid = vreg_base;
-    uint32_t* vreg_id = cml_calloc((size_t)(prog->next_vreg > 0 ? prog->next_vreg : 1),
-                                   sizeof(uint32_t));
-    if (!vreg_id) { cml_free(words); return NULL; }
+    uint32_t* vreg_id =
+        cml_calloc((size_t)(prog->next_vreg > 0 ? prog->next_vreg : 1), sizeof(uint32_t));
+    if (!vreg_id) {
+        cml_free(words);
+        return NULL;
+    }
 #define VREG(r) (((r) >= 0 && (r) < prog->next_vreg && vreg_id[(r)]) ? vreg_id[(r)] : id_float_zero)
 
     for (int i = 0; i < prog->num_ops; i++) {
@@ -911,7 +938,7 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
         case LINOP_LOAD: {
             /* AccessChain + Load from buffer */
             uint32_t chain_id = vid++;
-            uint32_t load_id = vid++;
+            uint32_t load_id  = vid++;
 
             emit(&w, SPIRV_OP(SpvOpAccessChain, 6));
             emit(&w, id_ptr_sb_float);
@@ -941,8 +968,10 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
                  * to fall into the default below and silently compile to an
                  * addition. */
                 uint32_t glsl_bin = 0;
-                if (op->uop == UOP_MAX)      glsl_bin = GLSL_STD_450_FMax;
-                else if (op->uop == UOP_POW) glsl_bin = GLSL_STD_450_Pow;
+                if (op->uop == UOP_MAX)
+                    glsl_bin = GLSL_STD_450_FMax;
+                else if (op->uop == UOP_POW)
+                    glsl_bin = GLSL_STD_450_Pow;
 
                 if (glsl_bin) {
                     emit(&w, SPIRV_OP(SpvOpExtInst, 7));
@@ -955,17 +984,25 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
                 } else {
                     uint32_t spirv_op;
                     switch (op->uop) {
-                        case UOP_ADD: spirv_op = SpvOpFAdd; break;
-                        case UOP_SUB: spirv_op = SpvOpFSub; break;
-                        case UOP_MUL: spirv_op = SpvOpFMul; break;
-                        case UOP_DIV: spirv_op = SpvOpFDiv; break;
-                        default:
-                            /* Emitting an add for an op with no case would
-                             * silently replace it. Abandon the module so the
-                             * caller falls back to a backend that can run it. */
-                            cml_free(vreg_id);
-                            cml_free(words);
-                            return NULL;
+                    case UOP_ADD:
+                        spirv_op = SpvOpFAdd;
+                        break;
+                    case UOP_SUB:
+                        spirv_op = SpvOpFSub;
+                        break;
+                    case UOP_MUL:
+                        spirv_op = SpvOpFMul;
+                        break;
+                    case UOP_DIV:
+                        spirv_op = SpvOpFDiv;
+                        break;
+                    default:
+                        /* Emitting an add for an op with no case would
+                         * silently replace it. Abandon the module so the
+                         * caller falls back to a backend that can run it. */
+                        cml_free(vreg_id);
+                        cml_free(words);
+                        return NULL;
                     }
                     emit(&w, SPIRV_OP(spirv_op, 5));
                     emit(&w, id_float_type);
@@ -993,41 +1030,66 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
                     uint32_t id_sig = (op->uop == UOP_SILU) ? vid++ : result_id;
 
                     emit(&w, SPIRV_OP(SpvOpFNegate, 4));
-                    emit(&w, id_float_type); emit(&w, id_neg); emit(&w, src);
+                    emit(&w, id_float_type);
+                    emit(&w, id_neg);
+                    emit(&w, src);
 
                     emit(&w, SPIRV_OP(SpvOpExtInst, 6));
-                    emit(&w, id_float_type); emit(&w, id_exp);
-                    emit(&w, id_ext_glsl); emit(&w, GLSL_STD_450_Exp); emit(&w, id_neg);
+                    emit(&w, id_float_type);
+                    emit(&w, id_exp);
+                    emit(&w, id_ext_glsl);
+                    emit(&w, GLSL_STD_450_Exp);
+                    emit(&w, id_neg);
 
                     emit(&w, SPIRV_OP(SpvOpFAdd, 5));
-                    emit(&w, id_float_type); emit(&w, id_den);
-                    emit(&w, id_float_one); emit(&w, id_exp);
+                    emit(&w, id_float_type);
+                    emit(&w, id_den);
+                    emit(&w, id_float_one);
+                    emit(&w, id_exp);
 
                     emit(&w, SPIRV_OP(SpvOpFDiv, 5));
-                    emit(&w, id_float_type); emit(&w, id_sig);
-                    emit(&w, id_float_one); emit(&w, id_den);
+                    emit(&w, id_float_type);
+                    emit(&w, id_sig);
+                    emit(&w, id_float_one);
+                    emit(&w, id_den);
 
                     if (op->uop == UOP_SILU) {
                         emit(&w, SPIRV_OP(SpvOpFMul, 5));
-                        emit(&w, id_float_type); emit(&w, result_id);
-                        emit(&w, src); emit(&w, id_sig);
+                        emit(&w, id_float_type);
+                        emit(&w, result_id);
+                        emit(&w, src);
+                        emit(&w, id_sig);
                     }
                 } else {
                     /* Use GLSL.std.450 extended instructions */
                     uint32_t glsl_op;
                     switch (op->uop) {
-                        case UOP_EXP:  glsl_op = GLSL_STD_450_Exp; break;
-                        case UOP_LOG:  glsl_op = GLSL_STD_450_Log; break;
-                        case UOP_SQRT: glsl_op = GLSL_STD_450_Sqrt; break;
-                        case UOP_ABS:  glsl_op = GLSL_STD_450_FAbs; break;
-                        case UOP_SIN:  glsl_op = GLSL_STD_450_Sin; break;
-                        case UOP_COS:  glsl_op = GLSL_STD_450_Cos; break;
-                        case UOP_TANH: glsl_op = GLSL_STD_450_Tanh; break;
-                        default:
-                            /* Substituting fabs would silently change the op. */
-                            cml_free(vreg_id);
-                            cml_free(words);
-                            return NULL;
+                    case UOP_EXP:
+                        glsl_op = GLSL_STD_450_Exp;
+                        break;
+                    case UOP_LOG:
+                        glsl_op = GLSL_STD_450_Log;
+                        break;
+                    case UOP_SQRT:
+                        glsl_op = GLSL_STD_450_Sqrt;
+                        break;
+                    case UOP_ABS:
+                        glsl_op = GLSL_STD_450_FAbs;
+                        break;
+                    case UOP_SIN:
+                        glsl_op = GLSL_STD_450_Sin;
+                        break;
+                    case UOP_COS:
+                        glsl_op = GLSL_STD_450_Cos;
+                        break;
+                    case UOP_TANH:
+                        glsl_op = GLSL_STD_450_Tanh;
+                        break;
+                    default:
+                        /* Substituting fabs would silently change the op. */
+                        cml_free(vreg_id);
+                        cml_free(words);
+                        return NULL;
                     }
                     emit(&w, SPIRV_OP(SpvOpExtInst, 6));
                     emit(&w, id_float_type);
@@ -1052,7 +1114,7 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
 
         case LINOP_STORE: {
             uint32_t chain_id = vid++;
-            uint32_t src = VREG(op->dest_reg);
+            uint32_t src      = VREG(op->dest_reg);
 
             emit(&w, SPIRV_OP(SpvOpAccessChain, 6));
             emit(&w, id_ptr_sb_float);
@@ -1080,11 +1142,11 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
 
     /* Fill in header */
     int total_words = (int)(w - words);
-    header[0] = 0x07230203;  /* Magic number */
-    header[1] = 0x00010300;  /* Version 1.3 */
-    header[2] = 0x00434D4C;  /* Generator: "CML" */
-    header[3] = next_id;     /* Bound */
-    header[4] = 0;           /* Schema */
+    header[0]       = 0x07230203; /* Magic number */
+    header[1]       = 0x00010300; /* Version 1.3 */
+    header[2]       = 0x00434D4C; /* Generator: "CML" */
+    header[3]       = next_id;    /* Bound */
+    header[4]       = 0;          /* Schema */
 
     *out_num_words = total_words;
     (void)work_size;
@@ -1094,7 +1156,8 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
 
 static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = cml_malloc(FUSED_BUF_SIZE);
-    if (!buf) return NULL;
+    if (!buf)
+        return NULL;
     int pos = 0;
 
     /* Emit storage buffer bindings */
@@ -1102,16 +1165,16 @@ static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) 
     for (int i = 0; i < prog->num_ops; i++) {
         if (prog->ops[i].kind == LINOP_LOAD || prog->ops[i].kind == LINOP_STORE) {
             pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                "@group(0) @binding(%d) var<storage, read_write> buf%d: array<f32>;\n",
-                buf_idx, buf_idx);
+                            "@group(0) @binding(%d) var<storage, read_write> buf%d: array<f32>;\n",
+                            buf_idx, buf_idx);
             buf_idx++;
         }
     }
 
     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-        "\n@compute @workgroup_size(256)\n"
-        "fn main(@builtin(global_invocation_id) gid: vec3<u32>) {\n"
-        "    let i = gid.x;\n");
+                    "\n@compute @workgroup_size(256)\n"
+                    "fn main(@builtin(global_invocation_id) gid: vec3<u32>) {\n"
+                    "    let i = gid.x;\n");
 
     /* Emit operations */
     buf_idx = 0;
@@ -1119,8 +1182,8 @@ static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) 
         const CMLLinearOp* op = &prog->ops[i];
         switch (op->kind) {
         case LINOP_LOAD:
-            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                "    let v%d = buf%d[i];\n", op->dest_reg, buf_idx);
+            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = buf%d[i];\n",
+                            op->dest_reg, buf_idx);
             buf_idx++;
             break;
 
@@ -1128,88 +1191,95 @@ static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) 
             if (uop_is_binary(op->uop) && op->num_srcs >= 2) {
                 const char* wgsl_op;
                 switch (op->uop) {
-                    case UOP_ADD: wgsl_op = "+"; break;
-                    case UOP_SUB: wgsl_op = "-"; break;
-                    case UOP_MUL: wgsl_op = "*"; break;
-                    case UOP_DIV: wgsl_op = "/"; break;
-                    default:      wgsl_op = "+"; break;
+                case UOP_ADD:
+                    wgsl_op = "+";
+                    break;
+                case UOP_SUB:
+                    wgsl_op = "-";
+                    break;
+                case UOP_MUL:
+                    wgsl_op = "*";
+                    break;
+                case UOP_DIV:
+                    wgsl_op = "/";
+                    break;
+                default:
+                    wgsl_op = "+";
+                    break;
                 }
                 if (op->uop == UOP_MAX) {
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = max(v%d, v%d);\n",
-                        op->dest_reg, op->src_regs[0], op->src_regs[1]);
+                    pos +=
+                        snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = max(v%d, v%d);\n",
+                                 op->dest_reg, op->src_regs[0], op->src_regs[1]);
                 } else if (op->uop == UOP_POW) {
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = pow(v%d, v%d);\n",
-                        op->dest_reg, op->src_regs[0], op->src_regs[1]);
+                    pos +=
+                        snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = pow(v%d, v%d);\n",
+                                 op->dest_reg, op->src_regs[0], op->src_regs[1]);
                 } else {
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = v%d %s v%d;\n",
-                        op->dest_reg, op->src_regs[0], wgsl_op, op->src_regs[1]);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = v%d %s v%d;\n",
+                                    op->dest_reg, op->src_regs[0], wgsl_op, op->src_regs[1]);
                 }
             } else if (uop_is_unary(op->uop) && op->num_srcs >= 1) {
                 int s = op->src_regs[0];
                 switch (op->uop) {
                 case UOP_NEG:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = -v%d;\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = -v%d;\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_EXP:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = exp(v%d);\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = exp(v%d);\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_LOG:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = log(v%d);\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = log(v%d);\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_SQRT:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = sqrt(v%d);\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = sqrt(v%d);\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_ABS:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = abs(v%d);\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = abs(v%d);\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_SIN:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = sin(v%d);\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = sin(v%d);\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_COS:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = cos(v%d);\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = cos(v%d);\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_TANH:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = tanh(v%d);\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = tanh(v%d);\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_SIGMOID:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = 1.0 / (1.0 + exp(-v%d));\n",
-                        op->dest_reg, s);
+                                    "    let v%d = 1.0 / (1.0 + exp(-v%d));\n", op->dest_reg, s);
                     break;
                 case UOP_RECIP:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = 1.0 / v%d;\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = 1.0 / v%d;\n",
+                                    op->dest_reg, s);
                     break;
                 case UOP_SILU:
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = v%d / (1.0 + exp(-v%d));\n",
-                        op->dest_reg, s, s);
+                                    "    let v%d = v%d / (1.0 + exp(-v%d));\n", op->dest_reg, s, s);
                     break;
                 default:
-                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                        "    let v%d = v%d;\n", op->dest_reg, s);
+                    pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = v%d;\n",
+                                    op->dest_reg, s);
                     break;
                 }
             } else {
-                pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                    "    let v%d = 0.0;\n", op->dest_reg);
+                pos +=
+                    snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    let v%d = 0.0;\n", op->dest_reg);
             }
             break;
 
         case LINOP_STORE:
-            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
-                "    buf%d[i] = v%d;\n", buf_idx, op->dest_reg);
+            pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos, "    buf%d[i] = v%d;\n", buf_idx,
+                            op->dest_reg);
             buf_idx++;
             break;
         }
@@ -1221,63 +1291,81 @@ static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) 
     return buf;
 }
 
-CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog,
-                                    CMLFusedBackend backend,
-                                    size_t work_size) {
-    if (!prog || prog->num_ops == 0) return NULL;
+CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog, CMLFusedBackend backend,
+                                  size_t work_size) {
+    if (!prog || prog->num_ops == 0)
+        return NULL;
 
     CMLFusedKernel* kernel = cml_calloc(1, sizeof(CMLFusedKernel));
-    if (!kernel) return NULL;
+    if (!kernel)
+        return NULL;
 
-    kernel->backend = backend;
+    kernel->backend   = backend;
     kernel->num_vregs = prog->next_vreg;
     kernel->work_size = work_size;
 
     /* Count inputs and outputs */
     for (int i = 0; i < prog->num_ops; i++) {
-        if (prog->ops[i].kind == LINOP_LOAD) kernel->num_inputs++;
-        if (prog->ops[i].kind == LINOP_STORE) kernel->num_outputs++;
+        if (prog->ops[i].kind == LINOP_LOAD)
+            kernel->num_inputs++;
+        if (prog->ops[i].kind == LINOP_STORE)
+            kernel->num_outputs++;
     }
 
     switch (backend) {
     case CML_FUSED_BACKEND_C:
         kernel->source = fused_codegen_c(prog, work_size);
-        if (!kernel->source) { cml_free(kernel); return NULL; }
+        if (!kernel->source) {
+            cml_free(kernel);
+            return NULL;
+        }
         break;
 
     case CML_FUSED_BACKEND_PTX:
         kernel->source = cml_ptx_gen_fused_kernel(prog, work_size);
-        if (!kernel->source) { cml_free(kernel); return NULL; }
+        if (!kernel->source) {
+            cml_free(kernel);
+            return NULL;
+        }
         break;
 
     case CML_FUSED_BACKEND_SPIRV:
-        kernel->spirv_words = cml_spirv_gen_fused_kernel(prog, work_size,
-                                                          &kernel->spirv_num_words);
-        if (!kernel->spirv_words) { cml_free(kernel); return NULL; }
+        kernel->spirv_words = cml_spirv_gen_fused_kernel(prog, work_size, &kernel->spirv_num_words);
+        if (!kernel->spirv_words) {
+            cml_free(kernel);
+            return NULL;
+        }
         break;
 
     case CML_FUSED_BACKEND_WGSL:
         kernel->source = fused_codegen_wgsl(prog, work_size);
-        if (!kernel->source) { cml_free(kernel); return NULL; }
+        if (!kernel->source) {
+            cml_free(kernel);
+            return NULL;
+        }
         break;
 
     default:
         LOG_WARNING("Fused codegen: unsupported backend %d, falling back to C", backend);
         kernel->backend = CML_FUSED_BACKEND_C;
-        kernel->source = fused_codegen_c(prog, work_size);
-        if (!kernel->source) { cml_free(kernel); return NULL; }
+        kernel->source  = fused_codegen_c(prog, work_size);
+        if (!kernel->source) {
+            cml_free(kernel);
+            return NULL;
+        }
         break;
     }
 
     return kernel;
 }
 
-CMLFusedKernel* cml_fused_codegen_group(const CMLFusionGroup* group,
-                                          CMLFusedBackend backend) {
-    if (!group) return NULL;
+CMLFusedKernel* cml_fused_codegen_group(const CMLFusionGroup* group, CMLFusedBackend backend) {
+    if (!group)
+        return NULL;
 
     CMLLinearProgram* prog = cml_linearize_group(group);
-    if (!prog) return NULL;
+    if (!prog)
+        return NULL;
 
     /* Estimate work size from first node's output */
     size_t work_size = 0;
@@ -1295,20 +1383,23 @@ CMLFusedKernel* cml_fused_codegen_group(const CMLFusionGroup* group,
 }
 
 void cml_fused_kernel_free(CMLFusedKernel* kernel) {
-    if (!kernel) return;
+    if (!kernel)
+        return;
     cml_free(kernel->source);
     cml_free(kernel->spirv_words);
     cml_free(kernel);
 }
 
 void cml_fused_kernel_print(const CMLFusedKernel* kernel) {
-    if (!kernel) { printf("FusedKernel: (null)\n"); return; }
+    if (!kernel) {
+        printf("FusedKernel: (null)\n");
+        return;
+    }
 
     const char* backend_names[] = {"C", "PTX", "SPIR-V", "WGSL", "Metal"};
     printf("Fused Kernel (%s)\n", backend_names[kernel->backend]);
-    printf("  inputs: %d, outputs: %d, vregs: %d, work_size: %zu\n",
-           kernel->num_inputs, kernel->num_outputs,
-           kernel->num_vregs, kernel->work_size);
+    printf("  inputs: %d, outputs: %d, vregs: %d, work_size: %zu\n", kernel->num_inputs,
+           kernel->num_outputs, kernel->num_vregs, kernel->work_size);
 
     if (kernel->source) {
         printf("Source\n%s\n", kernel->source);

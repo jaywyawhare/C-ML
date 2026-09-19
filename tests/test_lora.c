@@ -10,30 +10,38 @@
 
 static int test_lora_linear_forward(void) {
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Create a base weight [out=3, in=4] */
-    float W_data[] = {
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f
-    };
-    int W_shape[2] = {3, 4};
+    float W_data[]      = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+    int W_shape[2]      = {3, 4};
     Tensor* base_weight = tensor_from_data(W_data, W_shape, 2, &cfg);
-    if (!base_weight) return 0;
+    if (!base_weight)
+        return 0;
 
     /* Create LoRA with rank=2, alpha=2.0 */
     CMLLoRALinear* lora = cml_lora_linear_create(base_weight, 2, 2.0f);
-    if (!lora) { tensor_free(base_weight); return 0; }
+    if (!lora) {
+        tensor_free(base_weight);
+        return 0;
+    }
 
     /* Verify dimensions */
-    if (lora->in_features != 4) { cml_lora_linear_free(lora); tensor_free(base_weight); return 0; }
-    if (lora->out_features != 3) { cml_lora_linear_free(lora); tensor_free(base_weight); return 0; }
-    if (lora->rank != 2) { cml_lora_linear_free(lora); tensor_free(base_weight); return 0; }
+    if (lora->in_features != 4) {
+        cml_lora_linear_free(lora);
+        tensor_free(base_weight);
+        return 0;
+    }
+    if (lora->out_features != 3) {
+        cml_lora_linear_free(lora);
+        tensor_free(base_weight);
+        return 0;
+    }
+    if (lora->rank != 2) {
+        cml_lora_linear_free(lora);
+        tensor_free(base_weight);
+        return 0;
+    }
 
     /* Verify scaling = alpha / rank = 2.0 / 2 = 1.0 */
     if (fabsf(lora->scaling - 1.0f) > 1e-6f) {
@@ -43,13 +51,14 @@ static int test_lora_linear_forward(void) {
     }
 
     /* Create input [batch=2, in=4] */
-    float x_data[] = {
-        1.0f, 2.0f, 3.0f, 4.0f,
-        0.5f, 1.5f, 2.5f, 3.5f
-    };
+    float x_data[] = {1.0f, 2.0f, 3.0f, 4.0f, 0.5f, 1.5f, 2.5f, 3.5f};
     int x_shape[2] = {2, 4};
-    Tensor* input = tensor_from_data(x_data, x_shape, 2, &cfg);
-    if (!input) { cml_lora_linear_free(lora); tensor_free(base_weight); return 0; }
+    Tensor* input  = tensor_from_data(x_data, x_shape, 2, &cfg);
+    if (!input) {
+        cml_lora_linear_free(lora);
+        tensor_free(base_weight);
+        return 0;
+    }
 
     /* Forward pass */
     Tensor* output = cml_lora_linear_forward(lora, input);
@@ -80,13 +89,19 @@ static int test_lora_linear_forward(void) {
      */
     tensor_ensure_executed(output);
     float* out = (float*)tensor_data_ptr(output);
-    int ok = 1;
-    if (fabsf(out[0] - 1.0f) > 1e-5f) ok = 0;
-    if (fabsf(out[1] - 2.0f) > 1e-5f) ok = 0;
-    if (fabsf(out[2] - 3.0f) > 1e-5f) ok = 0;
-    if (fabsf(out[3] - 0.5f) > 1e-5f) ok = 0;
-    if (fabsf(out[4] - 1.5f) > 1e-5f) ok = 0;
-    if (fabsf(out[5] - 2.5f) > 1e-5f) ok = 0;
+    int ok     = 1;
+    if (fabsf(out[0] - 1.0f) > 1e-5f)
+        ok = 0;
+    if (fabsf(out[1] - 2.0f) > 1e-5f)
+        ok = 0;
+    if (fabsf(out[2] - 3.0f) > 1e-5f)
+        ok = 0;
+    if (fabsf(out[3] - 0.5f) > 1e-5f)
+        ok = 0;
+    if (fabsf(out[4] - 1.5f) > 1e-5f)
+        ok = 0;
+    if (fabsf(out[5] - 2.5f) > 1e-5f)
+        ok = 0;
 
     tensor_free(output);
     tensor_free(input);
@@ -95,23 +110,16 @@ static int test_lora_linear_forward(void) {
     return ok;
 }
 
-
 static int test_lora_merge_unmerge(void) {
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Create a simple base weight [out=2, in=3] */
-    float W_data[] = {
-        1.0f, 2.0f, 3.0f,
-        4.0f, 5.0f, 6.0f
-    };
-    int W_shape[2] = {2, 3};
+    float W_data[]      = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+    int W_shape[2]      = {2, 3};
     Tensor* base_weight = tensor_from_data(W_data, W_shape, 2, &cfg);
-    if (!base_weight) return 0;
+    if (!base_weight)
+        return 0;
 
     /* Save original weight values for later comparison */
     tensor_ensure_executed(base_weight);
@@ -121,7 +129,10 @@ static int test_lora_merge_unmerge(void) {
 
     /* Create LoRA with rank=1, alpha=1.0 (scaling = 1.0) */
     CMLLoRALinear* lora = cml_lora_linear_create(base_weight, 1, 1.0f);
-    if (!lora) { tensor_free(base_weight); return 0; }
+    if (!lora) {
+        tensor_free(base_weight);
+        return 0;
+    }
 
     /* Manually set A and B to known values for predictable merge result */
     tensor_ensure_executed(lora->lora_A);
@@ -130,9 +141,12 @@ static int test_lora_merge_unmerge(void) {
     float* B_ptr = (float*)tensor_data_ptr(lora->lora_B);
 
     /* A: [1, 3] = [1.0, 0.0, 0.0] */
-    A_ptr[0] = 1.0f; A_ptr[1] = 0.0f; A_ptr[2] = 0.0f;
+    A_ptr[0] = 1.0f;
+    A_ptr[1] = 0.0f;
+    A_ptr[2] = 0.0f;
     /* B: [2, 1] = [0.5, 0.5] */
-    B_ptr[0] = 0.5f; B_ptr[1] = 0.5f;
+    B_ptr[0] = 0.5f;
+    B_ptr[1] = 0.5f;
 
     /*
      * After merge: W += scaling * B @ A
@@ -155,14 +169,20 @@ static int test_lora_merge_unmerge(void) {
         return 0;
     }
 
-    W_ptr = (float*)tensor_data_ptr(base_weight);
+    W_ptr  = (float*)tensor_data_ptr(base_weight);
     int ok = 1;
-    if (fabsf(W_ptr[0] - 1.5f) > 1e-5f) ok = 0;   /* 1.0 + 0.5 */
-    if (fabsf(W_ptr[1] - 2.0f) > 1e-5f) ok = 0;   /* 2.0 + 0.0 */
-    if (fabsf(W_ptr[2] - 3.0f) > 1e-5f) ok = 0;   /* 3.0 + 0.0 */
-    if (fabsf(W_ptr[3] - 4.5f) > 1e-5f) ok = 0;   /* 4.0 + 0.5 */
-    if (fabsf(W_ptr[4] - 5.0f) > 1e-5f) ok = 0;   /* 5.0 + 0.0 */
-    if (fabsf(W_ptr[5] - 6.0f) > 1e-5f) ok = 0;   /* 6.0 + 0.0 */
+    if (fabsf(W_ptr[0] - 1.5f) > 1e-5f)
+        ok = 0; /* 1.0 + 0.5 */
+    if (fabsf(W_ptr[1] - 2.0f) > 1e-5f)
+        ok = 0; /* 2.0 + 0.0 */
+    if (fabsf(W_ptr[2] - 3.0f) > 1e-5f)
+        ok = 0; /* 3.0 + 0.0 */
+    if (fabsf(W_ptr[3] - 4.5f) > 1e-5f)
+        ok = 0; /* 4.0 + 0.5 */
+    if (fabsf(W_ptr[4] - 5.0f) > 1e-5f)
+        ok = 0; /* 5.0 + 0.0 */
+    if (fabsf(W_ptr[5] - 6.0f) > 1e-5f)
+        ok = 0; /* 6.0 + 0.0 */
 
     if (!ok) {
         printf("(merge values wrong) ");
@@ -187,8 +207,8 @@ static int test_lora_merge_unmerge(void) {
     W_ptr = (float*)tensor_data_ptr(base_weight);
     for (int i = 0; i < 6; i++) {
         if (fabsf(W_ptr[i] - original_W[i]) > 1e-5f) {
-            printf("(unmerge failed at index %d: got %.4f expected %.4f) ",
-                   i, W_ptr[i], original_W[i]);
+            printf("(unmerge failed at index %d: got %.4f expected %.4f) ", i, W_ptr[i],
+                   original_W[i]);
             ok = 0;
         }
     }
@@ -198,25 +218,24 @@ static int test_lora_merge_unmerge(void) {
     return ok;
 }
 
-
 static int test_lora_adapter(void) {
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Create two base weight tensors */
     float W1_data[] = {1.0f, 0.0f, 0.0f, 1.0f};
     int W1_shape[2] = {2, 2};
-    Tensor* W1 = tensor_from_data(W1_data, W1_shape, 2, &cfg);
-    if (!W1) return 0;
+    Tensor* W1      = tensor_from_data(W1_data, W1_shape, 2, &cfg);
+    if (!W1)
+        return 0;
 
     float W2_data[] = {2.0f, 0.0f, 0.0f, 0.0f, 2.0f, 0.0f};
     int W2_shape[2] = {2, 3};
-    Tensor* W2 = tensor_from_data(W2_data, W2_shape, 2, &cfg);
-    if (!W2) { tensor_free(W1); return 0; }
+    Tensor* W2      = tensor_from_data(W2_data, W2_shape, 2, &cfg);
+    if (!W2) {
+        tensor_free(W1);
+        return 0;
+    }
 
     /* Save original weight values */
     tensor_ensure_executed(W1);
@@ -227,18 +246,34 @@ static int test_lora_adapter(void) {
 
     /* Create adapter */
     CMLLoRAAdapter* adapter = cml_lora_adapter_create("test_adapter", 2, 2.0f);
-    if (!adapter) { tensor_free(W1); tensor_free(W2); return 0; }
+    if (!adapter) {
+        tensor_free(W1);
+        tensor_free(W2);
+        return 0;
+    }
 
     /* Verify adapter properties */
-    if (adapter->rank != 2) { cml_lora_adapter_free(adapter); tensor_free(W1); tensor_free(W2); return 0; }
-    if (adapter->num_layers != 0) { cml_lora_adapter_free(adapter); tensor_free(W1); tensor_free(W2); return 0; }
+    if (adapter->rank != 2) {
+        cml_lora_adapter_free(adapter);
+        tensor_free(W1);
+        tensor_free(W2);
+        return 0;
+    }
+    if (adapter->num_layers != 0) {
+        cml_lora_adapter_free(adapter);
+        tensor_free(W1);
+        tensor_free(W2);
+        return 0;
+    }
 
     /* Create and add LoRA layers */
     CMLLoRALinear* lora1 = cml_lora_linear_create(W1, 2, 2.0f);
     CMLLoRALinear* lora2 = cml_lora_linear_create(W2, 2, 2.0f);
     if (!lora1 || !lora2) {
-        if (lora1) cml_lora_linear_free(lora1);
-        if (lora2) cml_lora_linear_free(lora2);
+        if (lora1)
+            cml_lora_linear_free(lora1);
+        if (lora2)
+            cml_lora_linear_free(lora2);
         cml_lora_adapter_free(adapter);
         tensor_free(W1);
         tensor_free(W2);
@@ -291,7 +326,7 @@ static int test_lora_adapter(void) {
     }
 
     /* Verify original weights are restored */
-    int ok = 1;
+    int ok        = 1;
     float* w1_ptr = (float*)tensor_data_ptr(W1);
     float* w2_ptr = (float*)tensor_data_ptr(W2);
     for (int i = 0; i < 4; i++) {
@@ -313,29 +348,23 @@ static int test_lora_adapter(void) {
     return ok;
 }
 
-
 static int test_lora_zero_init_B(void) {
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Create a base weight [4, 3] */
-    float W_data[] = {
-        1.0f, 2.0f, 3.0f,
-        4.0f, 5.0f, 6.0f,
-        7.0f, 8.0f, 9.0f,
-        10.0f, 11.0f, 12.0f
-    };
+    float W_data[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f};
     int W_shape[2] = {4, 3};
     Tensor* base_weight = tensor_from_data(W_data, W_shape, 2, &cfg);
-    if (!base_weight) return 0;
+    if (!base_weight)
+        return 0;
 
     /* Create LoRA with rank=4, alpha=4.0 */
     CMLLoRALinear* lora = cml_lora_linear_create(base_weight, 4, 4.0f);
-    if (!lora) { tensor_free(base_weight); return 0; }
+    if (!lora) {
+        tensor_free(base_weight);
+        return 0;
+    }
 
     /* Check that B is all zeros */
     tensor_ensure_executed(lora->lora_B);
@@ -366,7 +395,7 @@ static int test_lora_zero_init_B(void) {
         return 0;
     }
 
-    int A_size = lora->rank * lora->in_features;
+    int A_size    = lora->rank * lora->in_features;
     float sum_abs = 0.0f;
     for (int i = 0; i < A_size; i++) {
         sum_abs += fabsf(A_data[i]);
@@ -382,7 +411,7 @@ static int test_lora_zero_init_B(void) {
      */
     float x_data[] = {1.0f, 1.0f, 1.0f};
     int x_shape[2] = {1, 3};
-    Tensor* input = tensor_from_data(x_data, x_shape, 2, &cfg);
+    Tensor* input  = tensor_from_data(x_data, x_shape, 2, &cfg);
     if (!input) {
         cml_lora_linear_free(lora);
         tensor_free(base_weight);
@@ -407,10 +436,22 @@ static int test_lora_zero_init_B(void) {
      * out[2] = 7+8+9 = 24
      * out[3] = 10+11+12 = 33
      */
-    if (fabsf(out[0] - 6.0f) > 1e-4f) { printf("(out[0]=%.4f expected 6) ", out[0]); ok = 0; }
-    if (fabsf(out[1] - 15.0f) > 1e-4f) { printf("(out[1]=%.4f expected 15) ", out[1]); ok = 0; }
-    if (fabsf(out[2] - 24.0f) > 1e-4f) { printf("(out[2]=%.4f expected 24) ", out[2]); ok = 0; }
-    if (fabsf(out[3] - 33.0f) > 1e-4f) { printf("(out[3]=%.4f expected 33) ", out[3]); ok = 0; }
+    if (fabsf(out[0] - 6.0f) > 1e-4f) {
+        printf("(out[0]=%.4f expected 6) ", out[0]);
+        ok = 0;
+    }
+    if (fabsf(out[1] - 15.0f) > 1e-4f) {
+        printf("(out[1]=%.4f expected 15) ", out[1]);
+        ok = 0;
+    }
+    if (fabsf(out[2] - 24.0f) > 1e-4f) {
+        printf("(out[2]=%.4f expected 24) ", out[2]);
+        ok = 0;
+    }
+    if (fabsf(out[3] - 33.0f) > 1e-4f) {
+        printf("(out[3]=%.4f expected 33) ", out[3]);
+        ok = 0;
+    }
 
     tensor_free(output);
     tensor_free(input);
@@ -418,7 +459,6 @@ static int test_lora_zero_init_B(void) {
     tensor_free(base_weight);
     return ok;
 }
-
 
 int main(void) {
     printf("\n");

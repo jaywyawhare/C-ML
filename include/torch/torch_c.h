@@ -42,8 +42,8 @@ extern "C" {
 /* Lifecycle                                                           */
 /* ------------------------------------------------------------------ */
 
-CML_API int  torch_init(void);
-CML_API int  torch_cleanup(void);
+CML_API int torch_init(void);
+CML_API int torch_cleanup(void);
 CML_API void torch_get_version(int* major, int* minor, int* patch, const char** version_string);
 
 /* ------------------------------------------------------------------ */
@@ -51,11 +51,11 @@ CML_API void torch_get_version(int* major, int* minor, int* patch, const char** 
 /* ------------------------------------------------------------------ */
 
 typedef struct TorchTensorOptions {
-    DType      dtype;
+    DType dtype;
     DeviceType device;
-    bool       requires_grad;
-    bool       has_dtype;
-    bool       has_device;
+    bool requires_grad;
+    bool has_dtype;
+    bool has_device;
     TensorConfig config; /* Precomputed; always valid after builder calls. */
 } TorchTensorOptions;
 
@@ -71,13 +71,13 @@ CML_API TensorConfig torch_options_to_config(const TorchTensorOptions* opts);
 /* Device & dtype defaults                                             */
 /* ------------------------------------------------------------------ */
 
-CML_API bool       torch_cuda_is_available(void);
-CML_API int        torch_cuda_device_count(void);
+CML_API bool torch_cuda_is_available(void);
+CML_API int torch_cuda_device_count(void);
 CML_API DeviceType torch_get_default_device(void);
-CML_API void       torch_set_default_device(DeviceType device);
-CML_API DType      torch_get_default_dtype(void);
-CML_API void       torch_set_default_dtype(DType dtype);
-CML_API void       torch_manual_seed(uint64_t seed);
+CML_API void torch_set_default_device(DeviceType device);
+CML_API DType torch_get_default_dtype(void);
+CML_API void torch_set_default_dtype(DType dtype);
+CML_API void torch_manual_seed(uint64_t seed);
 
 /* ------------------------------------------------------------------ */
 /* Tensor lifecycle & accessors (TensorPtr-style zero-copy handles)      */
@@ -101,17 +101,17 @@ CML_API Tensor* torch_zeros_like(Tensor* t);
 CML_API Tensor* torch_ones_like(Tensor* t);
 CML_API Tensor* torch_randn_like(Tensor* t);
 
-CML_API void    torch_tensor_retain(Tensor* t);
-CML_API void    torch_tensor_free(Tensor* t);
-CML_API int     torch_tensor_ref_count(const Tensor* t);
+CML_API void torch_tensor_retain(Tensor* t);
+CML_API void torch_tensor_free(Tensor* t);
+CML_API int torch_tensor_ref_count(const Tensor* t);
 
-CML_API int     torch_tensor_ndim(const Tensor* t);
-CML_API size_t  torch_tensor_numel(const Tensor* t);
-CML_API DType   torch_tensor_dtype(const Tensor* t);
+CML_API int torch_tensor_ndim(const Tensor* t);
+CML_API size_t torch_tensor_numel(const Tensor* t);
+CML_API DType torch_tensor_dtype(const Tensor* t);
 CML_API DeviceType torch_tensor_device(const Tensor* t);
-CML_API bool    torch_tensor_is_contiguous(const Tensor* t);
-CML_API bool    torch_tensor_requires_grad(const Tensor* t);
-CML_API void    torch_tensor_set_requires_grad(Tensor* t, bool requires_grad);
+CML_API bool torch_tensor_is_contiguous(const Tensor* t);
+CML_API bool torch_tensor_requires_grad(const Tensor* t);
+CML_API void torch_tensor_set_requires_grad(Tensor* t, bool requires_grad);
 
 /* Returns shape pointer (valid until tensor is freed; do not free). */
 CML_API const int* torch_tensor_sizes(const Tensor* t);
@@ -119,21 +119,21 @@ CML_API const int* torch_tensor_sizes(const Tensor* t);
 /* Materializes lazy tensor and returns raw data pointer.
  * Returns NULL on failure (OOM, device error, realize error); check
  * torch_has_error() / torch_get_last_error() for details. */
-CML_API void*   torch_tensor_data_ptr(Tensor* t);
+CML_API void* torch_tensor_data_ptr(Tensor* t);
 
 /* Like torch_tensor_data_ptr but returns NULL unless dtype is DTYPE_FLOAT32. */
-CML_API float*  torch_tensor_data_ptr_f32(Tensor* t);
+CML_API float* torch_tensor_data_ptr_f32(Tensor* t);
 
 /* True when the tensor is a materialized leaf (no pending IR node). */
-CML_API bool    torch_tensor_is_materialized(const Tensor* t);
+CML_API bool torch_tensor_is_materialized(const Tensor* t);
 
 /* True when the tensor still references a lazy IR graph node. */
-CML_API bool    torch_tensor_has_lazy_ir(const Tensor* t);
+CML_API bool torch_tensor_has_lazy_ir(const Tensor* t);
 
 /* Scalar accessors: require numel()==1 and DTYPE_FLOAT32. Returns 0.0f / no-op on
  * invalid tensors; check torch_has_error() after failures. */
-CML_API float   torch_tensor_item_float(Tensor* t);
-CML_API void    torch_tensor_set_item_float(Tensor* t, float value);
+CML_API float torch_tensor_item_float(Tensor* t);
+CML_API void torch_tensor_set_item_float(Tensor* t, float value);
 
 /* ------------------------------------------------------------------ */
 /* Tensor operations                                                   */
@@ -186,36 +186,36 @@ CML_API Tensor* torch_get_grad(Tensor* t);
 /* ------------------------------------------------------------------ */
 
 CML_API Tensor* torch_module_forward(Module* module, Tensor* input);
-CML_API void    torch_module_train(Module* module);
-CML_API void    torch_module_eval(Module* module);
-CML_API bool    torch_module_is_training(Module* module);
-CML_API void    torch_module_zero_grad(Module* module);
+CML_API void torch_module_train(Module* module);
+CML_API void torch_module_eval(Module* module);
+CML_API bool torch_module_is_training(Module* module);
+CML_API void torch_module_zero_grad(Module* module);
 
-CML_API Linear*       torch_nn_linear(int in_features, int out_features, bool bias);
-CML_API ReLU*         torch_nn_relu(void);
-CML_API Sequential*   torch_nn_sequential(void);
-CML_API void          torch_nn_sequential_add(Sequential* seq, Module* layer);
-CML_API Tensor*       torch_nn_sequential_forward(Sequential* seq, Tensor* input);
+CML_API Linear* torch_nn_linear(int in_features, int out_features, bool bias);
+CML_API ReLU* torch_nn_relu(void);
+CML_API Sequential* torch_nn_sequential(void);
+CML_API void torch_nn_sequential_add(Sequential* seq, Module* layer);
+CML_API Tensor* torch_nn_sequential_forward(Sequential* seq, Tensor* input);
 
 /* ------------------------------------------------------------------ */
 /* State dict (torch.nn.Module.state_dict analogue)                    */
 /* ------------------------------------------------------------------ */
 
 CML_API StateDict* torch_module_state_dict(Module* module, const char* prefix);
-CML_API int        torch_module_load_state_dict(Module* module, const StateDict* sd, bool strict);
-CML_API Tensor*    torch_state_dict_get(const StateDict* sd, const char* key);
-CML_API void       torch_state_dict_free(StateDict* sd);
+CML_API int torch_module_load_state_dict(Module* module, const StateDict* sd, bool strict);
+CML_API Tensor* torch_state_dict_get(const StateDict* sd, const char* key);
+CML_API void torch_state_dict_free(StateDict* sd);
 
 /* ------------------------------------------------------------------ */
 /* Optimizers                                                          */
 /* ------------------------------------------------------------------ */
 
-CML_API Optimizer* torch_optim_adam(Module* model, float lr, float weight_decay,
-                                    float beta1, float beta2, float eps);
+CML_API Optimizer* torch_optim_adam(Module* model, float lr, float weight_decay, float beta1,
+                                    float beta2, float eps);
 CML_API Optimizer* torch_optim_sgd(Module* model, float lr, float momentum, float weight_decay);
-CML_API void       torch_optim_zero_grad(Optimizer* optimizer);
-CML_API void       torch_optim_step(Optimizer* optimizer);
-CML_API void       torch_optim_free(Optimizer* optimizer);
+CML_API void torch_optim_zero_grad(Optimizer* optimizer);
+CML_API void torch_optim_step(Optimizer* optimizer);
+CML_API void torch_optim_free(Optimizer* optimizer);
 
 /* ------------------------------------------------------------------ */
 /* Loss functions                                                      */
@@ -236,18 +236,18 @@ typedef enum {
 
 typedef struct TorchRuntimeModule {
     TorchRuntimeKind kind;
-    Module*          eager_module;
-    CMLAOTModel*     aot_model;
-    CMLPTEModel*     pte_model;
+    Module* eager_module;
+    CMLAOTModel* aot_model;
+    CMLPTEModel* pte_model;
     TorchMemoryManager* memory;
-    bool             owns_eager;
-    bool             owns_memory;
+    bool owns_eager;
+    bool owns_memory;
 } TorchRuntimeModule;
 
 /* Prefer these accessors over reading struct fields directly. */
 CML_API TorchRuntimeKind torch_runtime_get_kind(const TorchRuntimeModule* runtime);
-CML_API bool             torch_runtime_has_memory(const TorchRuntimeModule* runtime);
-CML_API size_t           torch_runtime_pte_arena_size(const TorchRuntimeModule* runtime);
+CML_API bool torch_runtime_has_memory(const TorchRuntimeModule* runtime);
+CML_API size_t torch_runtime_pte_arena_size(const TorchRuntimeModule* runtime);
 
 /* Wrap an existing eager Module (does not take ownership). */
 CML_API TorchRuntimeModule* torch_runtime_from_module(Module* module);
@@ -263,8 +263,8 @@ CML_API int torch_runtime_export_pte(Module* module, Tensor* sample_input, const
                                      const TorchPTEExportOptions* opts);
 
 CML_API Tensor* torch_runtime_forward(TorchRuntimeModule* runtime, Tensor* input);
-CML_API void    torch_runtime_free(TorchRuntimeModule* runtime);
-CML_API void    torch_runtime_set_memory(TorchRuntimeModule* runtime, TorchMemoryManager* memory);
+CML_API void torch_runtime_free(TorchRuntimeModule* runtime);
+CML_API void torch_runtime_set_memory(TorchRuntimeModule* runtime, TorchMemoryManager* memory);
 
 /* ------------------------------------------------------------------ */
 /* IR / inference helpers                                              */
@@ -278,9 +278,9 @@ CML_API void torch_reset_ir_soft(void);
 /* ------------------------------------------------------------------ */
 
 CML_API const char* torch_get_last_error(void);
-CML_API int         torch_get_last_error_code(void);
-CML_API bool        torch_has_error(void);
-CML_API void        torch_clear_error(void);
+CML_API int torch_get_last_error_code(void);
+CML_API bool torch_has_error(void);
+CML_API void torch_clear_error(void);
 
 /* Optional zero-overhead inlines for in-process hot loops. */
 #include "torch/torch_c_inline.h"

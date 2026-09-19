@@ -20,13 +20,14 @@
 
 static struct {
     cl_platform_id platform;
-    cl_device_id   device;
-    cl_context     context;
-    bool           initialized;
+    cl_device_id device;
+    cl_context context;
+    bool initialized;
 } g_ocl_ctx = {0};
 
 static int ensure_ocl_init(void) {
-    if (g_ocl_ctx.initialized) return 0;
+    if (g_ocl_ctx.initialized)
+        return 0;
 
     CMLOpenCLIRBackend* be = cml_dispatch_get_opencl_backend();
     if (be && be->initialized) {
@@ -45,20 +46,18 @@ static int ensure_ocl_init(void) {
         return -1;
     }
 
-    err = clGetDeviceIDs(g_ocl_ctx.platform, CL_DEVICE_TYPE_GPU, 1,
-                         &g_ocl_ctx.device, NULL);
+    err = clGetDeviceIDs(g_ocl_ctx.platform, CL_DEVICE_TYPE_GPU, 1, &g_ocl_ctx.device, NULL);
     if (err != CL_SUCCESS) {
         /* Fall back to the default device type */
-        err = clGetDeviceIDs(g_ocl_ctx.platform, CL_DEVICE_TYPE_DEFAULT, 1,
-                             &g_ocl_ctx.device, NULL);
+        err =
+            clGetDeviceIDs(g_ocl_ctx.platform, CL_DEVICE_TYPE_DEFAULT, 1, &g_ocl_ctx.device, NULL);
         if (err != CL_SUCCESS) {
             LOG_ERROR("OpenCL HCQ: clGetDeviceIDs failed (err=%d)", err);
             return -1;
         }
     }
 
-    g_ocl_ctx.context = clCreateContext(NULL, 1, &g_ocl_ctx.device,
-                                        NULL, NULL, &err);
+    g_ocl_ctx.context = clCreateContext(NULL, 1, &g_ocl_ctx.device, NULL, NULL, &err);
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL HCQ: clCreateContext failed (err=%d)", err);
         return -1;
@@ -83,11 +82,10 @@ CMLHCQQueue* cml_hcq_opencl_queue_create(void) {
 
     cl_int err;
 #ifdef __APPLE__
-    cl_command_queue cq = clCreateCommandQueue(
-        g_ocl_ctx.context, g_ocl_ctx.device, 0, &err);
+    cl_command_queue cq = clCreateCommandQueue(g_ocl_ctx.context, g_ocl_ctx.device, 0, &err);
 #else
-    cl_command_queue cq = clCreateCommandQueueWithProperties(
-        g_ocl_ctx.context, g_ocl_ctx.device, NULL, &err);
+    cl_command_queue cq =
+        clCreateCommandQueueWithProperties(g_ocl_ctx.context, g_ocl_ctx.device, NULL, &err);
 #endif
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL HCQ: clCreateCommandQueue failed (err=%d)", err);
@@ -96,12 +94,13 @@ CMLHCQQueue* cml_hcq_opencl_queue_create(void) {
     }
 
     queue->native_handle = (void*)cq;
-    queue->active = true;
+    queue->active        = true;
     return queue;
 }
 
 void cml_hcq_opencl_queue_destroy(CMLHCQQueue* queue) {
-    if (!queue) return;
+    if (!queue)
+        return;
 
     if (queue->native_handle) {
         cl_int err = clReleaseCommandQueue((cl_command_queue)queue->native_handle);
@@ -113,23 +112,20 @@ void cml_hcq_opencl_queue_destroy(CMLHCQQueue* queue) {
     cml_free(queue);
 }
 
-int cml_hcq_opencl_submit_kernel(CMLHCQQueue* queue,
-                                 const CMLHCQKernelDesc* desc) {
-    if (!queue || !desc) return -1;
+int cml_hcq_opencl_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
+    if (!queue || !desc)
+        return -1;
 
     cl_command_queue cq = (cl_command_queue)queue->native_handle;
-    cl_kernel kernel = (cl_kernel)desc->compiled_kernel;
+    cl_kernel kernel    = (cl_kernel)desc->compiled_kernel;
 
-    cl_int err = clEnqueueNDRangeKernel(
-        cq,
-        kernel,
-        3,             /* work_dim */
-        NULL,          /* global_work_offset */
-        desc->grid,    /* global_work_size */
-        desc->block,   /* local_work_size */
-        0,             /* num_events_in_wait_list */
-        NULL,          /* event_wait_list */
-        NULL           /* event */
+    cl_int err = clEnqueueNDRangeKernel(cq, kernel, 3, /* work_dim */
+                                        NULL,          /* global_work_offset */
+                                        desc->grid,    /* global_work_size */
+                                        desc->block,   /* local_work_size */
+                                        0,             /* num_events_in_wait_list */
+                                        NULL,          /* event_wait_list */
+                                        NULL           /* event */
     );
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL HCQ: clEnqueueNDRangeKernel failed (err=%d)", err);
@@ -139,21 +135,15 @@ int cml_hcq_opencl_submit_kernel(CMLHCQQueue* queue,
     return 0;
 }
 
-int cml_hcq_opencl_memcpy_h2d(CMLHCQQueue* queue, void* dst,
-                               const void* src, size_t bytes) {
-    if (!queue || !dst || !src) return -1;
+int cml_hcq_opencl_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
+    if (!queue || !dst || !src)
+        return -1;
 
     cl_command_queue cq = (cl_command_queue)queue->native_handle;
 
-    cl_int err = clEnqueueWriteBuffer(
-        cq,
-        (cl_mem)dst,
-        CL_FALSE,   /* non-blocking */
-        0,           /* offset */
-        bytes,
-        src,
-        0, NULL, NULL
-    );
+    cl_int err = clEnqueueWriteBuffer(cq, (cl_mem)dst, CL_FALSE, /* non-blocking */
+                                      0,                         /* offset */
+                                      bytes, src, 0, NULL, NULL);
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL HCQ: clEnqueueWriteBuffer failed (err=%d)", err);
         return -1;
@@ -162,21 +152,15 @@ int cml_hcq_opencl_memcpy_h2d(CMLHCQQueue* queue, void* dst,
     return 0;
 }
 
-int cml_hcq_opencl_memcpy_d2h(CMLHCQQueue* queue, void* dst,
-                               const void* src, size_t bytes) {
-    if (!queue || !dst || !src) return -1;
+int cml_hcq_opencl_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
+    if (!queue || !dst || !src)
+        return -1;
 
     cl_command_queue cq = (cl_command_queue)queue->native_handle;
 
-    cl_int err = clEnqueueReadBuffer(
-        cq,
-        (cl_mem)src,
-        CL_FALSE,   /* non-blocking */
-        0,           /* offset */
-        bytes,
-        dst,
-        0, NULL, NULL
-    );
+    cl_int err = clEnqueueReadBuffer(cq, (cl_mem)src, CL_FALSE, /* non-blocking */
+                                     0,                         /* offset */
+                                     bytes, dst, 0, NULL, NULL);
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL HCQ: clEnqueueReadBuffer failed (err=%d)", err);
         return -1;
@@ -192,14 +176,15 @@ CMLHCQSignal* cml_hcq_opencl_signal_create(void) {
         return NULL;
     }
 
-    signal->backend = CML_HCQ_OPENCL;
-    signal->native_handle = NULL;  /* created lazily on signal_record */
-    signal->signaled = false;
+    signal->backend       = CML_HCQ_OPENCL;
+    signal->native_handle = NULL; /* created lazily on signal_record */
+    signal->signaled      = false;
     return signal;
 }
 
 void cml_hcq_opencl_signal_destroy(CMLHCQSignal* signal) {
-    if (!signal) return;
+    if (!signal)
+        return;
 
     if (signal->native_handle) {
         cl_int err = clReleaseEvent((cl_event)signal->native_handle);
@@ -212,7 +197,8 @@ void cml_hcq_opencl_signal_destroy(CMLHCQSignal* signal) {
 }
 
 int cml_hcq_opencl_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
-    if (!queue || !signal) return -1;
+    if (!queue || !signal)
+        return -1;
 
     /* Release any previously recorded event */
     if (signal->native_handle) {
@@ -221,21 +207,20 @@ int cml_hcq_opencl_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     }
 
     cl_event evt = NULL;
-    cl_int err = clEnqueueMarkerWithWaitList(
-        (cl_command_queue)queue->native_handle,
-        0, NULL, &evt);
+    cl_int err = clEnqueueMarkerWithWaitList((cl_command_queue)queue->native_handle, 0, NULL, &evt);
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL HCQ: clEnqueueMarkerWithWaitList failed (err=%d)", err);
         return -1;
     }
 
     signal->native_handle = (void*)evt;
-    signal->signaled = true;
+    signal->signaled      = true;
     return 0;
 }
 
 int cml_hcq_opencl_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
-    if (!queue || !signal) return -1;
+    if (!queue || !signal)
+        return -1;
 
     cl_event evt = (cl_event)signal->native_handle;
     if (!evt) {
@@ -243,9 +228,8 @@ int cml_hcq_opencl_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
         return -1;
     }
 
-    cl_int err = clEnqueueBarrierWithWaitList(
-        (cl_command_queue)queue->native_handle,
-        1, &evt, NULL);
+    cl_int err =
+        clEnqueueBarrierWithWaitList((cl_command_queue)queue->native_handle, 1, &evt, NULL);
     if (err != CL_SUCCESS) {
         LOG_ERROR("OpenCL HCQ: clEnqueueBarrierWithWaitList failed (err=%d)", err);
         return -1;
@@ -255,7 +239,8 @@ int cml_hcq_opencl_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
 }
 
 int cml_hcq_opencl_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
-    if (!signal) return -1;
+    if (!signal)
+        return -1;
     (void)timeout_ms; /* clWaitForEvents does not support timeout */
 
     cl_event evt = (cl_event)signal->native_handle;
@@ -274,7 +259,8 @@ int cml_hcq_opencl_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
 }
 
 int cml_hcq_opencl_queue_synchronize(CMLHCQQueue* queue) {
-    if (!queue) return -1;
+    if (!queue)
+        return -1;
 
     cl_int err = clFinish((cl_command_queue)queue->native_handle);
     if (err != CL_SUCCESS) {

@@ -21,19 +21,19 @@ typedef struct {
 } DDPConfig;
 
 typedef struct CMLDataParallel {
-    Module* module;             /* Wrapped module (not owned) */
-    DistProcessGroup* group;    /* Process group */
-    DDPConfig config;           /* Configuration */
+    Module* module;          /* Wrapped module (not owned) */
+    DistProcessGroup* group; /* Process group */
+    DDPConfig config;        /* Configuration */
 
     /* Gradient buckets */
-    float** buckets;            /* Bucket buffers */
-    int num_buckets;            /* Number of buckets */
-    size_t* bucket_sizes;       /* Size of each bucket in floats */
+    float** buckets;      /* Bucket buffers */
+    int num_buckets;      /* Number of buckets */
+    size_t* bucket_sizes; /* Size of each bucket in floats */
 
     /* Parameter tracking */
-    Parameter** all_params;     /* All parameters */
-    int num_params;             /* Number of parameters */
-    int* param_to_bucket;       /* Map param index -> bucket index */
+    Parameter** all_params; /* All parameters */
+    int num_params;         /* Number of parameters */
+    int* param_to_bucket;   /* Map param index -> bucket index */
 
     bool initialized;
 } CMLDataParallel;

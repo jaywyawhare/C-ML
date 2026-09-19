@@ -61,8 +61,7 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
                                           .device     = var_reduced->device,
                                           .has_dtype  = true,
                                           .has_device = true};
-    Tensor* eps_tensor =
-        tensor_full(var_reduced->shape, var_reduced->ndim, &eps_cfg, ln->eps);
+    Tensor* eps_tensor   = tensor_full(var_reduced->shape, var_reduced->ndim, &eps_cfg, ln->eps);
     if (!eps_tensor)
         return NULL;
 
@@ -143,8 +142,8 @@ LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtyp
     ln->weight           = NULL;
     ln->bias             = NULL;
     if (affine) {
-        if (nn_add_affine_params((Module*)ln, normalized_shape, dtype, device,
-                                 &ln->weight, &ln->bias) != 0)
+        if (nn_add_affine_params((Module*)ln, normalized_shape, dtype, device, &ln->weight,
+                                 &ln->bias) != 0)
             return NULL;
     } else {
         ln->weight = NULL;

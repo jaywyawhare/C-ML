@@ -38,7 +38,7 @@ int main(void) {
         /* Test 4: Buffer alloc and free */
         printf("  test_metal_buffer_alloc_free...");
         size_t buf_size = 1024 * sizeof(float);
-        void* buffer = cml_metal_alloc(backend, buf_size);
+        void* buffer    = cml_metal_alloc(backend, buf_size);
         REQUIRE(buffer != NULL);
 
         /* Upload some data */

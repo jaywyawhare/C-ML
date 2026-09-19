@@ -15,7 +15,8 @@ static float get_scalar(Tensor* t) {
 }
 
 static int test_xor_mlp(void) {
-    printf("  [XOR MLP] Sequential(Linear(2,4)+Tanh+Linear(4,1)+Sigmoid), Adam lr=0.05, 2000 epochs\n");
+    printf("  [XOR MLP] Sequential(Linear(2,4)+Tanh+Linear(4,1)+Sigmoid), Adam lr=0.05, 2000 "
+           "epochs\n");
 
     Sequential* model = nn_sequential();
     sequential_add(model, (Module*)nn_linear(2, 4, DTYPE_FLOAT32, DEVICE_CPU, true));
@@ -25,7 +26,7 @@ static int test_xor_mlp(void) {
     module_set_training((Module*)model, true);
 
     Parameter** params = NULL;
-    int num_params = 0;
+    int num_params     = 0;
     module_collect_parameters((Module*)model, &params, &num_params, true);
     Optimizer* optimizer = optim_adam(params, num_params, 0.05f, 0.0f, 0.9f, 0.999f, 1e-8f);
     if (!optimizer) {
@@ -35,13 +36,15 @@ static int test_xor_mlp(void) {
         return 0;
     }
 
-    float xor_inputs[]  = { 0.0f,0.0f, 0.0f,1.0f, 1.0f,0.0f, 1.0f,1.0f };
-    float xor_targets[] = { 0.0f, 1.0f, 1.0f, 0.0f };
+    float xor_inputs[]  = {0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f};
+    float xor_targets[] = {0.0f, 1.0f, 1.0f, 0.0f};
 
-    Tensor* X = cml_tensor_2d(xor_inputs,  4, 2);
+    Tensor* X = cml_tensor_2d(xor_inputs, 4, 2);
     Tensor* Y = cml_tensor_2d(xor_targets, 4, 1);
-    if (X) tensor_realize(X);
-    if (Y) tensor_realize(Y);
+    if (X)
+        tensor_realize(X);
+    if (Y)
+        tensor_realize(Y);
 
     float final_loss = INFINITY;
 
@@ -65,8 +68,8 @@ static int test_xor_mlp(void) {
     }
 
     int pass = (final_loss < 0.01f);
-    printf("    final loss = %.6f  (threshold < 0.01) => %s\n",
-           (double)final_loss, pass ? "PASS" : "FAIL");
+    printf("    final loss = %.6f  (threshold < 0.01) => %s\n", (double)final_loss,
+           pass ? "PASS" : "FAIL");
 
     tensor_free(X);
     tensor_free(Y);
@@ -85,7 +88,7 @@ static int test_linear_regression(void) {
     module_set_training(model, true);
 
     Parameter** params = NULL;
-    int num_params = 0;
+    int num_params     = 0;
     module_collect_parameters(model, &params, &num_params, true);
     Optimizer* optimizer = optim_sgd(params, num_params, 0.01f, 0.0f, 0.0f);
     if (!optimizer) {
@@ -95,7 +98,7 @@ static int test_linear_regression(void) {
         return 0;
     }
 
-    #define LR_N 20
+#define LR_N 20
     float x_data[LR_N];
     float y_data[LR_N];
     for (int i = 0; i < LR_N; i++) {
@@ -105,8 +108,10 @@ static int test_linear_regression(void) {
 
     Tensor* X = cml_tensor_2d(x_data, LR_N, 1);
     Tensor* Y = cml_tensor_2d(y_data, LR_N, 1);
-    if (X) tensor_realize(X);
-    if (Y) tensor_realize(Y);
+    if (X)
+        tensor_realize(X);
+    if (Y)
+        tensor_realize(Y);
 
     float final_loss = INFINITY;
 
@@ -136,11 +141,13 @@ static int test_linear_regression(void) {
     Parameter* b = linear_get_bias(layer);
     if (w && w->tensor) {
         float* wd = (float*)tensor_data_ptr(w->tensor);
-        if (wd) learned_weight = wd[0];
+        if (wd)
+            learned_weight = wd[0];
     }
     if (b && b->tensor) {
         float* bd = (float*)tensor_data_ptr(b->tensor);
-        if (bd) learned_bias = bd[0];
+        if (bd)
+            learned_bias = bd[0];
     }
 
     printf("    learned weight = %.4f (target ~2.0), bias = %.4f (target ~1.0)\n",
@@ -148,13 +155,13 @@ static int test_linear_regression(void) {
     printf("    final loss = %.6f\n", (double)final_loss);
 
     int weight_ok = (fabsf(learned_weight - 2.0f) < 0.5f);
-    int bias_ok   = (fabsf(learned_bias   - 1.0f) < 0.5f);
+    int bias_ok   = (fabsf(learned_bias - 1.0f) < 0.5f);
     int loss_ok   = (final_loss < 0.1f);
     int pass      = weight_ok && bias_ok && loss_ok;
 
     printf("    weight close to 2.0 (tol 0.5): %s\n", weight_ok ? "PASS" : "FAIL");
-    printf("    bias   close to 1.0 (tol 0.5): %s\n", bias_ok   ? "PASS" : "FAIL");
-    printf("    loss < 0.1:                     %s\n", loss_ok   ? "PASS" : "FAIL");
+    printf("    bias   close to 1.0 (tol 0.5): %s\n", bias_ok ? "PASS" : "FAIL");
+    printf("    loss < 0.1:                     %s\n", loss_ok ? "PASS" : "FAIL");
     printf("    => %s\n", pass ? "PASS" : "FAIL");
 
     tensor_free(X);
@@ -174,7 +181,7 @@ static int test_conv2d_pattern(void) {
     module_set_training((Module*)model, true);
 
     Parameter** params = NULL;
-    int num_params = 0;
+    int num_params     = 0;
     module_collect_parameters((Module*)model, &params, &num_params, true);
     Optimizer* optimizer = optim_adam(params, num_params, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
     if (!optimizer) {
@@ -184,19 +191,19 @@ static int test_conv2d_pattern(void) {
         return 0;
     }
 
-    #define CONV_N       8
-    #define CONV_H       8
-    #define CONV_W       8
-    #define CONV_PIXELS  (CONV_H * CONV_W)
+#define CONV_N 8
+#define CONV_H 8
+#define CONV_W 8
+#define CONV_PIXELS (CONV_H * CONV_W)
 
     float img_data[CONV_N * 1 * CONV_H * CONV_W];
     float target_data[CONV_N * 2];
 
-    memset(img_data,    0, sizeof(img_data));
+    memset(img_data, 0, sizeof(img_data));
     memset(target_data, 0, sizeof(target_data));
 
     for (int n = 0; n < CONV_N; n++) {
-        int cls = n % 2;
+        int cls    = n % 2;
         float* img = &img_data[n * CONV_PIXELS];
 
         if (cls == 0) {
@@ -212,21 +219,24 @@ static int test_conv2d_pattern(void) {
         target_data[n * 2 + cls] = 1.0f;
     }
 
-    int img_shape[] = { CONV_N, 1 * CONV_H * CONV_W };
-    TensorConfig cfg = { .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true };
+    int img_shape[]  = {CONV_N, 1 * CONV_H * CONV_W};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* X = cml_tensor(img_data, img_shape, 2, &cfg);
     Tensor* Y = cml_tensor_2d(target_data, CONV_N, 2);
-    if (X) tensor_realize(X);
-    if (Y) tensor_realize(Y);
+    if (X)
+        tensor_realize(X);
+    if (Y)
+        tensor_realize(Y);
 
     float final_loss = INFINITY;
 
     for (int epoch = 0; epoch < 500; epoch++) {
         optimizer_zero_grad(optimizer);
 
-        Tensor* out = module_forward((Module*)model, X);
+        Tensor* out  = module_forward((Module*)model, X);
         Tensor* loss = tensor_mse_loss(out, Y);
-        final_loss = get_scalar(loss);
+        final_loss   = get_scalar(loss);
 
         tensor_backward(loss, NULL, false, false);
         optimizer_step(optimizer);
@@ -240,7 +250,7 @@ static int test_conv2d_pattern(void) {
         cml_ir_reset_global_context();
     }
 
-    Tensor* preds = module_forward((Module*)model, X);
+    Tensor* preds    = module_forward((Module*)model, X);
     float* pred_data = (float*)tensor_data_ptr(preds);
     float* tgt_data  = (float*)tensor_data_ptr(Y);
 
@@ -248,16 +258,17 @@ static int test_conv2d_pattern(void) {
     if (pred_data && tgt_data) {
         for (int n = 0; n < CONV_N; n++) {
             int pred_cls = (pred_data[n * 2 + 1] > pred_data[n * 2 + 0]) ? 1 : 0;
-            int true_cls = (tgt_data[n * 2 + 1]  > tgt_data[n * 2 + 0])  ? 1 : 0;
-            if (pred_cls == true_cls) correct++;
+            int true_cls = (tgt_data[n * 2 + 1] > tgt_data[n * 2 + 0]) ? 1 : 0;
+            if (pred_cls == true_cls)
+                correct++;
         }
     }
 
     float accuracy = (float)correct / (float)CONV_N;
-    int pass = (accuracy >= 0.75f);
+    int pass       = (accuracy >= 0.75f);
 
-    printf("    accuracy = %.2f (%d/%d)  (threshold >= 0.75) => %s\n",
-           (double)accuracy, correct, CONV_N, pass ? "PASS" : "FAIL");
+    printf("    accuracy = %.2f (%d/%d)  (threshold >= 0.75) => %s\n", (double)accuracy, correct,
+           CONV_N, pass ? "PASS" : "FAIL");
 
     tensor_free(preds);
     tensor_free(X);

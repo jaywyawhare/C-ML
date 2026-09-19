@@ -88,13 +88,14 @@ static void test_upload_download(void) {
     CMLRemoteDevice* dev = cml_remote_connect("127.0.0.1", TEST_PORT + 2);
     REQUIRE(dev != NULL);
 
-    size_t n = 256 * sizeof(float);
+    size_t n   = 256 * sizeof(float);
     uint64_t h = cml_remote_alloc(dev, n);
     REQUIRE(h != 0);
 
     float* send_buf = (float*)cml_malloc(n);
     float* recv_buf = (float*)cml_malloc(n);
-    for (int i = 0; i < 256; i++) send_buf[i] = (float)i * 1.5f;
+    for (int i = 0; i < 256; i++)
+        send_buf[i] = (float)i * 1.5f;
 
     REQUIRE(cml_remote_upload(dev, h, send_buf, n) == 0);
     REQUIRE(cml_remote_download(dev, h, recv_buf, n) == 0);

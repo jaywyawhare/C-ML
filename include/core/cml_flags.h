@@ -21,41 +21,42 @@ extern "C" {
  *
  * Each entry in the list is: ID, ENV-VAR NAME, DEFAULT VALUE, DESCRIPTION.
  */
-#define CML_FLAG_LIST(X)                                                                            \
+#define CML_FLAG_LIST(X)                                                                           \
     /* Tier 1 -- leveled debug + core toggles */                                                   \
-    X(DEBUG, "DEBUG", 0,                                                                            \
+    X(DEBUG, "DEBUG", 0,                                                                           \
       "Leveled debug output (1-7): 1 devices, 2 timings, 3 opts, 4 codegen, 5 IR, 6 linear IR, "   \
-      "7 asm")                                                                                      \
-    X(NO_COLOR, "NO_COLOR", 0, "Disable ANSI color in log output")                                  \
-    X(NOOPT, "NOOPT", 0, "Disable IR/kernel optimization passes")                                   \
-    X(PROFILE, "PROFILE", 0, "Enable kernel/op profiling")                                          \
-    X(NO_MEMORY_PLANNER, "NO_MEMORY_PLANNER", 0,                                                    \
-      "Disable the graph memory planner (allocate each buffer independently)")                      \
-    X(NO_EXPORT, "NO_EXPORT", 0,                                                                    \
-      "Emit no dashboard/metrics files at all (training.json, graph.json, kernels.json, "           \
-      "flamegraph.json) and skip the work that builds them. Mutually exclusive with VIZ")           \
-    X(WINO, "WINO", -1, "Winograd conv override: -1 auto, 0 force off, 1 force on")                 \
-    X(CHECK_OOB, "CHECK_OOB", 0, "Enable out-of-bounds index checking in kernels")                  \
-    X(VALIDATE_WITH_CPU, "VALIDATE_WITH_CPU", 0,                                                    \
-      "Re-run graphs on CPU and diff results against the active backend")                           \
-    X(CACHELEVEL, "CACHELEVEL", 2, "Kernel cache level: 0 none, 1 memory, 2 memory+disk")           \
+      "7 asm")                                                                                     \
+    X(NO_COLOR, "NO_COLOR", 0, "Disable ANSI color in log output")                                 \
+    X(NOOPT, "NOOPT", 0, "Disable IR/kernel optimization passes")                                  \
+    X(PROFILE, "PROFILE", 0, "Enable kernel/op profiling")                                         \
+    X(NO_MEMORY_PLANNER, "NO_MEMORY_PLANNER", 0,                                                   \
+      "Disable the graph memory planner (allocate each buffer independently)")                     \
+    X(NO_EXPORT, "NO_EXPORT", 0,                                                                   \
+      "Emit no dashboard/metrics files at all (training.json, graph.json, kernels.json, "          \
+      "flamegraph.json) and skip the work that builds them. Mutually exclusive with VIZ")          \
+    X(WINO, "WINO", -1, "Winograd conv override: -1 auto, 0 force off, 1 force on")                \
+    X(CHECK_OOB, "CHECK_OOB", 0, "Enable out-of-bounds index checking in kernels")                 \
+    X(VALIDATE_WITH_CPU, "VALIDATE_WITH_CPU", 0,                                                   \
+      "Re-run graphs on CPU and diff results against the active backend")                          \
+    X(CACHELEVEL, "CACHELEVEL", 2, "Kernel cache level: 0 none, 1 memory, 2 memory+disk")          \
     /* Tier 2 -- more work / backend dependent */                                                  \
-    X(JIT, "JIT", 1, "JIT control: 0 off, 1 on, 2 on but graphs disabled")                          \
-    X(TC, "TC", 1, "Use tensor cores when available")                                               \
-    X(TC_SELECT, "TC_SELECT", -1, "Select a specific tensor-core config (-1 auto)")                 \
-    X(TC_OPT, "TC_OPT", 0, "Tensor-core optimization aggressiveness (0-2)")                         \
-    X(TRANSCENDENTAL, "TRANSCENDENTAL", 1,                                                          \
+    X(JIT, "JIT", 1, "JIT control: 0 off, 1 on, 2 on but graphs disabled")                         \
+    X(TC, "TC", 1, "Use tensor cores when available")                                              \
+    X(TC_SELECT, "TC_SELECT", -1, "Select a specific tensor-core config (-1 auto)")                \
+    X(TC_OPT, "TC_OPT", 0, "Tensor-core optimization aggressiveness (0-2)")                        \
+    X(TRANSCENDENTAL, "TRANSCENDENTAL", 1,                                                         \
       "Transcendental ops: 0 hardware, 1 auto, 2 always polynomial approximation")                 \
-    X(NOLOCALS, "NOLOCALS", 0, "Disable use of local/shared memory in kernels")                     \
-    X(SPLIT_REDUCEOP, "SPLIT_REDUCEOP", 1, "Split large reduce ops for parallelism")                \
-    X(IGNORE_BEAM_CACHE, "IGNORE_BEAM_CACHE", 0, "Ignore the on-disk BEAM search cache")            \
-    X(FUSE_OPTIM, "FUSE_OPTIM", 0, "Fuse the optimizer update into the backward graph")             \
-    X(MAX_BUFFER_SIZE, "MAX_BUFFER_SIZE", 0, "Cap single buffer allocation size in bytes (0 = "     \
-                                             "unlimited)")                                          \
+    X(NOLOCALS, "NOLOCALS", 0, "Disable use of local/shared memory in kernels")                    \
+    X(SPLIT_REDUCEOP, "SPLIT_REDUCEOP", 1, "Split large reduce ops for parallelism")               \
+    X(IGNORE_BEAM_CACHE, "IGNORE_BEAM_CACHE", 0, "Ignore the on-disk BEAM search cache")           \
+    X(FUSE_OPTIM, "FUSE_OPTIM", 0, "Fuse the optimizer update into the backward graph")            \
+    X(MAX_BUFFER_SIZE, "MAX_BUFFER_SIZE", 0,                                                       \
+      "Cap single buffer allocation size in bytes (0 = "                                           \
+      "unlimited)")                                                                                \
     /* Pre-existing flags, centralized here */                                                     \
-    X(BEAM, "BEAM", 0, "Number of beams in kernel beam search (0 = disabled)")                      \
-    X(DISABLE_FUSION, "DISABLE_FUSION", 0, "Disable operator fusion in the scheduler")              \
-    X(DISABLE_JIT, "DISABLE_JIT", 0, "Disable JIT compilation (force interpreter/BLAS path)")       \
+    X(BEAM, "BEAM", 0, "Number of beams in kernel beam search (0 = disabled)")                     \
+    X(DISABLE_FUSION, "DISABLE_FUSION", 0, "Disable operator fusion in the scheduler")             \
+    X(DISABLE_JIT, "DISABLE_JIT", 0, "Disable JIT compilation (force interpreter/BLAS path)")      \
     X(VIZ, "VIZ", 0, "Launch the graph/kernel visualizer")
 
 typedef enum {

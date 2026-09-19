@@ -11,21 +11,23 @@
 #include "ops/ir/flamegraph.h"
 #include "test_harness.h"
 
-
 /* Minimal node: the classifiers only read type, the fusion markers, the
  * forward_node link and the output shape. */
 static struct IRNode* make_node(UOpType type, int numel) {
     struct IRNode* n = (struct IRNode*)calloc(1, sizeof(struct IRNode));
-    if (!n) return NULL;
-    n->type        = type;
-    n->output_ndim = 1;
+    if (!n)
+        return NULL;
+    n->type         = type;
+    n->output_ndim  = 1;
     n->output_shape = (int*)malloc(sizeof(int));
-    if (n->output_shape) n->output_shape[0] = numel;
+    if (n->output_shape)
+        n->output_shape[0] = numel;
     return n;
 }
 
 static void free_node(struct IRNode* n) {
-    if (!n) return;
+    if (!n)
+        return;
     free(n->output_shape);
     free(n);
 }
@@ -43,11 +45,14 @@ int main(void) {
     struct IRNode* add = make_node(UOP_ADD, 4096);
     struct IRNode* mm2 = make_node(UOP_MATMUL, 64); /* same op, different work size */
     CHECK("nodes built", mm && add && mm2);
-    if (!mm || !add || !mm2) return 1;
+    if (!mm || !add || !mm2)
+        return 1;
 
     /* 100 executions across 3 signatures. */
-    for (int i = 0; i < 100; i++) cml_flame_record(mm, 1.0);
-    for (int i = 0; i < 50;  i++) cml_flame_record(add, 0.5);
+    for (int i = 0; i < 100; i++)
+        cml_flame_record(mm, 1.0);
+    for (int i = 0; i < 50; i++)
+        cml_flame_record(add, 0.5);
     cml_flame_record(mm2, 7.0);
     cml_flame_record(mm, 9.0); /* an outlier execution of an existing signature */
 
@@ -60,9 +65,12 @@ int main(void) {
     FILE* f = fopen(path, "r");
     CHECK("export produced a file", f != NULL);
     if (f) {
-        fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, 0, SEEK_SET);
-        char* buf = (char*)malloc((size_t)sz + 1);
-        size_t got = fread(buf, 1, (size_t)sz, f); buf[got] = '\0';
+        fseek(f, 0, SEEK_END);
+        long sz = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        char* buf  = (char*)malloc((size_t)sz + 1);
+        size_t got = fread(buf, 1, (size_t)sz, f);
+        buf[got]   = '\0';
         fclose(f);
 
         CHECK("marked as aggregated", strstr(buf, "\"aggregated\":true") != NULL);
@@ -70,7 +78,8 @@ int main(void) {
 
         /* 3 signatures -> 3 entries, however many executions there were. */
         int entries = 0;
-        for (const char* p = buf; (p = strstr(p, "\"op\":")); p++) entries++;
+        for (const char* p = buf; (p = strstr(p, "\"op\":")); p++)
+            entries++;
         CHECK("one entry per signature, not per execution", entries == 3);
 
         /* MATMUL@4096: 100 x 1.0 + one 9.0 = 109.0 over 101 executions, max 9.0. */
@@ -88,13 +97,13 @@ int main(void) {
          * reports what it dropped. */
         const char* tl = strstr(buf, "\"timeline\"");
         CHECK("timeline section present", tl != NULL);
-        CHECK("aggregate stays bounded by signatures",
-              tl != NULL && (size_t)(tl - buf) < 2048);
+        CHECK("aggregate stays bounded by signatures", tl != NULL && (size_t)(tl - buf) < 2048);
         CHECK("timeline reports its drop count", strstr(buf, "\"dropped\":0") != NULL);
 
         /* One triple per execution, in order. */
         int triples = 0;
-        for (const char* p2 = tl ? tl : buf; (p2 = strchr(p2, '[')); p2++) triples++;
+        for (const char* p2 = tl ? tl : buf; (p2 = strchr(p2, '[')); p2++)
+            triples++;
         CHECK("timeline holds every execution", triples >= 152);
 
         free(buf);
@@ -104,6 +113,8 @@ int main(void) {
     cml_flame_reset();
     CHECK("reset after export", cml_flame_num_spans() == 0);
 
-    free_node(mm); free_node(add); free_node(mm2);
+    free_node(mm);
+    free_node(add);
+    free_node(mm2);
     return TEST_SUMMARY();
 }

@@ -21,31 +21,33 @@ static float bicubic_kernel(float x) {
 }
 
 static Tensor* interpolate_nearest_4d(Tensor* input, int out_h, int out_w) {
-    int batch      = input->shape[0];
-    int channels   = input->shape[1];
-    int in_h       = input->shape[2];
-    int in_w       = input->shape[3];
+    int batch    = input->shape[0];
+    int channels = input->shape[1];
+    int in_h     = input->shape[2];
+    int in_w     = input->shape[3];
 
     /* Integer upscale = pure repeat -> reshape + expand + reshape (lazy, so it
      * builds IR and is graph-autodiff differentiable). Non-integer nearest
      * falls through to the eager reference below. */
     if (in_h > 0 && in_w > 0 && out_h % in_h == 0 && out_w % in_w == 0) {
         int kh = out_h / in_h, kw = out_w / in_w;
-        int s6[6] = {batch, channels, in_h, 1, in_w, 1};
+        int s6[6]        = {batch, channels, in_h, 1, in_w, 1};
         ReshapeParams r1 = {s6, 6};
-        Tensor* t1 = uop_reshape(input, &r1);
-        if (!t1) return NULL;
-        int e6[6] = {batch, channels, in_h, kh, in_w, kw};
+        Tensor* t1       = uop_reshape(input, &r1);
+        if (!t1)
+            return NULL;
+        int e6[6]       = {batch, channels, in_h, kh, in_w, kw};
         ExpandParams ep = {e6, 6};
-        Tensor* t2 = uop_expand(t1, &ep);
-        if (!t2) return NULL;
-        int s4[4] = {batch, channels, out_h, out_w};
+        Tensor* t2      = uop_expand(t1, &ep);
+        if (!t2)
+            return NULL;
+        int s4[4]        = {batch, channels, out_h, out_w};
         ReshapeParams r2 = {s4, 4};
         return uop_reshape(t2, &r2);
     }
 
     tensor_ensure_executed(input);
-    int out_shape[] = {batch, channels, out_h, out_w};
+    int out_shape[]     = {batch, channels, out_h, out_w};
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* output = tensor_empty(out_shape, 4, &config);
@@ -62,11 +64,13 @@ static Tensor* interpolate_nearest_4d(Tensor* input, int out_h, int out_w) {
         for (int c = 0; c < channels; c++) {
             for (int oh = 0; oh < out_h; oh++) {
                 int src_h = (int)floorf(oh * scale_h);
-                if (src_h >= in_h) src_h = in_h - 1;
+                if (src_h >= in_h)
+                    src_h = in_h - 1;
 
                 for (int ow = 0; ow < out_w; ow++) {
                     int src_w = (int)floorf(ow * scale_w);
-                    if (src_w >= in_w) src_w = in_w - 1;
+                    if (src_w >= in_w)
+                        src_w = in_w - 1;
 
                     out_data[((b * channels + c) * out_h + oh) * out_w + ow] =
                         in_data[((b * channels + c) * in_h + src_h) * in_w + src_w];
@@ -80,8 +84,7 @@ static Tensor* interpolate_nearest_4d(Tensor* input, int out_h, int out_w) {
 
 /* Per-axis interpolation scale: align_corners maps corner pixels exactly. */
 static inline float interp_scale(int in, int out, bool align_corners) {
-    return (align_corners && out > 1) ? (float)(in - 1) / (float)(out - 1)
-                                      : (float)in / (float)out;
+    return (align_corners && out > 1) ? (float)(in - 1) / (float)(out - 1) : (float)in / (float)out;
 }
 
 /* Source coordinate for output index `o`: align_corners maps corner pixels
@@ -94,7 +97,7 @@ static inline float interp_src_coord(int o, float scale, int out, bool align_cor
  * handing back both data pointers. */
 static Tensor* interp_alloc_output(Tensor* input, int out_h, int out_w, float** in_data,
                                    float** out_data) {
-    int out_shape[] = {input->shape[0], input->shape[1], out_h, out_w};
+    int out_shape[]     = {input->shape[0], input->shape[1], out_h, out_w};
     TensorConfig config = {
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* output = tensor_zeros(out_shape, 4, &config);
@@ -105,8 +108,7 @@ static Tensor* interp_alloc_output(Tensor* input, int out_h, int out_w, float** 
     return output;
 }
 
-static Tensor* interpolate_bilinear_4d(Tensor* input, int out_h, int out_w,
-                                        bool align_corners) {
+static Tensor* interpolate_bilinear_4d(Tensor* input, int out_h, int out_w, bool align_corners) {
     int batch    = input->shape[0];
     int channels = input->shape[1];
     int in_h     = input->shape[2];
@@ -125,33 +127,35 @@ static Tensor* interpolate_bilinear_4d(Tensor* input, int out_h, int out_w,
             for (int oh = 0; oh < out_h; oh++) {
                 float src_h = interp_src_coord(oh, scale_h, out_h, align_corners);
 
-                int h0 = (int)floorf(src_h);
-                int h1 = h0 + 1;
+                int h0   = (int)floorf(src_h);
+                int h1   = h0 + 1;
                 float wh = src_h - h0;
 
-                if (h0 < 0) h0 = 0;
-                if (h1 >= in_h) h1 = in_h - 1;
+                if (h0 < 0)
+                    h0 = 0;
+                if (h1 >= in_h)
+                    h1 = in_h - 1;
 
                 for (int ow = 0; ow < out_w; ow++) {
                     float src_w = interp_src_coord(ow, scale_w, out_w, align_corners);
 
-                    int w0 = (int)floorf(src_w);
-                    int w1 = w0 + 1;
+                    int w0   = (int)floorf(src_w);
+                    int w1   = w0 + 1;
                     float ww = src_w - w0;
 
-                    if (w0 < 0) w0 = 0;
-                    if (w1 >= in_w) w1 = in_w - 1;
+                    if (w0 < 0)
+                        w0 = 0;
+                    if (w1 >= in_w)
+                        w1 = in_w - 1;
 
-                    int base = (b * channels + c) * in_h;
+                    int base  = (b * channels + c) * in_h;
                     float v00 = in_data[(base + h0) * in_w + w0];
                     float v01 = in_data[(base + h0) * in_w + w1];
                     float v10 = in_data[(base + h1) * in_w + w0];
                     float v11 = in_data[(base + h1) * in_w + w1];
 
-                    float val = v00 * (1 - wh) * (1 - ww) +
-                                v01 * (1 - wh) * ww +
-                                v10 * wh * (1 - ww) +
-                                v11 * wh * ww;
+                    float val = v00 * (1 - wh) * (1 - ww) + v01 * (1 - wh) * ww +
+                                v10 * wh * (1 - ww) + v11 * wh * ww;
 
                     out_data[((b * channels + c) * out_h + oh) * out_w + ow] = val;
                 }
@@ -163,13 +167,14 @@ static Tensor* interpolate_bilinear_4d(Tensor* input, int out_h, int out_w,
 }
 
 static inline int clamp_int(int v, int lo, int hi) {
-    if (v < lo) return lo;
-    if (v > hi) return hi;
+    if (v < lo)
+        return lo;
+    if (v > hi)
+        return hi;
     return v;
 }
 
-static Tensor* interpolate_bicubic_4d(Tensor* input, int out_h, int out_w,
-                                       bool align_corners) {
+static Tensor* interpolate_bicubic_4d(Tensor* input, int out_h, int out_w, bool align_corners) {
     int batch    = input->shape[0];
     int channels = input->shape[1];
     int in_h     = input->shape[2];
@@ -223,8 +228,8 @@ static Tensor* interpolate_bicubic_4d(Tensor* input, int out_h, int out_w,
     return output;
 }
 
-Tensor* f_interpolate(Tensor* input, const int* output_size, int num_dims,
-                      UpsampleMode mode, bool align_corners) {
+Tensor* f_interpolate(Tensor* input, const int* output_size, int num_dims, UpsampleMode mode,
+                      bool align_corners) {
     if (!input) {
         LOG_ERROR("f_interpolate: NULL input");
         return NULL;
@@ -251,15 +256,15 @@ Tensor* f_interpolate(Tensor* input, const int* output_size, int num_dims,
     }
 
     switch (mode) {
-        case UPSAMPLE_NEAREST:
-            return interpolate_nearest_4d(input, out_h, out_w);
-        case UPSAMPLE_BILINEAR:
-            return interpolate_bilinear_4d(input, out_h, out_w, align_corners);
-        case UPSAMPLE_BICUBIC:
-            return interpolate_bicubic_4d(input, out_h, out_w, align_corners);
-        default:
-            LOG_ERROR("f_interpolate: unsupported mode %d", (int)mode);
-            return NULL;
+    case UPSAMPLE_NEAREST:
+        return interpolate_nearest_4d(input, out_h, out_w);
+    case UPSAMPLE_BILINEAR:
+        return interpolate_bilinear_4d(input, out_h, out_w, align_corners);
+    case UPSAMPLE_BICUBIC:
+        return interpolate_bicubic_4d(input, out_h, out_w, align_corners);
+    default:
+        LOG_ERROR("f_interpolate: unsupported mode %d", (int)mode);
+        return NULL;
     }
 }
 
@@ -268,16 +273,20 @@ static Tensor* upsample_nearest_5d(Tensor* input, int out_d, int out_h, int out_
     int N = input->shape[0], C = input->shape[1];
     int in_d = input->shape[2], in_h = input->shape[3], in_w = input->shape[4];
 
-    int out_shape[] = {N, C, out_d, out_h, out_w};
-    TensorConfig cfg = {.dtype = input->dtype, .device = input->device,
-                        .has_dtype = true, .has_device = true};
+    int out_shape[]  = {N, C, out_d, out_h, out_w};
+    TensorConfig cfg = {
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* output = tensor_empty(out_shape, 5, &cfg);
-    if (!output) return NULL;
+    if (!output)
+        return NULL;
     tensor_ensure_executed(output);
 
     float* in_data  = (float*)tensor_data_ptr(input);
     float* out_data = (float*)tensor_data_ptr(output);
-    if (!in_data || !out_data) { tensor_free(output); return NULL; }
+    if (!in_data || !out_data) {
+        tensor_free(output);
+        return NULL;
+    }
 
     for (int n = 0; n < N; n++) {
         for (int c = 0; c < C; c++) {
@@ -286,7 +295,7 @@ static Tensor* upsample_nearest_5d(Tensor* input, int out_d, int out_h, int out_
                 for (int oh = 0; oh < out_h; oh++) {
                     int ih = oh * in_h / out_h;
                     for (int ow = 0; ow < out_w; ow++) {
-                        int iw = ow * in_w / out_w;
+                        int iw     = ow * in_w / out_w;
                         size_t src = ((size_t)n * C + c) * in_d * in_h * in_w +
                                      (size_t)id * in_h * in_w + ih * in_w + iw;
                         size_t dst = ((size_t)n * C + c) * out_d * out_h * out_w +
@@ -369,11 +378,11 @@ Tensor* upsample_forward(Module* module, Tensor* input) {
     /* For nearest and bilinear, delegate to tensor_interpolate when the mode
      * maps directly.  Bicubic is handled locally. */
     if (layer->mode == UPSAMPLE_NEAREST) {
-        int size[] = {out_h, out_w};
+        int size[]     = {out_h, out_w};
         Tensor* result = tensor_interpolate(input, size, 2, INTERP_NEAREST);
         return result;
     } else if (layer->mode == UPSAMPLE_BILINEAR) {
-        int size[] = {out_h, out_w};
+        int size[]     = {out_h, out_w};
         Tensor* result = tensor_interpolate(input, size, 2, INTERP_BILINEAR);
         return result;
     } else if (layer->mode == UPSAMPLE_BICUBIC) {
@@ -392,7 +401,7 @@ static void upsample_free(Module* module) {
 }
 
 Upsample* nn_upsample(float scale_factor, const int* output_size, int num_output_dims,
-                       UpsampleMode mode, bool align_corners) {
+                      UpsampleMode mode, bool align_corners) {
     Upsample* layer = cml_calloc(1, sizeof(Upsample));
     if (!layer) {
         LOG_ERROR("Upsample: failed to allocate memory");
@@ -411,7 +420,8 @@ Upsample* nn_upsample(float scale_factor, const int* output_size, int num_output
 
     if (scale_factor <= 0.0f && output_size && num_output_dims > 0) {
         int n = num_output_dims;
-        if (n > UPSAMPLE_MAX_DIMS) n = UPSAMPLE_MAX_DIMS;
+        if (n > UPSAMPLE_MAX_DIMS)
+            n = UPSAMPLE_MAX_DIMS;
         for (int i = 0; i < n; i++) {
             layer->output_size[i] = output_size[i];
         }

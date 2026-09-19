@@ -15,11 +15,11 @@ extern "C" {
 #define CML_SPEC_MAX_DRAFT_TOKENS 16
 
 typedef struct CMLSpeculativeConfig {
-    int num_draft_tokens;       /* K: number of draft tokens per step (default: 5) */
-    float temperature;          /* Sampling temperature */
-    float top_p;                /* Nucleus sampling */
-    int top_k;                  /* Top-k sampling */
-    bool do_sample;             /* Use sampling vs greedy */
+    int num_draft_tokens; /* K: number of draft tokens per step (default: 5) */
+    float temperature;    /* Sampling temperature */
+    float top_p;          /* Nucleus sampling */
+    int top_k;            /* Top-k sampling */
+    bool do_sample;       /* Use sampling vs greedy */
     /* Leviathan-style stochastic verification: accept draft token x with
      * probability min(1, p_target(x)/p_draft(x)) and resample rejections from
      * the normalized residual max(0, p-q) — preserves the target sampling
@@ -29,11 +29,11 @@ typedef struct CMLSpeculativeConfig {
 } CMLSpeculativeConfig;
 
 typedef struct CMLSpeculativeResult {
-    int* accepted_tokens;       /* Final accepted token sequence */
-    int num_accepted;           /* Number of accepted tokens */
-    int num_drafted;            /* Total tokens drafted */
-    int num_verified;           /* Total verification passes */
-    float acceptance_rate;      /* accepted / drafted */
+    int* accepted_tokens;  /* Final accepted token sequence */
+    int num_accepted;      /* Number of accepted tokens */
+    int num_drafted;       /* Total tokens drafted */
+    int num_verified;      /* Total verification passes */
+    float acceptance_rate; /* accepted / drafted */
     double draft_time_ms;
     double verify_time_ms;
     double total_time_ms;
@@ -72,18 +72,15 @@ CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config
 void cml_speculative_free(CMLSpeculativeDecoder* decoder);
 
 void cml_speculative_set_draft_model(CMLSpeculativeDecoder* dec, void* ctx,
-                                     CMLModelForwardFn forward_fn,
-                                     CMLSampleTokenFn sample_fn);
+                                     CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn);
 
 void cml_speculative_set_target_model(CMLSpeculativeDecoder* dec, void* ctx,
-                                      CMLModelForwardFn forward_fn,
-                                      CMLSampleTokenFn sample_fn);
+                                      CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn);
 
 /* Drafts K tokens, verifies with target model, accepts matching tokens.
  * Returns heap-allocated result (free with cml_speculative_result_free). */
 CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
-                                                   const int* prefix_tokens,
-                                                   int prefix_len);
+                                                  const int* prefix_tokens, int prefix_len);
 
 void cml_speculative_result_free(CMLSpeculativeResult* result);
 

@@ -31,11 +31,11 @@ typedef enum CMLKernelBackend {
 } CMLKernelBackend;
 
 typedef struct CMLKernelEntry {
-    uint64_t hash;            // FNV-1a hash of IR + shapes
+    uint64_t hash; // FNV-1a hash of IR + shapes
     CMLKernelBackend backend;
-    void* compiled;           // Compiled kernel (backend-specific)
-    uint64_t last_used;       // Timestamp for LRU eviction
-    size_t memory_size;       // Estimated memory usage of compiled kernel
+    void* compiled;     // Compiled kernel (backend-specific)
+    uint64_t last_used; // Timestamp for LRU eviction
+    size_t memory_size; // Estimated memory usage of compiled kernel
 
     int num_ops;
     int num_inputs;
@@ -77,8 +77,9 @@ CMLKernelEntry* cml_kernel_cache_lookup_ir(CMLKernelCache* cache, CMLGraph_t ir,
 
 int cml_kernel_cache_insert(CMLKernelCache* cache, uint64_t hash, CMLKernelBackend backend,
                             void* compiled, size_t memory_size);
-int cml_kernel_cache_insert_ir(CMLKernelCache* cache, CMLGraph_t ir, Tensor** inputs, int num_inputs,
-                               CMLKernelBackend backend, void* compiled, size_t memory_size);
+int cml_kernel_cache_insert_ir(CMLKernelCache* cache, CMLGraph_t ir, Tensor** inputs,
+                               int num_inputs, CMLKernelBackend backend, void* compiled,
+                               size_t memory_size);
 
 int cml_kernel_cache_remove(CMLKernelCache* cache, uint64_t hash);
 

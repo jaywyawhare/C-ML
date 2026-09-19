@@ -116,12 +116,12 @@ static bool load_ilp64_functions(CMLBlasContext* ctx) {
     if (!ctx || !ctx->lib_handle)
         return false;
 
-    ctx->ilp64_sgemm = LIB_SYM(ctx->lib_handle, "scipy_cblas_sgemm64_");
-    ctx->ilp64_sgemv = LIB_SYM(ctx->lib_handle, "scipy_cblas_sgemv64_");
-    ctx->ilp64_saxpy = LIB_SYM(ctx->lib_handle, "scipy_cblas_saxpy64_");
-    ctx->ilp64_sscal = LIB_SYM(ctx->lib_handle, "scipy_cblas_sscal64_");
-    ctx->ilp64_sdot  = LIB_SYM(ctx->lib_handle, "scipy_cblas_sdot64_");
-    ctx->ilp64_snrm2 = LIB_SYM(ctx->lib_handle, "scipy_cblas_snrm264_");
+    ctx->ilp64_sgemm       = LIB_SYM(ctx->lib_handle, "scipy_cblas_sgemm64_");
+    ctx->ilp64_sgemv       = LIB_SYM(ctx->lib_handle, "scipy_cblas_sgemv64_");
+    ctx->ilp64_saxpy       = LIB_SYM(ctx->lib_handle, "scipy_cblas_saxpy64_");
+    ctx->ilp64_sscal       = LIB_SYM(ctx->lib_handle, "scipy_cblas_sscal64_");
+    ctx->ilp64_sdot        = LIB_SYM(ctx->lib_handle, "scipy_cblas_sdot64_");
+    ctx->ilp64_snrm2       = LIB_SYM(ctx->lib_handle, "scipy_cblas_snrm264_");
     ctx->ilp64_set_threads = LIB_SYM(ctx->lib_handle, "scipy_openblas_set_num_threads64_");
 
     return ctx->ilp64_sgemm != NULL;
@@ -131,7 +131,8 @@ static int default_thread_count(void) {
     int ncores = 1;
 #ifdef __linux__
     ncores = sysconf(_SC_NPROCESSORS_ONLN);
-    if (ncores < 1) ncores = 1;
+    if (ncores < 1)
+        ncores = 1;
 #endif
     return ncores;
 }
@@ -154,7 +155,7 @@ static void tune_blas_threading(CMLBlasContext* ctx) {
             LOG_INFO("MKL threads set to %d", ctx->max_threads);
         }
         ctx->fn_set_threads = mkl_set_num_threads;
-        ctx->is_mkl = true;
+        ctx->is_mkl         = true;
         return;
     }
 
@@ -165,7 +166,7 @@ static void tune_blas_threading(CMLBlasContext* ctx) {
             openblas_set(ctx->max_threads);
         }
         ctx->fn_set_threads = openblas_set;
-        ctx->is_openblas = true;
+        ctx->is_openblas    = true;
         return;
     }
 
@@ -176,7 +177,7 @@ static void tune_blas_threading(CMLBlasContext* ctx) {
             blis_set(ctx->max_threads);
         }
         ctx->fn_set_threads = blis_set;
-        ctx->is_blis = true;
+        ctx->is_blis        = true;
     }
 }
 
@@ -196,7 +197,8 @@ CMLBlasContext* cml_blas_init(void) {
                 strncpy(ctx->lib_name, env_blas, sizeof(ctx->lib_name) - 1);
                 ctx->initialized = true;
                 ctx->is_ilp64    = true;
-                if (ctx->ilp64_set_threads) ctx->ilp64_set_threads(default_thread_count());
+                if (ctx->ilp64_set_threads)
+                    ctx->ilp64_set_threads(default_thread_count());
                 fprintf(stderr, "[CML] BLAS (ILP64) loaded: %s\n", ctx->lib_name);
                 return ctx;
             }
@@ -223,7 +225,8 @@ CMLBlasContext* cml_blas_init(void) {
                 strncpy(ctx->lib_name, ilp64_library_paths[i], sizeof(ctx->lib_name) - 1);
                 ctx->initialized = true;
                 ctx->is_ilp64    = true;
-                if (ctx->ilp64_set_threads) ctx->ilp64_set_threads(default_thread_count());
+                if (ctx->ilp64_set_threads)
+                    ctx->ilp64_set_threads(default_thread_count());
                 fprintf(stderr, "[CML] BLAS (ILP64) loaded: %s\n", ctx->lib_name);
                 return ctx;
             }
@@ -380,19 +383,21 @@ static void sgemm_avx_small(const float* A, const float* B, float* C, int M, int
  * Hot loop: 6×16 FMA micro-kernel, B is pre-packed into sequential [k][n]
  * layout so the inner loop has no strided reads. */
 #ifdef __FMA__
-#define PACKED_MR    6
-#define PACKED_NR   16    /* 2 × __m256 per k step */
-#define PACKED_MC  120    /* L1/L2: MC × KC A-panel fits alongside packed B */
-#define PACKED_KC  256    /* L2:    KC × NC B-panel ≤ ~256 KB */
-#define PACKED_NC 2048    /* L3:    NC multiple of NR for clean packing */
+#define PACKED_MR 6
+#define PACKED_NR 16   /* 2 × __m256 per k step */
+#define PACKED_MC 120  /* L1/L2: MC × KC A-panel fits alongside packed B */
+#define PACKED_KC 256  /* L2:    KC × NC B-panel ≤ ~256 KB */
+#define PACKED_NC 2048 /* L3:    NC multiple of NR for clean packing */
 
 /* Pack a (KC_cur × NR) column panel of B into sequential [k][n] order.
  * Columns beyond NR_cur are zero-padded so the microkernel always sees NR. */
 static void pack_B_panel(const float* src, float* dst, int KC_cur, int NR_cur, int ldb) {
     for (int k = 0; k < KC_cur; k++) {
         int n = 0;
-        for (; n < NR_cur; n++) dst[k * PACKED_NR + n] = src[k * ldb + n];
-        for (; n < PACKED_NR; n++) dst[k * PACKED_NR + n] = 0.0f;
+        for (; n < NR_cur; n++)
+            dst[k * PACKED_NR + n] = src[k * ldb + n];
+        for (; n < PACKED_NR; n++)
+            dst[k * PACKED_NR + n] = 0.0f;
     }
 }
 
@@ -401,8 +406,10 @@ static void pack_B_panel(const float* src, float* dst, int KC_cur, int NR_cur, i
 static void pack_A_panel(const float* src, float* dst, int MR_cur, int KC_cur, int lda) {
     for (int k = 0; k < KC_cur; k++) {
         int m = 0;
-        for (; m < MR_cur; m++) dst[k * PACKED_MR + m] = src[m * lda + k];
-        for (; m < PACKED_MR; m++) dst[k * PACKED_MR + m] = 0.0f;
+        for (; m < MR_cur; m++)
+            dst[k * PACKED_MR + m] = src[m * lda + k];
+        for (; m < PACKED_MR; m++)
+            dst[k * PACKED_MR + m] = 0.0f;
     }
 }
 
@@ -411,64 +418,99 @@ static void pack_A_panel(const float* src, float* dst, int MR_cur, int KC_cur, i
  * B_p: [KC × NR] packed, stride PACKED_NR per k.
  * Both are fully sequential — L1 cache never misses in the hot loop.
  * k loop unrolled ×4 to hide 4-cycle FMA latency (Haswell/Skylake). */
-static void sgemm_ukr_6x16(float* C, int ldc,
-                            const float* A_p, const float* B_p,
-                            int KC, float alpha, float beta) {
+static void sgemm_ukr_6x16(float* C, int ldc, const float* A_p, const float* B_p, int KC,
+                           float alpha, float beta) {
     __m256 c00, c01, c10, c11, c20, c21, c30, c31, c40, c41, c50, c51;
 
     if (beta == 0.0f) {
-        c00=c01=c10=c11=c20=c21=c30=c31=c40=c41=c50=c51 = _mm256_setzero_ps();
+        c00 = c01 = c10 = c11 = c20 = c21 = c30 = c31 = c40 = c41 = c50 = c51 = _mm256_setzero_ps();
     } else {
         __m256 vb = _mm256_set1_ps(beta);
-        c00=_mm256_mul_ps(_mm256_loadu_ps(C+0*ldc+0),vb); c01=_mm256_mul_ps(_mm256_loadu_ps(C+0*ldc+8),vb);
-        c10=_mm256_mul_ps(_mm256_loadu_ps(C+1*ldc+0),vb); c11=_mm256_mul_ps(_mm256_loadu_ps(C+1*ldc+8),vb);
-        c20=_mm256_mul_ps(_mm256_loadu_ps(C+2*ldc+0),vb); c21=_mm256_mul_ps(_mm256_loadu_ps(C+2*ldc+8),vb);
-        c30=_mm256_mul_ps(_mm256_loadu_ps(C+3*ldc+0),vb); c31=_mm256_mul_ps(_mm256_loadu_ps(C+3*ldc+8),vb);
-        c40=_mm256_mul_ps(_mm256_loadu_ps(C+4*ldc+0),vb); c41=_mm256_mul_ps(_mm256_loadu_ps(C+4*ldc+8),vb);
-        c50=_mm256_mul_ps(_mm256_loadu_ps(C+5*ldc+0),vb); c51=_mm256_mul_ps(_mm256_loadu_ps(C+5*ldc+8),vb);
+        c00       = _mm256_mul_ps(_mm256_loadu_ps(C + 0 * ldc + 0), vb);
+        c01       = _mm256_mul_ps(_mm256_loadu_ps(C + 0 * ldc + 8), vb);
+        c10       = _mm256_mul_ps(_mm256_loadu_ps(C + 1 * ldc + 0), vb);
+        c11       = _mm256_mul_ps(_mm256_loadu_ps(C + 1 * ldc + 8), vb);
+        c20       = _mm256_mul_ps(_mm256_loadu_ps(C + 2 * ldc + 0), vb);
+        c21       = _mm256_mul_ps(_mm256_loadu_ps(C + 2 * ldc + 8), vb);
+        c30       = _mm256_mul_ps(_mm256_loadu_ps(C + 3 * ldc + 0), vb);
+        c31       = _mm256_mul_ps(_mm256_loadu_ps(C + 3 * ldc + 8), vb);
+        c40       = _mm256_mul_ps(_mm256_loadu_ps(C + 4 * ldc + 0), vb);
+        c41       = _mm256_mul_ps(_mm256_loadu_ps(C + 4 * ldc + 8), vb);
+        c50       = _mm256_mul_ps(_mm256_loadu_ps(C + 5 * ldc + 0), vb);
+        c51       = _mm256_mul_ps(_mm256_loadu_ps(C + 5 * ldc + 8), vb);
     }
 
     int k = 0;
 #define UKR_STEP(kk)                                                                               \
     do {                                                                                           \
-        __m256 b0_ = _mm256_loadu_ps(B_p + (kk)*PACKED_NR + 0);                                  \
-        __m256 b1_ = _mm256_loadu_ps(B_p + (kk)*PACKED_NR + 8);                                  \
+        __m256 b0_ = _mm256_loadu_ps(B_p + (kk) * PACKED_NR + 0);                                  \
+        __m256 b1_ = _mm256_loadu_ps(B_p + (kk) * PACKED_NR + 8);                                  \
         __m256 a_;                                                                                 \
-        a_=_mm256_set1_ps(A_p[(kk)*PACKED_MR+0]); c00=_mm256_fmadd_ps(a_,b0_,c00); c01=_mm256_fmadd_ps(a_,b1_,c01); \
-        a_=_mm256_set1_ps(A_p[(kk)*PACKED_MR+1]); c10=_mm256_fmadd_ps(a_,b0_,c10); c11=_mm256_fmadd_ps(a_,b1_,c11); \
-        a_=_mm256_set1_ps(A_p[(kk)*PACKED_MR+2]); c20=_mm256_fmadd_ps(a_,b0_,c20); c21=_mm256_fmadd_ps(a_,b1_,c21); \
-        a_=_mm256_set1_ps(A_p[(kk)*PACKED_MR+3]); c30=_mm256_fmadd_ps(a_,b0_,c30); c31=_mm256_fmadd_ps(a_,b1_,c31); \
-        a_=_mm256_set1_ps(A_p[(kk)*PACKED_MR+4]); c40=_mm256_fmadd_ps(a_,b0_,c40); c41=_mm256_fmadd_ps(a_,b1_,c41); \
-        a_=_mm256_set1_ps(A_p[(kk)*PACKED_MR+5]); c50=_mm256_fmadd_ps(a_,b0_,c50); c51=_mm256_fmadd_ps(a_,b1_,c51); \
+        a_  = _mm256_set1_ps(A_p[(kk) * PACKED_MR + 0]);                                           \
+        c00 = _mm256_fmadd_ps(a_, b0_, c00);                                                       \
+        c01 = _mm256_fmadd_ps(a_, b1_, c01);                                                       \
+        a_  = _mm256_set1_ps(A_p[(kk) * PACKED_MR + 1]);                                           \
+        c10 = _mm256_fmadd_ps(a_, b0_, c10);                                                       \
+        c11 = _mm256_fmadd_ps(a_, b1_, c11);                                                       \
+        a_  = _mm256_set1_ps(A_p[(kk) * PACKED_MR + 2]);                                           \
+        c20 = _mm256_fmadd_ps(a_, b0_, c20);                                                       \
+        c21 = _mm256_fmadd_ps(a_, b1_, c21);                                                       \
+        a_  = _mm256_set1_ps(A_p[(kk) * PACKED_MR + 3]);                                           \
+        c30 = _mm256_fmadd_ps(a_, b0_, c30);                                                       \
+        c31 = _mm256_fmadd_ps(a_, b1_, c31);                                                       \
+        a_  = _mm256_set1_ps(A_p[(kk) * PACKED_MR + 4]);                                           \
+        c40 = _mm256_fmadd_ps(a_, b0_, c40);                                                       \
+        c41 = _mm256_fmadd_ps(a_, b1_, c41);                                                       \
+        a_  = _mm256_set1_ps(A_p[(kk) * PACKED_MR + 5]);                                           \
+        c50 = _mm256_fmadd_ps(a_, b0_, c50);                                                       \
+        c51 = _mm256_fmadd_ps(a_, b1_, c51);                                                       \
     } while (0)
-    for (; k + 4 <= KC; k += 4) { UKR_STEP(k); UKR_STEP(k+1); UKR_STEP(k+2); UKR_STEP(k+3); }
-    for (; k < KC; k++)          { UKR_STEP(k); }
+    for (; k + 4 <= KC; k += 4) {
+        UKR_STEP(k);
+        UKR_STEP(k + 1);
+        UKR_STEP(k + 2);
+        UKR_STEP(k + 3);
+    }
+    for (; k < KC; k++) {
+        UKR_STEP(k);
+    }
 #undef UKR_STEP
 
     if (alpha == 1.0f) {
-        _mm256_storeu_ps(C+0*ldc+0,c00); _mm256_storeu_ps(C+0*ldc+8,c01);
-        _mm256_storeu_ps(C+1*ldc+0,c10); _mm256_storeu_ps(C+1*ldc+8,c11);
-        _mm256_storeu_ps(C+2*ldc+0,c20); _mm256_storeu_ps(C+2*ldc+8,c21);
-        _mm256_storeu_ps(C+3*ldc+0,c30); _mm256_storeu_ps(C+3*ldc+8,c31);
-        _mm256_storeu_ps(C+4*ldc+0,c40); _mm256_storeu_ps(C+4*ldc+8,c41);
-        _mm256_storeu_ps(C+5*ldc+0,c50); _mm256_storeu_ps(C+5*ldc+8,c51);
+        _mm256_storeu_ps(C + 0 * ldc + 0, c00);
+        _mm256_storeu_ps(C + 0 * ldc + 8, c01);
+        _mm256_storeu_ps(C + 1 * ldc + 0, c10);
+        _mm256_storeu_ps(C + 1 * ldc + 8, c11);
+        _mm256_storeu_ps(C + 2 * ldc + 0, c20);
+        _mm256_storeu_ps(C + 2 * ldc + 8, c21);
+        _mm256_storeu_ps(C + 3 * ldc + 0, c30);
+        _mm256_storeu_ps(C + 3 * ldc + 8, c31);
+        _mm256_storeu_ps(C + 4 * ldc + 0, c40);
+        _mm256_storeu_ps(C + 4 * ldc + 8, c41);
+        _mm256_storeu_ps(C + 5 * ldc + 0, c50);
+        _mm256_storeu_ps(C + 5 * ldc + 8, c51);
     } else {
         __m256 va = _mm256_set1_ps(alpha);
-        _mm256_storeu_ps(C+0*ldc+0,_mm256_mul_ps(va,c00)); _mm256_storeu_ps(C+0*ldc+8,_mm256_mul_ps(va,c01));
-        _mm256_storeu_ps(C+1*ldc+0,_mm256_mul_ps(va,c10)); _mm256_storeu_ps(C+1*ldc+8,_mm256_mul_ps(va,c11));
-        _mm256_storeu_ps(C+2*ldc+0,_mm256_mul_ps(va,c20)); _mm256_storeu_ps(C+2*ldc+8,_mm256_mul_ps(va,c21));
-        _mm256_storeu_ps(C+3*ldc+0,_mm256_mul_ps(va,c30)); _mm256_storeu_ps(C+3*ldc+8,_mm256_mul_ps(va,c31));
-        _mm256_storeu_ps(C+4*ldc+0,_mm256_mul_ps(va,c40)); _mm256_storeu_ps(C+4*ldc+8,_mm256_mul_ps(va,c41));
-        _mm256_storeu_ps(C+5*ldc+0,_mm256_mul_ps(va,c50)); _mm256_storeu_ps(C+5*ldc+8,_mm256_mul_ps(va,c51));
+        _mm256_storeu_ps(C + 0 * ldc + 0, _mm256_mul_ps(va, c00));
+        _mm256_storeu_ps(C + 0 * ldc + 8, _mm256_mul_ps(va, c01));
+        _mm256_storeu_ps(C + 1 * ldc + 0, _mm256_mul_ps(va, c10));
+        _mm256_storeu_ps(C + 1 * ldc + 8, _mm256_mul_ps(va, c11));
+        _mm256_storeu_ps(C + 2 * ldc + 0, _mm256_mul_ps(va, c20));
+        _mm256_storeu_ps(C + 2 * ldc + 8, _mm256_mul_ps(va, c21));
+        _mm256_storeu_ps(C + 3 * ldc + 0, _mm256_mul_ps(va, c30));
+        _mm256_storeu_ps(C + 3 * ldc + 8, _mm256_mul_ps(va, c31));
+        _mm256_storeu_ps(C + 4 * ldc + 0, _mm256_mul_ps(va, c40));
+        _mm256_storeu_ps(C + 4 * ldc + 8, _mm256_mul_ps(va, c41));
+        _mm256_storeu_ps(C + 5 * ldc + 0, _mm256_mul_ps(va, c50));
+        _mm256_storeu_ps(C + 5 * ldc + 8, _mm256_mul_ps(va, c51));
     }
 }
 
 /* Edge micro-kernel for tiles smaller than MR×NR (boundaries only).
  * Routes through the full 6×16 kernel via a padded stack buffer to avoid
  * a separate scalar path. */
-static void sgemm_ukr_edge(float* C, int ldc,
-                           const float* A_p, const float* B_p,
-                           int MR_cur, int NR_cur, int KC, float alpha, float beta) {
+static void sgemm_ukr_edge(float* C, int ldc, const float* A_p, const float* B_p, int MR_cur,
+                           int NR_cur, int KC, float alpha, float beta) {
     float buf[PACKED_MR * PACKED_NR] __attribute__((aligned(32)));
     memset(buf, 0, sizeof(buf));
     if (beta != 0.0f)
@@ -485,22 +527,20 @@ static void sgemm_ukr_edge(float* C, int ldc,
  * a_pack: ≥ PACKED_MC * PACKED_KC floats (aligned to 32 bytes).
  * b_pack: ≥ ceil(N/NR)*NR * PACKED_KC floats (aligned to 32 bytes).
  * Caller owns allocation and lifetime of both scratch buffers. */
-static void sgemm_packed_avx(const float* A, const float* B, float* C,
-                              int M, int N, int K, float alpha, float beta,
-                              float* a_pack, float* b_pack,
-                              int mc, int kc, int nc) {
+static void sgemm_packed_avx(const float* A, const float* B, float* C, int M, int N, int K,
+                             float alpha, float beta, float* a_pack, float* b_pack, int mc, int kc,
+                             int nc) {
     for (int jc = 0; jc < N; jc += nc) {
         int NC_cur = ((jc + nc) > N) ? (N - jc) : nc;
 
         for (int pc = 0; pc < K; pc += kc) {
-            int KC_cur = ((pc + kc) > K) ? (K - pc) : kc;
+            int KC_cur     = ((pc + kc) > K) ? (K - pc) : kc;
             float use_beta = (pc == 0) ? beta : 1.0f;
 
             /* Pack B strip (KC_cur × NC_cur) into NR-wide panels */
             for (int jr = 0; jr < NC_cur; jr += PACKED_NR) {
                 int NR_cur = ((jr + PACKED_NR) > NC_cur) ? (NC_cur - jr) : PACKED_NR;
-                pack_B_panel(B + pc * N + jc + jr,
-                             b_pack + (jr / PACKED_NR) * KC_cur * PACKED_NR,
+                pack_B_panel(B + pc * N + jc + jr, b_pack + (jr / PACKED_NR) * KC_cur * PACKED_NR,
                              KC_cur, NR_cur, N);
             }
 
@@ -511,25 +551,24 @@ static void sgemm_packed_avx(const float* A, const float* B, float* C,
                 for (int ir = 0; ir < MC_cur; ir += PACKED_MR) {
                     int MR_cur = ((ir + PACKED_MR) > MC_cur) ? (MC_cur - ir) : PACKED_MR;
                     pack_A_panel(A + (ic + ir) * K + pc,
-                                 a_pack + (ir / PACKED_MR) * KC_cur * PACKED_MR,
-                                 MR_cur, KC_cur, K);
+                                 a_pack + (ir / PACKED_MR) * KC_cur * PACKED_MR, MR_cur, KC_cur, K);
                 }
 
                 /* Micro-kernel sweep over the MC × NC output tile */
                 for (int jr = 0; jr < NC_cur; jr += PACKED_NR) {
-                    int NR_cur = ((jr + PACKED_NR) > NC_cur) ? (NC_cur - jr) : PACKED_NR;
+                    int NR_cur           = ((jr + PACKED_NR) > NC_cur) ? (NC_cur - jr) : PACKED_NR;
                     const float* B_panel = b_pack + (jr / PACKED_NR) * KC_cur * PACKED_NR;
 
                     for (int ir = 0; ir < MC_cur; ir += PACKED_MR) {
                         int MR_cur = ((ir + PACKED_MR) > MC_cur) ? (MC_cur - ir) : PACKED_MR;
                         const float* A_panel = a_pack + (ir / PACKED_MR) * KC_cur * PACKED_MR;
-                        float* C_tile = C + (ic + ir) * N + (jc + jr);
+                        float* C_tile        = C + (ic + ir) * N + (jc + jr);
 
                         if (MR_cur == PACKED_MR && NR_cur == PACKED_NR)
                             sgemm_ukr_6x16(C_tile, N, A_panel, B_panel, KC_cur, alpha, use_beta);
                         else
-                            sgemm_ukr_edge(C_tile, N, A_panel, B_panel,
-                                           MR_cur, NR_cur, KC_cur, alpha, use_beta);
+                            sgemm_ukr_edge(C_tile, N, A_panel, B_panel, MR_cur, NR_cur, KC_cur,
+                                           alpha, use_beta);
                     }
                 }
             }
@@ -560,7 +599,6 @@ static void sgemm_packed_avx(const float* A, const float* B, float* C,
 #define INFERENCE_BATCH_THRESHOLD 128
 #define INFERENCE_WEIGHT_THRESHOLD 110000
 
-
 /* ── GEMM tile auto-tuning ──────────────────────────────────────────────
  * The packed 6×16 kernel's MC/KC/NC blocking was fixed at compile time.
  * With CML_AUTOTUNE=1 the first call for a (M,N,K) shape class measures a
@@ -577,9 +615,9 @@ typedef struct {
 } AutotuneEntry;
 
 static AutotuneEntry g_at_cache[AT_MAX_ENTRIES];
-static int            g_at_count  = 0;
-static pthread_mutex_t g_at_lock  = PTHREAD_MUTEX_INITIALIZER;
-static bool            g_at_loaded = false;
+static int g_at_count            = 0;
+static pthread_mutex_t g_at_lock = PTHREAD_MUTEX_INITIALIZER;
+static bool g_at_loaded          = false;
 
 static double now_ms(void) {
     struct timespec ts;
@@ -590,7 +628,8 @@ static double now_ms(void) {
 static const char* autotune_path(void) {
     static char path[512];
     const char* home = getenv("HOME");
-    if (!home) return NULL;
+    if (!home)
+        return NULL;
     snprintf(path, sizeof(path), "%s/.cml", home);
     mkdir(path, 0755);
     snprintf(path, sizeof(path), "%s/.cml/autotune.json", home);
@@ -598,12 +637,15 @@ static const char* autotune_path(void) {
 }
 
 static void autotune_load(void) {
-    if (g_at_loaded) return;
-    g_at_loaded = true;
+    if (g_at_loaded)
+        return;
+    g_at_loaded      = true;
     const char* path = autotune_path();
-    if (!path) return;
+    if (!path)
+        return;
     FILE* f = fopen(path, "r");
-    if (!f) return;
+    if (!f)
+        return;
     /* flat line format: M N K mc kc nc — one entry per line */
     int m, n, k, mc, kc, nc;
     while (g_at_count < AT_MAX_ENTRIES &&
@@ -615,9 +657,11 @@ static void autotune_load(void) {
 
 static void autotune_save(int M, int N, int K, int mc, int kc, int nc) {
     const char* path = autotune_path();
-    if (!path) return;
+    if (!path)
+        return;
     FILE* f = fopen(path, "a");
-    if (!f) return;
+    if (!f)
+        return;
     fprintf(f, "%d %d %d %d %d %d\n", M, N, K, mc, kc, nc);
     fclose(f);
 }
@@ -626,35 +670,41 @@ static bool autotune_lookup(int M, int N, int K, int* mc, int* kc, int* nc) {
     autotune_load();
     for (int i = 0; i < g_at_count; i++) {
         if (g_at_cache[i].M == M && g_at_cache[i].N == N && g_at_cache[i].K == K) {
-            *mc = g_at_cache[i].mc; *kc = g_at_cache[i].kc; *nc = g_at_cache[i].nc;
+            *mc = g_at_cache[i].mc;
+            *kc = g_at_cache[i].kc;
+            *nc = g_at_cache[i].nc;
             return true;
         }
     }
     return false;
 }
 
-static void autotune_run(const float* A, const float* B, float* C,
-                         int M, int N, int K, float alpha, float beta,
-                         float* a_pack, float* b_pack,
-                         int* out_mc, int* out_kc, int* out_nc) {
-    struct { int mc, kc, nc; } cands[] = {
-        { PACKED_MC, PACKED_KC, PACKED_NC },   /* compile-time default   */
-        {  60,       128,       1024        },
-        { 240,       256,       4096        },
-        { 120,       512,       2048        },
+static void autotune_run(const float* A, const float* B, float* C, int M, int N, int K, float alpha,
+                         float beta, float* a_pack, float* b_pack, int* out_mc, int* out_kc,
+                         int* out_nc) {
+    struct {
+        int mc, kc, nc;
+    } cands[] = {
+        {PACKED_MC, PACKED_KC, PACKED_NC}, /* compile-time default   */
+        {60, 128, 1024},
+        {240, 256, 4096},
+        {120, 512, 2048},
     };
     const int NCAND = (int)(sizeof(cands) / sizeof(cands[0]));
-    const int REPS = 3;
+    const int REPS  = 3;
 
     double best_t = 1e18;
-    int best = 0;
+    int best      = 0;
     for (int ci = 0; ci < NCAND; ci++) {
         double t0 = now_ms();
         for (int r = 0; r < REPS; r++)
-            sgemm_packed_avx(A, B, C, M, N, K, alpha, beta, a_pack, b_pack,
-                             cands[ci].mc, cands[ci].kc, cands[ci].nc);
+            sgemm_packed_avx(A, B, C, M, N, K, alpha, beta, a_pack, b_pack, cands[ci].mc,
+                             cands[ci].kc, cands[ci].nc);
         double dt = now_ms() - t0;
-        if (dt < best_t) { best_t = dt; best = ci; }
+        if (dt < best_t) {
+            best_t = dt;
+            best   = ci;
+        }
     }
     *out_mc = cands[best].mc;
     *out_kc = cands[best].kc;
@@ -666,8 +716,8 @@ static void autotune_run(const float* A, const float* B, float* C,
     }
     pthread_mutex_unlock(&g_at_lock);
     autotune_save(M, N, K, *out_mc, *out_kc, *out_nc);
-    LOG_INFO("GEMM autotune %dx%dx%d -> MC=%d KC=%d NC=%d (%.2f ms)",
-             M, N, K, *out_mc, *out_kc, *out_nc, best_t);
+    LOG_INFO("GEMM autotune %dx%dx%d -> MC=%d KC=%d NC=%d (%.2f ms)", M, N, K, *out_mc, *out_kc,
+             *out_nc, best_t);
 }
 
 #endif /* __FMA__ */
@@ -692,10 +742,9 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
 #if defined(__AVX2__) || defined(__AVX__)
     {
         long long flops = (long long)M * N * K;
-        bool use_avx = flops < SMALL_GEMM_THRESHOLD ||
-                       (!ctx->is_ilp64 &&
-                        M <= INFERENCE_BATCH_THRESHOLD &&
-                        (long long)N * K <= INFERENCE_WEIGHT_THRESHOLD);
+        bool use_avx =
+            flops < SMALL_GEMM_THRESHOLD || (!ctx->is_ilp64 && M <= INFERENCE_BATCH_THRESHOLD &&
+                                             (long long)N * K <= INFERENCE_WEIGHT_THRESHOLD);
         if (use_avx) {
             sgemm_avx_small(A, B, C, M, N, K, alpha, beta);
             return 0;
@@ -706,11 +755,11 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
          * (N > PACKED_NC means ILP64's multi-threading beats the single-threaded
          * packed kernel even at small flops — e.g. im2col GEMM M=16, N=7200, K=27).
          * Without ILP64: always use packed (far better than LP64 OpenBLAS-OpenMP). */
-        bool use_packed = !ctx->is_ilp64 ||
-                          (flops < MEDIUM_GEMM_THRESHOLD && N <= PACKED_NC);
+        bool use_packed = !ctx->is_ilp64 || (flops < MEDIUM_GEMM_THRESHOLD && N <= PACKED_NC);
         if (use_packed) {
             int nc_alloc = ((N + PACKED_NR - 1) / PACKED_NR) * PACKED_NR;
-            if (nc_alloc > PACKED_NC) nc_alloc = PACKED_NC;
+            if (nc_alloc > PACKED_NC)
+                nc_alloc = PACKED_NC;
             size_t need_a = (size_t)PACKED_MC * PACKED_KC * sizeof(float);
             size_t need_b = (size_t)nc_alloc * PACKED_KC * sizeof(float);
             /* Grow context-resident buffers lazily — amortises alloc across calls */
@@ -726,17 +775,16 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
             }
             if (ctx->pack_a_buf && ctx->pack_b_buf) {
                 int mc = PACKED_MC, kc = PACKED_KC, nc = PACKED_NC;
-                static int at_checked = -1;   /* -1 unknown, 0 off, 1 on */
+                static int at_checked = -1; /* -1 unknown, 0 off, 1 on */
                 if (at_checked < 0)
                     at_checked = getenv("CML_AUTOTUNE") != NULL ? 1 : 0;
-                if (at_checked &&
-                    !autotune_lookup(M, N, K, &mc, &kc, &nc)) {
+                if (at_checked && !autotune_lookup(M, N, K, &mc, &kc, &nc)) {
                     /* tune on the caller's buffers; C is scratch here */
-                    autotune_run(A, B, C, M, N, K, alpha, beta,
-                                 ctx->pack_a_buf, ctx->pack_b_buf, &mc, &kc, &nc);
+                    autotune_run(A, B, C, M, N, K, alpha, beta, ctx->pack_a_buf, ctx->pack_b_buf,
+                                 &mc, &kc, &nc);
                 }
-                sgemm_packed_avx(A, B, C, M, N, K, alpha, beta,
-                                 ctx->pack_a_buf, ctx->pack_b_buf, mc, kc, nc);
+                sgemm_packed_avx(A, B, C, M, N, K, alpha, beta, ctx->pack_a_buf, ctx->pack_b_buf,
+                                 mc, kc, nc);
                 return 0;
             }
         }
@@ -766,21 +814,22 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
 /* f64 GEMM: straight cblas_dgemm, row-major no-transpose. The f32 packing
  * fast paths do not apply (they are float-only microkernels); dgemm itself is
  * compute-bound enough that BLAS threading wins at every size we see. */
-int cml_blas_dgemm(CMLBlasContext* ctx, const double* A, const double* B, double* C,
-                   int M, int N, int K, double alpha, double beta) {
+int cml_blas_dgemm(CMLBlasContext* ctx, const double* A, const double* B, double* C, int M, int N,
+                   int K, double alpha, double beta) {
     if (!ctx)
         ctx = cml_blas_get_context();
     if (!ctx || !ctx->initialized || !A || !B || !C || M <= 0 || N <= 0 || K <= 0)
         return -1;
     if (!ctx->cblas_dgemm)
-        return -1;   /* ILP64 scipy_openblas64 build: no dgemm loaded */
-    ctx->cblas_dgemm(CML_BLAS_ROW_MAJOR, CML_BLAS_NO_TRANS, CML_BLAS_NO_TRANS,
-                     M, N, K, alpha, A, K, B, N, beta, C, N);
+        return -1; /* ILP64 scipy_openblas64 build: no dgemm loaded */
+    ctx->cblas_dgemm(CML_BLAS_ROW_MAJOR, CML_BLAS_NO_TRANS, CML_BLAS_NO_TRANS, M, N, K, alpha, A, K,
+                     B, N, beta, C, N);
     return 0;
 }
 
 int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
-                      int K, float alpha, float beta, bool transA, bool transB) {    if (!ctx)
+                      int K, float alpha, float beta, bool transA, bool transB) {
+    if (!ctx)
         ctx = cml_blas_get_context();
     if (!ctx || !ctx->initialized || !A || !B || !C || M <= 0 || N <= 0 || K <= 0)
         return -1;
@@ -807,16 +856,22 @@ int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float
             const float* Bnp = B;
             float* a_scratch = NULL;
             float* b_scratch = NULL;
-            bool ok = true;
-            if (transA) {  /* A is [K,M] row-major -> want [M,K] */
+            bool ok          = true;
+            if (transA) { /* A is [K,M] row-major -> want [M,K] */
                 a_scratch = (float*)cml_aligned_alloc((size_t)M * K * sizeof(float), 32);
-                if (a_scratch) { simd_transpose_f32(A, a_scratch, K, M); Anp = a_scratch; }
-                else ok = false;
+                if (a_scratch) {
+                    simd_transpose_f32(A, a_scratch, K, M);
+                    Anp = a_scratch;
+                } else
+                    ok = false;
             }
-            if (ok && transB) {  /* B is [N,K] row-major -> want [K,N] */
+            if (ok && transB) { /* B is [N,K] row-major -> want [K,N] */
                 b_scratch = (float*)cml_aligned_alloc((size_t)K * N * sizeof(float), 32);
-                if (b_scratch) { simd_transpose_f32(B, b_scratch, N, K); Bnp = b_scratch; }
-                else ok = false;
+                if (b_scratch) {
+                    simd_transpose_f32(B, b_scratch, N, K);
+                    Bnp = b_scratch;
+                } else
+                    ok = false;
             }
             if (ok) {
                 int rc = cml_blas_sgemm(ctx, Anp, Bnp, C, M, N, K, alpha, beta);
@@ -838,9 +893,9 @@ int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float
     int ldb = transB ? K : N;
 
     if (ctx->is_ilp64 && ctx->ilp64_sgemm) {
-        ctx->ilp64_sgemm((int64_t)CML_BLAS_ROW_MAJOR, (int64_t)ta, (int64_t)tb,
-                         (int64_t)M, (int64_t)N, (int64_t)K,
-                         alpha, A, (int64_t)lda, B, (int64_t)ldb, beta, C, (int64_t)N);
+        ctx->ilp64_sgemm((int64_t)CML_BLAS_ROW_MAJOR, (int64_t)ta, (int64_t)tb, (int64_t)M,
+                         (int64_t)N, (int64_t)K, alpha, A, (int64_t)lda, B, (int64_t)ldb, beta, C,
+                         (int64_t)N);
         return 0;
     }
     if (ctx->cblas_sgemm) {
@@ -869,9 +924,8 @@ int cml_blas_sgemv(CMLBlasContext* ctx, const float* A, const float* x, float* y
         return -1;
 
     if (ctx->is_ilp64 && ctx->ilp64_sgemv) {
-        ctx->ilp64_sgemv((int64_t)CML_BLAS_ROW_MAJOR, (int64_t)CML_BLAS_NO_TRANS,
-                         (int64_t)M, (int64_t)N, alpha, A, (int64_t)N, x, (int64_t)1,
-                         beta, y, (int64_t)1);
+        ctx->ilp64_sgemv((int64_t)CML_BLAS_ROW_MAJOR, (int64_t)CML_BLAS_NO_TRANS, (int64_t)M,
+                         (int64_t)N, alpha, A, (int64_t)N, x, (int64_t)1, beta, y, (int64_t)1);
         return 0;
     }
     if (ctx->cblas_sgemv) {

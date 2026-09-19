@@ -8,58 +8,48 @@
 #include "alloc/cml_allocator.h"
 
 BERTConfig cml_zoo_bert_config_tiny(void) {
-    return (BERTConfig){
-        .vocab_size        = 30522,
-        .n_layer           = 4,
-        .n_head            = 2,
-        .hidden_size       = 128,
-        .intermediate_size = 512,
-        .max_position      = 512
-    };
+    return (BERTConfig){.vocab_size        = 30522,
+                        .n_layer           = 4,
+                        .n_head            = 2,
+                        .hidden_size       = 128,
+                        .intermediate_size = 512,
+                        .max_position      = 512};
 }
 
 BERTConfig cml_zoo_bert_config_mini(void) {
-    return (BERTConfig){
-        .vocab_size        = 30522,
-        .n_layer           = 4,
-        .n_head            = 4,
-        .hidden_size       = 256,
-        .intermediate_size = 1024,
-        .max_position      = 512
-    };
+    return (BERTConfig){.vocab_size        = 30522,
+                        .n_layer           = 4,
+                        .n_head            = 4,
+                        .hidden_size       = 256,
+                        .intermediate_size = 1024,
+                        .max_position      = 512};
 }
 
 BERTConfig cml_zoo_bert_config_small(void) {
-    return (BERTConfig){
-        .vocab_size        = 30522,
-        .n_layer           = 4,
-        .n_head            = 8,
-        .hidden_size       = 512,
-        .intermediate_size = 2048,
-        .max_position      = 512
-    };
+    return (BERTConfig){.vocab_size        = 30522,
+                        .n_layer           = 4,
+                        .n_head            = 8,
+                        .hidden_size       = 512,
+                        .intermediate_size = 2048,
+                        .max_position      = 512};
 }
 
 BERTConfig cml_zoo_bert_config_base(void) {
-    return (BERTConfig){
-        .vocab_size        = 30522,
-        .n_layer           = 12,
-        .n_head            = 12,
-        .hidden_size       = 768,
-        .intermediate_size = 3072,
-        .max_position      = 512
-    };
+    return (BERTConfig){.vocab_size        = 30522,
+                        .n_layer           = 12,
+                        .n_head            = 12,
+                        .hidden_size       = 768,
+                        .intermediate_size = 3072,
+                        .max_position      = 512};
 }
 
 BERTConfig cml_zoo_bert_config_large(void) {
-    return (BERTConfig){
-        .vocab_size        = 30522,
-        .n_layer           = 24,
-        .n_head            = 16,
-        .hidden_size       = 1024,
-        .intermediate_size = 4096,
-        .max_position      = 512
-    };
+    return (BERTConfig){.vocab_size        = 30522,
+                        .n_layer           = 24,
+                        .n_head            = 16,
+                        .hidden_size       = 1024,
+                        .intermediate_size = 4096,
+                        .max_position      = 512};
 }
 
 typedef struct {
@@ -113,8 +103,8 @@ static void bert_block_free(Module* module) {
     cml_free(block);
 }
 
-static Module* create_bert_block(int hidden_size, int n_head, int intermediate_size,
-                                  int n_layer, DType dtype, DeviceType device) {
+static Module* create_bert_block(int hidden_size, int n_head, int intermediate_size, int n_layer,
+                                 DType dtype, DeviceType device) {
     BERTEncoderBlock* block = cml_malloc(sizeof(BERTEncoderBlock));
     if (!block)
         return NULL;
@@ -129,7 +119,8 @@ static Module* create_bert_block(int hidden_size, int n_head, int intermediate_s
     block->attn_norm = nn_layernorm(hidden_size, 1e-12f, true, dtype, device);
 
     block->mlp = nn_sequential();
-    sequential_add(block->mlp, (Module*)nn_linear(hidden_size, intermediate_size, dtype, device, true));
+    sequential_add(block->mlp,
+                   (Module*)nn_linear(hidden_size, intermediate_size, dtype, device, true));
     sequential_add(block->mlp, (Module*)nn_gelu(false));
     Linear* mlp_proj = nn_linear(intermediate_size, hidden_size, dtype, device, true);
     sequential_add(block->mlp, (Module*)mlp_proj);
@@ -223,13 +214,13 @@ Module* cml_zoo_bert_create(BERTConfig* config, DType dtype, DeviceType device) 
 
     bert->layers = nn_module_list();
     for (int i = 0; i < config->n_layer; i++)
-        module_list_append(bert->layers, create_bert_block(
-            config->hidden_size, config->n_head, config->intermediate_size,
-            config->n_layer, dtype, device));
+        module_list_append(bert->layers, create_bert_block(config->hidden_size, config->n_head,
+                                                           config->intermediate_size,
+                                                           config->n_layer, dtype, device));
 
     bert->pooler = nn_linear(config->hidden_size, config->hidden_size, dtype, device, true);
 
-    LOG_INFO("Created BERT (%d layers, %d hidden, %d heads, %d vocab)",
-             config->n_layer, config->hidden_size, config->n_head, config->vocab_size);
+    LOG_INFO("Created BERT (%d layers, %d hidden, %d heads, %d vocab)", config->n_layer,
+             config->hidden_size, config->n_head, config->vocab_size);
     return (Module*)bert;
 }

@@ -26,7 +26,7 @@ static void test_trace_begin_end(void) {
     REQUIRE(trace != NULL);
 
     uint64_t graph_hash = 0x12345678;
-    int ret = cml_trace_begin(trace, graph_hash);
+    int ret             = cml_trace_begin(trace, graph_hash);
     REQUIRE(ret == 0);
     REQUIRE(trace->is_recording == true);
     REQUIRE(trace->graph_hash == graph_hash);
@@ -50,13 +50,12 @@ static void test_trace_record_kernel(void) {
     REQUIRE(ret == 0);
 
     /* Record a kernel entry */
-    size_t grid[3] = { 64, 1, 1 };
-    size_t block[3] = { 256, 1, 1 };
-    int arg_indices[] = { 0, 1, 2 };
+    size_t grid[3]    = {64, 1, 1};
+    size_t block[3]   = {256, 1, 1};
+    int arg_indices[] = {0, 1, 2};
     void* fake_kernel = (void*)0xDEAD;
 
-    ret = cml_trace_record_kernel(trace, 0x1111, fake_kernel,
-                                   grid, block, arg_indices, 3);
+    ret = cml_trace_record_kernel(trace, 0x1111, fake_kernel, grid, block, arg_indices, 3);
     REQUIRE(ret == 0);
     REQUIRE(trace->num_entries == 1);
 
@@ -72,12 +71,11 @@ static void test_trace_record_kernel(void) {
     REQUIRE(trace->entries[0].arg_indices[2] == 2);
 
     /* Record a second kernel */
-    size_t grid2[3] = { 32, 32, 1 };
-    size_t block2[3] = { 16, 16, 1 };
-    int arg_indices2[] = { 3, 4 };
+    size_t grid2[3]    = {32, 32, 1};
+    size_t block2[3]   = {16, 16, 1};
+    int arg_indices2[] = {3, 4};
 
-    ret = cml_trace_record_kernel(trace, 0x2222, (void*)0xBEEF,
-                                   grid2, block2, arg_indices2, 2);
+    ret = cml_trace_record_kernel(trace, 0x2222, (void*)0xBEEF, grid2, block2, arg_indices2, 2);
     REQUIRE(ret == 0);
     REQUIRE(trace->num_entries == 2);
 
@@ -131,13 +129,13 @@ static void test_cache_insert_lookup(void) {
     REQUIRE(trace != NULL);
 
     uint64_t hash = 0xCAFE;
-    int ret = cml_trace_begin(trace, hash);
+    int ret       = cml_trace_begin(trace, hash);
     REQUIRE(ret == 0);
 
-    size_t grid[3] = { 128, 1, 1 };
-    size_t block[3] = { 64, 1, 1 };
-    int args[] = { 0, 1 };
-    ret = cml_trace_record_kernel(trace, 0x5555, (void*)0x1, grid, block, args, 2);
+    size_t grid[3]  = {128, 1, 1};
+    size_t block[3] = {64, 1, 1};
+    int args[]      = {0, 1};
+    ret             = cml_trace_record_kernel(trace, 0x5555, (void*)0x1, grid, block, args, 2);
     REQUIRE(ret == 0);
 
     ret = cml_trace_end(trace);
@@ -176,7 +174,7 @@ static void test_cache_multiple_entries(void) {
         REQUIRE(trace != NULL);
 
         uint64_t hash = (uint64_t)(1000 + i);
-        int ret = cml_trace_begin(trace, hash);
+        int ret       = cml_trace_begin(trace, hash);
         REQUIRE(ret == 0);
         ret = cml_trace_end(trace);
         REQUIRE(ret == 0);
@@ -189,7 +187,7 @@ static void test_cache_multiple_entries(void) {
 
     /* Verify all can be found */
     for (int i = 0; i < 10; i++) {
-        uint64_t hash = (uint64_t)(1000 + i);
+        uint64_t hash   = (uint64_t)(1000 + i);
         CMLTrace* found = cml_trace_cache_lookup(cache, hash);
         REQUIRE(found != NULL);
         REQUIRE(found->graph_hash == hash);

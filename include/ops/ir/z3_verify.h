@@ -23,8 +23,8 @@ typedef enum {
 
 typedef struct CMLZ3Verifier {
     bool initialized;
-    void* z3_context;        /* Z3_context handle */
-    void* z3_solver;         /* Z3_solver handle */
+    void* z3_context; /* Z3_context handle */
+    void* z3_solver;  /* Z3_solver handle */
     int timeout_ms;
     int num_checks;
     int num_passed;
@@ -34,14 +34,11 @@ typedef struct CMLZ3Verifier {
 bool cml_z3_available(void);
 CMLZ3Verifier* cml_z3_verifier_create(int timeout_ms);
 void cml_z3_verifier_free(CMLZ3Verifier* v);
-CMLVerifyResult cml_z3_verify_equivalence(CMLZ3Verifier* v,
-                                           CMLGraph_t original,
-                                           CMLGraph_t optimized);
+CMLVerifyResult cml_z3_verify_equivalence(CMLZ3Verifier* v, CMLGraph_t original,
+                                          CMLGraph_t optimized);
 CMLVerifyResult cml_z3_verify_bounds(CMLZ3Verifier* v, CMLGraph_t ir);
-CMLVerifyResult cml_z3_verify_schedule(CMLZ3Verifier* v,
-                                        CMLGraph_t ir, void* schedule);
-void cml_z3_verifier_stats(const CMLZ3Verifier* v,
-                            int* checks, int* passed, int* failed);
+CMLVerifyResult cml_z3_verify_schedule(CMLZ3Verifier* v, CMLGraph_t ir, void* schedule);
+void cml_z3_verifier_stats(const CMLZ3Verifier* v, int* checks, int* passed, int* failed);
 
 #ifdef __cplusplus
 }

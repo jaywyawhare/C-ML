@@ -19,11 +19,11 @@ struct CMLGraph;
 typedef struct CMLGraph* CMLGraph_t;
 
 typedef struct CMLWebGPUBackend {
-    void* instance;     /* WGPUInstance */
-    void* adapter;      /* WGPUAdapter */
-    void* device;       /* WGPUDevice */
-    void* queue;        /* WGPUQueue */
-    void* lib_handle;   /* dlopen handle */
+    void* instance;   /* WGPUInstance */
+    void* adapter;    /* WGPUAdapter */
+    void* device;     /* WGPUDevice */
+    void* queue;      /* WGPUQueue */
+    void* lib_handle; /* dlopen handle */
     char device_name[128];
     bool initialized;
 
@@ -56,10 +56,10 @@ typedef struct CMLWebGPUBackend {
 } CMLWebGPUBackend;
 
 typedef struct CMLWebGPUKernel {
-    void* pipeline;         /* WGPUComputePipeline */
+    void* pipeline;          /* WGPUComputePipeline */
     void* bind_group_layout; /* WGPUBindGroupLayout */
-    void* pipeline_layout;  /* WGPUPipelineLayout */
-    void* shader_module;    /* WGPUShaderModule */
+    void* pipeline_layout;   /* WGPUPipelineLayout */
+    void* shader_module;     /* WGPUShaderModule */
     char name[64];
 } CMLWebGPUKernel;
 
@@ -69,21 +69,19 @@ CMLWebGPUBackend* cml_webgpu_backend_create(void);
 int cml_webgpu_backend_init(CMLWebGPUBackend* backend);
 void cml_webgpu_backend_free(CMLWebGPUBackend* backend);
 
-CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend,
-                                           const char* wgsl_source,
-                                           const char* entry_point);
+CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend, const char* wgsl_source,
+                                         const char* entry_point);
 void cml_webgpu_kernel_free(CMLWebGPUKernel* kernel);
 
 int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend, CMLWebGPUKernel* kernel,
-                             size_t workgroup_count[3],
-                             void** buffers, size_t* buffer_sizes, int num_buffers);
+                             size_t workgroup_count[3], void** buffers, size_t* buffer_sizes,
+                             int num_buffers);
 
 void* cml_webgpu_alloc(CMLWebGPUBackend* backend, size_t size);
 void cml_webgpu_free(CMLWebGPUBackend* backend, void* buffer);
-int cml_webgpu_upload(CMLWebGPUBackend* backend, void* dst_buffer,
-                      const void* src_host, size_t size);
-int cml_webgpu_download(CMLWebGPUBackend* backend, void* dst_host,
-                        void* src_buffer, size_t size);
+int cml_webgpu_upload(CMLWebGPUBackend* backend, void* dst_buffer, const void* src_host,
+                      size_t size);
+int cml_webgpu_download(CMLWebGPUBackend* backend, void* dst_host, void* src_buffer, size_t size);
 
 char* cml_wgsl_generate(struct IRNode* node);
 

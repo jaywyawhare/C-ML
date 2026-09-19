@@ -31,7 +31,7 @@ typedef enum {
 typedef struct CMLHCQSignal {
     CMLHCQBackendType backend;
     uint64_t timeline_value;
-    void* native_handle;   /* cl_event, CUevent, etc. */
+    void* native_handle; /* cl_event, CUevent, etc. */
     bool signaled;
 } CMLHCQSignal;
 
@@ -39,14 +39,14 @@ typedef struct CMLHCQSignal {
 
 typedef struct CMLHCQQueue {
     CMLHCQBackendType backend;
-    void* native_handle;   /* CUstream, cl_command_queue, etc. */
+    void* native_handle; /* CUstream, cl_command_queue, etc. */
     CMLHCQSignal* wait_signals[CML_HCQ_MAX_WAIT_SIGNALS];
     int num_wait_signals;
     bool active;
 } CMLHCQQueue;
 
 typedef struct {
-    void* compiled_kernel;  /* backend-specific compiled kernel */
+    void* compiled_kernel; /* backend-specific compiled kernel */
     size_t grid[3];
     size_t block[3];
     void** args;

@@ -17,8 +17,12 @@
 
 static int check(const char* name, int ok) {
     tests_run++;
-    if (ok) { tests_passed++; printf("  PASS: %s\n", name); }
-    else    { printf("  FAIL: %s\n", name); }
+    if (ok) {
+        tests_passed++;
+        printf("  PASS: %s\n", name);
+    } else {
+        printf("  FAIL: %s\n", name);
+    }
     return ok;
 }
 
@@ -42,8 +46,8 @@ int main(void) {
     check("error_code_set", cml_get_last_error_code() == CM_OPERATION_FAILED);
     check("error_string_maps",
           strcmp(cml_error_string(CM_OPERATION_FAILED), "operation failed") == 0 &&
-          strcmp(cml_error_string(CM_INVALID_ARGUMENT), "invalid argument") == 0 &&
-          strcmp(cml_error_string(12345), "unknown error") == 0);
+              strcmp(cml_error_string(CM_INVALID_ARGUMENT), "invalid argument") == 0 &&
+              strcmp(cml_error_string(12345), "unknown error") == 0);
 
     /* An int-returning op that fails (bad dims) also records. */
     cml_clear_last_error();
@@ -51,9 +55,8 @@ int main(void) {
     check("int_op_returns_code", rc == -1);
     /* (that particular guard returns before logging; verify the stack API is
      * still consistent — no error unless one was logged) */
-    check("clear_resets",
-          (cml_clear_last_error(), cml_get_last_error() == NULL &&
-           cml_get_last_error_code() == CM_SUCCESS));
+    check("clear_resets", (cml_clear_last_error(), cml_get_last_error() == NULL &&
+                                                       cml_get_last_error_code() == CM_SUCCESS));
 
     return TEST_SUMMARY();
 }

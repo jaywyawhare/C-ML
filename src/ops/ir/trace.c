@@ -8,30 +8,24 @@
 
 static _Thread_local CMLTrace* g_active_trace = NULL;
 
-CMLTrace* cml_trace_get_active(void) {
-    return g_active_trace;
-}
+CMLTrace* cml_trace_get_active(void) { return g_active_trace; }
 
-void cml_trace_set_active(CMLTrace* trace) {
-    g_active_trace = trace;
-}
+void cml_trace_set_active(CMLTrace* trace) { g_active_trace = trace; }
 
-
-CMLTrace *cml_trace_create(void)
-{
-    CMLTrace *trace = (CMLTrace *)cml_calloc(1, sizeof(CMLTrace));
+CMLTrace* cml_trace_create(void) {
+    CMLTrace* trace = (CMLTrace*)cml_calloc(1, sizeof(CMLTrace));
     return trace; /* NULL on allocation failure */
 }
 
-void cml_trace_free(CMLTrace *trace)
-{
-    if (!trace) return;
+void cml_trace_free(CMLTrace* trace) {
+    if (!trace)
+        return;
     cml_free(trace);
 }
 
-int cml_trace_begin(CMLTrace *trace, uint64_t graph_hash)
-{
-    if (!trace) return -1;
+int cml_trace_begin(CMLTrace* trace, uint64_t graph_hash) {
+    if (!trace)
+        return -1;
 
     trace->is_recording = true;
     trace->is_complete  = false;
@@ -44,9 +38,9 @@ int cml_trace_begin(CMLTrace *trace, uint64_t graph_hash)
     return 0;
 }
 
-int cml_trace_end(CMLTrace *trace)
-{
-    if (!trace) return -1;
+int cml_trace_end(CMLTrace* trace) {
+    if (!trace)
+        return -1;
 
     trace->is_recording = false;
     trace->is_complete  = true;
@@ -54,21 +48,22 @@ int cml_trace_end(CMLTrace *trace)
     return 0;
 }
 
-int cml_trace_record_kernel(CMLTrace *trace, uint64_t kernel_hash,
-                            void *compiled_kernel, const size_t grid[3],
-                            const size_t block[3], int *arg_indices,
-                            int num_args)
-{
-    if (!trace || !trace->is_recording) return -1;
-    if (trace->num_entries >= CML_TRACE_MAX_ENTRIES) return -2;
-    if (num_args > CML_TRACE_MAX_ARGS) return -3;
+int cml_trace_record_kernel(CMLTrace* trace, uint64_t kernel_hash, void* compiled_kernel,
+                            const size_t grid[3], const size_t block[3], int* arg_indices,
+                            int num_args) {
+    if (!trace || !trace->is_recording)
+        return -1;
+    if (trace->num_entries >= CML_TRACE_MAX_ENTRIES)
+        return -2;
+    if (num_args > CML_TRACE_MAX_ARGS)
+        return -3;
 
-    CMLTraceEntry *entry = &trace->entries[trace->num_entries];
+    CMLTraceEntry* entry   = &trace->entries[trace->num_entries];
     entry->type            = CML_TRACE_KERNEL;
     entry->kernel_hash     = kernel_hash;
     entry->compiled_kernel = compiled_kernel;
 
-    memcpy(entry->grid,  grid,  sizeof(size_t) * 3);
+    memcpy(entry->grid, grid, sizeof(size_t) * 3);
     memcpy(entry->block, block, sizeof(size_t) * 3);
 
     entry->num_args = num_args;
@@ -84,19 +79,21 @@ int cml_trace_record_kernel(CMLTrace *trace, uint64_t kernel_hash,
     return 0;
 }
 
-int cml_trace_record_memcpy(CMLTrace *trace, CMLTraceEntryType type,
-                            int src_slot, int dst_slot, size_t bytes)
-{
-    if (!trace || !trace->is_recording) return -1;
-    if (trace->num_entries >= CML_TRACE_MAX_ENTRIES) return -2;
-    if (type != CML_TRACE_MEMCPY_H2D && type != CML_TRACE_MEMCPY_D2H) return -3;
+int cml_trace_record_memcpy(CMLTrace* trace, CMLTraceEntryType type, int src_slot, int dst_slot,
+                            size_t bytes) {
+    if (!trace || !trace->is_recording)
+        return -1;
+    if (trace->num_entries >= CML_TRACE_MAX_ENTRIES)
+        return -2;
+    if (type != CML_TRACE_MEMCPY_H2D && type != CML_TRACE_MEMCPY_D2H)
+        return -3;
 
-    CMLTraceEntry *entry = &trace->entries[trace->num_entries];
-    entry->type        = type;
-    entry->kernel_hash = 0;
+    CMLTraceEntry* entry   = &trace->entries[trace->num_entries];
+    entry->type            = type;
+    entry->kernel_hash     = 0;
     entry->compiled_kernel = NULL;
 
-    memset(entry->grid,  0, sizeof(entry->grid));
+    memset(entry->grid, 0, sizeof(entry->grid));
     memset(entry->block, 0, sizeof(entry->block));
     entry->num_args = 0;
 
@@ -108,34 +105,34 @@ int cml_trace_record_memcpy(CMLTrace *trace, CMLTraceEntryType type,
     return 0;
 }
 
-typedef void (*cml_kernel_fn_t)(void **args, int num_args,
-                                const size_t grid[3],
+typedef void (*cml_kernel_fn_t)(void** args, int num_args, const size_t grid[3],
                                 const size_t block[3]);
 
-int cml_trace_replay(CMLTrace *trace, void **tensor_ptrs, int num_tensors)
-{
-    if (!trace || !trace->is_complete) return -1;
-    if (!tensor_ptrs && num_tensors > 0) return -2;
+int cml_trace_replay(CMLTrace* trace, void** tensor_ptrs, int num_tensors) {
+    if (!trace || !trace->is_complete)
+        return -1;
+    if (!tensor_ptrs && num_tensors > 0)
+        return -2;
 
-    int slots_to_copy = (num_tensors < trace->num_slots)
-                            ? num_tensors
-                            : trace->num_slots;
+    int slots_to_copy = (num_tensors < trace->num_slots) ? num_tensors : trace->num_slots;
     for (int i = 0; i < slots_to_copy; i++) {
         trace->tensor_slots[i] = tensor_ptrs[i];
     }
 
     for (int i = 0; i < trace->num_entries; i++) {
-        CMLTraceEntry *e = &trace->entries[i];
+        CMLTraceEntry* e = &trace->entries[i];
 
         switch (e->type) {
 
         case CML_TRACE_KERNEL: {
-            if (!e->compiled_kernel) return -3;
+            if (!e->compiled_kernel)
+                return -3;
 
-            void *args[CML_TRACE_MAX_ARGS];
+            void* args[CML_TRACE_MAX_ARGS];
             for (int a = 0; a < e->num_args; a++) {
                 int slot = e->arg_indices[a];
-                if (slot < 0 || slot >= num_tensors) return -4;
+                if (slot < 0 || slot >= num_tensors)
+                    return -4;
                 args[a] = tensor_ptrs[slot];
             }
 
@@ -146,12 +143,15 @@ int cml_trace_replay(CMLTrace *trace, void **tensor_ptrs, int num_tensors)
 
         case CML_TRACE_MEMCPY_H2D:
         case CML_TRACE_MEMCPY_D2H: {
-            if (e->src_slot < 0 || e->src_slot >= num_tensors) return -4;
-            if (e->dst_slot < 0 || e->dst_slot >= num_tensors) return -4;
+            if (e->src_slot < 0 || e->src_slot >= num_tensors)
+                return -4;
+            if (e->dst_slot < 0 || e->dst_slot >= num_tensors)
+                return -4;
 
-            void *src = tensor_ptrs[e->src_slot];
-            void *dst = tensor_ptrs[e->dst_slot];
-            if (!src || !dst) return -5;
+            void* src = tensor_ptrs[e->src_slot];
+            void* dst = tensor_ptrs[e->dst_slot];
+            if (!src || !dst)
+                return -5;
 
             memcpy(dst, src, e->memcpy_bytes);
             break;
@@ -165,15 +165,14 @@ int cml_trace_replay(CMLTrace *trace, void **tensor_ptrs, int num_tensors)
     return 0;
 }
 
-CMLTraceCache *cml_trace_cache_create(void)
-{
-    CMLTraceCache *cache = (CMLTraceCache *)cml_calloc(1, sizeof(CMLTraceCache));
+CMLTraceCache* cml_trace_cache_create(void) {
+    CMLTraceCache* cache = (CMLTraceCache*)cml_calloc(1, sizeof(CMLTraceCache));
     return cache;
 }
 
-void cml_trace_cache_free(CMLTraceCache *cache)
-{
-    if (!cache) return;
+void cml_trace_cache_free(CMLTraceCache* cache) {
+    if (!cache)
+        return;
 
     for (int i = 0; i < CML_TRACE_CACHE_SIZE; i++) {
         if (cache->entries[i].occupied && cache->entries[i].trace) {
@@ -183,9 +182,9 @@ void cml_trace_cache_free(CMLTraceCache *cache)
     cml_free(cache);
 }
 
-CMLTrace *cml_trace_cache_lookup(CMLTraceCache *cache, uint64_t graph_hash)
-{
-    if (!cache) return NULL;
+CMLTrace* cml_trace_cache_lookup(CMLTraceCache* cache, uint64_t graph_hash) {
+    if (!cache)
+        return NULL;
 
     uint64_t idx = graph_hash % CML_TRACE_CACHE_SIZE;
 
@@ -203,11 +202,11 @@ CMLTrace *cml_trace_cache_lookup(CMLTraceCache *cache, uint64_t graph_hash)
     return NULL; /* table full, not found */
 }
 
-int cml_trace_cache_insert(CMLTraceCache *cache, uint64_t graph_hash,
-                           CMLTrace *trace)
-{
-    if (!cache || !trace) return -1;
-    if (cache->count >= CML_TRACE_CACHE_SIZE) return -2; /* full */
+int cml_trace_cache_insert(CMLTraceCache* cache, uint64_t graph_hash, CMLTrace* trace) {
+    if (!cache || !trace)
+        return -1;
+    if (cache->count >= CML_TRACE_CACHE_SIZE)
+        return -2; /* full */
 
     uint64_t idx = graph_hash % CML_TRACE_CACHE_SIZE;
 
@@ -234,31 +233,33 @@ int cml_trace_cache_insert(CMLTraceCache *cache, uint64_t graph_hash,
     return -2; /* should not reach here if count < size */
 }
 
-static CMLTraceCache *g_trace_cache = NULL;
+static CMLTraceCache* g_trace_cache = NULL;
 
-int cml_ir_execute_traced(CMLGraph_t ir)
-{
-    if (!ir) return -1;
+int cml_ir_execute_traced(CMLGraph_t ir) {
+    if (!ir)
+        return -1;
 
     if (!g_trace_cache) {
         g_trace_cache = cml_trace_cache_create();
-        if (!g_trace_cache) return -2;
+        if (!g_trace_cache)
+            return -2;
     }
 
     uint64_t hash = cml_ir_graph_hash(ir);
 
-    CMLTrace *trace = cml_trace_cache_lookup(g_trace_cache, hash);
+    CMLTrace* trace = cml_trace_cache_lookup(g_trace_cache, hash);
 
     if (trace && trace->is_complete) {
 
-        void *tensor_ptrs[CML_TRACE_MAX_ENTRIES];
+        void* tensor_ptrs[CML_TRACE_MAX_ENTRIES];
         int n = cml_ir_output_slots(ir, tensor_ptrs, CML_TRACE_MAX_ENTRIES);
 
         return cml_trace_replay(trace, tensor_ptrs, n);
     }
 
     trace = cml_trace_create();
-    if (!trace) return -3;
+    if (!trace)
+        return -3;
 
     cml_trace_begin(trace, hash);
 
@@ -275,8 +276,7 @@ int cml_ir_execute_traced(CMLGraph_t ir)
 
     cml_trace_end(trace);
 
-    trace->num_slots =
-        cml_ir_output_slots(ir, trace->tensor_slots, CML_TRACE_MAX_ENTRIES);
+    trace->num_slots = cml_ir_output_slots(ir, trace->tensor_slots, CML_TRACE_MAX_ENTRIES);
 
     cml_trace_cache_insert(g_trace_cache, hash, trace);
 

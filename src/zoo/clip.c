@@ -9,58 +9,52 @@
 #include "alloc/cml_allocator.h"
 
 CMLCLIPConfig cml_zoo_clip_config_vit_b32(void) {
-    return (CMLCLIPConfig){
-        .image_size    = 224,
-        .patch_size    = 32,
-        .vision_layers = 12,
-        .vision_heads  = 12,
-        .vision_dim    = 768,
-        .text_layers   = 12,
-        .text_heads    = 8,
-        .text_dim      = 512,
-        .vocab_size    = 49408,
-        .max_text_len  = 77,
-        .embed_dim     = 512
-    };
+    return (CMLCLIPConfig){.image_size    = 224,
+                           .patch_size    = 32,
+                           .vision_layers = 12,
+                           .vision_heads  = 12,
+                           .vision_dim    = 768,
+                           .text_layers   = 12,
+                           .text_heads    = 8,
+                           .text_dim      = 512,
+                           .vocab_size    = 49408,
+                           .max_text_len  = 77,
+                           .embed_dim     = 512};
 }
 
 CMLCLIPConfig cml_zoo_clip_config_vit_b16(void) {
-    return (CMLCLIPConfig){
-        .image_size    = 224,
-        .patch_size    = 16,
-        .vision_layers = 12,
-        .vision_heads  = 12,
-        .vision_dim    = 768,
-        .text_layers   = 12,
-        .text_heads    = 8,
-        .text_dim      = 512,
-        .vocab_size    = 49408,
-        .max_text_len  = 77,
-        .embed_dim     = 512
-    };
+    return (CMLCLIPConfig){.image_size    = 224,
+                           .patch_size    = 16,
+                           .vision_layers = 12,
+                           .vision_heads  = 12,
+                           .vision_dim    = 768,
+                           .text_layers   = 12,
+                           .text_heads    = 8,
+                           .text_dim      = 512,
+                           .vocab_size    = 49408,
+                           .max_text_len  = 77,
+                           .embed_dim     = 512};
 }
 
 CMLCLIPConfig cml_zoo_clip_config_vit_l14(void) {
-    return (CMLCLIPConfig){
-        .image_size    = 224,
-        .patch_size    = 14,
-        .vision_layers = 24,
-        .vision_heads  = 16,
-        .vision_dim    = 1024,
-        .text_layers   = 12,
-        .text_heads    = 12,
-        .text_dim      = 768,
-        .vocab_size    = 49408,
-        .max_text_len  = 77,
-        .embed_dim     = 768
-    };
+    return (CMLCLIPConfig){.image_size    = 224,
+                           .patch_size    = 14,
+                           .vision_layers = 24,
+                           .vision_heads  = 16,
+                           .vision_dim    = 1024,
+                           .text_layers   = 12,
+                           .text_heads    = 12,
+                           .text_dim      = 768,
+                           .vocab_size    = 49408,
+                           .max_text_len  = 77,
+                           .embed_dim     = 768};
 }
 
 /* Vision encoder block */
 
 static Module* create_vision_block(int dim, int n_head, DType dtype, DeviceType device) {
-    return (Module*)zoo_prenorm_block("CLIPVisionBlock", dim, n_head, dim * 4, 1e-5f,
-                                      dtype, device);
+    return (Module*)zoo_prenorm_block("CLIPVisionBlock", dim, n_head, dim * 4, 1e-5f, dtype,
+                                      device);
 }
 
 /* Text encoder block (causal) */
@@ -107,76 +101,99 @@ static Tensor* clip_forward(Module* module, Tensor* input) {
 
 static void clip_free(Module* module) {
     CLIPModel* clip = (CLIPModel*)module;
-    if (!clip) return;
+    if (!clip)
+        return;
 
-    if (clip->vision_patch_embed) module_free((Module*)clip->vision_patch_embed);
-    if (clip->vision_blocks) module_free((Module*)clip->vision_blocks);
-    if (clip->vision_norm) module_free((Module*)clip->vision_norm);
-    if (clip->vision_proj) module_free((Module*)clip->vision_proj);
+    if (clip->vision_patch_embed)
+        module_free((Module*)clip->vision_patch_embed);
+    if (clip->vision_blocks)
+        module_free((Module*)clip->vision_blocks);
+    if (clip->vision_norm)
+        module_free((Module*)clip->vision_norm);
+    if (clip->vision_proj)
+        module_free((Module*)clip->vision_proj);
 
-    if (clip->text_tok_embed) module_free((Module*)clip->text_tok_embed);
-    if (clip->text_blocks) module_free((Module*)clip->text_blocks);
-    if (clip->text_norm) module_free((Module*)clip->text_norm);
-    if (clip->text_proj) module_free((Module*)clip->text_proj);
+    if (clip->text_tok_embed)
+        module_free((Module*)clip->text_tok_embed);
+    if (clip->text_blocks)
+        module_free((Module*)clip->text_blocks);
+    if (clip->text_norm)
+        module_free((Module*)clip->text_norm);
+    if (clip->text_proj)
+        module_free((Module*)clip->text_proj);
 
     cml_free(clip);
 }
 
 Tensor* clip_encode_image(Module* module, Tensor* image) {
     CLIPModel* clip = (CLIPModel*)module;
-    if (!clip || !image) return NULL;
+    if (!clip || !image)
+        return NULL;
 
     Tensor* patches = module_forward((Module*)clip->vision_patch_embed, image);
-    if (!patches) return NULL;
+    if (!patches)
+        return NULL;
 
-    int batch = patches->shape[0];
+    int batch   = patches->shape[0];
     int seq_len = clip->num_vision_patches;
-    int dim = clip->vision_dim;
+    int dim     = clip->vision_dim;
 
     int patch_shape[] = {batch, seq_len, dim};
-    patches = tensor_reshape(patches, patch_shape, 3);
-    if (!patches) return NULL;
+    patches           = tensor_reshape(patches, patch_shape, 3);
+    if (!patches)
+        return NULL;
 
-    Tensor* cls = clip->vision_cls_token->tensor;
+    Tensor* cls       = clip->vision_cls_token->tensor;
     Tensor* tensors[] = {cls, patches};
-    Tensor* x = tensor_concat(tensors, 2, 1);
-    if (!x) return NULL;
+    Tensor* x         = tensor_concat(tensors, 2, 1);
+    if (!x)
+        return NULL;
 
     x = tensor_add(x, clip->vision_pos_embed->tensor);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
 
     for (int i = 0; i < clip->vision_layers; i++) {
         Module* block = module_list_get(clip->vision_blocks, i);
-        if (!block) return NULL;
+        if (!block)
+            return NULL;
         x = module_forward(block, x);
-        if (!x) return NULL;
+        if (!x)
+            return NULL;
     }
 
     x = module_forward((Module*)clip->vision_norm, x);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
 
     return module_forward((Module*)clip->vision_proj, x);
 }
 
 Tensor* clip_encode_text(Module* module, Tensor* text) {
     CLIPModel* clip = (CLIPModel*)module;
-    if (!clip || !text) return NULL;
+    if (!clip || !text)
+        return NULL;
 
     Tensor* x = module_forward((Module*)clip->text_tok_embed, text);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
 
     x = tensor_add(x, clip->text_pos_embed->tensor);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
 
     for (int i = 0; i < clip->text_layers; i++) {
         Module* block = module_list_get(clip->text_blocks, i);
-        if (!block) return NULL;
+        if (!block)
+            return NULL;
         x = module_forward(block, x);
-        if (!x) return NULL;
+        if (!x)
+            return NULL;
     }
 
     x = module_forward((Module*)clip->text_norm, x);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
 
     return module_forward((Module*)clip->text_proj, x);
 }
@@ -186,20 +203,24 @@ Tensor* clip_contrastive_loss(Tensor* image_embeds, Tensor* text_embeds, float t
         return NULL;
 
     Tensor* text_t = tensor_transpose(text_embeds, 0, 1);
-    if (!text_t) return NULL;
+    if (!text_t)
+        return NULL;
 
     Tensor* logits = tensor_matmul(image_embeds, text_t);
-    if (!logits) return NULL;
+    if (!logits)
+        return NULL;
 
     TensorConfig tcfg = {.dtype = image_embeds->dtype, .device = image_embeds->device};
     int scale_shape[] = {1};
-    Tensor* scale = tensor_full(scale_shape, 1, &tcfg, 1.0f / temperature);
-    if (!scale) return NULL;
+    Tensor* scale     = tensor_full(scale_shape, 1, &tcfg, 1.0f / temperature);
+    if (!scale)
+        return NULL;
 
     logits = tensor_mul(logits, scale);
-    if (!logits) return NULL;
+    if (!logits)
+        return NULL;
 
-    int n = logits->shape[0];
+    int n                    = logits->shape[0];
     Tensor* log_softmax_rows = tensor_softmax(logits, 1);
     Tensor* log_softmax_cols = tensor_softmax(logits, 0);
     if (!log_softmax_rows || !log_softmax_cols)
@@ -207,19 +228,23 @@ Tensor* clip_contrastive_loss(Tensor* image_embeds, Tensor* text_embeds, float t
 
     Tensor* loss_img = tensor_log(log_softmax_rows);
     Tensor* loss_txt = tensor_log(log_softmax_cols);
-    if (!loss_img || !loss_txt) return NULL;
+    if (!loss_img || !loss_txt)
+        return NULL;
 
     Tensor* loss = tensor_add(loss_img, loss_txt);
-    if (!loss) return NULL;
+    if (!loss)
+        return NULL;
 
     loss = tensor_neg(loss);
-    if (!loss) return NULL;
+    if (!loss)
+        return NULL;
 
     Tensor* mean_loss = tensor_mean(loss, -1, false);
-    if (!mean_loss) return NULL;
+    if (!mean_loss)
+        return NULL;
 
     int result_shape[] = {1};
-    Tensor* half = tensor_full(result_shape, 1, &tcfg, 0.5f / (float)n);
+    Tensor* half       = tensor_full(result_shape, 1, &tcfg, 0.5f / (float)n);
     return tensor_mul(mean_loss, half);
 }
 
@@ -236,35 +261,39 @@ Module* cml_zoo_clip_create(CMLCLIPConfig* config, DType dtype, DeviceType devic
         return NULL;
     }
 
-    int num_patches = (config->image_size / config->patch_size) *
-                      (config->image_size / config->patch_size);
+    int num_patches =
+        (config->image_size / config->patch_size) * (config->image_size / config->patch_size);
 
-    clip->vision_dim = config->vision_dim;
-    clip->text_dim = config->text_dim;
-    clip->embed_dim = config->embed_dim;
+    clip->vision_dim         = config->vision_dim;
+    clip->text_dim           = config->text_dim;
+    clip->embed_dim          = config->embed_dim;
     clip->num_vision_patches = num_patches;
-    clip->vision_layers = config->vision_layers;
-    clip->text_layers = config->text_layers;
+    clip->vision_layers      = config->vision_layers;
+    clip->text_layers        = config->text_layers;
 
     /* Vision encoder */
     clip->vision_patch_embed = nn_conv2d(3, config->vision_dim, config->patch_size,
-                                          config->patch_size, 0, 1, true, dtype, device);
+                                         config->patch_size, 0, 1, true, dtype, device);
 
-    TensorConfig tcfg = {.dtype = dtype, .device = device, };
+    TensorConfig tcfg = {
+        .dtype  = dtype,
+        .device = device,
+    };
 
     int cls_shape[] = {1, 1, config->vision_dim};
-    Tensor* cls_t = tensor_zeros(cls_shape, 3, &tcfg);
+    Tensor* cls_t   = tensor_zeros(cls_shape, 3, &tcfg);
     module_add_parameter((Module*)clip, cls_t, "vision_cls_token", true);
     clip->vision_cls_token = module_get_parameter((Module*)clip, "vision_cls_token");
 
     int vpos_shape[] = {1, num_patches + 1, config->vision_dim};
-    Tensor* vpos_t = tensor_zeros(vpos_shape, 3, &tcfg);
+    Tensor* vpos_t   = tensor_zeros(vpos_shape, 3, &tcfg);
     module_add_parameter((Module*)clip, vpos_t, "vision_pos_embed", true);
     clip->vision_pos_embed = module_get_parameter((Module*)clip, "vision_pos_embed");
 
     clip->vision_blocks = nn_module_list();
     for (int i = 0; i < config->vision_layers; i++)
-        module_list_append(clip->vision_blocks,
+        module_list_append(
+            clip->vision_blocks,
             create_vision_block(config->vision_dim, config->vision_heads, dtype, device));
 
     clip->vision_norm = nn_layernorm(config->vision_dim, 1e-5f, true, dtype, device);
@@ -274,26 +303,26 @@ Module* cml_zoo_clip_create(CMLCLIPConfig* config, DType dtype, DeviceType devic
     clip->text_tok_embed = nn_embedding(config->vocab_size, config->text_dim, -1, dtype, device);
 
     int tpos_shape[] = {1, config->max_text_len, config->text_dim};
-    Tensor* tpos_t = tensor_zeros(tpos_shape, 3, &tcfg);
+    Tensor* tpos_t   = tensor_zeros(tpos_shape, 3, &tcfg);
     module_add_parameter((Module*)clip, tpos_t, "text_pos_embed", true);
     clip->text_pos_embed = module_get_parameter((Module*)clip, "text_pos_embed");
 
     clip->text_blocks = nn_module_list();
     for (int i = 0; i < config->text_layers; i++)
         module_list_append(clip->text_blocks,
-            create_text_block(config->text_dim, config->text_heads, dtype, device));
+                           create_text_block(config->text_dim, config->text_heads, dtype, device));
 
     clip->text_norm = nn_layernorm(config->text_dim, 1e-5f, true, dtype, device);
     clip->text_proj = nn_linear(config->text_dim, config->embed_dim, dtype, device, false);
 
     /* Learnable temperature */
     int scale_shape[] = {1};
-    Tensor* scale_t = tensor_full(scale_shape, 1, &tcfg, logf(1.0f / 0.07f));
+    Tensor* scale_t   = tensor_full(scale_shape, 1, &tcfg, logf(1.0f / 0.07f));
     module_add_parameter((Module*)clip, scale_t, "logit_scale", true);
     clip->logit_scale = module_get_parameter((Module*)clip, "logit_scale");
 
     LOG_INFO("Created CLIP (vision: %dL/%dd/patch%d, text: %dL/%dd, embed=%d)",
-             config->vision_layers, config->vision_dim, config->patch_size,
-             config->text_layers, config->text_dim, config->embed_dim);
+             config->vision_layers, config->vision_dim, config->patch_size, config->text_layers,
+             config->text_dim, config->embed_dim);
     return (Module*)clip;
 }

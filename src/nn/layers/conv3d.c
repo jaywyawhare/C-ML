@@ -20,10 +20,10 @@ static Tensor* conv3d_forward(Module* module, Tensor* input) {
 
     Conv3DParams params = {
         .kernel_size = {conv->kernel_size[0], conv->kernel_size[1], conv->kernel_size[2]},
-        .stride = {conv->stride[0], conv->stride[1], conv->stride[2]},
-        .padding = {conv->padding[0], conv->padding[1], conv->padding[2]},
-        .dilation = {conv->dilation[0], conv->dilation[1], conv->dilation[2]},
-        .use_bias = conv->use_bias,
+        .stride      = {conv->stride[0], conv->stride[1], conv->stride[2]},
+        .padding     = {conv->padding[0], conv->padding[1], conv->padding[2]},
+        .dilation    = {conv->dilation[0], conv->dilation[1], conv->dilation[2]},
+        .use_bias    = conv->use_bias,
     };
     Tensor* bias = (conv->use_bias && conv->bias) ? conv->bias->tensor : NULL;
     return uop_conv3d(input, conv->weight->tensor, bias, &params);
@@ -68,7 +68,7 @@ Conv3d* nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride
     conv3d->dilation[2]    = dilation;
     conv3d->use_bias       = use_bias;
     conv3d->groups         = 1;
-    int weight_shape[] = {out_channels, in_channels, kernel_size, kernel_size, kernel_size};
+    int weight_shape[]     = {out_channels, in_channels, kernel_size, kernel_size, kernel_size};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* weight = tensor_empty(weight_shape, 5, &config);

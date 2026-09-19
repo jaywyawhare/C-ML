@@ -16,8 +16,12 @@
 
 static int check(const char* name, int ok) {
     tests_run++;
-    if (ok) { tests_passed++; printf("  PASS: %s\n", name); }
-    else    { printf("  FAIL: %s\n", name); }
+    if (ok) {
+        tests_passed++;
+        printf("  PASS: %s\n", name);
+    } else {
+        printf("  FAIL: %s\n", name);
+    }
     return ok;
 }
 
@@ -26,12 +30,12 @@ static int check(const char* name, int ok) {
 static int test_registry_complete(void) {
     for (int b = 0; b < CML_HCQ_BACKEND_COUNT; b++) {
         const CMLHCQBackendOps* ops = cml_hcq_backend_ops((CMLHCQBackendType)b);
-        if (!ops) continue;
-        if (!ops->name || !ops->queue_create || !ops->queue_destroy ||
-            !ops->submit_kernel || !ops->memcpy_h2d || !ops->memcpy_d2h ||
-            !ops->queue_synchronize || !ops->signal_create ||
-            !ops->signal_destroy || !ops->signal_record || !ops->queue_wait ||
-            !ops->signal_wait_cpu)
+        if (!ops)
+            continue;
+        if (!ops->name || !ops->queue_create || !ops->queue_destroy || !ops->submit_kernel ||
+            !ops->memcpy_h2d || !ops->memcpy_d2h || !ops->queue_synchronize ||
+            !ops->signal_create || !ops->signal_destroy || !ops->signal_record ||
+            !ops->queue_wait || !ops->signal_wait_cpu)
             return 0;
     }
     return cml_hcq_backend_ops((CMLHCQBackendType)-1) == NULL &&
@@ -57,7 +61,8 @@ static void exercise_backend(CMLHCQBackendType type, int* ok) {
     /* Host<->device round-trip through the uniform API. */
     unsigned char host[64];
     unsigned char back[64];
-    for (int i = 0; i < 64; i++) host[i] = (unsigned char)i;
+    for (int i = 0; i < 64; i++)
+        host[i] = (unsigned char)i;
     memset(back, 0, sizeof(back));
     void* dev = cml_malloc(64);
     *ok &= dev != NULL;

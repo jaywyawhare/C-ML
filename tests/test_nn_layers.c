@@ -9,10 +9,11 @@
 
 static int test_linear(void) {
     Linear* layer = cml_nn_linear(4, 8, DTYPE_FLOAT32, DEVICE_CPU, true);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     /* weight: 8*4=32, bias: 8, total: 40 */
     Module* m = (Module*)layer;
-    int ok = (m->num_parameters == 2);
+    int ok    = (m->num_parameters == 2);
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
     return ok;
@@ -20,44 +21,50 @@ static int test_linear(void) {
 
 static int test_relu(void) {
     ReLU* layer = cml_nn_relu(false);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     Module* m = (Module*)layer;
-    int ok = (m->num_parameters == 0);
+    int ok    = (m->num_parameters == 0);
     module_free(m);
     return ok;
 }
 
 static int test_sigmoid(void) {
     Sigmoid* layer = cml_nn_sigmoid();
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     module_free((Module*)layer);
     return 1;
 }
 
 static int test_tanh_layer(void) {
     Tanh* layer = cml_nn_tanh();
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     module_free((Module*)layer);
     return 1;
 }
 
 static int test_leaky_relu(void) {
     LeakyReLU* layer = cml_nn_leaky_relu(0.01f, false);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     module_free((Module*)layer);
     return 1;
 }
 
 static int test_dropout(void) {
     Dropout* layer = cml_nn_dropout(0.5f, false);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     module_free((Module*)layer);
     return 1;
 }
 
 static int test_conv2d(void) {
     Conv2d* layer = cml_nn_conv2d(3, 16, 3, 1, 1, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     Module* m = (Module*)layer;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -66,7 +73,8 @@ static int test_conv2d(void) {
 
 static int test_conv1d(void) {
     Conv1d* layer = cml_nn_conv1d(3, 16, 3, 1, 1, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     Module* m = (Module*)layer;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -75,7 +83,8 @@ static int test_conv1d(void) {
 
 static int test_conv3d(void) {
     Conv3d* layer = cml_nn_conv3d(3, 16, 3, 1, 1, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     Module* m = (Module*)layer;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -84,7 +93,8 @@ static int test_conv3d(void) {
 
 static int test_batchnorm2d(void) {
     BatchNorm2d* layer = cml_nn_batchnorm2d(16, 1e-5f, 0.1f, true, true, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     Module* m = (Module*)layer;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -93,7 +103,8 @@ static int test_batchnorm2d(void) {
 
 static int test_layernorm(void) {
     LayerNorm* layer = cml_nn_layernorm(64, 1e-5f, true, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     Module* m = (Module*)layer;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -102,7 +113,8 @@ static int test_layernorm(void) {
 
 static int test_groupnorm(void) {
     GroupNorm* layer = cml_nn_groupnorm(4, 16, 1e-5f, true, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     Module* m = (Module*)layer;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -111,21 +123,24 @@ static int test_groupnorm(void) {
 
 static int test_maxpool2d(void) {
     MaxPool2d* layer = cml_nn_maxpool2d(2, 2, 0, 1, false);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     module_free((Module*)layer);
     return 1;
 }
 
 static int test_avgpool2d(void) {
     AvgPool2d* layer = cml_nn_avgpool2d(2, 2, 0, false, true);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     module_free((Module*)layer);
     return 1;
 }
 
 static int test_embedding(void) {
     Embedding* layer = cml_nn_embedding(1000, 64, -1, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!layer) return 0;
+    if (!layer)
+        return 0;
     Module* m = (Module*)layer;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -134,7 +149,8 @@ static int test_embedding(void) {
 
 static int test_rnn_cell(void) {
     RNNCell* cell = cml_nn_rnn_cell(32, 64, true, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!cell) return 0;
+    if (!cell)
+        return 0;
     Module* m = (Module*)cell;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -143,7 +159,8 @@ static int test_rnn_cell(void) {
 
 static int test_lstm_cell(void) {
     LSTMCell* cell = cml_nn_lstm_cell(32, 64, true, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!cell) return 0;
+    if (!cell)
+        return 0;
     Module* m = (Module*)cell;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -152,7 +169,8 @@ static int test_lstm_cell(void) {
 
 static int test_gru_cell(void) {
     GRUCell* cell = cml_nn_gru_cell(32, 64, true, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!cell) return 0;
+    if (!cell)
+        return 0;
     Module* m = (Module*)cell;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -161,7 +179,8 @@ static int test_gru_cell(void) {
 
 static int test_multihead_attention(void) {
     MultiHeadAttention* mha = cml_nn_multihead_attention(64, 8, 0.1f, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!mha) return 0;
+    if (!mha)
+        return 0;
     Module* m = (Module*)mha;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -169,9 +188,10 @@ static int test_multihead_attention(void) {
 }
 
 static int test_transformer_encoder_layer(void) {
-    TransformerEncoderLayer* layer = cml_nn_transformer_encoder_layer(64, 8, 256, 0.1f,
-                                                                       DTYPE_FLOAT32, DEVICE_CPU);
-    if (!layer) return 0;
+    TransformerEncoderLayer* layer =
+        cml_nn_transformer_encoder_layer(64, 8, 256, 0.1f, DTYPE_FLOAT32, DEVICE_CPU);
+    if (!layer)
+        return 0;
     Module* m = (Module*)layer;
     printf("(params=%d) ", m->num_parameters);
     module_free(m);
@@ -180,11 +200,14 @@ static int test_transformer_encoder_layer(void) {
 
 static int test_module_list(void) {
     ModuleList* list = cml_nn_module_list();
-    if (!list) return 0;
+    if (!list)
+        return 0;
     int ret = module_list_append(list, (Module*)cml_nn_relu(false));
-    if (ret != 0) return 0;
+    if (ret != 0)
+        return 0;
     ret = module_list_append(list, (Module*)cml_nn_sigmoid());
-    if (ret != 0) return 0;
+    if (ret != 0)
+        return 0;
     int len = module_list_length(list);
     printf("(len=%d) ", len);
     module_free((Module*)list);
@@ -193,9 +216,11 @@ static int test_module_list(void) {
 
 static int test_module_dict(void) {
     ModuleDict* dict = cml_nn_module_dict();
-    if (!dict) return 0;
+    if (!dict)
+        return 0;
     int ret = module_dict_add(dict, "relu", (Module*)cml_nn_relu(false));
-    if (ret != 0) return 0;
+    if (ret != 0)
+        return 0;
     Module* got = module_dict_get(dict, "relu");
     printf("(found=%s) ", got ? "yes" : "no");
     module_free((Module*)dict);
@@ -204,17 +229,25 @@ static int test_module_dict(void) {
 
 static int test_sequential_forward(void) {
     Sequential* seq = cml_nn_sequential();
-    if (!seq) return 0;
+    if (!seq)
+        return 0;
     sequential_add(seq, (Module*)cml_nn_linear(4, 8, DTYPE_FLOAT32, DEVICE_CPU, true));
     sequential_add(seq, (Module*)cml_nn_relu(false));
     sequential_add(seq, (Module*)cml_nn_linear(8, 2, DTYPE_FLOAT32, DEVICE_CPU, true));
 
     /* Forward with batch=1, features=4 */
     Tensor* input = cml_ones_2d(1, 4);
-    if (!input) { module_free((Module*)seq); return 0; }
+    if (!input) {
+        module_free((Module*)seq);
+        return 0;
+    }
 
     Tensor* output = module_forward((Module*)seq, input);
-    if (!output) { tensor_free(input); module_free((Module*)seq); return 0; }
+    if (!output) {
+        tensor_free(input);
+        module_free((Module*)seq);
+        return 0;
+    }
 
     int ok = (output->ndim == 2 && output->shape[0] == 1 && output->shape[1] == 2);
     printf("(out_shape=[%d,%d]) ", output->shape[0], output->shape[1]);

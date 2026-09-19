@@ -19,15 +19,16 @@ static int argmax_at_row(Tensor* logits, int row_index, int vocab_size) {
         tensor_ensure_executed(logits);
     }
     float* data = (float*)tensor_data_ptr(logits);
-    if (!data) return 0;
+    if (!data)
+        return 0;
 
-    int offset = row_index * vocab_size;
-    int best = 0;
+    int offset     = row_index * vocab_size;
+    int best       = 0;
     float best_val = data[offset];
     for (int i = 1; i < vocab_size; i++) {
         if (data[offset + i] > best_val) {
             best_val = data[offset + i];
-            best = i;
+            best     = i;
         }
     }
     return best;
@@ -46,10 +47,11 @@ CMLSpeculativeConfig cml_speculative_default_config(void) {
 
 /* Temperature softmax of one logits row into probs[vocab]. */
 static void softmax_row(const float* row, int vocab, float temperature, float* probs) {
-    float t = temperature > 1e-6f ? temperature : 1.0f;
+    float t    = temperature > 1e-6f ? temperature : 1.0f;
     float maxl = row[0];
     for (int i = 1; i < vocab; i++)
-        if (row[i] > maxl) maxl = row[i];
+        if (row[i] > maxl)
+            maxl = row[i];
     double denom = 0.0;
     for (int i = 0; i < vocab; i++) {
         probs[i] = expf((row[i] - maxl) / t);
@@ -61,17 +63,17 @@ static void softmax_row(const float* row, int vocab, float temperature, float* p
 }
 
 static int sample_from_probs(const float* probs, int vocab) {
-    float u = (float)rand() / ((float)RAND_MAX + 1.0f);
+    float u   = (float)rand() / ((float)RAND_MAX + 1.0f);
     float acc = 0.0f;
     for (int i = 0; i < vocab; i++) {
         acc += probs[i];
-        if (u < acc) return i;
+        if (u < acc)
+            return i;
     }
     return vocab - 1;
 }
 
-CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config,
-                                               int vocab_size) {
+CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config, int vocab_size) {
     if (!config) {
         LOG_ERROR("cml_speculative_create: config is NULL");
         return NULL;
@@ -80,14 +82,14 @@ CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config
         LOG_ERROR("cml_speculative_create: vocab_size must be > 0");
         return NULL;
     }
-    if (config->num_draft_tokens <= 0 ||
-        config->num_draft_tokens > CML_SPEC_MAX_DRAFT_TOKENS) {
+    if (config->num_draft_tokens <= 0 || config->num_draft_tokens > CML_SPEC_MAX_DRAFT_TOKENS) {
         LOG_ERROR("cml_speculative_create: num_draft_tokens must be in [1, %d]",
                   CML_SPEC_MAX_DRAFT_TOKENS);
         return NULL;
     }
 
-    CMLSpeculativeDecoder* dec = (CMLSpeculativeDecoder*)cml_calloc(1, sizeof(CMLSpeculativeDecoder));
+    CMLSpeculativeDecoder* dec =
+        (CMLSpeculativeDecoder*)cml_calloc(1, sizeof(CMLSpeculativeDecoder));
     if (!dec) {
         LOG_ERROR("cml_speculative_create: allocation failed");
         return NULL;
@@ -99,37 +101,36 @@ CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config
 }
 
 void cml_speculative_free(CMLSpeculativeDecoder* decoder) {
-    if (!decoder) return;
+    if (!decoder)
+        return;
     cml_free(decoder);
 }
 
 void cml_speculative_set_draft_model(CMLSpeculativeDecoder* dec, void* ctx,
-                                     CMLModelForwardFn forward_fn,
-                                     CMLSampleTokenFn sample_fn) {
-    if (!dec) return;
+                                     CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn) {
+    if (!dec)
+        return;
     dec->draft_model_ctx = ctx;
     dec->draft_forward   = forward_fn;
     dec->draft_sample    = sample_fn;
 }
 
 void cml_speculative_set_target_model(CMLSpeculativeDecoder* dec, void* ctx,
-                                      CMLModelForwardFn forward_fn,
-                                      CMLSampleTokenFn sample_fn) {
-    if (!dec) return;
+                                      CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn) {
+    if (!dec)
+        return;
     dec->target_model_ctx = ctx;
     dec->target_forward   = forward_fn;
     dec->target_sample    = sample_fn;
 }
 
 CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
-                                                   const int* prefix_tokens,
-                                                   int prefix_len) {
+                                                  const int* prefix_tokens, int prefix_len) {
     if (!dec) {
         LOG_ERROR("cml_speculative_decode_step: decoder is NULL");
         return NULL;
     }
-    if (!dec->draft_forward || !dec->draft_sample ||
-        !dec->target_forward || !dec->target_sample) {
+    if (!dec->draft_forward || !dec->draft_sample || !dec->target_forward || !dec->target_sample) {
         LOG_ERROR("cml_speculative_decode_step: model callbacks not set");
         return NULL;
     }
@@ -138,11 +139,11 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
         return NULL;
     }
 
-    int K = dec->config.num_draft_tokens;
+    int K             = dec->config.num_draft_tokens;
     float temperature = dec->config.temperature;
 
     /* Allocate working buffer for prefix + K draft tokens. */
-    int max_seq = prefix_len + K;
+    int max_seq   = prefix_len + K;
     int* full_seq = (int*)cml_malloc((size_t)max_seq * sizeof(int));
     if (!full_seq) {
         LOG_ERROR("cml_speculative_decode_step: allocation failed");
@@ -159,11 +160,12 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
 
     /* Stochastic verification needs the draft distribution at each drafted
      * position; keep the last-row logits per draft step. */
-    bool stochastic = dec->config.stochastic_accept && dec->config.do_sample;
+    bool stochastic   = dec->config.stochastic_accept && dec->config.do_sample;
     float* draft_rows = NULL;
     if (stochastic) {
         draft_rows = (float*)cml_malloc((size_t)K * (size_t)dec->vocab_size * sizeof(float));
-        if (!draft_rows) stochastic = false; /* degrade to greedy acceptance */
+        if (!draft_rows)
+            stochastic = false; /* degrade to greedy acceptance */
     }
 
     /* 1. Draft phase: autoregressively generate K tokens with draft model. */
@@ -172,11 +174,10 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
     int draft_seq_len = prefix_len;
     for (int i = 0; i < K; i++) {
         /* Forward the draft model on the current sequence. */
-        Tensor* draft_logits = dec->draft_forward(dec->draft_model_ctx,
-                                                   full_seq, draft_seq_len);
+        Tensor* draft_logits = dec->draft_forward(dec->draft_model_ctx, full_seq, draft_seq_len);
         if (!draft_logits) {
             LOG_WARNING("draft forward returned NULL at step %d", i);
-            K = i;  /* Truncate to whatever we managed. */
+            K = i; /* Truncate to whatever we managed. */
             break;
         }
 
@@ -193,11 +194,10 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
         }
 
         /* Sample from last position. */
-        int token = dec->draft_sample(dec->draft_model_ctx,
-                                      draft_logits, temperature);
+        int token = dec->draft_sample(dec->draft_model_ctx, draft_logits, temperature);
         tensor_free(draft_logits);
 
-        draft_tokens[i] = token;
+        draft_tokens[i]         = token;
         full_seq[draft_seq_len] = token;
         draft_seq_len++;
     }
@@ -207,10 +207,9 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
     /* 2. Verify phase: single target-model forward on prefix + K drafts. */
     double t_verify_start = now_ms();
 
-    int verify_seq_len = prefix_len + K;
-    Tensor* target_logits = dec->target_forward(dec->target_model_ctx,
-                                                 full_seq, verify_seq_len);
-    double t_verify_end = now_ms();
+    int verify_seq_len    = prefix_len + K;
+    Tensor* target_logits = dec->target_forward(dec->target_model_ctx, full_seq, verify_seq_len);
+    double t_verify_end   = now_ms();
 
     if (!target_logits) {
         LOG_ERROR("target forward returned NULL");
@@ -230,18 +229,19 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
      * the output is then exactly the target model's greedy decode.
      * Stochastic mode (config.stochastic_accept): Leviathan et al. rule —
      * accept with prob min(1, p/q), resample rejects from norm(max(0,p-q)). */
-    int num_accepted = 0;
+    int num_accepted     = 0;
     int correction_token = -1;
-    int bonus_token = -1;
+    int bonus_token      = -1;
 
     if (stochastic) {
         tensor_ensure_executed(target_logits);
         const float* tdata = (const float*)tensor_data_ptr(target_logits);
-        int vocab = dec->vocab_size;
-        float* p = (float*)cml_malloc((size_t)vocab * sizeof(float));
-        float* q = (float*)cml_malloc((size_t)vocab * sizeof(float));
+        int vocab          = dec->vocab_size;
+        float* p           = (float*)cml_malloc((size_t)vocab * sizeof(float));
+        float* q           = (float*)cml_malloc((size_t)vocab * sizeof(float));
         if (!tdata || !p || !q) {
-            cml_free(p); cml_free(q);
+            cml_free(p);
+            cml_free(q);
             tensor_free(target_logits);
             cml_free(full_seq);
             cml_free(draft_tokens);
@@ -254,10 +254,10 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
             softmax_row(tdata + (size_t)target_row * vocab, vocab, temperature, p);
             softmax_row(draft_rows + (size_t)i * vocab, vocab, temperature, q);
 
-            int tok = draft_tokens[i];
-            float qd = q[tok] > 1e-12f ? q[tok] : 1e-12f;
+            int tok     = draft_tokens[i];
+            float qd    = q[tok] > 1e-12f ? q[tok] : 1e-12f;
             float ratio = p[tok] / qd;
-            float u = (float)rand() / ((float)RAND_MAX + 1.0f);
+            float u     = (float)rand() / ((float)RAND_MAX + 1.0f);
             if (u < ratio) {
                 num_accepted++;
                 continue;
@@ -270,7 +270,8 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
             }
             if (mass > 1e-12) {
                 float inv = (float)(1.0 / mass);
-                for (int j = 0; j < vocab; j++) p[j] *= inv;
+                for (int j = 0; j < vocab; j++)
+                    p[j] *= inv;
                 correction_token = sample_from_probs(p, vocab);
             } else {
                 /* p <= q everywhere it matters: fall back to target argmax. */
@@ -288,9 +289,8 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
         cml_free(q);
     } else {
         for (int i = 0; i < K; i++) {
-            int target_row = prefix_len - 1 + i;
-            int target_argmax = argmax_at_row(target_logits, target_row,
-                                              dec->vocab_size);
+            int target_row    = prefix_len - 1 + i;
+            int target_argmax = argmax_at_row(target_logits, target_row, dec->vocab_size);
 
             if (target_argmax == draft_tokens[i]) {
                 num_accepted++;
@@ -305,7 +305,7 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
          * target logits at the last position. */
         if (num_accepted == K) {
             int last_row = prefix_len + K - 1;
-            bonus_token = argmax_at_row(target_logits, last_row, dec->vocab_size);
+            bonus_token  = argmax_at_row(target_logits, last_row, dec->vocab_size);
         }
     }
 
@@ -316,7 +316,8 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
     int total_output = num_accepted + ((num_accepted == K) ? 1 : 1);
     /* accepted draft tokens + either correction or bonus */
 
-    CMLSpeculativeResult* result = (CMLSpeculativeResult*)cml_calloc(1, sizeof(CMLSpeculativeResult));
+    CMLSpeculativeResult* result =
+        (CMLSpeculativeResult*)cml_calloc(1, sizeof(CMLSpeculativeResult));
     if (!result) {
         cml_free(full_seq);
         cml_free(draft_tokens);
@@ -339,40 +340,42 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
     /* Append correction or bonus token. */
     if (num_accepted == K) {
         result->accepted_tokens[num_accepted] = bonus_token;
-        result->num_accepted = num_accepted + 1;  /* K drafts + 1 bonus */
+        result->num_accepted                  = num_accepted + 1; /* K drafts + 1 bonus */
     } else {
         result->accepted_tokens[num_accepted] = correction_token;
-        result->num_accepted = num_accepted + 1;  /* accepted drafts + correction */
+        result->num_accepted                  = num_accepted + 1; /* accepted drafts + correction */
     }
 
-    result->num_drafted  = K;
-    result->num_verified = 1;
+    result->num_drafted     = K;
+    result->num_verified    = 1;
     result->acceptance_rate = (K > 0) ? (float)num_accepted / (float)K : 0.0f;
     result->draft_time_ms   = t_draft_end - t_draft_start;
     result->verify_time_ms  = t_verify_end - t_verify_start;
     result->total_time_ms   = t_verify_end - t_draft_start;
 
     /* Update decoder lifetime statistics. */
-    dec->total_drafted  += (size_t)K;
+    dec->total_drafted += (size_t)K;
     dec->total_accepted += (size_t)num_accepted;
     dec->total_steps++;
 
     cml_free(full_seq);
     cml_free(draft_tokens);
 
-    LOG_DEBUG("speculative step: drafted=%d accepted=%d rate=%.2f",
-              K, num_accepted, result->acceptance_rate);
+    LOG_DEBUG("speculative step: drafted=%d accepted=%d rate=%.2f", K, num_accepted,
+              result->acceptance_rate);
 
     return result;
 }
 
 void cml_speculative_result_free(CMLSpeculativeResult* result) {
-    if (!result) return;
+    if (!result)
+        return;
     cml_free(result->accepted_tokens);
     cml_free(result);
 }
 
 float cml_speculative_acceptance_rate(const CMLSpeculativeDecoder* dec) {
-    if (!dec || dec->total_drafted == 0) return 0.0f;
+    if (!dec || dec->total_drafted == 0)
+        return 0.0f;
     return (float)dec->total_accepted / (float)dec->total_drafted;
 }

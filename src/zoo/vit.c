@@ -8,57 +8,49 @@
 #include "alloc/cml_allocator.h"
 
 ViTConfig cml_zoo_vit_config_tiny(void) {
-    return (ViTConfig){
-        .image_size  = 224,
-        .patch_size  = 16,
-        .num_classes = 1000,
-        .n_layer     = 12,
-        .n_head      = 3,
-        .hidden_size = 192,
-        .mlp_dim     = 768
-    };
+    return (ViTConfig){.image_size  = 224,
+                       .patch_size  = 16,
+                       .num_classes = 1000,
+                       .n_layer     = 12,
+                       .n_head      = 3,
+                       .hidden_size = 192,
+                       .mlp_dim     = 768};
 }
 
 ViTConfig cml_zoo_vit_config_small(void) {
-    return (ViTConfig){
-        .image_size  = 224,
-        .patch_size  = 16,
-        .num_classes = 1000,
-        .n_layer     = 12,
-        .n_head      = 6,
-        .hidden_size = 384,
-        .mlp_dim     = 1536
-    };
+    return (ViTConfig){.image_size  = 224,
+                       .patch_size  = 16,
+                       .num_classes = 1000,
+                       .n_layer     = 12,
+                       .n_head      = 6,
+                       .hidden_size = 384,
+                       .mlp_dim     = 1536};
 }
 
 ViTConfig cml_zoo_vit_config_base(void) {
-    return (ViTConfig){
-        .image_size  = 224,
-        .patch_size  = 16,
-        .num_classes = 1000,
-        .n_layer     = 12,
-        .n_head      = 12,
-        .hidden_size = 768,
-        .mlp_dim     = 3072
-    };
+    return (ViTConfig){.image_size  = 224,
+                       .patch_size  = 16,
+                       .num_classes = 1000,
+                       .n_layer     = 12,
+                       .n_head      = 12,
+                       .hidden_size = 768,
+                       .mlp_dim     = 3072};
 }
 
 ViTConfig cml_zoo_vit_config_large(void) {
-    return (ViTConfig){
-        .image_size  = 224,
-        .patch_size  = 16,
-        .num_classes = 1000,
-        .n_layer     = 24,
-        .n_head      = 16,
-        .hidden_size = 1024,
-        .mlp_dim     = 4096
-    };
+    return (ViTConfig){.image_size  = 224,
+                       .patch_size  = 16,
+                       .num_classes = 1000,
+                       .n_layer     = 24,
+                       .n_head      = 16,
+                       .hidden_size = 1024,
+                       .mlp_dim     = 4096};
 }
 
-static Module* create_vit_block(int hidden_size, int n_head, int mlp_dim,
-                                 DType dtype, DeviceType device) {
-    return (Module*)zoo_prenorm_block("ViTBlock", hidden_size, n_head, mlp_dim, 1e-6f,
-                                      dtype, device);
+static Module* create_vit_block(int hidden_size, int n_head, int mlp_dim, DType dtype,
+                                DeviceType device) {
+    return (Module*)zoo_prenorm_block("ViTBlock", hidden_size, n_head, mlp_dim, 1e-6f, dtype,
+                                      device);
 }
 
 typedef struct {
@@ -83,18 +75,18 @@ static Tensor* vit_forward(Module* module, Tensor* input) {
     if (!patches)
         return NULL;
 
-    int batch = patches->shape[0];
+    int batch   = patches->shape[0];
     int seq_len = vit->num_patches;
-    int dim = vit->hidden_size;
+    int dim     = vit->hidden_size;
 
     int patch_shape[] = {batch, seq_len, dim};
-    patches = tensor_reshape(patches, patch_shape, 3);
+    patches           = tensor_reshape(patches, patch_shape, 3);
     if (!patches)
         return NULL;
 
-    Tensor* cls = vit->cls_token->tensor;
+    Tensor* cls       = vit->cls_token->tensor;
     Tensor* tensors[] = {cls, patches};
-    Tensor* x = tensor_concat(tensors, 2, 1);
+    Tensor* x         = tensor_concat(tensors, 2, 1);
     if (!x)
         return NULL;
 
@@ -146,37 +138,37 @@ Module* cml_zoo_vit_create(ViTConfig* config, DType dtype, DeviceType device) {
         return NULL;
     }
 
-    int num_patches = (config->image_size / config->patch_size) *
-                      (config->image_size / config->patch_size);
+    int num_patches =
+        (config->image_size / config->patch_size) * (config->image_size / config->patch_size);
 
     vit->hidden_size = config->hidden_size;
     vit->num_patches = num_patches;
-    vit->n_layer = config->n_layer;
+    vit->n_layer     = config->n_layer;
 
-    vit->patch_embed = nn_conv2d(3, config->hidden_size, config->patch_size,
-                                  config->patch_size, 0, 1, true, dtype, device);
+    vit->patch_embed = nn_conv2d(3, config->hidden_size, config->patch_size, config->patch_size, 0,
+                                 1, true, dtype, device);
 
-    TensorConfig tcfg = {.dtype = dtype, .device = device};
-    int cls_shape[] = {1, 1, config->hidden_size};
+    TensorConfig tcfg  = {.dtype = dtype, .device = device};
+    int cls_shape[]    = {1, 1, config->hidden_size};
     Tensor* cls_tensor = tensor_zeros(cls_shape, 3, &tcfg);
-    vit->cls_token = NULL;
+    vit->cls_token     = NULL;
     module_add_parameter((Module*)vit, cls_tensor, "cls_token", true);
     vit->cls_token = module_get_parameter((Module*)vit, "cls_token");
 
-    int pos_shape[] = {1, num_patches + 1, config->hidden_size};
+    int pos_shape[]    = {1, num_patches + 1, config->hidden_size};
     Tensor* pos_tensor = tensor_zeros(pos_shape, 3, &tcfg);
     module_add_parameter((Module*)vit, pos_tensor, "pos_embed", true);
     vit->pos_embed = module_get_parameter((Module*)vit, "pos_embed");
 
     vit->blocks = nn_module_list();
     for (int i = 0; i < config->n_layer; i++)
-        module_list_append(vit->blocks, create_vit_block(
-            config->hidden_size, config->n_head, config->mlp_dim, dtype, device));
+        module_list_append(vit->blocks, create_vit_block(config->hidden_size, config->n_head,
+                                                         config->mlp_dim, dtype, device));
 
     vit->norm = nn_layernorm(config->hidden_size, 1e-6f, true, dtype, device);
     vit->head = nn_linear(config->hidden_size, config->num_classes, dtype, device, true);
 
-    LOG_INFO("Created ViT (%d layers, %d hidden, %d heads, patch=%d)",
-             config->n_layer, config->hidden_size, config->n_head, config->patch_size);
+    LOG_INFO("Created ViT (%d layers, %d hidden, %d heads, patch=%d)", config->n_layer,
+             config->hidden_size, config->n_head, config->patch_size);
     return (Module*)vit;
 }

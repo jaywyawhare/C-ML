@@ -220,7 +220,7 @@ Tensor* autograd_recompute(Tensor* tensor) {
                 max_reduce_params.dims         = NULL;
                 max_reduce_params.num_dims     = 0;
                 max_reduce_params.keepdim      = false;
-                recomputed = uop_max_reduce(inputs[0], &max_reduce_params);
+                recomputed                     = uop_max_reduce(inputs[0], &max_reduce_params);
             }
             break;
         case UOP_RESHAPE:
@@ -228,7 +228,7 @@ Tensor* autograd_recompute(Tensor* tensor) {
                 ReshapeParams reshape_params;
                 reshape_params.new_shape = node->output_shape;
                 reshape_params.new_ndim  = node->output_ndim;
-                recomputed = uop_reshape(inputs[0], &reshape_params);
+                recomputed               = uop_reshape(inputs[0], &reshape_params);
             }
             break;
         case UOP_PERMUTE:
@@ -254,7 +254,7 @@ Tensor* autograd_recompute(Tensor* tensor) {
         case UOP_CONV2D:
             if (checkpoint->num_inputs >= 2 && node->params) {
                 Tensor* bias = checkpoint->num_inputs >= 3 ? inputs[2] : NULL;
-                recomputed = uop_conv2d(inputs[0], inputs[1], bias, (Conv2DParams*)node->params);
+                recomputed   = uop_conv2d(inputs[0], inputs[1], bias, (Conv2DParams*)node->params);
             }
             break;
         case UOP_WHERE:
@@ -263,7 +263,7 @@ Tensor* autograd_recompute(Tensor* tensor) {
                 where_params.cond = inputs[0];
                 where_params.a    = inputs[1];
                 where_params.b    = inputs[2];
-                recomputed = uop_where(&where_params);
+                recomputed        = uop_where(&where_params);
             }
             break;
         case UOP_COUNT:
@@ -303,10 +303,12 @@ Tensor* autograd_recompute(Tensor* tensor) {
 }
 
 Tensor* checkpoint_forward(Module* module, Tensor* input) {
-    if (!module || !input) return NULL;
+    if (!module || !input)
+        return NULL;
 
     Tensor* output = module_forward(module, input);
-    if (!output) return NULL;
+    if (!output)
+        return NULL;
 
     if (checkpointing_enabled) {
         autograd_checkpoint(output);
@@ -316,7 +318,8 @@ Tensor* checkpoint_forward(Module* module, Tensor* input) {
 }
 
 void sequential_apply_checkpointing(Sequential* seq, int every_n) {
-    if (!seq || every_n < 0) return;
+    if (!seq || every_n < 0)
+        return;
 
     if (every_n == 0) {
         autograd_set_checkpointing(false);

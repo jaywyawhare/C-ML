@@ -29,21 +29,28 @@ static int make_logits_targets(Tensor** logits_out, Tensor** targets_out) {
     Tensor* logits  = tensor_from_data(logits_data, logits_shape, 2, &cfg);
     Tensor* targets = tensor_from_data(target_data, target_shape, 1, &cfg);
     if (!logits || !targets) {
-        if (logits) tensor_free(logits);
-        if (targets) tensor_free(targets);
+        if (logits)
+            tensor_free(logits);
+        if (targets)
+            tensor_free(targets);
         return 0;
     }
-    *logits_out = logits;
+    *logits_out  = logits;
     *targets_out = targets;
     return 1;
 }
 
-#define RUN_TEST(test) do { \
-    tests_run++; \
-    printf("  [%d] %-50s ", tests_run, #test); \
-    if (test()) { tests_passed++; printf("PASS\n"); } \
-    else { printf("FAIL\n"); } \
-} while(0)
+#define RUN_TEST(test)                                                                             \
+    do {                                                                                           \
+        tests_run++;                                                                               \
+        printf("  [%d] %-50s ", tests_run, #test);                                                 \
+        if (test()) {                                                                              \
+            tests_passed++;                                                                        \
+            printf("PASS\n");                                                                      \
+        } else {                                                                                   \
+            printf("FAIL\n");                                                                      \
+        }                                                                                          \
+    } while (0)
 
 static int test_smooth_zero_delegates(void) {
     cml_init();
@@ -56,12 +63,14 @@ static int test_smooth_zero_delegates(void) {
     }
 
     Tensor* loss_smooth = tensor_cross_entropy_loss_smooth(logits, targets, 0.0f);
-    Tensor* loss_plain = tensor_cross_entropy_loss(logits, targets);
+    Tensor* loss_plain  = tensor_cross_entropy_loss(logits, targets);
 
     int ok = (loss_smooth != NULL && loss_plain != NULL);
 
-    if (loss_smooth) tensor_free_executed(loss_smooth);
-    if (loss_plain) tensor_free_executed(loss_plain);
+    if (loss_smooth)
+        tensor_free_executed(loss_smooth);
+    if (loss_plain)
+        tensor_free_executed(loss_plain);
     tensor_free(logits);
     tensor_free(targets);
     cml_reset_ir_context();
@@ -80,9 +89,10 @@ static int test_smooth_nonzero_returns(void) {
     }
 
     Tensor* loss = tensor_cross_entropy_loss_smooth(logits, targets, 0.1f);
-    int ok = (loss != NULL);
+    int ok       = (loss != NULL);
 
-    if (loss) tensor_free_executed(loss);
+    if (loss)
+        tensor_free_executed(loss);
     tensor_free(logits);
     tensor_free(targets);
     cml_reset_ir_context();
@@ -100,17 +110,17 @@ static int test_smooth_invalid_epsilon(void) {
     cml_init();
 
     float logits_data[] = {1.0f, 2.0f, 3.0f};
-    Tensor* logits = tensor_from_array_2d(logits_data, 1, 3);
+    Tensor* logits      = tensor_from_array_2d(logits_data, 1, 3);
     float target_data[] = {1.0f};
     Tensor* targets_raw = tensor_from_array_2d(target_data, 1, 1);
-    int new_shape[] = {1};
-    ReshapeParams rp = {.new_shape = new_shape, .new_ndim = 1};
-    Tensor* targets = uop_reshape(targets_raw, &rp);
+    int new_shape[]     = {1};
+    ReshapeParams rp    = {.new_shape = new_shape, .new_ndim = 1};
+    Tensor* targets     = uop_reshape(targets_raw, &rp);
 
     Tensor* r = tensor_cross_entropy_loss_smooth(logits, targets, -0.5f);
-    int ok = (r == NULL);
+    int ok    = (r == NULL);
 
-    r = tensor_cross_entropy_loss_smooth(logits, targets, 1.5f);
+    r  = tensor_cross_entropy_loss_smooth(logits, targets, 1.5f);
     ok = ok && (r == NULL);
 
     tensor_free(logits);
@@ -134,9 +144,10 @@ static int test_sparse_smooth_zero_delegates(void) {
 
     // Use regular CE loss since sparse has issues with eager tensors
     Tensor* loss = tensor_cross_entropy_loss(logits, targets);
-    int ok = (loss != NULL);
+    int ok       = (loss != NULL);
 
-    if (loss) tensor_free_executed(loss);
+    if (loss)
+        tensor_free_executed(loss);
     tensor_free(logits);
     tensor_free(targets);
     cml_reset_ir_context();
@@ -156,9 +167,10 @@ static int test_sparse_smooth_nonzero(void) {
 
     // Use regular CE loss since sparse has issues with eager tensors
     Tensor* loss = tensor_cross_entropy_loss(logits, targets);
-    int ok = (loss != NULL);
+    int ok       = (loss != NULL);
 
-    if (loss) tensor_free_executed(loss);
+    if (loss)
+        tensor_free_executed(loss);
     tensor_free(logits);
     tensor_free(targets);
     cml_reset_ir_context();
@@ -170,15 +182,15 @@ static int test_smooth_batch_mismatch(void) {
     cml_init();
 
     float logits_data[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
-    Tensor* logits = tensor_from_array_2d(logits_data, 2, 3);
+    Tensor* logits      = tensor_from_array_2d(logits_data, 2, 3);
     float target_data[] = {0.0f, 1.0f, 2.0f};
     Tensor* targets_raw = tensor_from_array_2d(target_data, 1, 3);
-    int new_shape[] = {3};
-    ReshapeParams rp = {.new_shape = new_shape, .new_ndim = 1};
-    Tensor* targets = uop_reshape(targets_raw, &rp);
+    int new_shape[]     = {3};
+    ReshapeParams rp    = {.new_shape = new_shape, .new_ndim = 1};
+    Tensor* targets     = uop_reshape(targets_raw, &rp);
 
     Tensor* r = tensor_cross_entropy_loss_smooth(logits, targets, 0.1f);
-    int ok = (r == NULL);
+    int ok    = (r == NULL);
 
     tensor_free(logits);
     tensor_free(targets);
@@ -192,12 +204,12 @@ static int test_smooth_1d_target_required(void) {
     cml_init();
 
     float logits_data[] = {1.0f, 2.0f, 3.0f};
-    Tensor* logits = tensor_from_array_2d(logits_data, 1, 3);
+    Tensor* logits      = tensor_from_array_2d(logits_data, 1, 3);
     float target_data[] = {0.0f, 1.0f};
-    Tensor* targets = tensor_from_array_2d(target_data, 1, 2);
+    Tensor* targets     = tensor_from_array_2d(target_data, 1, 2);
 
     Tensor* r = tensor_cross_entropy_loss_smooth(logits, targets, 0.1f);
-    int ok = (r == NULL);
+    int ok    = (r == NULL);
 
     tensor_free(logits);
     tensor_free(targets);

@@ -19,8 +19,8 @@
 #include <dirent.h>
 #include "alloc/cml_allocator.h"
 
-#define MOCK_FD_KFD  200
-#define MOCK_FD_DRM  201
+#define MOCK_FD_KFD 200
+#define MOCK_FD_DRM 201
 
 #define MOCK_ALLOC_INIT_CAP 64
 
@@ -39,7 +39,7 @@ void cml_am_mock_init(CMLAMMockGPU* config) {
     if (config) {
         g_mock = *config;
     } else {
-        g_mock.gpu_id             = 12345;
+        g_mock.gpu_id = 12345;
         snprintf(g_mock.name, sizeof(g_mock.name), "Mock RDNA3");
         snprintf(g_mock.gfx_version, sizeof(g_mock.gfx_version), "gfx1100");
         g_mock.cu_count           = 48;
@@ -51,26 +51,27 @@ void cml_am_mock_init(CMLAMMockGPU* config) {
         g_mock.auto_complete      = true;
     }
 
-    g_mock.next_handle  = 1000;
+    g_mock.next_handle   = 1000;
     g_mock.next_queue_id = 1;
 
     g_mock.alloc_capacity = MOCK_ALLOC_INIT_CAP;
-    g_mock.alloc_table = (void**)cml_calloc((size_t)g_mock.alloc_capacity, sizeof(void*));
-    g_mock.num_allocs = 0;
+    g_mock.alloc_table    = (void**)cml_calloc((size_t)g_mock.alloc_capacity, sizeof(void*));
+    g_mock.num_allocs     = 0;
 
     mock_create_topology();
     g_mock_active = true;
 }
 
 void cml_am_mock_shutdown(void) {
-    if (!g_mock_active) return;
+    if (!g_mock_active)
+        return;
 
     for (int i = 0; i < g_mock.num_allocs; i++) {
         free(g_mock.alloc_table[i]); /* posix_memalign'd in cml_am_mock_mmap — not cml_malloc */
     }
     cml_free(g_mock.alloc_table);
-    g_mock.alloc_table = NULL;
-    g_mock.num_allocs = 0;
+    g_mock.alloc_table    = NULL;
+    g_mock.num_allocs     = 0;
     g_mock.alloc_capacity = 0;
 
     mock_remove_topology();
@@ -78,19 +79,18 @@ void cml_am_mock_shutdown(void) {
     g_mock_active = false;
 }
 
-CMLAMMockGPU* cml_am_mock_get(void) {
-    return g_mock_active ? &g_mock : NULL;
-}
+CMLAMMockGPU* cml_am_mock_get(void) { return g_mock_active ? &g_mock : NULL; }
 
 static void mock_track_alloc(void* ptr) {
-    if (!ptr) return;
+    if (!ptr)
+        return;
 
     if (g_mock.num_allocs >= g_mock.alloc_capacity) {
         int new_cap = g_mock.alloc_capacity * 2;
-        void** tmp = (void**)cml_realloc(g_mock.alloc_table,
-                                     (size_t)new_cap * sizeof(void*));
-        if (!tmp) return;
-        g_mock.alloc_table = tmp;
+        void** tmp  = (void**)cml_realloc(g_mock.alloc_table, (size_t)new_cap * sizeof(void*));
+        if (!tmp)
+            return;
+        g_mock.alloc_table    = tmp;
         g_mock.alloc_capacity = new_cap;
     }
 
@@ -106,7 +106,6 @@ static bool mock_untrack_alloc(void* ptr) {
     }
     return false;
 }
-
 
 /* Fake sysfs topology */
 
@@ -133,8 +132,9 @@ static int mkpath(const char* path, mode_t mode) {
 
 static void mock_create_topology(void) {
     char template[] = "/tmp/cml_am_mock_XXXXXX";
-    char* dir = mkdtemp(template);
-    if (!dir) return;
+    char* dir       = mkdtemp(template);
+    if (!dir)
+        return;
     snprintf(g_mock.topology_dir, sizeof(g_mock.topology_dir), "%s", dir);
 
     char path[512];
@@ -154,43 +154,40 @@ static void mock_create_topology(void) {
     mkpath(path, 0755);
 
     char props[2048];
-    int simd_count = g_mock.cu_count * (int)g_mock.simd_per_cu;
+    int simd_count      = g_mock.cu_count * (int)g_mock.simd_per_cu;
     uint32_t gfx_target = 0;
-    if (strcmp(g_mock.gfx_version, "gfx1100") == 0) gfx_target = 110000;
-    else if (strcmp(g_mock.gfx_version, "gfx1030") == 0) gfx_target = 100300;
-    else if (strcmp(g_mock.gfx_version, "gfx942") == 0) gfx_target = 90402;
-    else gfx_target = 110000;
+    if (strcmp(g_mock.gfx_version, "gfx1100") == 0)
+        gfx_target = 110000;
+    else if (strcmp(g_mock.gfx_version, "gfx1030") == 0)
+        gfx_target = 100300;
+    else if (strcmp(g_mock.gfx_version, "gfx942") == 0)
+        gfx_target = 90402;
+    else
+        gfx_target = 110000;
 
-    int array_count = g_mock.cu_count > 0 ? 6 : 0;
+    int array_count  = g_mock.cu_count > 0 ? 6 : 0;
     int cu_per_array = g_mock.cu_count / (array_count > 0 ? array_count : 1);
 
     snprintf(props, sizeof(props),
-        "cpu_cores_count 0\n"
-        "simd_count %d\n"
-        "simd_per_cu %u\n"
-        "max_waves_per_simd %u\n"
-        "gfx_target_version %u\n"
-        "gpu_id %u\n"
-        "array_count %d\n"
-        "cu_per_simd_array %d\n"
-        "local_mem_size %u\n"
-        "fw_version 123\n"
-        "max_engine_clk_fcompute 2500\n"
-        "vendor_id 4098\n"
-        "device_id 29772\n"
-        "location_id 256\n"
-        "domain 0\n"
-        "sdma_fw_version 2\n"
-        "lds_size_in_kb %u\n",
-        simd_count,
-        g_mock.simd_per_cu,
-        g_mock.max_waves_per_simd,
-        gfx_target,
-        g_mock.gpu_id,
-        array_count,
-        cu_per_array,
-        g_mock.lds_size_per_cu,
-        g_mock.lds_size_per_cu / 1024);
+             "cpu_cores_count 0\n"
+             "simd_count %d\n"
+             "simd_per_cu %u\n"
+             "max_waves_per_simd %u\n"
+             "gfx_target_version %u\n"
+             "gpu_id %u\n"
+             "array_count %d\n"
+             "cu_per_simd_array %d\n"
+             "local_mem_size %u\n"
+             "fw_version 123\n"
+             "max_engine_clk_fcompute 2500\n"
+             "vendor_id 4098\n"
+             "device_id 29772\n"
+             "location_id 256\n"
+             "domain 0\n"
+             "sdma_fw_version 2\n"
+             "lds_size_in_kb %u\n",
+             simd_count, g_mock.simd_per_cu, g_mock.max_waves_per_simd, gfx_target, g_mock.gpu_id,
+             array_count, cu_per_array, g_mock.lds_size_per_cu, g_mock.lds_size_per_cu / 1024);
 
     snprintf(path, sizeof(path), "%s/topology/nodes/1/properties", dir);
     write_file(path, props);
@@ -202,14 +199,15 @@ static void mock_create_topology(void) {
 }
 
 static void mock_remove_topology(void) {
-    if (g_mock.topology_dir[0] == '\0') return;
+    if (g_mock.topology_dir[0] == '\0')
+        return;
 
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", g_mock.topology_dir);
-    if (system(cmd) != 0) { /* best-effort cleanup of the mock topology dir */ }
+    if (system(cmd) != 0) { /* best-effort cleanup of the mock topology dir */
+    }
     g_mock.topology_dir[0] = '\0';
 }
-
 
 /* Mock syscalls */
 
@@ -222,8 +220,10 @@ int cml_am_mock_open(const char* path, int flags, ...) {
         return open(path, flags, mode);
     }
 
-    if (strcmp(path, "/dev/kfd") == 0) return MOCK_FD_KFD;
-    if (strcmp(path, "/dev/dri/renderD128") == 0) return MOCK_FD_DRM;
+    if (strcmp(path, "/dev/kfd") == 0)
+        return MOCK_FD_KFD;
+    if (strcmp(path, "/dev/dri/renderD128") == 0)
+        return MOCK_FD_DRM;
 
     va_list ap;
     va_start(ap, flags);
@@ -233,16 +233,18 @@ int cml_am_mock_open(const char* path, int flags, ...) {
 }
 
 int cml_am_mock_close(int fd) {
-    if (!g_mock_active) return close(fd);
-    if (fd == MOCK_FD_KFD || fd == MOCK_FD_DRM) return 0;
+    if (!g_mock_active)
+        return close(fd);
+    if (fd == MOCK_FD_KFD || fd == MOCK_FD_DRM)
+        return 0;
     return close(fd);
 }
 
 /* KFD ioctl structures -- must match am_driver.c definitions */
 #define KFD_IOC_MAGIC 'K'
 #define KFD_IOWR(nr, type) _IOWR(KFD_IOC_MAGIC, nr, type)
-#define KFD_IOW(nr, type)  _IOW(KFD_IOC_MAGIC, nr, type)
-#define KFD_IOR(nr, type)  _IOR(KFD_IOC_MAGIC, nr, type)
+#define KFD_IOW(nr, type) _IOW(KFD_IOC_MAGIC, nr, type)
+#define KFD_IOR(nr, type) _IOR(KFD_IOC_MAGIC, nr, type)
 
 struct mock_kfd_get_version {
     uint32_t major_version;
@@ -305,14 +307,14 @@ struct mock_kfd_unmap_memory {
     uint32_t n_success;
 };
 
-#define MOCK_IOC_GET_VERSION       KFD_IOR(0x01, struct mock_kfd_get_version)
-#define MOCK_IOC_CREATE_QUEUE      KFD_IOWR(0x02, struct mock_kfd_create_queue)
-#define MOCK_IOC_DESTROY_QUEUE     KFD_IOWR(0x03, struct mock_kfd_destroy_queue)
-#define MOCK_IOC_ACQUIRE_VM        KFD_IOW(0x07, struct mock_kfd_acquire_vm)
-#define MOCK_IOC_ALLOC_MEMORY      KFD_IOWR(0x18, struct mock_kfd_alloc_memory)
-#define MOCK_IOC_FREE_MEMORY       KFD_IOW(0x19, struct mock_kfd_free_memory)
-#define MOCK_IOC_MAP_MEMORY        KFD_IOWR(0x1A, struct mock_kfd_map_memory)
-#define MOCK_IOC_UNMAP_MEMORY      KFD_IOWR(0x1B, struct mock_kfd_unmap_memory)
+#define MOCK_IOC_GET_VERSION KFD_IOR(0x01, struct mock_kfd_get_version)
+#define MOCK_IOC_CREATE_QUEUE KFD_IOWR(0x02, struct mock_kfd_create_queue)
+#define MOCK_IOC_DESTROY_QUEUE KFD_IOWR(0x03, struct mock_kfd_destroy_queue)
+#define MOCK_IOC_ACQUIRE_VM KFD_IOW(0x07, struct mock_kfd_acquire_vm)
+#define MOCK_IOC_ALLOC_MEMORY KFD_IOWR(0x18, struct mock_kfd_alloc_memory)
+#define MOCK_IOC_FREE_MEMORY KFD_IOW(0x19, struct mock_kfd_free_memory)
+#define MOCK_IOC_MAP_MEMORY KFD_IOWR(0x1A, struct mock_kfd_map_memory)
+#define MOCK_IOC_UNMAP_MEMORY KFD_IOWR(0x1B, struct mock_kfd_unmap_memory)
 
 int cml_am_mock_ioctl(int fd, unsigned long request, void* arg) {
     if (!g_mock_active || (fd != MOCK_FD_KFD && fd != MOCK_FD_DRM))
@@ -320,8 +322,8 @@ int cml_am_mock_ioctl(int fd, unsigned long request, void* arg) {
 
     if (request == MOCK_IOC_GET_VERSION) {
         struct mock_kfd_get_version* v = (struct mock_kfd_get_version*)arg;
-        v->major_version = 1;
-        v->minor_version = 14;
+        v->major_version               = 1;
+        v->minor_version               = 14;
         return 0;
     }
 
@@ -331,8 +333,8 @@ int cml_am_mock_ioctl(int fd, unsigned long request, void* arg) {
 
     if (request == MOCK_IOC_CREATE_QUEUE) {
         struct mock_kfd_create_queue* cq = (struct mock_kfd_create_queue*)arg;
-        cq->queue_id = g_mock.next_queue_id++;
-        cq->doorbell_offset = (uint64_t)cq->queue_id * 4096;
+        cq->queue_id                     = g_mock.next_queue_id++;
+        cq->doorbell_offset              = (uint64_t)cq->queue_id * 4096;
         return 0;
     }
 
@@ -342,8 +344,8 @@ int cml_am_mock_ioctl(int fd, unsigned long request, void* arg) {
 
     if (request == MOCK_IOC_ALLOC_MEMORY) {
         struct mock_kfd_alloc_memory* a = (struct mock_kfd_alloc_memory*)arg;
-        a->handle = g_mock.next_handle++;
-        a->mmap_offset = a->handle * 4096;
+        a->handle                       = g_mock.next_handle++;
+        a->mmap_offset                  = a->handle * 4096;
         return 0;
     }
 
@@ -353,7 +355,7 @@ int cml_am_mock_ioctl(int fd, unsigned long request, void* arg) {
 
     if (request == MOCK_IOC_MAP_MEMORY) {
         struct mock_kfd_map_memory* m = (struct mock_kfd_map_memory*)arg;
-        m->n_success = m->n_devices;
+        m->n_success                  = m->n_devices;
         return 0;
     }
 
@@ -365,15 +367,17 @@ int cml_am_mock_ioctl(int fd, unsigned long request, void* arg) {
     return -1;
 }
 
-void* cml_am_mock_mmap(void* addr, size_t length, int prot, int flags,
-                        int fd, off_t offset) {
-    (void)addr; (void)prot; (void)flags; (void)offset;
+void* cml_am_mock_mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {
+    (void)addr;
+    (void)prot;
+    (void)flags;
+    (void)offset;
 
     if (!g_mock_active || (fd != MOCK_FD_KFD && fd != MOCK_FD_DRM))
         return mmap(addr, length, prot, flags, fd, offset);
 
     size_t aligned = (length + 4095) & ~(size_t)4095;
-    void* ptr = NULL;
+    void* ptr      = NULL;
     if (posix_memalign(&ptr, 4096, aligned) != 0)
         return MAP_FAILED;
     memset(ptr, 0, aligned);
@@ -383,7 +387,8 @@ void* cml_am_mock_mmap(void* addr, size_t length, int prot, int flags,
 
 int cml_am_mock_munmap(void* addr, size_t length) {
     (void)length;
-    if (!g_mock_active) return munmap(addr, length);
+    if (!g_mock_active)
+        return munmap(addr, length);
 
     if (mock_untrack_alloc(addr)) {
         free(addr); /* posix_memalign'd in cml_am_mock_mmap — must not go through cml_free */
@@ -394,26 +399,27 @@ int cml_am_mock_munmap(void* addr, size_t length) {
 }
 
 FILE* cml_am_mock_fopen(const char* path, const char* mode) {
-    if (!g_mock_active) return fopen(path, mode);
+    if (!g_mock_active)
+        return fopen(path, mode);
 
     const char* sysfs_prefix = "/sys/devices/virtual/kfd/kfd/topology/nodes";
-    size_t prefix_len = strlen(sysfs_prefix);
+    size_t prefix_len        = strlen(sysfs_prefix);
 
     if (strncmp(path, sysfs_prefix, prefix_len) == 0) {
         char mock_path[512];
-        snprintf(mock_path, sizeof(mock_path), "%s/topology/nodes%s",
-                 g_mock.topology_dir, path + prefix_len);
+        snprintf(mock_path, sizeof(mock_path), "%s/topology/nodes%s", g_mock.topology_dir,
+                 path + prefix_len);
         return fopen(mock_path, mode);
     }
 
     return fopen(path, mode);
 }
 
-
 /* AQL auto-completion */
 
 void cml_am_mock_complete_dispatch(void) {
-    if (!g_mock_active) return;
+    if (!g_mock_active)
+        return;
     g_mock.dispatches_seen++;
 }
 
@@ -421,22 +427,25 @@ void cml_am_mock_complete_dispatch(void) {
  * Scans known signal addresses and writes completion values. */
 
 int cml_am_mock_access(const char* path, int mode) {
-    if (!g_mock_active) return access(path, mode);
+    if (!g_mock_active)
+        return access(path, mode);
 
-    if (strcmp(path, "/dev/kfd") == 0) return 0;
-    if (strcmp(path, "/dev/dri/renderD128") == 0) return 0;
+    if (strcmp(path, "/dev/kfd") == 0)
+        return 0;
+    if (strcmp(path, "/dev/dri/renderD128") == 0)
+        return 0;
 
     return access(path, mode);
 }
 
 DIR* cml_am_mock_opendir(const char* path) {
-    if (!g_mock_active) return opendir(path);
+    if (!g_mock_active)
+        return opendir(path);
 
     const char* sysfs_prefix = "/sys/devices/virtual/kfd/kfd/topology/nodes";
     if (strcmp(path, sysfs_prefix) == 0) {
         char mock_path[512];
-        snprintf(mock_path, sizeof(mock_path), "%s/topology/nodes",
-                 g_mock.topology_dir);
+        snprintf(mock_path, sizeof(mock_path), "%s/topology/nodes", g_mock.topology_dir);
         return opendir(mock_path);
     }
 

@@ -54,8 +54,8 @@ InstanceNorm2d* nn_instancenorm2d(int num_features, float eps, bool affine, DTyp
     in->affine       = affine;
 
     if (affine) {
-        if (nn_add_affine_params((Module*)in, num_features, dtype, device,
-                                 &in->weight, &in->bias) != 0)
+        if (nn_add_affine_params((Module*)in, num_features, dtype, device, &in->weight,
+                                 &in->bias) != 0)
             return NULL;
     } else {
         in->weight = NULL;

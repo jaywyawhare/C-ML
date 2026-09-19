@@ -16,15 +16,16 @@
 #define CML_GRAD_CHECK_ASAN 0
 #endif
 
-#define EPS   1e-3f
-#define TOL   1e-2f
+#define EPS 1e-3f
+#define TOL 1e-2f
 
 #include "test_harness.h"
 
 static Tensor* make_rand(int* shape, int ndim, bool requires_grad) {
     TensorConfig cfg = {0};
-    Tensor* t = tensor_empty(shape, ndim, &cfg);
-    if (!t) return NULL;
+    Tensor* t        = tensor_empty(shape, ndim, &cfg);
+    if (!t)
+        return NULL;
     float* d = (float*)tensor_data_ptr(t);
     for (size_t i = 0; i < t->numel; i++)
         d[i] = ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
@@ -32,11 +33,11 @@ static Tensor* make_rand(int* shape, int ndim, bool requires_grad) {
     return t;
 }
 
-static Tensor* make_rand_positive(int* shape, int ndim, bool requires_grad,
-                                  float lo, float hi) {
+static Tensor* make_rand_positive(int* shape, int ndim, bool requires_grad, float lo, float hi) {
     TensorConfig cfg = {0};
-    Tensor* t = tensor_empty(shape, ndim, &cfg);
-    if (!t) return NULL;
+    Tensor* t        = tensor_empty(shape, ndim, &cfg);
+    if (!t)
+        return NULL;
     float* d = (float*)tensor_data_ptr(t);
     for (size_t i = 0; i < t->numel; i++)
         d[i] = lo + ((float)rand() / (float)RAND_MAX) * (hi - lo);
@@ -46,16 +47,16 @@ static Tensor* make_rand_positive(int* shape, int ndim, bool requires_grad,
 
 static float tensor_sum_all(Tensor* t) {
     float* d = (float*)tensor_data_ptr(t);
-    if (!d) return 0.0f;
+    if (!d)
+        return 0.0f;
     float s = 0.0f;
     for (size_t i = 0; i < t->numel; i++)
         s += d[i];
     return s;
 }
 
-static bool numerical_grad_check(const char* name, Tensor* param,
-                                 float (*loss_fn)(void*), void* ctx,
-                                 float eps, float tol) {
+static bool numerical_grad_check(const char* name, Tensor* param, float (*loss_fn)(void*),
+                                 void* ctx, float eps, float tol) {
     if (!param || !param->grad) {
         printf("  FAIL [%s]: parameter or gradient is NULL\n", name);
         return false;
@@ -71,21 +72,21 @@ static bool numerical_grad_check(const char* name, Tensor* param,
     for (size_t i = 0; i < param->numel; i++) {
         float orig = data[i];
 
-        data[i] = orig + eps;
+        data[i]      = orig + eps;
         float f_plus = loss_fn(ctx);
 
-        data[i] = orig - eps;
+        data[i]       = orig - eps;
         float f_minus = loss_fn(ctx);
 
         data[i] = orig;
 
-        float numerical = (f_plus - f_minus) / (2.0f * eps);
+        float numerical  = (f_plus - f_minus) / (2.0f * eps);
         float analytical = grad[i];
-        float diff = fabsf(numerical - analytical);
+        float diff       = fabsf(numerical - analytical);
 
         if (diff > tol) {
-            printf("  FAIL [%s]: element %zu  analytical=%.6f  numerical=%.6f  diff=%.6f\n",
-                   name, i, analytical, numerical, diff);
+            printf("  FAIL [%s]: element %zu  analytical=%.6f  numerical=%.6f  diff=%.6f\n", name,
+                   i, analytical, numerical, diff);
             return false;
         }
     }
@@ -93,7 +94,10 @@ static bool numerical_grad_check(const char* name, Tensor* param,
 }
 
 /* The loss every layer check drives: the sum of the forward output. */
-typedef struct { Module* layer; Tensor* input; } LayerCtx;
+typedef struct {
+    Module* layer;
+    Tensor* input;
+} LayerCtx;
 
 static float layer_loss(void* vctx) {
     LayerCtx* c = (LayerCtx*)vctx;
@@ -103,16 +107,17 @@ static float layer_loss(void* vctx) {
 /* Forward `layer` over `x`, backpropagate, then finite-difference `weight` and
  * `bias` (either may be absent). Frees the forward output; the layer and input
  * stay the caller's to free, including when this returns false. */
-static bool check_layer_grads(const char* label, Module* layer, Tensor* x,
-                              Parameter* weight, Parameter* bias) {
+static bool check_layer_grads(const char* label, Module* layer, Tensor* x, Parameter* weight,
+                              Parameter* bias) {
     module_set_training(layer, true);
 
     Tensor* out = module_forward(layer, x);
-    if (!out) return false;
+    if (!out)
+        return false;
     tensor_ensure_executed(out);
     cml_backward(out, NULL, false, false);
 
-    LayerCtx ctx = { layer, x };
+    LayerCtx ctx = {layer, x};
     char name[128];
     bool ok = true;
     if (weight && weight->tensor) {
@@ -130,15 +135,16 @@ static bool check_layer_grads(const char* label, Module* layer, Tensor* x,
 static bool check_linear(void) {
     cml_reset_ir_context();
     int in_shape[] = {2, 4};
-    Tensor* x = make_rand(in_shape, 2, true);
-    Linear* layer = nn_linear(4, 3, DTYPE_FLOAT32, DEVICE_CPU, true);
+    Tensor* x      = make_rand(in_shape, 2, true);
+    Linear* layer  = nn_linear(4, 3, DTYPE_FLOAT32, DEVICE_CPU, true);
     if (!layer || !x) {
-        if (x) tensor_free(x);
-        if (layer) module_free((Module*)layer);
+        if (x)
+            tensor_free(x);
+        if (layer)
+            module_free((Module*)layer);
         return false;
     }
-    bool ok = check_layer_grads("Linear", (Module*)layer, x,
-                                layer->weight, layer->bias);
+    bool ok = check_layer_grads("Linear", (Module*)layer, x, layer->weight, layer->bias);
     module_free((Module*)layer);
     tensor_free(x);
     cml_reset_ir_context();
@@ -147,15 +153,16 @@ static bool check_linear(void) {
 
 static bool check_conv1d(void) {
     int in_shape[] = {1, 2, 6};
-    Tensor* x = make_rand(in_shape, 3, true);
-    Conv1d* layer = nn_conv1d(2, 3, 3, 1, 0, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* x      = make_rand(in_shape, 3, true);
+    Conv1d* layer  = nn_conv1d(2, 3, 3, 1, 0, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
     if (!layer || !x) {
-        if (x) tensor_free(x);
-        if (layer) module_free((Module*)layer);
+        if (x)
+            tensor_free(x);
+        if (layer)
+            module_free((Module*)layer);
         return false;
     }
-    bool ok = check_layer_grads("Conv1d", (Module*)layer, x,
-                                layer->weight, layer->bias);
+    bool ok = check_layer_grads("Conv1d", (Module*)layer, x, layer->weight, layer->bias);
     module_free((Module*)layer);
     tensor_free(x);
     cml_reset_ir_context();
@@ -164,15 +171,16 @@ static bool check_conv1d(void) {
 
 static bool check_conv2d(void) {
     int in_shape[] = {1, 1, 5, 5};
-    Tensor* x = make_rand(in_shape, 4, true);
-    Conv2d* layer = nn_conv2d(1, 2, 3, 1, 0, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* x      = make_rand(in_shape, 4, true);
+    Conv2d* layer  = nn_conv2d(1, 2, 3, 1, 0, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
     if (!layer || !x) {
-        if (x) tensor_free(x);
-        if (layer) module_free((Module*)layer);
+        if (x)
+            tensor_free(x);
+        if (layer)
+            module_free((Module*)layer);
         return false;
     }
-    bool ok = check_layer_grads("Conv2d", (Module*)layer, x,
-                                layer->weight, layer->bias);
+    bool ok = check_layer_grads("Conv2d", (Module*)layer, x, layer->weight, layer->bias);
     module_free((Module*)layer);
     tensor_free(x);
     cml_reset_ir_context();
@@ -181,15 +189,16 @@ static bool check_conv2d(void) {
 
 static bool check_conv3d(void) {
     int in_shape[] = {1, 1, 4, 4, 4};
-    Tensor* x = make_rand(in_shape, 5, true);
-    Conv3d* layer = nn_conv3d(1, 2, 3, 1, 0, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* x      = make_rand(in_shape, 5, true);
+    Conv3d* layer  = nn_conv3d(1, 2, 3, 1, 0, 1, true, DTYPE_FLOAT32, DEVICE_CPU);
     if (!layer || !x) {
-        if (x) tensor_free(x);
-        if (layer) module_free((Module*)layer);
+        if (x)
+            tensor_free(x);
+        if (layer)
+            module_free((Module*)layer);
         return false;
     }
-    bool ok = check_layer_grads("Conv3d", (Module*)layer, x,
-                                layer->weight, layer->bias);
+    bool ok = check_layer_grads("Conv3d", (Module*)layer, x, layer->weight, layer->bias);
     module_free((Module*)layer);
     tensor_free(x);
     cml_reset_ir_context();
@@ -197,13 +206,12 @@ static bool check_conv3d(void) {
 }
 
 static bool check_batchnorm2d(void) {
-    int in_shape[] = {2, 3, 4, 4};
-    Tensor* x = make_rand(in_shape, 4, true);
-    BatchNorm2d* layer = nn_batchnorm2d(3, 1e-5f, 0.1f, true, true,
-                                         DTYPE_FLOAT32, DEVICE_CPU);
-    if (!layer || !x) return false;
-    bool ok = check_layer_grads("BatchNorm2d", (Module*)layer, x,
-                                layer->weight, layer->bias);
+    int in_shape[]     = {2, 3, 4, 4};
+    Tensor* x          = make_rand(in_shape, 4, true);
+    BatchNorm2d* layer = nn_batchnorm2d(3, 1e-5f, 0.1f, true, true, DTYPE_FLOAT32, DEVICE_CPU);
+    if (!layer || !x)
+        return false;
+    bool ok = check_layer_grads("BatchNorm2d", (Module*)layer, x, layer->weight, layer->bias);
     module_free((Module*)layer);
     tensor_free(x);
     cml_reset_ir_context();
@@ -211,16 +219,17 @@ static bool check_batchnorm2d(void) {
 }
 
 static bool check_layernorm(void) {
-    int in_shape[] = {2, 8};
-    Tensor* x = make_rand(in_shape, 2, true);
+    int in_shape[]   = {2, 8};
+    Tensor* x        = make_rand(in_shape, 2, true);
     LayerNorm* layer = nn_layernorm(8, 1e-5f, true, DTYPE_FLOAT32, DEVICE_CPU);
     if (!layer || !x) {
-        if (x) tensor_free(x);
-        if (layer) module_free((Module*)layer);
+        if (x)
+            tensor_free(x);
+        if (layer)
+            module_free((Module*)layer);
         return false;
     }
-    bool ok = check_layer_grads("LayerNorm", (Module*)layer, x,
-                                layer->weight, layer->bias);
+    bool ok = check_layer_grads("LayerNorm", (Module*)layer, x, layer->weight, layer->bias);
     module_free((Module*)layer);
     tensor_free(x);
     cml_reset_ir_context();
@@ -228,27 +237,32 @@ static bool check_layernorm(void) {
 }
 
 static bool check_groupnorm(void) {
-    int in_shape[] = {2, 4, 3, 3};
-    Tensor* x = make_rand(in_shape, 4, true);
+    int in_shape[]   = {2, 4, 3, 3};
+    Tensor* x        = make_rand(in_shape, 4, true);
     GroupNorm* layer = nn_groupnorm(2, 4, 1e-5f, true, DTYPE_FLOAT32, DEVICE_CPU);
     if (!layer || !x) {
-        if (x) tensor_free(x);
-        if (layer) module_free((Module*)layer);
+        if (x)
+            tensor_free(x);
+        if (layer)
+            module_free((Module*)layer);
         return false;
     }
-    bool ok = check_layer_grads("GroupNorm", (Module*)layer, x,
-                                layer->weight, layer->bias);
+    bool ok = check_layer_grads("GroupNorm", (Module*)layer, x, layer->weight, layer->bias);
     module_free((Module*)layer);
     tensor_free(x);
     cml_reset_ir_context();
     return ok;
 }
 
-typedef struct { RNNCell* cell; Tensor* input; Tensor* hidden; } RNNCellCtx;
+typedef struct {
+    RNNCell* cell;
+    Tensor* input;
+    Tensor* hidden;
+} RNNCellCtx;
 
 static float rnn_cell_loss_fn(void* vctx) {
     RNNCellCtx* c = (RNNCellCtx*)vctx;
-    Tensor* out = rnn_cell_forward(c->cell, c->input, c->hidden);
+    Tensor* out   = rnn_cell_forward(c->cell, c->input, c->hidden);
     return tensor_sum_all(out);
 }
 
@@ -256,14 +270,16 @@ static bool check_rnn_cell(void) {
     int input_size = 4, hidden_size = 3, batch = 2;
     int in_shape[]  = {batch, input_size};
     int hid_shape[] = {batch, hidden_size};
-    Tensor* x = make_rand(in_shape, 2, true);
-    Tensor* h = make_rand(hid_shape, 2, true);
-    RNNCell* cell = nn_rnn_cell(input_size, hidden_size, true,
-                                 DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* x       = make_rand(in_shape, 2, true);
+    Tensor* h       = make_rand(hid_shape, 2, true);
+    RNNCell* cell   = nn_rnn_cell(input_size, hidden_size, true, DTYPE_FLOAT32, DEVICE_CPU);
     if (!cell || !x || !h) {
-        if (x) tensor_free(x);
-        if (h) tensor_free(h);
-        if (cell) module_free((Module*)cell);
+        if (x)
+            tensor_free(x);
+        if (h)
+            tensor_free(h);
+        if (cell)
+            module_free((Module*)cell);
         return false;
     }
     module_set_training((Module*)cell, true);
@@ -278,14 +294,14 @@ static bool check_rnn_cell(void) {
     tensor_ensure_executed(out);
     cml_backward(out, NULL, false, false);
 
-    RNNCellCtx ctx = { cell, x, h };
-    bool ok = true;
+    RNNCellCtx ctx = {cell, x, h};
+    bool ok        = true;
     if (cell->weight_ih && cell->weight_ih->tensor)
         ok = ok && numerical_grad_check("RNNCell.weight_ih", cell->weight_ih->tensor,
-                                         rnn_cell_loss_fn, &ctx, EPS, TOL);
+                                        rnn_cell_loss_fn, &ctx, EPS, TOL);
     if (cell->weight_hh && cell->weight_hh->tensor)
         ok = ok && numerical_grad_check("RNNCell.weight_hh", cell->weight_hh->tensor,
-                                         rnn_cell_loss_fn, &ctx, EPS, TOL);
+                                        rnn_cell_loss_fn, &ctx, EPS, TOL);
     module_free((Module*)cell);
     tensor_free(out);
     tensor_free(x);
@@ -303,15 +319,16 @@ typedef struct {
 
 static float lstm_cell_loss_fn(void* vctx) {
     LSTMCellCtx* c = (LSTMCellCtx*)vctx;
-    Tensor* h_out = NULL;
-    Tensor* c_out = NULL;
+    Tensor* h_out  = NULL;
+    Tensor* c_out  = NULL;
     lstm_cell_forward(c->cell, c->input, c->h_prev, c->c_prev, &h_out, &c_out);
     /* Loss must match what the analytical backward seeds (h_out only).  Including
      * c_out here while cml_backward() only backprops h_out made the analytical
      * gradient omit the c_out path -> mismatch.  h_out already depends on every
      * gate and the cell state, so this exercises the full LSTM backward. */
     float loss = 0.0f;
-    if (h_out) loss += tensor_sum_all(h_out);
+    if (h_out)
+        loss += tensor_sum_all(h_out);
     return loss;
 }
 
@@ -319,16 +336,19 @@ static bool check_lstm_cell(void) {
     int input_size = 4, hidden_size = 3, batch = 2;
     int in_shape[]  = {batch, input_size};
     int hid_shape[] = {batch, hidden_size};
-    Tensor* x  = make_rand(in_shape, 2, true);
-    Tensor* hp = make_rand(hid_shape, 2, true);
-    Tensor* cp = make_rand(hid_shape, 2, true);
-    LSTMCell* cell = nn_lstm_cell(input_size, hidden_size, true,
-                                   DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* x       = make_rand(in_shape, 2, true);
+    Tensor* hp      = make_rand(hid_shape, 2, true);
+    Tensor* cp      = make_rand(hid_shape, 2, true);
+    LSTMCell* cell  = nn_lstm_cell(input_size, hidden_size, true, DTYPE_FLOAT32, DEVICE_CPU);
     if (!cell || !x || !hp || !cp) {
-        if (x) tensor_free(x);
-        if (hp) tensor_free(hp);
-        if (cp) tensor_free(cp);
-        if (cell) module_free((Module*)cell);
+        if (x)
+            tensor_free(x);
+        if (hp)
+            tensor_free(hp);
+        if (cp)
+            tensor_free(cp);
+        if (cell)
+            module_free((Module*)cell);
         return false;
     }
     module_set_training((Module*)cell, true);
@@ -344,19 +364,21 @@ static bool check_lstm_cell(void) {
         return false;
     }
     tensor_ensure_executed(h_out);
-    if (c_out) tensor_ensure_executed(c_out);
+    if (c_out)
+        tensor_ensure_executed(c_out);
     cml_backward(h_out, NULL, false, false);
 
-    LSTMCellCtx ctx = { cell, x, hp, cp };
-    bool ok = true;
+    LSTMCellCtx ctx = {cell, x, hp, cp};
+    bool ok         = true;
     if (cell->weight_ih && cell->weight_ih->tensor)
         ok = ok && numerical_grad_check("LSTMCell.weight_ih", cell->weight_ih->tensor,
-                                         lstm_cell_loss_fn, &ctx, EPS, TOL);
+                                        lstm_cell_loss_fn, &ctx, EPS, TOL);
     if (cell->weight_hh && cell->weight_hh->tensor)
         ok = ok && numerical_grad_check("LSTMCell.weight_hh", cell->weight_hh->tensor,
-                                         lstm_cell_loss_fn, &ctx, EPS, TOL);
+                                        lstm_cell_loss_fn, &ctx, EPS, TOL);
     module_free((Module*)cell);
-    if (c_out) tensor_free(c_out);
+    if (c_out)
+        tensor_free(c_out);
     tensor_free(h_out);
     tensor_free(x);
     tensor_free(hp);
@@ -365,11 +387,15 @@ static bool check_lstm_cell(void) {
     return ok;
 }
 
-typedef struct { GRUCell* cell; Tensor* input; Tensor* hidden; } GRUCellCtx;
+typedef struct {
+    GRUCell* cell;
+    Tensor* input;
+    Tensor* hidden;
+} GRUCellCtx;
 
 static float gru_cell_loss_fn(void* vctx) {
     GRUCellCtx* c = (GRUCellCtx*)vctx;
-    Tensor* out = gru_cell_forward(c->cell, c->input, c->hidden);
+    Tensor* out   = gru_cell_forward(c->cell, c->input, c->hidden);
     return tensor_sum_all(out);
 }
 
@@ -377,14 +403,16 @@ static bool check_gru_cell(void) {
     int input_size = 4, hidden_size = 3, batch = 2;
     int in_shape[]  = {batch, input_size};
     int hid_shape[] = {batch, hidden_size};
-    Tensor* x = make_rand(in_shape, 2, true);
-    Tensor* h = make_rand(hid_shape, 2, true);
-    GRUCell* cell = nn_gru_cell(input_size, hidden_size, true,
-                                 DTYPE_FLOAT32, DEVICE_CPU);
+    Tensor* x       = make_rand(in_shape, 2, true);
+    Tensor* h       = make_rand(hid_shape, 2, true);
+    GRUCell* cell   = nn_gru_cell(input_size, hidden_size, true, DTYPE_FLOAT32, DEVICE_CPU);
     if (!cell || !x || !h) {
-        if (x) tensor_free(x);
-        if (h) tensor_free(h);
-        if (cell) module_free((Module*)cell);
+        if (x)
+            tensor_free(x);
+        if (h)
+            tensor_free(h);
+        if (cell)
+            module_free((Module*)cell);
         return false;
     }
     module_set_training((Module*)cell, true);
@@ -399,14 +427,14 @@ static bool check_gru_cell(void) {
     tensor_ensure_executed(out);
     cml_backward(out, NULL, false, false);
 
-    GRUCellCtx ctx = { cell, x, h };
-    bool ok = true;
+    GRUCellCtx ctx = {cell, x, h};
+    bool ok        = true;
     if (cell->weight_ih && cell->weight_ih->tensor)
         ok = ok && numerical_grad_check("GRUCell.weight_ih", cell->weight_ih->tensor,
-                                         gru_cell_loss_fn, &ctx, EPS, TOL);
+                                        gru_cell_loss_fn, &ctx, EPS, TOL);
     if (cell->weight_hh && cell->weight_hh->tensor)
         ok = ok && numerical_grad_check("GRUCell.weight_hh", cell->weight_hh->tensor,
-                                         gru_cell_loss_fn, &ctx, EPS, TOL);
+                                        gru_cell_loss_fn, &ctx, EPS, TOL);
     module_free((Module*)cell);
     tensor_free(out);
     tensor_free(x);
@@ -415,29 +443,39 @@ static bool check_gru_cell(void) {
     return ok;
 }
 
-typedef struct { Embedding* layer; Tensor* indices; } EmbeddingCtx;
+typedef struct {
+    Embedding* layer;
+    Tensor* indices;
+} EmbeddingCtx;
 
 static float embedding_loss(void* vctx) {
     EmbeddingCtx* c = (EmbeddingCtx*)vctx;
-    Tensor* out = module_forward((Module*)c->layer, c->indices);
+    Tensor* out     = module_forward((Module*)c->layer, c->indices);
     return tensor_sum_all(out);
 }
 
 static bool check_embedding(void) {
     int num_embeddings = 10, embedding_dim = 4;
-    Embedding* layer = nn_embedding(num_embeddings, embedding_dim, -1,
-                                     DTYPE_FLOAT32, DEVICE_CPU);
-    if (!layer) return false;
+    Embedding* layer = nn_embedding(num_embeddings, embedding_dim, -1, DTYPE_FLOAT32, DEVICE_CPU);
+    if (!layer)
+        return false;
     module_set_training((Module*)layer, true);
 
-    int idx_shape[] = {2, 3};
-    TensorConfig cfg = { .dtype = DTYPE_INT32, .device = DEVICE_CPU,
-                         .has_dtype = true, .has_device = true };
+    int idx_shape[]  = {2, 3};
+    TensorConfig cfg = {
+        .dtype = DTYPE_INT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* indices = tensor_empty(idx_shape, 2, &cfg);
-    if (!indices) { module_free((Module*)layer); return false; }
+    if (!indices) {
+        module_free((Module*)layer);
+        return false;
+    }
     int32_t* idx_data = (int32_t*)tensor_data_ptr(indices);
-    idx_data[0] = 0; idx_data[1] = 3; idx_data[2] = 7;
-    idx_data[3] = 1; idx_data[4] = 5; idx_data[5] = 9;
+    idx_data[0]       = 0;
+    idx_data[1]       = 3;
+    idx_data[2]       = 7;
+    idx_data[3]       = 1;
+    idx_data[4]       = 5;
+    idx_data[5]       = 9;
 
     Tensor* out = module_forward((Module*)layer, indices);
     if (!out) {
@@ -448,11 +486,11 @@ static bool check_embedding(void) {
     tensor_ensure_executed(out);
     cml_backward(out, NULL, false, false);
 
-    EmbeddingCtx ctx = { layer, indices };
-    bool ok = true;
+    EmbeddingCtx ctx = {layer, indices};
+    bool ok          = true;
     if (layer->weight && layer->weight->tensor)
-        ok = ok && numerical_grad_check("Embedding.weight", layer->weight->tensor,
-                                         embedding_loss, &ctx, EPS, TOL);
+        ok = ok && numerical_grad_check("Embedding.weight", layer->weight->tensor, embedding_loss,
+                                        &ctx, EPS, TOL);
     module_free((Module*)layer);
     tensor_free(out);
     tensor_free(indices);
@@ -460,21 +498,26 @@ static bool check_embedding(void) {
     return ok;
 }
 
-typedef struct { MaxPool2d* layer; Tensor* input; } MaxPool2dCtx;
+typedef struct {
+    MaxPool2d* layer;
+    Tensor* input;
+} MaxPool2dCtx;
 
 static float maxpool2d_loss(void* vctx) {
     MaxPool2dCtx* c = (MaxPool2dCtx*)vctx;
-    Tensor* out = module_forward((Module*)c->layer, c->input);
+    Tensor* out     = module_forward((Module*)c->layer, c->input);
     return tensor_sum_all(out);
 }
 
 static bool check_maxpool2d(void) {
-    int in_shape[] = {1, 1, 4, 4};
-    Tensor* x = make_rand(in_shape, 4, true);
+    int in_shape[]   = {1, 1, 4, 4};
+    Tensor* x        = make_rand(in_shape, 4, true);
     MaxPool2d* layer = nn_maxpool2d(2, 2, 0, 1, false);
     if (!layer || !x) {
-        if (x) tensor_free(x);
-        if (layer) module_free((Module*)layer);
+        if (x)
+            tensor_free(x);
+        if (layer)
+            module_free((Module*)layer);
         return false;
     }
 
@@ -487,8 +530,8 @@ static bool check_maxpool2d(void) {
     tensor_ensure_executed(out);
     cml_backward(out, NULL, false, false);
 
-    MaxPool2dCtx ctx = { layer, x };
-    bool ok = true;
+    MaxPool2dCtx ctx = {layer, x};
+    bool ok          = true;
     if (x->grad) {
         ok = numerical_grad_check("MaxPool2d.input", x, maxpool2d_loss, &ctx, EPS, TOL);
     } else {
@@ -501,21 +544,26 @@ static bool check_maxpool2d(void) {
     return ok;
 }
 
-typedef struct { AvgPool2d* layer; Tensor* input; } AvgPool2dCtx;
+typedef struct {
+    AvgPool2d* layer;
+    Tensor* input;
+} AvgPool2dCtx;
 
 static float avgpool2d_loss(void* vctx) {
     AvgPool2dCtx* c = (AvgPool2dCtx*)vctx;
-    Tensor* out = module_forward((Module*)c->layer, c->input);
+    Tensor* out     = module_forward((Module*)c->layer, c->input);
     return tensor_sum_all(out);
 }
 
 static bool check_avgpool2d(void) {
-    int in_shape[] = {1, 1, 4, 4};
-    Tensor* x = make_rand(in_shape, 4, true);
+    int in_shape[]   = {1, 1, 4, 4};
+    Tensor* x        = make_rand(in_shape, 4, true);
     AvgPool2d* layer = nn_avgpool2d(2, 2, 0, false, true);
     if (!layer || !x) {
-        if (x) tensor_free(x);
-        if (layer) module_free((Module*)layer);
+        if (x)
+            tensor_free(x);
+        if (layer)
+            module_free((Module*)layer);
         return false;
     }
 
@@ -528,8 +576,8 @@ static bool check_avgpool2d(void) {
     tensor_ensure_executed(out);
     cml_backward(out, NULL, false, false);
 
-    AvgPool2dCtx ctx = { layer, x };
-    bool ok = true;
+    AvgPool2dCtx ctx = {layer, x};
+    bool ok          = true;
     if (x->grad) {
         ok = numerical_grad_check("AvgPool2d.input", x, avgpool2d_loss, &ctx, EPS, TOL);
     } else {
@@ -542,18 +590,23 @@ static bool check_avgpool2d(void) {
     return ok;
 }
 
-typedef struct { Module* act; Tensor* input; } ActivationCtx;
+typedef struct {
+    Module* act;
+    Tensor* input;
+} ActivationCtx;
 
 static float activation_loss(void* vctx) {
     ActivationCtx* c = (ActivationCtx*)vctx;
-    Tensor* out = module_forward(c->act, c->input);
+    Tensor* out      = module_forward(c->act, c->input);
     return tensor_sum_all(out);
 }
 
 static bool check_activation(const char* name, Module* act, Tensor* x) {
     if (!act || !x) {
-        if (x) tensor_free(x);
-        if (act) module_free(act);
+        if (x)
+            tensor_free(x);
+        if (act)
+            module_free(act);
         return false;
     }
 
@@ -566,8 +619,8 @@ static bool check_activation(const char* name, Module* act, Tensor* x) {
     tensor_ensure_executed(out);
     cml_backward(out, NULL, false, false);
 
-    ActivationCtx ctx = { act, x };
-    bool ok = true;
+    ActivationCtx ctx = {act, x};
+    bool ok           = true;
     if (x->grad) {
         ok = numerical_grad_check(name, x, activation_loss, &ctx, EPS, TOL);
     } else {
@@ -582,29 +635,29 @@ static bool check_activation(const char* name, Module* act, Tensor* x) {
 
 static bool check_relu(void) {
     int shape[] = {2, 4};
-    Tensor* x = make_rand_positive(shape, 2, true, 0.1f, 2.0f);
+    Tensor* x   = make_rand_positive(shape, 2, true, 0.1f, 2.0f);
     ReLU* layer = nn_relu(false);
     return check_activation("ReLU", (Module*)layer, x);
 }
 
 static bool check_sigmoid(void) {
-    int shape[] = {2, 4};
-    Tensor* x = make_rand(shape, 2, true);
+    int shape[]    = {2, 4};
+    Tensor* x      = make_rand(shape, 2, true);
     Sigmoid* layer = nn_sigmoid();
     return check_activation("Sigmoid", (Module*)layer, x);
 }
 
 static bool check_tanh(void) {
     int shape[] = {2, 4};
-    Tensor* x = make_rand(shape, 2, true);
+    Tensor* x   = make_rand(shape, 2, true);
     Tanh* layer = nn_tanh();
     return check_activation("Tanh", (Module*)layer, x);
 }
 
 static bool check_leaky_relu(void) {
     int shape[] = {2, 4};
-    Tensor* x = make_rand(shape, 2, true);
-    float* d = (float*)tensor_data_ptr(x);
+    Tensor* x   = make_rand(shape, 2, true);
+    float* d    = (float*)tensor_data_ptr(x);
     for (size_t i = 0; i < x->numel; i++) {
         if (fabsf(d[i]) < 0.05f)
             d[i] = (d[i] >= 0.0f) ? 0.1f : -0.1f;
@@ -614,8 +667,8 @@ static bool check_leaky_relu(void) {
 }
 
 static bool check_softmax(void) {
-    int shape[] = {2, 5};
-    Tensor* x = make_rand(shape, 2, true);
+    int shape[]    = {2, 5};
+    Tensor* x      = make_rand(shape, 2, true);
     Softmax* layer = nn_softmax(1);
     return check_activation("Softmax", (Module*)layer, x);
 }
@@ -623,28 +676,30 @@ static bool check_softmax(void) {
 static int required_run    = 0;
 static int required_passed = 0;
 
-#define RUN_TEST(fn) do {                                       \
-    tests_run++;                                                \
-    printf("  [%2d] %-25s ... ", tests_run, #fn);               \
-    if (check_##fn()) {                                         \
-        printf("PASS\n");                                       \
-        tests_passed++;                                         \
-    } else {                                                    \
-        printf("FAIL\n");                                       \
-    }                                                           \
-} while (0)
+#define RUN_TEST(fn)                                                                               \
+    do {                                                                                           \
+        tests_run++;                                                                               \
+        printf("  [%2d] %-25s ... ", tests_run, #fn);                                              \
+        if (check_##fn()) {                                                                        \
+            printf("PASS\n");                                                                      \
+            tests_passed++;                                                                        \
+        } else {                                                                                   \
+            printf("FAIL\n");                                                                      \
+        }                                                                                          \
+    } while (0)
 
-#define RUN_TEST_XFAIL(fn) do {                                 \
-    tests_run++;                                                \
-    printf("  [%2d] %-25s ... ", tests_run, #fn);               \
-    if (check_##fn()) {                                         \
-        printf("PASS (xfail cleared!)\n");                      \
-        tests_passed++;                                         \
-    } else {                                                    \
-        printf("XFAIL\n");                                      \
-        tests_passed++;                                         \
-    }                                                           \
-} while (0)
+#define RUN_TEST_XFAIL(fn)                                                                         \
+    do {                                                                                           \
+        tests_run++;                                                                               \
+        printf("  [%2d] %-25s ... ", tests_run, #fn);                                              \
+        if (check_##fn()) {                                                                        \
+            printf("PASS (xfail cleared!)\n");                                                     \
+            tests_passed++;                                                                        \
+        } else {                                                                                   \
+            printf("XFAIL\n");                                                                     \
+            tests_passed++;                                                                        \
+        }                                                                                          \
+    } while (0)
 
 int main(void) {
     srand((unsigned)time(NULL));

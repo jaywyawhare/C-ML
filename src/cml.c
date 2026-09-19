@@ -75,8 +75,9 @@ void cml_track_module(Module* module) {
         return;
 
     if (g_num_modules >= g_modules_capacity) {
-        size_t new_capacity  = g_modules_capacity == 0 ? 16 : g_modules_capacity * 2;
-        Module** new_modules = cml_realloc(g_tracked_modules, (size_t)new_capacity * sizeof(Module*));
+        size_t new_capacity = g_modules_capacity == 0 ? 16 : g_modules_capacity * 2;
+        Module** new_modules =
+            cml_realloc(g_tracked_modules, (size_t)new_capacity * sizeof(Module*));
         if (!new_modules)
             return;
         g_tracked_modules  = new_modules;
@@ -273,11 +274,10 @@ static void check_and_launch_viz(void) {
     }
 
 #ifdef _WIN32
-    const char* try_paths[] = {"scripts/viz.py", "../scripts/viz.py", getenv("VIZ_SCRIPT"),
-                               NULL};
+    const char* try_paths[] = {"scripts/viz.py", "../scripts/viz.py", getenv("VIZ_SCRIPT"), NULL};
 #else
     const char* try_paths[] = {
-        "scripts/viz.py",        "../scripts/viz.py",      "/usr/local/share/cml/viz.py",
+        "scripts/viz.py",        "../scripts/viz.py",  "/usr/local/share/cml/viz.py",
         "/usr/share/cml/viz.py", getenv("VIZ_SCRIPT"), NULL};
 #endif
 
@@ -304,7 +304,8 @@ static void check_and_launch_viz(void) {
 
     char cmd[2048];
     snprintf(cmd, sizeof(cmd), "python \"%s\" \"%s\"", script_path, exe_path);
-    if (system(cmd) != 0) { /* best-effort launch of the viz script */ }
+    if (system(cmd) != 0) { /* best-effort launch of the viz script */
+    }
 
     // Note: On Windows, system() waits for the command to finish.
     // If we want async, we'd need CreateProcess.
@@ -435,8 +436,7 @@ int cml_init(void) {
      * why -- so reject the combination instead of quietly picking a winner. */
     {
         const char* viz = getenv("VIZ");
-        bool viz_on = viz && viz[0] != '\0' && strcmp(viz, "0") != 0 &&
-                      strcmp(viz, "false") != 0;
+        bool viz_on = viz && viz[0] != '\0' && strcmp(viz, "0") != 0 && strcmp(viz, "false") != 0;
         if (viz_on && cml_flag_enabled(CML_FLAG_NO_EXPORT)) {
             LOG_ERROR("VIZ=1 and NO_EXPORT=1 are mutually exclusive: VIZ asks for the "
                       "dashboard exports, NO_EXPORT guarantees no files are written. "
@@ -471,14 +471,11 @@ int cml_init(void) {
      * (simd_*_parallel). Thread count: CML_THREADS, else auto-detect. */
     {
         const char* threads_env = getenv("CML_THREADS");
-        size_t threads = (threads_env && atoi(threads_env) > 0)
-                             ? (size_t)atoi(threads_env)
-                             : 0;
+        size_t threads   = (threads_env && atoi(threads_env) > 0) ? (size_t)atoi(threads_env) : 0;
         ThreadPool* pool = threadpool_create(threads);
         if (pool) {
             threadpool_set_global(pool);
-            LOG_DEBUG("C-ML thread pool started (%zu workers)",
-                      threadpool_get_num_threads(pool));
+            LOG_DEBUG("C-ML thread pool started (%zu workers)", threadpool_get_num_threads(pool));
         } else {
             LOG_WARNING("Thread pool unavailable; elementwise kernels run serial");
         }
@@ -832,7 +829,7 @@ Tensor* cml_reshape(Tensor* a, int* new_shape, int new_ndim) {
      * (or an autograd-attached view), not a bare tensor_reshape view that
      * severs the backward graph -- gradients would not reach producers of the
      * reshaped tensor (e.g. attention/transformer blocks did not train). */
-    ReshapeParams p = { .new_shape = new_shape, .new_ndim = new_ndim };
+    ReshapeParams p = {.new_shape = new_shape, .new_ndim = new_ndim};
     return uop_reshape(a, &p);
 }
 Tensor* cml_clone(Tensor* a) { return tensor_clone(a); }
@@ -843,9 +840,7 @@ Tensor* cml_concat(Tensor** tensors, int num_tensors, int dim) {
 Tensor* cml_stack(Tensor** tensors, int num_tensors, int dim) {
     return tensor_stack(tensors, num_tensors, dim);
 }
-Tensor* cml_where(Tensor* condition, Tensor* x, Tensor* y) {
-    return tensor_where(condition, x, y);
-}
+Tensor* cml_where(Tensor* condition, Tensor* x, Tensor* y) { return tensor_where(condition, x, y); }
 Tensor* cml_einsum(const char* equation, Tensor** tensors, int num_tensors) {
     return tensor_einsum(equation, tensors, num_tensors);
 }
@@ -1009,7 +1004,7 @@ void cml_graph_cache_reset_global(void);
 
 void cml_autograd_step_end(Tensor* keep) {
     if (keep)
-        tensor_realize(keep);   /* materialize + detach so the reset won't free it */
+        tensor_realize(keep); /* materialize + detach so the reset won't free it */
     /* FUSE_OPTIM is honored by sgd_step (optim.c); other optimizers still
      * realize per parameter. Note the latter once. */
     if (cml_flag_enabled(CML_FLAG_FUSE_OPTIM)) {
@@ -1029,9 +1024,7 @@ void cml_autograd_step_end(Tensor* keep) {
  * allocated tensor of the same shape — e.g. a second model in the same process.
  * The pooled buffers themselves and the parameters' realized data are kept, so
  * this is safe to call every step (unlike the full cml_reset_ir_context). */
-void cml_autograd_reset_after_step(void) {
-    cml_ir_reset_graph_only();
-}
+void cml_autograd_reset_after_step(void) { cml_ir_reset_graph_only(); }
 
 /* Materialize every parameter (and its gradient) into owned storage, so they no
  * longer borrow data from execution-plan buffers. Called before the plan cache
@@ -1154,9 +1147,7 @@ Tensor* cml_cumprod(Tensor* a, int dim) { return uop_cumprod(a, dim); }
 
 Tensor* cml_logcumsumexp(Tensor* a, int dim) { return uop_logcumsumexp(a, dim); }
 
-Tensor* cml_argsort(Tensor* a, int dim, bool descending) {
-    return uop_argsort(a, dim, descending);
-}
+Tensor* cml_argsort(Tensor* a, int dim, bool descending) { return uop_argsort(a, dim, descending); }
 
 Tensor* cml_var(Tensor* a, int dim, bool unbiased, bool keepdim) {
     return tensor_var(a, dim, unbiased, keepdim);
@@ -1170,22 +1161,30 @@ Tensor* cml_std(Tensor* a, int dim, bool unbiased, bool keepdim) {
  * build a differentiable graph node rather than a bare view (which severed the
  * backward graph, as raw reshape did before its fix). */
 Tensor* cml_squeeze(Tensor* a, int dim) {
-    if (!a || a->ndim < 1) return tensor_squeeze(a, dim);
+    if (!a || a->ndim < 1)
+        return tensor_squeeze(a, dim);
     int nd = a->ndim;
-    if (dim < 0) dim += nd;
+    if (dim < 0)
+        dim += nd;
     if (dim < 0 || dim >= nd || a->shape[dim] != 1)
-        return cml_reshape(a, a->shape, nd);  /* nothing to drop: identity reshape */
+        return cml_reshape(a, a->shape, nd); /* nothing to drop: identity reshape */
     int shape[16], j = 0;
-    for (int i = 0; i < nd; i++) if (i != dim) shape[j++] = a->shape[i];
+    for (int i = 0; i < nd; i++)
+        if (i != dim)
+            shape[j++] = a->shape[i];
     return cml_reshape(a, shape, nd - 1);
 }
 Tensor* cml_unsqueeze(Tensor* a, int dim) {
-    if (!a || a->ndim + 1 > 16) return tensor_unsqueeze(a, dim);
+    if (!a || a->ndim + 1 > 16)
+        return tensor_unsqueeze(a, dim);
     int nd = a->ndim;
-    if (dim < 0) dim += nd + 1;
-    if (dim < 0 || dim > nd) return tensor_unsqueeze(a, dim);
+    if (dim < 0)
+        dim += nd + 1;
+    if (dim < 0 || dim > nd)
+        return tensor_unsqueeze(a, dim);
     int shape[16], j = 0;
-    for (int i = 0; i < nd + 1; i++) shape[i] = (i == dim) ? 1 : a->shape[j++];
+    for (int i = 0; i < nd + 1; i++)
+        shape[i] = (i == dim) ? 1 : a->shape[j++];
     return cml_reshape(a, shape, nd + 1);
 }
 /* Route through uop_flip so flip is a differentiable graph node (grad = flip
@@ -1508,8 +1507,7 @@ Tensor* cml_sort(Tensor* a, int dim, bool descending) { return tensor_sort(a, di
 Tensor* cml_topk(Tensor* a, int k, int dim, bool largest, bool sorted) {
     return tensor_topk(a, k, dim, largest, sorted);
 }
-Tensor* cml_topk_with_indices(Tensor* a, int k, int dim, bool largest,
-                              Tensor** indices_out) {
+Tensor* cml_topk_with_indices(Tensor* a, int k, int dim, bool largest, Tensor** indices_out) {
     if (!a || !indices_out)
         return uop_topk(a, k, dim, largest, NULL);
     *indices_out = NULL;

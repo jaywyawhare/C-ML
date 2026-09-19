@@ -18,239 +18,281 @@
 
 #ifdef CML_HAS_OPENCL
 
-
 static const char* g_ocl_kernel_src =
-"#pragma OPENCL EXTENSION cl_intel_required_subgroup_size : enable\n"
+    "#pragma OPENCL EXTENSION cl_intel_required_subgroup_size : enable\n"
 
-"__attribute__((intel_reqd_sub_group_size(8)))\n"
-"__kernel void matmul(__global const float* restrict A,\n"
-"                        __global const float* restrict B,\n"
-"                        __global float* restrict C, int M, int N, int K) {\n"
-"    int tidC = get_local_id(0);\n"
-"    int tidR = get_local_id(1);\n"
-"    int gidR = get_group_id(1) * 128;\n"
-"    int gidC = get_group_id(0) * 128;\n"
-"    __local float As_T[16][129];\n"
-"    __local float Bs[16][129];\n"
-"    float acc[8][8];\n"
-"    for (int i = 0; i < 8; i++) for (int j = 0; j < 8; j++) acc[i][j] = 0.0f;\n"
-"    int tid = tidR * 16 + tidC;\n"
-"    for (int t = 0; t < K / 16; t++) {\n"
-"        int tK = t * 16;\n"
-"        for (int l = 0; l < 2; l++) {\n"
-"            int idx = tid + l * 256;\n"
-"            int lr  = idx >> 2;\n"
-"            int lc4 = (idx & 3) * 4;\n"
-"            __global const float4* a4 = (__global const float4*)(A + (gidR + lr) * K + tK + lc4);\n"
-"            float4 v = *a4;\n"
-"            As_T[lc4+0][lr] = v.x; As_T[lc4+1][lr] = v.y;\n"
-"            As_T[lc4+2][lr] = v.z; As_T[lc4+3][lr] = v.w;\n"
-"        }\n"
-"        for (int l = 0; l < 2; l++) {\n"
-"            int idx = tid + l * 256;\n"
-"            int lr  = idx >> 5;\n"
-"            int lc4 = (idx & 31) * 4;\n"
-"            __global const float4* b4 = (__global const float4*)(B + (tK + lr) * N + gidC + lc4);\n"
-"            float4 v = *b4;\n"
-"            Bs[lr][lc4+0] = v.x; Bs[lr][lc4+1] = v.y;\n"
-"            Bs[lr][lc4+2] = v.z; Bs[lr][lc4+3] = v.w;\n"
-"        }\n"
-"        barrier(CLK_LOCAL_MEM_FENCE);\n"
-"        #pragma unroll\n"
-"        for (int k = 0; k < 16; k++) {\n"
-"            float a0=As_T[k][tidR*8],a1=As_T[k][tidR*8+1],a2=As_T[k][tidR*8+2],a3=As_T[k][tidR*8+3];\n"
-"            float a4=As_T[k][tidR*8+4],a5=As_T[k][tidR*8+5],a6=As_T[k][tidR*8+6],a7=As_T[k][tidR*8+7];\n"
-"            float b0=Bs[k][tidC*8], b1=Bs[k][tidC*8+1], b2=Bs[k][tidC*8+2], b3=Bs[k][tidC*8+3];\n"
-"            float b4=Bs[k][tidC*8+4], b5=Bs[k][tidC*8+5], b6=Bs[k][tidC*8+6], b7=Bs[k][tidC*8+7];\n"
-"            acc[0][0]=mad(a0,b0,acc[0][0]); acc[0][1]=mad(a0,b1,acc[0][1]); acc[0][2]=mad(a0,b2,acc[0][2]); acc[0][3]=mad(a0,b3,acc[0][3]);\n"
-"            acc[0][4]=mad(a0,b4,acc[0][4]); acc[0][5]=mad(a0,b5,acc[0][5]); acc[0][6]=mad(a0,b6,acc[0][6]); acc[0][7]=mad(a0,b7,acc[0][7]);\n"
-"            acc[1][0]=mad(a1,b0,acc[1][0]); acc[1][1]=mad(a1,b1,acc[1][1]); acc[1][2]=mad(a1,b2,acc[1][2]); acc[1][3]=mad(a1,b3,acc[1][3]);\n"
-"            acc[1][4]=mad(a1,b4,acc[1][4]); acc[1][5]=mad(a1,b5,acc[1][5]); acc[1][6]=mad(a1,b6,acc[1][6]); acc[1][7]=mad(a1,b7,acc[1][7]);\n"
-"            acc[2][0]=mad(a2,b0,acc[2][0]); acc[2][1]=mad(a2,b1,acc[2][1]); acc[2][2]=mad(a2,b2,acc[2][2]); acc[2][3]=mad(a2,b3,acc[2][3]);\n"
-"            acc[2][4]=mad(a2,b4,acc[2][4]); acc[2][5]=mad(a2,b5,acc[2][5]); acc[2][6]=mad(a2,b6,acc[2][6]); acc[2][7]=mad(a2,b7,acc[2][7]);\n"
-"            acc[3][0]=mad(a3,b0,acc[3][0]); acc[3][1]=mad(a3,b1,acc[3][1]); acc[3][2]=mad(a3,b2,acc[3][2]); acc[3][3]=mad(a3,b3,acc[3][3]);\n"
-"            acc[3][4]=mad(a3,b4,acc[3][4]); acc[3][5]=mad(a3,b5,acc[3][5]); acc[3][6]=mad(a3,b6,acc[3][6]); acc[3][7]=mad(a3,b7,acc[3][7]);\n"
-"            acc[4][0]=mad(a4,b0,acc[4][0]); acc[4][1]=mad(a4,b1,acc[4][1]); acc[4][2]=mad(a4,b2,acc[4][2]); acc[4][3]=mad(a4,b3,acc[4][3]);\n"
-"            acc[4][4]=mad(a4,b4,acc[4][4]); acc[4][5]=mad(a4,b5,acc[4][5]); acc[4][6]=mad(a4,b6,acc[4][6]); acc[4][7]=mad(a4,b7,acc[4][7]);\n"
-"            acc[5][0]=mad(a5,b0,acc[5][0]); acc[5][1]=mad(a5,b1,acc[5][1]); acc[5][2]=mad(a5,b2,acc[5][2]); acc[5][3]=mad(a5,b3,acc[5][3]);\n"
-"            acc[5][4]=mad(a5,b4,acc[5][4]); acc[5][5]=mad(a5,b5,acc[5][5]); acc[5][6]=mad(a5,b6,acc[5][6]); acc[5][7]=mad(a5,b7,acc[5][7]);\n"
-"            acc[6][0]=mad(a6,b0,acc[6][0]); acc[6][1]=mad(a6,b1,acc[6][1]); acc[6][2]=mad(a6,b2,acc[6][2]); acc[6][3]=mad(a6,b3,acc[6][3]);\n"
-"            acc[6][4]=mad(a6,b4,acc[6][4]); acc[6][5]=mad(a6,b5,acc[6][5]); acc[6][6]=mad(a6,b6,acc[6][6]); acc[6][7]=mad(a6,b7,acc[6][7]);\n"
-"            acc[7][0]=mad(a7,b0,acc[7][0]); acc[7][1]=mad(a7,b1,acc[7][1]); acc[7][2]=mad(a7,b2,acc[7][2]); acc[7][3]=mad(a7,b3,acc[7][3]);\n"
-"            acc[7][4]=mad(a7,b4,acc[7][4]); acc[7][5]=mad(a7,b5,acc[7][5]); acc[7][6]=mad(a7,b6,acc[7][6]); acc[7][7]=mad(a7,b7,acc[7][7]);\n"
-"        }\n"
-"        barrier(CLK_LOCAL_MEM_FENCE);\n"
-"    }\n"
-"    for (int i = 0; i < 8; i++)\n"
-"        for (int j = 0; j < 8; j++)\n"
-"            C[(gidR+tidR*8+i)*N+gidC+tidC*8+j] = acc[i][j];\n"
-"}\n"
+    "__attribute__((intel_reqd_sub_group_size(8)))\n"
+    "__kernel void matmul(__global const float* restrict A,\n"
+    "                        __global const float* restrict B,\n"
+    "                        __global float* restrict C, int M, int N, int K) {\n"
+    "    int tidC = get_local_id(0);\n"
+    "    int tidR = get_local_id(1);\n"
+    "    int gidR = get_group_id(1) * 128;\n"
+    "    int gidC = get_group_id(0) * 128;\n"
+    "    __local float As_T[16][129];\n"
+    "    __local float Bs[16][129];\n"
+    "    float acc[8][8];\n"
+    "    for (int i = 0; i < 8; i++) for (int j = 0; j < 8; j++) acc[i][j] = 0.0f;\n"
+    "    int tid = tidR * 16 + tidC;\n"
+    "    for (int t = 0; t < K / 16; t++) {\n"
+    "        int tK = t * 16;\n"
+    "        for (int l = 0; l < 2; l++) {\n"
+    "            int idx = tid + l * 256;\n"
+    "            int lr  = idx >> 2;\n"
+    "            int lc4 = (idx & 3) * 4;\n"
+    "            __global const float4* a4 = (__global const float4*)(A + (gidR + lr) * K + tK + "
+    "lc4);\n"
+    "            float4 v = *a4;\n"
+    "            As_T[lc4+0][lr] = v.x; As_T[lc4+1][lr] = v.y;\n"
+    "            As_T[lc4+2][lr] = v.z; As_T[lc4+3][lr] = v.w;\n"
+    "        }\n"
+    "        for (int l = 0; l < 2; l++) {\n"
+    "            int idx = tid + l * 256;\n"
+    "            int lr  = idx >> 5;\n"
+    "            int lc4 = (idx & 31) * 4;\n"
+    "            __global const float4* b4 = (__global const float4*)(B + (tK + lr) * N + gidC + "
+    "lc4);\n"
+    "            float4 v = *b4;\n"
+    "            Bs[lr][lc4+0] = v.x; Bs[lr][lc4+1] = v.y;\n"
+    "            Bs[lr][lc4+2] = v.z; Bs[lr][lc4+3] = v.w;\n"
+    "        }\n"
+    "        barrier(CLK_LOCAL_MEM_FENCE);\n"
+    "        #pragma unroll\n"
+    "        for (int k = 0; k < 16; k++) {\n"
+    "            float "
+    "a0=As_T[k][tidR*8],a1=As_T[k][tidR*8+1],a2=As_T[k][tidR*8+2],a3=As_T[k][tidR*8+3];\n"
+    "            float "
+    "a4=As_T[k][tidR*8+4],a5=As_T[k][tidR*8+5],a6=As_T[k][tidR*8+6],a7=As_T[k][tidR*8+7];\n"
+    "            float b0=Bs[k][tidC*8], b1=Bs[k][tidC*8+1], b2=Bs[k][tidC*8+2], "
+    "b3=Bs[k][tidC*8+3];\n"
+    "            float b4=Bs[k][tidC*8+4], b5=Bs[k][tidC*8+5], b6=Bs[k][tidC*8+6], "
+    "b7=Bs[k][tidC*8+7];\n"
+    "            acc[0][0]=mad(a0,b0,acc[0][0]); acc[0][1]=mad(a0,b1,acc[0][1]); "
+    "acc[0][2]=mad(a0,b2,acc[0][2]); acc[0][3]=mad(a0,b3,acc[0][3]);\n"
+    "            acc[0][4]=mad(a0,b4,acc[0][4]); acc[0][5]=mad(a0,b5,acc[0][5]); "
+    "acc[0][6]=mad(a0,b6,acc[0][6]); acc[0][7]=mad(a0,b7,acc[0][7]);\n"
+    "            acc[1][0]=mad(a1,b0,acc[1][0]); acc[1][1]=mad(a1,b1,acc[1][1]); "
+    "acc[1][2]=mad(a1,b2,acc[1][2]); acc[1][3]=mad(a1,b3,acc[1][3]);\n"
+    "            acc[1][4]=mad(a1,b4,acc[1][4]); acc[1][5]=mad(a1,b5,acc[1][5]); "
+    "acc[1][6]=mad(a1,b6,acc[1][6]); acc[1][7]=mad(a1,b7,acc[1][7]);\n"
+    "            acc[2][0]=mad(a2,b0,acc[2][0]); acc[2][1]=mad(a2,b1,acc[2][1]); "
+    "acc[2][2]=mad(a2,b2,acc[2][2]); acc[2][3]=mad(a2,b3,acc[2][3]);\n"
+    "            acc[2][4]=mad(a2,b4,acc[2][4]); acc[2][5]=mad(a2,b5,acc[2][5]); "
+    "acc[2][6]=mad(a2,b6,acc[2][6]); acc[2][7]=mad(a2,b7,acc[2][7]);\n"
+    "            acc[3][0]=mad(a3,b0,acc[3][0]); acc[3][1]=mad(a3,b1,acc[3][1]); "
+    "acc[3][2]=mad(a3,b2,acc[3][2]); acc[3][3]=mad(a3,b3,acc[3][3]);\n"
+    "            acc[3][4]=mad(a3,b4,acc[3][4]); acc[3][5]=mad(a3,b5,acc[3][5]); "
+    "acc[3][6]=mad(a3,b6,acc[3][6]); acc[3][7]=mad(a3,b7,acc[3][7]);\n"
+    "            acc[4][0]=mad(a4,b0,acc[4][0]); acc[4][1]=mad(a4,b1,acc[4][1]); "
+    "acc[4][2]=mad(a4,b2,acc[4][2]); acc[4][3]=mad(a4,b3,acc[4][3]);\n"
+    "            acc[4][4]=mad(a4,b4,acc[4][4]); acc[4][5]=mad(a4,b5,acc[4][5]); "
+    "acc[4][6]=mad(a4,b6,acc[4][6]); acc[4][7]=mad(a4,b7,acc[4][7]);\n"
+    "            acc[5][0]=mad(a5,b0,acc[5][0]); acc[5][1]=mad(a5,b1,acc[5][1]); "
+    "acc[5][2]=mad(a5,b2,acc[5][2]); acc[5][3]=mad(a5,b3,acc[5][3]);\n"
+    "            acc[5][4]=mad(a5,b4,acc[5][4]); acc[5][5]=mad(a5,b5,acc[5][5]); "
+    "acc[5][6]=mad(a5,b6,acc[5][6]); acc[5][7]=mad(a5,b7,acc[5][7]);\n"
+    "            acc[6][0]=mad(a6,b0,acc[6][0]); acc[6][1]=mad(a6,b1,acc[6][1]); "
+    "acc[6][2]=mad(a6,b2,acc[6][2]); acc[6][3]=mad(a6,b3,acc[6][3]);\n"
+    "            acc[6][4]=mad(a6,b4,acc[6][4]); acc[6][5]=mad(a6,b5,acc[6][5]); "
+    "acc[6][6]=mad(a6,b6,acc[6][6]); acc[6][7]=mad(a6,b7,acc[6][7]);\n"
+    "            acc[7][0]=mad(a7,b0,acc[7][0]); acc[7][1]=mad(a7,b1,acc[7][1]); "
+    "acc[7][2]=mad(a7,b2,acc[7][2]); acc[7][3]=mad(a7,b3,acc[7][3]);\n"
+    "            acc[7][4]=mad(a7,b4,acc[7][4]); acc[7][5]=mad(a7,b5,acc[7][5]); "
+    "acc[7][6]=mad(a7,b6,acc[7][6]); acc[7][7]=mad(a7,b7,acc[7][7]);\n"
+    "        }\n"
+    "        barrier(CLK_LOCAL_MEM_FENCE);\n"
+    "    }\n"
+    "    for (int i = 0; i < 8; i++)\n"
+    "        for (int j = 0; j < 8; j++)\n"
+    "            C[(gidR+tidR*8+i)*N+gidC+tidC*8+j] = acc[i][j];\n"
+    "}\n"
 
-"__attribute__((intel_reqd_sub_group_size(8)))\n"
-"__kernel void matmul_fused_bias_relu(__global const float* restrict A,\n"
-"                                     __global const float* restrict B,\n"
-"                                     __global const float* restrict bias,\n"
-"                                     __global float* restrict C,\n"
-"                                     int M, int N, int K) {\n"
-"    int tidC = get_local_id(0);\n"
-"    int tidR = get_local_id(1);\n"
-"    int gidR = get_group_id(1) * 128;\n"
-"    int gidC = get_group_id(0) * 128;\n"
-"    __local float As_T[16][129];\n"
-"    __local float Bs[16][129];\n"
-"    float acc[8][8];\n"
-"    for (int i = 0; i < 8; i++) for (int j = 0; j < 8; j++) acc[i][j] = 0.0f;\n"
-"    int tid = tidR * 16 + tidC;\n"
-"    for (int t = 0; t < K / 16; t++) {\n"
-"        int tK = t * 16;\n"
-"        for (int l = 0; l < 2; l++) {\n"
-"            int idx = tid + l * 256;\n"
-"            int lr  = idx >> 2;\n"
-"            int lc4 = (idx & 3) * 4;\n"
-"            __global const float4* a4 = (__global const float4*)(A + (gidR + lr) * K + tK + lc4);\n"
-"            float4 v = *a4;\n"
-"            As_T[lc4+0][lr] = v.x; As_T[lc4+1][lr] = v.y;\n"
-"            As_T[lc4+2][lr] = v.z; As_T[lc4+3][lr] = v.w;\n"
-"        }\n"
-"        for (int l = 0; l < 2; l++) {\n"
-"            int idx = tid + l * 256;\n"
-"            int lr  = idx >> 5;\n"
-"            int lc4 = (idx & 31) * 4;\n"
-"            __global const float4* b4 = (__global const float4*)(B + (tK + lr) * N + gidC + lc4);\n"
-"            float4 v = *b4;\n"
-"            Bs[lr][lc4+0] = v.x; Bs[lr][lc4+1] = v.y;\n"
-"            Bs[lr][lc4+2] = v.z; Bs[lr][lc4+3] = v.w;\n"
-"        }\n"
-"        barrier(CLK_LOCAL_MEM_FENCE);\n"
-"        #pragma unroll\n"
-"        for (int k = 0; k < 16; k++) {\n"
-"            float a0=As_T[k][tidR*8],a1=As_T[k][tidR*8+1],a2=As_T[k][tidR*8+2],a3=As_T[k][tidR*8+3];\n"
-"            float a4=As_T[k][tidR*8+4],a5=As_T[k][tidR*8+5],a6=As_T[k][tidR*8+6],a7=As_T[k][tidR*8+7];\n"
-"            float b0=Bs[k][tidC*8], b1=Bs[k][tidC*8+1], b2=Bs[k][tidC*8+2], b3=Bs[k][tidC*8+3];\n"
-"            float b4=Bs[k][tidC*8+4], b5=Bs[k][tidC*8+5], b6=Bs[k][tidC*8+6], b7=Bs[k][tidC*8+7];\n"
-"            acc[0][0]=mad(a0,b0,acc[0][0]); acc[0][1]=mad(a0,b1,acc[0][1]); acc[0][2]=mad(a0,b2,acc[0][2]); acc[0][3]=mad(a0,b3,acc[0][3]);\n"
-"            acc[0][4]=mad(a0,b4,acc[0][4]); acc[0][5]=mad(a0,b5,acc[0][5]); acc[0][6]=mad(a0,b6,acc[0][6]); acc[0][7]=mad(a0,b7,acc[0][7]);\n"
-"            acc[1][0]=mad(a1,b0,acc[1][0]); acc[1][1]=mad(a1,b1,acc[1][1]); acc[1][2]=mad(a1,b2,acc[1][2]); acc[1][3]=mad(a1,b3,acc[1][3]);\n"
-"            acc[1][4]=mad(a1,b4,acc[1][4]); acc[1][5]=mad(a1,b5,acc[1][5]); acc[1][6]=mad(a1,b6,acc[1][6]); acc[1][7]=mad(a1,b7,acc[1][7]);\n"
-"            acc[2][0]=mad(a2,b0,acc[2][0]); acc[2][1]=mad(a2,b1,acc[2][1]); acc[2][2]=mad(a2,b2,acc[2][2]); acc[2][3]=mad(a2,b3,acc[2][3]);\n"
-"            acc[2][4]=mad(a2,b4,acc[2][4]); acc[2][5]=mad(a2,b5,acc[2][5]); acc[2][6]=mad(a2,b6,acc[2][6]); acc[2][7]=mad(a2,b7,acc[2][7]);\n"
-"            acc[3][0]=mad(a3,b0,acc[3][0]); acc[3][1]=mad(a3,b1,acc[3][1]); acc[3][2]=mad(a3,b2,acc[3][2]); acc[3][3]=mad(a3,b3,acc[3][3]);\n"
-"            acc[3][4]=mad(a3,b4,acc[3][4]); acc[3][5]=mad(a3,b5,acc[3][5]); acc[3][6]=mad(a3,b6,acc[3][6]); acc[3][7]=mad(a3,b7,acc[3][7]);\n"
-"            acc[4][0]=mad(a4,b0,acc[4][0]); acc[4][1]=mad(a4,b1,acc[4][1]); acc[4][2]=mad(a4,b2,acc[4][2]); acc[4][3]=mad(a4,b3,acc[4][3]);\n"
-"            acc[4][4]=mad(a4,b4,acc[4][4]); acc[4][5]=mad(a4,b5,acc[4][5]); acc[4][6]=mad(a4,b6,acc[4][6]); acc[4][7]=mad(a4,b7,acc[4][7]);\n"
-"            acc[5][0]=mad(a5,b0,acc[5][0]); acc[5][1]=mad(a5,b1,acc[5][1]); acc[5][2]=mad(a5,b2,acc[5][2]); acc[5][3]=mad(a5,b3,acc[5][3]);\n"
-"            acc[5][4]=mad(a5,b4,acc[5][4]); acc[5][5]=mad(a5,b5,acc[5][5]); acc[5][6]=mad(a5,b6,acc[5][6]); acc[5][7]=mad(a5,b7,acc[5][7]);\n"
-"            acc[6][0]=mad(a6,b0,acc[6][0]); acc[6][1]=mad(a6,b1,acc[6][1]); acc[6][2]=mad(a6,b2,acc[6][2]); acc[6][3]=mad(a6,b3,acc[6][3]);\n"
-"            acc[6][4]=mad(a6,b4,acc[6][4]); acc[6][5]=mad(a6,b5,acc[6][5]); acc[6][6]=mad(a6,b6,acc[6][6]); acc[6][7]=mad(a6,b7,acc[6][7]);\n"
-"            acc[7][0]=mad(a7,b0,acc[7][0]); acc[7][1]=mad(a7,b1,acc[7][1]); acc[7][2]=mad(a7,b2,acc[7][2]); acc[7][3]=mad(a7,b3,acc[7][3]);\n"
-"            acc[7][4]=mad(a7,b4,acc[7][4]); acc[7][5]=mad(a7,b5,acc[7][5]); acc[7][6]=mad(a7,b6,acc[7][6]); acc[7][7]=mad(a7,b7,acc[7][7]);\n"
-"        }\n"
-"        barrier(CLK_LOCAL_MEM_FENCE);\n"
-"    }\n"
-"    for (int i = 0; i < 8; i++) {\n"
-"        int row = gidR + tidR * 8 + i;\n"
-"        for (int j = 0; j < 8; j++) {\n"
-"            int col = gidC + tidC * 8 + j;\n"
-"            float v = acc[i][j] + bias[col];\n"
-"            C[row * N + col] = v < 0.0f ? 0.0f : v;\n"   /* NaN-propagating relu */
-"        }\n"
-"    }\n"
-"}\n"
+    "__attribute__((intel_reqd_sub_group_size(8)))\n"
+    "__kernel void matmul_fused_bias_relu(__global const float* restrict A,\n"
+    "                                     __global const float* restrict B,\n"
+    "                                     __global const float* restrict bias,\n"
+    "                                     __global float* restrict C,\n"
+    "                                     int M, int N, int K) {\n"
+    "    int tidC = get_local_id(0);\n"
+    "    int tidR = get_local_id(1);\n"
+    "    int gidR = get_group_id(1) * 128;\n"
+    "    int gidC = get_group_id(0) * 128;\n"
+    "    __local float As_T[16][129];\n"
+    "    __local float Bs[16][129];\n"
+    "    float acc[8][8];\n"
+    "    for (int i = 0; i < 8; i++) for (int j = 0; j < 8; j++) acc[i][j] = 0.0f;\n"
+    "    int tid = tidR * 16 + tidC;\n"
+    "    for (int t = 0; t < K / 16; t++) {\n"
+    "        int tK = t * 16;\n"
+    "        for (int l = 0; l < 2; l++) {\n"
+    "            int idx = tid + l * 256;\n"
+    "            int lr  = idx >> 2;\n"
+    "            int lc4 = (idx & 3) * 4;\n"
+    "            __global const float4* a4 = (__global const float4*)(A + (gidR + lr) * K + tK + "
+    "lc4);\n"
+    "            float4 v = *a4;\n"
+    "            As_T[lc4+0][lr] = v.x; As_T[lc4+1][lr] = v.y;\n"
+    "            As_T[lc4+2][lr] = v.z; As_T[lc4+3][lr] = v.w;\n"
+    "        }\n"
+    "        for (int l = 0; l < 2; l++) {\n"
+    "            int idx = tid + l * 256;\n"
+    "            int lr  = idx >> 5;\n"
+    "            int lc4 = (idx & 31) * 4;\n"
+    "            __global const float4* b4 = (__global const float4*)(B + (tK + lr) * N + gidC + "
+    "lc4);\n"
+    "            float4 v = *b4;\n"
+    "            Bs[lr][lc4+0] = v.x; Bs[lr][lc4+1] = v.y;\n"
+    "            Bs[lr][lc4+2] = v.z; Bs[lr][lc4+3] = v.w;\n"
+    "        }\n"
+    "        barrier(CLK_LOCAL_MEM_FENCE);\n"
+    "        #pragma unroll\n"
+    "        for (int k = 0; k < 16; k++) {\n"
+    "            float "
+    "a0=As_T[k][tidR*8],a1=As_T[k][tidR*8+1],a2=As_T[k][tidR*8+2],a3=As_T[k][tidR*8+3];\n"
+    "            float "
+    "a4=As_T[k][tidR*8+4],a5=As_T[k][tidR*8+5],a6=As_T[k][tidR*8+6],a7=As_T[k][tidR*8+7];\n"
+    "            float b0=Bs[k][tidC*8], b1=Bs[k][tidC*8+1], b2=Bs[k][tidC*8+2], "
+    "b3=Bs[k][tidC*8+3];\n"
+    "            float b4=Bs[k][tidC*8+4], b5=Bs[k][tidC*8+5], b6=Bs[k][tidC*8+6], "
+    "b7=Bs[k][tidC*8+7];\n"
+    "            acc[0][0]=mad(a0,b0,acc[0][0]); acc[0][1]=mad(a0,b1,acc[0][1]); "
+    "acc[0][2]=mad(a0,b2,acc[0][2]); acc[0][3]=mad(a0,b3,acc[0][3]);\n"
+    "            acc[0][4]=mad(a0,b4,acc[0][4]); acc[0][5]=mad(a0,b5,acc[0][5]); "
+    "acc[0][6]=mad(a0,b6,acc[0][6]); acc[0][7]=mad(a0,b7,acc[0][7]);\n"
+    "            acc[1][0]=mad(a1,b0,acc[1][0]); acc[1][1]=mad(a1,b1,acc[1][1]); "
+    "acc[1][2]=mad(a1,b2,acc[1][2]); acc[1][3]=mad(a1,b3,acc[1][3]);\n"
+    "            acc[1][4]=mad(a1,b4,acc[1][4]); acc[1][5]=mad(a1,b5,acc[1][5]); "
+    "acc[1][6]=mad(a1,b6,acc[1][6]); acc[1][7]=mad(a1,b7,acc[1][7]);\n"
+    "            acc[2][0]=mad(a2,b0,acc[2][0]); acc[2][1]=mad(a2,b1,acc[2][1]); "
+    "acc[2][2]=mad(a2,b2,acc[2][2]); acc[2][3]=mad(a2,b3,acc[2][3]);\n"
+    "            acc[2][4]=mad(a2,b4,acc[2][4]); acc[2][5]=mad(a2,b5,acc[2][5]); "
+    "acc[2][6]=mad(a2,b6,acc[2][6]); acc[2][7]=mad(a2,b7,acc[2][7]);\n"
+    "            acc[3][0]=mad(a3,b0,acc[3][0]); acc[3][1]=mad(a3,b1,acc[3][1]); "
+    "acc[3][2]=mad(a3,b2,acc[3][2]); acc[3][3]=mad(a3,b3,acc[3][3]);\n"
+    "            acc[3][4]=mad(a3,b4,acc[3][4]); acc[3][5]=mad(a3,b5,acc[3][5]); "
+    "acc[3][6]=mad(a3,b6,acc[3][6]); acc[3][7]=mad(a3,b7,acc[3][7]);\n"
+    "            acc[4][0]=mad(a4,b0,acc[4][0]); acc[4][1]=mad(a4,b1,acc[4][1]); "
+    "acc[4][2]=mad(a4,b2,acc[4][2]); acc[4][3]=mad(a4,b3,acc[4][3]);\n"
+    "            acc[4][4]=mad(a4,b4,acc[4][4]); acc[4][5]=mad(a4,b5,acc[4][5]); "
+    "acc[4][6]=mad(a4,b6,acc[4][6]); acc[4][7]=mad(a4,b7,acc[4][7]);\n"
+    "            acc[5][0]=mad(a5,b0,acc[5][0]); acc[5][1]=mad(a5,b1,acc[5][1]); "
+    "acc[5][2]=mad(a5,b2,acc[5][2]); acc[5][3]=mad(a5,b3,acc[5][3]);\n"
+    "            acc[5][4]=mad(a5,b4,acc[5][4]); acc[5][5]=mad(a5,b5,acc[5][5]); "
+    "acc[5][6]=mad(a5,b6,acc[5][6]); acc[5][7]=mad(a5,b7,acc[5][7]);\n"
+    "            acc[6][0]=mad(a6,b0,acc[6][0]); acc[6][1]=mad(a6,b1,acc[6][1]); "
+    "acc[6][2]=mad(a6,b2,acc[6][2]); acc[6][3]=mad(a6,b3,acc[6][3]);\n"
+    "            acc[6][4]=mad(a6,b4,acc[6][4]); acc[6][5]=mad(a6,b5,acc[6][5]); "
+    "acc[6][6]=mad(a6,b6,acc[6][6]); acc[6][7]=mad(a6,b7,acc[6][7]);\n"
+    "            acc[7][0]=mad(a7,b0,acc[7][0]); acc[7][1]=mad(a7,b1,acc[7][1]); "
+    "acc[7][2]=mad(a7,b2,acc[7][2]); acc[7][3]=mad(a7,b3,acc[7][3]);\n"
+    "            acc[7][4]=mad(a7,b4,acc[7][4]); acc[7][5]=mad(a7,b5,acc[7][5]); "
+    "acc[7][6]=mad(a7,b6,acc[7][6]); acc[7][7]=mad(a7,b7,acc[7][7]);\n"
+    "        }\n"
+    "        barrier(CLK_LOCAL_MEM_FENCE);\n"
+    "    }\n"
+    "    for (int i = 0; i < 8; i++) {\n"
+    "        int row = gidR + tidR * 8 + i;\n"
+    "        for (int j = 0; j < 8; j++) {\n"
+    "            int col = gidC + tidC * 8 + j;\n"
+    "            float v = acc[i][j] + bias[col];\n"
+    "            C[row * N + col] = v < 0.0f ? 0.0f : v;\n" /* NaN-propagating relu */
+    "        }\n"
+    "    }\n"
+    "}\n"
 
-"__kernel void matmul_naive(__global const float* A, __global const float* B,\n"
-"                           __global float* C, int M, int N, int K) {\n"
-"    int row = get_global_id(0);\n"
-"    int col = get_global_id(1);\n"
-"    if (row < M && col < N) {\n"
-"        float sum = 0.0f;\n"
-"        for (int i = 0; i < K; i++)\n"
-"            sum += A[row * K + i] * B[i * N + col];\n"
-"        C[row * N + col] = sum;\n"
-"    }\n"
-"}\n"
+    "__kernel void matmul_naive(__global const float* A, __global const float* B,\n"
+    "                           __global float* C, int M, int N, int K) {\n"
+    "    int row = get_global_id(0);\n"
+    "    int col = get_global_id(1);\n"
+    "    if (row < M && col < N) {\n"
+    "        float sum = 0.0f;\n"
+    "        for (int i = 0; i < K; i++)\n"
+    "            sum += A[row * K + i] * B[i * N + col];\n"
+    "        C[row * N + col] = sum;\n"
+    "    }\n"
+    "}\n"
 
-"__kernel void ew_add(__global const float* a, int sa,\n"
-"                     __global const float* b, int sb,\n"
-"                     __global float* out, int n) {\n"
-"    int i = get_global_id(0);\n"
-"    if (i < n) out[i] = a[sa ? (i % sa) : i] + b[sb ? (i % sb) : i];\n"
-"}\n"
-"__kernel void ew_sub(__global const float* a, int sa,\n"
-"                     __global const float* b, int sb,\n"
-"                     __global float* out, int n) {\n"
-"    int i = get_global_id(0);\n"
-"    if (i < n) out[i] = a[sa ? (i % sa) : i] - b[sb ? (i % sb) : i];\n"
-"}\n"
-"__kernel void ew_mul(__global const float* a, int sa,\n"
-"                     __global const float* b, int sb,\n"
-"                     __global float* out, int n) {\n"
-"    int i = get_global_id(0);\n"
-"    if (i < n) out[i] = a[sa ? (i % sa) : i] * b[sb ? (i % sb) : i];\n"
-"}\n"
-"__kernel void ew_div(__global const float* a, int sa,\n"
-"                     __global const float* b, int sb,\n"
-"                     __global float* out, int n) {\n"
-"    int i = get_global_id(0);\n"
-"    if (i < n) out[i] = a[sa ? (i % sa) : i] / b[sb ? (i % sb) : i];\n"
-"}\n"
+    "__kernel void ew_add(__global const float* a, int sa,\n"
+    "                     __global const float* b, int sb,\n"
+    "                     __global float* out, int n) {\n"
+    "    int i = get_global_id(0);\n"
+    "    if (i < n) out[i] = a[sa ? (i % sa) : i] + b[sb ? (i % sb) : i];\n"
+    "}\n"
+    "__kernel void ew_sub(__global const float* a, int sa,\n"
+    "                     __global const float* b, int sb,\n"
+    "                     __global float* out, int n) {\n"
+    "    int i = get_global_id(0);\n"
+    "    if (i < n) out[i] = a[sa ? (i % sa) : i] - b[sb ? (i % sb) : i];\n"
+    "}\n"
+    "__kernel void ew_mul(__global const float* a, int sa,\n"
+    "                     __global const float* b, int sb,\n"
+    "                     __global float* out, int n) {\n"
+    "    int i = get_global_id(0);\n"
+    "    if (i < n) out[i] = a[sa ? (i % sa) : i] * b[sb ? (i % sb) : i];\n"
+    "}\n"
+    "__kernel void ew_div(__global const float* a, int sa,\n"
+    "                     __global const float* b, int sb,\n"
+    "                     __global float* out, int n) {\n"
+    "    int i = get_global_id(0);\n"
+    "    if (i < n) out[i] = a[sa ? (i % sa) : i] / b[sb ? (i % sb) : i];\n"
+    "}\n"
 
-"__kernel void ew_neg(__global const float* x, __global float* out, int n) {\n"
-"    int i = get_global_id(0); if (i < n) out[i] = -x[i];\n"
-"}\n"
-"__kernel void ew_relu(__global const float* x, __global float* out, int n) {\n"
-"    int i = get_global_id(0);\n"
-"    /* `x < 0 ? 0 : x`, not `x > 0 ? x : 0`: an ordered compare is false for\n"
-"       NaN, so the latter would quietly turn NaN into 0. */\n"
-"    if (i < n) { float v = x[i]; out[i] = v < 0.0f ? 0.0f : v; }\n"
-"}\n"
-"__kernel void ew_sigmoid(__global const float* x, __global float* out, int n) {\n"
-"    int i = get_global_id(0); if (i < n) out[i] = 1.0f / (1.0f + exp(-x[i]));\n"
-"}\n"
-"__kernel void ew_tanh_k(__global const float* x, __global float* out, int n) {\n"
-"    int i = get_global_id(0); if (i < n) out[i] = tanh(x[i]);\n"
-"}\n"
-"__kernel void ew_exp(__global const float* x, __global float* out, int n) {\n"
-"    int i = get_global_id(0); if (i < n) out[i] = exp(x[i]);\n"
-"}\n"
-"__kernel void ew_log(__global const float* x, __global float* out, int n) {\n"
-"    int i = get_global_id(0); if (i < n) out[i] = log(x[i]);\n"
-"}\n"
-"__kernel void ew_sqrt_k(__global const float* x, __global float* out, int n) {\n"
-"    int i = get_global_id(0); if (i < n) out[i] = sqrt(x[i]);\n"
-"}\n"
+    "__kernel void ew_neg(__global const float* x, __global float* out, int n) {\n"
+    "    int i = get_global_id(0); if (i < n) out[i] = -x[i];\n"
+    "}\n"
+    "__kernel void ew_relu(__global const float* x, __global float* out, int n) {\n"
+    "    int i = get_global_id(0);\n"
+    "    /* `x < 0 ? 0 : x`, not `x > 0 ? x : 0`: an ordered compare is false for\n"
+    "       NaN, so the latter would quietly turn NaN into 0. */\n"
+    "    if (i < n) { float v = x[i]; out[i] = v < 0.0f ? 0.0f : v; }\n"
+    "}\n"
+    "__kernel void ew_sigmoid(__global const float* x, __global float* out, int n) {\n"
+    "    int i = get_global_id(0); if (i < n) out[i] = 1.0f / (1.0f + exp(-x[i]));\n"
+    "}\n"
+    "__kernel void ew_tanh_k(__global const float* x, __global float* out, int n) {\n"
+    "    int i = get_global_id(0); if (i < n) out[i] = tanh(x[i]);\n"
+    "}\n"
+    "__kernel void ew_exp(__global const float* x, __global float* out, int n) {\n"
+    "    int i = get_global_id(0); if (i < n) out[i] = exp(x[i]);\n"
+    "}\n"
+    "__kernel void ew_log(__global const float* x, __global float* out, int n) {\n"
+    "    int i = get_global_id(0); if (i < n) out[i] = log(x[i]);\n"
+    "}\n"
+    "__kernel void ew_sqrt_k(__global const float* x, __global float* out, int n) {\n"
+    "    int i = get_global_id(0); if (i < n) out[i] = sqrt(x[i]);\n"
+    "}\n"
 
-"__kernel void ew_fill(__global float* out, float val, int n) {\n"
-"    int i = get_global_id(0); if (i < n) out[i] = val;\n"
-"}\n"
+    "__kernel void ew_fill(__global float* out, float val, int n) {\n"
+    "    int i = get_global_id(0); if (i < n) out[i] = val;\n"
+    "}\n"
 
-"__kernel void reduce_sum(__global const float* x, __global float* out,\n"
-"                         __local float* scratch, int n) {\n"
-"    int lid = get_local_id(0);\n"
-"    int gid = get_global_id(0);\n"
-"    scratch[lid] = (gid < n) ? x[gid] : 0.0f;\n"
-"    barrier(CLK_LOCAL_MEM_FENCE);\n"
-"    for (int s = get_local_size(0) / 2; s > 0; s >>= 1) {\n"
-"        if (lid < s) scratch[lid] += scratch[lid + s];\n"
-"        barrier(CLK_LOCAL_MEM_FENCE);\n"
-"    }\n"
-"    if (lid == 0) out[get_group_id(0)] = scratch[0];\n"
-"}\n"
-"__kernel void reduce_max(__global const float* x, __global float* out,\n"
-"                         __local float* scratch, int n) {\n"
-"    int lid = get_local_id(0);\n"
-"    int gid = get_global_id(0);\n"
-"    scratch[lid] = (gid < n) ? x[gid] : -INFINITY;\n"
-"    barrier(CLK_LOCAL_MEM_FENCE);\n"
-"    for (int s = get_local_size(0) / 2; s > 0; s >>= 1) {\n"
-"        /* `!(a <= b)` is true when either is NaN, so NaN wins the reduction\n"
-"           instead of being skipped by an ordered compare. */\n"
-"        if (lid < s && !(scratch[lid + s] <= scratch[lid]))\n"
-"            scratch[lid] = scratch[lid + s];\n"
-"        barrier(CLK_LOCAL_MEM_FENCE);\n"
-"    }\n"
-"    if (lid == 0) out[get_group_id(0)] = scratch[0];\n"
-"}\n"
-;
+    "__kernel void reduce_sum(__global const float* x, __global float* out,\n"
+    "                         __local float* scratch, int n) {\n"
+    "    int lid = get_local_id(0);\n"
+    "    int gid = get_global_id(0);\n"
+    "    scratch[lid] = (gid < n) ? x[gid] : 0.0f;\n"
+    "    barrier(CLK_LOCAL_MEM_FENCE);\n"
+    "    for (int s = get_local_size(0) / 2; s > 0; s >>= 1) {\n"
+    "        if (lid < s) scratch[lid] += scratch[lid + s];\n"
+    "        barrier(CLK_LOCAL_MEM_FENCE);\n"
+    "    }\n"
+    "    if (lid == 0) out[get_group_id(0)] = scratch[0];\n"
+    "}\n"
+    "__kernel void reduce_max(__global const float* x, __global float* out,\n"
+    "                         __local float* scratch, int n) {\n"
+    "    int lid = get_local_id(0);\n"
+    "    int gid = get_global_id(0);\n"
+    "    scratch[lid] = (gid < n) ? x[gid] : -INFINITY;\n"
+    "    barrier(CLK_LOCAL_MEM_FENCE);\n"
+    "    for (int s = get_local_size(0) / 2; s > 0; s >>= 1) {\n"
+    "        /* `!(a <= b)` is true when either is NaN, so NaN wins the reduction\n"
+    "           instead of being skipped by an ordered compare. */\n"
+    "        if (lid < s && !(scratch[lid + s] <= scratch[lid]))\n"
+    "            scratch[lid] = scratch[lid + s];\n"
+    "        barrier(CLK_LOCAL_MEM_FENCE);\n"
+    "    }\n"
+    "    if (lid == 0) out[get_group_id(0)] = scratch[0];\n"
+    "}\n";
 
 /* ─── Buffer tracker helpers ───────────────────────────────────────────── */
 
@@ -273,10 +315,12 @@ static CMLOCLBufferEntry* ocl_find_cached_input(CMLOpenCLIRBackend* b, void* dat
 }
 
 static cl_mem ocl_ensure_gpu(CMLOpenCLIRBackend* b, Tensor* t) {
-    if (!t || !t->data) return NULL;
+    if (!t || !t->data)
+        return NULL;
 
     size_t bytes = t->numel * cml_dtype_size(t->dtype);
-    if (bytes == 0) return NULL;
+    if (bytes == 0)
+        return NULL;
 
     CMLOCLBufferEntry* e = ocl_find_buffer(b, t);
     if (e && e->valid) {
@@ -295,7 +339,8 @@ static cl_mem ocl_ensure_gpu(CMLOpenCLIRBackend* b, Tensor* t) {
     if (cached) {
         /* Same staleness concern for a buffer shared by data pointer. */
         if (cached->size == bytes && t->data)
-            clEnqueueWriteBuffer(b->queue, cached->gpu_buf, CL_FALSE, 0, bytes, t->data, 0, NULL, NULL);
+            clEnqueueWriteBuffer(b->queue, cached->gpu_buf, CL_FALSE, 0, bytes, t->data, 0, NULL,
+                                 NULL);
         cached->tensor = t;
         return cached->gpu_buf;
     }
@@ -305,18 +350,23 @@ static cl_mem ocl_ensure_gpu(CMLOpenCLIRBackend* b, Tensor* t) {
 
     if (e) {
         if (e->size == bytes) {
-            err = clEnqueueWriteBuffer(b->queue, e->gpu_buf, CL_FALSE, 0, bytes, t->data,
-                                       0, NULL, NULL);
-            if (err == CL_SUCCESS) { e->valid = true; e->data_ptr = t->data; return e->gpu_buf; }
+            err = clEnqueueWriteBuffer(b->queue, e->gpu_buf, CL_FALSE, 0, bytes, t->data, 0, NULL,
+                                       NULL);
+            if (err == CL_SUCCESS) {
+                e->valid    = true;
+                e->data_ptr = t->data;
+                return e->gpu_buf;
+            }
         }
         clReleaseMemObject(e->gpu_buf);
-        buf = clCreateBuffer(b->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                             bytes, t->data, &err);
-        if (err != CL_SUCCESS) return NULL;
-        e->gpu_buf = buf;
-        e->size = bytes;
+        buf = clCreateBuffer(b->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, bytes, t->data,
+                             &err);
+        if (err != CL_SUCCESS)
+            return NULL;
+        e->gpu_buf  = buf;
+        e->size     = bytes;
         e->data_ptr = t->data;
-        e->valid = true;
+        e->valid    = true;
         return buf;
     }
 
@@ -335,23 +385,25 @@ static cl_mem ocl_ensure_gpu(CMLOpenCLIRBackend* b, Tensor* t) {
             return NULL;
         }
     }
-    buf = clCreateBuffer(b->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                         bytes, t->data, &err);
-    if (err != CL_SUCCESS) return NULL;
+    buf =
+        clCreateBuffer(b->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, bytes, t->data, &err);
+    if (err != CL_SUCCESS)
+        return NULL;
 
-    e = &b->buffers[b->buffer_count++];
+    e           = &b->buffers[b->buffer_count++];
     e->tensor   = t;
     e->data_ptr = t->data;
     e->gpu_buf  = buf;
     e->size     = bytes;
     e->valid    = true;
-    e->is_input = (t->ir_node == NULL);  /* only cache leaf inputs across executions */
+    e->is_input = (t->ir_node == NULL); /* only cache leaf inputs across executions */
     return buf;
 }
 
 static cl_mem ocl_alloc_output(CMLOpenCLIRBackend* b, Tensor* t) {
     size_t bytes = t->numel * cml_dtype_size(t->dtype);
-    if (bytes == 0) return NULL;
+    if (bytes == 0)
+        return NULL;
 
     CMLOCLBufferEntry* e = ocl_find_buffer(b, t);
     if (e && e->size >= bytes) {
@@ -363,7 +415,7 @@ static cl_mem ocl_alloc_output(CMLOpenCLIRBackend* b, Tensor* t) {
         CMLOCLBufferEntry* p = &b->buffers[i];
         if (!p->is_input && !p->valid && p->gpu_buf && p->size == bytes) {
             p->tensor = t;
-            p->valid = true;
+            p->valid  = true;
             return p->gpu_buf;
         }
     }
@@ -375,7 +427,8 @@ static cl_mem ocl_alloc_output(CMLOpenCLIRBackend* b, Tensor* t) {
 
     cl_int err;
     cl_mem buf = clCreateBuffer(b->context, CL_MEM_READ_WRITE, bytes, NULL, &err);
-    if (err != CL_SUCCESS) return NULL;
+    if (err != CL_SUCCESS)
+        return NULL;
 
     if (e) {
         clReleaseMemObject(e->gpu_buf);
@@ -383,7 +436,7 @@ static cl_mem ocl_alloc_output(CMLOpenCLIRBackend* b, Tensor* t) {
         e->size    = bytes;
         e->valid   = true;
     } else {
-        e = &b->buffers[b->buffer_count++];
+        e          = &b->buffers[b->buffer_count++];
         e->tensor  = t;
         e->gpu_buf = buf;
         e->size    = bytes;
@@ -394,17 +447,19 @@ static cl_mem ocl_alloc_output(CMLOpenCLIRBackend* b, Tensor* t) {
 
 static int ocl_download(CMLOpenCLIRBackend* b, Tensor* t) {
     CMLOCLBufferEntry* e = ocl_find_buffer(b, t);
-    if (!e || !e->valid) return -1;
+    if (!e || !e->valid)
+        return -1;
 
     size_t bytes = t->numel * cml_dtype_size(t->dtype);
 
     if (!t->data) {
         t->data = cml_malloc(bytes);
-        if (!t->data) return -1;
+        if (!t->data)
+            return -1;
         t->owns_data = true;
     }
-    cl_int err = clEnqueueReadBuffer(b->queue, e->gpu_buf, CL_FALSE, 0, bytes, t->data,
-                                     0, NULL, NULL);
+    cl_int err =
+        clEnqueueReadBuffer(b->queue, e->gpu_buf, CL_FALSE, 0, bytes, t->data, 0, NULL, NULL);
     return (err == CL_SUCCESS) ? 0 : -1;
 }
 
@@ -413,11 +468,11 @@ static void ocl_release_intermediate_buffers(CMLOpenCLIRBackend* b) {
      * and clear tensor pointers so they can be reused by ocl_alloc_output. */
     for (int i = 0; i < b->buffer_count; i++) {
         if (b->buffers[i].is_input) {
-            b->buffers[i].tensor = NULL;  /* prevent stale pointer match */
+            b->buffers[i].tensor = NULL; /* prevent stale pointer match */
         } else {
-            b->buffers[i].tensor = NULL;
+            b->buffers[i].tensor   = NULL;
             b->buffers[i].data_ptr = NULL;
-            b->buffers[i].valid = false;
+            b->buffers[i].valid    = false;
             /* Keep gpu_buf alive for reuse */
         }
     }
@@ -436,19 +491,20 @@ static void ocl_release_all_buffers(CMLOpenCLIRBackend* b) {
 /* Generate OpenCL source for a parameterized GEMM kernel.
  * Returns heap-allocated string. Caller must cml_free(). */
 static char* ocl_beam_generate_gemm(const CMLGemmVariantParams* p, int id) {
-    int wg_x = p->tsn / p->reg_n;
-    int wg_y = p->tsm / p->reg_m;
+    int wg_x     = p->tsn / p->reg_n;
+    int wg_y     = p->tsm / p->reg_m;
     int wg_total = wg_x * wg_y;
-    int a_tile = p->tsm * p->tsk;
-    int b_tile = p->tsk * p->tsn;
-    int a_loads = a_tile / wg_total;
-    int b_loads = b_tile / wg_total;
-    int slm_w_a = p->transpose_a ? (p->tsm + p->slm_pad) : (p->tsk + p->slm_pad);
-    int slm_h_a = p->transpose_a ? p->tsk : p->tsm;
-    int slm_w_b = p->tsn + p->slm_pad;
+    int a_tile   = p->tsm * p->tsk;
+    int b_tile   = p->tsk * p->tsn;
+    int a_loads  = a_tile / wg_total;
+    int b_loads  = b_tile / wg_total;
+    int slm_w_a  = p->transpose_a ? (p->tsm + p->slm_pad) : (p->tsk + p->slm_pad);
+    int slm_h_a  = p->transpose_a ? p->tsk : p->tsm;
+    int slm_w_b  = p->tsn + p->slm_pad;
 
     char* buf = (char*)cml_malloc(16384);
-    if (!buf) return NULL;
+    if (!buf)
+        return NULL;
     int off = 0;
 
 #define P(...) off += snprintf(buf + off, 16384 - off, __VA_ARGS__)
@@ -469,8 +525,8 @@ static char* ocl_beam_generate_gemm(const CMLGemmVariantParams* p, int id) {
     P("    __local float Bs[%d][%d];\n", p->tsk, slm_w_b);
 
     P("    float acc[%d][%d];\n", p->reg_m, p->reg_n);
-    P("    for (int i = 0; i < %d; i++) for (int j = 0; j < %d; j++) acc[i][j] = 0.0f;\n",
-      p->reg_m, p->reg_n);
+    P("    for (int i = 0; i < %d; i++) for (int j = 0; j < %d; j++) acc[i][j] = 0.0f;\n", p->reg_m,
+      p->reg_n);
     P("    int tid = tidR * %d + tidC;\n", wg_x);
 
     P("    for (int t = 0; t < K / %d; t++) {\n", p->tsk);
@@ -537,17 +593,23 @@ static char* ocl_beam_generate_gemm(const CMLGemmVariantParams* p, int id) {
 }
 
 static bool ocl_beam_params_valid(const CMLGemmVariantParams* p) {
-    int wg_x = p->tsn / p->reg_n;
-    int wg_y = p->tsm / p->reg_m;
+    int wg_x     = p->tsn / p->reg_n;
+    int wg_y     = p->tsm / p->reg_m;
     int wg_total = wg_x * wg_y;
-    if (wg_x < 4 || wg_y < 4 || wg_total > 512) return false;
-    if ((p->tsm * p->tsk) % wg_total != 0) return false;
-    if ((p->tsk * p->tsn) % wg_total != 0) return false;
+    if (wg_x < 4 || wg_y < 4 || wg_total > 512)
+        return false;
+    if ((p->tsm * p->tsk) % wg_total != 0)
+        return false;
+    if ((p->tsk * p->tsn) % wg_total != 0)
+        return false;
     int regs = p->reg_m * p->reg_n + p->reg_m + p->reg_n;
-    if (regs > 80) return false;
-    int slm_a = (p->transpose_a ? p->tsk : p->tsm) * (p->transpose_a ? (p->tsm + p->slm_pad) : (p->tsk + p->slm_pad));
+    if (regs > 80)
+        return false;
+    int slm_a = (p->transpose_a ? p->tsk : p->tsm) *
+                (p->transpose_a ? (p->tsm + p->slm_pad) : (p->tsk + p->slm_pad));
     int slm_b = p->tsk * (p->tsn + p->slm_pad);
-    if ((slm_a + slm_b) * 4 > 65536) return false;
+    if ((slm_a + slm_b) * 4 > 65536)
+        return false;
     return true;
 }
 
@@ -556,66 +618,73 @@ static bool ocl_beam_params_valid(const CMLGemmVariantParams* p) {
  * so autotuning with early-exit finds the winner quickly. */
 static void ocl_beam_compile_variants(CMLOpenCLIRBackend* b) {
     /* Priority order: large tiles first (for big GEMM), then small tiles */
-    static const int tile_sizes[][2] = {{128,128}, {128,64}, {64,128}, {64,64}};
-    static const int tsk_values[] = {16, 8};
+    static const int tile_sizes[][2] = {{128, 128}, {128, 64}, {64, 128}, {64, 64}};
+    static const int tsk_values[]    = {16, 8};
     /* Priority: high-compute register blocks first */
-    static const int reg_blocks[][2] = {{8,8}, {8,4}, {4,8}, {4,4}};
-    static const int pad_values[] = {0, 1};
+    static const int reg_blocks[][2] = {{8, 8}, {8, 4}, {4, 8}, {4, 4}};
+    static const int pad_values[]    = {0, 1};
 
     b->gemm_variant_count = 0;
 
     for (int ti = 0; ti < 4; ti++)
-    for (int ki = 0; ki < 2; ki++)
-    for (int ri = 0; ri < 4; ri++)
-    for (int pi = 0; pi < 2; pi++) {
-        if (b->gemm_variant_count >= CML_OCL_MAX_GEMM_VARIANTS) break;
+        for (int ki = 0; ki < 2; ki++)
+            for (int ri = 0; ri < 4; ri++)
+                for (int pi = 0; pi < 2; pi++) {
+                    if (b->gemm_variant_count >= CML_OCL_MAX_GEMM_VARIANTS)
+                        break;
 
-        CMLGemmVariantParams p = {
-            .tsm = tile_sizes[ti][0], .tsn = tile_sizes[ti][1],
-            .tsk = tsk_values[ki],
-            .reg_m = reg_blocks[ri][0], .reg_n = reg_blocks[ri][1],
-            .slm_pad = pad_values[pi],
-            .transpose_a = true  /* always use A-transposed — proven faster */
-        };
-        if (!ocl_beam_params_valid(&p)) continue;
+                    CMLGemmVariantParams p = {
+                        .tsm         = tile_sizes[ti][0],
+                        .tsn         = tile_sizes[ti][1],
+                        .tsk         = tsk_values[ki],
+                        .reg_m       = reg_blocks[ri][0],
+                        .reg_n       = reg_blocks[ri][1],
+                        .slm_pad     = pad_values[pi],
+                        .transpose_a = true /* always use A-transposed — proven faster */
+                    };
+                    if (!ocl_beam_params_valid(&p))
+                        continue;
 
-        int idx = b->gemm_variant_count;
-        char* src = ocl_beam_generate_gemm(&p, idx);
-        if (!src) continue;
+                    int idx   = b->gemm_variant_count;
+                    char* src = ocl_beam_generate_gemm(&p, idx);
+                    if (!src)
+                        continue;
 
-        cl_int err;
-        cl_program prog = clCreateProgramWithSource(b->context, 1, (const char**)&src, NULL, &err);
-        cml_free(src);
-        if (err != CL_SUCCESS) continue;
+                    cl_int err;
+                    cl_program prog =
+                        clCreateProgramWithSource(b->context, 1, (const char**)&src, NULL, &err);
+                    cml_free(src);
+                    if (err != CL_SUCCESS)
+                        continue;
 
-        /* NOT -cl-fast-relaxed-math: it implies -cl-finite-math-only, which lets the
-         * compiler assume NaN and Inf never occur. Under that assumption it may fold
-         * a NaN-safe select straight back into fmax, so relu(NaN) returned 0 on the
-         * GPU while the CPU returned NaN -- the same tensor, two different answers.
-         * -cl-mad-enable keeps the fused multiply-add, which is the bulk of the win. */
-        err = clBuildProgram(prog, 1, &b->device, "-cl-mad-enable", NULL, NULL);
-        if (err != CL_SUCCESS) {
-            clReleaseProgram(prog);
-            continue;
-        }
+                    /* NOT -cl-fast-relaxed-math: it implies -cl-finite-math-only, which lets the
+                     * compiler assume NaN and Inf never occur. Under that assumption it may fold
+                     * a NaN-safe select straight back into fmax, so relu(NaN) returned 0 on the
+                     * GPU while the CPU returned NaN -- the same tensor, two different answers.
+                     * -cl-mad-enable keeps the fused multiply-add, which is the bulk of the win. */
+                    err = clBuildProgram(prog, 1, &b->device, "-cl-mad-enable", NULL, NULL);
+                    if (err != CL_SUCCESS) {
+                        clReleaseProgram(prog);
+                        continue;
+                    }
 
-        char kname[32];
-        snprintf(kname, sizeof(kname), "beam_gemm_%d", idx);
-        cl_kernel kern = clCreateKernel(prog, kname, &err);
-        if (err != CL_SUCCESS) {
-            clReleaseProgram(prog);
-            continue;
-        }
+                    char kname[32];
+                    snprintf(kname, sizeof(kname), "beam_gemm_%d", idx);
+                    cl_kernel kern = clCreateKernel(prog, kname, &err);
+                    if (err != CL_SUCCESS) {
+                        clReleaseProgram(prog);
+                        continue;
+                    }
 
-        CMLGemmVariant* v = &b->gemm_variants[idx];
-        v->params = p;
-        v->program = prog;
-        v->kernel = kern;
-        v->local_size[0] = p.tsn / p.reg_n;
-        v->local_size[1] = p.tsm / p.reg_m;
-        v->valid = true;
-        b->gemm_variant_count++;
-    }
+                    CMLGemmVariant* v = &b->gemm_variants[idx];
+                    v->params         = p;
+                    v->program        = prog;
+                    v->kernel         = kern;
+                    v->local_size[0]  = p.tsn / p.reg_n;
+                    v->local_size[1]  = p.tsm / p.reg_m;
+                    v->valid          = true;
+                    b->gemm_variant_count++;
+                }
 
     LOG_INFO("BEAM: compiled %d GEMM variants", b->gemm_variant_count);
 }
@@ -633,13 +702,13 @@ static void ocl_beam_cache_store(CMLOpenCLIRBackend* b, int M, int N, int K, int
     uint64_t key = ((uint64_t)M << 40) | ((uint64_t)N << 20) | (uint64_t)K;
     for (int i = 0; i < CML_OCL_GEMM_CACHE_SIZE; i++) {
         if (!b->gemm_cache[i].occupied) {
-            b->gemm_cache[i].key = key;
+            b->gemm_cache[i].key         = key;
             b->gemm_cache[i].variant_idx = vidx;
-            b->gemm_cache[i].occupied = true;
+            b->gemm_cache[i].occupied    = true;
             return;
         }
     }
-    b->gemm_cache[0].key = key;
+    b->gemm_cache[0].key         = key;
     b->gemm_cache[0].variant_idx = vidx;
 }
 
@@ -651,11 +720,11 @@ static void ocl_beam_cache_store(CMLOpenCLIRBackend* b, int M, int N, int K, int
 #define CML_OCL_BEAM_CAL 1024
 
 /* One timed GEMM launch (ns) of `kernel` at the calibration size. */
-static double ocl_beam_time_once(CMLOpenCLIRBackend* b, cl_kernel kernel,
-                                  const size_t global[2], const size_t local[2]) {
+static double ocl_beam_time_once(CMLOpenCLIRBackend* b, cl_kernel kernel, const size_t global[2],
+                                 const size_t local[2]) {
     cl_event ev;
-    if (clEnqueueNDRangeKernel(b->profiling_queue, kernel, 2, NULL,
-                               global, local, 0, NULL, &ev) != CL_SUCCESS)
+    if (clEnqueueNDRangeKernel(b->profiling_queue, kernel, 2, NULL, global, local, 0, NULL, &ev) !=
+        CL_SUCCESS)
         return 1e18;
     clFinish(b->profiling_queue);
     cl_ulong t0, t1;
@@ -669,12 +738,12 @@ static double ocl_beam_time_once(CMLOpenCLIRBackend* b, cl_kernel kernel,
  * dedicated buffers. Bails after the first timed launch if it is already >4x
  * `skip_ns` (a bad config -- register spill / poor occupancy), so a few slow
  * variants cannot blow up calibration time. Returns 1e18 on failure. */
-static double ocl_beam_probe_variant(CMLOpenCLIRBackend* b, CMLGemmVariant* var,
-                                      cl_mem A, cl_mem B, cl_mem C, double skip_ns) {
-    const int S = CML_OCL_BEAM_CAL;
+static double ocl_beam_probe_variant(CMLOpenCLIRBackend* b, CMLGemmVariant* var, cl_mem A, cl_mem B,
+                                     cl_mem C, double skip_ns) {
+    const int S             = CML_OCL_BEAM_CAL;
     CMLGemmVariantParams* p = &var->params;
-    size_t global[2] = { (size_t)(S / p->tsn) * var->local_size[0],
-                         (size_t)(S / p->tsm) * var->local_size[1] };
+    size_t global[2]        = {(size_t)(S / p->tsn) * var->local_size[0],
+                               (size_t)(S / p->tsm) * var->local_size[1]};
     clSetKernelArg(var->kernel, 0, sizeof(cl_mem), &A);
     clSetKernelArg(var->kernel, 1, sizeof(cl_mem), &B);
     clSetKernelArg(var->kernel, 2, sizeof(cl_mem), &C);
@@ -682,16 +751,18 @@ static double ocl_beam_probe_variant(CMLOpenCLIRBackend* b, CMLGemmVariant* var,
     clSetKernelArg(var->kernel, 4, sizeof(int), &(int){S});
     clSetKernelArg(var->kernel, 5, sizeof(int), &(int){S});
 
-    if (clEnqueueNDRangeKernel(b->profiling_queue, var->kernel, 2, NULL,
-                               global, var->local_size, 0, NULL, NULL) != CL_SUCCESS)
-        return 1e18;                      /* warmup */
+    if (clEnqueueNDRangeKernel(b->profiling_queue, var->kernel, 2, NULL, global, var->local_size, 0,
+                               NULL, NULL) != CL_SUCCESS)
+        return 1e18; /* warmup */
     clFinish(b->profiling_queue);
 
     double best = ocl_beam_time_once(b, var->kernel, global, var->local_size);
-    if (best > skip_ns * 4.0) return best;  /* clearly bad -- don't spend more launches */
+    if (best > skip_ns * 4.0)
+        return best; /* clearly bad -- don't spend more launches */
     for (int r = 0; r < 2; r++) {
         double ns = ocl_beam_time_once(b, var->kernel, global, var->local_size);
-        if (ns < best) best = ns;
+        if (ns < best)
+            best = ns;
     }
     return best;
 }
@@ -702,54 +773,77 @@ static double ocl_beam_probe_variant(CMLOpenCLIRBackend* b, CMLGemmVariant* var,
  * autotuning unusably slow. Runs once per backend. */
 static void ocl_beam_calibrate(CMLOpenCLIRBackend* b) {
     b->beam_calibrated = true;
-    const int S = CML_OCL_BEAM_CAL;
-    size_t bytes = (size_t)S * S * sizeof(float);
+    const int S        = CML_OCL_BEAM_CAL;
+    size_t bytes       = (size_t)S * S * sizeof(float);
     cl_int err;
     cl_mem A = clCreateBuffer(b->context, CL_MEM_READ_WRITE, bytes, NULL, &err);
-    if (err != CL_SUCCESS) return;
+    if (err != CL_SUCCESS)
+        return;
     cl_mem B = clCreateBuffer(b->context, CL_MEM_READ_WRITE, bytes, NULL, &err);
-    if (err != CL_SUCCESS) { clReleaseMemObject(A); return; }
+    if (err != CL_SUCCESS) {
+        clReleaseMemObject(A);
+        return;
+    }
     cl_mem C = clCreateBuffer(b->context, CL_MEM_READ_WRITE, bytes, NULL, &err);
-    if (err != CL_SUCCESS) { clReleaseMemObject(A); clReleaseMemObject(B); return; }
+    if (err != CL_SUCCESS) {
+        clReleaseMemObject(A);
+        clReleaseMemObject(B);
+        return;
+    }
 
     double best_ns = 1e18;
     for (int v = 0; v < b->gemm_variant_count; v++) {
         CMLGemmVariant* var = &b->gemm_variants[v];
-        var->cal_gflops = 0.0;
-        if (!var->valid) continue;
+        var->cal_gflops     = 0.0;
+        if (!var->valid)
+            continue;
         CMLGemmVariantParams* p = &var->params;
-        if (S % p->tsm || S % p->tsn || S % p->tsk) continue;
+        if (S % p->tsm || S % p->tsn || S % p->tsk)
+            continue;
         double ns = ocl_beam_probe_variant(b, var, A, B, C, best_ns);
-        if (ns < best_ns) best_ns = ns;
-        if (ns < 1e17) var->cal_gflops = 2.0 * S * S * S / ns;
-        LOG_INFO("BEAM cal V%d: TSM=%d TSN=%d TSK=%d reg=%dx%d pad=%d -> %.1f GFLOPS",
-                 v, p->tsm, p->tsn, p->tsk, p->reg_m, p->reg_n, p->slm_pad, var->cal_gflops);
+        if (ns < best_ns)
+            best_ns = ns;
+        if (ns < 1e17)
+            var->cal_gflops = 2.0 * S * S * S / ns;
+        LOG_INFO("BEAM cal V%d: TSM=%d TSN=%d TSK=%d reg=%dx%d pad=%d -> %.1f GFLOPS", v, p->tsm,
+                 p->tsn, p->tsk, p->reg_m, p->reg_n, p->slm_pad, var->cal_gflops);
     }
 
-    clReleaseMemObject(A); clReleaseMemObject(B); clReleaseMemObject(C);
+    clReleaseMemObject(A);
+    clReleaseMemObject(B);
+    clReleaseMemObject(C);
 }
 
 /* Pick the fastest calibrated variant whose tiles divide (M,N,K). Selection is
  * O(variants) after the one-time calibration -- no per-shape kernel launches. */
-static int ocl_beam_autotune(CMLOpenCLIRBackend* b, int M, int N, int K,
-                              cl_mem buf_a, cl_mem buf_b) {
-    (void)buf_a; (void)buf_b;  /* selection uses calibration scores, not the live buffers */
+static int ocl_beam_autotune(CMLOpenCLIRBackend* b, int M, int N, int K, cl_mem buf_a,
+                             cl_mem buf_b) {
+    (void)buf_a;
+    (void)buf_b; /* selection uses calibration scores, not the live buffers */
 
     int cached = ocl_beam_cache_lookup(b, M, N, K);
-    if (cached >= 0) return cached;
-    if (!b->beam_calibrated) ocl_beam_calibrate(b);
+    if (cached >= 0)
+        return cached;
+    if (!b->beam_calibrated)
+        ocl_beam_calibrate(b);
 
-    int max_try = b->beam_width > 0 ? b->beam_width : b->gemm_variant_count;
+    int max_try  = b->beam_width > 0 ? b->beam_width : b->gemm_variant_count;
     int best_idx = -1, tried = 0;
     double best = 0.0;
     for (int v = 0; v < b->gemm_variant_count && tried < max_try; v++) {
         CMLGemmVariant* var = &b->gemm_variants[v];
-        if (!var->valid || var->cal_gflops <= 0.0) continue;
+        if (!var->valid || var->cal_gflops <= 0.0)
+            continue;
         CMLGemmVariantParams* p = &var->params;
-        if (M < p->tsm || N < p->tsn) continue;
-        if (M % p->tsm || N % p->tsn || K % p->tsk) continue;
+        if (M < p->tsm || N < p->tsn)
+            continue;
+        if (M % p->tsm || N % p->tsn || K % p->tsk)
+            continue;
         tried++;
-        if (var->cal_gflops > best) { best = var->cal_gflops; best_idx = v; }
+        if (var->cal_gflops > best) {
+            best     = var->cal_gflops;
+            best_idx = v;
+        }
     }
 
     /* When the hand-tuned V3 kernel applies (÷128 / ÷16) it is the best option
@@ -767,7 +861,8 @@ static int ocl_beam_autotune(CMLOpenCLIRBackend* b, int M, int N, int K,
     if (best_idx >= 0) {
         CMLGemmVariantParams* bp = &b->gemm_variants[best_idx].params;
         LOG_INFO("BEAM: %dx%dx%d -> V%d (TSM=%d TSN=%d TSK=%d reg=%dx%d pad=%d, cal %.1f GFLOPS)",
-                 M, N, K, best_idx, bp->tsm, bp->tsn, bp->tsk, bp->reg_m, bp->reg_n, bp->slm_pad, best);
+                 M, N, K, best_idx, bp->tsm, bp->tsn, bp->tsk, bp->reg_m, bp->reg_n, bp->slm_pad,
+                 best);
         ocl_beam_cache_store(b, M, N, K, best_idx);
     }
     return best_idx;
@@ -776,14 +871,15 @@ static int ocl_beam_autotune(CMLOpenCLIRBackend* b, int M, int N, int K,
 /* ─── Backend lifecycle ────────────────────────────────────────────────── */
 
 bool cml_opencl_ir_available(void) {
-    cl_uint n = 0;
+    cl_uint n  = 0;
     cl_int err = clGetPlatformIDs(0, NULL, &n);
-    if (err != CL_SUCCESS || n == 0) return false;
+    if (err != CL_SUCCESS || n == 0)
+        return false;
 
     cl_platform_id plat;
     clGetPlatformIDs(1, &plat, NULL);
     cl_uint nd = 0;
-    err = clGetDeviceIDs(plat, CL_DEVICE_TYPE_GPU, 0, NULL, &nd);
+    err        = clGetDeviceIDs(plat, CL_DEVICE_TYPE_GPU, 0, NULL, &nd);
     return (err == CL_SUCCESS && nd > 0);
 }
 
@@ -793,14 +889,19 @@ CMLOpenCLIRBackend* cml_opencl_ir_backend_create(void) {
 }
 
 int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
-    if (!b) return -1;
-    if (b->initialized) return 0;
+    if (!b)
+        return -1;
+    if (b->initialized)
+        return 0;
 
     cl_int err;
 
     cl_uint np;
     err = clGetPlatformIDs(0, NULL, &np);
-    if (err != CL_SUCCESS || np == 0) { LOG_ERROR("No OpenCL platforms"); return -1; }
+    if (err != CL_SUCCESS || np == 0) {
+        LOG_ERROR("No OpenCL platforms");
+        return -1;
+    }
 
     cl_platform_id platforms[8];
     clGetPlatformIDs(np > 8 ? 8 : np, platforms, NULL);
@@ -811,11 +912,14 @@ int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
         err = clGetDeviceIDs(platforms[p], CL_DEVICE_TYPE_GPU, 1, &b->device, &nd);
         if (err == CL_SUCCESS && nd > 0) {
             b->platform = platforms[p];
-            found = true;
+            found       = true;
             break;
         }
     }
-    if (!found) { LOG_ERROR("No OpenCL GPU device found"); return -1; }
+    if (!found) {
+        LOG_ERROR("No OpenCL GPU device found");
+        return -1;
+    }
 
     clGetDeviceInfo(b->device, CL_DEVICE_NAME, sizeof(b->device_name), b->device_name, NULL);
     cl_ulong mem;
@@ -828,55 +932,67 @@ int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
     clGetDeviceInfo(b->device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cu), &cu, NULL);
     b->max_compute_units = cu;
 
-    LOG_INFO("OpenCL IR backend: %s (%u CUs, %zu MB, max WG %u)",
-             b->device_name, cu, b->total_memory / (1024 * 1024), b->max_work_group_size);
+    LOG_INFO("OpenCL IR backend: %s (%u CUs, %zu MB, max WG %u)", b->device_name, cu,
+             b->total_memory / (1024 * 1024), b->max_work_group_size);
 
     b->context = clCreateContext(NULL, 1, &b->device, NULL, NULL, &err);
-    if (err != CL_SUCCESS) { LOG_ERROR("clCreateContext failed: %d", err); return -1; }
+    if (err != CL_SUCCESS) {
+        LOG_ERROR("clCreateContext failed: %d", err);
+        return -1;
+    }
 
 #ifdef CL_VERSION_2_0
-    cl_queue_properties props[] = { CL_QUEUE_PROPERTIES, 0, 0 };
+    cl_queue_properties props[] = {CL_QUEUE_PROPERTIES, 0, 0};
     b->queue = clCreateCommandQueueWithProperties(b->context, b->device, props, &err);
 #else
     b->queue = clCreateCommandQueue(b->context, b->device, 0, &err);
 #endif
-    if (err != CL_SUCCESS) { LOG_ERROR("clCreateCommandQueue failed: %d", err); return -1; }
+    if (err != CL_SUCCESS) {
+        LOG_ERROR("clCreateCommandQueue failed: %d", err);
+        return -1;
+    }
 
     const char* src = g_ocl_kernel_src;
-    size_t len = strlen(src);
-    b->program = clCreateProgramWithSource(b->context, 1, &src, &len, &err);
-    if (err != CL_SUCCESS) { LOG_ERROR("clCreateProgramWithSource failed: %d", err); return -1; }
+    size_t len      = strlen(src);
+    b->program      = clCreateProgramWithSource(b->context, 1, &src, &len, &err);
+    if (err != CL_SUCCESS) {
+        LOG_ERROR("clCreateProgramWithSource failed: %d", err);
+        return -1;
+    }
 
     err = clBuildProgram(b->program, 1, &b->device, "-cl-mad-enable", NULL, NULL);
     if (err != CL_SUCCESS) {
         char log_buf[4096];
-        clGetProgramBuildInfo(b->program, b->device, CL_PROGRAM_BUILD_LOG,
-                              sizeof(log_buf), log_buf, NULL);
+        clGetProgramBuildInfo(b->program, b->device, CL_PROGRAM_BUILD_LOG, sizeof(log_buf), log_buf,
+                              NULL);
         LOG_ERROR("OpenCL kernel build failed:\n%s", log_buf);
         return -1;
     }
 
-#define GET_KERNEL(field, name) \
-    b->field = clCreateKernel(b->program, name, &err); \
-    if (err != CL_SUCCESS) { LOG_ERROR("Missing kernel: " name); return -1; }
+#define GET_KERNEL(field, name)                                                                    \
+    b->field = clCreateKernel(b->program, name, &err);                                             \
+    if (err != CL_SUCCESS) {                                                                       \
+        LOG_ERROR("Missing kernel: " name);                                                        \
+        return -1;                                                                                 \
+    }
 
-    GET_KERNEL(k_matmul,      "matmul");
+    GET_KERNEL(k_matmul, "matmul");
     GET_KERNEL(k_matmul_fused_bias_relu, "matmul_fused_bias_relu");
     GET_KERNEL(k_matmul_naive, "matmul_naive");
-    GET_KERNEL(k_add,          "ew_add");
-    GET_KERNEL(k_sub,          "ew_sub");
-    GET_KERNEL(k_mul,          "ew_mul");
-    GET_KERNEL(k_div,          "ew_div");
-    GET_KERNEL(k_neg,          "ew_neg");
-    GET_KERNEL(k_relu,         "ew_relu");
-    GET_KERNEL(k_sigmoid,      "ew_sigmoid");
-    GET_KERNEL(k_tanh,         "ew_tanh_k");
-    GET_KERNEL(k_exp,          "ew_exp");
-    GET_KERNEL(k_log,          "ew_log");
-    GET_KERNEL(k_sqrt,         "ew_sqrt_k");
-    GET_KERNEL(k_fill,         "ew_fill");
-    GET_KERNEL(k_sum_reduce,   "reduce_sum");
-    GET_KERNEL(k_max_reduce,   "reduce_max");
+    GET_KERNEL(k_add, "ew_add");
+    GET_KERNEL(k_sub, "ew_sub");
+    GET_KERNEL(k_mul, "ew_mul");
+    GET_KERNEL(k_div, "ew_div");
+    GET_KERNEL(k_neg, "ew_neg");
+    GET_KERNEL(k_relu, "ew_relu");
+    GET_KERNEL(k_sigmoid, "ew_sigmoid");
+    GET_KERNEL(k_tanh, "ew_tanh_k");
+    GET_KERNEL(k_exp, "ew_exp");
+    GET_KERNEL(k_log, "ew_log");
+    GET_KERNEL(k_sqrt, "ew_sqrt_k");
+    GET_KERNEL(k_fill, "ew_fill");
+    GET_KERNEL(k_sum_reduce, "reduce_sum");
+    GET_KERNEL(k_max_reduce, "reduce_max");
 #undef GET_KERNEL
 
     b->k_mean_reduce = NULL; /* mean = sum / n, composed from sum_reduce */
@@ -886,8 +1002,10 @@ int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
     int beam_width = 0;
     {
         const char* beam_env = getenv("BEAM");
-        if (beam_env) beam_width = atoi(beam_env);
-        if (beam_width < 0) beam_width = 0;
+        if (beam_env)
+            beam_width = atoi(beam_env);
+        if (beam_width < 0)
+            beam_width = 0;
     }
 
     /* BEAM autotuning is opt-in (BEAM=<width>). It probes every GEMM variant
@@ -899,12 +1017,12 @@ int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
         b->beam_width = 0;
     } else {
 #ifdef CL_VERSION_2_0
-        cl_queue_properties prof_props[] = {
-            CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE, 0
-        };
-        b->profiling_queue = clCreateCommandQueueWithProperties(b->context, b->device, prof_props, &err);
+        cl_queue_properties prof_props[] = {CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE, 0};
+        b->profiling_queue =
+            clCreateCommandQueueWithProperties(b->context, b->device, prof_props, &err);
 #else
-        b->profiling_queue = clCreateCommandQueue(b->context, b->device, CL_QUEUE_PROFILING_ENABLE, &err);
+        b->profiling_queue =
+            clCreateCommandQueue(b->context, b->device, CL_QUEUE_PROFILING_ENABLE, &err);
 #endif
         if (err != CL_SUCCESS) {
             LOG_WARNING("BEAM: failed to create profiling queue, disabling");
@@ -916,8 +1034,8 @@ int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
                 b->beam_width = 0;
             } else {
                 b->beam_width = beam_width;
-                LOG_INFO("BEAM: enabled with width=%d (%d variants compiled)",
-                         b->beam_width, b->gemm_variant_count);
+                LOG_INFO("BEAM: enabled with width=%d (%d variants compiled)", b->beam_width,
+                         b->gemm_variant_count);
             }
         }
     }
@@ -926,11 +1044,14 @@ int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
 }
 
 void cml_opencl_ir_backend_free(CMLOpenCLIRBackend* b) {
-    if (!b) return;
+    if (!b)
+        return;
 
     ocl_release_all_buffers(b);
 
-#define REL_KERNEL(k) if (b->k) clReleaseKernel(b->k)
+#define REL_KERNEL(k)                                                                              \
+    if (b->k)                                                                                      \
+    clReleaseKernel(b->k)
     REL_KERNEL(k_matmul);
     REL_KERNEL(k_matmul_fused_bias_relu);
     REL_KERNEL(k_matmul_naive);
@@ -952,15 +1073,21 @@ void cml_opencl_ir_backend_free(CMLOpenCLIRBackend* b) {
 
     for (int i = 0; i < b->gemm_variant_count; i++) {
         if (b->gemm_variants[i].valid) {
-            if (b->gemm_variants[i].kernel)  clReleaseKernel(b->gemm_variants[i].kernel);
-            if (b->gemm_variants[i].program) clReleaseProgram(b->gemm_variants[i].program);
+            if (b->gemm_variants[i].kernel)
+                clReleaseKernel(b->gemm_variants[i].kernel);
+            if (b->gemm_variants[i].program)
+                clReleaseProgram(b->gemm_variants[i].program);
         }
     }
-    if (b->profiling_queue) clReleaseCommandQueue(b->profiling_queue);
+    if (b->profiling_queue)
+        clReleaseCommandQueue(b->profiling_queue);
 
-    if (b->program) clReleaseProgram(b->program);
-    if (b->queue)   clReleaseCommandQueue(b->queue);
-    if (b->context) clReleaseContext(b->context);
+    if (b->program)
+        clReleaseProgram(b->program);
+    if (b->queue)
+        clReleaseCommandQueue(b->queue);
+    if (b->context)
+        clReleaseContext(b->context);
 
     cml_free(b);
 }
@@ -970,8 +1097,8 @@ void cml_opencl_ir_backend_free(CMLOpenCLIRBackend* b) {
 /* 2D GEMM dispatch: BEAM autotuner -> V3 aligned kernel -> naive fallback.
  * Buffers may be sub-buffer views into a batched tensor (see the batched path),
  * so this must not assume base-of-allocation offsets. */
-static int ocl_matmul_2d(CMLOpenCLIRBackend* b, int M, int N, int K,
-                          cl_mem buf_a, cl_mem buf_b, cl_mem buf_out) {
+static int ocl_matmul_2d(CMLOpenCLIRBackend* b, int M, int N, int K, cl_mem buf_a, cl_mem buf_b,
+                         cl_mem buf_out) {
     cl_kernel kernel;
     size_t global[2], local[2];
 
@@ -979,7 +1106,7 @@ static int ocl_matmul_2d(CMLOpenCLIRBackend* b, int M, int N, int K,
     if (b->beam_width > 0 && M >= 64 && N >= 64) {
         int vidx = ocl_beam_autotune(b, M, N, K, buf_a, buf_b);
         if (vidx >= 0) {
-            CMLGemmVariant* var = &b->gemm_variants[vidx];
+            CMLGemmVariant* var     = &b->gemm_variants[vidx];
             CMLGemmVariantParams* p = &var->params;
             if (M % p->tsm == 0 && N % p->tsn == 0 && K % p->tsk == 0) {
                 global[0] = (size_t)(N / p->tsn) * var->local_size[0];
@@ -990,8 +1117,8 @@ static int ocl_matmul_2d(CMLOpenCLIRBackend* b, int M, int N, int K,
                 clSetKernelArg(var->kernel, 3, sizeof(int), &M);
                 clSetKernelArg(var->kernel, 4, sizeof(int), &N);
                 clSetKernelArg(var->kernel, 5, sizeof(int), &K);
-                cl_int err = clEnqueueNDRangeKernel(b->queue, var->kernel, 2, NULL,
-                                                     global, var->local_size, 0, NULL, NULL);
+                cl_int err = clEnqueueNDRangeKernel(b->queue, var->kernel, 2, NULL, global,
+                                                    var->local_size, 0, NULL, NULL);
                 return (err == CL_SUCCESS) ? 0 : -1;
             }
         }
@@ -999,16 +1126,18 @@ static int ocl_matmul_2d(CMLOpenCLIRBackend* b, int M, int N, int K,
 
     if ((M % 128) == 0 && (N % 128) == 0 && (K % 16) == 0) {
         /* V3 GEMM: float4 loads, A-transposed SLM, 8×8 register block. */
-        kernel = b->k_matmul;
+        kernel    = b->k_matmul;
         global[0] = (size_t)(N / 128) * 16;
         global[1] = (size_t)(M / 128) * 16;
-        local[0] = 16; local[1] = 16;
+        local[0]  = 16;
+        local[1]  = 16;
     } else {
         /* Naive fallback: one thread per output element (small or non-aligned). */
-        kernel = b->k_matmul_naive;
+        kernel    = b->k_matmul_naive;
         global[0] = M;
         global[1] = N;
-        local[0] = 0; local[1] = 0;
+        local[0]  = 0;
+        local[1]  = 0;
     }
 
     clSetKernelArg(kernel, 0, sizeof(cl_mem), &buf_a);
@@ -1031,26 +1160,28 @@ static int ocl_matmul_2d(CMLOpenCLIRBackend* b, int M, int N, int K,
  * views. A 2D operand (batch count 1) is broadcast across all batches. Returns
  * -1 if a slice offset isn't device-aligned so the caller falls back to CPU
  * (correct, just unaccelerated) rather than failing. */
-static int ocl_matmul_batched(CMLOpenCLIRBackend* b, Tensor* a, Tensor* bb,
-                               cl_mem buf_a, cl_mem buf_b, cl_mem buf_out) {
-    int M = a->shape[a->ndim - 2];
-    int K = a->shape[a->ndim - 1];
+static int ocl_matmul_batched(CMLOpenCLIRBackend* b, Tensor* a, Tensor* bb, cl_mem buf_a,
+                              cl_mem buf_b, cl_mem buf_out) {
+    int M  = a->shape[a->ndim - 2];
+    int K  = a->shape[a->ndim - 1];
     int Kb = bb->shape[bb->ndim - 2];
-    int N = bb->shape[bb->ndim - 1];
-    if (K != Kb) return -1;
+    int N  = bb->shape[bb->ndim - 1];
+    if (K != Kb)
+        return -1;
 
     int64_t batch_a = 1, batch_b = 1;
-    for (int i = 0; i < a->ndim - 2; i++)  batch_a *= a->shape[i];
-    for (int i = 0; i < bb->ndim - 2; i++) batch_b *= bb->shape[i];
+    for (int i = 0; i < a->ndim - 2; i++)
+        batch_a *= a->shape[i];
+    for (int i = 0; i < bb->ndim - 2; i++)
+        batch_b *= bb->shape[i];
     int64_t batches = batch_a > batch_b ? batch_a : batch_b;
-    if (!((batch_a == batches || batch_a == 1) &&
-          (batch_b == batches || batch_b == 1)))
+    if (!((batch_a == batches || batch_a == 1) && (batch_b == batches || batch_b == 1)))
         return -1; /* only scalar-batch broadcasting is supported */
 
     /* Sub-buffer origins must satisfy CL_DEVICE_MEM_BASE_ADDR_ALIGN. */
     cl_uint align_bits = 0;
-    if (clGetDeviceInfo(b->device, CL_DEVICE_MEM_BASE_ADDR_ALIGN,
-                        sizeof(align_bits), &align_bits, NULL) != CL_SUCCESS ||
+    if (clGetDeviceInfo(b->device, CL_DEVICE_MEM_BASE_ADDR_ALIGN, sizeof(align_bits), &align_bits,
+                        NULL) != CL_SUCCESS ||
         align_bits == 0)
         return -1;
     size_t align_bytes = align_bits / 8;
@@ -1066,39 +1197,54 @@ static int ocl_matmul_batched(CMLOpenCLIRBackend* b, Tensor* a, Tensor* bb,
         if (off_a % align_bytes || off_b % align_bytes || off_o % align_bytes)
             return -1; /* unaligned slice -> CPU fallback */
 
-        cl_int err = CL_SUCCESS;
-        cl_buffer_region ra = { off_a, sa }, rb = { off_b, sb }, ro = { off_o, so };
-        cl_mem sub_a = clCreateSubBuffer(buf_a, CL_MEM_READ_WRITE,
-                                         CL_BUFFER_CREATE_TYPE_REGION, &ra, &err);
-        if (err != CL_SUCCESS) return -1;
-        cl_mem sub_b = clCreateSubBuffer(buf_b, CL_MEM_READ_WRITE,
-                                         CL_BUFFER_CREATE_TYPE_REGION, &rb, &err);
-        if (err != CL_SUCCESS) { clReleaseMemObject(sub_a); return -1; }
-        cl_mem sub_o = clCreateSubBuffer(buf_out, CL_MEM_READ_WRITE,
-                                         CL_BUFFER_CREATE_TYPE_REGION, &ro, &err);
-        if (err != CL_SUCCESS) { clReleaseMemObject(sub_a); clReleaseMemObject(sub_b); return -1; }
+        cl_int err          = CL_SUCCESS;
+        cl_buffer_region ra = {off_a, sa}, rb = {off_b, sb}, ro = {off_o, so};
+        cl_mem sub_a =
+            clCreateSubBuffer(buf_a, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &ra, &err);
+        if (err != CL_SUCCESS)
+            return -1;
+        cl_mem sub_b =
+            clCreateSubBuffer(buf_b, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &rb, &err);
+        if (err != CL_SUCCESS) {
+            clReleaseMemObject(sub_a);
+            return -1;
+        }
+        cl_mem sub_o =
+            clCreateSubBuffer(buf_out, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &ro, &err);
+        if (err != CL_SUCCESS) {
+            clReleaseMemObject(sub_a);
+            clReleaseMemObject(sub_b);
+            return -1;
+        }
 
         int rc = ocl_matmul_2d(b, M, N, K, sub_a, sub_b, sub_o);
         clReleaseMemObject(sub_a);
         clReleaseMemObject(sub_b);
         clReleaseMemObject(sub_o);
-        if (rc != 0) return -1;
+        if (rc != 0)
+            return -1;
     }
     return 0;
 }
 
-static int ocl_exec_matmul(CMLOpenCLIRBackend* b, struct IRNode* node,
-                            cl_mem buf_a, cl_mem buf_b, cl_mem buf_out) {
-    Tensor* a = node->inputs[0];
+static int ocl_exec_matmul(CMLOpenCLIRBackend* b, struct IRNode* node, cl_mem buf_a, cl_mem buf_b,
+                           cl_mem buf_out) {
+    Tensor* a  = node->inputs[0];
     Tensor* bb = node->inputs[1];
 
     int M, K, N;
     if (a->ndim == 2 && bb->ndim == 2) {
-        M = a->shape[0]; K = a->shape[1]; N = bb->shape[1];
+        M = a->shape[0];
+        K = a->shape[1];
+        N = bb->shape[1];
     } else if (a->ndim == 1 && bb->ndim == 2) {
-        M = 1; K = a->shape[0]; N = bb->shape[1];
+        M = 1;
+        K = a->shape[0];
+        N = bb->shape[1];
     } else if (a->ndim == 2 && bb->ndim == 1) {
-        M = a->shape[0]; K = a->shape[1]; N = 1;
+        M = a->shape[0];
+        K = a->shape[1];
+        N = 1;
     } else if (a->ndim >= 2 && bb->ndim >= 2) {
         return ocl_matmul_batched(b, a, bb, buf_a, buf_b, buf_out);
     } else {
@@ -1108,13 +1254,12 @@ static int ocl_exec_matmul(CMLOpenCLIRBackend* b, struct IRNode* node,
     return ocl_matmul_2d(b, M, N, K, buf_a, buf_b, buf_out);
 }
 
-static int ocl_exec_binary(CMLOpenCLIRBackend* b, cl_kernel kernel,
-                            struct IRNode* node,
-                            cl_mem buf_a, cl_mem buf_b, cl_mem buf_out) {
-    Tensor* a = node->inputs[0];
-    Tensor* bb = node->inputs[1];
+static int ocl_exec_binary(CMLOpenCLIRBackend* b, cl_kernel kernel, struct IRNode* node,
+                           cl_mem buf_a, cl_mem buf_b, cl_mem buf_out) {
+    Tensor* a   = node->inputs[0];
+    Tensor* bb  = node->inputs[1];
     Tensor* out = node->output;
-    int n = (int)out->numel;
+    int n       = (int)out->numel;
 
     /* stride params: 0 = no broadcast (use i directly), >0 = modulo wrap */
     int sa = (a->numel == (size_t)n) ? 0 : (int)a->numel;
@@ -1128,23 +1273,23 @@ static int ocl_exec_binary(CMLOpenCLIRBackend* b, cl_kernel kernel,
     clSetKernelArg(kernel, 5, sizeof(int), &n);
 
     size_t global = (size_t)n;
-    cl_int err = clEnqueueNDRangeKernel(b->queue, kernel, 1, NULL, &global, NULL, 0, NULL, NULL);
+    cl_int err    = clEnqueueNDRangeKernel(b->queue, kernel, 1, NULL, &global, NULL, 0, NULL, NULL);
     return (err == CL_SUCCESS) ? 0 : -1;
 }
 
-static int ocl_exec_unary(CMLOpenCLIRBackend* b, cl_kernel kernel,
-                           cl_mem buf_in, cl_mem buf_out, int n) {
+static int ocl_exec_unary(CMLOpenCLIRBackend* b, cl_kernel kernel, cl_mem buf_in, cl_mem buf_out,
+                          int n) {
     clSetKernelArg(kernel, 0, sizeof(cl_mem), &buf_in);
     clSetKernelArg(kernel, 1, sizeof(cl_mem), &buf_out);
     clSetKernelArg(kernel, 2, sizeof(int), &n);
 
     size_t global = (size_t)n;
-    cl_int err = clEnqueueNDRangeKernel(b->queue, kernel, 1, NULL, &global, NULL, 0, NULL, NULL);
+    cl_int err    = clEnqueueNDRangeKernel(b->queue, kernel, 1, NULL, &global, NULL, 0, NULL, NULL);
     return (err == CL_SUCCESS) ? 0 : -1;
 }
 
-static int ocl_exec_reduce(CMLOpenCLIRBackend* b, cl_kernel kernel,
-                            cl_mem buf_in, cl_mem buf_out, int n, bool is_mean) {
+static int ocl_exec_reduce(CMLOpenCLIRBackend* b, cl_kernel kernel, cl_mem buf_in, cl_mem buf_out,
+                           int n, bool is_mean) {
     /* Multi-pass reduction: reduce n elements via work-groups of 256 */
     int wg_size = 256;
     if (wg_size > (int)b->max_work_group_size)
@@ -1152,12 +1297,14 @@ static int ocl_exec_reduce(CMLOpenCLIRBackend* b, cl_kernel kernel,
 
     /* Round up to power of 2 for reduction */
     int actual_wg = wg_size;
-    while (actual_wg > n) actual_wg >>= 1;
-    if (actual_wg < 1) actual_wg = 1;
+    while (actual_wg > n)
+        actual_wg >>= 1;
+    if (actual_wg < 1)
+        actual_wg = 1;
 
     int num_groups = (n + actual_wg - 1) / actual_wg;
-    size_t global = (size_t)(num_groups * actual_wg);
-    size_t local = (size_t)actual_wg;
+    size_t global  = (size_t)(num_groups * actual_wg);
+    size_t local   = (size_t)actual_wg;
 
     cl_int err;
 
@@ -1168,27 +1315,34 @@ static int ocl_exec_reduce(CMLOpenCLIRBackend* b, cl_kernel kernel,
         clSetKernelArg(kernel, 2, local * sizeof(float), NULL);
         clSetKernelArg(kernel, 3, sizeof(int), &n);
         err = clEnqueueNDRangeKernel(b->queue, kernel, 1, NULL, &global, &local, 0, NULL, NULL);
-        if (err != CL_SUCCESS) return -1;
+        if (err != CL_SUCCESS)
+            return -1;
     } else {
         /* Multi-pass: first pass into temp, then reduce temp */
-        cl_mem temp = clCreateBuffer(b->context, CL_MEM_READ_WRITE,
-                                     num_groups * sizeof(float), NULL, &err);
-        if (err != CL_SUCCESS) return -1;
+        cl_mem temp =
+            clCreateBuffer(b->context, CL_MEM_READ_WRITE, num_groups * sizeof(float), NULL, &err);
+        if (err != CL_SUCCESS)
+            return -1;
 
         clSetKernelArg(kernel, 0, sizeof(cl_mem), &buf_in);
         clSetKernelArg(kernel, 1, sizeof(cl_mem), &temp);
         clSetKernelArg(kernel, 2, local * sizeof(float), NULL);
         clSetKernelArg(kernel, 3, sizeof(int), &n);
         err = clEnqueueNDRangeKernel(b->queue, kernel, 1, NULL, &global, &local, 0, NULL, NULL);
-        if (err != CL_SUCCESS) { clReleaseMemObject(temp); return -1; }
+        if (err != CL_SUCCESS) {
+            clReleaseMemObject(temp);
+            return -1;
+        }
 
         /* Second pass */
-        int n2 = num_groups;
+        int n2  = num_groups;
         int wg2 = actual_wg;
-        while (wg2 > n2) wg2 >>= 1;
-        if (wg2 < 1) wg2 = 1;
+        while (wg2 > n2)
+            wg2 >>= 1;
+        if (wg2 < 1)
+            wg2 = 1;
         size_t global2 = (size_t)wg2;
-        size_t local2 = (size_t)wg2;
+        size_t local2  = (size_t)wg2;
 
         clSetKernelArg(kernel, 0, sizeof(cl_mem), &temp);
         clSetKernelArg(kernel, 1, sizeof(cl_mem), &buf_out);
@@ -1196,7 +1350,8 @@ static int ocl_exec_reduce(CMLOpenCLIRBackend* b, cl_kernel kernel,
         clSetKernelArg(kernel, 3, sizeof(int), &n2);
         err = clEnqueueNDRangeKernel(b->queue, kernel, 1, NULL, &global2, &local2, 0, NULL, NULL);
         clReleaseMemObject(temp);
-        if (err != CL_SUCCESS) return -1;
+        if (err != CL_SUCCESS)
+            return -1;
     }
 
     /* For mean: read back, divide, write back */
@@ -1215,12 +1370,24 @@ static int ocl_exec_reduce(CMLOpenCLIRBackend* b, cl_kernel kernel,
 static bool is_gpu_supported(UOpType type) {
     switch (type) {
     case UOP_MATMUL:
-    case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV:
-    case UOP_NEG: case UOP_EXP: case UOP_LOG: case UOP_SQRT:
-    case UOP_RELU: case UOP_SIGMOID: case UOP_TANH:
-    case UOP_SUM: case UOP_MAX_REDUCE: case UOP_MEAN:
+    case UOP_ADD:
+    case UOP_SUB:
+    case UOP_MUL:
+    case UOP_DIV:
+    case UOP_NEG:
+    case UOP_EXP:
+    case UOP_LOG:
+    case UOP_SQRT:
+    case UOP_RELU:
+    case UOP_SIGMOID:
+    case UOP_TANH:
+    case UOP_SUM:
+    case UOP_MAX_REDUCE:
+    case UOP_MEAN:
     case UOP_FILL:
-    case UOP_RESHAPE: case UOP_EXPAND: case UOP_PERMUTE:
+    case UOP_RESHAPE:
+    case UOP_EXPAND:
+    case UOP_PERMUTE:
         return true;
     default:
         return false;
@@ -1228,8 +1395,8 @@ static bool is_gpu_supported(UOpType type) {
 }
 
 static bool is_view_op(UOpType type) {
-    return type == UOP_RESHAPE || type == UOP_EXPAND || type == UOP_PERMUTE ||
-           type == UOP_STRIDE || type == UOP_SLICE;
+    return type == UOP_RESHAPE || type == UOP_EXPAND || type == UOP_PERMUTE || type == UOP_STRIDE ||
+           type == UOP_SLICE;
 }
 
 int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
@@ -1243,11 +1410,11 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
         struct IRNode* scan = ir->head;
         while (scan) {
             if (scan->type == UOP_MATMUL && scan->num_inputs >= 2) {
-                Tensor* a = scan->inputs[0];
+                Tensor* a  = scan->inputs[0];
                 Tensor* bb = scan->inputs[1];
-                int64_t m = (a->ndim >= 2) ? a->shape[0] : 1;
-                int64_t k = (a->ndim >= 2) ? a->shape[a->ndim - 1] : a->shape[0];
-                int64_t n = (bb->ndim >= 2) ? bb->shape[bb->ndim - 1] : 1;
+                int64_t m  = (a->ndim >= 2) ? a->shape[0] : 1;
+                int64_t k  = (a->ndim >= 2) ? a->shape[a->ndim - 1] : a->shape[0];
+                int64_t n  = (bb->ndim >= 2) ? bb->shape[bb->ndim - 1] : 1;
                 total_flops += 2 * m * k * n;
             } else if (scan->output) {
                 total_flops += (int64_t)scan->output->numel;
@@ -1285,8 +1452,8 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
             }
             cpu_execute_node(node);
             node->is_executed = true;
-            out->is_executed = true;
-            node = node->next;
+            out->is_executed  = true;
+            node              = node->next;
             continue;
         }
 
@@ -1301,8 +1468,8 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
             }
             cpu_execute_node(node);
             node->is_executed = true;
-            out->is_executed = true;
-            node = node->next;
+            out->is_executed  = true;
+            node              = node->next;
             continue;
         }
 
@@ -1310,10 +1477,12 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
         if (node->type == UOP_FILL) {
             /* Allocate output on GPU and fill */
             cl_mem buf_out = ocl_alloc_output(b, out);
-            if (!buf_out) goto cpu_fallback;
+            if (!buf_out)
+                goto cpu_fallback;
 
             float val = 0.0f;
-            if (node->params) val = *(float*)node->params;
+            if (node->params)
+                val = *(float*)node->params;
             int n = (int)out->numel;
 
             clSetKernelArg(b->k_fill, 0, sizeof(cl_mem), &buf_out);
@@ -1324,36 +1493,33 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
             clEnqueueNDRangeKernel(b->queue, b->k_fill, 1, NULL, &global, NULL, 0, NULL, NULL);
 
             node->is_executed = true;
-            out->is_executed = true;
-            node = node->next;
+            out->is_executed  = true;
+            node              = node->next;
             continue;
         }
 
-        if (node->type == UOP_MATMUL && b->k_matmul_fused_bias_relu &&
-            node->num_inputs >= 2 && node->inputs[0] && node->inputs[1]) {
+        if (node->type == UOP_MATMUL && b->k_matmul_fused_bias_relu && node->num_inputs >= 2 &&
+            node->inputs[0] && node->inputs[1]) {
             struct IRNode* add_n  = node->next;
             struct IRNode* relu_n = add_n ? add_n->next : NULL;
-            if (add_n && relu_n &&
-                add_n->type  == UOP_ADD  && !add_n->is_executed &&
-                relu_n->type == UOP_RELU && !relu_n->is_executed &&
-                add_n->num_inputs == 2 && relu_n->num_inputs == 1 &&
-                relu_n->output) {
-                Tensor* mm_out   = out; /* matmul output */
-                Tensor* bias_t   = (add_n->inputs[0] == mm_out) ? add_n->inputs[1]
-                                                                 : add_n->inputs[0];
+            if (add_n && relu_n && add_n->type == UOP_ADD && !add_n->is_executed &&
+                relu_n->type == UOP_RELU && !relu_n->is_executed && add_n->num_inputs == 2 &&
+                relu_n->num_inputs == 1 && relu_n->output) {
+                Tensor* mm_out = out; /* matmul output */
+                Tensor* bias_t = (add_n->inputs[0] == mm_out) ? add_n->inputs[1] : add_n->inputs[0];
                 Tensor* final_out = relu_n->output;
-                Tensor* ta = node->inputs[0], *tb = node->inputs[1];
+                Tensor *ta = node->inputs[0], *tb = node->inputs[1];
                 if (mm_out && mm_out->ndim == 2 && bias_t && ta && ta->ndim >= 2) {
                     int fM = mm_out->shape[0], fN = mm_out->shape[1];
                     int fK = ta->shape[ta->ndim - 1];
                     if ((fM % 128) == 0 && (fN % 128) == 0 && (fK % 16) == 0 &&
                         (int)bias_t->numel == fN) {
-                        cl_mem ba = ocl_ensure_gpu(b, ta);
-                        cl_mem bb2 = ocl_ensure_gpu(b, tb);
-                        cl_mem bbias = ocl_ensure_gpu(b, bias_t);
+                        cl_mem ba     = ocl_ensure_gpu(b, ta);
+                        cl_mem bb2    = ocl_ensure_gpu(b, tb);
+                        cl_mem bbias  = ocl_ensure_gpu(b, bias_t);
                         cl_mem bfinal = ocl_alloc_output(b, final_out);
                         if (ba && bb2 && bbias && bfinal) {
-                            size_t gs[2] = {(size_t)(fN/128)*16, (size_t)(fM/128)*16};
+                            size_t gs[2] = {(size_t)(fN / 128) * 16, (size_t)(fM / 128) * 16};
                             size_t ls[2] = {16, 16};
                             clSetKernelArg(b->k_matmul_fused_bias_relu, 0, sizeof(cl_mem), &ba);
                             clSetKernelArg(b->k_matmul_fused_bias_relu, 1, sizeof(cl_mem), &bb2);
@@ -1362,15 +1528,16 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
                             clSetKernelArg(b->k_matmul_fused_bias_relu, 4, sizeof(int), &fM);
                             clSetKernelArg(b->k_matmul_fused_bias_relu, 5, sizeof(int), &fN);
                             clSetKernelArg(b->k_matmul_fused_bias_relu, 6, sizeof(int), &fK);
-                            cl_int ferr = clEnqueueNDRangeKernel(b->queue,
-                                              b->k_matmul_fused_bias_relu,
-                                              2, NULL, gs, ls, 0, NULL, NULL);
+                            cl_int ferr =
+                                clEnqueueNDRangeKernel(b->queue, b->k_matmul_fused_bias_relu, 2,
+                                                       NULL, gs, ls, 0, NULL, NULL);
                             if (ferr == CL_SUCCESS) {
                                 node->is_executed = out->is_executed = true;
-                                add_n->is_executed = true;
-                                if (add_n->output) add_n->output->is_executed = true;
+                                add_n->is_executed                   = true;
+                                if (add_n->output)
+                                    add_n->output->is_executed = true;
                                 relu_n->is_executed = final_out->is_executed = true;
-                                node = relu_n->next;
+                                node                                         = relu_n->next;
                                 continue;
                             }
                         }
@@ -1381,18 +1548,24 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
 
         /* Ensure inputs are on GPU */
         cl_mem bufs_in[8] = {0};
-        bool input_ok = true;
+        bool input_ok     = true;
         for (int i = 0; i < node->num_inputs && i < 8; i++) {
             Tensor* inp = node->inputs[i];
-            if (!inp) continue;
+            if (!inp)
+                continue;
             bufs_in[i] = ocl_ensure_gpu(b, inp);
-            if (!bufs_in[i]) { input_ok = false; break; }
+            if (!bufs_in[i]) {
+                input_ok = false;
+                break;
+            }
         }
-        if (!input_ok) goto cpu_fallback;
+        if (!input_ok)
+            goto cpu_fallback;
 
         /* Allocate output on GPU (CPU-side alloc deferred to download) */
         cl_mem buf_out = ocl_alloc_output(b, out);
-        if (!buf_out) goto cpu_fallback;
+        if (!buf_out)
+            goto cpu_fallback;
 
         int rc = -1;
         switch (node->type) {
@@ -1448,11 +1621,12 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
             goto cpu_fallback;
         }
 
-        if (rc != 0) goto cpu_fallback;
+        if (rc != 0)
+            goto cpu_fallback;
 
         node->is_executed = true;
-        out->is_executed = true;
-        node = node->next;
+        out->is_executed  = true;
+        node              = node->next;
         continue;
 
     cpu_fallback:
@@ -1469,12 +1643,13 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
             /* ocl_download enqueues a NON-blocking read; the CPU op below reads
              * inp->data immediately, so we must finish the queue first or it
              * reads stale/uninitialized host memory. */
-            if (downloaded) clFinish(b->queue);
+            if (downloaded)
+                clFinish(b->queue);
         }
         cpu_execute_node(node);
         node->is_executed = true;
-        out->is_executed = true;
-        node = node->next;
+        out->is_executed  = true;
+        node              = node->next;
         continue;
     }
 
@@ -1483,19 +1658,23 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
     node = ir->head;
     while (node) {
         if (node->output && node->is_executed) {
-            Tensor* t = node->output;
+            Tensor* t            = node->output;
             CMLOCLBufferEntry* e = ocl_find_buffer(b, t);
             if (e && e->valid) {
                 /* Check if this output feeds into any later executed node */
-                bool consumed = false;
+                bool consumed        = false;
                 struct IRNode* later = node->next;
                 while (later) {
                     if (later->is_executed) {
                         for (int i = 0; i < later->num_inputs; i++) {
-                            if (later->inputs[i] == t) { consumed = true; break; }
+                            if (later->inputs[i] == t) {
+                                consumed = true;
+                                break;
+                            }
                         }
                     }
-                    if (consumed) break;
+                    if (consumed)
+                        break;
                     later = later->next;
                 }
                 if (!consumed)

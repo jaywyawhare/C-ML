@@ -32,9 +32,9 @@ CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size) {
         return NULL;
     }
 
-    nf4->block_size = block_size;
+    nf4->block_size     = block_size;
     nf4->original_numel = float_tensor->numel;
-    nf4->original_ndim = float_tensor->ndim;
+    nf4->original_ndim  = float_tensor->ndim;
 
     /* Copy original shape */
     nf4->original_shape = (int*)cml_malloc((size_t)float_tensor->ndim * sizeof(int));
@@ -43,11 +43,10 @@ CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size) {
         cml_free(nf4);
         return NULL;
     }
-    memcpy(nf4->original_shape, float_tensor->shape,
-           (size_t)float_tensor->ndim * sizeof(int));
+    memcpy(nf4->original_shape, float_tensor->shape, (size_t)float_tensor->ndim * sizeof(int));
 
     /* Quantize to NF4 */
-    float* scales = NULL;
+    float* scales  = NULL;
     int num_scales = 0;
     Tensor* packed = cml_quantize_nf4(float_tensor, block_size, &scales, &num_scales);
     if (!packed) {
@@ -58,14 +57,15 @@ CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size) {
     }
 
     nf4->packed_data = packed;
-    nf4->scales = scales;
-    nf4->num_scales = num_scales;
+    nf4->scales      = scales;
+    nf4->num_scales  = num_scales;
 
     return nf4;
 }
 
 void cml_nf4_tensor_free(CMLNF4Tensor* nf4) {
-    if (!nf4) return;
+    if (!nf4)
+        return;
 
     if (nf4->packed_data) {
         tensor_free(nf4->packed_data);
@@ -93,9 +93,8 @@ Tensor* cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4) {
     }
 
     /* Dequantize to flat float32 */
-    Tensor* flat = cml_dequantize_nf4(nf4->packed_data, nf4->scales,
-                                       nf4->num_scales, nf4->block_size,
-                                       nf4->original_numel);
+    Tensor* flat = cml_dequantize_nf4(nf4->packed_data, nf4->scales, nf4->num_scales,
+                                      nf4->block_size, nf4->original_numel);
     if (!flat) {
         LOG_ERROR("cml_nf4_tensor_dequantize: dequantization failed");
         return NULL;
@@ -115,11 +114,10 @@ Tensor* cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4) {
             tensor_free(flat);
             return NULL;
         }
-        memcpy(shape_copy, nf4->original_shape,
-               (size_t)nf4->original_ndim * sizeof(int));
+        memcpy(shape_copy, nf4->original_shape, (size_t)nf4->original_ndim * sizeof(int));
 
-        TensorConfig config = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                               .has_dtype = true, .has_device = true};
+        TensorConfig config = {
+            .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
         Tensor* reshaped = tensor_from_data(fdata, shape_copy, nf4->original_ndim, &config);
         cml_free(shape_copy);
         tensor_free(flat);
@@ -134,14 +132,15 @@ Tensor* cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4) {
     return flat;
 }
 
-CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
-                                         float alpha, int block_size) {
+CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank, float alpha,
+                                        int block_size) {
     if (!base_weight) {
         LOG_ERROR("cml_qlora_linear_create: base_weight is NULL");
         return NULL;
     }
     if (base_weight->ndim != 2) {
-        LOG_ERROR("cml_qlora_linear_create: base_weight must be 2D [out_features, in_features], got ndim=%d",
+        LOG_ERROR("cml_qlora_linear_create: base_weight must be 2D [out_features, in_features], "
+                  "got ndim=%d",
                   base_weight->ndim);
         return NULL;
     }
@@ -155,7 +154,7 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
     }
 
     int out_features = base_weight->shape[0];
-    int in_features = base_weight->shape[1];
+    int in_features  = base_weight->shape[1];
 
     CMLQLoRALinear* qlora = (CMLQLoRALinear*)cml_calloc(1, sizeof(CMLQLoRALinear));
     if (!qlora) {
@@ -163,11 +162,11 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
         return NULL;
     }
 
-    qlora->in_features = in_features;
-    qlora->out_features = out_features;
-    qlora->rank = rank;
-    qlora->alpha = alpha;
-    qlora->scaling = alpha / (float)rank;
+    qlora->in_features         = in_features;
+    qlora->out_features        = out_features;
+    qlora->rank                = rank;
+    qlora->alpha               = alpha;
+    qlora->scaling             = alpha / (float)rank;
     qlora->enable_double_quant = false;
 
     /* Quantize base weight to NF4 */
@@ -179,14 +178,10 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
     }
 
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Initialize lora_A with Xavier/small random values */
-    int shape_A[2] = {rank, in_features};
+    int shape_A[2]     = {rank, in_features};
     float xavier_scale = sqrtf(2.0f / (float)(rank + in_features));
 
     qlora->lora_A = tensor_empty(shape_A, 2, &cfg);
@@ -207,7 +202,7 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
 
     /* Initialize lora_B with zeros */
     int shape_B[2] = {out_features, rank};
-    qlora->lora_B = tensor_zeros(shape_B, 2, &cfg);
+    qlora->lora_B  = tensor_zeros(shape_B, 2, &cfg);
     if (!qlora->lora_B) {
         LOG_ERROR("cml_qlora_linear_create: failed to allocate lora_B");
         tensor_free(qlora->lora_A);
@@ -220,7 +215,8 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
 }
 
 void cml_qlora_linear_free(CMLQLoRALinear* qlora) {
-    if (!qlora) return;
+    if (!qlora)
+        return;
 
     if (qlora->base_weight_nf4) {
         cml_nf4_tensor_free(qlora->base_weight_nf4);
@@ -249,16 +245,16 @@ Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
     }
 
     int batch = input->shape[0];
-    int in_f = input->shape[1];
+    int in_f  = input->shape[1];
 
     if (in_f != qlora->in_features) {
-        LOG_ERROR("cml_qlora_linear_forward: input in_features mismatch: got %d, expected %d",
-                  in_f, qlora->in_features);
+        LOG_ERROR("cml_qlora_linear_forward: input in_features mismatch: got %d, expected %d", in_f,
+                  qlora->in_features);
         return NULL;
     }
 
     int out_f = qlora->out_features;
-    int r = qlora->rank;
+    int r     = qlora->rank;
 
     const CMLNF4Tensor* nf4 = qlora->base_weight_nf4;
     if (!nf4 || !nf4->packed_data || !nf4->scales) {
@@ -271,10 +267,10 @@ Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
     tensor_ensure_executed(qlora->lora_A);
     tensor_ensure_executed(qlora->lora_B);
 
-    float* x_data = (float*)tensor_data_ptr(input);
+    float* x_data        = (float*)tensor_data_ptr(input);
     const uint8_t* pdata = (const uint8_t*)tensor_data_ptr(nf4->packed_data);
-    float* A_data = (float*)tensor_data_ptr(qlora->lora_A);
-    float* B_data = (float*)tensor_data_ptr(qlora->lora_B);
+    float* A_data        = (float*)tensor_data_ptr(qlora->lora_A);
+    float* B_data        = (float*)tensor_data_ptr(qlora->lora_B);
 
     if (!x_data || !pdata || !A_data || !B_data) {
         LOG_ERROR("cml_qlora_linear_forward: failed to get data pointers");
@@ -282,15 +278,11 @@ Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
     }
 
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Allocate output tensor [batch, out_features] */
     int out_shape[2] = {batch, out_f};
-    Tensor* output = tensor_zeros(out_shape, 2, &cfg);
+    Tensor* output   = tensor_zeros(out_shape, 2, &cfg);
     if (!output) {
         LOG_ERROR("cml_qlora_linear_forward: failed to allocate output tensor");
         return NULL;
@@ -313,17 +305,18 @@ Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
     for (int o = 0; o < out_f; o++) {
         size_t row_base = (size_t)o * (size_t)in_f;
         for (int i = 0; i < in_f; i++) {
-            size_t e = row_base + (size_t)i;
+            size_t e     = row_base + (size_t)i;
             uint8_t byte = pdata[e >> 1];
             /* even flat index = high nibble (matches cml_dequantize_nf4) */
             int idx = (e & 1) ? (byte & 0x0F) : ((byte >> 4) & 0x0F);
             int blk = (int)(e / (size_t)nf4->block_size);
-            if (blk >= nf4->num_scales) blk = nf4->num_scales - 1;
+            if (blk >= nf4->num_scales)
+                blk = nf4->num_scales - 1;
             wrow[i] = CML_NF4_TABLE[idx] * nf4->scales[blk];
         }
         for (int b = 0; b < batch; b++) {
             const float* xb = x_data + (size_t)b * (size_t)in_f;
-            float sum = 0.0f;
+            float sum       = 0.0f;
             for (int i = 0; i < in_f; i++) {
                 sum += xb[i] * wrow[i];
             }
@@ -378,14 +371,15 @@ Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
 }
 
 size_t cml_qlora_memory_usage(const CMLQLoRALinear* qlora) {
-    if (!qlora) return 0;
+    if (!qlora)
+        return 0;
 
     size_t mem = 0;
 
     /* NF4 packed data: original_numel / 2 bytes (uint8) */
     if (qlora->base_weight_nf4) {
-        mem += (qlora->base_weight_nf4->original_numel + 1) / 2;  /* packed uint8 */
-        mem += (size_t)qlora->base_weight_nf4->num_scales * sizeof(float);  /* scales */
+        mem += (qlora->base_weight_nf4->original_numel + 1) / 2;           /* packed uint8 */
+        mem += (size_t)qlora->base_weight_nf4->num_scales * sizeof(float); /* scales */
     }
 
     /* LoRA A: [rank, in_features] * sizeof(float) */

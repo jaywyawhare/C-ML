@@ -18,8 +18,8 @@ static void channel_broadcast_shape(int* out, const int* shape, int ndim, int ch
         out[i] = (i == channel_dim) ? shape[channel_dim] : 1;
 }
 
-Tensor* nn_norm_affine(Tensor* x, const Parameter* weight, const Parameter* bias,
-                       const int* shape, int ndim, int channel_dim) {
+Tensor* nn_norm_affine(Tensor* x, const Parameter* weight, const Parameter* bias, const int* shape,
+                       int ndim, int channel_dim) {
     if (!x || !weight || !bias || ndim > NORM_MAX_NDIM)
         return x;
 
@@ -38,10 +38,10 @@ Tensor* nn_norm_rowwise(Tensor* x, int rows, int cols, float eps) {
     int flat[] = {rows, cols};
     int stat[] = {rows, 1};
 
-    Tensor* x2      = uop_reshape_to(x, flat, 2);
-    Tensor* mean    = uop_reshape_to(uop_mean_dim(x2, 1, false), stat, 2);
-    Tensor* diff    = uop_sub(x2, uop_expand_to(mean, flat, 2));
-    Tensor* var     = uop_reshape_to(uop_mean_dim(uop_mul(diff, diff), 1, false), stat, 2);
+    Tensor* x2   = uop_reshape_to(x, flat, 2);
+    Tensor* mean = uop_reshape_to(uop_mean_dim(x2, 1, false), stat, 2);
+    Tensor* diff = uop_sub(x2, uop_expand_to(mean, flat, 2));
+    Tensor* var  = uop_reshape_to(uop_mean_dim(uop_mul(diff, diff), 1, false), stat, 2);
 
     TensorConfig config = {
         .dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
@@ -72,10 +72,10 @@ static int batchnorm_update_stats(BatchNormState* bn, Tensor* input, int batch, 
             return -1;
     }
 
-    int grouped[]   = {batch, channels, spatial};
-    int per_chan[]  = {1, channels, 1};
-    Tensor* x3      = uop_reshape_to(input, grouped, 3);
-    Tensor* mean    = uop_mean_dim(uop_mean_dim(x3, 2, false), 0, false);
+    int grouped[]  = {batch, channels, spatial};
+    int per_chan[] = {1, channels, 1};
+    Tensor* x3     = uop_reshape_to(input, grouped, 3);
+    Tensor* mean   = uop_mean_dim(uop_mean_dim(x3, 2, false), 0, false);
 
     float* mean_data         = (float*)tensor_data_ptr(mean);
     float* current_mean_data = (float*)tensor_data_ptr(bn->current_mean);
@@ -85,10 +85,10 @@ static int batchnorm_update_stats(BatchNormState* bn, Tensor* input, int batch, 
 
     /* Centre against the materialised copy, not `mean`, so the statistics stay
      * out of the gradient graph (as PyTorch's running stats do). */
-    Tensor* mean_broadcast = uop_expand_to(uop_reshape_to(bn->current_mean, per_chan, 3),
-                                           grouped, 3);
-    Tensor* diff           = uop_sub(x3, mean_broadcast);
-    Tensor* var            = uop_mean_dim(uop_mean_dim(uop_mul(diff, diff), 2, false), 0, false);
+    Tensor* mean_broadcast =
+        uop_expand_to(uop_reshape_to(bn->current_mean, per_chan, 3), grouped, 3);
+    Tensor* diff = uop_sub(x3, mean_broadcast);
+    Tensor* var  = uop_mean_dim(uop_mean_dim(uop_mul(diff, diff), 2, false), 0, false);
 
     float* var_data         = (float*)tensor_data_ptr(var);
     float* current_var_data = (float*)tensor_data_ptr(bn->current_var);
@@ -126,8 +126,8 @@ static Tensor* batchnorm_forward(Module* module, Tensor* input) {
     int batch    = input->shape[0];
     int channels = input->shape[1];
     if (channels != bn->num_features) {
-        LOG_ERROR("%s: input channels (%d) doesn't match num_features (%d)", module->name,
-                  channels, bn->num_features);
+        LOG_ERROR("%s: input channels (%d) doesn't match num_features (%d)", module->name, channels,
+                  bn->num_features);
         return NULL;
     }
 
@@ -142,7 +142,7 @@ static Tensor* batchnorm_forward(Module* module, Tensor* input) {
     TensorConfig config = {
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
 
-    Tensor* centered = NULL;
+    Tensor* centered      = NULL;
     Tensor* std_broadcast = NULL;
 
     if (training) {
@@ -155,17 +155,17 @@ static Tensor* batchnorm_forward(Module* module, Tensor* input) {
         if (batchnorm_update_stats(bn, input, batch, channels, spatial) != 0)
             return NULL;
 
-        int grouped[] = {batch, channels, spatial};
-        Tensor* x3   = uop_reshape_to(input, grouped, 3);
-        Tensor* mean = uop_mean_dim(uop_mean_dim(x3, 2, true), 0, true);  /* [1,C,1] */
+        int grouped[]     = {batch, channels, spatial};
+        Tensor* x3        = uop_reshape_to(input, grouped, 3);
+        Tensor* mean      = uop_mean_dim(uop_mean_dim(x3, 2, true), 0, true); /* [1,C,1] */
         Tensor* centered3 = uop_sub(x3, mean);
-        Tensor* var  = uop_mean_dim(uop_mean_dim(uop_mul(centered3, centered3), 2, true), 0, true);
+        Tensor* var = uop_mean_dim(uop_mean_dim(uop_mul(centered3, centered3), 2, true), 0, true);
 
-        int one_shape[] = {1};
+        int one_shape[]    = {1};
         Tensor* eps_tensor = tensor_full(one_shape, 1, &config, bn->eps);
         if (!eps_tensor)
             return NULL;
-        Tensor* std3 = uop_sqrt(uop_add(var, eps_tensor));  /* [1,C,1] */
+        Tensor* std3 = uop_sqrt(uop_add(var, eps_tensor)); /* [1,C,1] */
         tensor_free(eps_tensor);
 
         Tensor* normalized3 = uop_div(centered3, std3);
@@ -180,19 +180,18 @@ static Tensor* batchnorm_forward(Module* module, Tensor* input) {
             LOG_ERROR("%s: missing mean or variance tensor", module->name);
             return NULL;
         }
-        Tensor* mean_broadcast =
-            uop_expand_to(uop_reshape_to(mean_tensor, stat_shape, input->ndim), input->shape,
-                          input->ndim);
-        centered = uop_sub(input, mean_broadcast);
+        Tensor* mean_broadcast = uop_expand_to(uop_reshape_to(mean_tensor, stat_shape, input->ndim),
+                                               input->shape, input->ndim);
+        centered               = uop_sub(input, mean_broadcast);
 
         int channel_shape[] = {channels};
-        Tensor* eps_tensor = tensor_full(channel_shape, 1, &config, bn->eps);
+        Tensor* eps_tensor  = tensor_full(channel_shape, 1, &config, bn->eps);
         if (!eps_tensor)
             return NULL;
         Tensor* std = uop_sqrt(uop_add(var_tensor, eps_tensor));
         tensor_free(eps_tensor);
-        std_broadcast = uop_expand_to(uop_reshape_to(std, stat_shape, input->ndim),
-                                      input->shape, input->ndim);
+        std_broadcast =
+            uop_expand_to(uop_reshape_to(std, stat_shape, input->ndim), input->shape, input->ndim);
     }
 
     Tensor* normalized = uop_div(centered, std_broadcast);
@@ -218,8 +217,8 @@ static void batchnorm_free(Module* module) {
 }
 
 BatchNormState* nn_batchnorm_new(const char* name, int input_ndim, int num_features, float eps,
-                                 float momentum, bool affine, bool track_running_stats,
-                                 DType dtype, DeviceType device) {
+                                 float momentum, bool affine, bool track_running_stats, DType dtype,
+                                 DeviceType device) {
     BatchNormState* bn = cml_malloc(sizeof(BatchNormState));
     if (!bn)
         return NULL;

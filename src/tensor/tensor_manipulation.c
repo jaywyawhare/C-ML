@@ -33,15 +33,16 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
 
     int dim_size = tensor->shape[normalized_dim];
 
-    int* sizes = NULL;
+    int* sizes    = NULL;
     int need_free = 0;
     if (split_sizes) {
         sizes = split_sizes;
     } else {
         int base_size = dim_size / num_splits;
         int remainder = dim_size % num_splits;
-        sizes = cml_malloc((size_t)num_splits * sizeof(int));
-        if (!sizes) return NULL;
+        sizes         = cml_malloc((size_t)num_splits * sizeof(int));
+        if (!sizes)
+            return NULL;
         need_free = 1;
         for (int i = 0; i < num_splits; i++)
             sizes[i] = base_size + (i < remainder ? 1 : 0);
@@ -49,7 +50,8 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
 
     Tensor** results = cml_malloc((size_t)num_splits * sizeof(Tensor*));
     if (!results) {
-        if (need_free) cml_free(sizes);
+        if (need_free)
+            cml_free(sizes);
         return NULL;
     }
 
@@ -59,10 +61,14 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
         int* ends   = cml_malloc((size_t)tensor->ndim * sizeof(int));
         int* steps  = cml_malloc((size_t)tensor->ndim * sizeof(int));
         if (!starts || !ends || !steps) {
-            cml_free(starts); cml_free(ends); cml_free(steps);
-            for (int j = 0; j < i; j++) tensor_free(results[j]);
+            cml_free(starts);
+            cml_free(ends);
+            cml_free(steps);
+            for (int j = 0; j < i; j++)
+                tensor_free(results[j]);
             cml_free(results);
-            if (need_free) cml_free(sizes);
+            if (need_free)
+                cml_free(sizes);
             return NULL;
         }
         for (int d = 0; d < tensor->ndim; d++) {
@@ -73,10 +79,14 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
 
         SliceParams* sp = cml_malloc(sizeof(SliceParams));
         if (!sp) {
-            cml_free(starts); cml_free(ends); cml_free(steps);
-            for (int j = 0; j < i; j++) tensor_free(results[j]);
+            cml_free(starts);
+            cml_free(ends);
+            cml_free(steps);
+            for (int j = 0; j < i; j++)
+                tensor_free(results[j]);
             cml_free(results);
-            if (need_free) cml_free(sizes);
+            if (need_free)
+                cml_free(sizes);
             return NULL;
         }
         sp->start    = starts;
@@ -88,7 +98,8 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
         offset += sizes[i];
     }
 
-    if (need_free) cml_free(sizes);
+    if (need_free)
+        cml_free(sizes);
     return results;
 }
 
@@ -117,7 +128,8 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     }
     for (int d = 0; d < input->ndim; d++) {
         if (d != normalized_dim && indices->shape[d] != input->shape[d]) {
-            LOG_ERROR("tensor_gather: indices shape must match input shape except in gather dimension");
+            LOG_ERROR(
+                "tensor_gather: indices shape must match input shape except in gather dimension");
             return NULL;
         }
     }
@@ -125,7 +137,8 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* output = tensor_empty(indices->shape, indices->ndim, &config);
-    if (!output) return NULL;
+    if (!output)
+        return NULL;
 
     float* in_data  = (float*)tensor_data_ptr(input);
     float* out_data = (float*)tensor_data_ptr(output);

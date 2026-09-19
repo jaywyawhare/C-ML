@@ -10,7 +10,7 @@ extern "C" {
 typedef BatchNormState BatchNorm1d;
 
 BatchNorm1d* nn_batchnorm1d(int num_features, float eps, float momentum, bool affine,
-                             bool track_running_stats, DType dtype, DeviceType device);
+                            bool track_running_stats, DType dtype, DeviceType device);
 
 #ifdef __cplusplus
 }

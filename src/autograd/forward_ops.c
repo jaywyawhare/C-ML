@@ -63,21 +63,13 @@ static Tensor* forward_unary(Tensor* a, UOpType type) {
     return tensor_from_ir_node(node, ir);
 }
 
-Tensor* tensor_add(Tensor* a, Tensor* b) {
-    return forward_binary(a, b, UOP_ADD);
-}
+Tensor* tensor_add(Tensor* a, Tensor* b) { return forward_binary(a, b, UOP_ADD); }
 
-Tensor* tensor_sub(Tensor* a, Tensor* b) {
-    return forward_binary(a, b, UOP_SUB);
-}
+Tensor* tensor_sub(Tensor* a, Tensor* b) { return forward_binary(a, b, UOP_SUB); }
 
-Tensor* tensor_mul(Tensor* a, Tensor* b) {
-    return forward_binary(a, b, UOP_MUL);
-}
+Tensor* tensor_mul(Tensor* a, Tensor* b) { return forward_binary(a, b, UOP_MUL); }
 
-Tensor* tensor_div(Tensor* a, Tensor* b) {
-    return forward_binary(a, b, UOP_DIV);
-}
+Tensor* tensor_div(Tensor* a, Tensor* b) { return forward_binary(a, b, UOP_DIV); }
 
 Tensor* tensor_pow(Tensor* a, Tensor* b) {
     if (!a || !b)
@@ -85,21 +77,13 @@ Tensor* tensor_pow(Tensor* a, Tensor* b) {
     return uop_pow(a, b);
 }
 
-Tensor* tensor_neg(Tensor* a) {
-    return forward_unary(a, UOP_NEG);
-}
+Tensor* tensor_neg(Tensor* a) { return forward_unary(a, UOP_NEG); }
 
-Tensor* tensor_exp(Tensor* a) {
-    return forward_unary(a, UOP_EXP);
-}
+Tensor* tensor_exp(Tensor* a) { return forward_unary(a, UOP_EXP); }
 
-Tensor* tensor_log(Tensor* a) {
-    return forward_unary(a, UOP_LOG);
-}
+Tensor* tensor_log(Tensor* a) { return forward_unary(a, UOP_LOG); }
 
-Tensor* tensor_sqrt(Tensor* a) {
-    return forward_unary(a, UOP_SQRT);
-}
+Tensor* tensor_sqrt(Tensor* a) { return forward_unary(a, UOP_SQRT); }
 
 Tensor* tensor_sin(Tensor* a) {
     if (!a)
@@ -270,9 +254,9 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     if (cml_ir_add_uop(ir, UOP_MATMUL, inputs, 2, NULL) != 0)
         return NULL;
     struct IRNode* node = cml_ir_get_tail(ir);
-    int batch_dims = (a->ndim > 2) ? a->ndim - 2 : 0;
-    int out_ndim = batch_dims + 2;
-    node->output_shape = cml_malloc((size_t)out_ndim * sizeof(int));
+    int batch_dims      = (a->ndim > 2) ? a->ndim - 2 : 0;
+    int out_ndim        = batch_dims + 2;
+    node->output_shape  = cml_malloc((size_t)out_ndim * sizeof(int));
     if (!node->output_shape) {
         CML_ERR_NULL("Failed to allocate output shape for matmul");
     }
@@ -281,7 +265,7 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     }
     node->output_shape[out_ndim - 2] = a->shape[a->ndim - 2];
     node->output_shape[out_ndim - 1] = b->shape[b->ndim - 1];
-    node->output_ndim = out_ndim;
+    node->output_ndim                = out_ndim;
     if (a->requires_grad || b->requires_grad) {
         node->requires_grad       = true;
         node->needs_input_grad[0] = a->requires_grad;
@@ -375,7 +359,7 @@ Tensor* tensor_argmax(Tensor* a, int dim) {
         return NULL;
     ReduceParams params = {0};
     if (dim >= 0) {
-        params.dims = &dim;
+        params.dims     = &dim;
         params.num_dims = 1;
     }
     return uop_argmax(a, dim >= 0 ? &params : NULL);
@@ -386,7 +370,7 @@ Tensor* tensor_argmin(Tensor* a, int dim) {
         return NULL;
     ReduceParams params = {0};
     if (dim >= 0) {
-        params.dims = &dim;
+        params.dims     = &dim;
         params.num_dims = 1;
     }
     return uop_argmin(a, dim >= 0 ? &params : NULL);
@@ -395,69 +379,83 @@ Tensor* tensor_argmin(Tensor* a, int dim) {
 bool tensor_has_grad(Tensor* a) { return a && a->grad != NULL; }
 
 Tensor* tensor_elu(Tensor* a, float alpha) {
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
     return uop_elu(a, alpha);
 }
 
 Tensor* tensor_selu(Tensor* a) {
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
     return uop_selu(a);
 }
 
 Tensor* tensor_mish(Tensor* a) {
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
     return uop_mish(a);
 }
 
 Tensor* tensor_silu(Tensor* a) {
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
     return uop_silu(a);
 }
 
 Tensor* tensor_hardswish(Tensor* a) {
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
     return uop_hardswish(a);
 }
 
 Tensor* tensor_sort(Tensor* a, int dim, bool descending) {
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
     return uop_sort(a, dim, descending);
 }
 
 Tensor* tensor_topk(Tensor* a, int k, int dim, bool largest, bool sorted) {
     (void)sorted; // topk always returns sorted
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
     return uop_topk(a, k, dim, largest, NULL);
 }
 
 Tensor* tensor_masked_select(Tensor* a, Tensor* mask) {
-    if (!a || !mask) return NULL;
+    if (!a || !mask)
+        return NULL;
     return uop_masked_select(a, mask);
 }
 
 Tensor** tensor_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {
-    if (!tensors || !num_outputs) return NULL;
+    if (!tensors || !num_outputs)
+        return NULL;
     return uop_meshgrid(tensors, num_tensors, num_outputs);
 }
 
 Tensor* tensor_diagonal(Tensor* a, int offset, int dim1, int dim2) {
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
     return uop_diagonal(a, offset, dim1, dim2);
 }
 
 Tensor* tensor_lerp(Tensor* a, Tensor* b, float weight) {
-    if (!a || !b) return NULL;
+    if (!a || !b)
+        return NULL;
     Tensor* w = uop_fill(a->shape, a->ndim, weight);
-    if (!w) return NULL;
+    if (!w)
+        return NULL;
     return uop_lerp(a, b, w);
 }
 
 Tensor* tensor_idiv(Tensor* a, Tensor* b) {
-    if (!a || !b) return NULL;
+    if (!a || !b)
+        return NULL;
     return uop_idiv(a, b);
 }
 
 Tensor* tensor_mod(Tensor* a, Tensor* b) {
-    if (!a || !b) return NULL;
+    if (!a || !b)
+        return NULL;
     return uop_mod(a, b);
 }

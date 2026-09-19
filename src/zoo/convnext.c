@@ -6,34 +6,22 @@
 #include "alloc/cml_allocator.h"
 
 ConvNeXtConfig cml_zoo_convnext_config_tiny(void) {
-    ConvNeXtConfig cfg = {
-        .dims = {96, 192, 384, 768},
-        .depths = {3, 3, 9, 3}
-    };
+    ConvNeXtConfig cfg = {.dims = {96, 192, 384, 768}, .depths = {3, 3, 9, 3}};
     return cfg;
 }
 
 ConvNeXtConfig cml_zoo_convnext_config_small(void) {
-    ConvNeXtConfig cfg = {
-        .dims = {96, 192, 384, 768},
-        .depths = {3, 3, 27, 3}
-    };
+    ConvNeXtConfig cfg = {.dims = {96, 192, 384, 768}, .depths = {3, 3, 27, 3}};
     return cfg;
 }
 
 ConvNeXtConfig cml_zoo_convnext_config_base(void) {
-    ConvNeXtConfig cfg = {
-        .dims = {128, 256, 512, 1024},
-        .depths = {3, 3, 27, 3}
-    };
+    ConvNeXtConfig cfg = {.dims = {128, 256, 512, 1024}, .depths = {3, 3, 27, 3}};
     return cfg;
 }
 
 ConvNeXtConfig cml_zoo_convnext_config_large(void) {
-    ConvNeXtConfig cfg = {
-        .dims = {192, 384, 768, 1536},
-        .depths = {3, 3, 27, 3}
-    };
+    ConvNeXtConfig cfg = {.dims = {192, 384, 768, 1536}, .depths = {3, 3, 27, 3}};
     return cfg;
 }
 
@@ -75,7 +63,8 @@ static Module* create_convnext_block(int dim, DType dtype, DeviceType device) {
     if (!block)
         return NULL;
 
-    if (module_init((Module*)block, "ConvNeXtBlock", convnext_block_forward, convnext_block_free) != 0) {
+    if (module_init((Module*)block, "ConvNeXtBlock", convnext_block_forward, convnext_block_free) !=
+        0) {
         cml_free(block);
         return NULL;
     }
@@ -108,8 +97,8 @@ static Module* create_downsample(int in_dim, int out_dim, DType dtype, DeviceTyp
     return (Module*)ds;
 }
 
-Module* cml_zoo_convnext_create(const ConvNeXtConfig* cfg, int num_classes,
-                                 DType dtype, DeviceType device) {
+Module* cml_zoo_convnext_create(const ConvNeXtConfig* cfg, int num_classes, DType dtype,
+                                DeviceType device) {
     if (!cfg)
         return NULL;
     if (num_classes <= 0)
@@ -124,7 +113,8 @@ Module* cml_zoo_convnext_create(const ConvNeXtConfig* cfg, int num_classes,
 
     for (int stage = 0; stage < 4; stage++) {
         if (stage > 0)
-            sequential_add(model, create_downsample(cfg->dims[stage - 1], cfg->dims[stage], dtype, device));
+            sequential_add(
+                model, create_downsample(cfg->dims[stage - 1], cfg->dims[stage], dtype, device));
 
         for (int b = 0; b < cfg->depths[stage]; b++)
             sequential_add(model, create_convnext_block(cfg->dims[stage], dtype, device));
@@ -135,7 +125,7 @@ Module* cml_zoo_convnext_create(const ConvNeXtConfig* cfg, int num_classes,
     sequential_add(model, (Module*)nn_layernorm(cfg->dims[3], 1e-6f, true, dtype, device));
     sequential_add(model, (Module*)nn_linear(cfg->dims[3], num_classes, dtype, device, true));
 
-    LOG_INFO("Created ConvNeXt (%d-%d-%d-%d, %d classes)",
-             cfg->dims[0], cfg->dims[1], cfg->dims[2], cfg->dims[3], num_classes);
+    LOG_INFO("Created ConvNeXt (%d-%d-%d-%d, %d classes)", cfg->dims[0], cfg->dims[1], cfg->dims[2],
+             cfg->dims[3], num_classes);
     return (Module*)model;
 }

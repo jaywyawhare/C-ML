@@ -51,9 +51,9 @@ TorchPTEExportOptions torch_pte_default_export_options(void) {
     TorchPTEExportOptions opts = {0};
     opts.method_name           = "forward";
     opts.backend               = CML_BACKEND_CPU_FALLBACK;
-    opts.include_weights         = true;
-    opts.compute_memory_plan     = true;
-    opts.aot_output_path         = NULL;
+    opts.include_weights       = true;
+    opts.compute_memory_plan   = true;
+    opts.aot_output_path       = NULL;
     return opts;
 }
 
@@ -82,7 +82,7 @@ static int pte_collect_ir(CMLGraph_t ir, CMLPTEInstruction** out_instrs, int* ou
     if (!ir || !out_instrs || !out_count)
         return -1;
 
-    int cap   = ir->node_count > 0 ? ir->node_count : 16;
+    int cap                   = ir->node_count > 0 ? ir->node_count : 16;
     CMLPTEInstruction* instrs = calloc((size_t)cap, sizeof(CMLPTEInstruction));
     if (!instrs)
         return -1;
@@ -90,7 +90,7 @@ static int pte_collect_ir(CMLGraph_t ir, CMLPTEInstruction** out_instrs, int* ou
     /* Map parameter tensors to constant indices (negative slot encoding) */
     StateDict* sd = module ? nn_get_state_dict(module, "") : NULL;
 
-    int idx = 0;
+    int idx        = 0;
     uint64_t arena = 0;
 
     for (struct IRNode* node = ir->head; node; node = node->next) {
@@ -98,7 +98,8 @@ static int pte_collect_ir(CMLGraph_t ir, CMLPTEInstruction** out_instrs, int* ou
             LOG_ERROR("PTE export: node has %d inputs (max %d)", node->num_inputs,
                       CML_PTE_MAX_INSTR_ARGS);
             free(instrs);
-            if (sd) nn_state_dict_free(sd);
+            if (sd)
+                nn_state_dict_free(sd);
             return -1;
         }
         /* Fail at export rather than shipping a program the runtime can't run. */
@@ -108,14 +109,16 @@ static int pte_collect_ir(CMLGraph_t ir, CMLPTEInstruction** out_instrs, int* ou
             LOG_ERROR("PTE export: op %d (%s) has no PTE runtime kernel — refusing export",
                       node->type, uop_type_to_string(node->type));
             free(instrs);
-            if (sd) nn_state_dict_free(sd);
+            if (sd)
+                nn_state_dict_free(sd);
             return -1;
         }
         int out_ndim = node->output ? node->output->ndim : node->output_ndim;
         if (out_ndim > CML_PTE_MAX_SHAPE_DIMS) {
             LOG_ERROR("PTE export: output has %d dims (max %d)", out_ndim, CML_PTE_MAX_SHAPE_DIMS);
             free(instrs);
-            if (sd) nn_state_dict_free(sd);
+            if (sd)
+                nn_state_dict_free(sd);
             return -1;
         }
         if (idx >= cap) {
@@ -123,7 +126,8 @@ static int pte_collect_ir(CMLGraph_t ir, CMLPTEInstruction** out_instrs, int* ou
             CMLPTEInstruction* tmp = realloc(instrs, (size_t)cap * sizeof(CMLPTEInstruction));
             if (!tmp) {
                 free(instrs);
-                if (sd) nn_state_dict_free(sd);
+                if (sd)
+                    nn_state_dict_free(sd);
                 return -1;
             }
             instrs = tmp;
@@ -223,7 +227,7 @@ static int pte_collect_constants(Module* module, CMLPTEConstant** out_consts, ui
     }
 
     size_t offset = 0;
-    int n = 0;
+    int n         = 0;
     for (int i = 0; i < sd->count; i++) {
         Tensor* t = sd->entries[i].value;
         if (!t)
@@ -238,17 +242,17 @@ static int pte_collect_constants(Module* module, CMLPTEConstant** out_consts, ui
             c->shape[d] = t->shape[d];
 
         size_t nbytes = t->numel * pte_dtype_nbytes(t->dtype);
-        c->nbytes = nbytes;
+        c->nbytes     = nbytes;
         if (blob && t->data)
             memcpy(blob + offset, t->data, nbytes);
         offset += nbytes;
     }
 
     nn_state_dict_free(sd);
-    *out_consts     = consts;
-    *out_data       = blob;
-    *out_data_size  = offset;
-    *out_count      = n;
+    *out_consts    = consts;
+    *out_data      = blob;
+    *out_data_size = offset;
+    *out_count     = n;
     return 0;
 }
 
@@ -281,7 +285,8 @@ int torch_pte_export_module(Module* module, Tensor* sample_input, const char* pa
     CMLPTEInstruction* instrs = NULL;
     int num_instrs            = 0;
     CMLPTEMemoryPlan plan     = {0};
-    if (pte_collect_ir(ir, &instrs, &num_instrs, o.compute_memory_plan ? &plan : NULL, module) != 0) {
+    if (pte_collect_ir(ir, &instrs, &num_instrs, o.compute_memory_plan ? &plan : NULL, module) !=
+        0) {
         LOG_ERROR("PTE export: IR collection failed");
         return -1;
     }
@@ -298,7 +303,8 @@ int torch_pte_export_module(Module* module, Tensor* sample_input, const char* pa
     }
 
     CMLPTEMetadata meta = {0};
-    strncpy(meta.method_name, o.method_name ? o.method_name : "forward", sizeof(meta.method_name) - 1);
+    strncpy(meta.method_name, o.method_name ? o.method_name : "forward",
+            sizeof(meta.method_name) - 1);
     meta.backend_id       = (uint32_t)o.backend;
     meta.num_inputs       = 1;
     meta.num_outputs      = 1;
@@ -307,10 +313,10 @@ int torch_pte_export_module(Module* module, Tensor* sample_input, const char* pa
     meta.arena_size       = plan.peak_bytes;
 
     /* Build section payloads in memory */
-    size_t prog_size = (size_t)num_instrs * sizeof(CMLPTEInstruction);
+    size_t prog_size       = (size_t)num_instrs * sizeof(CMLPTEInstruction);
     size_t const_meta_size = (size_t)num_consts * sizeof(CMLPTEConstant);
-    size_t meta_size = sizeof(CMLPTEMetadata);
-    size_t plan_size = sizeof(CMLPTEMemoryPlan);
+    size_t meta_size       = sizeof(CMLPTEMetadata);
+    size_t plan_size       = sizeof(CMLPTEMemoryPlan);
 
     uint32_t num_sections = 4u; /* METADATA always required; CONSTANTS may have size=0 */
     PTEFileSection sections[4];
@@ -347,11 +353,11 @@ int torch_pte_export_module(Module* module, Tensor* sample_input, const char* pa
     }
 
     PTEFileHeader hdr = {
-        .magic         = CML_PTE_MAGIC,
-        .version       = CML_PTE_VERSION,
-        .num_sections  = num_sections,
-        .flags         = 0,
-        .total_size    = cursor,
+        .magic        = CML_PTE_MAGIC,
+        .version      = CML_PTE_VERSION,
+        .num_sections = num_sections,
+        .flags        = 0,
+        .total_size   = cursor,
     };
     fwrite(&hdr, sizeof(hdr), 1, f);
     fwrite(sections, sizeof(PTEFileSection), num_sections, f);
@@ -451,9 +457,8 @@ CMLPTEModel* torch_pte_load(const char* path) {
             int n = (int)(sections[s].size / sizeof(CMLPTEInstruction));
             if (n > 0) {
                 model->instructions = calloc((size_t)n, sizeof(CMLPTEInstruction));
-                if (!model->instructions ||
-                    fread(model->instructions, sizeof(CMLPTEInstruction), (size_t)n, f) !=
-                        (size_t)n) {
+                if (!model->instructions || fread(model->instructions, sizeof(CMLPTEInstruction),
+                                                  (size_t)n, f) != (size_t)n) {
                     free(sections);
                     fclose(f);
                     torch_pte_free(model);
@@ -461,7 +466,7 @@ CMLPTEModel* torch_pte_load(const char* path) {
                 }
             }
         } else if (sections[s].type == CML_PTE_SECTION_CONSTANTS) {
-            uint32_t nc = model->meta.num_constants;
+            uint32_t nc       = model->meta.num_constants;
             size_t meta_bytes = (size_t)nc * sizeof(CMLPTEConstant);
             if (nc > 0) {
                 model->constants = calloc(nc, sizeof(CMLPTEConstant));
@@ -509,8 +514,8 @@ CMLPTEModel* torch_pte_load(const char* path) {
         return NULL;
     }
 
-    LOG_INFO("PTE loaded: %s (%u instructions, %u constants)", path,
-             model->meta.num_instructions, model->meta.num_constants);
+    LOG_INFO("PTE loaded: %s (%u instructions, %u constants)", path, model->meta.num_instructions,
+             model->meta.num_constants);
     return model;
 }
 
@@ -608,7 +613,7 @@ static Tensor* pte_exec_kernel(UOpType op, Tensor** args, int num_args,
         return tensor_reshape(args[0], shape, ins->output_ndim);
     }
     case UOP_LINEAR:
-        return num_args >= 3 ? uop_linear(args[0], args[1], args[2])
+        return num_args >= 3   ? uop_linear(args[0], args[1], args[2])
                : num_args >= 2 ? uop_linear(args[0], args[1], NULL)
                                : NULL;
     case UOP_POW:
@@ -641,7 +646,7 @@ static Tensor* pte_exec_kernel(UOpType op, Tensor** args, int num_args,
         int shape[CML_PTE_MAX_SHAPE_DIMS];
         for (int d = 0; d < ins->output_ndim; d++)
             shape[d] = ins->output_shape[d];
-        ExpandParams ep = { .new_shape = shape, .new_ndim = ins->output_ndim };
+        ExpandParams ep = {.new_shape = shape, .new_ndim = ins->output_ndim};
         return uop_expand(args[0], &ep);
     }
     default:
@@ -654,10 +659,26 @@ static Tensor* pte_exec_kernel(UOpType op, Tensor** args, int num_args,
  * instead of writing a .cpte that only errors at execution time. */
 bool torch_pte_runtime_supports(UOpType op) {
     switch (op) {
-    case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV: case UOP_MATMUL:
-    case UOP_RELU: case UOP_SIGMOID: case UOP_TANH: case UOP_SUM: case UOP_MEAN:
-    case UOP_RESHAPE: case UOP_LINEAR: case UOP_POW: case UOP_MAX: case UOP_NEG:
-    case UOP_EXP: case UOP_LOG: case UOP_SQRT: case UOP_ABS: case UOP_PERMUTE:
+    case UOP_ADD:
+    case UOP_SUB:
+    case UOP_MUL:
+    case UOP_DIV:
+    case UOP_MATMUL:
+    case UOP_RELU:
+    case UOP_SIGMOID:
+    case UOP_TANH:
+    case UOP_SUM:
+    case UOP_MEAN:
+    case UOP_RESHAPE:
+    case UOP_LINEAR:
+    case UOP_POW:
+    case UOP_MAX:
+    case UOP_NEG:
+    case UOP_EXP:
+    case UOP_LOG:
+    case UOP_SQRT:
+    case UOP_ABS:
+    case UOP_PERMUTE:
     case UOP_EXPAND:
         return true;
     default:
@@ -681,7 +702,7 @@ __attribute__((hot)) int torch_pte_execute(CMLPTEModel* model, Tensor** inputs, 
     }
 
     for (uint32_t i = 0; i < model->meta.num_instructions; i++) {
-        const CMLPTEInstruction* ins = &model->instructions[i];
+        const CMLPTEInstruction* ins         = &model->instructions[i];
         Tensor* args[CML_PTE_MAX_INSTR_ARGS] = {0};
 
         for (int a = 0; a < ins->num_args && a < CML_PTE_MAX_INSTR_ARGS; a++) {

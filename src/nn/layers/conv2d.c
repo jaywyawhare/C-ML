@@ -111,7 +111,7 @@ Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride
     conv2d->dilation[1]    = dilation;
     conv2d->use_bias       = use_bias;
     conv2d->groups         = 1;
-    int weight_shape[] = {out_channels, in_channels, kernel_size, kernel_size};
+    int weight_shape[]     = {out_channels, in_channels, kernel_size, kernel_size};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* weight = tensor_empty(weight_shape, 4, &config);

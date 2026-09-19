@@ -10,13 +10,14 @@
 
 static void fill_random(float* b, int n, unsigned seed) {
     srand(seed);
-    for (int i = 0; i < n; i++) b[i] = (float)rand() / (float)RAND_MAX - 0.5f;
+    for (int i = 0; i < n; i++)
+        b[i] = (float)rand() / (float)RAND_MAX - 0.5f;
 }
 
 static int check_one(int N, int IC, int OC, int H, int W, int K, int stride, int pad) {
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
-    int xn = N * IC * H * W;
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    int xn    = N * IC * H * W;
     float* xd = cml_malloc(sizeof(float) * xn);
     fill_random(xd, xn, 7);
     int xs[4] = {N, IC, H, W};
@@ -26,31 +27,33 @@ static int check_one(int N, int IC, int OC, int H, int W, int K, int stride, int
 
     /* Reference: grad enabled -> decompose (im2col + matmul). */
     cml_enable_grad();
-    Tensor* Xr = cml_tensor(xd, xs, 4, &cfg);
-    Tensor* ref = module_forward((Module*)conv, Xr);
-    float* rp = tensor_data_ptr(ref);
-    size_t no = ref->numel;
+    Tensor* Xr    = cml_tensor(xd, xs, 4, &cfg);
+    Tensor* ref   = module_forward((Module*)conv, Xr);
+    float* rp     = tensor_data_ptr(ref);
+    size_t no     = ref->numel;
     float* refbuf = cml_malloc(sizeof(float) * no);
-    for (size_t i = 0; i < no; i++) refbuf[i] = rp[i];
+    for (size_t i = 0; i < no; i++)
+        refbuf[i] = rp[i];
     cml_reset_ir_context();
 
     /* Test: no_grad -> direct conv kernel. */
     cml_no_grad();
-    Tensor* Xt = cml_tensor(xd, xs, 4, &cfg);
+    Tensor* Xt  = cml_tensor(xd, xs, 4, &cfg);
     Tensor* got = module_forward((Module*)conv, Xt);
-    float* gp = tensor_data_ptr(got);
+    float* gp   = tensor_data_ptr(got);
 
     double maxdiff = 0;
     for (size_t i = 0; i < no; i++) {
         double d = fabs((double)gp[i] - (double)refbuf[i]);
-        if (d > maxdiff) maxdiff = d;
+        if (d > maxdiff)
+            maxdiff = d;
     }
     cml_reset_ir_context();
     cml_enable_grad();
 
     int ok = maxdiff < 1e-4;
-    printf("  N%d IC%d OC%d %dx%d k%d s%d p%d : maxdiff=%.2e  %s\n",
-           N, IC, OC, H, W, K, stride, pad, maxdiff, ok ? "PASS" : "FAIL");
+    printf("  N%d IC%d OC%d %dx%d k%d s%d p%d : maxdiff=%.2e  %s\n", N, IC, OC, H, W, K, stride,
+           pad, maxdiff, ok ? "PASS" : "FAIL");
     cml_free(xd);
     cml_free(refbuf);
     module_free((Module*)conv);

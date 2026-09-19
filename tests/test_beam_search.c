@@ -49,14 +49,14 @@ static void test_store_and_lookup(void) {
     /* Store a config */
     CMLBeamConfig stored_config;
     memset(&stored_config, 0, sizeof(stored_config));
-    stored_config.block_size_x = 128;
-    stored_config.block_size_y = 1;
-    stored_config.block_size_z = 1;
+    stored_config.block_size_x  = 128;
+    stored_config.block_size_y  = 1;
+    stored_config.block_size_z  = 1;
     stored_config.unroll_factor = 4;
-    stored_config.vec_width = 4;
+    stored_config.vec_width     = 4;
 
     uint64_t hash = 0xCAFEBABE;
-    int ret = cml_beam_search_store(ctx, hash, &stored_config, 42.5);
+    int ret       = cml_beam_search_store(ctx, hash, &stored_config, 42.5);
     REQUIRE(ret == 0);
 
     /* Lookup the stored config */
@@ -87,7 +87,7 @@ static void test_store_multiple(void) {
         CMLBeamConfig cfg;
         memset(&cfg, 0, sizeof(cfg));
         cfg.block_size_x = 32 * (i + 1);
-        cfg.vec_width = i + 1;
+        cfg.vec_width    = i + 1;
 
         int ret = cml_beam_search_store(ctx, (uint64_t)(100 + i), &cfg, (double)i * 10.0);
         REQUIRE(ret == 0);
@@ -113,7 +113,7 @@ static void test_tune(void) {
     CMLBeamSearchCtx* ctx = cml_beam_search_create();
     REQUIRE(ctx != NULL);
 
-    int shape[] = { 256, 256 };
+    int shape[]  = {256, 256};
     size_t total = 256 * 256;
     CMLBeamConfig best;
     memset(&best, 0, sizeof(best));

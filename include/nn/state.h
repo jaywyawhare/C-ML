@@ -11,18 +11,18 @@ extern "C" {
 #endif
 
 typedef struct StateDictEntry {
-    char*   key;    
-    Tensor* value;  
+    char* key;
+    Tensor* value;
 } StateDictEntry;
 
 typedef struct StateDict {
     StateDictEntry* entries;
-    int             count;
-    int             capacity;
+    int count;
+    int capacity;
 } StateDict;
 
 StateDict* nn_state_dict_create(void);
-void       nn_state_dict_free(StateDict* sd);
+void nn_state_dict_free(StateDict* sd);
 
 int nn_state_dict_set(StateDict* sd, const char* key, Tensor* value);
 
@@ -50,4 +50,4 @@ int nn_state_dict_lerp(StateDict* dst, const StateDict* src, float alpha);
 }
 #endif
 
-#endif 
+#endif

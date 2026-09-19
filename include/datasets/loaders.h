@@ -49,8 +49,8 @@ typedef struct CMLKiTS19Loader {
 
 CMLKiTS19Loader* cml_kits19_open(const char* data_dir);
 void cml_kits19_free(CMLKiTS19Loader* loader);
-int cml_kits19_load_case(CMLKiTS19Loader* loader, int case_idx,
-                         Tensor** volume, Tensor** segmentation);
+int cml_kits19_load_case(CMLKiTS19Loader* loader, int case_idx, Tensor** volume,
+                         Tensor** segmentation);
 
 typedef struct CMLOpenImagesLoader {
     char** image_ids;
@@ -70,8 +70,8 @@ typedef struct CMLWikipediaLoader {
 
 CMLWikipediaLoader* cml_wikipedia_open(const char* dump_dir);
 void cml_wikipedia_free(CMLWikipediaLoader* loader);
-int cml_wikipedia_read_chunk(CMLWikipediaLoader* loader, int article_idx,
-                             char* buf, size_t buf_size, size_t* bytes_read);
+int cml_wikipedia_read_chunk(CMLWikipediaLoader* loader, int article_idx, char* buf,
+                             size_t buf_size, size_t* bytes_read);
 
 #ifdef __cplusplus
 }

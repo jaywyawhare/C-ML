@@ -45,7 +45,7 @@ static int test_model_save_load(void) {
     }
 
     /* Verify parameters match */
-    Parameter** orig_params = NULL;
+    Parameter** orig_params   = NULL;
     Parameter** loaded_params = NULL;
     int n_orig = 0, n_loaded = 0;
     module_collect_parameters((Module*)model, &orig_params, &n_orig, true);
@@ -54,12 +54,13 @@ static int test_model_save_load(void) {
     int ok = (n_orig == n_loaded);
     if (ok) {
         for (int i = 0; i < n_orig && ok; i++) {
-            if (orig_params[i] && loaded_params[i] &&
-                orig_params[i]->tensor && loaded_params[i]->tensor) {
+            if (orig_params[i] && loaded_params[i] && orig_params[i]->tensor &&
+                loaded_params[i]->tensor) {
                 float* od = (float*)orig_params[i]->tensor->data;
                 float* ld = (float*)loaded_params[i]->tensor->data;
                 for (size_t j = 0; j < orig_params[i]->tensor->numel && ok; j++) {
-                    if (!APPROX_EQ(od[j], ld[j])) ok = 0;
+                    if (!APPROX_EQ(od[j], ld[j]))
+                        ok = 0;
                 }
             }
         }
@@ -67,8 +68,10 @@ static int test_model_save_load(void) {
 
     printf("(params_match=%s) ", ok ? "yes" : "no");
 
-    if (orig_params) cml_free(orig_params);
-    if (loaded_params) cml_free(loaded_params);
+    if (orig_params)
+        cml_free(orig_params);
+    if (loaded_params)
+        cml_free(loaded_params);
     module_free((Module*)model);
     module_free((Module*)loaded);
     unlink(filepath);
@@ -82,19 +85,25 @@ static int test_checkpoint_save_load(void) {
     sequential_add(model, (Module*)cml_nn_linear(2, 4, DTYPE_FLOAT32, DEVICE_CPU, true));
 
     Parameter** params = NULL;
-    int num_params = 0;
+    int num_params     = 0;
     module_collect_parameters((Module*)model, &params, &num_params, true);
 
     Optimizer* opt = cml_optim_sgd(params, num_params, 0.01f, 0.0f, 0.0f);
-    if (!opt) { cml_free(params); module_free((Module*)model); return 0; }
+    if (!opt) {
+        cml_free(params);
+        module_free((Module*)model);
+        return 0;
+    }
 
-    int save_epoch = 5;
+    int save_epoch  = 5;
     float save_loss = 0.123f;
 
     int ret = model_save_checkpoint((Module*)model, opt, save_epoch, save_loss, filepath);
     if (ret != 0) {
         printf("(checkpoint save failed) ");
-        optimizer_free(opt); cml_free(params); module_free((Module*)model);
+        optimizer_free(opt);
+        cml_free(params);
+        module_free((Module*)model);
         return 0;
     }
 
@@ -103,20 +112,23 @@ static int test_checkpoint_save_load(void) {
     sequential_add(loaded, (Module*)cml_nn_linear(2, 4, DTYPE_FLOAT32, DEVICE_CPU, true));
 
     Parameter** loaded_params = NULL;
-    int num_loaded = 0;
+    int num_loaded            = 0;
     module_collect_parameters((Module*)loaded, &loaded_params, &num_loaded, true);
 
     Optimizer* loaded_opt = cml_optim_sgd(loaded_params, num_loaded, 0.01f, 0.0f, 0.0f);
 
-    int load_epoch = 0;
+    int load_epoch  = 0;
     float load_loss = 0.0f;
 
     ret = model_load_checkpoint((Module*)loaded, loaded_opt, &load_epoch, &load_loss, filepath);
     if (ret != 0) {
         printf("(checkpoint load failed) ");
-        optimizer_free(opt); optimizer_free(loaded_opt);
-        cml_free(params); cml_free(loaded_params);
-        module_free((Module*)model); module_free((Module*)loaded);
+        optimizer_free(opt);
+        optimizer_free(loaded_opt);
+        cml_free(params);
+        cml_free(loaded_params);
+        module_free((Module*)model);
+        module_free((Module*)loaded);
         unlink(filepath);
         return 0;
     }
@@ -124,9 +136,12 @@ static int test_checkpoint_save_load(void) {
     printf("(epoch=%d, loss=%.3f) ", load_epoch, load_loss);
     int ok = (load_epoch == save_epoch) && APPROX_EQ(load_loss, save_loss);
 
-    optimizer_free(opt); optimizer_free(loaded_opt);
-    cml_free(params); cml_free(loaded_params);
-    module_free((Module*)model); module_free((Module*)loaded);
+    optimizer_free(opt);
+    optimizer_free(loaded_opt);
+    cml_free(params);
+    cml_free(loaded_params);
+    module_free((Module*)model);
+    module_free((Module*)loaded);
     unlink(filepath);
     return ok;
 }

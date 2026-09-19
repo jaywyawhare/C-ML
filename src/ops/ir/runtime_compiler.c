@@ -13,7 +13,7 @@
 #include "alloc/cml_allocator.h"
 
 #define FNV_OFFSET 0xcbf29ce484222325ULL
-#define FNV_PRIME  0x100000001b3ULL
+#define FNV_PRIME 0x100000001b3ULL
 
 static uint64_t hash_bytes(uint64_t h, const void* data, size_t len) {
     const uint8_t* bytes = (const uint8_t*)data;
@@ -26,15 +26,15 @@ static uint64_t hash_bytes(uint64_t h, const void* data, size_t len) {
 
 static uint64_t hash_linear_program(const CMLLinearProgram* prog) {
     uint64_t h = FNV_OFFSET;
-    h = hash_bytes(h, &prog->num_ops, sizeof(prog->num_ops));
-    h = hash_bytes(h, &prog->next_vreg, sizeof(prog->next_vreg));
+    h          = hash_bytes(h, &prog->num_ops, sizeof(prog->num_ops));
+    h          = hash_bytes(h, &prog->next_vreg, sizeof(prog->next_vreg));
 
     for (int i = 0; i < prog->num_ops; i++) {
         const CMLLinearOp* op = &prog->ops[i];
-        h = hash_bytes(h, &op->kind, sizeof(op->kind));
-        h = hash_bytes(h, &op->uop, sizeof(op->uop));
-        h = hash_bytes(h, &op->dest_reg, sizeof(op->dest_reg));
-        h = hash_bytes(h, &op->num_srcs, sizeof(op->num_srcs));
+        h                     = hash_bytes(h, &op->kind, sizeof(op->kind));
+        h                     = hash_bytes(h, &op->uop, sizeof(op->uop));
+        h                     = hash_bytes(h, &op->dest_reg, sizeof(op->dest_reg));
+        h                     = hash_bytes(h, &op->num_srcs, sizeof(op->num_srcs));
         for (int j = 0; j < op->num_srcs; j++) {
             h = hash_bytes(h, &op->src_regs[j], sizeof(op->src_regs[j]));
         }
@@ -44,15 +44,17 @@ static uint64_t hash_linear_program(const CMLLinearProgram* prog) {
 
 CMLRuntimeCompiler* cml_runtime_compiler_create(void) {
     CMLRuntimeCompiler* rc = cml_calloc(1, sizeof(CMLRuntimeCompiler));
-    if (!rc) return NULL;
+    if (!rc)
+        return NULL;
     rc->preferred_backend = CML_FUSED_BACKEND_C;
-    rc->enable_caching = true;
-    rc->verbose = false;
+    rc->enable_caching    = true;
+    rc->verbose           = false;
     return rc;
 }
 
 void cml_runtime_compiler_free(CMLRuntimeCompiler* rc) {
-    if (!rc) return;
+    if (!rc)
+        return;
     for (int i = 0; i < CML_COMPILED_CACHE_SIZE; i++) {
         CMLCompiledKernel* k = &rc->cache[i];
         if (k->valid) {
@@ -67,10 +69,12 @@ void cml_runtime_compiler_free(CMLRuntimeCompiler* rc) {
 static CMLCompiledKernel* cache_lookup(CMLRuntimeCompiler* rc, uint64_t hash) {
     uint64_t idx = hash % CML_COMPILED_CACHE_SIZE;
     for (int probe = 0; probe < CML_COMPILED_CACHE_SIZE; probe++) {
-        uint64_t slot = (idx + (uint64_t)probe) % CML_COMPILED_CACHE_SIZE;
+        uint64_t slot        = (idx + (uint64_t)probe) % CML_COMPILED_CACHE_SIZE;
         CMLCompiledKernel* k = &rc->cache[slot];
-        if (!k->valid) return NULL;
-        if (k->hash == hash) return k;
+        if (!k->valid)
+            return NULL;
+        if (k->hash == hash)
+            return k;
     }
     return NULL;
 }
@@ -78,10 +82,10 @@ static CMLCompiledKernel* cache_lookup(CMLRuntimeCompiler* rc, uint64_t hash) {
 static CMLCompiledKernel* cache_insert(CMLRuntimeCompiler* rc, uint64_t hash) {
     uint64_t idx = hash % CML_COMPILED_CACHE_SIZE;
     for (int probe = 0; probe < CML_COMPILED_CACHE_SIZE; probe++) {
-        uint64_t slot = (idx + (uint64_t)probe) % CML_COMPILED_CACHE_SIZE;
+        uint64_t slot        = (idx + (uint64_t)probe) % CML_COMPILED_CACHE_SIZE;
         CMLCompiledKernel* k = &rc->cache[slot];
         if (!k->valid) {
-            k->hash = hash;
+            k->hash  = hash;
             k->valid = true;
             rc->num_cached++;
             return k;
@@ -92,15 +96,16 @@ static CMLCompiledKernel* cache_insert(CMLRuntimeCompiler* rc, uint64_t hash) {
     cml_free(k->binary);
     cml_free(k->ops);
     memset(k, 0, sizeof(*k));
-    k->hash = hash;
+    k->hash  = hash;
     k->valid = true;
     return k;
 }
 
 const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
-                                                       const CMLLinearProgram* prog,
-                                                       size_t work_size) {
-    if (!rc || !prog) return NULL;
+                                                     const CMLLinearProgram* prog,
+                                                     size_t work_size) {
+    if (!rc || !prog)
+        return NULL;
 
     uint64_t hash = hash_linear_program(prog);
 
@@ -126,22 +131,21 @@ const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
         return NULL;
     }
 
-    entry->backend = fused->backend;
-    entry->source = fused->source;
-    fused->source = NULL;
-    entry->binary = fused->spirv_words;
-    entry->binary_size = fused->spirv_words
-        ? (size_t)fused->spirv_num_words * sizeof(uint32_t) : 0;
+    entry->backend     = fused->backend;
+    entry->source      = fused->source;
+    fused->source      = NULL;
+    entry->binary      = fused->spirv_words;
+    entry->binary_size = fused->spirv_words ? (size_t)fused->spirv_num_words * sizeof(uint32_t) : 0;
     fused->spirv_words = NULL;
-    entry->num_inputs = fused->num_inputs;
+    entry->num_inputs  = fused->num_inputs;
     entry->num_outputs = fused->num_outputs;
-    entry->work_size = work_size;
+    entry->work_size   = work_size;
 
     if (prog->num_ops > 0) {
         entry->ops = cml_malloc((size_t)prog->num_ops * sizeof(CMLLinearOp));
         if (entry->ops) {
             memcpy(entry->ops, prog->ops, (size_t)prog->num_ops * sizeof(CMLLinearOp));
-            entry->num_ops = prog->num_ops;
+            entry->num_ops   = prog->num_ops;
             entry->num_vregs = prog->next_vreg;
         }
     }
@@ -153,19 +157,20 @@ const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
     if (rc->verbose) {
         LOG_DEBUG("Runtime compiler: compiled kernel hash=0x%016llx, "
                   "%d inputs, %d outputs, work_size=%zu",
-                  (unsigned long long)hash,
-                  entry->num_inputs, entry->num_outputs, work_size);
+                  (unsigned long long)hash, entry->num_inputs, entry->num_outputs, work_size);
     }
 
     return entry;
 }
 
 const CMLCompiledKernel* cml_runtime_compile_group(CMLRuntimeCompiler* rc,
-                                                     const CMLFusionGroup* group) {
-    if (!rc || !group) return NULL;
+                                                   const CMLFusionGroup* group) {
+    if (!rc || !group)
+        return NULL;
 
     CMLLinearProgram* prog = cml_linearize_group(group);
-    if (!prog) return NULL;
+    if (!prog)
+        return NULL;
 
     size_t work_size = 0;
     if (group->num_nodes > 0 && group->nodes[0] && group->nodes[0]->output) {
@@ -181,19 +186,20 @@ const CMLCompiledKernel* cml_runtime_compile_group(CMLRuntimeCompiler* rc,
     return result;
 }
 
-int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
-                                  Tensor** inputs, int num_inputs,
-                                  Tensor** outputs, int num_outputs) {
-    if (!kernel || !inputs || !outputs) return -1;
+int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel, Tensor** inputs, int num_inputs,
+                                 Tensor** outputs, int num_outputs) {
+    if (!kernel || !inputs || !outputs)
+        return -1;
     if (num_inputs < kernel->num_inputs || num_outputs < kernel->num_outputs) {
         LOG_ERROR("Runtime execute: buffer count mismatch");
         return -1;
     }
 
     if (kernel->backend == CML_FUSED_BACKEND_C && kernel->work_size > 0) {
-        size_t n = kernel->work_size;
+        size_t n  = kernel->work_size;
         int nregs = kernel->num_vregs > 0 ? kernel->num_vregs : 64;
-        if (nregs > 256) nregs = 256;
+        if (nregs > 256)
+            nregs = 256;
 
         if (kernel->ops && kernel->num_ops > 0) {
             for (size_t i = 0; i < n; i++) {
@@ -202,57 +208,100 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
 
                 for (int op_i = 0; op_i < kernel->num_ops; op_i++) {
                     const CMLLinearOp* op = &kernel->ops[op_i];
-                    if (op->is_eliminated) continue;
+                    if (op->is_eliminated)
+                        continue;
 
                     int d = op->dest_reg;
-                    if (d < 0 || d >= nregs) continue;
+                    if (d < 0 || d >= nregs)
+                        continue;
 
                     if (op->kind == LINOP_LOAD) {
-                        if (input_idx < num_inputs && inputs[input_idx]
-                            && inputs[input_idx]->data
-                            && i < (size_t)inputs[input_idx]->numel) {
+                        if (input_idx < num_inputs && inputs[input_idx] &&
+                            inputs[input_idx]->data && i < (size_t)inputs[input_idx]->numel) {
                             vregs[d] = ((float*)inputs[input_idx]->data)[i];
                         }
                         input_idx++;
                     } else if (op->kind == LINOP_STORE) {
-                        float val = (op->num_srcs > 0 && op->src_regs[0] >= 0
-                                     && op->src_regs[0] < nregs)
-                                    ? vregs[op->src_regs[0]] : 0.0f;
-                        if (output_idx < num_outputs && outputs[output_idx]
-                            && outputs[output_idx]->data
-                            && i < (size_t)outputs[output_idx]->numel) {
+                        float val =
+                            (op->num_srcs > 0 && op->src_regs[0] >= 0 && op->src_regs[0] < nregs)
+                                ? vregs[op->src_regs[0]]
+                                : 0.0f;
+                        if (output_idx < num_outputs && outputs[output_idx] &&
+                            outputs[output_idx]->data && i < (size_t)outputs[output_idx]->numel) {
                             ((float*)outputs[output_idx]->data)[i] = val;
                         }
                         output_idx++;
                     } else if (op->kind == LINOP_COMPUTE) {
-                        float a = (op->num_srcs > 0 && op->src_regs[0] >= 0
-                                   && op->src_regs[0] < nregs)
-                                  ? vregs[op->src_regs[0]] : 0.0f;
-                        float b = (op->num_srcs > 1 && op->src_regs[1] >= 0
-                                   && op->src_regs[1] < nregs)
-                                  ? vregs[op->src_regs[1]] : 0.0f;
+                        float a =
+                            (op->num_srcs > 0 && op->src_regs[0] >= 0 && op->src_regs[0] < nregs)
+                                ? vregs[op->src_regs[0]]
+                                : 0.0f;
+                        float b =
+                            (op->num_srcs > 1 && op->src_regs[1] >= 0 && op->src_regs[1] < nregs)
+                                ? vregs[op->src_regs[1]]
+                                : 0.0f;
 
                         switch (op->uop) {
-                        case UOP_ADD:   vregs[d] = a + b; break;
-                        case UOP_SUB:   vregs[d] = a - b; break;
-                        case UOP_MUL:   vregs[d] = a * b; break;
-                        case UOP_DIV:   vregs[d] = b != 0.0f ? a / b : 0.0f; break;
-                        case UOP_NEG:   vregs[d] = -a; break;
-                        case UOP_EXP:   vregs[d] = expf(a); break;
-                        case UOP_LOG:   vregs[d] = a > 0.0f ? logf(a) : -INFINITY; break;
-                        case UOP_LOG2:  vregs[d] = a > 0.0f ? log2f(a) : -INFINITY; break;
-                        case UOP_LOG10: vregs[d] = a > 0.0f ? log10f(a) : -INFINITY; break;
-                        case UOP_EXP2:  vregs[d] = exp2f(a); break;
-                        case UOP_SQRT:  vregs[d] = a >= 0.0f ? sqrtf(a) : 0.0f; break;
-                        case UOP_RECIP: vregs[d] = a != 0.0f ? 1.0f / a : 0.0f; break;
-                        case UOP_ABS:   vregs[d] = fabsf(a); break;
-                        case UOP_SIN:   vregs[d] = sinf(a); break;
-                        case UOP_COS:   vregs[d] = cosf(a); break;
-                        case UOP_TAN:   vregs[d] = tanf(a); break;
-                        case UOP_POW:   vregs[d] = powf(a, b); break;
-                        case UOP_MAX:   vregs[d] = a > b ? a : b; break;
-                        case UOP_CMPLT: vregs[d] = a < b ? 1.0f : 0.0f; break;
-                        default:        vregs[d] = a; break; /* passthrough */
+                        case UOP_ADD:
+                            vregs[d] = a + b;
+                            break;
+                        case UOP_SUB:
+                            vregs[d] = a - b;
+                            break;
+                        case UOP_MUL:
+                            vregs[d] = a * b;
+                            break;
+                        case UOP_DIV:
+                            vregs[d] = b != 0.0f ? a / b : 0.0f;
+                            break;
+                        case UOP_NEG:
+                            vregs[d] = -a;
+                            break;
+                        case UOP_EXP:
+                            vregs[d] = expf(a);
+                            break;
+                        case UOP_LOG:
+                            vregs[d] = a > 0.0f ? logf(a) : -INFINITY;
+                            break;
+                        case UOP_LOG2:
+                            vregs[d] = a > 0.0f ? log2f(a) : -INFINITY;
+                            break;
+                        case UOP_LOG10:
+                            vregs[d] = a > 0.0f ? log10f(a) : -INFINITY;
+                            break;
+                        case UOP_EXP2:
+                            vregs[d] = exp2f(a);
+                            break;
+                        case UOP_SQRT:
+                            vregs[d] = a >= 0.0f ? sqrtf(a) : 0.0f;
+                            break;
+                        case UOP_RECIP:
+                            vregs[d] = a != 0.0f ? 1.0f / a : 0.0f;
+                            break;
+                        case UOP_ABS:
+                            vregs[d] = fabsf(a);
+                            break;
+                        case UOP_SIN:
+                            vregs[d] = sinf(a);
+                            break;
+                        case UOP_COS:
+                            vregs[d] = cosf(a);
+                            break;
+                        case UOP_TAN:
+                            vregs[d] = tanf(a);
+                            break;
+                        case UOP_POW:
+                            vregs[d] = powf(a, b);
+                            break;
+                        case UOP_MAX:
+                            vregs[d] = a > b ? a : b;
+                            break;
+                        case UOP_CMPLT:
+                            vregs[d] = a < b ? 1.0f : 0.0f;
+                            break;
+                        default:
+                            vregs[d] = a;
+                            break; /* passthrough */
                         }
                     }
                 }
@@ -260,30 +309,30 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
         } else {
             for (size_t i = 0; i < n; i++) {
                 float val = 0.0f;
-                if (num_inputs > 0 && inputs[0] && inputs[0]->data
-                    && i < (size_t)inputs[0]->numel) {
+                if (num_inputs > 0 && inputs[0] && inputs[0]->data &&
+                    i < (size_t)inputs[0]->numel) {
                     val = ((float*)inputs[0]->data)[i];
                 }
                 for (int j = 0; j < num_outputs; j++) {
-                    if (outputs[j] && outputs[j]->data
-                        && i < (size_t)outputs[j]->numel) {
+                    if (outputs[j] && outputs[j]->data && i < (size_t)outputs[j]->numel) {
                         ((float*)outputs[j]->data)[i] = val;
                     }
                 }
             }
         }
-        LOG_DEBUG("Runtime execute: fused C kernel, %zu elements, %d in, %d out",
-                  n, num_inputs, num_outputs);
+        LOG_DEBUG("Runtime execute: fused C kernel, %zu elements, %d in, %d out", n, num_inputs,
+                  num_outputs);
         return 0;
     }
 
-    LOG_DEBUG("Runtime execute: %d inputs, %d outputs (backend=%d)",
-              num_inputs, num_outputs, kernel->backend);
+    LOG_DEBUG("Runtime execute: %d inputs, %d outputs (backend=%d)", num_inputs, num_outputs,
+              kernel->backend);
     return 0;
 }
 
 int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
-    if (!rc || !ir) return -1;
+    if (!rc || !ir)
+        return -1;
 
     CMLFusionSchedule* sched = cml_fusion_schedule_create(ir, NULL);
     if (!sched) {
@@ -294,25 +343,26 @@ int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
     int rc_val = 0;
 
     for (int i = 0; i < sched->num_ordered && rc_val == 0; i++) {
-        int idx = sched->execution_order[i];
+        int idx               = sched->execution_order[i];
         CMLFusionGroup* group = sched->groups[idx];
-        if (!group) continue;
+        if (!group)
+            continue;
 
         /* Try fused compilation and execution */
         const CMLCompiledKernel* compiled = cml_runtime_compile_group(rc, group);
-        bool fused_executed = false;
+        bool fused_executed               = false;
 
-        if (compiled && compiled->backend == CML_FUSED_BACKEND_C
-            && compiled->work_size > 0
-            && group->num_nodes > 1) {
+        if (compiled && compiled->backend == CML_FUSED_BACKEND_C && compiled->work_size > 0 &&
+            group->num_nodes > 1) {
             /* Collect input/output tensors for the fused group */
-            Tensor* fused_inputs[64] = {0};
+            Tensor* fused_inputs[64]  = {0};
             Tensor* fused_outputs[64] = {0};
             int n_in = 0, n_out = 0;
 
             for (int j = 0; j < group->num_nodes; j++) {
                 struct IRNode* nd = group->nodes[j];
-                if (!nd) continue;
+                if (!nd)
+                    continue;
 
                 /* Gather external inputs */
                 for (int k = 0; k < nd->num_inputs && n_in < 64; k++) {
@@ -337,8 +387,8 @@ int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
                 }
             }
 
-            if (cml_runtime_execute_compiled(compiled, fused_inputs, n_in,
-                                              fused_outputs, n_out) == 0) {
+            if (cml_runtime_execute_compiled(compiled, fused_inputs, n_in, fused_outputs, n_out) ==
+                0) {
                 /* Mark all nodes as executed */
                 for (int j = 0; j < group->num_nodes; j++) {
                     if (group->nodes[j]) {
@@ -357,9 +407,11 @@ int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
         if (!fused_executed) {
             for (int j = 0; j < group->num_nodes && rc_val == 0; j++) {
                 struct IRNode* node = group->nodes[j];
-                if (!node || node->is_executed) continue;
+                if (!node || node->is_executed)
+                    continue;
                 rc_val = cpu_execute_node(node);
-                if (rc_val == 0) node->is_executed = true;
+                if (rc_val == 0)
+                    node->is_executed = true;
             }
         }
     }
@@ -368,17 +420,21 @@ int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
     return rc_val;
 }
 
-void cml_runtime_compiler_stats(const CMLRuntimeCompiler* rc,
-                                 size_t* hits, size_t* misses,
-                                 size_t* compilations) {
-    if (!rc) return;
-    if (hits) *hits = rc->compile_hits;
-    if (misses) *misses = rc->compile_misses;
-    if (compilations) *compilations = rc->total_compilations;
+void cml_runtime_compiler_stats(const CMLRuntimeCompiler* rc, size_t* hits, size_t* misses,
+                                size_t* compilations) {
+    if (!rc)
+        return;
+    if (hits)
+        *hits = rc->compile_hits;
+    if (misses)
+        *misses = rc->compile_misses;
+    if (compilations)
+        *compilations = rc->total_compilations;
 }
 
 void cml_runtime_compiler_clear_cache(CMLRuntimeCompiler* rc) {
-    if (!rc) return;
+    if (!rc)
+        return;
     for (int i = 0; i < CML_COMPILED_CACHE_SIZE; i++) {
         CMLCompiledKernel* k = &rc->cache[i];
         if (k->valid) {
@@ -391,8 +447,8 @@ void cml_runtime_compiler_clear_cache(CMLRuntimeCompiler* rc) {
     rc->num_cached = 0;
 }
 
-void cml_runtime_compiler_set_backend(CMLRuntimeCompiler* rc,
-                                       CMLFusedBackend backend) {
-    if (!rc) return;
+void cml_runtime_compiler_set_backend(CMLRuntimeCompiler* rc, CMLFusedBackend backend) {
+    if (!rc)
+        return;
     rc->preferred_backend = backend;
 }

@@ -18,8 +18,10 @@ typedef struct {
 static int cmp_by_size_desc(const void* a, const void* b) {
     const BufferEntry* ea = (const BufferEntry*)a;
     const BufferEntry* eb = (const BufferEntry*)b;
-    if (eb->size > ea->size) return 1;
-    if (eb->size < ea->size) return -1;
+    if (eb->size > ea->size)
+        return 1;
+    if (eb->size < ea->size)
+        return -1;
     return ea->index - eb->index;
 }
 
@@ -27,17 +29,18 @@ static int lifetimes_overlap(int a_first, int a_last, int b_first, int b_last) {
     return !(a_last < b_first || b_last < a_first);
 }
 
-CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
-                                       int* first_use, int* last_use) {
+CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes, int* first_use,
+                                      int* last_use) {
     if (num_buffers <= 0 || !sizes || !first_use || !last_use)
         return NULL;
 
     CMLMemoryPlan* plan = cml_calloc(1, sizeof(CMLMemoryPlan));
-    if (!plan) return NULL;
+    if (!plan)
+        return NULL;
 
-    plan->num_buffers    = num_buffers;
-    plan->buffer_sizes   = cml_malloc((size_t)num_buffers * sizeof(size_t));
-    plan->buffer_offsets = cml_calloc((size_t)num_buffers, sizeof(size_t));
+    plan->num_buffers      = num_buffers;
+    plan->buffer_sizes     = cml_malloc((size_t)num_buffers * sizeof(size_t));
+    plan->buffer_offsets   = cml_calloc((size_t)num_buffers, sizeof(size_t));
     plan->buffer_reuse_map = cml_malloc((size_t)num_buffers * sizeof(int));
     plan->buffer_first_use = cml_malloc((size_t)num_buffers * sizeof(int));
     plan->buffer_last_use  = cml_malloc((size_t)num_buffers * sizeof(int));
@@ -77,7 +80,7 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
      *
      * We cap at num_buffers slots (worst case: no reuse).
      */
-    int num_slots = 0;
+    int num_slots      = 0;
     size_t* slot_sizes = cml_calloc((size_t)num_buffers, sizeof(size_t));
     int* slot_owner    = cml_malloc((size_t)num_buffers * sizeof(int));
     /* For each slot, track the merged lifetime [earliest first_use, latest last_use] */
@@ -88,8 +91,11 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
 
     if (!slot_sizes || !slot_owner || !slot_first || !slot_last || !buf_slot) {
         cml_free(sorted);
-        cml_free(slot_sizes); cml_free(slot_owner);
-        cml_free(slot_first); cml_free(slot_last); cml_free(buf_slot);
+        cml_free(slot_sizes);
+        cml_free(slot_owner);
+        cml_free(slot_first);
+        cml_free(slot_last);
+        cml_free(buf_slot);
         cml_memory_plan_free(plan);
         return NULL;
     }
@@ -100,25 +106,31 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
      * are overly conservative when a slot hosts multiple non-overlapping
      * buffers with a gap between them.
      */
-    int** slot_bufs   = cml_calloc((size_t)num_buffers, sizeof(int*));
-    int*  slot_nbuf   = cml_calloc((size_t)num_buffers, sizeof(int));
-    int*  slot_bufcap = cml_calloc((size_t)num_buffers, sizeof(int));
+    int** slot_bufs  = cml_calloc((size_t)num_buffers, sizeof(int*));
+    int* slot_nbuf   = cml_calloc((size_t)num_buffers, sizeof(int));
+    int* slot_bufcap = cml_calloc((size_t)num_buffers, sizeof(int));
 
     if (!slot_bufs || !slot_nbuf || !slot_bufcap) {
-        cml_free(sorted); cml_free(slot_sizes); cml_free(slot_owner);
-        cml_free(slot_first); cml_free(slot_last); cml_free(buf_slot);
-        cml_free(slot_bufs); cml_free(slot_nbuf); cml_free(slot_bufcap);
+        cml_free(sorted);
+        cml_free(slot_sizes);
+        cml_free(slot_owner);
+        cml_free(slot_first);
+        cml_free(slot_last);
+        cml_free(buf_slot);
+        cml_free(slot_bufs);
+        cml_free(slot_nbuf);
+        cml_free(slot_bufcap);
         cml_memory_plan_free(plan);
         return NULL;
     }
 
     for (int si = 0; si < num_buffers; si++) {
-        int idx    = sorted[si].index;
-        size_t sz  = sizes[idx];
-        int fu     = first_use[idx];
-        int lu     = last_use[idx];
+        int idx   = sorted[si].index;
+        size_t sz = sizes[idx];
+        int fu    = first_use[idx];
+        int lu    = last_use[idx];
 
-        int best_slot = -1;
+        int best_slot     = -1;
         size_t best_waste = (size_t)-1;
 
         for (int s = 0; s < num_slots; s++) {
@@ -145,16 +157,18 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
         }
 
         if (best_slot >= 0) {
-            buf_slot[idx] = best_slot;
+            buf_slot[idx]               = best_slot;
             plan->buffer_reuse_map[idx] = slot_owner[best_slot];
 
             /* Extend merged interval */
-            if (fu < slot_first[best_slot]) slot_first[best_slot] = fu;
-            if (lu > slot_last[best_slot])  slot_last[best_slot]  = lu;
+            if (fu < slot_first[best_slot])
+                slot_first[best_slot] = fu;
+            if (lu > slot_last[best_slot])
+                slot_last[best_slot] = lu;
 
             /* Append to slot's buffer list */
             if (slot_nbuf[best_slot] >= slot_bufcap[best_slot]) {
-                int nc = slot_bufcap[best_slot] ? slot_bufcap[best_slot] * 2 : 4;
+                int nc   = slot_bufcap[best_slot] ? slot_bufcap[best_slot] * 2 : 4;
                 int* tmp = cml_realloc(slot_bufs[best_slot], (size_t)nc * sizeof(int));
                 if (tmp) {
                     slot_bufs[best_slot]   = tmp;
@@ -163,7 +177,7 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
             }
             slot_bufs[best_slot][slot_nbuf[best_slot]++] = idx;
         } else {
-            int s = num_slots++;
+            int s         = num_slots++;
             slot_sizes[s] = sz;
             slot_owner[s] = idx;
             slot_first[s] = fu;
@@ -194,8 +208,10 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
     /* Peak memory: max sum of alive buffer sizes at any schedule step */
     int min_step = first_use[0], max_step = last_use[0];
     for (int i = 1; i < num_buffers; i++) {
-        if (first_use[i] < min_step) min_step = first_use[i];
-        if (last_use[i] > max_step)  max_step = last_use[i];
+        if (first_use[i] < min_step)
+            min_step = first_use[i];
+        if (last_use[i] > max_step)
+            max_step = last_use[i];
     }
 
     size_t peak = 0;
@@ -205,7 +221,8 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
             if (first_use[i] <= step && step <= last_use[i])
                 alive += sizes[i];
         }
-        if (alive > peak) peak = alive;
+        if (alive > peak)
+            peak = alive;
     }
     plan->peak_memory = peak;
 
@@ -225,7 +242,8 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes,
 }
 
 void cml_memory_plan_free(CMLMemoryPlan* plan) {
-    if (!plan) return;
+    if (!plan)
+        return;
     cml_free(plan->buffer_sizes);
     cml_free(plan->buffer_offsets);
     cml_free(plan->buffer_reuse_map);
@@ -248,9 +266,8 @@ void cml_memory_plan_print(const CMLMemoryPlan* plan) {
     printf("\n");
 
     for (int i = 0; i < plan->num_buffers; i++) {
-        printf("  buf[%d]: size=%-8zu  offset=%-8zu  life=[%d,%d]",
-               i, plan->buffer_sizes[i], plan->buffer_offsets[i],
-               plan->buffer_first_use[i], plan->buffer_last_use[i]);
+        printf("  buf[%d]: size=%-8zu  offset=%-8zu  life=[%d,%d]", i, plan->buffer_sizes[i],
+               plan->buffer_offsets[i], plan->buffer_first_use[i], plan->buffer_last_use[i]);
         if (plan->buffer_reuse_map[i] >= 0)
             printf("  reuses=%d", plan->buffer_reuse_map[i]);
         printf("\n");

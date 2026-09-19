@@ -28,11 +28,12 @@ static int checks = 0, failures = 0;
 static const float X[8] = {-3.5f, -2.5f, -0.5f, 0.0f, 0.5f, 1.5f, 2.5f, 3.5f};
 
 static Tensor* mk(const float* v, int n) {
-    TensorConfig c = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                      .has_dtype = true, .has_device = true};
+    TensorConfig c = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     int shape[1] = {n};
-    Tensor* t = tensor_zeros(shape, 1, &c);
-    for (int i = 0; i < n; i++) tensor_set_float(t, i, v[i]);
+    Tensor* t    = tensor_zeros(shape, 1, &c);
+    for (int i = 0; i < n; i++)
+        tensor_set_float(t, i, v[i]);
     return t;
 }
 
@@ -55,8 +56,8 @@ static void expect_rel(const char* name, Tensor* r, const double* want, int n, d
         double got = (double)tensor_get_float(r, (size_t)i);
         double err = (want[i] == 0.0) ? fabs(got) : fabs(got - want[i]) / fabs(want[i]);
         if (err > rel) {
-            printf("  %-18s [%d] = %.9g, reference %.9g  (rel err %.3g)\n",
-                   name, i, got, want[i], err);
+            printf("  %-18s [%d] = %.9g, reference %.9g  (rel err %.3g)\n", name, i, got, want[i],
+                   err);
             failures++;
             break;
         }
@@ -95,32 +96,66 @@ int main(void) {
     printf("Reference accuracy (independent values, not self-consistency):\n");
 
     /* @GENERATED-BEGIN */
-    { const double want[8] = {-4, -2, -0, 0, 0, 2, 2, 4};
-      expect("round", uop_round(mk(X, 8)), want, 8); }
-    { const double want[8] = {-4, -3, -1, 0, 0, 1, 2, 3};
-      expect("floor", uop_floor(mk(X, 8)), want, 8); }
-    { const double want[8] = {-3, -2, -0, 0, 1, 2, 3, 4};
-      expect("ceil", uop_ceil(mk(X, 8)), want, 8); }
-    { const double want[8] = {-3, -2, -0, 0, 0, 1, 2, 3};
-      expect("trunc", uop_trunc(mk(X, 8)), want, 8); }
-    { const double want[8] = {-0.000616197655, -0.0150842661, -0.15428599, 0, 0.34571401, 1.39957158, 2.48491573, 3.4993838};
-      expect("gelu", uop_gelu(mk(X, 8)), want, 8); }
-    { const double want[8] = {-0.102592808, -0.18964545, -0.188770334, 0, 0.311229666, 1.22636171, 2.31035455, 3.39740719};
-      expect("silu", uop_silu(mk(X, 8)), want, 8); }
-    { const double want[8] = {0.0297504183, 0.0788897343, 0.474076984, 0.693147181, 0.974076984, 1.70141328, 2.57888973, 3.52975042};
-      expect("softplus", uop_softplus(mk(X, 8)), want, 8); }
-    { const double want[8] = {-1.70500934, -1.61378576, -0.691758188, 0, 0.525350494, 1.57605148, 2.62675247, 3.67745346};
-      expect("selu", uop_selu(mk(X, 8)), want, 8); }
-    { const double want[8] = {-0.999999257, -0.999593048, -0.520499878, 0, 0.520499878, 0.966105146, 0.999593048, 0.999999257};
-      expect("erf", uop_erf(mk(X, 8)), want, 8); }
-    { const double want[8] = {0, -0.208333333, -0.208333333, 0, 0.291666667, 1.125, 2.29166667, 3.5};
-      expect("hardswish", uop_hardswish(mk(X, 8)), want, 8); }
-    { const double want[8] = {0.0293122308, 0.07585818, 0.377540669, 0.5, 0.622459331, 0.817574476, 0.92414182, 0.970687769};
-      expect("sigmoid", uop_sigmoid(mk(X, 8)), want, 8); }
-    { const double want[8] = {-0.998177898, -0.986614298, -0.462117157, 0, 0.462117157, 0.905148254, 0.986614298, 0.998177898};
-      expect("tanh", uop_tanh(mk(X, 8)), want, 8); }
-    { const double want[8] = {-3.5, -6, -6.5, -6.5, -6, -4.5, -2, 1.5};
-      expect("cumsum", uop_cumsum(mk(X, 8), 0), want, 8); }
+    {
+        const double want[8] = {-4, -2, -0, 0, 0, 2, 2, 4};
+        expect("round", uop_round(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {-4, -3, -1, 0, 0, 1, 2, 3};
+        expect("floor", uop_floor(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {-3, -2, -0, 0, 1, 2, 3, 4};
+        expect("ceil", uop_ceil(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {-3, -2, -0, 0, 0, 1, 2, 3};
+        expect("trunc", uop_trunc(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {-0.000616197655, -0.0150842661, -0.15428599, 0,
+                                0.34571401,      1.39957158,    2.48491573,  3.4993838};
+        expect("gelu", uop_gelu(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {-0.102592808, -0.18964545, -0.188770334, 0,
+                                0.311229666,  1.22636171,  2.31035455,   3.39740719};
+        expect("silu", uop_silu(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {0.0297504183, 0.0788897343, 0.474076984, 0.693147181,
+                                0.974076984,  1.70141328,   2.57888973,  3.52975042};
+        expect("softplus", uop_softplus(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {-1.70500934, -1.61378576, -0.691758188, 0,
+                                0.525350494, 1.57605148,  2.62675247,   3.67745346};
+        expect("selu", uop_selu(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {-0.999999257, -0.999593048, -0.520499878, 0,
+                                0.520499878,  0.966105146,  0.999593048,  0.999999257};
+        expect("erf", uop_erf(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {0,           -0.208333333, -0.208333333, 0,
+                                0.291666667, 1.125,        2.29166667,   3.5};
+        expect("hardswish", uop_hardswish(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {0.0293122308, 0.07585818,  0.377540669, 0.5,
+                                0.622459331,  0.817574476, 0.92414182,  0.970687769};
+        expect("sigmoid", uop_sigmoid(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {-0.998177898, -0.986614298, -0.462117157, 0,
+                                0.462117157,  0.905148254,  0.986614298,  0.998177898};
+        expect("tanh", uop_tanh(mk(X, 8)), want, 8);
+    }
+    {
+        const double want[8] = {-3.5, -6, -6.5, -6.5, -6, -4.5, -2, 1.5};
+        expect("cumsum", uop_cumsum(mk(X, 8), 0), want, 8);
+    }
 
     /* Small magnitudes.
      *
@@ -132,11 +167,18 @@ int main(void) {
      * other on the coarse inputs above, so only a small-magnitude reference
      * check catches it. */
     {
-        static const float XS[8] = {1e-08f, 1e-06f, 0.0001f, 0.001f, 0.01f, -1e-08f, -1e-06f, -0.01f};
-        { const double want[8] = {1e-08, 1e-06, 9.999999967e-05, 0.0009999996667, 0.00999966668, -1e-08, -1e-06, -0.00999966668};
-          expect_rel("tanh (small x)", uop_tanh(mk(XS, 8)), want, 8, 1e-5); }
-        { const double want[8] = {0.5000000025, 0.50000025, 0.500025, 0.50025, 0.5024999792, 0.4999999975, 0.49999975, 0.4975000208};
-          expect_rel("sigmoid (small x)", uop_sigmoid(mk(XS, 8)), want, 8, 1e-5); }
+        static const float XS[8] = {1e-08f, 1e-06f,  0.0001f, 0.001f,
+                                    0.01f,  -1e-08f, -1e-06f, -0.01f};
+        {
+            const double want[8] = {1e-08,         1e-06,  9.999999967e-05, 0.0009999996667,
+                                    0.00999966668, -1e-08, -1e-06,          -0.00999966668};
+            expect_rel("tanh (small x)", uop_tanh(mk(XS, 8)), want, 8, 1e-5);
+        }
+        {
+            const double want[8] = {0.5000000025, 0.50000025,   0.500025,   0.50025,
+                                    0.5024999792, 0.4999999975, 0.49999975, 0.4975000208};
+            expect_rel("sigmoid (small x)", uop_sigmoid(mk(XS, 8)), want, 8, 1e-5);
+        }
     }
 
     /* Saturating tails of the softplus family.
@@ -148,12 +190,23 @@ int main(void) {
      * it, so the moderate inputs above all passed. */
     {
         static const float XT[8] = {-10.0f, -5.0f, -1.0f, -0.01f, 0.01f, 1.0f, 5.0f, 10.0f};
-        { const double want[8] = {4.539889922e-05, 0.006715348489, 0.3132616875, 0.6881596805, 0.6981596805, 1.313261688, 5.006715348, 10.0000454};
-          expect_rel("softplus (tails)", uop_softplus(mk(XT, 8)), want, 8, 1e-5); }
-        { const double want[8] = {-10.0000454, -5.006715348, -1.313261688, -0.6981596805, -0.6881596805, -0.3132616875, -0.006715348489, -4.539889922e-05};
-          expect_rel("logsigmoid (tails)", uop_logsigmoid(mk(XT, 8)), want, 8, 1e-5); }
-        { const double want[8] = {-0.0004539889919, -0.03357623773, -0.3034014614, -0.005967984459, 0.006031983541, 0.8650983883, 4.999552078, 9.999999959};
-          expect_rel("mish (tails)", uop_mish(mk(XT, 8)), want, 8, 1e-5); }
+        {
+            const double want[8] = {4.539889922e-05, 0.006715348489, 0.3132616875, 0.6881596805,
+                                    0.6981596805,    1.313261688,    5.006715348,  10.0000454};
+            expect_rel("softplus (tails)", uop_softplus(mk(XT, 8)), want, 8, 1e-5);
+        }
+        {
+            const double want[8] = {-10.0000454,     -5.006715348,    -1.313261688,
+                                    -0.6981596805,   -0.6881596805,   -0.3132616875,
+                                    -0.006715348489, -4.539889922e-05};
+            expect_rel("logsigmoid (tails)", uop_logsigmoid(mk(XT, 8)), want, 8, 1e-5);
+        }
+        {
+            const double want[8] = {-0.0004539889919, -0.03357623773, -0.3034014614,
+                                    -0.005967984459,  0.006031983541, 0.8650983883,
+                                    4.999552078,      9.999999959};
+            expect_rel("mish (tails)", uop_mish(mk(XT, 8)), want, 8, 1e-5);
+        }
     }
 
     /* Large-N summation.
@@ -165,12 +218,13 @@ int main(void) {
      * break the serial dependency chain. Small N cannot show this -- the error
      * only accumulates over many terms. */
     {
-        const int N = 1000000;
-        TensorConfig c = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                          .has_dtype = true, .has_device = true};
+        const int N    = 1000000;
+        TensorConfig c = {
+            .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
         int shape[1] = {N};
-        Tensor* t = tensor_zeros(shape, 1, &c);
-        for (int i = 0; i < N; i++) tensor_set_float(t, i, 0.1f);
+        Tensor* t    = tensor_zeros(shape, 1, &c);
+        for (int i = 0; i < N; i++)
+            tensor_set_float(t, i, 0.1f);
         Tensor* r = uop_sum(t, NULL);
         checks++;
         tensor_ensure_executed(r);
@@ -186,18 +240,26 @@ int main(void) {
         cml_reset_ir_context();
     }
 
-
-
-    { const double want[1] = {1.5};
-      expect("sum", uop_sum(mk(X, 8), NULL), want, 1); }
-    { const double want[1] = {0.1875};
-      expect("mean", uop_mean(mk(X, 8), NULL), want, 1); }
-    { const double want[1] = {4.93359375};
-      expect("var", uop_var(mk(X, 8), NULL), want, 1); }
-    { const double want[1] = {2.22116946};
-      expect("std", uop_std(mk(X, 8), NULL), want, 1); }
-    { const double want[1] = {3.97306484};
-      expect("logsumexp", uop_logsumexp(mk(X, 8), NULL), want, 1); }
+    {
+        const double want[1] = {1.5};
+        expect("sum", uop_sum(mk(X, 8), NULL), want, 1);
+    }
+    {
+        const double want[1] = {0.1875};
+        expect("mean", uop_mean(mk(X, 8), NULL), want, 1);
+    }
+    {
+        const double want[1] = {4.93359375};
+        expect("var", uop_var(mk(X, 8), NULL), want, 1);
+    }
+    {
+        const double want[1] = {2.22116946};
+        expect("std", uop_std(mk(X, 8), NULL), want, 1);
+    }
+    {
+        const double want[1] = {3.97306484};
+        expect("logsumexp", uop_logsumexp(mk(X, 8), NULL), want, 1);
+    }
     /* @GENERATED-END */
 
     printf("\n%d checks, %d failures\n", checks, failures);

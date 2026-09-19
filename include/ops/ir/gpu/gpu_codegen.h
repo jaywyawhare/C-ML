@@ -18,8 +18,8 @@ extern "C" {
 #endif
 
 typedef enum GPUTarget {
-    GPU_TARGET_CUDA,  // NVIDIA via NVPTX
-    GPU_TARGET_ROCM   // AMD via AMDGPU
+    GPU_TARGET_CUDA, // NVIDIA via NVPTX
+    GPU_TARGET_ROCM  // AMD via AMDGPU
 } GPUTarget;
 
 typedef struct CMLGPUCodegen {
@@ -27,11 +27,11 @@ typedef struct CMLGPUCodegen {
     bool initialized;
     int kernel_count;
 
-    char target_cpu[32];      // "sm_75" or "gfx900"
-    char target_triple[64];   // "nvptx64-nvidia-cuda" or "amdgcn-amd-amdhsa"
-    int default_block_size;   // 256
+    char target_cpu[32];    // "sm_75" or "gfx900"
+    char target_triple[64]; // "nvptx64-nvidia-cuda" or "amdgcn-amd-amdhsa"
+    int default_block_size; // 256
 
-    CMLCUDABackend* cuda;     // One will be non-NULL
+    CMLCUDABackend* cuda; // One will be non-NULL
     CMLROCmBackend* rocm;
 } CMLGPUCodegen;
 

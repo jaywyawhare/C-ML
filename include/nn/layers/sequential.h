@@ -34,18 +34,18 @@ typedef struct CachedModelGraph {
        Weight/bias pointers are stable; model input is the only one that
        changes between passes.  original_inputs[i][j] = data ptr of
        node i, input j at cache-creation time. */
-    float*** original_inputs;      // [num_nodes][num_inputs_per_node]
-    int* node_num_inputs;          // num_inputs for each node
+    float*** original_inputs; // [num_nodes][num_inputs_per_node]
+    int* node_num_inputs;     // num_inputs for each node
 
     /* Pre-resolved input table: resolved[i][j] for node i, input j */
-    ResolvedInput** resolved;      // [num_nodes][num_inputs_per_node]
-    float* orig_model_input;       // Cached original model-input data pointer
+    ResolvedInput** resolved; // [num_nodes][num_inputs_per_node]
+    float* orig_model_input;  // Cached original model-input data pointer
 
     /* Reusable output tensor — avoids malloc per forward pass */
-    Tensor* reuse_output;          // Allocated once, data overwritten each pass
+    Tensor* reuse_output; // Allocated once, data overwritten each pass
 
-    bool valid;                    // Is cache valid?
-    bool buffers_populated;        // Have plan buffers been filled at least once?
+    bool valid;             // Is cache valid?
+    bool buffers_populated; // Have plan buffers been filled at least once?
 } CachedModelGraph;
 
 struct SequentialFastPath;
@@ -55,8 +55,8 @@ typedef struct Sequential {
     Module** modules;
     int num_modules;
     int capacity;
-    CachedModelGraph* cached_graph;      // Optional cached execution graph
-    bool enable_graph_cache;             // Whether to use graph caching
+    CachedModelGraph* cached_graph;       // Optional cached execution graph
+    bool enable_graph_cache;              // Whether to use graph caching
     struct SequentialFastPath* fast_path; // Zero-IR inference fast path
 } Sequential;
 

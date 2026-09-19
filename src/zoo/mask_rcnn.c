@@ -10,13 +10,11 @@
 #include "alloc/cml_allocator.h"
 
 MaskRCNNConfig cml_zoo_mask_rcnn_default_config(void) {
-    MaskRCNNConfig cfg = {
-        .num_classes = 81,
-        .num_anchors = 9,
-        .fpn_channels = 256,
-        .roi_output_size = 7,
-        .mask_output_size = 14
-    };
+    MaskRCNNConfig cfg = {.num_classes      = 81,
+                          .num_anchors      = 9,
+                          .fpn_channels     = 256,
+                          .roi_output_size  = 7,
+                          .mask_output_size = 14};
     return cfg;
 }
 
@@ -30,20 +28,24 @@ typedef struct {
 } Backbone;
 
 static void build_bottleneck_layer(Sequential* stage, int num_blocks, int in_ch, int mid_ch,
-                                    int out_ch, int first_stride, DType dtype, DeviceType device) {
+                                   int out_ch, int first_stride, DType dtype, DeviceType device) {
     for (int i = 0; i < num_blocks; i++) {
-        int inch = (i == 0) ? in_ch : out_ch;
+        int inch   = (i == 0) ? in_ch : out_ch;
         int stride = (i == 0) ? first_stride : 1;
 
         Sequential* blk = nn_sequential();
         sequential_add(blk, (Module*)nn_conv2d(inch, mid_ch, 1, 1, 0, 1, false, dtype, device));
-        sequential_add(blk, (Module*)nn_batchnorm2d(mid_ch, 1e-5f, 0.1f, true, true, dtype, device));
+        sequential_add(blk,
+                       (Module*)nn_batchnorm2d(mid_ch, 1e-5f, 0.1f, true, true, dtype, device));
         sequential_add(blk, (Module*)nn_relu(false));
-        sequential_add(blk, (Module*)nn_conv2d(mid_ch, mid_ch, 3, stride, 1, 1, false, dtype, device));
-        sequential_add(blk, (Module*)nn_batchnorm2d(mid_ch, 1e-5f, 0.1f, true, true, dtype, device));
+        sequential_add(blk,
+                       (Module*)nn_conv2d(mid_ch, mid_ch, 3, stride, 1, 1, false, dtype, device));
+        sequential_add(blk,
+                       (Module*)nn_batchnorm2d(mid_ch, 1e-5f, 0.1f, true, true, dtype, device));
         sequential_add(blk, (Module*)nn_relu(false));
         sequential_add(blk, (Module*)nn_conv2d(mid_ch, out_ch, 1, 1, 0, 1, false, dtype, device));
-        sequential_add(blk, (Module*)nn_batchnorm2d(out_ch, 1e-5f, 0.1f, true, true, dtype, device));
+        sequential_add(blk,
+                       (Module*)nn_batchnorm2d(out_ch, 1e-5f, 0.1f, true, true, dtype, device));
         sequential_add(blk, (Module*)nn_relu(false));
         sequential_add(stage, (Module*)blk);
     }
@@ -51,33 +53,45 @@ static void build_bottleneck_layer(Sequential* stage, int num_blocks, int in_ch,
 
 static Tensor* backbone_forward(Module* module, Tensor* input) {
     Backbone* bb = (Backbone*)module;
-    if (!bb || !input) return NULL;
+    if (!bb || !input)
+        return NULL;
 
     Tensor* x = module_forward((Module*)bb->stem, input);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
     x = module_forward((Module*)bb->layer1, x);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
     x = module_forward((Module*)bb->layer2, x);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
     x = module_forward((Module*)bb->layer3, x);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
     return module_forward((Module*)bb->layer4, x);
 }
 
 static void backbone_free(Module* module) {
     Backbone* bb = (Backbone*)module;
-    if (!bb) return;
-    if (bb->stem) module_free((Module*)bb->stem);
-    if (bb->layer1) module_free((Module*)bb->layer1);
-    if (bb->layer2) module_free((Module*)bb->layer2);
-    if (bb->layer3) module_free((Module*)bb->layer3);
-    if (bb->layer4) module_free((Module*)bb->layer4);
+    if (!bb)
+        return;
+    if (bb->stem)
+        module_free((Module*)bb->stem);
+    if (bb->layer1)
+        module_free((Module*)bb->layer1);
+    if (bb->layer2)
+        module_free((Module*)bb->layer2);
+    if (bb->layer3)
+        module_free((Module*)bb->layer3);
+    if (bb->layer4)
+        module_free((Module*)bb->layer4);
     cml_free(bb);
 }
 
 static Module* create_backbone(DType dtype, DeviceType device) {
     Backbone* bb = cml_malloc(sizeof(Backbone));
-    if (!bb) return NULL;
+    if (!bb)
+        return NULL;
 
     if (module_init((Module*)bb, "ResNet50+FPN_Backbone", backbone_forward, backbone_free) != 0) {
         cml_free(bb);
@@ -122,29 +136,41 @@ typedef struct {
  * intermediate backbone stages. */
 static Tensor* fpn_forward(Module* module, Tensor* input) {
     FPN* fpn = (FPN*)module;
-    if (!fpn || !input) return NULL;
+    if (!fpn || !input)
+        return NULL;
     Tensor* p5 = module_forward(fpn->lateral5, input);
-    if (!p5) return NULL;
+    if (!p5)
+        return NULL;
     return module_forward(fpn->smooth5, p5);
 }
 
 static void fpn_free(Module* module) {
     FPN* fpn = (FPN*)module;
-    if (!fpn) return;
-    if (fpn->lateral2) module_free(fpn->lateral2);
-    if (fpn->lateral3) module_free(fpn->lateral3);
-    if (fpn->lateral4) module_free(fpn->lateral4);
-    if (fpn->lateral5) module_free(fpn->lateral5);
-    if (fpn->smooth2) module_free(fpn->smooth2);
-    if (fpn->smooth3) module_free(fpn->smooth3);
-    if (fpn->smooth4) module_free(fpn->smooth4);
-    if (fpn->smooth5) module_free(fpn->smooth5);
+    if (!fpn)
+        return;
+    if (fpn->lateral2)
+        module_free(fpn->lateral2);
+    if (fpn->lateral3)
+        module_free(fpn->lateral3);
+    if (fpn->lateral4)
+        module_free(fpn->lateral4);
+    if (fpn->lateral5)
+        module_free(fpn->lateral5);
+    if (fpn->smooth2)
+        module_free(fpn->smooth2);
+    if (fpn->smooth3)
+        module_free(fpn->smooth3);
+    if (fpn->smooth4)
+        module_free(fpn->smooth4);
+    if (fpn->smooth5)
+        module_free(fpn->smooth5);
     cml_free(fpn);
 }
 
 static Module* create_fpn(int fpn_ch, DType dtype, DeviceType device) {
     FPN* fpn = cml_malloc(sizeof(FPN));
-    if (!fpn) return NULL;
+    if (!fpn)
+        return NULL;
 
     if (module_init((Module*)fpn, "FPN", fpn_forward, fpn_free) != 0) {
         cml_free(fpn);
@@ -173,25 +199,32 @@ typedef struct {
 
 static Tensor* rpn_forward(Module* module, Tensor* input) {
     RPN* rpn = (RPN*)module;
-    if (!rpn || !input) return NULL;
+    if (!rpn || !input)
+        return NULL;
 
     Tensor* x = module_forward(rpn->rpn_conv, input);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
     return f_relu(x);
 }
 
 static void rpn_free(Module* module) {
     RPN* rpn = (RPN*)module;
-    if (!rpn) return;
-    if (rpn->rpn_conv) module_free(rpn->rpn_conv);
-    if (rpn->rpn_cls) module_free(rpn->rpn_cls);
-    if (rpn->rpn_bbox) module_free(rpn->rpn_bbox);
+    if (!rpn)
+        return;
+    if (rpn->rpn_conv)
+        module_free(rpn->rpn_conv);
+    if (rpn->rpn_cls)
+        module_free(rpn->rpn_cls);
+    if (rpn->rpn_bbox)
+        module_free(rpn->rpn_bbox);
     cml_free(rpn);
 }
 
 static Module* create_rpn(int fpn_ch, int num_anchors, DType dtype, DeviceType device) {
     RPN* rpn = cml_malloc(sizeof(RPN));
-    if (!rpn) return NULL;
+    if (!rpn)
+        return NULL;
 
     if (module_init((Module*)rpn, "RPN", rpn_forward, rpn_free) != 0) {
         cml_free(rpn);
@@ -199,7 +232,7 @@ static Module* create_rpn(int fpn_ch, int num_anchors, DType dtype, DeviceType d
     }
 
     rpn->rpn_conv = (Module*)nn_conv2d(fpn_ch, fpn_ch, 3, 1, 1, 1, true, dtype, device);
-    rpn->rpn_cls = (Module*)nn_conv2d(fpn_ch, 2 * num_anchors, 1, 1, 0, 1, true, dtype, device);
+    rpn->rpn_cls  = (Module*)nn_conv2d(fpn_ch, 2 * num_anchors, 1, 1, 0, 1, true, dtype, device);
     rpn->rpn_bbox = (Module*)nn_conv2d(fpn_ch, 4 * num_anchors, 1, 1, 0, 1, true, dtype, device);
 
     return (Module*)rpn;
@@ -216,14 +249,17 @@ typedef struct {
 
 static Tensor* roi_head_forward(Module* module, Tensor* input) {
     ROIHead* head = (ROIHead*)module;
-    if (!head || !input) return NULL;
+    if (!head || !input)
+        return NULL;
 
     Tensor* x = module_forward(head->fc1, input);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
     x = f_relu(x);
 
     x = module_forward(head->fc2, x);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
     x = f_relu(x);
 
     return module_forward(head->cls_score, x);
@@ -231,30 +267,36 @@ static Tensor* roi_head_forward(Module* module, Tensor* input) {
 
 static void roi_head_free(Module* module) {
     ROIHead* head = (ROIHead*)module;
-    if (!head) return;
-    if (head->fc1) module_free(head->fc1);
-    if (head->fc2) module_free(head->fc2);
-    if (head->cls_score) module_free(head->cls_score);
-    if (head->bbox_pred) module_free(head->bbox_pred);
+    if (!head)
+        return;
+    if (head->fc1)
+        module_free(head->fc1);
+    if (head->fc2)
+        module_free(head->fc2);
+    if (head->cls_score)
+        module_free(head->cls_score);
+    if (head->bbox_pred)
+        module_free(head->bbox_pred);
     cml_free(head);
 }
 
-static Module* create_roi_head(int fpn_ch, int roi_size, int num_classes,
-                                DType dtype, DeviceType device) {
+static Module* create_roi_head(int fpn_ch, int roi_size, int num_classes, DType dtype,
+                               DeviceType device) {
     ROIHead* head = cml_malloc(sizeof(ROIHead));
-    if (!head) return NULL;
+    if (!head)
+        return NULL;
 
     if (module_init((Module*)head, "ROIHead", roi_head_forward, roi_head_free) != 0) {
         cml_free(head);
         return NULL;
     }
 
-    int fc_in = fpn_ch * roi_size * roi_size;
+    int fc_in             = fpn_ch * roi_size * roi_size;
     head->roi_output_size = roi_size;
-    head->fc1 = (Module*)nn_linear(fc_in, 1024, dtype, device, true);
-    head->fc2 = (Module*)nn_linear(1024, 1024, dtype, device, true);
-    head->cls_score = (Module*)nn_linear(1024, num_classes, dtype, device, true);
-    head->bbox_pred = (Module*)nn_linear(1024, num_classes * 4, dtype, device, true);
+    head->fc1             = (Module*)nn_linear(fc_in, 1024, dtype, device, true);
+    head->fc2             = (Module*)nn_linear(1024, 1024, dtype, device, true);
+    head->cls_score       = (Module*)nn_linear(1024, num_classes, dtype, device, true);
+    head->bbox_pred       = (Module*)nn_linear(1024, num_classes * 4, dtype, device, true);
 
     return (Module*)head;
 }
@@ -268,13 +310,16 @@ typedef struct {
 
 static Tensor* mask_head_forward(Module* module, Tensor* input) {
     MaskHead* head = (MaskHead*)module;
-    if (!head || !input) return NULL;
+    if (!head || !input)
+        return NULL;
 
     Tensor* x = module_forward((Module*)head->conv_layers, input);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
 
     x = module_forward(head->deconv, x);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
     x = f_relu(x);
 
     return module_forward(head->mask_pred, x);
@@ -282,16 +327,21 @@ static Tensor* mask_head_forward(Module* module, Tensor* input) {
 
 static void mask_head_free(Module* module) {
     MaskHead* head = (MaskHead*)module;
-    if (!head) return;
-    if (head->conv_layers) module_free((Module*)head->conv_layers);
-    if (head->deconv) module_free(head->deconv);
-    if (head->mask_pred) module_free(head->mask_pred);
+    if (!head)
+        return;
+    if (head->conv_layers)
+        module_free((Module*)head->conv_layers);
+    if (head->deconv)
+        module_free(head->deconv);
+    if (head->mask_pred)
+        module_free(head->mask_pred);
     cml_free(head);
 }
 
 static Module* create_mask_head(int fpn_ch, int num_classes, DType dtype, DeviceType device) {
     MaskHead* head = cml_malloc(sizeof(MaskHead));
-    if (!head) return NULL;
+    if (!head)
+        return NULL;
 
     if (module_init((Module*)head, "MaskHead", mask_head_forward, mask_head_free) != 0) {
         cml_free(head);
@@ -300,11 +350,12 @@ static Module* create_mask_head(int fpn_ch, int num_classes, DType dtype, Device
 
     head->conv_layers = nn_sequential();
     for (int i = 0; i < 4; i++) {
-        sequential_add(head->conv_layers, (Module*)nn_conv2d(fpn_ch, fpn_ch, 3, 1, 1, 1, true, dtype, device));
+        sequential_add(head->conv_layers,
+                       (Module*)nn_conv2d(fpn_ch, fpn_ch, 3, 1, 1, 1, true, dtype, device));
         sequential_add(head->conv_layers, (Module*)nn_relu(false));
     }
 
-    head->deconv = (Module*)nn_conv_transpose2d(fpn_ch, fpn_ch, 2, 2, 0, 0, true, dtype, device);
+    head->deconv    = (Module*)nn_conv_transpose2d(fpn_ch, fpn_ch, 2, 2, 0, 0, true, dtype, device);
     head->mask_pred = (Module*)nn_conv2d(fpn_ch, num_classes, 1, 1, 0, 1, true, dtype, device);
 
     return (Module*)head;
@@ -322,64 +373,89 @@ typedef struct {
 
 static Tensor* mask_rcnn_forward(Module* module, Tensor* input) {
     MaskRCNN* net = (MaskRCNN*)module;
-    if (!net || !input) return NULL;
+    if (!net || !input)
+        return NULL;
 
     Backbone* bb = (Backbone*)net->backbone;
     FPN* fpn     = (FPN*)net->fpn;
-    if (!bb || !fpn) return NULL;
+    if (!bb || !fpn)
+        return NULL;
 
     Tensor* c1 = module_forward((Module*)bb->stem, input);
-    if (!c1) return NULL;
+    if (!c1)
+        return NULL;
     Tensor* c2 = module_forward((Module*)bb->layer1, c1);
-    if (!c2) return NULL;
+    if (!c2)
+        return NULL;
     Tensor* c3 = module_forward((Module*)bb->layer2, c2);
-    if (!c3) return NULL;
+    if (!c3)
+        return NULL;
     Tensor* c4 = module_forward((Module*)bb->layer3, c3);
-    if (!c4) return NULL;
+    if (!c4)
+        return NULL;
     Tensor* c5 = module_forward((Module*)bb->layer4, c4);
-    if (!c5) return NULL;
+    if (!c5)
+        return NULL;
 
     /* Top-down pathway. The single-tensor Module interface can only carry one
      * pyramid level forward, so the RPN/ROI path runs on the finest level P2;
      * P3-P5 heads would need multi-output support. */
     Tensor* p5 = module_forward(fpn->lateral5, c5);
-    if (!p5) return NULL;
+    if (!p5)
+        return NULL;
     Tensor* p4 = zoo_fpn_topdown_add(fpn->lateral4, c4, p5);
-    if (!p4) return NULL;
+    if (!p4)
+        return NULL;
     Tensor* p3 = zoo_fpn_topdown_add(fpn->lateral3, c3, p4);
-    if (!p3) return NULL;
+    if (!p3)
+        return NULL;
     Tensor* p2 = zoo_fpn_topdown_add(fpn->lateral2, c2, p3);
-    if (!p2) return NULL;
+    if (!p2)
+        return NULL;
     p2 = module_forward(fpn->smooth2, p2);
-    if (!p2) return NULL;
+    if (!p2)
+        return NULL;
 
     Tensor* rpn_out = module_forward(net->rpn, p2);
-    if (!rpn_out) return NULL;
+    if (!rpn_out)
+        return NULL;
 
     return module_forward(net->roi_head, rpn_out);
 }
 
 static void mask_rcnn_free(Module* module) {
     MaskRCNN* net = (MaskRCNN*)module;
-    if (!net) return;
-    if (net->backbone) module_free(net->backbone);
-    if (net->fpn) module_free(net->fpn);
-    if (net->rpn) module_free(net->rpn);
-    if (net->roi_head) module_free(net->roi_head);
-    if (net->mask_head) module_free(net->mask_head);
+    if (!net)
+        return;
+    if (net->backbone)
+        module_free(net->backbone);
+    if (net->fpn)
+        module_free(net->fpn);
+    if (net->rpn)
+        module_free(net->rpn);
+    if (net->roi_head)
+        module_free(net->roi_head);
+    if (net->mask_head)
+        module_free(net->mask_head);
     cml_free(net);
 }
 
 Module* cml_zoo_mask_rcnn_create(const MaskRCNNConfig* cfg, DType dtype, DeviceType device) {
     MaskRCNNConfig c = cfg ? *cfg : cml_zoo_mask_rcnn_default_config();
-    if (c.num_classes <= 0) c.num_classes = 81;
-    if (c.num_anchors <= 0) c.num_anchors = 9;
-    if (c.fpn_channels <= 0) c.fpn_channels = 256;
-    if (c.roi_output_size <= 0) c.roi_output_size = 7;
-    if (c.mask_output_size <= 0) c.mask_output_size = 14;
+    if (c.num_classes <= 0)
+        c.num_classes = 81;
+    if (c.num_anchors <= 0)
+        c.num_anchors = 9;
+    if (c.fpn_channels <= 0)
+        c.fpn_channels = 256;
+    if (c.roi_output_size <= 0)
+        c.roi_output_size = 7;
+    if (c.mask_output_size <= 0)
+        c.mask_output_size = 14;
 
     MaskRCNN* net = cml_malloc(sizeof(MaskRCNN));
-    if (!net) return NULL;
+    if (!net)
+        return NULL;
 
     if (module_init((Module*)net, "MaskRCNN", mask_rcnn_forward, mask_rcnn_free) != 0) {
         cml_free(net);
@@ -387,15 +463,15 @@ Module* cml_zoo_mask_rcnn_create(const MaskRCNNConfig* cfg, DType dtype, DeviceT
     }
 
     net->num_classes = c.num_classes;
-    net->backbone = create_backbone(dtype, device);
-    net->fpn = create_fpn(c.fpn_channels, dtype, device);
-    net->rpn = create_rpn(c.fpn_channels, c.num_anchors, dtype, device);
-    net->roi_head = create_roi_head(c.fpn_channels, c.roi_output_size, c.num_classes, dtype, device);
+    net->backbone    = create_backbone(dtype, device);
+    net->fpn         = create_fpn(c.fpn_channels, dtype, device);
+    net->rpn         = create_rpn(c.fpn_channels, c.num_anchors, dtype, device);
+    net->roi_head =
+        create_roi_head(c.fpn_channels, c.roi_output_size, c.num_classes, dtype, device);
     net->mask_head = create_mask_head(c.fpn_channels, c.num_classes, dtype, device);
 
     LOG_INFO("Created Mask R-CNN (%d classes, %d anchors, FPN %d, ROI %dx%d, mask %dx%d)",
-             c.num_classes, c.num_anchors, c.fpn_channels,
-             c.roi_output_size, c.roi_output_size,
+             c.num_classes, c.num_anchors, c.fpn_channels, c.roi_output_size, c.roi_output_size,
              c.mask_output_size, c.mask_output_size);
     return (Module*)net;
 }

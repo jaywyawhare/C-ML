@@ -31,8 +31,8 @@ static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
     int in_length   = input->shape[2];
 
     if (in_channels != layer->in_channels) {
-        LOG_ERROR("ConvTranspose1d: input channels (%d) doesn't match expected (%d)",
-                  in_channels, layer->in_channels);
+        LOG_ERROR("ConvTranspose1d: input channels (%d) doesn't match expected (%d)", in_channels,
+                  layer->in_channels);
         return NULL;
     }
 
@@ -51,28 +51,36 @@ static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
 
     /* Lazy: run as a height-1 ConvTranspose2d so it builds IR, decomposes to
      * primitives, and is graph-autodiff differentiable (was an eager loop). */
-    Tensor* w = layer->weight->tensor;                     /* [Cin,Cout,ks] */
-    int xs[4] = {batch, in_channels, 1, in_length};
+    Tensor* w        = layer->weight->tensor; /* [Cin,Cout,ks] */
+    int xs[4]        = {batch, in_channels, 1, in_length};
     ReshapeParams ri = {xs, 4};
-    Tensor* x4 = uop_reshape(input, &ri);
-    if (!x4) return NULL;
-    int wsz[4] = {w->shape[0], w->shape[1], 1, ks};
+    Tensor* x4       = uop_reshape(input, &ri);
+    if (!x4)
+        return NULL;
+    int wsz[4]       = {w->shape[0], w->shape[1], 1, ks};
     ReshapeParams rw = {wsz, 4};
-    Tensor* w4 = uop_reshape(w, &rw);
-    if (!w4) return NULL;
+    Tensor* w4       = uop_reshape(w, &rw);
+    if (!w4)
+        return NULL;
 
-    Tensor* bias = (layer->use_bias && layer->bias) ? layer->bias->tensor : NULL;
+    Tensor* bias             = (layer->use_bias && layer->bias) ? layer->bias->tensor : NULL;
     ConvTranspose2DParams p2 = {0};
-    p2.kernel_size[0] = 1;    p2.kernel_size[1] = ks;
-    p2.stride[0] = 1;         p2.stride[1] = s;
-    p2.padding[0] = 0;        p2.padding[1] = p;
-    p2.output_padding[0] = 0; p2.output_padding[1] = opad;
-    p2.dilation[0] = 1;       p2.dilation[1] = d;
-    p2.use_bias = bias != NULL;
-    Tensor* y4 = uop_conv_transpose2d(x4, w4, bias, &p2);  /* [N,Cout,1,OL] */
-    if (!y4) return NULL;
+    p2.kernel_size[0]        = 1;
+    p2.kernel_size[1]        = ks;
+    p2.stride[0]             = 1;
+    p2.stride[1]             = s;
+    p2.padding[0]            = 0;
+    p2.padding[1]            = p;
+    p2.output_padding[0]     = 0;
+    p2.output_padding[1]     = opad;
+    p2.dilation[0]           = 1;
+    p2.dilation[1]           = d;
+    p2.use_bias              = bias != NULL;
+    Tensor* y4               = uop_conv_transpose2d(x4, w4, bias, &p2); /* [N,Cout,1,OL] */
+    if (!y4)
+        return NULL;
 
-    int ys[3] = {batch, out_channels, out_length};
+    int ys[3]        = {batch, out_channels, out_length};
     ReshapeParams ro = {ys, 3};
     return uop_reshape(y4, &ro);
 }
@@ -84,9 +92,9 @@ static void conv_transpose1d_free(Module* module) {
     cml_free(layer);
 }
 
-ConvTranspose1d* nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size,
-                                      int stride, int padding, int output_padding,
-                                      bool use_bias, DType dtype, DeviceType device) {
+ConvTranspose1d* nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size, int stride,
+                                     int padding, int output_padding, bool use_bias, DType dtype,
+                                     DeviceType device) {
     ConvTranspose1d* layer = cml_malloc(sizeof(ConvTranspose1d));
     if (!layer)
         return NULL;
@@ -105,7 +113,7 @@ ConvTranspose1d* nn_conv_transpose1d(int in_channels, int out_channels, int kern
     layer->output_padding = output_padding;
     layer->dilation       = 1;
     layer->use_bias       = use_bias;
-    int weight_shape[] = {in_channels, out_channels, kernel_size};
+    int weight_shape[]    = {in_channels, out_channels, kernel_size};
     TensorConfig config =
         (TensorConfig){.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
     Tensor* weight = tensor_empty(weight_shape, 3, &config);

@@ -6,15 +6,17 @@
 #include "cml.h"
 #include "test_harness.h"
 
-
 int main(void) {
     cml_init();
     printf("=== training_metrics ===\n");
 
-    int N = 5;
+    int N              = 5;
     TrainingMetrics* m = training_metrics_create((size_t)N);
     CHECK("training_metrics_create", m != NULL);
-    if (!m) { printf("\nTRAINING METRICS FAILED\n"); return 1; }
+    if (!m) {
+        printf("\nTRAINING METRICS FAILED\n");
+        return 1;
+    }
 
     /* record a decreasing loss / increasing accuracy curve */
     for (int e = 0; e < N; e++)
@@ -29,9 +31,12 @@ int main(void) {
     FILE* f = fopen(path, "r");
     CHECK("export_json produced a file", f != NULL);
     if (f) {
-        fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, 0, SEEK_SET);
-        char* buf = (char*)malloc((size_t)sz + 1);
-        size_t got = fread(buf, 1, (size_t)sz, f); buf[got] = '\0';
+        fseek(f, 0, SEEK_END);
+        long sz = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        char* buf  = (char*)malloc((size_t)sz + 1);
+        size_t got = fread(buf, 1, (size_t)sz, f);
+        buf[got]   = '\0';
         fclose(f);
         CHECK("JSON file is non-empty", sz > 0);
         /* first epoch loss was 1.0 — the exported JSON should mention loss */
@@ -48,13 +53,13 @@ int main(void) {
         CHECK("linear layer for distribution test", fc != NULL);
 
         Parameter** params = NULL;
-        int nparams = 0;
+        int nparams        = 0;
         module_collect_parameters((Module*)fc, &params, &nparams, true);
         CHECK("collected parameters", params != NULL && nparams > 0);
 
         if (params && nparams > 0) {
             Tensor* w = params[0]->tensor;
-            size_t n = 0;
+            size_t n  = 0;
             float* wd = cml_tensor_float_buffer(w, &n);
             CHECK("weight buffer resolved", wd != NULL && n > 0);
 
@@ -64,12 +69,15 @@ int main(void) {
 
                 /* Give the parameter a gradient spanning -1..+1. */
                 int gshape[8];
-                for (int d = 0; d < w->ndim; d++) gshape[d] = w->shape[d];
-                TensorConfig gcfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                                     .has_dtype = true, .has_device = true};
-                Tensor* g = cml_zeros(gshape, w->ndim, &gcfg);
-                size_t gn = 0;
-                float* gd = cml_tensor_float_buffer(g, &gn);
+                for (int d = 0; d < w->ndim; d++)
+                    gshape[d] = w->shape[d];
+                TensorConfig gcfg = {.dtype      = DTYPE_FLOAT32,
+                                     .device     = DEVICE_CPU,
+                                     .has_dtype  = true,
+                                     .has_device = true};
+                Tensor* g         = cml_zeros(gshape, w->ndim, &gcfg);
+                size_t gn         = 0;
+                float* gd         = cml_tensor_float_buffer(g, &gn);
                 if (gd) {
                     for (size_t i = 0; i < gn; i++)
                         gd[i] = -1.0f + 2.0f * ((float)i / (float)(gn > 1 ? gn - 1 : 1));
@@ -102,9 +110,12 @@ int main(void) {
         CHECK("export with distributions", training_metrics_export_json(m, dpath, NULL) == 0);
         FILE* df = fopen(dpath, "r");
         if (df) {
-            fseek(df, 0, SEEK_END); long dsz = ftell(df); fseek(df, 0, SEEK_SET);
-            char* dbuf = (char*)malloc((size_t)dsz + 1);
-            size_t dgot = fread(dbuf, 1, (size_t)dsz, df); dbuf[dgot] = '\0';
+            fseek(df, 0, SEEK_END);
+            long dsz = ftell(df);
+            fseek(df, 0, SEEK_SET);
+            char* dbuf  = (char*)malloc((size_t)dsz + 1);
+            size_t dgot = fread(dbuf, 1, (size_t)dsz, df);
+            dbuf[dgot]  = '\0';
             fclose(df);
             CHECK("JSON has grad_distribution", strstr(dbuf, "grad_distribution") != NULL);
             CHECK("JSON has weight_distribution", strstr(dbuf, "weight_distribution") != NULL);

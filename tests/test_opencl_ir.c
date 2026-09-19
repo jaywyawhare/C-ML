@@ -25,7 +25,8 @@ static float max_abs_diff(float* a, float* b, int n) {
     float mx = 0;
     for (int i = 0; i < n; i++) {
         float d = fabsf(a[i] - b[i]);
-        if (d > mx) mx = d;
+        if (d > mx)
+            mx = d;
     }
     return mx;
 }
@@ -37,16 +38,18 @@ static void test_matmul(void) {
 
     /* CPU reference */
     TensorConfig cfg = {0};
-    float* a_data = cml_malloc(M * K * sizeof(float));
-    float* b_data = cml_malloc(K * N * sizeof(float));
-    for (int i = 0; i < M * K; i++) a_data[i] = (float)(i % 7) * 0.1f;
-    for (int i = 0; i < K * N; i++) b_data[i] = (float)(i % 5) * 0.1f;
+    float* a_data    = cml_malloc(M * K * sizeof(float));
+    float* b_data    = cml_malloc(K * N * sizeof(float));
+    for (int i = 0; i < M * K; i++)
+        a_data[i] = (float)(i % 7) * 0.1f;
+    for (int i = 0; i < K * N; i++)
+        b_data[i] = (float)(i % 5) * 0.1f;
 
-    int shape_a[] = {M, K};
-    int shape_b[] = {K, N};
-    Tensor* ta_cpu = tensor_from_data(a_data, shape_a, 2, &cfg);
-    Tensor* tb_cpu = tensor_from_data(b_data, shape_b, 2, &cfg);
-    Tensor* tc_cpu = uop_matmul(ta_cpu, tb_cpu);
+    int shape_a[]     = {M, K};
+    int shape_b[]     = {K, N};
+    Tensor* ta_cpu    = tensor_from_data(a_data, shape_a, 2, &cfg);
+    Tensor* tb_cpu    = tensor_from_data(b_data, shape_b, 2, &cfg);
+    Tensor* tc_cpu    = uop_matmul(ta_cpu, tb_cpu);
     float* cpu_result = (float*)tensor_data_ptr(tc_cpu);
 
     float* cpu_copy = cml_malloc(M * N * sizeof(float));
@@ -59,9 +62,9 @@ static void test_matmul(void) {
 
     /* GPU via OpenCL */
     setenv("BACKEND", "opencl", 1);
-    Tensor* ta_gpu = tensor_from_data(a_data, shape_a, 2, &cfg);
-    Tensor* tb_gpu = tensor_from_data(b_data, shape_b, 2, &cfg);
-    Tensor* tc_gpu = uop_matmul(ta_gpu, tb_gpu);
+    Tensor* ta_gpu    = tensor_from_data(a_data, shape_a, 2, &cfg);
+    Tensor* tb_gpu    = tensor_from_data(b_data, shape_b, 2, &cfg);
+    Tensor* tc_gpu    = uop_matmul(ta_gpu, tb_gpu);
     float* gpu_result = (float*)tensor_data_ptr(tc_gpu);
 
     float diff = max_abs_diff(cpu_copy, gpu_result, M * N);
@@ -84,10 +87,12 @@ static void test_batched_matmul(void) {
     int B = 3, M = 64, K = 128, N = 64;
 
     TensorConfig cfg = {0};
-    float* a_data = cml_malloc((size_t)B * M * K * sizeof(float));
-    float* b_data = cml_malloc((size_t)B * K * N * sizeof(float));
-    for (int i = 0; i < B * M * K; i++) a_data[i] = (float)(i % 7) * 0.1f;
-    for (int i = 0; i < B * K * N; i++) b_data[i] = (float)(i % 5) * 0.1f;
+    float* a_data    = cml_malloc((size_t)B * M * K * sizeof(float));
+    float* b_data    = cml_malloc((size_t)B * K * N * sizeof(float));
+    for (int i = 0; i < B * M * K; i++)
+        a_data[i] = (float)(i % 7) * 0.1f;
+    for (int i = 0; i < B * K * N; i++)
+        b_data[i] = (float)(i % 5) * 0.1f;
 
     /* Hand-computed reference: independent GEMM per batch. */
     float* ref = cml_malloc((size_t)B * M * N * sizeof(float));
@@ -103,9 +108,9 @@ static void test_batched_matmul(void) {
     int shape_a[] = {B, M, K};
     int shape_b[] = {B, K, N};
     setenv("BACKEND", "opencl", 1);
-    Tensor* ta = tensor_from_data(a_data, shape_a, 3, &cfg);
-    Tensor* tb = tensor_from_data(b_data, shape_b, 3, &cfg);
-    Tensor* tc = uop_matmul(ta, tb);
+    Tensor* ta        = tensor_from_data(a_data, shape_a, 3, &cfg);
+    Tensor* tb        = tensor_from_data(b_data, shape_b, 3, &cfg);
+    Tensor* tc        = uop_matmul(ta, tb);
     float* gpu_result = (float*)tensor_data_ptr(tc);
 
     float diff = max_abs_diff(ref, gpu_result, B * M * N);
@@ -129,58 +134,82 @@ static void test_gpu_unary_validation(void) {
     printf("Testing GPU unary ops vs CPU...\n");
     int n = 1024, shape[] = {n};
     TensorConfig cfg = {0};
-    float* pos = cml_malloc(n * sizeof(float));
-    float* mix = cml_malloc(n * sizeof(float));
-    for (int i = 0; i < n; i++) { pos[i] = (float)(i + 1) * 0.01f; mix[i] = (float)(i - 512) * 0.02f; }
+    float* pos       = cml_malloc(n * sizeof(float));
+    float* mix       = cml_malloc(n * sizeof(float));
+    for (int i = 0; i < n; i++) {
+        pos[i] = (float)(i + 1) * 0.01f;
+        mix[i] = (float)(i - 512) * 0.02f;
+    }
 
-    struct { const char* name; Tensor* (*fn)(Tensor*); int pos; } ops[] = {
-        {"exp",     uop_exp,     0}, {"log",  uop_log,  1}, {"sqrt", uop_sqrt, 1},
-        {"sigmoid", uop_sigmoid, 0}, {"tanh", uop_tanh, 0}, {"neg",  uop_neg,  0},
+    struct {
+        const char* name;
+        Tensor* (*fn)(Tensor*);
+        int pos;
+    } ops[] = {
+        {"exp", uop_exp, 0},         {"log", uop_log, 1},   {"sqrt", uop_sqrt, 1},
+        {"sigmoid", uop_sigmoid, 0}, {"tanh", uop_tanh, 0}, {"neg", uop_neg, 0},
     };
     for (size_t k = 0; k < sizeof(ops) / sizeof(ops[0]); k++) {
-        float* in = ops[k].pos ? pos : mix;
-        Tensor* t = tensor_from_data(in, shape, 1, &cfg);
-        Tensor* r = ops[k].fn(t);
+        float* in  = ops[k].pos ? pos : mix;
+        Tensor* t  = tensor_from_data(in, shape, 1, &cfg);
+        Tensor* r  = ops[k].fn(t);
         float* cpu = cml_malloc(n * sizeof(float));
         memcpy(cpu, tensor_data_ptr(r), n * sizeof(float));
-        tensor_free(t); tensor_free(r); cml_reset_ir_context();
+        tensor_free(t);
+        tensor_free(r);
+        cml_reset_ir_context();
 
         setenv("BACKEND", "opencl", 1);
-        t = tensor_from_data(in, shape, 1, &cfg);
-        r = ops[k].fn(t);
+        t          = tensor_from_data(in, shape, 1, &cfg);
+        r          = ops[k].fn(t);
         float diff = max_abs_diff(cpu, (float*)tensor_data_ptr(r), n);
-        char lbl[64]; snprintf(lbl, sizeof(lbl), "GPU %s vs CPU", ops[k].name);
+        char lbl[64];
+        snprintf(lbl, sizeof(lbl), "GPU %s vs CPU", ops[k].name);
         CHECK(lbl, diff < 1e-3f);
-        tensor_free(t); tensor_free(r); cml_reset_ir_context();
+        tensor_free(t);
+        tensor_free(r);
+        cml_reset_ir_context();
         unsetenv("BACKEND");
         cml_free(cpu);
     }
-    cml_free(pos); cml_free(mix);
+    cml_free(pos);
+    cml_free(mix);
 }
 
 static void test_gpu_reduction_validation(void) {
     printf("Testing GPU reductions vs CPU...\n");
     int n = 4096, shape[] = {n};
     TensorConfig cfg = {0};
-    float* data = cml_malloc(n * sizeof(float));
-    for (int i = 0; i < n; i++) data[i] = (float)((i % 97) - 48) * 0.1f;
+    float* data      = cml_malloc(n * sizeof(float));
+    for (int i = 0; i < n; i++)
+        data[i] = (float)((i % 97) - 48) * 0.1f;
 
-    struct { const char* name; Tensor* (*fn)(Tensor*, ReduceParams*); } ops[] = {
-        {"sum", uop_sum}, {"mean", uop_mean}, {"max_reduce", uop_max_reduce},
+    struct {
+        const char* name;
+        Tensor* (*fn)(Tensor*, ReduceParams*);
+    } ops[] = {
+        {"sum", uop_sum},
+        {"mean", uop_mean},
+        {"max_reduce", uop_max_reduce},
     };
     for (size_t k = 0; k < sizeof(ops) / sizeof(ops[0]); k++) {
         Tensor* t = tensor_from_data(data, shape, 1, &cfg);
         Tensor* r = ops[k].fn(t, NULL);
         float cpu = ((float*)tensor_data_ptr(r))[0];
-        tensor_free(t); tensor_free(r); cml_reset_ir_context();
+        tensor_free(t);
+        tensor_free(r);
+        cml_reset_ir_context();
 
         setenv("BACKEND", "opencl", 1);
-        t = tensor_from_data(data, shape, 1, &cfg);
-        r = ops[k].fn(t, NULL);
+        t         = tensor_from_data(data, shape, 1, &cfg);
+        r         = ops[k].fn(t, NULL);
         float gpu = ((float*)tensor_data_ptr(r))[0];
-        char lbl[64]; snprintf(lbl, sizeof(lbl), "GPU %s vs CPU", ops[k].name);
+        char lbl[64];
+        snprintf(lbl, sizeof(lbl), "GPU %s vs CPU", ops[k].name);
         CHECK(lbl, fabsf(cpu - gpu) < 1e-2f * (1.0f + fabsf(cpu)));
-        tensor_free(t); tensor_free(r); cml_reset_ir_context();
+        tensor_free(t);
+        tensor_free(r);
+        cml_reset_ir_context();
         unsetenv("BACKEND");
     }
     cml_free(data);
@@ -188,32 +217,35 @@ static void test_gpu_reduction_validation(void) {
 
 static void test_elementwise(void) {
     printf("Testing elementwise ops on GPU...\n");
-    int n = 1024;
+    int n       = 1024;
     float* data = cml_malloc(n * sizeof(float));
-    for (int i = 0; i < n; i++) data[i] = (float)(i - 512) * 0.01f;
+    for (int i = 0; i < n; i++)
+        data[i] = (float)(i - 512) * 0.01f;
 
-    int shape[] = {n};
+    int shape[]      = {n};
     TensorConfig cfg = {0};
 
     /* Test RELU */
     {
         /* CPU */
-        Tensor* t = tensor_from_data(data, shape, 1, &cfg);
-        Tensor* r = uop_relu(t);
-        float* cpu_res = (float*)tensor_data_ptr(r);
+        Tensor* t       = tensor_from_data(data, shape, 1, &cfg);
+        Tensor* r       = uop_relu(t);
+        float* cpu_res  = (float*)tensor_data_ptr(r);
         float* cpu_copy = cml_malloc(n * sizeof(float));
         memcpy(cpu_copy, cpu_res, n * sizeof(float));
-        tensor_free(t); tensor_free(r);
+        tensor_free(t);
+        tensor_free(r);
         cml_reset_ir_context();
 
         /* GPU */
         setenv("BACKEND", "opencl", 1);
-        t = tensor_from_data(data, shape, 1, &cfg);
-        r = uop_relu(t);
+        t              = tensor_from_data(data, shape, 1, &cfg);
+        r              = uop_relu(t);
         float* gpu_res = (float*)tensor_data_ptr(r);
-        float diff = max_abs_diff(cpu_copy, gpu_res, n);
+        float diff     = max_abs_diff(cpu_copy, gpu_res, n);
         CHECK("RELU correctness", diff < 1e-5f);
-        tensor_free(t); tensor_free(r);
+        tensor_free(t);
+        tensor_free(r);
         cml_reset_ir_context();
         unsetenv("BACKEND");
         cml_free(cpu_copy);
@@ -222,28 +254,32 @@ static void test_elementwise(void) {
     /* Test ADD with broadcast */
     {
         float* data2 = cml_malloc(sizeof(float));
-        data2[0] = 3.14f;
+        data2[0]     = 3.14f;
         int shape2[] = {1};
 
         /* CPU */
-        Tensor* ta = tensor_from_data(data, shape, 1, &cfg);
-        Tensor* tb = tensor_from_data(data2, shape2, 1, &cfg);
-        Tensor* r = uop_add(ta, tb);
-        float* cpu_res = (float*)tensor_data_ptr(r);
+        Tensor* ta      = tensor_from_data(data, shape, 1, &cfg);
+        Tensor* tb      = tensor_from_data(data2, shape2, 1, &cfg);
+        Tensor* r       = uop_add(ta, tb);
+        float* cpu_res  = (float*)tensor_data_ptr(r);
         float* cpu_copy = cml_malloc(n * sizeof(float));
         memcpy(cpu_copy, cpu_res, n * sizeof(float));
-        tensor_free(ta); tensor_free(tb); tensor_free(r);
+        tensor_free(ta);
+        tensor_free(tb);
+        tensor_free(r);
         cml_reset_ir_context();
 
         /* GPU */
         setenv("BACKEND", "opencl", 1);
-        ta = tensor_from_data(data, shape, 1, &cfg);
-        tb = tensor_from_data(data2, shape2, 1, &cfg);
-        r = uop_add(ta, tb);
+        ta             = tensor_from_data(data, shape, 1, &cfg);
+        tb             = tensor_from_data(data2, shape2, 1, &cfg);
+        r              = uop_add(ta, tb);
         float* gpu_res = (float*)tensor_data_ptr(r);
-        float diff = max_abs_diff(cpu_copy, gpu_res, n);
+        float diff     = max_abs_diff(cpu_copy, gpu_res, n);
         CHECK("ADD broadcast correctness", diff < 1e-5f);
-        tensor_free(ta); tensor_free(tb); tensor_free(r);
+        tensor_free(ta);
+        tensor_free(tb);
+        tensor_free(r);
         cml_reset_ir_context();
         unsetenv("BACKEND");
         cml_free(cpu_copy);
@@ -258,11 +294,13 @@ static void test_large_matmul_perf(void) {
     int M = 512, K = 512, N = 512;
     float* a_data = cml_malloc(M * K * sizeof(float));
     float* b_data = cml_malloc(K * N * sizeof(float));
-    for (int i = 0; i < M * K; i++) a_data[i] = (float)(i % 11) * 0.01f;
-    for (int i = 0; i < K * N; i++) b_data[i] = (float)(i % 13) * 0.01f;
+    for (int i = 0; i < M * K; i++)
+        a_data[i] = (float)(i % 11) * 0.01f;
+    for (int i = 0; i < K * N; i++)
+        b_data[i] = (float)(i % 13) * 0.01f;
 
-    int shape_a[] = {M, K};
-    int shape_b[] = {K, N};
+    int shape_a[]    = {M, K};
+    int shape_b[]    = {K, N};
     TensorConfig cfg = {0};
 
     /* Warmup + time GPU */
@@ -272,7 +310,9 @@ static void test_large_matmul_perf(void) {
         Tensor* tb = tensor_from_data(b_data, shape_b, 2, &cfg);
         Tensor* tc = uop_matmul(ta, tb);
         tensor_data_ptr(tc);
-        tensor_free(ta); tensor_free(tb); tensor_free(tc);
+        tensor_free(ta);
+        tensor_free(tb);
+        tensor_free(tc);
         cml_reset_ir_context();
     }
 
@@ -284,7 +324,9 @@ static void test_large_matmul_perf(void) {
         Tensor* tb = tensor_from_data(b_data, shape_b, 2, &cfg);
         Tensor* tc = uop_matmul(ta, tb);
         tensor_data_ptr(tc);
-        tensor_free(ta); tensor_free(tb); tensor_free(tc);
+        tensor_free(ta);
+        tensor_free(tb);
+        tensor_free(tc);
         cml_reset_ir_context();
     }
     clock_gettime(CLOCK_MONOTONIC, &t1);
@@ -298,7 +340,9 @@ static void test_large_matmul_perf(void) {
         Tensor* tb = tensor_from_data(b_data, shape_b, 2, &cfg);
         Tensor* tc = uop_matmul(ta, tb);
         tensor_data_ptr(tc);
-        tensor_free(ta); tensor_free(tb); tensor_free(tc);
+        tensor_free(ta);
+        tensor_free(tb);
+        tensor_free(tc);
         cml_reset_ir_context();
     }
     clock_gettime(CLOCK_MONOTONIC, &t1);

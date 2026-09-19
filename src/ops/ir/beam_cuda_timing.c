@@ -8,8 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
-{
+double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data) {
     (void)user_data;
 
     if (!variant || !variant->source_code) {
@@ -23,26 +22,22 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
         return -1.0;
     }
 
-    if (!cuda->cuEventCreate || !cuda->cuEventRecord ||
-        !cuda->cuEventSynchronize || !cuda->cuEventElapsedTime ||
-        !cuda->cuEventDestroy) {
+    if (!cuda->cuEventCreate || !cuda->cuEventRecord || !cuda->cuEventSynchronize ||
+        !cuda->cuEventElapsedTime || !cuda->cuEventDestroy) {
         LOG_ERROR("BEAM CUDA timing: event functions not available");
         return -1.0;
     }
 
-    CMLCUDAKernel* kernel = cml_cuda_compile_source(cuda, variant->source_code,
-                                                     "cml_kernel");
+    CMLCUDAKernel* kernel = cml_cuda_compile_source(cuda, variant->source_code, "cml_kernel");
     if (!kernel) {
         LOG_DEBUG("BEAM CUDA timing: failed to compile variant");
         return -1.0;
     }
 
-    cml_cuda_kernel_set_launch_config(
-        kernel,
-        (int)variant->config.grid[0], (int)variant->config.grid[1],
-        (int)variant->config.grid[2],
-        (int)variant->config.block[0], (int)variant->config.block[1],
-        (int)variant->config.block[2]);
+    cml_cuda_kernel_set_launch_config(kernel, (int)variant->config.grid[0],
+                                      (int)variant->config.grid[1], (int)variant->config.grid[2],
+                                      (int)variant->config.block[0], (int)variant->config.block[1],
+                                      (int)variant->config.block[2]);
 
     CUevent start = NULL, stop = NULL;
     CUresult err;
@@ -60,13 +55,10 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
     }
 
     for (int w = 0; w < CML_BEAM_DEFAULT_WARMUP; w++) {
-        cuda->cuLaunchKernel(
-            kernel->function,
-            (unsigned)kernel->grid_dim[0], (unsigned)kernel->grid_dim[1],
-            (unsigned)kernel->grid_dim[2],
-            (unsigned)kernel->block_dim[0], (unsigned)kernel->block_dim[1],
-            (unsigned)kernel->block_dim[2],
-            0, cuda->stream, NULL, NULL);
+        cuda->cuLaunchKernel(kernel->function, (unsigned)kernel->grid_dim[0],
+                             (unsigned)kernel->grid_dim[1], (unsigned)kernel->grid_dim[2],
+                             (unsigned)kernel->block_dim[0], (unsigned)kernel->block_dim[1],
+                             (unsigned)kernel->block_dim[2], 0, cuda->stream, NULL, NULL);
     }
     if (cuda->stream) {
         cuda->cuStreamSynchronize(cuda->stream);
@@ -77,13 +69,10 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
     cuda->cuEventRecord(start, cuda->stream);
 
     for (int t = 0; t < CML_BEAM_DEFAULT_TIMING; t++) {
-        cuda->cuLaunchKernel(
-            kernel->function,
-            (unsigned)kernel->grid_dim[0], (unsigned)kernel->grid_dim[1],
-            (unsigned)kernel->grid_dim[2],
-            (unsigned)kernel->block_dim[0], (unsigned)kernel->block_dim[1],
-            (unsigned)kernel->block_dim[2],
-            0, cuda->stream, NULL, NULL);
+        cuda->cuLaunchKernel(kernel->function, (unsigned)kernel->grid_dim[0],
+                             (unsigned)kernel->grid_dim[1], (unsigned)kernel->grid_dim[2],
+                             (unsigned)kernel->block_dim[0], (unsigned)kernel->block_dim[1],
+                             (unsigned)kernel->block_dim[2], 0, cuda->stream, NULL, NULL);
     }
 
     cuda->cuEventRecord(stop, cuda->stream);
@@ -98,10 +87,8 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
 
     double avg_us = (double)(elapsed_ms * 1000.0f) / (double)CML_BEAM_DEFAULT_TIMING;
 
-    LOG_DEBUG("BEAM CUDA timing: %.2f us/launch (block=%d,%d,%d)",
-              avg_us,
-              variant->config.block_size_x,
-              variant->config.block_size_y,
+    LOG_DEBUG("BEAM CUDA timing: %.2f us/launch (block=%d,%d,%d)", avg_us,
+              variant->config.block_size_x, variant->config.block_size_y,
               variant->config.block_size_z);
 
     return avg_us;
@@ -111,8 +98,7 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
 
 #include "ops/ir/beam_search.h"
 
-double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data)
-{
+double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data) {
     (void)variant;
     (void)user_data;
     return -1.0;

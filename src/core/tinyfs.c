@@ -14,30 +14,29 @@ CMLTinyFS* cml_tinyfs_create(const char* base_path, int num_shards, size_t shard
         return NULL;
 
     CMLTinyFS* fs = (CMLTinyFS*)cml_calloc(1, sizeof(CMLTinyFS));
-    if (!fs) return NULL;
+    if (!fs)
+        return NULL;
 
     strncpy(fs->base_path, base_path, sizeof(fs->base_path) - 1);
-    fs->num_shards = num_shards;
-    fs->shard_size = shard_size;
+    fs->num_shards         = num_shards;
+    fs->shard_size         = shard_size;
     fs->replication_factor = 1;
-    fs->initialized = true;
+    fs->initialized        = true;
 
     for (int i = 0; i < num_shards; i++) {
-        snprintf(fs->shards[i].path, sizeof(fs->shards[i].path),
-                 "%s/shard_%03d.bin", base_path, i);
-        fs->shards[i].shard_id = i;
+        snprintf(fs->shards[i].path, sizeof(fs->shards[i].path), "%s/shard_%03d.bin", base_path, i);
+        fs->shards[i].shard_id  = i;
         fs->shards[i].is_remote = false;
     }
 
     return fs;
 }
 
-void cml_tinyfs_free(CMLTinyFS* fs) {
-    cml_free(fs);
-}
+void cml_tinyfs_free(CMLTinyFS* fs) { cml_free(fs); }
 
 int cml_tinyfs_store(CMLTinyFS* fs, const char* name, Tensor* tensor) {
-    if (!fs || !fs->initialized || !name || !tensor) return -1;
+    if (!fs || !fs->initialized || !name || !tensor)
+        return -1;
 
     size_t data_size = tensor->numel * sizeof(float);
 
@@ -54,7 +53,8 @@ int cml_tinyfs_store(CMLTinyFS* fs, const char* name, Tensor* tensor) {
     snprintf(actual_path, sizeof(actual_path), "%s/%s.tfs", fs->base_path, name);
 
     FILE* f = fopen(actual_path, "wb");
-    if (!f) return -1;
+    if (!f)
+        return -1;
 
     /* Header: ndim, shape, dtype */
     fwrite(&tensor->ndim, sizeof(int), 1, f);
@@ -71,30 +71,50 @@ int cml_tinyfs_store(CMLTinyFS* fs, const char* name, Tensor* tensor) {
 }
 
 Tensor* cml_tinyfs_load(CMLTinyFS* fs, const char* name) {
-    if (!fs || !fs->initialized || !name) return NULL;
+    if (!fs || !fs->initialized || !name)
+        return NULL;
 
     char path[512];
     snprintf(path, sizeof(path), "%s/%s.tfs", fs->base_path, name);
 
     FILE* f = fopen(path, "rb");
-    if (!f) return NULL;
+    if (!f)
+        return NULL;
 
     int ndim;
-    if (fread(&ndim, sizeof(int), 1, f) != 1) { fclose(f); return NULL; }
-    if (ndim <= 0 || ndim > 8) { fclose(f); return NULL; }
+    if (fread(&ndim, sizeof(int), 1, f) != 1) {
+        fclose(f);
+        return NULL;
+    }
+    if (ndim <= 0 || ndim > 8) {
+        fclose(f);
+        return NULL;
+    }
 
     int shape[8];
-    if (fread(shape, sizeof(int), (size_t)ndim, f) != (size_t)ndim) { fclose(f); return NULL; }
+    if (fread(shape, sizeof(int), (size_t)ndim, f) != (size_t)ndim) {
+        fclose(f);
+        return NULL;
+    }
 
     int dtype;
-    if (fread(&dtype, sizeof(int), 1, f) != 1) { fclose(f); return NULL; }
+    if (fread(&dtype, sizeof(int), 1, f) != 1) {
+        fclose(f);
+        return NULL;
+    }
 
     size_t data_size;
-    if (fread(&data_size, sizeof(size_t), 1, f) != 1) { fclose(f); return NULL; }
+    if (fread(&data_size, sizeof(size_t), 1, f) != 1) {
+        fclose(f);
+        return NULL;
+    }
 
     TensorConfig tc = {0};
-    Tensor* t = tensor_empty(shape, ndim, &tc);
-    if (!t) { fclose(f); return NULL; }
+    Tensor* t       = tensor_empty(shape, ndim, &tc);
+    if (!t) {
+        fclose(f);
+        return NULL;
+    }
 
     if (t->data && data_size > 0) {
         size_t read = fread(t->data, 1, data_size, f);
@@ -106,16 +126,21 @@ Tensor* cml_tinyfs_load(CMLTinyFS* fs, const char* name) {
 }
 
 bool cml_tinyfs_exists(CMLTinyFS* fs, const char* name) {
-    if (!fs || !name) return false;
+    if (!fs || !name)
+        return false;
     char path[512];
     snprintf(path, sizeof(path), "%s/%s.tfs", fs->base_path, name);
     FILE* f = fopen(path, "rb");
-    if (f) { fclose(f); return true; }
+    if (f) {
+        fclose(f);
+        return true;
+    }
     return false;
 }
 
 int cml_tinyfs_delete(CMLTinyFS* fs, const char* name) {
-    if (!fs || !name) return -1;
+    if (!fs || !name)
+        return -1;
     char path[512];
     snprintf(path, sizeof(path), "%s/%s.tfs", fs->base_path, name);
     return remove(path);
@@ -124,8 +149,10 @@ int cml_tinyfs_delete(CMLTinyFS* fs, const char* name) {
 /* Returns the stored tensor names (the ".tfs" suffix stripped). Caller frees
  * each string and the array with cml_free. NULL with *count==0 when empty. */
 char** cml_tinyfs_list(CMLTinyFS* fs, int* count) {
-    if (count) *count = 0;
-    if (!fs || !fs->initialized || !count) return NULL;
+    if (count)
+        *count = 0;
+    if (!fs || !fs->initialized || !count)
+        return NULL;
 
     char** names = NULL;
     int n = 0, cap = 0;
@@ -135,12 +162,14 @@ char** cml_tinyfs_list(CMLTinyFS* fs, int* count) {
     snprintf(pattern, sizeof(pattern), "%s\\*.tfs", fs->base_path);
     WIN32_FIND_DATAA fd;
     HANDLE h = FindFirstFileA(pattern, &fd);
-    if (h == INVALID_HANDLE_VALUE) return NULL;
+    if (h == INVALID_HANDLE_VALUE)
+        return NULL;
     do {
         const char* fname = fd.cFileName;
 #else
     DIR* dir = opendir(fs->base_path);
-    if (!dir) return NULL;
+    if (!dir)
+        return NULL;
     struct dirent* ent;
     while ((ent = readdir(dir)) != NULL) {
         const char* fname = ent->d_name;
@@ -148,17 +177,19 @@ char** cml_tinyfs_list(CMLTinyFS* fs, int* count) {
         size_t len = strlen(fname);
         if (len > 4 && strcmp(fname + len - 4, ".tfs") == 0) {
             if (n == cap) {
-                int new_cap = cap ? cap * 2 : 8;
+                int new_cap  = cap ? cap * 2 : 8;
                 char** grown = (char**)cml_realloc(names, (size_t)new_cap * sizeof(char*));
-                if (!grown) goto fail;
+                if (!grown)
+                    goto fail;
                 names = grown;
-                cap = new_cap;
+                cap   = new_cap;
             }
             char* name = (char*)cml_malloc(len - 3);
-            if (!name) goto fail;
+            if (!name)
+                goto fail;
             memcpy(name, fname, len - 4);
             name[len - 4] = '\0';
-            names[n++] = name;
+            names[n++]    = name;
         }
 #ifdef _WIN32
     } while (FindNextFileA(h, &fd));
@@ -177,13 +208,15 @@ fail:
 #else
     closedir(dir);
 #endif
-    for (int i = 0; i < n; i++) cml_free(names[i]);
+    for (int i = 0; i < n; i++)
+        cml_free(names[i]);
     cml_free(names);
     return NULL;
 }
 
 size_t cml_tinyfs_used_bytes(const CMLTinyFS* fs) {
-    if (!fs) return 0;
+    if (!fs)
+        return 0;
     size_t total = 0;
     for (int i = 0; i < fs->num_shards; i++)
         total += fs->shards[i].size;
@@ -191,7 +224,10 @@ size_t cml_tinyfs_used_bytes(const CMLTinyFS* fs) {
 }
 
 void cml_tinyfs_print(const CMLTinyFS* fs) {
-    if (!fs) { printf("TinyFS: NULL\n"); return; }
+    if (!fs) {
+        printf("TinyFS: NULL\n");
+        return;
+    }
     printf("TinyFS\n");
     printf("Base path: %s\n", fs->base_path);
     printf("Shards: %d, Shard size: %zu bytes\n", fs->num_shards, fs->shard_size);

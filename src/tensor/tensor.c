@@ -23,7 +23,6 @@
 #include "core/threefry.h"
 #include "autograd/autograd.h"
 
-
 static void resolve_config(const TensorConfig* config, DType* dtype, DeviceType* device) {
     if (!config) {
         *dtype  = DTYPE_FLOAT32;
@@ -44,7 +43,7 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     if (!shape || ndim < 0)
         return NULL;
 
-    size_t numel = 0;
+    size_t numel      = 0;
     size_t total_size = 0;
     if (!tensor_numel_checked(shape, ndim, &numel) ||
         !tensor_nbytes_checked(numel, dtype, &total_size))
@@ -73,23 +72,23 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
         return NULL;
     }
 
-    t->requires_grad  = requires_grad;
-    t->is_executed    = true;
-    t->ir_context     = NULL;
-    t->ir_node        = NULL;
-    t->grad           = NULL;
-    t->ref_count      = 1;
-    t->external_refs  = 0;
-    t->base           = NULL;
-    t->strides        = compute_contiguous_strides(t->shape, ndim);
+    t->requires_grad = requires_grad;
+    t->is_executed   = true;
+    t->ir_context    = NULL;
+    t->ir_node       = NULL;
+    t->grad          = NULL;
+    t->ref_count     = 1;
+    t->external_refs = 0;
+    t->base          = NULL;
+    t->strides       = compute_contiguous_strides(t->shape, ndim);
     if (!t->strides && ndim > 0) {
         cml_free(t->data);
         cml_free(t->shape);
         cml_free(t);
         return NULL;
     }
-    t->storage_offset = 0;
-    t->is_contiguous  = true;
+    t->storage_offset    = 0;
+    t->is_contiguous     = true;
     t->buffer_handle     = NULL;
     t->user_data         = NULL;
     t->backward_hooks    = NULL;
@@ -153,7 +152,8 @@ void* tensor_data_ptr(Tensor* t) {
             // After execution, update tensor metadata from IR node's output shape
             // (e.g., reshape operations may have changed dimensions)
             if (t->ir_node && t->ir_node->output_shape && t->ir_node->output_ndim > 0) {
-                if (t->shape) cml_free(t->shape);
+                if (t->shape)
+                    cml_free(t->shape);
                 t->shape = tensor_shape_copy(t->ir_node->output_shape, t->ir_node->output_ndim);
                 t->ndim  = t->ir_node->output_ndim;
                 t->numel = tensor_numel(t->ir_node->output_shape, t->ir_node->output_ndim);
@@ -225,7 +225,8 @@ DType cml_promote_dtype(DType dtype1, DType dtype2) {
 
     int rank1 = 0, rank2 = 0;
 
-    // Promotion hierarchy: BOOL < UINT8 < INT8 < INT32 < INT64 < FLOAT16 < BFLOAT16 < FLOAT32 < FLOAT64
+    // Promotion hierarchy: BOOL < UINT8 < INT8 < INT32 < INT64 < FLOAT16 < BFLOAT16 < FLOAT32 <
+    // FLOAT64
     static const int dtype_rank[] = {
         [DTYPE_FLOAT32]          = 9,
         [DTYPE_FLOAT64]          = 10,
@@ -341,7 +342,7 @@ int* tensor_shape_copy(int* shape, int ndim) {
     if (!new_shape) {
         CML_ERR_NULL("Failed to allocate memory for tensor shape copy");
     }
-    if (shape && ndim > 0)  /* memcpy(_, NULL, 0) is UB for a 0-dim tensor */
+    if (shape && ndim > 0) /* memcpy(_, NULL, 0) is UB for a 0-dim tensor */
         memcpy(new_shape, shape, (size_t)ndim * sizeof(int));
     return new_shape;
 }
@@ -498,8 +499,8 @@ static int tensor_refresh_shape_from_node(Tensor* t, struct IRNode* node) {
     if (!t->shape)
         return -1;
 
-    t->ndim  = node->output_ndim;
-    t->numel = tensor_numel(t->shape, t->ndim);
+    t->ndim    = node->output_ndim;
+    t->numel   = tensor_numel(t->shape, t->ndim);
     t->strides = compute_contiguous_strides(t->shape, t->ndim);
     if (!t->strides && t->ndim > 0) {
         cml_free(t->shape);
@@ -594,9 +595,9 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     t->grad          = NULL;
 
     // Memory management
-    t->ref_count    = 1;
+    t->ref_count     = 1;
     t->external_refs = 0;
-    t->base         = NULL;
+    t->base          = NULL;
 
     t->strides = compute_contiguous_strides(t->shape, t->ndim);
     if (!t->strides && t->ndim > 0) {
@@ -666,8 +667,9 @@ Tensor* tensor_from_data(const void* data, int* shape, int ndim, const TensorCon
         return NULL;
     }
     if (!shape || ndim < 0) {
-        error_stack_push(CM_INVALID_ARGUMENT, "Invalid argument to tensor_from_data: bad shape/ndim",
-                         __FILE__, __LINE__, __func__);
+        error_stack_push(CM_INVALID_ARGUMENT,
+                         "Invalid argument to tensor_from_data: bad shape/ndim", __FILE__, __LINE__,
+                         __func__);
         return NULL;
     }
 
@@ -680,7 +682,8 @@ Tensor* tensor_from_data(const void* data, int* shape, int ndim, const TensorCon
      * so there is no benefit to deferring.  Making it eager also means the
      * tensor survives IR graph resets without needing tensor_realize(). */
     Tensor* t = tensor_create(dtype, device, ndim, shape, false);
-    if (!t) return NULL;
+    if (!t)
+        return NULL;
     size_t nbytes = t->numel * cml_dtype_size(dtype);
     memcpy(t->data, data, nbytes);
     return t;
@@ -695,7 +698,7 @@ void tensor_detach_keep(Tensor* t) {
         return;
     if (t->data && !t->owns_data) {
         size_t nbytes = t->numel * cml_dtype_size(t->dtype);
-        void* owned    = cml_malloc(nbytes);
+        void* owned   = cml_malloc(nbytes);
         if (owned) {
             memcpy(owned, t->data, nbytes);
             t->data      = owned;
@@ -736,19 +739,18 @@ void tensor_release(Tensor* t) {
 /* --- Shared storage lifetime for views ---------------------------------- */
 
 static CMLTensorStorage* tensor_storage_attach(Tensor* owner) {
-    if (!owner || owner->storage || !owner->owns_data || !owner->data ||
-        owner->buffer_handle)
+    if (!owner || owner->storage || !owner->owns_data || !owner->data || owner->buffer_handle)
         return owner ? owner->storage : NULL;
 
     CMLTensorStorage* s = cml_calloc(1, sizeof(CMLTensorStorage));
     if (!s)
         return NULL;
-    s->data             = owner->data;
-    s->nbytes           = owner->numel * cml_dtype_size(owner->dtype);
-    s->refs             = 1;
+    s->data              = owner->data;
+    s->nbytes            = owner->numel * cml_dtype_size(owner->dtype);
+    s->refs              = 1;
     s->from_buffer_cache = owner->from_buffer_cache;
-    s->device           = owner->device;
-    owner->storage      = s;
+    s->device            = owner->device;
+    owner->storage       = s;
     return s;
 }
 
@@ -852,10 +854,9 @@ void tensor_free(Tensor* t) {
         /* The grad is pinned when published (see autodiff publish loop); release
          * that reference so it is freed exactly once, here, by its owning parent. */
         Tensor* g = t->grad;
-        t->grad = NULL;
+        t->grad   = NULL;
         tensor_release(g);
     }
-
 
     if (t->user_data) {
         cml_free(t->user_data);
@@ -866,9 +867,9 @@ void tensor_free(Tensor* t) {
 
     if (t->quant_data) {
         cml_free(t->quant_data);
-        t->quant_data = NULL;
+        t->quant_data       = NULL;
         t->quant_data_bytes = 0;
-        t->quant_type = CML_QUANT_NONE;
+        t->quant_type       = CML_QUANT_NONE;
     }
 
     cml_free(t);
@@ -905,11 +906,10 @@ Tensor* tensor_from_flat(const float* data, int rows, int cols) {
     if (!data || rows <= 0 || cols <= 0)
         return NULL;
 
-    int shape[2] = {rows, cols};
+    int shape[2]      = {rows, cols};
     DType dtype       = cml_get_default_dtype();
     DeviceType device = cml_get_default_device();
-    return uop_const(data, (size_t)(rows * cols) * sizeof(float),
-                     shape, 2, dtype, device);
+    return uop_const(data, (size_t)(rows * cols) * sizeof(float), shape, 2, dtype, device);
 }
 
 Tensor* tensor_from_array_2d(const float* data, int rows, int cols) {
@@ -972,7 +972,8 @@ int tensor_to_device(Tensor* tensor, DeviceType device) {
 }
 
 Tensor* tensor_arange(float start, float end, float step, const TensorConfig* config) {
-    if (step == 0.0f) return NULL;
+    if (step == 0.0f)
+        return NULL;
     DType dtype;
     DeviceType device;
     resolve_config(config, &dtype, &device);
@@ -980,7 +981,8 @@ Tensor* tensor_arange(float start, float end, float step, const TensorConfig* co
 }
 
 Tensor* tensor_linspace(float start, float end, int steps, const TensorConfig* config) {
-    if (steps <= 0) return NULL;
+    if (steps <= 0)
+        return NULL;
     int shape[] = {steps};
     DType dtype;
     DeviceType device;
@@ -1003,16 +1005,15 @@ Tensor* tensor_linspace(float start, float end, int steps, const TensorConfig* c
 }
 
 Tensor* tensor_eye(int n, const TensorConfig* config) {
-    if (n <= 0) return NULL;
+    if (n <= 0)
+        return NULL;
     DType dtype;
     DeviceType device;
     resolve_config(config, &dtype, &device);
     return uop_eye_op(n, dtype, device);
 }
 
-void tensor_manual_seed(uint64_t seed) {
-    cml_rng_set_global_seed(seed);
-}
+void tensor_manual_seed(uint64_t seed) { cml_rng_set_global_seed(seed); }
 
 Tensor* tensor_rand(int* shape, int ndim, const TensorConfig* config) {
     DType dtype;
@@ -1036,63 +1037,82 @@ Tensor* tensor_randint(int low, int high, int* shape, int ndim, const TensorConf
 }
 
 Tensor* tensor_zeros_like(Tensor* a) {
-    if (!a) return NULL;
-    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    if (!a)
+        return NULL;
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
     return tensor_zeros(a->shape, a->ndim, &config);
 }
 
 Tensor* tensor_ones_like(Tensor* a) {
-    if (!a) return NULL;
-    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    if (!a)
+        return NULL;
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
     return tensor_ones(a->shape, a->ndim, &config);
 }
 
 Tensor* tensor_rand_like(Tensor* a) {
-    if (!a) return NULL;
-    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    if (!a)
+        return NULL;
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
     return tensor_rand(a->shape, a->ndim, &config);
 }
 
 Tensor* tensor_randn_like(Tensor* a) {
-    if (!a) return NULL;
-    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    if (!a)
+        return NULL;
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
     return tensor_randn(a->shape, a->ndim, &config);
 }
 
 Tensor* tensor_full_like(Tensor* a, float value) {
-    if (!a) return NULL;
-    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    if (!a)
+        return NULL;
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
     return tensor_full(a->shape, a->ndim, &config, value);
 }
 
 Tensor* tensor_squeeze(Tensor* a, int dim) {
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
 
     // Count dimensions that are not 1 (or specific dim)
     int new_ndim = 0;
     for (int i = 0; i < a->ndim; i++) {
         if (dim >= 0) {
-            if (i == dim && a->shape[i] == 1) continue;
+            if (i == dim && a->shape[i] == 1)
+                continue;
         } else {
-            if (a->shape[i] == 1) continue;
+            if (a->shape[i] == 1)
+                continue;
         }
         new_ndim++;
     }
-    if (new_ndim == 0) new_ndim = 1;
+    if (new_ndim == 0)
+        new_ndim = 1;
 
     int* new_shape = cml_malloc((size_t)new_ndim * sizeof(int));
-    if (!new_shape) return NULL;
+    if (!new_shape)
+        return NULL;
 
     int j = 0;
     for (int i = 0; i < a->ndim; i++) {
         if (dim >= 0) {
-            if (i == dim && a->shape[i] == 1) continue;
+            if (i == dim && a->shape[i] == 1)
+                continue;
         } else {
-            if (a->shape[i] == 1) continue;
+            if (a->shape[i] == 1)
+                continue;
         }
-        if (j < new_ndim) new_shape[j++] = a->shape[i];
+        if (j < new_ndim)
+            new_shape[j++] = a->shape[i];
     }
-    if (j == 0) new_shape[0] = 1;
+    if (j == 0)
+        new_shape[0] = 1;
 
     Tensor* result = tensor_reshape(a, new_shape, new_ndim);
     cml_free(new_shape);
@@ -1100,13 +1120,17 @@ Tensor* tensor_squeeze(Tensor* a, int dim) {
 }
 
 Tensor* tensor_unsqueeze(Tensor* a, int dim) {
-    if (!a) return NULL;
-    if (dim < 0) dim = a->ndim + 1 + dim;
-    if (dim < 0 || dim > a->ndim) return NULL;
+    if (!a)
+        return NULL;
+    if (dim < 0)
+        dim = a->ndim + 1 + dim;
+    if (dim < 0 || dim > a->ndim)
+        return NULL;
 
-    int new_ndim = a->ndim + 1;
+    int new_ndim   = a->ndim + 1;
     int* new_shape = cml_malloc((size_t)new_ndim * sizeof(int));
-    if (!new_shape) return NULL;
+    if (!new_shape)
+        return NULL;
 
     int j = 0;
     for (int i = 0; i < new_ndim; i++) {
@@ -1123,17 +1147,23 @@ Tensor* tensor_unsqueeze(Tensor* a, int dim) {
 }
 
 Tensor* tensor_flip(Tensor* a, int dim) {
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
     tensor_ensure_executed(a);
     float* data = (float*)tensor_data_ptr(a);
-    if (!data) return NULL;
+    if (!data)
+        return NULL;
 
-    if (dim < 0) dim = a->ndim + dim;
-    if (dim < 0 || dim >= a->ndim) return NULL;
+    if (dim < 0)
+        dim = a->ndim + dim;
+    if (dim < 0 || dim >= a->ndim)
+        return NULL;
 
-    TensorConfig config = {.dtype = a->dtype, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    TensorConfig config = {
+        .dtype = a->dtype, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* result = tensor_empty(a->shape, a->ndim, &config);
-    if (!result) return NULL;
+    if (!result)
+        return NULL;
     tensor_ensure_executed(result);
     float* out_data = (float*)tensor_data_ptr(result);
 
@@ -1145,7 +1175,8 @@ Tensor* tensor_flip(Tensor* a, int dim) {
         int rows = a->shape[0], cols = a->shape[1];
         if (dim == 0) {
             for (int r = 0; r < rows; r++)
-                memcpy(out_data + r * cols, data + (rows - 1 - r) * cols, (size_t)cols * sizeof(float));
+                memcpy(out_data + r * cols, data + (rows - 1 - r) * cols,
+                       (size_t)cols * sizeof(float));
         } else {
             for (int r = 0; r < rows; r++)
                 for (int c = 0; c < cols; c++)
@@ -1158,7 +1189,8 @@ Tensor* tensor_flip(Tensor* a, int dim) {
 }
 
 Tensor* tensor_repeat(Tensor* a, int* repeats, int num_repeats) {
-    if (!a || !repeats || num_repeats != a->ndim) return NULL;
+    if (!a || !repeats || num_repeats != a->ndim)
+        return NULL;
     return uop_tile(a, repeats, num_repeats);
 }
 
@@ -1166,13 +1198,15 @@ Tensor* tensor_repeat(Tensor* a, int* repeats, int num_repeats) {
 
 Tensor** tensor_chunk(Tensor* a, int chunks, int dim, int* out_count) {
     Tensor** result = tensor_split(a, chunks, dim, NULL);
-    if (result && out_count) *out_count = chunks;
+    if (result && out_count)
+        *out_count = chunks;
     return result;
 }
 
 Tensor* tensor_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config) {
     Tensor* t = tensor_rand(shape, ndim, config);
-    if (!t) return NULL;
+    if (!t)
+        return NULL;
     if (tensor_ensure_executed(t) != 0) {
         tensor_free(t);
         return NULL;
@@ -1186,21 +1220,24 @@ Tensor* tensor_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorCon
 
 Tensor* tensor_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config) {
     Tensor* t = tensor_randn(shape, ndim, config);
-    if (!t) return NULL;
+    if (!t)
+        return NULL;
     if (tensor_ensure_executed(t) != 0) {
         tensor_free(t);
         return NULL;
     }
-    float* data = (float*)tensor_data_ptr(t);
+    float* data   = (float*)tensor_data_ptr(t);
     float std_val = sqrtf(2.0f / (float)fan_in);
     for (size_t i = 0; i < t->numel; i++)
         data[i] *= std_val;
     return t;
 }
 
-Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config) {
+Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out,
+                              const TensorConfig* config) {
     Tensor* t = tensor_rand(shape, ndim, config);
-    if (!t) return NULL;
+    if (!t)
+        return NULL;
     if (tensor_ensure_executed(t) != 0) {
         tensor_free(t);
         return NULL;
@@ -1212,44 +1249,53 @@ Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, con
     return t;
 }
 
-Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config) {
+Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out,
+                             const TensorConfig* config) {
     Tensor* t = tensor_randn(shape, ndim, config);
-    if (!t) return NULL;
+    if (!t)
+        return NULL;
     if (tensor_ensure_executed(t) != 0) {
         tensor_free(t);
         return NULL;
     }
-    float* data = (float*)tensor_data_ptr(t);
+    float* data   = (float*)tensor_data_ptr(t);
     float std_val = sqrtf(2.0f / (float)(fan_in + fan_out));
     for (size_t i = 0; i < t->numel; i++)
         data[i] *= std_val;
     return t;
 }
 
-
 /* Precision-preserving element-wise dtype conversion of a raw buffer.
  * int->int goes via int64 (lossless for all integer widths); anything touching
  * a float goes via double. Returns 0 on success, -1 if a dtype isn't one of the
  * directly-supported types (f16/bf16/fp8 fall back to the caller). */
 int cml_cast_buffer(const void* src, DType from, void* dst, DType to, size_t n) {
-    if (!src || !dst) return -1;
-    if (!cml_dtype_direct(from) || !cml_dtype_direct(to)) return -1;
+    if (!src || !dst)
+        return -1;
+    if (!cml_dtype_direct(from) || !cml_dtype_direct(to))
+        return -1;
     bool int_to_int = cml_dtype_is_int(from) && cml_dtype_is_int(to);
     for (size_t i = 0; i < n; i++) {
-        if (int_to_int) cml_store_i64(dst, i, to, cml_load_i64(src, i, from));
-        else            cml_store_f64(dst, i, to, cml_load_f64(src, i, from));
+        if (int_to_int)
+            cml_store_i64(dst, i, to, cml_load_i64(src, i, from));
+        else
+            cml_store_f64(dst, i, to, cml_load_f64(src, i, from));
     }
     return 0;
 }
 
 Tensor* tensor_cast(Tensor* a, DType dtype) {
-    if (!a) return NULL;
-    if (a->dtype == dtype) return tensor_clone(a);
+    if (!a)
+        return NULL;
+    if (a->dtype == dtype)
+        return tensor_clone(a);
     tensor_ensure_executed(a);
-    if (!a->data) return NULL;
+    if (!a->data)
+        return NULL;
 
     Tensor* out = tensor_create(dtype, a->device, a->ndim, a->shape, false);
-    if (!out) return NULL;
+    if (!out)
+        return NULL;
 
     /* Precision-preserving direct conversion; fall back to the float path only
      * for half/bf16/fp8 which tensor_get_float/set_float handle. */
@@ -1261,36 +1307,42 @@ Tensor* tensor_cast(Tensor* a, DType dtype) {
 }
 
 Tensor* tensor_from_blob(void* data, int* shape, int ndim, const TensorConfig* config) {
-    if (!data || !shape || ndim <= 0) return NULL;
+    if (!data || !shape || ndim <= 0)
+        return NULL;
 
     DType dtype;
     DeviceType device;
     resolve_config(config, &dtype, &device);
 
     Tensor* t = (Tensor*)cml_calloc(1, sizeof(Tensor));
-    if (!t) return NULL;
+    if (!t)
+        return NULL;
 
-    t->ndim = ndim;
+    t->ndim  = ndim;
     t->shape = (int*)cml_malloc((size_t)ndim * sizeof(int));
-    if (!t->shape) { cml_free(t); return NULL; }
+    if (!t->shape) {
+        cml_free(t);
+        return NULL;
+    }
     memcpy(t->shape, shape, (size_t)ndim * sizeof(int));
 
-    t->numel = tensor_numel(shape, ndim);
-    t->dtype = dtype;
-    t->device = device;
-    t->data = data;
-    t->owns_data = false;  // caller retains ownership
-    t->is_executed = true;
-    t->is_contiguous = true;
-    t->strides = compute_contiguous_strides(shape, ndim);
+    t->numel          = tensor_numel(shape, ndim);
+    t->dtype          = dtype;
+    t->device         = device;
+    t->data           = data;
+    t->owns_data      = false; // caller retains ownership
+    t->is_executed    = true;
+    t->is_contiguous  = true;
+    t->strides        = compute_contiguous_strides(shape, ndim);
     t->storage_offset = 0;
-    t->ref_count = 1;
+    t->ref_count      = 1;
 
     return t;
 }
 
 Tensor* tensor_randperm(int n, const TensorConfig* config) {
-    if (n <= 0) return NULL;
+    if (n <= 0)
+        return NULL;
 
     int shape[] = {n};
     DType dtype;
@@ -1327,9 +1379,11 @@ Tensor* tensor_fp8e4m3fnuz(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT8_E4M3_
 Tensor* tensor_fp8e5m2fnuz(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT8_E5M2_FNUZ); }
 
 Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode) {
-    if (!a || !output_size || num_dims < 1) return NULL;
+    if (!a || !output_size || num_dims < 1)
+        return NULL;
     tensor_ensure_executed(a);
-    if (!a->data) return NULL;
+    if (!a->data)
+        return NULL;
 
     // Support 4D [N, C, H, W]
     if (a->ndim != 4 || num_dims != 2) {
@@ -1340,12 +1394,14 @@ Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode
     int in_h = a->shape[2], in_w = a->shape[3];
     int out_h = output_size[0], out_w = output_size[1];
 
-    int out_shape[] = {N, C, out_h, out_w};
-    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int out_shape[]     = {N, C, out_h, out_w};
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
     Tensor* out = tensor_empty(out_shape, 4, &config);
-    if (!out) return NULL;
+    if (!out)
+        return NULL;
     tensor_ensure_executed(out);
-    float* in_data = (float*)a->data;
+    float* in_data  = (float*)a->data;
     float* out_data = (float*)out->data;
 
     for (int n = 0; n < N; n++) {
@@ -1358,26 +1414,34 @@ Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode
                     if (mode == INTERP_NEAREST) {
                         int ih = (int)((float)oh * in_h / out_h);
                         int iw = (int)((float)ow * in_w / out_w);
-                        if (ih >= in_h) ih = in_h - 1;
-                        if (iw >= in_w) iw = in_w - 1;
+                        if (ih >= in_h)
+                            ih = in_h - 1;
+                        if (iw >= in_w)
+                            iw = in_w - 1;
                         size_t in_idx = (size_t)n * C * in_h * in_w + (size_t)c * in_h * in_w +
                                         (size_t)ih * in_w + iw;
                         out_data[out_idx] = in_data[in_idx];
                     } else { // INTERP_BILINEAR
-                        float fy = (float)oh * (float)(in_h - 1) / (float)(out_h - 1 > 0 ? out_h - 1 : 1);
-                        float fx = (float)ow * (float)(in_w - 1) / (float)(out_w - 1 > 0 ? out_w - 1 : 1);
+                        float fy =
+                            (float)oh * (float)(in_h - 1) / (float)(out_h - 1 > 0 ? out_h - 1 : 1);
+                        float fx =
+                            (float)ow * (float)(in_w - 1) / (float)(out_w - 1 > 0 ? out_w - 1 : 1);
                         int y0 = (int)floorf(fy), x0 = (int)floorf(fx);
                         int y1 = y0 + 1, x1 = x0 + 1;
-                        if (y0 < 0) y0 = 0;
-                        if (y1 >= in_h) y1 = in_h - 1;
-                        if (x0 < 0) x0 = 0;
-                        if (x1 >= in_w) x1 = in_w - 1;
+                        if (y0 < 0)
+                            y0 = 0;
+                        if (y1 >= in_h)
+                            y1 = in_h - 1;
+                        if (x0 < 0)
+                            x0 = 0;
+                        if (x1 >= in_w)
+                            x1 = in_w - 1;
                         float wy = fy - (float)y0, wx = fx - (float)x0;
-                        size_t base = (size_t)n * C * in_h * in_w + (size_t)c * in_h * in_w;
-                        float v00 = in_data[base + (size_t)y0 * in_w + x0];
-                        float v01 = in_data[base + (size_t)y0 * in_w + x1];
-                        float v10 = in_data[base + (size_t)y1 * in_w + x0];
-                        float v11 = in_data[base + (size_t)y1 * in_w + x1];
+                        size_t base       = (size_t)n * C * in_h * in_w + (size_t)c * in_h * in_w;
+                        float v00         = in_data[base + (size_t)y0 * in_w + x0];
+                        float v01         = in_data[base + (size_t)y0 * in_w + x1];
+                        float v10         = in_data[base + (size_t)y1 * in_w + x0];
+                        float v11         = in_data[base + (size_t)y1 * in_w + x1];
                         out_data[out_idx] = (1 - wy) * (1 - wx) * v00 + (1 - wy) * wx * v01 +
                                             wy * (1 - wx) * v10 + wy * wx * v11;
                     }
@@ -1389,21 +1453,26 @@ Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode
 }
 
 Tensor* tensor_dot(Tensor* a, Tensor* b) {
-    if (!a || !b) return NULL;
+    if (!a || !b)
+        return NULL;
     if (a->ndim != 1 || b->ndim != 1 || a->numel != b->numel) {
         CML_ERR_NULL("tensor_dot: both tensors must be 1D with same size");
     }
     /* Lazy: dot(a,b) = sum(a * b) — builds IR, defers execution, and is now
      * differentiable (was: eager tensor_ensure_executed + get_float loop). */
     Tensor* prod = uop_mul(a, b);
-    if (!prod) return NULL;
+    if (!prod)
+        return NULL;
     ReduceParams params = {.dims = NULL, .num_dims = 0, .keepdim = true};
     return uop_sum(prod, &params);
 }
 
-Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode) {
-    if (!self || !index || !src) return NULL;
-    if (dim < 0) dim += self->ndim;
+Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
+                              ScatterReduceMode mode) {
+    if (!self || !index || !src)
+        return NULL;
+    if (dim < 0)
+        dim += self->ndim;
     if (dim < 0 || dim >= self->ndim) {
         LOG_ERROR("tensor_scatter_reduce: invalid dim %d for %dD tensor", dim, self->ndim);
         return NULL;
@@ -1412,27 +1481,42 @@ Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
     tensor_ensure_executed(self);
     tensor_ensure_executed(index);
     tensor_ensure_executed(src);
-    if (!self->data || !index->data || !src->data) return NULL;
+    if (!self->data || !index->data || !src->data)
+        return NULL;
 
     Tensor* output = tensor_clone(self);
-    if (!output) return NULL;
+    if (!output)
+        return NULL;
     tensor_ensure_executed(output);
 
     // For simplicity, handle 1D and 2D cases
     if (self->ndim == 1) {
         for (size_t i = 0; i < index->numel; i++) {
             int idx = (int)tensor_get_float(index, i);
-            if (idx < 0 || idx >= self->shape[0]) continue;
+            if (idx < 0 || idx >= self->shape[0])
+                continue;
             float src_val = tensor_get_float(src, i);
             float cur_val = tensor_get_float(output, idx);
             float new_val;
             switch (mode) {
-                case SCATTER_REDUCE_SUM:  new_val = cur_val + src_val; break;
-                case SCATTER_REDUCE_PROD: new_val = cur_val * src_val; break;
-                case SCATTER_REDUCE_AMAX: new_val = src_val > cur_val ? src_val : cur_val; break;
-                case SCATTER_REDUCE_AMIN: new_val = src_val < cur_val ? src_val : cur_val; break;
-                case SCATTER_REDUCE_MEAN: new_val = cur_val + src_val; break; // accumulate, divide later
-                default: new_val = cur_val; break;
+            case SCATTER_REDUCE_SUM:
+                new_val = cur_val + src_val;
+                break;
+            case SCATTER_REDUCE_PROD:
+                new_val = cur_val * src_val;
+                break;
+            case SCATTER_REDUCE_AMAX:
+                new_val = src_val > cur_val ? src_val : cur_val;
+                break;
+            case SCATTER_REDUCE_AMIN:
+                new_val = src_val < cur_val ? src_val : cur_val;
+                break;
+            case SCATTER_REDUCE_MEAN:
+                new_val = cur_val + src_val;
+                break; // accumulate, divide later
+            default:
+                new_val = cur_val;
+                break;
             }
             tensor_set_float(output, idx, new_val);
         }
@@ -1440,10 +1524,12 @@ Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
             // Count contributions per index
             int* counts = cml_calloc(self->shape[0], sizeof(int));
             if (counts) {
-                for (int i = 0; i < self->shape[0]; i++) counts[i] = 1; // self contributes 1
+                for (int i = 0; i < self->shape[0]; i++)
+                    counts[i] = 1; // self contributes 1
                 for (size_t i = 0; i < index->numel; i++) {
                     int idx = (int)tensor_get_float(index, i);
-                    if (idx >= 0 && idx < self->shape[0]) counts[idx]++;
+                    if (idx >= 0 && idx < self->shape[0])
+                        counts[idx]++;
                 }
                 for (int i = 0; i < self->shape[0]; i++) {
                     if (counts[i] > 1) {
@@ -1456,29 +1542,43 @@ Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
     } else if (self->ndim == 2) {
         int rows = self->shape[0], cols = self->shape[1];
         for (size_t i = 0; i < index->numel; i++) {
-            int r = (int)(i / index->shape[1]);
-            int c = (int)(i % index->shape[1]);
-            int idx = (int)tensor_get_float(index, i);
+            int r          = (int)(i / index->shape[1]);
+            int c          = (int)(i % index->shape[1]);
+            int idx        = (int)tensor_get_float(index, i);
             size_t src_off = r * src->shape[1] + c;
-            float src_val = tensor_get_float(src, src_off);
+            float src_val  = tensor_get_float(src, src_off);
 
             size_t out_off;
             if (dim == 0) {
-                if (idx < 0 || idx >= rows) continue;
+                if (idx < 0 || idx >= rows)
+                    continue;
                 out_off = idx * cols + c;
             } else {
-                if (idx < 0 || idx >= cols) continue;
+                if (idx < 0 || idx >= cols)
+                    continue;
                 out_off = r * cols + idx;
             }
             float cur_val = tensor_get_float(output, out_off);
             float new_val;
             switch (mode) {
-                case SCATTER_REDUCE_SUM:  new_val = cur_val + src_val; break;
-                case SCATTER_REDUCE_PROD: new_val = cur_val * src_val; break;
-                case SCATTER_REDUCE_AMAX: new_val = src_val > cur_val ? src_val : cur_val; break;
-                case SCATTER_REDUCE_AMIN: new_val = src_val < cur_val ? src_val : cur_val; break;
-                case SCATTER_REDUCE_MEAN: new_val = cur_val + src_val; break;
-                default: new_val = cur_val; break;
+            case SCATTER_REDUCE_SUM:
+                new_val = cur_val + src_val;
+                break;
+            case SCATTER_REDUCE_PROD:
+                new_val = cur_val * src_val;
+                break;
+            case SCATTER_REDUCE_AMAX:
+                new_val = src_val > cur_val ? src_val : cur_val;
+                break;
+            case SCATTER_REDUCE_AMIN:
+                new_val = src_val < cur_val ? src_val : cur_val;
+                break;
+            case SCATTER_REDUCE_MEAN:
+                new_val = cur_val + src_val;
+                break;
+            default:
+                new_val = cur_val;
+                break;
             }
             tensor_set_float(output, out_off, new_val);
         }
@@ -1487,9 +1587,11 @@ Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
 }
 
 Tensor* tensor_bitcast(Tensor* a, DType target_dtype) {
-    if (!a) return NULL;
+    if (!a)
+        return NULL;
     tensor_ensure_executed(a);
-    if (!a->data) return NULL;
+    if (!a->data)
+        return NULL;
 
     size_t src_size = cml_dtype_size(a->dtype);
     size_t dst_size = cml_dtype_size(target_dtype);
@@ -1507,20 +1609,28 @@ Tensor* tensor_bitcast(Tensor* a, DType target_dtype) {
 
     size_t new_numel = total_bytes / dst_size;
 
-    int new_ndim = a->ndim;
+    int new_ndim   = a->ndim;
     int* new_shape = cml_malloc(new_ndim * sizeof(int));
-    if (!new_shape) return NULL;
+    if (!new_shape)
+        return NULL;
 
-    for (int i = 0; i < new_ndim - 1; i++) new_shape[i] = a->shape[i];
+    for (int i = 0; i < new_ndim - 1; i++)
+        new_shape[i] = a->shape[i];
     size_t leading = 1;
-    for (int i = 0; i < new_ndim - 1; i++) leading *= a->shape[i];
-    if (leading == 0) { cml_free(new_shape); return NULL; }
+    for (int i = 0; i < new_ndim - 1; i++)
+        leading *= a->shape[i];
+    if (leading == 0) {
+        cml_free(new_shape);
+        return NULL;
+    }
     new_shape[new_ndim - 1] = (int)(new_numel / leading);
 
-    TensorConfig config = {.dtype = target_dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    TensorConfig config = {
+        .dtype = target_dtype, .device = a->device, .has_dtype = true, .has_device = true};
     Tensor* out = tensor_empty(new_shape, new_ndim, &config);
     cml_free(new_shape);
-    if (!out) return NULL;
+    if (!out)
+        return NULL;
     tensor_ensure_executed(out);
 
     // Raw memcpy — reinterpret bits
@@ -1536,24 +1646,34 @@ QRResult tensor_qr(Tensor* a) {
     }
 
     tensor_ensure_executed(a);
-    if (!a->data) return result;
+    if (!a->data)
+        return result;
 
     int m = a->shape[0], n = a->shape[1];
     int k = m < n ? m : n;
 
     // Work on a copy of A (will become R)
     float* R = cml_malloc((size_t)m * n * sizeof(float));
-    if (!R) return result;
+    if (!R)
+        return result;
     for (int i = 0; i < m * n; i++)
         R[i] = tensor_get_float(a, i);
 
     // Q starts as identity [m, m]
     float* Q = cml_calloc((size_t)m * m, sizeof(float));
-    if (!Q) { cml_free(R); return result; }
-    for (int i = 0; i < m; i++) Q[i * m + i] = 1.0f;
+    if (!Q) {
+        cml_free(R);
+        return result;
+    }
+    for (int i = 0; i < m; i++)
+        Q[i * m + i] = 1.0f;
 
     float* v = cml_malloc((size_t)m * sizeof(float));
-    if (!v) { cml_free(R); cml_free(Q); return result; }
+    if (!v) {
+        cml_free(R);
+        cml_free(Q);
+        return result;
+    }
 
     for (int j = 0; j < k; j++) {
         // Extract column j from row j..m-1
@@ -1563,40 +1683,52 @@ QRResult tensor_qr(Tensor* a) {
             norm += v[i] * v[i];
         }
         norm = sqrtf(norm);
-        if (norm < 1e-12f) continue;
+        if (norm < 1e-12f)
+            continue;
 
         float sign = (R[j * n + j] >= 0.0f) ? 1.0f : -1.0f;
         v[j] += sign * norm;
 
         float vnorm = 0.0f;
-        for (int i = j; i < m; i++) vnorm += v[i] * v[i];
-        if (vnorm < 1e-24f) continue;
+        for (int i = j; i < m; i++)
+            vnorm += v[i] * v[i];
+        if (vnorm < 1e-24f)
+            continue;
         float inv_vnorm = 1.0f / vnorm;
 
         // Apply Householder to R: R = R - 2*v*(v^T * R) / (v^T * v)
         for (int c = j; c < n; c++) {
             float dot = 0.0f;
-            for (int i = j; i < m; i++) dot += v[i] * R[i * n + c];
+            for (int i = j; i < m; i++)
+                dot += v[i] * R[i * n + c];
             dot *= 2.0f * inv_vnorm;
-            for (int i = j; i < m; i++) R[i * n + c] -= dot * v[i];
+            for (int i = j; i < m; i++)
+                R[i * n + c] -= dot * v[i];
         }
 
         // Apply Householder to Q: Q = Q - 2*Q*v*v^T / (v^T * v)
         for (int r = 0; r < m; r++) {
             float dot = 0.0f;
-            for (int i = j; i < m; i++) dot += Q[r * m + i] * v[i];
+            for (int i = j; i < m; i++)
+                dot += Q[r * m + i] * v[i];
             dot *= 2.0f * inv_vnorm;
-            for (int i = j; i < m; i++) Q[r * m + i] -= dot * v[i];
+            for (int i = j; i < m; i++)
+                Q[r * m + i] -= dot * v[i];
         }
     }
     cml_free(v);
 
     // Create reduced Q [m, k] and R [k, n]
-    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
 
     int q_shape[] = {m, k};
-    result.Q = tensor_empty(q_shape, 2, &config);
-    if (!result.Q) { cml_free(R); cml_free(Q); return result; }
+    result.Q      = tensor_empty(q_shape, 2, &config);
+    if (!result.Q) {
+        cml_free(R);
+        cml_free(Q);
+        return result;
+    }
     tensor_ensure_executed(result.Q);
     float* q_out = (float*)result.Q->data;
     for (int i = 0; i < m; i++)
@@ -1604,8 +1736,14 @@ QRResult tensor_qr(Tensor* a) {
             q_out[i * k + j] = Q[i * m + j];
 
     int r_shape[] = {k, n};
-    result.R = tensor_empty(r_shape, 2, &config);
-    if (!result.R) { cml_free(R); cml_free(Q); tensor_free(result.Q); result.Q = NULL; return result; }
+    result.R      = tensor_empty(r_shape, 2, &config);
+    if (!result.R) {
+        cml_free(R);
+        cml_free(Q);
+        tensor_free(result.Q);
+        result.Q = NULL;
+        return result;
+    }
     tensor_ensure_executed(result.R);
     float* r_out = (float*)result.R->data;
     for (int i = 0; i < k; i++)
@@ -1625,7 +1763,8 @@ SVDResult tensor_svd(Tensor* a) {
     }
 
     tensor_ensure_executed(a);
-    if (!a->data) return result;
+    if (!a->data)
+        return result;
 
     int m = a->shape[0], n = a->shape[1];
     int k = m < n ? m : n;
@@ -1633,14 +1772,19 @@ SVDResult tensor_svd(Tensor* a) {
     // Work on A^T * A for right singular vectors, or use Jacobi on A directly
     // Use one-sided Jacobi: iterate on columns of A copy
     float* W = cml_malloc((size_t)m * n * sizeof(float));
-    if (!W) return result;
+    if (!W)
+        return result;
     for (int i = 0; i < m * n; i++)
         W[i] = tensor_get_float(a, i);
 
     // V starts as identity [n, n]
     float* V = cml_calloc((size_t)n * n, sizeof(float));
-    if (!V) { cml_free(W); return result; }
-    for (int i = 0; i < n; i++) V[i * n + i] = 1.0f;
+    if (!V) {
+        cml_free(W);
+        return result;
+    }
+    for (int i = 0; i < n; i++)
+        V[i * n + i] = 1.0f;
 
     // One-sided Jacobi rotations
     int max_iter = 100;
@@ -1652,11 +1796,12 @@ SVDResult tensor_svd(Tensor* a) {
                 float alpha = 0.0f, beta = 0.0f, gamma = 0.0f;
                 for (int i = 0; i < m; i++) {
                     alpha += W[i * n + p] * W[i * n + p];
-                    beta  += W[i * n + q] * W[i * n + q];
+                    beta += W[i * n + q] * W[i * n + q];
                     gamma += W[i * n + p] * W[i * n + q];
                 }
                 off += gamma * gamma;
-                if (fabsf(gamma) < 1e-12f) continue;
+                if (fabsf(gamma) < 1e-12f)
+                    continue;
 
                 // Compute Jacobi rotation
                 float tau = (beta - alpha) / (2.0f * gamma);
@@ -1680,23 +1825,45 @@ SVDResult tensor_svd(Tensor* a) {
                 }
             }
         }
-        if (off < 1e-20f) break;
+        if (off < 1e-20f)
+            break;
     }
 
     // Compute singular values (column norms of W) and U = W / sigma
     float* sigma = cml_malloc((size_t)k * sizeof(float));
-    float* U = cml_malloc((size_t)m * k * sizeof(float));
-    if (!sigma || !U) { cml_free(W); cml_free(V); cml_free(sigma); cml_free(U); return result; }
+    float* U     = cml_malloc((size_t)m * k * sizeof(float));
+    if (!sigma || !U) {
+        cml_free(W);
+        cml_free(V);
+        cml_free(sigma);
+        cml_free(U);
+        return result;
+    }
 
     int* order = cml_malloc((size_t)n * sizeof(int));
-    if (!order) { cml_free(W); cml_free(V); cml_free(sigma); cml_free(U); return result; }
-    for (int i = 0; i < n; i++) order[i] = i;
+    if (!order) {
+        cml_free(W);
+        cml_free(V);
+        cml_free(sigma);
+        cml_free(U);
+        return result;
+    }
+    for (int i = 0; i < n; i++)
+        order[i] = i;
 
     float* col_norms = cml_malloc((size_t)n * sizeof(float));
-    if (!col_norms) { cml_free(W); cml_free(V); cml_free(sigma); cml_free(U); cml_free(order); return result; }
+    if (!col_norms) {
+        cml_free(W);
+        cml_free(V);
+        cml_free(sigma);
+        cml_free(U);
+        cml_free(order);
+        return result;
+    }
     for (int j = 0; j < n; j++) {
         float norm = 0.0f;
-        for (int i = 0; i < m; i++) norm += W[i * n + j] * W[i * n + j];
+        for (int i = 0; i < m; i++)
+            norm += W[i * n + j] * W[i * n + j];
         col_norms[j] = sqrtf(norm);
     }
 
@@ -1704,13 +1871,18 @@ SVDResult tensor_svd(Tensor* a) {
     for (int i = 0; i < k; i++) {
         int max_idx = i;
         for (int j = i + 1; j < n; j++) {
-            if (col_norms[order[j]] > col_norms[order[max_idx]]) max_idx = j;
+            if (col_norms[order[j]] > col_norms[order[max_idx]])
+                max_idx = j;
         }
-        if (max_idx != i) { int tmp = order[i]; order[i] = order[max_idx]; order[max_idx] = tmp; }
+        if (max_idx != i) {
+            int tmp        = order[i];
+            order[i]       = order[max_idx];
+            order[max_idx] = tmp;
+        }
     }
 
     for (int j = 0; j < k; j++) {
-        int oj = order[j];
+        int oj   = order[j];
         sigma[j] = col_norms[oj];
         if (sigma[j] > 1e-12f) {
             for (int i = 0; i < m; i++)
@@ -1721,19 +1893,26 @@ SVDResult tensor_svd(Tensor* a) {
         }
     }
 
-    TensorConfig config = {.dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
 
     int u_shape[] = {m, k};
-    result.U = tensor_empty(u_shape, 2, &config);
-    if (result.U) { tensor_ensure_executed(result.U); memcpy(result.U->data, U, (size_t)m * k * sizeof(float)); }
+    result.U      = tensor_empty(u_shape, 2, &config);
+    if (result.U) {
+        tensor_ensure_executed(result.U);
+        memcpy(result.U->data, U, (size_t)m * k * sizeof(float));
+    }
 
     int s_shape[] = {k};
-    result.S = tensor_empty(s_shape, 1, &config);
-    if (result.S) { tensor_ensure_executed(result.S); memcpy(result.S->data, sigma, (size_t)k * sizeof(float)); }
+    result.S      = tensor_empty(s_shape, 1, &config);
+    if (result.S) {
+        tensor_ensure_executed(result.S);
+        memcpy(result.S->data, sigma, (size_t)k * sizeof(float));
+    }
 
     // Vt = V^T but only rows corresponding to sorted order
     int vt_shape[] = {k, n};
-    result.Vt = tensor_empty(vt_shape, 2, &config);
+    result.Vt      = tensor_empty(vt_shape, 2, &config);
     if (result.Vt) {
         tensor_ensure_executed(result.Vt);
         float* vt_data = (float*)result.Vt->data;
@@ -1744,15 +1923,21 @@ SVDResult tensor_svd(Tensor* a) {
         }
     }
 
-    cml_free(W); cml_free(V); cml_free(sigma); cml_free(U); cml_free(order); cml_free(col_norms);
+    cml_free(W);
+    cml_free(V);
+    cml_free(sigma);
+    cml_free(U);
+    cml_free(order);
+    cml_free(col_norms);
     return result;
 }
 
 Tensor* tensor_from_url(const char* url) {
-    if (!url) return NULL;
+    if (!url)
+        return NULL;
 
     char tmppath[] = "/tmp/cml_tensor_XXXXXX";
-    int fd = mkstemp(tmppath);
+    int fd         = mkstemp(tmppath);
     if (fd < 0) {
         CML_ERR_NULL("tensor_from_url: failed to create temp file");
     }
@@ -1760,8 +1945,8 @@ Tensor* tensor_from_url(const char* url) {
 
     char cmd[2048];
     snprintf(cmd, sizeof(cmd),
-             "curl -fsSL -o '%s' '%s' 2>/dev/null || wget -q -O '%s' '%s' 2>/dev/null",
-             tmppath, url, tmppath, url);
+             "curl -fsSL -o '%s' '%s' 2>/dev/null || wget -q -O '%s' '%s' 2>/dev/null", tmppath,
+             url, tmppath, url);
 
     int ret = system(cmd);
     if (ret != 0) {
@@ -1776,14 +1961,18 @@ Tensor* tensor_from_url(const char* url) {
 }
 
 int tensor_assign(Tensor* t, Tensor* src) {
-    if (!t || !src) return -1;
-    if (t->ndim != src->ndim) return -1;
+    if (!t || !src)
+        return -1;
+    if (t->ndim != src->ndim)
+        return -1;
     for (int i = 0; i < t->ndim; i++) {
-        if (t->shape[i] != src->shape[i]) return -1;
+        if (t->shape[i] != src->shape[i])
+            return -1;
     }
 
     tensor_ensure_executed(src);
-    if (!src->data) return -1;
+    if (!src->data)
+        return -1;
 
     size_t nbytes = t->numel * cml_dtype_size(t->dtype);
 
@@ -1812,13 +2001,14 @@ int tensor_assign(Tensor* t, Tensor* src) {
     }
 
     if (t->device == src->device) {
-        t->data = src->data;
-        t->owns_data = false;
-        t->buffer_handle = NULL;
+        t->data              = src->data;
+        t->owns_data         = false;
+        t->buffer_handle     = NULL;
         t->from_buffer_cache = false;
     } else {
         t->data = cml_malloc(nbytes);
-        if (!t->data) return -1;
+        if (!t->data)
+            return -1;
         memcpy(t->data, src->data, nbytes);
         t->owns_data = true;
     }
@@ -1828,14 +2018,17 @@ int tensor_assign(Tensor* t, Tensor* src) {
 }
 
 int tensor_assign_data(Tensor* t, const void* data, size_t nbytes) {
-    if (!t || !data || nbytes == 0) return -1;
+    if (!t || !data || nbytes == 0)
+        return -1;
 
     size_t expected = t->numel * cml_dtype_size(t->dtype);
-    if (nbytes > expected) return -1;
+    if (nbytes > expected)
+        return -1;
 
     if (!t->data) {
         t->data = cml_malloc(expected);
-        if (!t->data) return -1;
+        if (!t->data)
+            return -1;
         t->owns_data = true;
     }
 

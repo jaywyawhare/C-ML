@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#define GGUF_MAGIC 0x46475547  // "GGUF" in little-endian
+#define GGUF_MAGIC 0x46475547 // "GGUF" in little-endian
 
 typedef enum {
     GGUF_TYPE_UINT8   = 0,

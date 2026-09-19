@@ -203,10 +203,10 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
         return NULL;
     }
 
-    plan->nodes           = cml_calloc(plan->num_nodes, sizeof(struct IRNode*));
-    plan->buffers         = cml_calloc(plan->num_nodes, sizeof(float*));
-    plan->buffer_sizes    = cml_calloc(plan->num_nodes, sizeof(size_t));
-    plan->output_tensors  = cml_calloc(plan->num_nodes, sizeof(Tensor*));
+    plan->nodes          = cml_calloc(plan->num_nodes, sizeof(struct IRNode*));
+    plan->buffers        = cml_calloc(plan->num_nodes, sizeof(float*));
+    plan->buffer_sizes   = cml_calloc(plan->num_nodes, sizeof(size_t));
+    plan->output_tensors = cml_calloc(plan->num_nodes, sizeof(Tensor*));
 
     if (!plan->nodes || !plan->buffers || !plan->buffer_sizes || !plan->output_tensors) {
         cml_free_execution_plan(plan);
@@ -229,12 +229,10 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
             /* buffer_sizes holds BYTES (numel * dtype size), not element count, so
              * the plan buffer and its memcpy/rebind are correct for every dtype —
              * sizeof(float) over-read int16/f16 sources and under-copied f64/i64. */
-            size_t nbytes             = (size_t)node->output->numel *
-                                        cml_dtype_size(node->output->dtype);
+            size_t nbytes = (size_t)node->output->numel * cml_dtype_size(node->output->dtype);
             plan->buffer_sizes[idx]   = nbytes;
             plan->output_tensors[idx] = node->output;
-            plan->buffers[idx] =
-                cml_aligned_alloc(cml_alloc_size_aligned(nbytes, 32), 32);
+            plan->buffers[idx]        = cml_aligned_alloc(cml_alloc_size_aligned(nbytes, 32), 32);
             if (!plan->buffers[idx]) {
                 cml_free_execution_plan(plan);
                 return NULL;
@@ -277,9 +275,7 @@ static void free_execution_plan_impl(CMLExecutionPlan* plan, bool detach_tensor_
     cml_free(plan);
 }
 
-void cml_free_execution_plan(CMLExecutionPlan* plan) {
-    free_execution_plan_impl(plan, true);
-}
+void cml_free_execution_plan(CMLExecutionPlan* plan) { free_execution_plan_impl(plan, true); }
 
 int cml_execute_node_fast(struct IRNode* node, float* out_buf) {
     if (!node || !out_buf)
@@ -442,13 +438,13 @@ int cml_execute_node_fast(struct IRNode* node, float* out_buf) {
         Tensor* weight_t = node->inputs[1];
         if (!input_t || !weight_t || input_t->ndim < 2 || weight_t->ndim != 2)
             return -1;
-        int K             = input_t->shape[input_t->ndim - 1];
-        int N             = weight_t->shape[0];
-        size_t total_rows = input_t->numel / (size_t)K;
+        int K                = input_t->shape[input_t->ndim - 1];
+        int N                = weight_t->shape[0];
+        size_t total_rows    = input_t->numel / (size_t)K;
         CMLBlasContext* blas = cml_blas_get_context();
         if (blas && blas->initialized) {
-            cml_blas_sgemm_ex(blas, in1, in2, out_buf, (int)total_rows, N, K, 1.0f, 0.0f,
-                              false, true);
+            cml_blas_sgemm_ex(blas, in1, in2, out_buf, (int)total_rows, N, K, 1.0f, 0.0f, false,
+                              true);
         } else {
             memset(out_buf, 0, out_n * sizeof(float));
             for (size_t m = 0; m < total_rows; m++)

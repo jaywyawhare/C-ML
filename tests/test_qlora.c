@@ -11,11 +11,7 @@
 
 static int test_nf4_roundtrip(void) {
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Create a float tensor with values roughly normally distributed in [-1, 1] */
     int numel = 128;
@@ -24,12 +20,13 @@ static int test_nf4_roundtrip(void) {
         /* Simple pattern: values spread across [-1, 1] */
         data[i] = -1.0f + 2.0f * (float)i / (float)(numel - 1);
     }
-    int shape[1] = {numel};
+    int shape[1]     = {numel};
     Tensor* original = tensor_from_data(data, shape, 1, &cfg);
-    if (!original) return 0;
+    if (!original)
+        return 0;
 
     /* Quantize to NF4 */
-    float* scales = NULL;
+    float* scales  = NULL;
     int num_scales = 0;
     int block_size = 64;
     Tensor* packed = cml_quantize_nf4(original, block_size, &scales, &num_scales);
@@ -49,8 +46,8 @@ static int test_nf4_roundtrip(void) {
     }
 
     /* Dequantize back */
-    Tensor* reconstructed = cml_dequantize_nf4(packed, scales, num_scales,
-                                                block_size, (size_t)numel);
+    Tensor* reconstructed =
+        cml_dequantize_nf4(packed, scales, num_scales, block_size, (size_t)numel);
     if (!reconstructed) {
         cml_free(scales);
         tensor_free(packed);
@@ -61,14 +58,15 @@ static int test_nf4_roundtrip(void) {
     /* Check that reconstruction error is small (NF4 has limited precision) */
     tensor_ensure_executed(original);
     tensor_ensure_executed(reconstructed);
-    float* orig_data = (float*)tensor_data_ptr(original);
+    float* orig_data  = (float*)tensor_data_ptr(original);
     float* recon_data = (float*)tensor_data_ptr(reconstructed);
 
-    float max_error = 0.0f;
+    float max_error    = 0.0f;
     float sum_sq_error = 0.0f;
     for (int i = 0; i < numel; i++) {
         float err = fabsf(orig_data[i] - recon_data[i]);
-        if (err > max_error) max_error = err;
+        if (err > max_error)
+            max_error = err;
         sum_sq_error += err * err;
     }
     float rmse = sqrtf(sum_sq_error / (float)numel);
@@ -91,7 +89,6 @@ static int test_nf4_roundtrip(void) {
     return ok;
 }
 
-
 static int test_nf4_table_values(void) {
     int ok = 1;
 
@@ -99,8 +96,8 @@ static int test_nf4_table_values(void) {
     /* Check sorted (monotonically non-decreasing) */
     for (int i = 1; i < 16; i++) {
         if (CML_NF4_TABLE[i] < CML_NF4_TABLE[i - 1]) {
-            printf("(table not sorted at index %d: %.4f < %.4f) ",
-                   i, CML_NF4_TABLE[i], CML_NF4_TABLE[i - 1]);
+            printf("(table not sorted at index %d: %.4f < %.4f) ", i, CML_NF4_TABLE[i],
+                   CML_NF4_TABLE[i - 1]);
             ok = 0;
         }
     }
@@ -117,8 +114,7 @@ static int test_nf4_table_values(void) {
 
     /* Check approximate symmetry: table[0] = -table[15], table[7] = 0 */
     if (fabsf(CML_NF4_TABLE[0] + CML_NF4_TABLE[15]) > 1e-6f) {
-        printf("(table not symmetric: [0]=%.4f, [15]=%.4f) ",
-               CML_NF4_TABLE[0], CML_NF4_TABLE[15]);
+        printf("(table not symmetric: [0]=%.4f, [15]=%.4f) ", CML_NF4_TABLE[0], CML_NF4_TABLE[15]);
         ok = 0;
     }
     if (fabsf(CML_NF4_TABLE[7]) > 1e-6f) {
@@ -135,19 +131,15 @@ static int test_nf4_table_values(void) {
     return ok;
 }
 
-
 static int test_qlora_create_and_forward_shape(void) {
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Create a base weight [out=4, in=8] */
-    int W_shape[2] = {4, 8};
+    int W_shape[2]      = {4, 8};
     Tensor* base_weight = tensor_zeros(W_shape, 2, &cfg);
-    if (!base_weight) return 0;
+    if (!base_weight)
+        return 0;
 
     /* Fill with some values */
     tensor_ensure_executed(base_weight);
@@ -193,7 +185,7 @@ static int test_qlora_create_and_forward_shape(void) {
 
     /* Create input [batch=3, in=8] */
     int x_shape[2] = {3, 8};
-    Tensor* input = tensor_zeros(x_shape, 2, &cfg);
+    Tensor* input  = tensor_zeros(x_shape, 2, &cfg);
     if (!input) {
         cml_qlora_linear_free(qlora);
         tensor_free(base_weight);
@@ -237,24 +229,20 @@ static int test_qlora_create_and_forward_shape(void) {
     return ok;
 }
 
-
 static int test_qlora_memory_savings(void) {
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
-    int in_features = 256;
+    int in_features  = 256;
     int out_features = 128;
-    int rank = 8;
-    int block_size = 64;
+    int rank         = 8;
+    int block_size   = 64;
 
     /* Create a base weight [128, 256] */
-    int W_shape[2] = {out_features, in_features};
+    int W_shape[2]      = {out_features, in_features};
     Tensor* base_weight = tensor_zeros(W_shape, 2, &cfg);
-    if (!base_weight) return 0;
+    if (!base_weight)
+        return 0;
 
     /* Fill with random-ish values */
     tensor_ensure_executed(base_weight);
@@ -270,7 +258,7 @@ static int test_qlora_memory_savings(void) {
     }
 
     size_t qlora_mem = cml_qlora_memory_usage(qlora);
-    size_t full_mem = cml_qlora_full_memory_usage(in_features, out_features);
+    size_t full_mem  = cml_qlora_full_memory_usage(in_features, out_features);
 
     int ok = 1;
     if (qlora_mem >= full_mem) {
@@ -295,24 +283,16 @@ static int test_qlora_memory_savings(void) {
     return ok;
 }
 
-
 static int test_qlora_lora_b_zero_init(void) {
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Create a base weight [out=3, in=4] with known values */
-    float W_data[] = {
-        1.0f, 0.5f, 0.0f, -0.5f,
-        0.0f, 1.0f, 0.5f,  0.0f,
-       -0.5f, 0.0f, 1.0f,  0.5f
-    };
+    float W_data[] = {1.0f, 0.5f, 0.0f, -0.5f, 0.0f, 1.0f, 0.5f, 0.0f, -0.5f, 0.0f, 1.0f, 0.5f};
     int W_shape[2] = {3, 4};
     Tensor* base_weight = tensor_from_data(W_data, W_shape, 2, &cfg);
-    if (!base_weight) return 0;
+    if (!base_weight)
+        return 0;
 
     /* Create QLoRA with rank=2, alpha=2.0, block_size=4 */
     CMLQLoRALinear* qlora = cml_qlora_linear_create(base_weight, 2, 2.0f, 4);
@@ -330,7 +310,7 @@ static int test_qlora_lora_b_zero_init(void) {
         return 0;
     }
 
-    int ok = 1;
+    int ok     = 1;
     int B_size = qlora->out_features * qlora->rank;
     for (int i = 0; i < B_size; i++) {
         if (fabsf(B_data[i]) > 1e-10f) {
@@ -344,7 +324,7 @@ static int test_qlora_lora_b_zero_init(void) {
     tensor_ensure_executed(qlora->lora_A);
     float* A_data = (float*)tensor_data_ptr(qlora->lora_A);
     float sum_abs = 0.0f;
-    int A_size = qlora->rank * qlora->in_features;
+    int A_size    = qlora->rank * qlora->in_features;
     for (int i = 0; i < A_size; i++) {
         sum_abs += fabsf(A_data[i]);
     }
@@ -360,7 +340,7 @@ static int test_qlora_lora_b_zero_init(void) {
      */
     float x_data[] = {1.0f, 1.0f, 1.0f, 1.0f};
     int x_shape[2] = {1, 4};
-    Tensor* input = tensor_from_data(x_data, x_shape, 2, &cfg);
+    Tensor* input  = tensor_from_data(x_data, x_shape, 2, &cfg);
     if (!input) {
         cml_qlora_linear_free(qlora);
         tensor_free(base_weight);
@@ -417,23 +397,16 @@ static int test_qlora_lora_b_zero_init(void) {
     return ok;
 }
 
-
 static int test_qlora_forward_nonzero_lora(void) {
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Create a base weight [out=2, in=4] */
-    float W_data[] = {
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f
-    };
-    int W_shape[2] = {2, 4};
+    float W_data[]      = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+    int W_shape[2]      = {2, 4};
     Tensor* base_weight = tensor_from_data(W_data, W_shape, 2, &cfg);
-    if (!base_weight) return 0;
+    if (!base_weight)
+        return 0;
 
     /* Create QLoRA with rank=2, alpha=2.0, block_size=4 */
     CMLQLoRALinear* qlora = cml_qlora_linear_create(base_weight, 2, 2.0f, 4);
@@ -445,7 +418,7 @@ static int test_qlora_forward_nonzero_lora(void) {
     /* First do a forward with B=0 to get baseline output */
     float x_data[] = {1.0f, 2.0f, 3.0f, 4.0f};
     int x_shape[2] = {1, 4};
-    Tensor* input = tensor_from_data(x_data, x_shape, 2, &cfg);
+    Tensor* input  = tensor_from_data(x_data, x_shape, 2, &cfg);
     if (!input) {
         cml_qlora_linear_free(qlora);
         tensor_free(base_weight);
@@ -461,15 +434,17 @@ static int test_qlora_forward_nonzero_lora(void) {
     }
 
     tensor_ensure_executed(base_output);
-    float* base_out = (float*)tensor_data_ptr(base_output);
+    float* base_out    = (float*)tensor_data_ptr(base_output);
     float base_vals[2] = {base_out[0], base_out[1]};
 
     /* Now set B to non-zero values */
     tensor_ensure_executed(qlora->lora_B);
     float* B_data = (float*)tensor_data_ptr(qlora->lora_B);
     /* B: [out=2, rank=2] */
-    B_data[0] = 1.0f; B_data[1] = 0.0f;
-    B_data[2] = 0.0f; B_data[3] = 1.0f;
+    B_data[0] = 1.0f;
+    B_data[1] = 0.0f;
+    B_data[2] = 0.0f;
+    B_data[3] = 1.0f;
 
     /* Forward again with non-zero LoRA */
     Tensor* lora_output = cml_qlora_linear_forward(qlora, input);
@@ -485,13 +460,12 @@ static int test_qlora_forward_nonzero_lora(void) {
     float* lora_out = (float*)tensor_data_ptr(lora_output);
 
     /* With non-zero B, the output should differ from base-only output */
-    int ok = 1;
+    int ok      = 1;
     float diff0 = fabsf(lora_out[0] - base_vals[0]);
     float diff1 = fabsf(lora_out[1] - base_vals[1]);
 
     if (diff0 < 1e-6f && diff1 < 1e-6f) {
-        printf("(output unchanged with non-zero LoRA: diff0=%.6f, diff1=%.6f) ",
-               diff0, diff1);
+        printf("(output unchanged with non-zero LoRA: diff0=%.6f, diff1=%.6f) ", diff0, diff1);
         ok = 0;
     }
 
@@ -502,7 +476,6 @@ static int test_qlora_forward_nonzero_lora(void) {
     tensor_free(base_weight);
     return ok;
 }
-
 
 int main(void) {
     printf("\n");

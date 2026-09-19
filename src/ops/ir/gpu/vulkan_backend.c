@@ -23,10 +23,9 @@
 #define VULKAN_LIB_NAME NULL
 #endif
 
-
 /* VkApplicationInfo */
 typedef struct {
-    uint32_t sType;        /* VK_STRUCTURE_TYPE_APPLICATION_INFO = 0 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_APPLICATION_INFO = 0 */
     const void* pNext;
     const char* pApplicationName;
     uint32_t applicationVersion;
@@ -37,7 +36,7 @@ typedef struct {
 
 /* VkInstanceCreateInfo */
 typedef struct {
-    uint32_t sType;        /* VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO = 1 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO = 1 */
     const void* pNext;
     VkFlags flags;
     const VkApplicationInfo_t* pApplicationInfo;
@@ -49,7 +48,7 @@ typedef struct {
 
 /* VkDeviceQueueCreateInfo */
 typedef struct {
-    uint32_t sType;        /* VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO = 2 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO = 2 */
     const void* pNext;
     VkFlags flags;
     uint32_t queueFamilyIndex;
@@ -59,7 +58,7 @@ typedef struct {
 
 /* VkDeviceCreateInfo */
 typedef struct {
-    uint32_t sType;        /* VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO = 3 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO = 3 */
     const void* pNext;
     VkFlags flags;
     uint32_t queueCreateInfoCount;
@@ -78,15 +77,15 @@ typedef struct {
     uint32_t vendorID;
     uint32_t deviceID;
     uint32_t deviceType;
-    char     deviceName[256];
-    uint8_t  pipelineCacheUUID[16];
+    char deviceName[256];
+    uint8_t pipelineCacheUUID[16];
     /* VkPhysicalDeviceLimits (504 bytes) + VkPhysicalDeviceSparseProperties (20 bytes) */
-    uint8_t  _limits_and_sparse[1024]; /* padding for limits + sparse properties */
+    uint8_t _limits_and_sparse[1024]; /* padding for limits + sparse properties */
 } VkPhysicalDeviceProperties_t;
 
 /* VkQueueFamilyProperties */
 typedef struct {
-    VkFlags  queueFlags;
+    VkFlags queueFlags;
     uint32_t queueCount;
     uint32_t timestampValidBits;
     uint32_t minImageTransferGranularity[3];
@@ -96,83 +95,83 @@ typedef struct {
 
 /* VkMemoryType */
 typedef struct {
-    VkFlags  propertyFlags;
+    VkFlags propertyFlags;
     uint32_t heapIndex;
 } VkMemoryType_t;
 
 /* VkMemoryHeap */
 typedef struct {
     VkDeviceSize size;
-    VkFlags      flags;
+    VkFlags flags;
 } VkMemoryHeap_t;
 
 /* VkPhysicalDeviceMemoryProperties */
 typedef struct {
-    uint32_t      memoryTypeCount;
+    uint32_t memoryTypeCount;
     VkMemoryType_t memoryTypes[32];
-    uint32_t      memoryHeapCount;
+    uint32_t memoryHeapCount;
     VkMemoryHeap_t memoryHeaps[16];
 } VkPhysicalDeviceMemoryProperties_t;
 
-#define VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT  0x01
-#define VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT  0x02
+#define VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT 0x01
+#define VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT 0x02
 #define VK_MEMORY_PROPERTY_HOST_COHERENT_BIT 0x04
 
 /* VkBufferCreateInfo */
 typedef struct {
-    uint32_t     sType;   /* VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO = 12 */
-    const void*  pNext;
-    VkFlags      flags;
+    uint32_t sType; /* VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO = 12 */
+    const void* pNext;
+    VkFlags flags;
     VkDeviceSize size;
-    VkFlags      usage;
-    uint32_t     sharingMode;
-    uint32_t     queueFamilyIndexCount;
+    VkFlags usage;
+    uint32_t sharingMode;
+    uint32_t queueFamilyIndexCount;
     const uint32_t* pQueueFamilyIndices;
 } VkBufferCreateInfo_t;
 
-#define VK_BUFFER_USAGE_TRANSFER_SRC_BIT  0x01
-#define VK_BUFFER_USAGE_TRANSFER_DST_BIT  0x02
+#define VK_BUFFER_USAGE_TRANSFER_SRC_BIT 0x01
+#define VK_BUFFER_USAGE_TRANSFER_DST_BIT 0x02
 #define VK_BUFFER_USAGE_STORAGE_BUFFER_BIT 0x20
 
 /* VkMemoryRequirements */
 typedef struct {
     VkDeviceSize size;
     VkDeviceSize alignment;
-    uint32_t     memoryTypeBits;
+    uint32_t memoryTypeBits;
 } VkMemoryRequirements_t;
 
 /* VkMemoryAllocateInfo */
 typedef struct {
-    uint32_t     sType;   /* VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO = 5 */
-    const void*  pNext;
+    uint32_t sType; /* VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO = 5 */
+    const void* pNext;
     VkDeviceSize allocationSize;
-    uint32_t     memoryTypeIndex;
+    uint32_t memoryTypeIndex;
 } VkMemoryAllocateInfo_t;
 
 /* VkCommandPoolCreateInfo */
 typedef struct {
-    uint32_t    sType;    /* VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO = 39 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO = 39 */
     const void* pNext;
-    VkFlags     flags;
-    uint32_t    queueFamilyIndex;
+    VkFlags flags;
+    uint32_t queueFamilyIndex;
 } VkCommandPoolCreateInfo_t;
 
 #define VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT 0x02
 
 /* VkCommandBufferAllocateInfo */
 typedef struct {
-    uint32_t      sType;  /* VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO = 40 */
-    const void*   pNext;
+    uint32_t sType; /* VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO = 40 */
+    const void* pNext;
     VkCommandPool commandPool;
-    uint32_t      level;  /* VK_COMMAND_BUFFER_LEVEL_PRIMARY = 0 */
-    uint32_t      commandBufferCount;
+    uint32_t level; /* VK_COMMAND_BUFFER_LEVEL_PRIMARY = 0 */
+    uint32_t commandBufferCount;
 } VkCommandBufferAllocateInfo_t;
 
 /* VkCommandBufferBeginInfo */
 typedef struct {
-    uint32_t    sType;    /* VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO = 42 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO = 42 */
     const void* pNext;
-    VkFlags     flags;
+    VkFlags flags;
     const void* pInheritanceInfo;
 } VkCommandBufferBeginInfo_t;
 
@@ -180,30 +179,30 @@ typedef struct {
 
 /* VkFenceCreateInfo */
 typedef struct {
-    uint32_t    sType;    /* VK_STRUCTURE_TYPE_FENCE_CREATE_INFO = 8 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_FENCE_CREATE_INFO = 8 */
     const void* pNext;
-    VkFlags     flags;
+    VkFlags flags;
 } VkFenceCreateInfo_t;
 
 /* VkSubmitInfo */
 typedef struct {
-    uint32_t           sType;  /* VK_STRUCTURE_TYPE_SUBMIT_INFO = 4 */
-    const void*        pNext;
-    uint32_t           waitSemaphoreCount;
-    const void*        pWaitSemaphores;
-    const VkFlags*     pWaitDstStageMask;
-    uint32_t           commandBufferCount;
+    uint32_t sType; /* VK_STRUCTURE_TYPE_SUBMIT_INFO = 4 */
+    const void* pNext;
+    uint32_t waitSemaphoreCount;
+    const void* pWaitSemaphores;
+    const VkFlags* pWaitDstStageMask;
+    uint32_t commandBufferCount;
     const VkCommandBuffer* pCommandBuffers;
-    uint32_t           signalSemaphoreCount;
-    const void*        pSignalSemaphores;
+    uint32_t signalSemaphoreCount;
+    const void* pSignalSemaphores;
 } VkSubmitInfo_t;
 
 /* VkShaderModuleCreateInfo */
 typedef struct {
-    uint32_t    sType;    /* VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO = 16 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO = 16 */
     const void* pNext;
-    VkFlags     flags;
-    size_t      codeSize;
+    VkFlags flags;
+    size_t codeSize;
     const uint32_t* pCode;
 } VkShaderModuleCreateInfo_t;
 
@@ -212,16 +211,16 @@ typedef struct {
     uint32_t binding;
     uint32_t descriptorType;
     uint32_t descriptorCount;
-    VkFlags  stageFlags;
+    VkFlags stageFlags;
     const void* pImmutableSamplers;
 } VkDescriptorSetLayoutBinding_t;
 
 #define VK_DESCRIPTOR_TYPE_STORAGE_BUFFER 7
-#define VK_SHADER_STAGE_COMPUTE_BIT       0x20
+#define VK_SHADER_STAGE_COMPUTE_BIT 0x20
 
 /* VkDescriptorSetLayoutCreateInfo */
 typedef struct {
-    uint32_t sType;       /* VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO = 32 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO = 32 */
     const void* pNext;
     VkFlags flags;
     uint32_t bindingCount;
@@ -230,7 +229,7 @@ typedef struct {
 
 /* VkPipelineLayoutCreateInfo */
 typedef struct {
-    uint32_t sType;       /* VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO = 30 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO = 30 */
     const void* pNext;
     VkFlags flags;
     uint32_t setLayoutCount;
@@ -241,10 +240,10 @@ typedef struct {
 
 /* VkPipelineShaderStageCreateInfo */
 typedef struct {
-    uint32_t sType;       /* VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO = 18 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO = 18 */
     const void* pNext;
     VkFlags flags;
-    uint32_t stage;       /* VK_SHADER_STAGE_COMPUTE_BIT */
+    uint32_t stage; /* VK_SHADER_STAGE_COMPUTE_BIT */
     VkShaderModule module;
     const char* pName;
     const void* pSpecializationInfo;
@@ -252,7 +251,7 @@ typedef struct {
 
 /* VkComputePipelineCreateInfo */
 typedef struct {
-    uint32_t sType;       /* VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO = 29 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO = 29 */
     const void* pNext;
     VkFlags flags;
     VkPipelineShaderStageCreateInfo_t stage;
@@ -269,7 +268,7 @@ typedef struct {
 
 /* VkDescriptorPoolCreateInfo */
 typedef struct {
-    uint32_t sType;       /* VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO = 33 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO = 33 */
     const void* pNext;
     VkFlags flags;
     uint32_t maxSets;
@@ -279,7 +278,7 @@ typedef struct {
 
 /* VkDescriptorSetAllocateInfo */
 typedef struct {
-    uint32_t sType;       /* VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO = 34 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO = 34 */
     const void* pNext;
     VkDescriptorPool descriptorPool;
     uint32_t descriptorSetCount;
@@ -288,14 +287,14 @@ typedef struct {
 
 /* VkDescriptorBufferInfo */
 typedef struct {
-    VkBuffer     buffer;
+    VkBuffer buffer;
     VkDeviceSize offset;
     VkDeviceSize range;
 } VkDescriptorBufferInfo_t;
 
 /* VkWriteDescriptorSet */
 typedef struct {
-    uint32_t sType;       /* VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET = 35 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET = 35 */
     const void* pNext;
     VkDescriptorSet dstSet;
     uint32_t dstBinding;
@@ -316,23 +315,23 @@ typedef struct {
 
 /* VkMemoryBarrier */
 typedef struct {
-    uint32_t    sType;    /* VK_STRUCTURE_TYPE_MEMORY_BARRIER = 46 */
+    uint32_t sType; /* VK_STRUCTURE_TYPE_MEMORY_BARRIER = 46 */
     const void* pNext;
-    VkFlags     srcAccessMask;
-    VkFlags     dstAccessMask;
+    VkFlags srcAccessMask;
+    VkFlags dstAccessMask;
 } VkMemoryBarrier_t;
 
 #define VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT 0x00000800
-#define VK_PIPELINE_STAGE_TRANSFER_BIT       0x00001000
-#define VK_ACCESS_SHADER_WRITE_BIT           0x00000040
-#define VK_ACCESS_SHADER_READ_BIT            0x00000020
-#define VK_ACCESS_TRANSFER_WRITE_BIT         0x00000100
-#define VK_ACCESS_TRANSFER_READ_BIT          0x00000080
-#define VK_PIPELINE_BIND_POINT_COMPUTE       1
-
+#define VK_PIPELINE_STAGE_TRANSFER_BIT 0x00001000
+#define VK_ACCESS_SHADER_WRITE_BIT 0x00000040
+#define VK_ACCESS_SHADER_READ_BIT 0x00000020
+#define VK_ACCESS_TRANSFER_WRITE_BIT 0x00000100
+#define VK_ACCESS_TRANSFER_READ_BIT 0x00000080
+#define VK_PIPELINE_BIND_POINT_COMPUTE 1
 
 static void* vk_load_library(const char* name) {
-    if (!name) return NULL;
+    if (!name)
+        return NULL;
     void* lib = CML_DLOPEN(name, RTLD_LAZY | RTLD_LOCAL);
     if (!lib) {
         LOG_DEBUG("Failed to load %s: %s", name, CML_DLERROR());
@@ -340,20 +339,18 @@ static void* vk_load_library(const char* name) {
     return lib;
 }
 
-static void* vk_get_symbol(void* lib, const char* name) {
-    return CML_DLSYM(lib, name);
-}
+static void* vk_get_symbol(void* lib, const char* name) { return CML_DLSYM(lib, name); }
 
 static void vk_unload_library(void* lib) {
-    if (lib) CML_DLCLOSE(lib);
+    if (lib)
+        CML_DLCLOSE(lib);
 }
 
-
-#define VK_LOAD_FUNC(name) \
-    backend->name = vk_get_symbol(backend->vulkan_lib, #name); \
-    if (!backend->name) { \
-        LOG_ERROR("Failed to load Vulkan function: %s", #name); \
-        return -1; \
+#define VK_LOAD_FUNC(name)                                                                         \
+    backend->name = vk_get_symbol(backend->vulkan_lib, #name);                                     \
+    if (!backend->name) {                                                                          \
+        LOG_ERROR("Failed to load Vulkan function: %s", #name);                                    \
+        return -1;                                                                                 \
     }
 
 static int load_vulkan_functions(CMLVulkanBackend* backend) {
@@ -410,22 +407,22 @@ static int load_vulkan_functions(CMLVulkanBackend* backend) {
 
 #undef VK_LOAD_FUNC
 
-
 bool cml_vulkan_available(void) {
 #ifndef __linux__
     /* Currently only Linux is supported for Vulkan dynamic loading */
     (void)VULKAN_LIB_NAME;
     return false;
 #else
-    if (!VULKAN_LIB_NAME) return false;
+    if (!VULKAN_LIB_NAME)
+        return false;
     void* lib = vk_load_library(VULKAN_LIB_NAME);
-    if (!lib) return false;
+    if (!lib)
+        return false;
     void* fn = vk_get_symbol(lib, "vkCreateInstance");
     vk_unload_library(lib);
     return fn != NULL;
 #endif
 }
-
 
 CMLVulkanBackend* cml_vulkan_backend_create(void) {
     CMLVulkanBackend* backend = (CMLVulkanBackend*)cml_calloc(1, sizeof(CMLVulkanBackend));
@@ -436,9 +433,10 @@ CMLVulkanBackend* cml_vulkan_backend_create(void) {
     return backend;
 }
 
-static uint32_t find_memory_type(VkPhysicalDeviceMemoryProperties_t* mem_props,
-                                  uint32_t type_bits, VkFlags required_flags) {
-    if (!mem_props) return UINT32_MAX;
+static uint32_t find_memory_type(VkPhysicalDeviceMemoryProperties_t* mem_props, uint32_t type_bits,
+                                 VkFlags required_flags) {
+    if (!mem_props)
+        return UINT32_MAX;
     for (uint32_t i = 0; i < mem_props->memoryTypeCount; i++) {
         if ((type_bits & (1u << i)) &&
             (mem_props->memoryTypes[i].propertyFlags & required_flags) == required_flags) {
@@ -449,8 +447,10 @@ static uint32_t find_memory_type(VkPhysicalDeviceMemoryProperties_t* mem_props,
 }
 
 int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
-    if (!backend) return -1;
-    if (backend->initialized) return 0;
+    if (!backend)
+        return -1;
+    if (backend->initialized)
+        return 0;
 
     backend->vulkan_lib = vk_load_library(VULKAN_LIB_NAME);
     if (!backend->vulkan_lib) {
@@ -465,16 +465,16 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
     }
 
     VkApplicationInfo_t app_info = {0};
-    app_info.sType = 0; /* VK_STRUCTURE_TYPE_APPLICATION_INFO */
-    app_info.pApplicationName = "C-ML";
-    app_info.applicationVersion = 1;
-    app_info.pEngineName = "C-ML";
-    app_info.engineVersion = 1;
-    app_info.apiVersion = (1u << 22) | (2u << 12); /* VK_API_VERSION_1_2 */
+    app_info.sType               = 0; /* VK_STRUCTURE_TYPE_APPLICATION_INFO */
+    app_info.pApplicationName    = "C-ML";
+    app_info.applicationVersion  = 1;
+    app_info.pEngineName         = "C-ML";
+    app_info.engineVersion       = 1;
+    app_info.apiVersion          = (1u << 22) | (2u << 12); /* VK_API_VERSION_1_2 */
 
     VkInstanceCreateInfo_t inst_info = {0};
-    inst_info.sType = 1; /* VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO */
-    inst_info.pApplicationInfo = &app_info;
+    inst_info.sType                  = 1; /* VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO */
+    inst_info.pApplicationInfo       = &app_info;
 
     VkResult res = backend->vkCreateInstance(&inst_info, NULL, &backend->instance);
     if (res != VK_SUCCESS) {
@@ -507,11 +507,11 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
     VkPhysicalDeviceMemoryProperties_t mem_props = {0};
     backend->vkGetPhysicalDeviceMemoryProperties(backend->physical_device, &mem_props);
 
-    backend->memory_type_device_local = find_memory_type(
-        &mem_props, UINT32_MAX, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    backend->memory_type_host_visible = find_memory_type(
-        &mem_props, UINT32_MAX,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    backend->memory_type_device_local =
+        find_memory_type(&mem_props, UINT32_MAX, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    backend->memory_type_host_visible = find_memory_type(&mem_props, UINT32_MAX,
+                                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     backend->total_memory = 0;
     for (uint32_t i = 0; i < mem_props.memoryHeapCount; i++) {
@@ -524,7 +524,7 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
     VkQueueFamilyProperties_t* qf_props =
         (VkQueueFamilyProperties_t*)cml_calloc(qf_count, sizeof(VkQueueFamilyProperties_t));
     backend->vkGetPhysicalDeviceQueueFamilyProperties(backend->physical_device, &qf_count,
-                                                       qf_props);
+                                                      qf_props);
 
     backend->compute_queue_family = UINT32_MAX;
     for (uint32_t i = 0; i < qf_count; i++) {
@@ -543,17 +543,17 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
         return -1;
     }
 
-    float queue_priority = 1.0f;
+    float queue_priority                 = 1.0f;
     VkDeviceQueueCreateInfo_t queue_info = {0};
-    queue_info.sType = 2; /* VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO */
-    queue_info.queueFamilyIndex = backend->compute_queue_family;
-    queue_info.queueCount = 1;
-    queue_info.pQueuePriorities = &queue_priority;
+    queue_info.sType                     = 2; /* VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO */
+    queue_info.queueFamilyIndex          = backend->compute_queue_family;
+    queue_info.queueCount                = 1;
+    queue_info.pQueuePriorities          = &queue_priority;
 
     VkDeviceCreateInfo_t dev_info = {0};
-    dev_info.sType = 3; /* VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO */
+    dev_info.sType                = 3; /* VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO */
     dev_info.queueCreateInfoCount = 1;
-    dev_info.pQueueCreateInfos = &queue_info;
+    dev_info.pQueueCreateInfos    = &queue_info;
 
     res = backend->vkCreateDevice(backend->physical_device, &dev_info, NULL, &backend->device);
     if (res != VK_SUCCESS) {
@@ -565,15 +565,14 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
     }
 
     backend->vkGetDeviceQueue(backend->device, backend->compute_queue_family, 0,
-                               &backend->compute_queue);
+                              &backend->compute_queue);
 
     VkCommandPoolCreateInfo_t pool_info = {0};
-    pool_info.sType = 39; /* VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO */
-    pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    pool_info.queueFamilyIndex = backend->compute_queue_family;
+    pool_info.sType                     = 39; /* VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO */
+    pool_info.flags                     = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    pool_info.queueFamilyIndex          = backend->compute_queue_family;
 
-    res = backend->vkCreateCommandPool(backend->device, &pool_info, NULL,
-                                        &backend->command_pool);
+    res = backend->vkCreateCommandPool(backend->device, &pool_info, NULL, &backend->command_pool);
     if (res != VK_SUCCESS) {
         LOG_ERROR("vkCreateCommandPool failed: %d", res);
         backend->vkDestroyDevice(backend->device, NULL);
@@ -584,16 +583,15 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
     }
 
     backend->initialized = true;
-    LOG_INFO("Vulkan backend initialized: %s (API %u.%u.%u, %zu MB VRAM)",
-             backend->device_name,
+    LOG_INFO("Vulkan backend initialized: %s (API %u.%u.%u, %zu MB VRAM)", backend->device_name,
              (backend->api_version >> 22), (backend->api_version >> 12) & 0x3FF,
-             backend->api_version & 0xFFF,
-             backend->total_memory / (1024 * 1024));
+             backend->api_version & 0xFFF, backend->total_memory / (1024 * 1024));
     return 0;
 }
 
 void cml_vulkan_backend_free(CMLVulkanBackend* backend) {
-    if (!backend) return;
+    if (!backend)
+        return;
 
     if (backend->initialized) {
         if (backend->device) {
@@ -612,22 +610,22 @@ void cml_vulkan_backend_free(CMLVulkanBackend* backend) {
     cml_free(backend);
 }
 
-
 CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSize size,
-                                           bool device_local) {
-    if (!backend || !backend->initialized || size == 0) return NULL;
+                                          bool device_local) {
+    if (!backend || !backend->initialized || size == 0)
+        return NULL;
 
     CMLVulkanBuffer* buf = (CMLVulkanBuffer*)cml_calloc(1, sizeof(CMLVulkanBuffer));
-    if (!buf) return NULL;
+    if (!buf)
+        return NULL;
 
-    buf->size = size;
+    buf->size            = size;
     buf->is_device_local = device_local;
 
     VkBufferCreateInfo_t buf_info = {0};
-    buf_info.sType = 12; /* VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO */
-    buf_info.size = size;
-    buf_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+    buf_info.sType                = 12; /* VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO */
+    buf_info.size                 = size;
+    buf_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                      VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     buf_info.sharingMode = 0; /* VK_SHARING_MODE_EXCLUSIVE */
 
@@ -641,10 +639,10 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
     backend->vkGetBufferMemoryRequirements(backend->device, buf->buffer, &mem_reqs);
 
     VkMemoryAllocateInfo_t alloc_info = {0};
-    alloc_info.sType = 5; /* VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO */
-    alloc_info.allocationSize = mem_reqs.size;
-    alloc_info.memoryTypeIndex = device_local ?
-        backend->memory_type_device_local : backend->memory_type_host_visible;
+    alloc_info.sType                  = 5; /* VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO */
+    alloc_info.allocationSize         = mem_reqs.size;
+    alloc_info.memoryTypeIndex =
+        device_local ? backend->memory_type_device_local : backend->memory_type_host_visible;
 
     res = backend->vkAllocateMemory(backend->device, &alloc_info, NULL, &buf->memory);
     if (res != VK_SUCCESS) {
@@ -672,7 +670,8 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
 }
 
 void cml_vulkan_buffer_free(CMLVulkanBackend* backend, CMLVulkanBuffer* buf) {
-    if (!backend || !buf) return;
+    if (!backend || !buf)
+        return;
 
     if (buf->mapped)
         backend->vkUnmapMemory(backend->device, buf->memory);
@@ -683,9 +682,10 @@ void cml_vulkan_buffer_free(CMLVulkanBackend* backend, CMLVulkanBuffer* buf) {
     cml_free(buf);
 }
 
-int cml_vulkan_buffer_upload(CMLVulkanBackend* backend, CMLVulkanBuffer* dst,
-                              const void* src, size_t size) {
-    if (!backend || !dst || !src) return -1;
+int cml_vulkan_buffer_upload(CMLVulkanBackend* backend, CMLVulkanBuffer* dst, const void* src,
+                             size_t size) {
+    if (!backend || !dst || !src)
+        return -1;
 
     if (dst->mapped) {
         memcpy(dst->mapped, src, size);
@@ -693,22 +693,23 @@ int cml_vulkan_buffer_upload(CMLVulkanBackend* backend, CMLVulkanBuffer* dst,
     }
 
     CMLVulkanBuffer* staging = cml_vulkan_buffer_create(backend, size, false);
-    if (!staging) return -1;
+    if (!staging)
+        return -1;
 
     memcpy(staging->mapped, src, size);
 
     VkCommandBufferAllocateInfo_t alloc_info = {0};
-    alloc_info.sType = 40;
-    alloc_info.commandPool = backend->command_pool;
-    alloc_info.level = 0; /* PRIMARY */
-    alloc_info.commandBufferCount = 1;
+    alloc_info.sType                         = 40;
+    alloc_info.commandPool                   = backend->command_pool;
+    alloc_info.level                         = 0; /* PRIMARY */
+    alloc_info.commandBufferCount            = 1;
 
     VkCommandBuffer cmd = NULL;
     backend->vkAllocateCommandBuffers(backend->device, &alloc_info, &cmd);
 
     VkCommandBufferBeginInfo_t begin_info = {0};
-    begin_info.sType = 42;
-    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    begin_info.sType                      = 42;
+    begin_info.flags                      = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     backend->vkBeginCommandBuffer(cmd, &begin_info);
 
     VkBufferCopy_t region = {0, 0, size};
@@ -716,10 +717,10 @@ int cml_vulkan_buffer_upload(CMLVulkanBackend* backend, CMLVulkanBuffer* dst,
 
     backend->vkEndCommandBuffer(cmd);
 
-    VkSubmitInfo_t submit = {0};
-    submit.sType = 4;
+    VkSubmitInfo_t submit     = {0};
+    submit.sType              = 4;
     submit.commandBufferCount = 1;
-    submit.pCommandBuffers = &cmd;
+    submit.pCommandBuffers    = &cmd;
 
     backend->vkQueueSubmit(backend->compute_queue, 1, &submit, NULL);
     backend->vkQueueWaitIdle(backend->compute_queue);
@@ -729,9 +730,10 @@ int cml_vulkan_buffer_upload(CMLVulkanBackend* backend, CMLVulkanBuffer* dst,
     return 0;
 }
 
-int cml_vulkan_buffer_download(CMLVulkanBackend* backend, CMLVulkanBuffer* src,
-                                void* dst, size_t size) {
-    if (!backend || !src || !dst) return -1;
+int cml_vulkan_buffer_download(CMLVulkanBackend* backend, CMLVulkanBuffer* src, void* dst,
+                               size_t size) {
+    if (!backend || !src || !dst)
+        return -1;
 
     if (src->mapped) {
         memcpy(dst, src->mapped, size);
@@ -739,20 +741,21 @@ int cml_vulkan_buffer_download(CMLVulkanBackend* backend, CMLVulkanBuffer* src,
     }
 
     CMLVulkanBuffer* staging = cml_vulkan_buffer_create(backend, size, false);
-    if (!staging) return -1;
+    if (!staging)
+        return -1;
 
     VkCommandBufferAllocateInfo_t alloc_info = {0};
-    alloc_info.sType = 40;
-    alloc_info.commandPool = backend->command_pool;
-    alloc_info.level = 0;
-    alloc_info.commandBufferCount = 1;
+    alloc_info.sType                         = 40;
+    alloc_info.commandPool                   = backend->command_pool;
+    alloc_info.level                         = 0;
+    alloc_info.commandBufferCount            = 1;
 
     VkCommandBuffer cmd = NULL;
     backend->vkAllocateCommandBuffers(backend->device, &alloc_info, &cmd);
 
     VkCommandBufferBeginInfo_t begin_info = {0};
-    begin_info.sType = 42;
-    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    begin_info.sType                      = 42;
+    begin_info.flags                      = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     backend->vkBeginCommandBuffer(cmd, &begin_info);
 
     VkBufferCopy_t region = {0, 0, size};
@@ -760,10 +763,10 @@ int cml_vulkan_buffer_download(CMLVulkanBackend* backend, CMLVulkanBuffer* src,
 
     backend->vkEndCommandBuffer(cmd);
 
-    VkSubmitInfo_t submit = {0};
-    submit.sType = 4;
+    VkSubmitInfo_t submit     = {0};
+    submit.sType              = 4;
     submit.commandBufferCount = 1;
-    submit.pCommandBuffers = &cmd;
+    submit.pCommandBuffers    = &cmd;
 
     backend->vkQueueSubmit(backend->compute_queue, 1, &submit, NULL);
     backend->vkQueueWaitIdle(backend->compute_queue);
@@ -775,88 +778,94 @@ int cml_vulkan_buffer_download(CMLVulkanBackend* backend, CMLVulkanBuffer* src,
     return 0;
 }
 
-
 CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint32_t* spirv,
-                                            size_t spirv_size, const char* entry_point,
-                                            int num_buffers) {
-    if (!backend || !backend->initialized || !spirv || spirv_size == 0) return NULL;
-    if (num_buffers < 1 || num_buffers > VK_MAX_BUFFERS_PER_KERNEL) return NULL;
+                                          size_t spirv_size, const char* entry_point,
+                                          int num_buffers) {
+    if (!backend || !backend->initialized || !spirv || spirv_size == 0)
+        return NULL;
+    if (num_buffers < 1 || num_buffers > VK_MAX_BUFFERS_PER_KERNEL)
+        return NULL;
 
     CMLVulkanKernel* kernel = (CMLVulkanKernel*)cml_calloc(1, sizeof(CMLVulkanKernel));
-    if (!kernel) return NULL;
+    if (!kernel)
+        return NULL;
     kernel->num_buffers = num_buffers;
-    kernel->name = cml_strdup(entry_point ? entry_point : "main");
+    kernel->name        = cml_strdup(entry_point ? entry_point : "main");
 
     VkShaderModuleCreateInfo_t sm_info = {0};
-    sm_info.sType = 16;
-    sm_info.codeSize = spirv_size;
-    sm_info.pCode = spirv;
+    sm_info.sType                      = 16;
+    sm_info.codeSize                   = spirv_size;
+    sm_info.pCode                      = spirv;
 
-    VkResult res = backend->vkCreateShaderModule(backend->device, &sm_info, NULL,
-                                                   &kernel->shader_module);
-    if (res != VK_SUCCESS) goto fail;
+    VkResult res =
+        backend->vkCreateShaderModule(backend->device, &sm_info, NULL, &kernel->shader_module);
+    if (res != VK_SUCCESS)
+        goto fail;
 
-    VkDescriptorSetLayoutBinding_t* bindings =
-        (VkDescriptorSetLayoutBinding_t*)cml_calloc(num_buffers,
-                                                  sizeof(VkDescriptorSetLayoutBinding_t));
+    VkDescriptorSetLayoutBinding_t* bindings = (VkDescriptorSetLayoutBinding_t*)cml_calloc(
+        num_buffers, sizeof(VkDescriptorSetLayoutBinding_t));
     for (int i = 0; i < num_buffers; i++) {
-        bindings[i].binding = (uint32_t)i;
-        bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        bindings[i].binding         = (uint32_t)i;
+        bindings[i].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         bindings[i].descriptorCount = 1;
-        bindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        bindings[i].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
     }
 
     VkDescriptorSetLayoutCreateInfo_t dsl_info = {0};
-    dsl_info.sType = 32;
-    dsl_info.bindingCount = (uint32_t)num_buffers;
-    dsl_info.pBindings = bindings;
+    dsl_info.sType                             = 32;
+    dsl_info.bindingCount                      = (uint32_t)num_buffers;
+    dsl_info.pBindings                         = bindings;
 
     res = backend->vkCreateDescriptorSetLayout(backend->device, &dsl_info, NULL,
-                                                 &kernel->desc_layout);
+                                               &kernel->desc_layout);
     cml_free(bindings);
-    if (res != VK_SUCCESS) goto fail;
+    if (res != VK_SUCCESS)
+        goto fail;
 
     VkPipelineLayoutCreateInfo_t pl_info = {0};
-    pl_info.sType = 30;
-    pl_info.setLayoutCount = 1;
-    pl_info.pSetLayouts = &kernel->desc_layout;
+    pl_info.sType                        = 30;
+    pl_info.setLayoutCount               = 1;
+    pl_info.pSetLayouts                  = &kernel->desc_layout;
 
-    res = backend->vkCreatePipelineLayout(backend->device, &pl_info, NULL,
-                                            &kernel->pipeline_layout);
-    if (res != VK_SUCCESS) goto fail;
+    res =
+        backend->vkCreatePipelineLayout(backend->device, &pl_info, NULL, &kernel->pipeline_layout);
+    if (res != VK_SUCCESS)
+        goto fail;
 
     VkComputePipelineCreateInfo_t cp_info = {0};
-    cp_info.sType = 29;
-    cp_info.stage.sType = 18;
-    cp_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    cp_info.stage.module = kernel->shader_module;
-    cp_info.stage.pName = kernel->name;
-    cp_info.layout = kernel->pipeline_layout;
-    cp_info.basePipelineIndex = -1;
+    cp_info.sType                         = 29;
+    cp_info.stage.sType                   = 18;
+    cp_info.stage.stage                   = VK_SHADER_STAGE_COMPUTE_BIT;
+    cp_info.stage.module                  = kernel->shader_module;
+    cp_info.stage.pName                   = kernel->name;
+    cp_info.layout                        = kernel->pipeline_layout;
+    cp_info.basePipelineIndex             = -1;
 
     res = backend->vkCreateComputePipelines(backend->device, NULL, 1, &cp_info, NULL,
-                                              &kernel->pipeline);
-    if (res != VK_SUCCESS) goto fail;
+                                            &kernel->pipeline);
+    if (res != VK_SUCCESS)
+        goto fail;
 
     VkDescriptorPoolSize_t pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (uint32_t)num_buffers};
     VkDescriptorPoolCreateInfo_t dp_info = {0};
-    dp_info.sType = 33;
-    dp_info.maxSets = 1;
-    dp_info.poolSizeCount = 1;
-    dp_info.pPoolSizes = &pool_size;
+    dp_info.sType                        = 33;
+    dp_info.maxSets                      = 1;
+    dp_info.poolSizeCount                = 1;
+    dp_info.pPoolSizes                   = &pool_size;
 
-    res = backend->vkCreateDescriptorPool(backend->device, &dp_info, NULL,
-                                            &kernel->desc_pool);
-    if (res != VK_SUCCESS) goto fail;
+    res = backend->vkCreateDescriptorPool(backend->device, &dp_info, NULL, &kernel->desc_pool);
+    if (res != VK_SUCCESS)
+        goto fail;
 
     VkDescriptorSetAllocateInfo_t ds_info = {0};
-    ds_info.sType = 34;
-    ds_info.descriptorPool = kernel->desc_pool;
-    ds_info.descriptorSetCount = 1;
-    ds_info.pSetLayouts = &kernel->desc_layout;
+    ds_info.sType                         = 34;
+    ds_info.descriptorPool                = kernel->desc_pool;
+    ds_info.descriptorSetCount            = 1;
+    ds_info.pSetLayouts                   = &kernel->desc_layout;
 
     res = backend->vkAllocateDescriptorSets(backend->device, &ds_info, &kernel->desc_set);
-    if (res != VK_SUCCESS) goto fail;
+    if (res != VK_SUCCESS)
+        goto fail;
 
     return kernel;
 
@@ -866,7 +875,8 @@ fail:
 }
 
 void cml_vulkan_kernel_free(CMLVulkanBackend* backend, CMLVulkanKernel* kernel) {
-    if (!backend || !kernel) return;
+    if (!backend || !kernel)
+        return;
 
     if (kernel->desc_pool)
         backend->vkDestroyDescriptorPool(backend->device, kernel->desc_pool, NULL);
@@ -882,74 +892,77 @@ void cml_vulkan_kernel_free(CMLVulkanBackend* backend, CMLVulkanKernel* kernel) 
     cml_free(kernel);
 }
 
-int cml_vulkan_kernel_bind_buffer(CMLVulkanBackend* backend, CMLVulkanKernel* kernel,
-                                   int binding, CMLVulkanBuffer* buffer) {
-    if (!backend || !kernel || !buffer) return -1;
-    if (binding < 0 || binding >= kernel->num_buffers) return -1;
+int cml_vulkan_kernel_bind_buffer(CMLVulkanBackend* backend, CMLVulkanKernel* kernel, int binding,
+                                  CMLVulkanBuffer* buffer) {
+    if (!backend || !kernel || !buffer)
+        return -1;
+    if (binding < 0 || binding >= kernel->num_buffers)
+        return -1;
 
     VkDescriptorBufferInfo_t buf_info = {0};
-    buf_info.buffer = buffer->buffer;
-    buf_info.offset = 0;
-    buf_info.range = buffer->size;
+    buf_info.buffer                   = buffer->buffer;
+    buf_info.offset                   = 0;
+    buf_info.range                    = buffer->size;
 
     VkWriteDescriptorSet_t write = {0};
-    write.sType = 35;
-    write.dstSet = kernel->desc_set;
-    write.dstBinding = (uint32_t)binding;
-    write.descriptorCount = 1;
-    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    write.pBufferInfo = &buf_info;
+    write.sType                  = 35;
+    write.dstSet                 = kernel->desc_set;
+    write.dstBinding             = (uint32_t)binding;
+    write.descriptorCount        = 1;
+    write.descriptorType         = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.pBufferInfo            = &buf_info;
 
     backend->vkUpdateDescriptorSets(backend->device, 1, &write, 0, NULL);
     return 0;
 }
 
-int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kernel,
-                                uint32_t gx, uint32_t gy, uint32_t gz) {
-    if (!backend || !kernel) return -1;
+int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kernel, uint32_t gx,
+                               uint32_t gy, uint32_t gz) {
+    if (!backend || !kernel)
+        return -1;
 
     VkCommandBufferAllocateInfo_t alloc_info = {0};
-    alloc_info.sType = 40;
-    alloc_info.commandPool = backend->command_pool;
-    alloc_info.level = 0;
-    alloc_info.commandBufferCount = 1;
+    alloc_info.sType                         = 40;
+    alloc_info.commandPool                   = backend->command_pool;
+    alloc_info.level                         = 0;
+    alloc_info.commandBufferCount            = 1;
 
     VkCommandBuffer cmd = NULL;
-    VkResult res = backend->vkAllocateCommandBuffers(backend->device, &alloc_info, &cmd);
-    if (res != VK_SUCCESS) return -1;
+    VkResult res        = backend->vkAllocateCommandBuffers(backend->device, &alloc_info, &cmd);
+    if (res != VK_SUCCESS)
+        return -1;
 
     VkCommandBufferBeginInfo_t begin_info = {0};
-    begin_info.sType = 42;
-    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    begin_info.sType                      = 42;
+    begin_info.flags                      = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     backend->vkBeginCommandBuffer(cmd, &begin_info);
 
     backend->vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, kernel->pipeline);
-    backend->vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                      kernel->pipeline_layout, 0, 1,
-                                      &kernel->desc_set, 0, NULL);
+    backend->vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, kernel->pipeline_layout,
+                                     0, 1, &kernel->desc_set, 0, NULL);
 
     backend->vkCmdDispatch(cmd, gx, gy, gz);
 
     VkMemoryBarrier_t barrier = {0};
-    barrier.sType = 46;
-    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
-    backend->vkCmdPipelineBarrier(cmd,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
-        0, 1, &barrier, 0, NULL, 0, NULL);
+    barrier.sType             = 46;
+    barrier.srcAccessMask     = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask     = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
+    backend->vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                                  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                                      VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                  0, 1, &barrier, 0, NULL, 0, NULL);
 
     backend->vkEndCommandBuffer(cmd);
 
     VkFenceCreateInfo_t fence_info = {0};
-    fence_info.sType = 8;
-    VkFence fence = NULL;
+    fence_info.sType               = 8;
+    VkFence fence                  = NULL;
     backend->vkCreateFence(backend->device, &fence_info, NULL, &fence);
 
-    VkSubmitInfo_t submit = {0};
-    submit.sType = 4;
+    VkSubmitInfo_t submit     = {0};
+    submit.sType              = 4;
     submit.commandBufferCount = 1;
-    submit.pCommandBuffers = &cmd;
+    submit.pCommandBuffers    = &cmd;
 
     backend->vkQueueSubmit(backend->compute_queue, 1, &submit, fence);
     backend->vkWaitForFences(backend->device, 1, &fence, 1, UINT64_MAX);
@@ -959,11 +972,10 @@ int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kerne
     return 0;
 }
 
-
 /* Process-wide lazily-initialised Vulkan backend for the execution path.
  * Returns NULL if no Vulkan device is available (caller stays on CPU). */
-static CMLVulkanBackend* g_vk_backend       = NULL;
-static int               g_vk_backend_tried = 0;
+static CMLVulkanBackend* g_vk_backend = NULL;
+static int g_vk_backend_tried         = 0;
 
 CMLVulkanBackend* cml_vulkan_get_backend(void) {
     if (g_vk_backend_tried)
@@ -989,28 +1001,62 @@ static int vk_classify(UOpType t, int num_inputs, int* op_code) {
         return 3;
     if (num_inputs == 2) {
         switch (t) {
-            case UOP_ADD: *op_code = 0; return 1;
-            case UOP_SUB: *op_code = 1; return 1;
-            case UOP_MUL: *op_code = 2; return 1;
-            case UOP_DIV: *op_code = 3; return 1;
-            case UOP_MAX: *op_code = 4; return 1;
-            default:      return 0;
+        case UOP_ADD:
+            *op_code = 0;
+            return 1;
+        case UOP_SUB:
+            *op_code = 1;
+            return 1;
+        case UOP_MUL:
+            *op_code = 2;
+            return 1;
+        case UOP_DIV:
+            *op_code = 3;
+            return 1;
+        case UOP_MAX:
+            *op_code = 4;
+            return 1;
+        default:
+            return 0;
         }
     }
     if (num_inputs == 1) {
         switch (t) {
-            case UOP_RELU:    *op_code = 0; return 2;
-            case UOP_NEG:     *op_code = 1; return 2;
-            case UOP_EXP:     *op_code = 2; return 2;
-            case UOP_SQRT:    *op_code = 3; return 2;
-            case UOP_SQUARE:  *op_code = 4; return 2;
-            case UOP_SIGMOID: *op_code = 5; return 2;
-            case UOP_TANH:    *op_code = 6; return 2;
-            case UOP_ABS:     *op_code = 7; return 2;
-            case UOP_LOG:     *op_code = 8; return 2;
-            case UOP_RECIP:   *op_code = 9; return 2;
-            case UOP_RSQRT:   *op_code = 10; return 2;
-            default:          return 0;
+        case UOP_RELU:
+            *op_code = 0;
+            return 2;
+        case UOP_NEG:
+            *op_code = 1;
+            return 2;
+        case UOP_EXP:
+            *op_code = 2;
+            return 2;
+        case UOP_SQRT:
+            *op_code = 3;
+            return 2;
+        case UOP_SQUARE:
+            *op_code = 4;
+            return 2;
+        case UOP_SIGMOID:
+            *op_code = 5;
+            return 2;
+        case UOP_TANH:
+            *op_code = 6;
+            return 2;
+        case UOP_ABS:
+            *op_code = 7;
+            return 2;
+        case UOP_LOG:
+            *op_code = 8;
+            return 2;
+        case UOP_RECIP:
+            *op_code = 9;
+            return 2;
+        case UOP_RSQRT:
+            *op_code = 10;
+            return 2;
+        default:
+            return 0;
         }
     }
     return 0;
@@ -1046,12 +1092,12 @@ int cml_vulkan_execute_node(CMLVulkanBackend* backend, struct IRNode* node) {
         return -1;
 
     /* matmul: 2D only, dims from shapes */
-    uint32_t P[4]  = {0, 0, 0, 0};
+    uint32_t P[4] = {0, 0, 0, 0};
     uint32_t gx = 1, gy = 1;
     const uint32_t* spv = NULL;
-    size_t spv_size = 0;
-    int num_bufs = 0;
-    size_t n = out->numel;
+    size_t spv_size     = 0;
+    int num_bufs        = 0;
+    size_t n            = out->numel;
 
     if (kind == 3) {
         if (in0->ndim != 2 || in1->ndim != 2 || out->ndim != 2)
@@ -1060,40 +1106,55 @@ int cml_vulkan_execute_node(CMLVulkanBackend* backend, struct IRNode* node) {
         uint32_t K = (uint32_t)in0->shape[1];
         if ((uint32_t)in1->shape[0] != K)
             return -1;
-        P[0] = M; P[1] = N; P[2] = K;
-        gx = (N + 15u) / 16u; gy = (M + 15u) / 16u;
-        spv = VK_SPV_MATMUL; spv_size = VK_SPV_MATMUL_SIZE; num_bufs = 4;
+        P[0]     = M;
+        P[1]     = N;
+        P[2]     = K;
+        gx       = (N + 15u) / 16u;
+        gy       = (M + 15u) / 16u;
+        spv      = VK_SPV_MATMUL;
+        spv_size = VK_SPV_MATMUL_SIZE;
+        num_bufs = 4;
     } else if (kind == 1) {
-        P[0] = (uint32_t)n; P[1] = (uint32_t)op_code;
-        P[2] = (uint32_t)in0->numel; P[3] = (uint32_t)in1->numel;
-        gx = ((uint32_t)n + 255u) / 256u;
-        spv = VK_SPV_BINARY; spv_size = VK_SPV_BINARY_SIZE; num_bufs = 4;
+        P[0]     = (uint32_t)n;
+        P[1]     = (uint32_t)op_code;
+        P[2]     = (uint32_t)in0->numel;
+        P[3]     = (uint32_t)in1->numel;
+        gx       = ((uint32_t)n + 255u) / 256u;
+        spv      = VK_SPV_BINARY;
+        spv_size = VK_SPV_BINARY_SIZE;
+        num_bufs = 4;
     } else { /* unary */
-        P[0] = (uint32_t)n; P[1] = (uint32_t)op_code;
-        gx = ((uint32_t)n + 255u) / 256u;
-        spv = VK_SPV_UNARY; spv_size = VK_SPV_UNARY_SIZE; num_bufs = 3;
+        P[0]     = (uint32_t)n;
+        P[1]     = (uint32_t)op_code;
+        gx       = ((uint32_t)n + 255u) / 256u;
+        spv      = VK_SPV_UNARY;
+        spv_size = VK_SPV_UNARY_SIZE;
+        num_bufs = 3;
     }
 
     if (!out->data) {
         out->data = cml_calloc(n, sizeof(float));
-        if (!out->data) return -1;
+        if (!out->data)
+            return -1;
         out->owns_data = true;
     }
 
     CMLVulkanKernel* kernel = cml_vulkan_kernel_create(backend, spv, spv_size, "main", num_bufs);
-    if (!kernel) return -1;
+    if (!kernel)
+        return -1;
 
-    int rc = -1;
+    int rc                 = -1;
     CMLVulkanBuffer* b_in0 = cml_vulkan_buffer_create(backend, in0->numel * sizeof(float), true);
     CMLVulkanBuffer* b_out = cml_vulkan_buffer_create(backend, n * sizeof(float), true);
-    CMLVulkanBuffer* b_in1 = in1 ? cml_vulkan_buffer_create(backend, in1->numel * sizeof(float), true)
-                                 : NULL;
+    CMLVulkanBuffer* b_in1 =
+        in1 ? cml_vulkan_buffer_create(backend, in1->numel * sizeof(float), true) : NULL;
     CMLVulkanBuffer* b_par = cml_vulkan_buffer_create(backend, sizeof(P), true);
     if (!b_in0 || !b_out || !b_par || (in1 && !b_in1))
         goto done;
 
     cml_vulkan_buffer_upload(backend, b_in0, in0->data, in0->numel * sizeof(float));
-    if (b_in1) cml_vulkan_buffer_upload(backend, b_in1, in1->data, in1->numel * sizeof(float));
+    if (b_in1)
+        cml_vulkan_buffer_upload(backend, b_in1, in1->data, in1->numel * sizeof(float));
     cml_vulkan_buffer_upload(backend, b_par, P, sizeof(P));
 
     cml_vulkan_kernel_bind_buffer(backend, kernel, 0, b_in0);
@@ -1111,16 +1172,21 @@ int cml_vulkan_execute_node(CMLVulkanBackend* backend, struct IRNode* node) {
     rc = 0;
 
 done:
-    if (b_in0) cml_vulkan_buffer_free(backend, b_in0);
-    if (b_in1) cml_vulkan_buffer_free(backend, b_in1);
-    if (b_out) cml_vulkan_buffer_free(backend, b_out);
-    if (b_par) cml_vulkan_buffer_free(backend, b_par);
+    if (b_in0)
+        cml_vulkan_buffer_free(backend, b_in0);
+    if (b_in1)
+        cml_vulkan_buffer_free(backend, b_in1);
+    if (b_out)
+        cml_vulkan_buffer_free(backend, b_out);
+    if (b_par)
+        cml_vulkan_buffer_free(backend, b_par);
     cml_vulkan_kernel_free(backend, kernel);
     return rc;
 }
 
 int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
-    if (!backend || !backend->initialized || !ir) return -1;
+    if (!backend || !backend->initialized || !ir)
+        return -1;
 
     /* Delegate to the validated per-node path. The previous inline
      * reimplementation created kernels with a params/dims binding it never
@@ -1140,13 +1206,14 @@ int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
             if (cpu_execute_node(node) != 0)
                 return -1;
         }
-        node->is_executed = true;
+        node->is_executed         = true;
         node->output->is_executed = true;
     }
     return 0;
 }
 
 int cml_vulkan_synchronize(CMLVulkanBackend* backend) {
-    if (!backend || !backend->initialized) return -1;
+    if (!backend || !backend->initialized)
+        return -1;
     return backend->vkDeviceWaitIdle(backend->device) == VK_SUCCESS ? 0 : -1;
 }

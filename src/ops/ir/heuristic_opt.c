@@ -7,19 +7,18 @@
 #include <string.h>
 
 static CMLHeuristicConfig g_heuristic_config = {
-    .max_local_size = CML_HEURISTIC_DEFAULT_LOCAL_SIZE,
+    .max_local_size      = CML_HEURISTIC_DEFAULT_LOCAL_SIZE,
     .preferred_vec_width = CML_HEURISTIC_DEFAULT_VEC_WIDTH,
-    .use_local_memory = true,
+    .use_local_memory    = true,
 };
 
 void cml_heuristic_set_config(CMLHeuristicConfig* config) {
-    if (!config) return;
+    if (!config)
+        return;
     g_heuristic_config = *config;
 }
 
-CMLHeuristicConfig cml_heuristic_get_config(void) {
-    return g_heuristic_config;
-}
+CMLHeuristicConfig cml_heuristic_get_config(void) { return g_heuristic_config; }
 
 typedef enum {
     KERNEL_ELEMENTWISE,
@@ -32,16 +31,25 @@ typedef enum {
 static KernelKind classify_program(const struct LinearProgram* prog) {
     bool has_reduce = false;
     bool has_matmul = false;
-    bool has_conv = false;
+    bool has_conv   = false;
 
     for (int i = 0; i < prog->num_ops; i++) {
-        if (prog->ops[i].kind != LINOP_COMPUTE) continue;
+        if (prog->ops[i].kind != LINOP_COMPUTE)
+            continue;
         UOpType uop = prog->ops[i].uop;
         switch (uop) {
-        case UOP_SUM: case UOP_MAX_REDUCE: case UOP_MEAN:
-        case UOP_PROD: case UOP_MIN_REDUCE: case UOP_VAR:
-        case UOP_STD: case UOP_ANY: case UOP_ALL:
-        case UOP_LOGSUMEXP: case UOP_ARGMAX: case UOP_ARGMIN:
+        case UOP_SUM:
+        case UOP_MAX_REDUCE:
+        case UOP_MEAN:
+        case UOP_PROD:
+        case UOP_MIN_REDUCE:
+        case UOP_VAR:
+        case UOP_STD:
+        case UOP_ANY:
+        case UOP_ALL:
+        case UOP_LOGSUMEXP:
+        case UOP_ARGMAX:
+        case UOP_ARGMIN:
             has_reduce = true;
             break;
         case UOP_MATMUL:
@@ -55,9 +63,12 @@ static KernelKind classify_program(const struct LinearProgram* prog) {
         }
     }
 
-    if (has_matmul) return KERNEL_MATMUL;
-    if (has_conv) return KERNEL_CONV;
-    if (has_reduce) return KERNEL_REDUCE;
+    if (has_matmul)
+        return KERNEL_MATMUL;
+    if (has_conv)
+        return KERNEL_CONV;
+    if (has_reduce)
+        return KERNEL_REDUCE;
     return KERNEL_ELEMENTWISE;
 }
 
@@ -74,7 +85,8 @@ static int innermost_axis(const struct LinearProgram* prog) {
 }
 
 static int pick_tile(int extent, int preferred) {
-    if (extent <= 0) return 1;
+    if (extent <= 0)
+        return 1;
     int tile = preferred;
     while (tile > 1 && extent % tile != 0)
         tile /= 2;
@@ -91,9 +103,10 @@ static int pick_power2_tile(int extent, int max_tile) {
 static CMLOptList* optimize_elementwise(const struct LinearProgram* prog,
                                         const CMLHeuristicConfig* cfg) {
     CMLOptList* opts = cml_opt_list_create();
-    if (!opts) return NULL;
+    if (!opts)
+        return NULL;
 
-    int inner = innermost_axis(prog);
+    int inner  = innermost_axis(prog);
     int extent = (inner < prog->num_axes) ? prog->loop_axes[inner] : 0;
 
     if (extent > 1) {
@@ -102,20 +115,23 @@ static CMLOptList* optimize_elementwise(const struct LinearProgram* prog,
             cml_opt_list_add(opts, OPT_UPCAST, inner, vec);
     }
 
-    int best_group_axis = -1;
+    int best_group_axis   = -1;
     int best_group_extent = 0;
     for (int ax = 0; ax < prog->num_axes; ax++) {
         if (prog->loop_axes[ax] > best_group_extent) {
             best_group_extent = prog->loop_axes[ax];
-            best_group_axis = ax;
+            best_group_axis   = ax;
         }
     }
 
     if (best_group_axis >= 0 && best_group_extent > 1) {
-        int vec = (inner < prog->num_axes) ? pick_tile(prog->loop_axes[inner], cfg->preferred_vec_width) : 1;
-        if (vec < 1) vec = 1;
+        int vec = (inner < prog->num_axes)
+                      ? pick_tile(prog->loop_axes[inner], cfg->preferred_vec_width)
+                      : 1;
+        if (vec < 1)
+            vec = 1;
         int group_target = cfg->max_local_size / (vec > 0 ? vec : 1);
-        int group_size = pick_power2_tile(best_group_extent, group_target);
+        int group_size   = pick_power2_tile(best_group_extent, group_target);
         if (group_size > 1)
             cml_opt_list_add(opts, OPT_GROUP, best_group_axis, group_size);
     }
@@ -126,9 +142,10 @@ static CMLOptList* optimize_elementwise(const struct LinearProgram* prog,
 static CMLOptList* optimize_reduce(const struct LinearProgram* prog,
                                    const CMLHeuristicConfig* cfg) {
     CMLOptList* opts = cml_opt_list_create();
-    if (!opts) return NULL;
+    if (!opts)
+        return NULL;
 
-    int reduce_ax = find_reduce_axis(prog);
+    int reduce_ax     = find_reduce_axis(prog);
     int reduce_extent = (reduce_ax < prog->num_axes) ? prog->loop_axes[reduce_ax] : 0;
 
     if (cfg->use_local_memory && cml_flag(CML_FLAG_SPLIT_REDUCEOP) && reduce_extent > 1) {
@@ -139,7 +156,7 @@ static CMLOptList* optimize_reduce(const struct LinearProgram* prog,
             cml_opt_list_add(opts, OPT_LOCAL, reduce_ax, local_tile);
     }
 
-    int inner = innermost_axis(prog);
+    int inner        = innermost_axis(prog);
     int inner_extent = (inner < prog->num_axes) ? prog->loop_axes[inner] : 0;
 
     if (inner != reduce_ax && inner_extent > 1) {
@@ -165,7 +182,8 @@ static CMLOptList* optimize_reduce(const struct LinearProgram* prog,
 static CMLOptList* optimize_matmul(const struct LinearProgram* prog,
                                    const CMLHeuristicConfig* cfg) {
     CMLOptList* opts = cml_opt_list_create();
-    if (!opts) return NULL;
+    if (!opts)
+        return NULL;
 
     int ax_m = -1, ax_n = -1, ax_k = -1;
     if (prog->num_axes >= 3) {
@@ -201,14 +219,15 @@ static CMLOptList* optimize_matmul(const struct LinearProgram* prog,
     return opts;
 }
 
-static CMLOptList* optimize_conv(const struct LinearProgram* prog,
-                                 const CMLHeuristicConfig* cfg) {
+static CMLOptList* optimize_conv(const struct LinearProgram* prog, const CMLHeuristicConfig* cfg) {
     CMLOptList* opts = cml_opt_list_create();
-    if (!opts) return NULL;
+    if (!opts)
+        return NULL;
 
     for (int ax = 0; ax < prog->num_axes && ax < 2; ax++) {
         int extent = prog->loop_axes[ax];
-        if (extent <= 1) continue;
+        if (extent <= 1)
+            continue;
         if (cfg->use_local_memory) {
             int tile = pick_power2_tile(extent, 16);
             if (tile > 1)
@@ -217,7 +236,7 @@ static CMLOptList* optimize_conv(const struct LinearProgram* prog,
     }
 
     if (prog->num_axes > 2) {
-        int ch_axis = 2;
+        int ch_axis   = 2;
         int ch_extent = prog->loop_axes[ch_axis];
         if (ch_extent > 1) {
             int unroll = pick_tile(ch_extent, 4);
@@ -233,7 +252,7 @@ CMLOptList* cml_heuristic_optimize(struct LinearProgram* prog) {
     if (!prog || prog->num_axes == 0)
         return cml_opt_list_create();
 
-    KernelKind kind = classify_program(prog);
+    KernelKind kind  = classify_program(prog);
     CMLOptList* opts = NULL;
 
     switch (kind) {

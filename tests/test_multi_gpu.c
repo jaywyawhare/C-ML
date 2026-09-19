@@ -24,19 +24,21 @@
 #endif
 
 /* Test counters */
-#define ASSERT(cond) do { \
-    if (!(cond)) { \
-        printf("(ASSERT failed: %s, line %d) ", #cond, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT(cond)                                                                               \
+    do {                                                                                           \
+        if (!(cond)) {                                                                             \
+            printf("(ASSERT failed: %s, line %d) ", #cond, __LINE__);                              \
+            return 0;                                                                              \
+        }                                                                                          \
+    } while (0)
 
-#define ASSERT_NEAR(a, b, eps) do { \
-    if (fabsf((a) - (b)) > (eps)) { \
-        printf("(%.6f != %.6f, line %d) ", (a), (b), __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_NEAR(a, b, eps)                                                                     \
+    do {                                                                                           \
+        if (fabsf((a) - (b)) > (eps)) {                                                            \
+            printf("(%.6f != %.6f, line %d) ", (a), (b), __LINE__);                                \
+            return 0;                                                                              \
+        }                                                                                          \
+    } while (0)
 
 static int test_sim_gpu_enable_disable(void) {
     /* Enable 4 simulated GPUs with 256MB each */
@@ -141,7 +143,7 @@ static int test_sim_gpu_copy(void) {
     device_sim_gpu_enable(2, 1024 * 1024);
 
     float cpu_data[] = {1.0f, 2.0f, 3.0f, 4.0f};
-    float result[4] = {0};
+    float result[4]  = {0};
 
     /* CPU -> SimGPU */
     void* gpu_buf = device_alloc(sizeof(cpu_data), DEVICE_SIM_GPU);
@@ -175,9 +177,9 @@ static int test_sim_gpu_tensor_move(void) {
     device_sim_gpu_enable(2, 1024 * 1024);
 
     /* Create a CPU tensor explicitly */
-    int shape[] = {2, 3};
-    TensorConfig cpu_cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                            .has_dtype = true, .has_device = true};
+    int shape[]          = {2, 3};
+    TensorConfig cpu_cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* t = tensor_ones(shape, 2, &cpu_cfg);
     ASSERT(t != NULL);
     tensor_ensure_executed(t);
@@ -292,7 +294,7 @@ static int test_dist_allreduce_single(void) {
     cml_dist_init(DIST_BACKEND_GLOO, 1, 0);
 
     int shape[] = {4};
-    Tensor* t = tensor_from_data((float[]){1.0f, 2.0f, 3.0f, 4.0f}, shape, 1, NULL);
+    Tensor* t   = tensor_from_data((float[]){1.0f, 2.0f, 3.0f, 4.0f}, shape, 1, NULL);
     ASSERT(t != NULL);
     tensor_ensure_executed(t);
 
@@ -317,7 +319,7 @@ static int test_dist_allreduce_avg(void) {
     cml_dist_init(DIST_BACKEND_GLOO, 1, 0);
 
     int shape[] = {3};
-    Tensor* t = tensor_from_data((float[]){6.0f, 9.0f, 12.0f}, shape, 1, NULL);
+    Tensor* t   = tensor_from_data((float[]){6.0f, 9.0f, 12.0f}, shape, 1, NULL);
     ASSERT(t != NULL);
     tensor_ensure_executed(t);
 
@@ -339,7 +341,7 @@ static int test_dist_broadcast_single(void) {
     cml_dist_init(DIST_BACKEND_GLOO, 1, 0);
 
     int shape[] = {3};
-    Tensor* t = tensor_from_data((float[]){10.0f, 20.0f, 30.0f}, shape, 1, NULL);
+    Tensor* t   = tensor_from_data((float[]){10.0f, 20.0f, 30.0f}, shape, 1, NULL);
     ASSERT(t != NULL);
     tensor_ensure_executed(t);
 
@@ -359,7 +361,7 @@ static int test_dist_broadcast_single(void) {
 static int test_dist_allgather_single(void) {
     cml_dist_init(DIST_BACKEND_GLOO, 1, 0);
 
-    int shape[] = {2};
+    int shape[]   = {2};
     Tensor* input = tensor_from_data((float[]){5.0f, 7.0f}, shape, 1, NULL);
     ASSERT(input != NULL);
     tensor_ensure_executed(input);
@@ -369,7 +371,7 @@ static int test_dist_allgather_single(void) {
     tensor_ensure_executed(output);
 
     Tensor* outputs[] = {output};
-    int ret = cml_dist_allgather(outputs, input);
+    int ret           = cml_dist_allgather(outputs, input);
     ASSERT(ret == 0);
 
     float* odata = (float*)output->data;
@@ -398,7 +400,7 @@ static int test_dist_async_allreduce(void) {
     cml_dist_init(DIST_BACKEND_GLOO, 1, 0);
 
     int shape[] = {3};
-    Tensor* t = tensor_from_data((float[]){1.0f, 2.0f, 3.0f}, shape, 1, NULL);
+    Tensor* t   = tensor_from_data((float[]){1.0f, 2.0f, 3.0f}, shape, 1, NULL);
     ASSERT(t != NULL);
     tensor_ensure_executed(t);
 
@@ -424,7 +426,7 @@ static int test_dist_not_initialized(void) {
     ASSERT(cml_dist_get_world_size() == 1);
 
     int shape[] = {2};
-    Tensor* t = tensor_ones(shape, 1, NULL);
+    Tensor* t   = tensor_ones(shape, 1, NULL);
     tensor_ensure_executed(t);
 
     ASSERT(cml_dist_allreduce(t, DIST_REDUCE_SUM) == -1);
@@ -468,7 +470,7 @@ static int test_ddp_forward(void) {
     CMLDataParallel* ddp = cml_ddp_create((Module*)model, NULL);
     ASSERT(ddp != NULL);
 
-    int shape[] = {2, 3};
+    int shape[]   = {2, 3};
     Tensor* input = tensor_ones(shape, 2, NULL);
     ASSERT(input != NULL);
     tensor_ensure_executed(input);
@@ -501,8 +503,8 @@ static int test_ddp_gradient_sync(void) {
     /* Do a forward + backward pass */
     int x_shape[] = {4, 2};
     int y_shape[] = {4, 1};
-    Tensor* x = tensor_ones(x_shape, 2, NULL);
-    Tensor* y = tensor_ones(y_shape, 2, NULL);
+    Tensor* x     = tensor_ones(x_shape, 2, NULL);
+    Tensor* y     = tensor_ones(y_shape, 2, NULL);
     tensor_ensure_executed(x);
     tensor_ensure_executed(y);
 
@@ -534,7 +536,7 @@ static int test_ddp_gradient_sync(void) {
 static int test_ddp_custom_config(void) {
     cml_dist_init(DIST_BACKEND_GLOO, 1, 0);
 
-    DDPConfig config = cml_ddp_default_config();
+    DDPConfig config         = cml_ddp_default_config();
     config.bucket_size_bytes = 1024; /* Tiny buckets for testing */
     config.broadcast_buffers = false;
 
@@ -614,11 +616,11 @@ static int test_pipeline_forward(void) {
         {.module = stage1, .device_id = 0, .device = DEVICE_CPU, .stage_id = 1},
     };
 
-    PipelineConfig config = {.num_micro_batches = 2, .num_stages = 2, .interleaved = false};
+    PipelineConfig config         = {.num_micro_batches = 2, .num_stages = 2, .interleaved = false};
     CMLPipelineParallel* pipeline = cml_pipeline_create(stages, 2, &config);
     ASSERT(pipeline != NULL);
 
-    int shape[] = {4, 3};
+    int shape[]   = {4, 3};
     Tensor* input = tensor_ones(shape, 2, NULL);
     ASSERT(input != NULL);
     tensor_ensure_executed(input);
@@ -653,7 +655,7 @@ static int test_pipeline_backward(void) {
     ASSERT(pipeline != NULL);
 
     int grad_shape[] = {1};
-    Tensor* grad = tensor_ones(grad_shape, 1, NULL);
+    Tensor* grad     = tensor_ones(grad_shape, 1, NULL);
     tensor_ensure_executed(grad);
 
     int ret = cml_pipeline_backward(pipeline, grad);
@@ -715,7 +717,7 @@ static int test_sim_gpu_with_distributed(void) {
 
     /* Allreduce on a tensor */
     int shape[] = {5};
-    Tensor* t = tensor_from_data((float[]){1.0f, 2.0f, 3.0f, 4.0f, 5.0f}, shape, 1, NULL);
+    Tensor* t   = tensor_from_data((float[]){1.0f, 2.0f, 3.0f, 4.0f, 5.0f}, shape, 1, NULL);
     tensor_ensure_executed(t);
 
     int ret = cml_dist_allreduce(t, DIST_REDUCE_SUM);
@@ -747,18 +749,18 @@ static int test_ddp_training_loop(void) {
 
     /* Create optimizer */
     Parameter** params = NULL;
-    int num_params = 0;
+    int num_params     = 0;
     module_collect_parameters((Module*)model, &params, &num_params, true);
     Optimizer* optimizer = optim_sgd(params, num_params, 0.01f, 0.0f, 0.0f);
     ASSERT(optimizer != NULL);
 
     /* Simple XOR-like data */
-    float x_data[] = {0,0, 0,1, 1,0, 1,1};
+    float x_data[] = {0, 0, 0, 1, 1, 0, 1, 1};
     float y_data[] = {0, 1, 1, 0};
-    int x_shape[] = {4, 2};
-    int y_shape[] = {4, 1};
+    int x_shape[]  = {4, 2};
+    int y_shape[]  = {4, 1};
 
-    float prev_loss = 1e10;
+    float prev_loss     = 1e10;
     bool loss_decreased = false;
 
     for (int epoch = 0; epoch < 50; epoch++) {

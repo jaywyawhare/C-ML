@@ -16,8 +16,8 @@ extern "C" {
 #endif
 
 typedef struct CMLNF4Tensor {
-    Tensor* packed_data;    /* uint8 tensor, numel = original_numel / 2 */
-    float* scales;          /* Per-block scale factors */
+    Tensor* packed_data; /* uint8 tensor, numel = original_numel / 2 */
+    float* scales;       /* Per-block scale factors */
     int num_scales;
     int block_size;
     size_t original_numel;
@@ -30,13 +30,13 @@ typedef struct CMLQLoRALinear {
     int out_features;
     int rank;
     float alpha;
-    float scaling;          /* alpha / rank */
+    float scaling; /* alpha / rank */
 
-    CMLNF4Tensor* base_weight_nf4;  /* NF4-quantized base weight */
-    Tensor* lora_A;         /* [rank, in_features] float32 */
-    Tensor* lora_B;         /* [out_features, rank] float32 */
+    CMLNF4Tensor* base_weight_nf4; /* NF4-quantized base weight */
+    Tensor* lora_A;                /* [rank, in_features] float32 */
+    Tensor* lora_B;                /* [out_features, rank] float32 */
 
-    bool enable_double_quant;  /* Quantize the scales too */
+    bool enable_double_quant; /* Quantize the scales too */
 } CMLQLoRALinear;
 
 CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size);
@@ -46,8 +46,7 @@ void cml_nf4_tensor_free(CMLNF4Tensor* nf4);
 Tensor* cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4);
 
 /* Quantizes base_weight to NF4, initializes lora_A (Xavier) and lora_B (zeros). */
-CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank,
-                                         float alpha, int block_size);
+CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank, float alpha, int block_size);
 
 void cml_qlora_linear_free(CMLQLoRALinear* qlora);
 

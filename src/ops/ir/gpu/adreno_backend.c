@@ -8,21 +8,21 @@
 #include <stdint.h>
 #include "alloc/cml_allocator.h"
 
-#define CL_SUCCESS                  0
-#define CL_TRUE                     1
-#define CL_MEM_READ_WRITE           (1 << 0)
-#define CL_MEM_WRITE_ONLY           (1 << 1)
-#define CL_MEM_READ_ONLY            (1 << 2)
-#define CL_DEVICE_TYPE_GPU          (1 << 2)
-#define CL_PLATFORM_NAME            0x0902
-#define CL_DEVICE_NAME              0x102B
-#define CL_DEVICE_VENDOR            0x102C
-#define CL_DEVICE_VERSION           0x102F
-#define CL_DEVICE_GLOBAL_MEM_SIZE   0x101F
+#define CL_SUCCESS 0
+#define CL_TRUE 1
+#define CL_MEM_READ_WRITE (1 << 0)
+#define CL_MEM_WRITE_ONLY (1 << 1)
+#define CL_MEM_READ_ONLY (1 << 2)
+#define CL_DEVICE_TYPE_GPU (1 << 2)
+#define CL_PLATFORM_NAME 0x0902
+#define CL_DEVICE_NAME 0x102B
+#define CL_DEVICE_VENDOR 0x102C
+#define CL_DEVICE_VERSION 0x102F
+#define CL_DEVICE_GLOBAL_MEM_SIZE 0x101F
 #define CL_DEVICE_MAX_MEM_ALLOC_SIZE 0x1010
 #define CL_DEVICE_MAX_WORK_GROUP_SIZE 0x1004
 #define CL_DEVICE_MAX_COMPUTE_UNITS 0x1002
-#define CL_PROGRAM_BUILD_LOG        0x1183
+#define CL_PROGRAM_BUILD_LOG 0x1183
 
 typedef int32_t cl_int;
 typedef uint32_t cl_uint;
@@ -36,47 +36,51 @@ typedef cl_int (*clGetPlatformIDs_fn)(cl_uint, void**, cl_uint*);
 typedef cl_int (*clGetDeviceIDs_fn)(void*, cl_device_type, cl_uint, void**, cl_uint*);
 typedef cl_int (*clGetPlatformInfo_fn)(void*, cl_platform_info, size_t, void*, size_t*);
 typedef cl_int (*clGetDeviceInfo_fn)(void*, cl_device_info, size_t, void*, size_t*);
-typedef void*  (*clCreateContext_fn)(void*, cl_uint, void**, void*, void*, cl_int*);
-typedef void*  (*clCreateCommandQueue_fn)(void*, void*, uint64_t, cl_int*);
-typedef void*  (*clCreateProgramWithSource_fn)(void*, cl_uint, const char**, const size_t*, cl_int*);
+typedef void* (*clCreateContext_fn)(void*, cl_uint, void**, void*, void*, cl_int*);
+typedef void* (*clCreateCommandQueue_fn)(void*, void*, uint64_t, cl_int*);
+typedef void* (*clCreateProgramWithSource_fn)(void*, cl_uint, const char**, const size_t*, cl_int*);
 typedef cl_int (*clBuildProgram_fn)(void*, cl_uint, void**, const char*, void*, void*);
-typedef void*  (*clCreateKernel_fn)(void*, const char*, cl_int*);
+typedef void* (*clCreateKernel_fn)(void*, const char*, cl_int*);
 typedef cl_int (*clSetKernelArg_fn)(void*, cl_uint, size_t, const void*);
-typedef cl_int (*clEnqueueNDRangeKernel_fn)(void*, void*, cl_uint, const size_t*, const size_t*, const size_t*, cl_uint, void*, void*);
+typedef cl_int (*clEnqueueNDRangeKernel_fn)(void*, void*, cl_uint, const size_t*, const size_t*,
+                                            const size_t*, cl_uint, void*, void*);
 typedef cl_int (*clFinish_fn)(void*);
 typedef cl_int (*clReleaseKernel_fn)(void*);
 typedef cl_int (*clReleaseProgram_fn)(void*);
 typedef cl_int (*clReleaseCommandQueue_fn)(void*);
 typedef cl_int (*clReleaseContext_fn)(void*);
-typedef void*  (*clCreateBuffer_fn)(void*, uint64_t, size_t, void*, cl_int*);
-typedef cl_int (*clEnqueueReadBuffer_fn)(void*, void*, cl_uint, size_t, size_t, void*, cl_uint, void*, void*);
-typedef cl_int (*clEnqueueWriteBuffer_fn)(void*, void*, cl_uint, size_t, size_t, const void*, cl_uint, void*, void*);
+typedef void* (*clCreateBuffer_fn)(void*, uint64_t, size_t, void*, cl_int*);
+typedef cl_int (*clEnqueueReadBuffer_fn)(void*, void*, cl_uint, size_t, size_t, void*, cl_uint,
+                                         void*, void*);
+typedef cl_int (*clEnqueueWriteBuffer_fn)(void*, void*, cl_uint, size_t, size_t, const void*,
+                                          cl_uint, void*, void*);
 typedef cl_int (*clReleaseMemObject_fn)(void*);
-typedef cl_int (*clGetProgramBuildInfo_fn)(void*, void*, cl_program_build_info, size_t, void*, size_t*);
+typedef cl_int (*clGetProgramBuildInfo_fn)(void*, void*, cl_program_build_info, size_t, void*,
+                                           size_t*);
 
 static void* s_cl_lib = NULL;
 
-static clGetPlatformIDs_fn          fn_clGetPlatformIDs          = NULL;
-static clGetDeviceIDs_fn            fn_clGetDeviceIDs            = NULL;
-static clGetPlatformInfo_fn         fn_clGetPlatformInfo         = NULL;
-static clGetDeviceInfo_fn           fn_clGetDeviceInfo           = NULL;
-static clCreateContext_fn           fn_clCreateContext            = NULL;
-static clCreateCommandQueue_fn      fn_clCreateCommandQueue      = NULL;
+static clGetPlatformIDs_fn fn_clGetPlatformIDs                   = NULL;
+static clGetDeviceIDs_fn fn_clGetDeviceIDs                       = NULL;
+static clGetPlatformInfo_fn fn_clGetPlatformInfo                 = NULL;
+static clGetDeviceInfo_fn fn_clGetDeviceInfo                     = NULL;
+static clCreateContext_fn fn_clCreateContext                     = NULL;
+static clCreateCommandQueue_fn fn_clCreateCommandQueue           = NULL;
 static clCreateProgramWithSource_fn fn_clCreateProgramWithSource = NULL;
-static clBuildProgram_fn            fn_clBuildProgram            = NULL;
-static clCreateKernel_fn            fn_clCreateKernel            = NULL;
-static clSetKernelArg_fn            fn_clSetKernelArg            = NULL;
-static clEnqueueNDRangeKernel_fn    fn_clEnqueueNDRangeKernel    = NULL;
-static clFinish_fn                  fn_clFinish                  = NULL;
-static clReleaseKernel_fn           fn_clReleaseKernel           = NULL;
-static clReleaseProgram_fn          fn_clReleaseProgram          = NULL;
-static clReleaseCommandQueue_fn     fn_clReleaseCommandQueue     = NULL;
-static clReleaseContext_fn          fn_clReleaseContext           = NULL;
-static clCreateBuffer_fn            fn_clCreateBuffer            = NULL;
-static clEnqueueReadBuffer_fn       fn_clEnqueueReadBuffer       = NULL;
-static clEnqueueWriteBuffer_fn      fn_clEnqueueWriteBuffer      = NULL;
-static clReleaseMemObject_fn        fn_clReleaseMemObject        = NULL;
-static clGetProgramBuildInfo_fn     fn_clGetProgramBuildInfo     = NULL;
+static clBuildProgram_fn fn_clBuildProgram                       = NULL;
+static clCreateKernel_fn fn_clCreateKernel                       = NULL;
+static clSetKernelArg_fn fn_clSetKernelArg                       = NULL;
+static clEnqueueNDRangeKernel_fn fn_clEnqueueNDRangeKernel       = NULL;
+static clFinish_fn fn_clFinish                                   = NULL;
+static clReleaseKernel_fn fn_clReleaseKernel                     = NULL;
+static clReleaseProgram_fn fn_clReleaseProgram                   = NULL;
+static clReleaseCommandQueue_fn fn_clReleaseCommandQueue         = NULL;
+static clReleaseContext_fn fn_clReleaseContext                   = NULL;
+static clCreateBuffer_fn fn_clCreateBuffer                       = NULL;
+static clEnqueueReadBuffer_fn fn_clEnqueueReadBuffer             = NULL;
+static clEnqueueWriteBuffer_fn fn_clEnqueueWriteBuffer           = NULL;
+static clReleaseMemObject_fn fn_clReleaseMemObject               = NULL;
+static clGetProgramBuildInfo_fn fn_clGetProgramBuildInfo         = NULL;
 
 static char s_device_info_buf[512];
 
@@ -88,13 +92,14 @@ static void* open_opencl_lib(void) {
     return h;
 }
 
-#define LOAD_CL_SYM(name) do { \
-    fn_##name = (name##_fn)CML_DLSYM(lib, #name); \
-    if (!fn_##name) { \
-        LOG_ERROR("Adreno: failed to load %s: %s", #name, CML_DLERROR()); \
-        return -1; \
-    } \
-} while (0)
+#define LOAD_CL_SYM(name)                                                                          \
+    do {                                                                                           \
+        fn_##name = (name##_fn)CML_DLSYM(lib, #name);                                              \
+        if (!fn_##name) {                                                                          \
+            LOG_ERROR("Adreno: failed to load %s: %s", #name, CML_DLERROR());                      \
+            return -1;                                                                             \
+        }                                                                                          \
+    } while (0)
 
 static int load_opencl_symbols(void* lib) {
     LOAD_CL_SYM(clGetPlatformIDs);
@@ -128,7 +133,8 @@ static bool find_adreno_device(void** out_platform, void** out_device) {
     }
 
     void** platforms = (void**)cml_calloc(num_platforms, sizeof(void*));
-    if (!platforms) return false;
+    if (!platforms)
+        return false;
 
     if (fn_clGetPlatformIDs(num_platforms, platforms, NULL) != CL_SUCCESS) {
         cml_free(platforms);
@@ -140,15 +146,18 @@ static bool find_adreno_device(void** out_platform, void** out_device) {
         fn_clGetPlatformInfo(platforms[i], CL_PLATFORM_NAME, sizeof(name), name, NULL);
 
         cl_uint num_devices = 0;
-        if (fn_clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, 0, NULL, &num_devices) != CL_SUCCESS
-            || num_devices == 0) {
+        if (fn_clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, 0, NULL, &num_devices) !=
+                CL_SUCCESS ||
+            num_devices == 0) {
             continue;
         }
 
         void** devices = (void**)cml_calloc(num_devices, sizeof(void*));
-        if (!devices) continue;
+        if (!devices)
+            continue;
 
-        if (fn_clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, num_devices, devices, NULL) != CL_SUCCESS) {
+        if (fn_clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU, num_devices, devices, NULL) !=
+            CL_SUCCESS) {
             cml_free(devices);
             continue;
         }
@@ -157,9 +166,10 @@ static bool find_adreno_device(void** out_platform, void** out_device) {
             char dev_name[256] = {0};
             fn_clGetDeviceInfo(devices[j], CL_DEVICE_NAME, sizeof(dev_name), dev_name, NULL);
 
-            if (strstr(dev_name, "Adreno") || strstr(name, "Qualcomm") || strstr(name, "QUALCOMM")) {
+            if (strstr(dev_name, "Adreno") || strstr(name, "Qualcomm") ||
+                strstr(name, "QUALCOMM")) {
                 *out_platform = platforms[i];
-                *out_device = devices[j];
+                *out_device   = devices[j];
                 cml_free(devices);
                 cml_free(platforms);
                 return true;
@@ -174,12 +184,13 @@ static bool find_adreno_device(void** out_platform, void** out_device) {
 
 bool cml_adreno_available(void) {
     void* lib = open_opencl_lib();
-    if (!lib) return false;
+    if (!lib)
+        return false;
 
-    clGetPlatformIDs_fn get_plat = (clGetPlatformIDs_fn)CML_DLSYM(lib, "clGetPlatformIDs");
-    clGetDeviceIDs_fn get_dev = (clGetDeviceIDs_fn)CML_DLSYM(lib, "clGetDeviceIDs");
+    clGetPlatformIDs_fn get_plat       = (clGetPlatformIDs_fn)CML_DLSYM(lib, "clGetPlatformIDs");
+    clGetDeviceIDs_fn get_dev          = (clGetDeviceIDs_fn)CML_DLSYM(lib, "clGetDeviceIDs");
     clGetPlatformInfo_fn get_plat_info = (clGetPlatformInfo_fn)CML_DLSYM(lib, "clGetPlatformInfo");
-    clGetDeviceInfo_fn get_dev_info = (clGetDeviceInfo_fn)CML_DLSYM(lib, "clGetDeviceInfo");
+    clGetDeviceInfo_fn get_dev_info    = (clGetDeviceInfo_fn)CML_DLSYM(lib, "clGetDeviceInfo");
 
     if (!get_plat || !get_dev || !get_plat_info || !get_dev_info) {
         CML_DLCLOSE(lib);
@@ -193,7 +204,10 @@ bool cml_adreno_available(void) {
     }
 
     void** platforms = (void**)cml_calloc(num_platforms, sizeof(void*));
-    if (!platforms) { CML_DLCLOSE(lib); return false; }
+    if (!platforms) {
+        CML_DLCLOSE(lib);
+        return false;
+    }
 
     bool found = false;
     if (get_plat(num_platforms, platforms, NULL) == CL_SUCCESS) {
@@ -202,19 +216,22 @@ bool cml_adreno_available(void) {
             get_plat_info(platforms[i], CL_PLATFORM_NAME, sizeof(name), name, NULL);
 
             cl_uint num_devices = 0;
-            if (get_dev(platforms[i], CL_DEVICE_TYPE_GPU, 0, NULL, &num_devices) != CL_SUCCESS
-                || num_devices == 0) {
+            if (get_dev(platforms[i], CL_DEVICE_TYPE_GPU, 0, NULL, &num_devices) != CL_SUCCESS ||
+                num_devices == 0) {
                 continue;
             }
 
             void** devices = (void**)cml_calloc(num_devices, sizeof(void*));
-            if (!devices) continue;
+            if (!devices)
+                continue;
 
-            if (get_dev(platforms[i], CL_DEVICE_TYPE_GPU, num_devices, devices, NULL) == CL_SUCCESS) {
+            if (get_dev(platforms[i], CL_DEVICE_TYPE_GPU, num_devices, devices, NULL) ==
+                CL_SUCCESS) {
                 for (cl_uint j = 0; j < num_devices; j++) {
                     char dev_name[256] = {0};
                     get_dev_info(devices[j], CL_DEVICE_NAME, sizeof(dev_name), dev_name, NULL);
-                    if (strstr(dev_name, "Adreno") || strstr(name, "Qualcomm") || strstr(name, "QUALCOMM")) {
+                    if (strstr(dev_name, "Adreno") || strstr(name, "Qualcomm") ||
+                        strstr(name, "QUALCOMM")) {
                         found = true;
                         break;
                     }
@@ -238,7 +255,8 @@ CMLAdrenoBackend* cml_adreno_backend_create(void) {
 }
 
 int cml_adreno_backend_init(CMLAdrenoBackend* backend) {
-    if (!backend) return -1;
+    if (!backend)
+        return -1;
 
     if (backend->initialized) {
         LOG_WARNING("Adreno backend already initialized");
@@ -259,33 +277,36 @@ int cml_adreno_backend_init(CMLAdrenoBackend* backend) {
     s_cl_lib = lib;
 
     void* platform = NULL;
-    void* device = NULL;
+    void* device   = NULL;
     if (!find_adreno_device(&platform, &device)) {
         LOG_ERROR("Adreno: no Adreno GPU device found");
         goto fail;
     }
 
-    cl_ulong global_mem = 0;
-    cl_ulong max_alloc = 0;
-    size_t max_wg = 0;
+    cl_ulong global_mem   = 0;
+    cl_ulong max_alloc    = 0;
+    size_t max_wg         = 0;
     cl_uint compute_units = 0;
     char dev_version[128] = {0};
 
     fn_clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(global_mem), &global_mem, NULL);
     fn_clGetDeviceInfo(device, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(max_alloc), &max_alloc, NULL);
     fn_clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(max_wg), &max_wg, NULL);
-    fn_clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(compute_units), &compute_units, NULL);
+    fn_clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(compute_units), &compute_units,
+                       NULL);
     fn_clGetDeviceInfo(device, CL_DEVICE_VERSION, sizeof(dev_version), dev_version, NULL);
 
-    int gpu_ver = 0;
+    int gpu_ver            = 0;
     const char* adreno_pos = strstr(dev_version, "Adreno");
     if (adreno_pos) {
         const char* p = adreno_pos;
-        while (*p && (*p < '0' || *p > '9')) p++;
-        if (*p) gpu_ver = atoi(p);
+        while (*p && (*p < '0' || *p > '9'))
+            p++;
+        if (*p)
+            gpu_ver = atoi(p);
     }
 
-    cl_int err = 0;
+    cl_int err    = 0;
     void* context = fn_clCreateContext(NULL, 1, &device, NULL, NULL, &err);
     if (err != CL_SUCCESS || !context) {
         LOG_ERROR("Adreno: clCreateContext failed (err=%d)", err);
@@ -299,19 +320,17 @@ int cml_adreno_backend_init(CMLAdrenoBackend* backend) {
         goto fail;
     }
 
-    backend->gpu_version = gpu_ver;
-    backend->global_mem_size = (size_t)global_mem;
-    backend->max_alloc_size = (size_t)max_alloc;
+    backend->gpu_version         = gpu_ver;
+    backend->global_mem_size     = (size_t)global_mem;
+    backend->max_alloc_size      = (size_t)max_alloc;
     backend->max_work_group_size = (int)max_wg;
-    backend->compute_units = (int)compute_units;
-    backend->cl_context = context;
-    backend->cl_queue = queue;
-    backend->initialized = true;
+    backend->compute_units       = (int)compute_units;
+    backend->cl_context          = context;
+    backend->cl_queue            = queue;
+    backend->initialized         = true;
 
     LOG_INFO("Adreno backend initialized: GPU %d, %zu MB global mem, %d CUs, max WG %d",
-             backend->gpu_version,
-             backend->global_mem_size / (1024 * 1024),
-             backend->compute_units,
+             backend->gpu_version, backend->global_mem_size / (1024 * 1024), backend->compute_units,
              backend->max_work_group_size);
     return 0;
 
@@ -322,7 +341,8 @@ fail:
 }
 
 void cml_adreno_backend_free(CMLAdrenoBackend* backend) {
-    if (!backend) return;
+    if (!backend)
+        return;
 
     if (backend->cl_queue && fn_clReleaseCommandQueue) {
         fn_clReleaseCommandQueue(backend->cl_queue);
@@ -344,32 +364,50 @@ void cml_adreno_backend_free(CMLAdrenoBackend* backend) {
 /* OpenCL C expression for an elementwise unary op (operand `a`), or NULL. */
 static const char* adreno_unary_expr(UOpType t) {
     switch (t) {
-    case UOP_NEG:     return "-a";
-    case UOP_EXP:     return "exp(a)";
-    case UOP_LOG:     return "log(a)";
-    case UOP_SQRT:    return "sqrt(a)";
-    case UOP_ABS:     return "fabs(a)";
-    case UOP_SIN:     return "sin(a)";
-    case UOP_COS:     return "cos(a)";
+    case UOP_NEG:
+        return "-a";
+    case UOP_EXP:
+        return "exp(a)";
+    case UOP_LOG:
+        return "log(a)";
+    case UOP_SQRT:
+        return "sqrt(a)";
+    case UOP_ABS:
+        return "fabs(a)";
+    case UOP_SIN:
+        return "sin(a)";
+    case UOP_COS:
+        return "cos(a)";
     /* fmax is IEEE maxNum and returns the non-NaN operand, so it would
      * erase NaN; the flipped compare keeps it at no cost. */
-    case UOP_RELU:    return "(a < 0.0f ? 0.0f : a)";
-    case UOP_SIGMOID: return "1.0f/(1.0f+exp(-a))";
-    case UOP_TANH:    return "tanh(a)";
-    default:          return NULL;
+    case UOP_RELU:
+        return "(a < 0.0f ? 0.0f : a)";
+    case UOP_SIGMOID:
+        return "1.0f/(1.0f+exp(-a))";
+    case UOP_TANH:
+        return "tanh(a)";
+    default:
+        return NULL;
     }
 }
 
 /* OpenCL C expression for an elementwise binary op (operands `a`,`b`), or NULL. */
 static const char* adreno_binary_expr(UOpType t) {
     switch (t) {
-    case UOP_ADD: return "a + b";
-    case UOP_SUB: return "a - b";
-    case UOP_MUL: return "a * b";
-    case UOP_DIV: return "a / b";
-    case UOP_MAX: return "((a != a) || (b != b)) ? (a + b) : fmax(a, b)";
-    case UOP_POW: return "pow(a, b)";
-    default:      return NULL;
+    case UOP_ADD:
+        return "a + b";
+    case UOP_SUB:
+        return "a - b";
+    case UOP_MUL:
+        return "a * b";
+    case UOP_DIV:
+        return "a / b";
+    case UOP_MAX:
+        return "((a != a) || (b != b)) ? (a + b) : fmax(a, b)";
+    case UOP_POW:
+        return "pow(a, b)";
+    default:
+        return NULL;
     }
 }
 
@@ -377,28 +415,37 @@ static const char* adreno_binary_expr(UOpType t) {
  * 1 if the op/shape isn't GPU-eligible (caller should fall back), -1 on error. */
 static int adreno_dispatch_elementwise(CMLAdrenoBackend* backend, struct IRNode* node, int idx) {
     Tensor* out = node->output;
-    if (!out) return 1;
+    if (!out)
+        return 1;
     int nin = node->num_inputs;
 
     const char* expr = NULL;
-    if (nin == 1) expr = adreno_unary_expr(node->type);
-    else if (nin == 2) expr = adreno_binary_expr(node->type);
-    if (!expr) return 1;   /* unsupported op */
+    if (nin == 1)
+        expr = adreno_unary_expr(node->type);
+    else if (nin == 2)
+        expr = adreno_binary_expr(node->type);
+    if (!expr)
+        return 1; /* unsupported op */
 
     /* Only the no-broadcast case is handled by this simple 1:1 kernel. */
     for (int i = 0; i < nin; i++)
-        if (!node->inputs[i] || node->inputs[i]->numel != out->numel) return 1;
+        if (!node->inputs[i] || node->inputs[i]->numel != out->numel)
+            return 1;
 
     size_t n = out->numel;
-    if (n == 0) return 1;
+    if (n == 0)
+        return 1;
 
-    for (int i = 0; i < nin; i++) tensor_ensure_executed(node->inputs[i]);
     for (int i = 0; i < nin; i++)
-        if (!node->inputs[i]->data) return 1;
+        tensor_ensure_executed(node->inputs[i]);
+    for (int i = 0; i < nin; i++)
+        if (!node->inputs[i]->data)
+            return 1;
 
     if (!out->data) {
         out->data = (float*)cml_malloc(n * sizeof(float));
-        if (!out->data) return -1;
+        if (!out->data)
+            return -1;
         out->owns_data = true;
     }
 
@@ -406,30 +453,47 @@ static int adreno_dispatch_elementwise(CMLAdrenoBackend* backend, struct IRNode*
     snprintf(kname, sizeof(kname), "ew_%d", idx);
     if (nin == 1) {
         snprintf(src, sizeof(src),
-            "__kernel void %s(__global float* out, __global const float* in, uint n){\n"
-            "  uint gid = get_global_id(0);\n"
-            "  if (gid < n) { float a = in[gid]; out[gid] = %s; }\n}\n", kname, expr);
+                 "__kernel void %s(__global float* out, __global const float* in, uint n){\n"
+                 "  uint gid = get_global_id(0);\n"
+                 "  if (gid < n) { float a = in[gid]; out[gid] = %s; }\n}\n",
+                 kname, expr);
     } else {
         snprintf(src, sizeof(src),
-            "__kernel void %s(__global float* out, __global const float* in0, __global const float* in1, uint n){\n"
-            "  uint gid = get_global_id(0);\n"
-            "  if (gid < n) { float a = in0[gid]; float b = in1[gid]; out[gid] = %s; }\n}\n", kname, expr);
+                 "__kernel void %s(__global float* out, __global const float* in0, __global const "
+                 "float* in1, uint n){\n"
+                 "  uint gid = get_global_id(0);\n"
+                 "  if (gid < n) { float a = in0[gid]; float b = in1[gid]; out[gid] = %s; }\n}\n",
+                 kname, expr);
     }
 
-    const char* src_ptr = src; size_t src_len = strlen(src); cl_int err = 0;
+    const char* src_ptr = src;
+    size_t src_len      = strlen(src);
+    cl_int err          = 0;
     void* prog = fn_clCreateProgramWithSource(backend->cl_context, 1, &src_ptr, &src_len, &err);
-    if (err != CL_SUCCESS || !prog) { LOG_ERROR("Adreno: create program failed (%d)", err); return -1; }
+    if (err != CL_SUCCESS || !prog) {
+        LOG_ERROR("Adreno: create program failed (%d)", err);
+        return -1;
+    }
     err = fn_clBuildProgram(prog, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
-    if (err != CL_SUCCESS) { LOG_ERROR("Adreno: build failed (%d)", err); fn_clReleaseProgram(prog); return -1; }
+    if (err != CL_SUCCESS) {
+        LOG_ERROR("Adreno: build failed (%d)", err);
+        fn_clReleaseProgram(prog);
+        return -1;
+    }
     void* kern = fn_clCreateKernel(prog, kname, &err);
-    if (err != CL_SUCCESS || !kern) { LOG_ERROR("Adreno: create kernel failed (%d)", err); fn_clReleaseProgram(prog); return -1; }
+    if (err != CL_SUCCESS || !kern) {
+        LOG_ERROR("Adreno: create kernel failed (%d)", err);
+        fn_clReleaseProgram(prog);
+        return -1;
+    }
 
-    int rc = -1;
+    int rc       = -1;
     size_t bytes = n * sizeof(float);
-    void* d_out = fn_clCreateBuffer(backend->cl_context, CL_MEM_WRITE_ONLY, bytes, NULL, &err);
-    void* d_in0 = (err == CL_SUCCESS)
-        ? fn_clCreateBuffer(backend->cl_context, CL_MEM_READ_ONLY, bytes, NULL, &err) : NULL;
-    void* d_in1 = NULL;
+    void* d_out  = fn_clCreateBuffer(backend->cl_context, CL_MEM_WRITE_ONLY, bytes, NULL, &err);
+    void* d_in0  = (err == CL_SUCCESS)
+                       ? fn_clCreateBuffer(backend->cl_context, CL_MEM_READ_ONLY, bytes, NULL, &err)
+                       : NULL;
+    void* d_in1  = NULL;
     if (nin == 2 && err == CL_SUCCESS)
         d_in1 = fn_clCreateBuffer(backend->cl_context, CL_MEM_READ_ONLY, bytes, NULL, &err);
     if (err != CL_SUCCESS || !d_out || !d_in0 || (nin == 2 && !d_in1)) {
@@ -437,30 +501,42 @@ static int adreno_dispatch_elementwise(CMLAdrenoBackend* backend, struct IRNode*
         goto cleanup;
     }
 
-    if (fn_clEnqueueWriteBuffer(backend->cl_queue, d_in0, CL_TRUE, 0, bytes, node->inputs[0]->data, 0, NULL, NULL) != CL_SUCCESS)
+    if (fn_clEnqueueWriteBuffer(backend->cl_queue, d_in0, CL_TRUE, 0, bytes, node->inputs[0]->data,
+                                0, NULL, NULL) != CL_SUCCESS)
         goto cleanup;
-    if (nin == 2 &&
-        fn_clEnqueueWriteBuffer(backend->cl_queue, d_in1, CL_TRUE, 0, bytes, node->inputs[1]->data, 0, NULL, NULL) != CL_SUCCESS)
+    if (nin == 2 && fn_clEnqueueWriteBuffer(backend->cl_queue, d_in1, CL_TRUE, 0, bytes,
+                                            node->inputs[1]->data, 0, NULL, NULL) != CL_SUCCESS)
         goto cleanup;
 
     cl_uint nn = (cl_uint)n;
     cl_uint ai = 0;
-    if (fn_clSetKernelArg(kern, ai++, sizeof(void*), &d_out) != CL_SUCCESS) goto cleanup;
-    if (fn_clSetKernelArg(kern, ai++, sizeof(void*), &d_in0) != CL_SUCCESS) goto cleanup;
-    if (nin == 2 && fn_clSetKernelArg(kern, ai++, sizeof(void*), &d_in1) != CL_SUCCESS) goto cleanup;
-    if (fn_clSetKernelArg(kern, ai++, sizeof(cl_uint), &nn) != CL_SUCCESS) goto cleanup;
+    if (fn_clSetKernelArg(kern, ai++, sizeof(void*), &d_out) != CL_SUCCESS)
+        goto cleanup;
+    if (fn_clSetKernelArg(kern, ai++, sizeof(void*), &d_in0) != CL_SUCCESS)
+        goto cleanup;
+    if (nin == 2 && fn_clSetKernelArg(kern, ai++, sizeof(void*), &d_in1) != CL_SUCCESS)
+        goto cleanup;
+    if (fn_clSetKernelArg(kern, ai++, sizeof(cl_uint), &nn) != CL_SUCCESS)
+        goto cleanup;
 
     size_t gws = n;
-    if (fn_clEnqueueNDRangeKernel(backend->cl_queue, kern, 1, NULL, &gws, NULL, 0, NULL, NULL) != CL_SUCCESS) goto cleanup;
-    if (fn_clEnqueueReadBuffer(backend->cl_queue, d_out, CL_TRUE, 0, bytes, out->data, 0, NULL, NULL) != CL_SUCCESS) goto cleanup;
+    if (fn_clEnqueueNDRangeKernel(backend->cl_queue, kern, 1, NULL, &gws, NULL, 0, NULL, NULL) !=
+        CL_SUCCESS)
+        goto cleanup;
+    if (fn_clEnqueueReadBuffer(backend->cl_queue, d_out, CL_TRUE, 0, bytes, out->data, 0, NULL,
+                               NULL) != CL_SUCCESS)
+        goto cleanup;
 
     out->is_executed = true;
-    rc = 0;
+    rc               = 0;
 
 cleanup:
-    if (d_out && fn_clReleaseMemObject) fn_clReleaseMemObject(d_out);
-    if (d_in0 && fn_clReleaseMemObject) fn_clReleaseMemObject(d_in0);
-    if (d_in1 && fn_clReleaseMemObject) fn_clReleaseMemObject(d_in1);
+    if (d_out && fn_clReleaseMemObject)
+        fn_clReleaseMemObject(d_out);
+    if (d_in0 && fn_clReleaseMemObject)
+        fn_clReleaseMemObject(d_in0);
+    if (d_in1 && fn_clReleaseMemObject)
+        fn_clReleaseMemObject(d_in1);
     fn_clReleaseKernel(kern);
     fn_clReleaseProgram(prog);
     return rc;
@@ -477,21 +553,30 @@ int cml_adreno_execute(CMLAdrenoBackend* backend, CMLGraph_t ir) {
     }
 
     struct IRNode* node = ir->head;
-    int node_idx = 0;
-    int status = 0;
+    int node_idx        = 0;
+    int status          = 0;
 
     while (node) {
         if (node->is_executed && node->output && node->output->is_executed) {
-            node = node->next; node_idx++; continue;
+            node = node->next;
+            node_idx++;
+            continue;
         }
 
         /* Try a real GPU elementwise dispatch; fall back to the CPU interpreter
          * for unsupported ops / shapes (broadcast, matmul, reductions, ...). */
         int r = adreno_dispatch_elementwise(backend, node, node_idx);
-        if (r == -1) { status = -1; break; }
+        if (r == -1) {
+            status = -1;
+            break;
+        }
         if (r == 1) {
-            if (cpu_execute_node(node) != 0) { status = -1; break; }
-            if (node->output) node->output->is_executed = true;
+            if (cpu_execute_node(node) != 0) {
+                status = -1;
+                break;
+            }
+            if (node->output)
+                node->output->is_executed = true;
         }
         node->is_executed = true;
 
@@ -514,11 +599,8 @@ const char* cml_adreno_device_info(const CMLAdrenoBackend* backend) {
 
     snprintf(s_device_info_buf, sizeof(s_device_info_buf),
              "Adreno %d | %zu MB global | %d CUs | max WG %d | max alloc %zu MB",
-             backend->gpu_version,
-             backend->global_mem_size / (1024 * 1024),
-             backend->compute_units,
-             backend->max_work_group_size,
-             backend->max_alloc_size / (1024 * 1024));
+             backend->gpu_version, backend->global_mem_size / (1024 * 1024), backend->compute_units,
+             backend->max_work_group_size, backend->max_alloc_size / (1024 * 1024));
 
     return s_device_info_buf;
 }

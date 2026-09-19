@@ -26,21 +26,21 @@ extern "C" {
 
 typedef enum {
     NIR_TARGET_RADEONSI = 0, /* AMD RDNA/GCN via radeonsi */
-    NIR_TARGET_IRIS,          /* Intel Xe via iris */
-    NIR_TARGET_TURNIP,        /* Qualcomm Adreno via turnip */
-    NIR_TARGET_PANFROST,      /* ARM Mali via panfrost */
-    NIR_TARGET_FREEDRENO,     /* Qualcomm via freedreno */
-    NIR_TARGET_NVK,           /* NVIDIA via NVK (Nouveau Vulkan) */
-    NIR_TARGET_RADV,          /* AMD via RADV (Vulkan) */
-    NIR_TARGET_LLVMPIPE,      /* Software rasteriser (llvmpipe) */
+    NIR_TARGET_IRIS,         /* Intel Xe via iris */
+    NIR_TARGET_TURNIP,       /* Qualcomm Adreno via turnip */
+    NIR_TARGET_PANFROST,     /* ARM Mali via panfrost */
+    NIR_TARGET_FREEDRENO,    /* Qualcomm via freedreno */
+    NIR_TARGET_NVK,          /* NVIDIA via NVK (Nouveau Vulkan) */
+    NIR_TARGET_RADV,         /* AMD via RADV (Vulkan) */
+    NIR_TARGET_LLVMPIPE,     /* Software rasteriser (llvmpipe) */
     NIR_TARGET_COUNT,
 } CMLNIRTarget;
 
 typedef struct CMLNIRCompiler {
     bool initialized;
     CMLNIRTarget target;
-    void* mesa_lib;           /* dlopen("libmesa_nir.so") handle */
-    void* nir_shader;         /* nir_shader* handle */
+    void* mesa_lib;   /* dlopen("libmesa_nir.so") handle */
+    void* nir_shader; /* nir_shader* handle */
     void* compiler_options;
     int version;
 
@@ -48,15 +48,13 @@ typedef struct CMLNIRCompiler {
     uint32_t* spirv_output;
     size_t spirv_size;
 
-    void* (*nir_builder_init_simple_shader)(void* mem_ctx, void* options,
-                                            int stage, const char* name);
+    void* (*nir_builder_init_simple_shader)(void* mem_ctx, void* options, int stage,
+                                            const char* name);
     void* (*nir_fadd)(void* builder, void* a, void* b);
     void* (*nir_fmul)(void* builder, void* a, void* b);
     void* (*nir_fexp2)(void* builder, void* a);
-    void* (*nir_load_ssbo)(void* builder, int components, int bit_size,
-                           void* index, void* offset);
-    void  (*nir_store_ssbo)(void* builder, void* value, void* index,
-                            void* offset);
+    void* (*nir_load_ssbo)(void* builder, int components, int bit_size, void* index, void* offset);
+    void (*nir_store_ssbo)(void* builder, void* value, void* index, void* offset);
     void* (*nir_load_global_invocation_id)(void* builder);
     void* (*nir_shader_to_spirv)(void* shader, size_t* size);
 } CMLNIRCompiler;

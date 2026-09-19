@@ -39,11 +39,12 @@ typedef struct {
 
 static int send_all(int fd, const void* buf, size_t len) {
     const uint8_t* p = (const uint8_t*)buf;
-    size_t sent = 0;
+    size_t sent      = 0;
     while (sent < len) {
         ssize_t n = send(fd, p + sent, len - sent, MSG_NOSIGNAL);
         if (n <= 0) {
-            if (n < 0 && errno == EINTR) continue;
+            if (n < 0 && errno == EINTR)
+                continue;
             return -1;
         }
         sent += (size_t)n;
@@ -57,7 +58,8 @@ static int recv_all(int fd, void* buf, size_t len) {
     while (got < len) {
         ssize_t n = recv(fd, p + got, len - got, 0);
         if (n <= 0) {
-            if (n < 0 && errno == EINTR) continue;
+            if (n < 0 && errno == EINTR)
+                continue;
             return -1;
         }
         got += (size_t)n;
@@ -67,27 +69,33 @@ static int recv_all(int fd, void* buf, size_t len) {
 
 static int send_msg(int fd, uint32_t opcode, const void* payload, uint32_t payload_size) {
     MsgHeader hdr = {.opcode = htonl(opcode), .payload_size = htonl(payload_size)};
-    if (send_all(fd, &hdr, sizeof(hdr)) != 0) return -1;
+    if (send_all(fd, &hdr, sizeof(hdr)) != 0)
+        return -1;
     if (payload_size > 0 && payload) {
-        if (send_all(fd, payload, payload_size) != 0) return -1;
+        if (send_all(fd, payload, payload_size) != 0)
+            return -1;
     }
     return 0;
 }
 
 static int recv_resp(int fd, uint32_t* status, void* payload, uint32_t* payload_size) {
     RespHeader rhdr;
-    if (recv_all(fd, &rhdr, sizeof(rhdr)) != 0) return -1;
-    *status = ntohl(rhdr.status);
+    if (recv_all(fd, &rhdr, sizeof(rhdr)) != 0)
+        return -1;
+    *status        = ntohl(rhdr.status);
     uint32_t psize = ntohl(rhdr.payload_size);
-    if (payload_size) *payload_size = psize;
+    if (payload_size)
+        *payload_size = psize;
     if (psize > 0 && payload) {
-        if (recv_all(fd, payload, psize) != 0) return -1;
+        if (recv_all(fd, payload, psize) != 0)
+            return -1;
     } else if (psize > 0) {
         uint8_t discard[4096];
         uint32_t remaining = psize;
         while (remaining > 0) {
             uint32_t chunk = remaining < sizeof(discard) ? remaining : sizeof(discard);
-            if (recv_all(fd, discard, chunk) != 0) return -1;
+            if (recv_all(fd, discard, chunk) != 0)
+                return -1;
             remaining -= chunk;
         }
     }
@@ -96,9 +104,11 @@ static int recv_resp(int fd, uint32_t* status, void* payload, uint32_t* payload_
 
 static int send_resp(int fd, uint32_t status, const void* payload, uint32_t payload_size) {
     RespHeader rhdr = {.status = htonl(status), .payload_size = htonl(payload_size)};
-    if (send_all(fd, &rhdr, sizeof(rhdr)) != 0) return -1;
+    if (send_all(fd, &rhdr, sizeof(rhdr)) != 0)
+        return -1;
     if (payload_size > 0 && payload) {
-        if (send_all(fd, payload, payload_size) != 0) return -1;
+        if (send_all(fd, payload, payload_size) != 0)
+            return -1;
     }
     return 0;
 }
@@ -106,16 +116,18 @@ static int send_resp(int fd, uint32_t status, const void* payload, uint32_t payl
 /* Client */
 
 CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
-    if (!host || port <= 0) return NULL;
+    if (!host || port <= 0)
+        return NULL;
 
     CMLRemoteDevice* dev = (CMLRemoteDevice*)cml_calloc(1, sizeof(CMLRemoteDevice));
-    if (!dev) return NULL;
+    if (!dev)
+        return NULL;
 
     strncpy(dev->host, host, sizeof(dev->host) - 1);
     dev->port = port;
 
     struct addrinfo hints = {0}, *res = NULL;
-    hints.ai_family = AF_INET;
+    hints.ai_family   = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
     char port_str[16];
@@ -155,7 +167,7 @@ CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
     }
 
     uint32_t status;
-    uint64_t sid = 0;
+    uint64_t sid   = 0;
     uint32_t psize = 0;
     if (recv_resp(dev->sock_fd, &status, &sid, &psize) != 0 || status != CML_REMOTE_STATUS_OK) {
         LOG_ERROR("remote_connect: ping response failed");
@@ -165,14 +177,15 @@ CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
     }
 
     dev->session_id = sid;
-    dev->connected = true;
-    LOG_INFO("Connected to remote device %s:%d (session 0x%llx)",
-             host, port, (unsigned long long)dev->session_id);
+    dev->connected  = true;
+    LOG_INFO("Connected to remote device %s:%d (session 0x%llx)", host, port,
+             (unsigned long long)dev->session_id);
     return dev;
 }
 
 void cml_remote_disconnect(CMLRemoteDevice* dev) {
-    if (!dev) return;
+    if (!dev)
+        return;
     if (dev->sock_fd >= 0) {
         close(dev->sock_fd);
         dev->sock_fd = -1;
@@ -186,7 +199,8 @@ bool cml_remote_is_connected(CMLRemoteDevice* dev) {
 }
 
 uint64_t cml_remote_alloc(CMLRemoteDevice* dev, size_t size) {
-    if (!cml_remote_is_connected(dev)) return 0;
+    if (!cml_remote_is_connected(dev))
+        return 0;
 
     uint64_t net_size = (uint64_t)size;
     if (send_msg(dev->sock_fd, CML_REMOTE_OP_ALLOC, &net_size, sizeof(net_size)) != 0)
@@ -194,16 +208,18 @@ uint64_t cml_remote_alloc(CMLRemoteDevice* dev, size_t size) {
 
     uint32_t status;
     uint64_t handle = 0;
-    uint32_t psize = 0;
+    uint32_t psize  = 0;
     if (recv_resp(dev->sock_fd, &status, &handle, &psize) != 0)
         return 0;
 
-    if (status != CML_REMOTE_STATUS_OK) return 0;
+    if (status != CML_REMOTE_STATUS_OK)
+        return 0;
     return handle;
 }
 
 void cml_remote_free(CMLRemoteDevice* dev, uint64_t handle) {
-    if (!cml_remote_is_connected(dev)) return;
+    if (!cml_remote_is_connected(dev))
+        return;
 
     if (send_msg(dev->sock_fd, CML_REMOTE_OP_FREE, &handle, sizeof(handle)) != 0)
         return;
@@ -213,12 +229,14 @@ void cml_remote_free(CMLRemoteDevice* dev, uint64_t handle) {
 }
 
 int cml_remote_upload(CMLRemoteDevice* dev, uint64_t handle, const void* data, size_t n) {
-    if (!cml_remote_is_connected(dev) || !data) return -1;
+    if (!cml_remote_is_connected(dev) || !data)
+        return -1;
 
-    size_t hdr_size = sizeof(handle) + sizeof(uint64_t);
-    size_t total = hdr_size + n;
+    size_t hdr_size  = sizeof(handle) + sizeof(uint64_t);
+    size_t total     = hdr_size + n;
     uint8_t* payload = (uint8_t*)cml_malloc(total);
-    if (!payload) return -1;
+    if (!payload)
+        return -1;
 
     memcpy(payload, &handle, sizeof(handle));
     uint64_t data_len = (uint64_t)n;
@@ -227,15 +245,18 @@ int cml_remote_upload(CMLRemoteDevice* dev, uint64_t handle, const void* data, s
 
     int ret = send_msg(dev->sock_fd, CML_REMOTE_OP_UPLOAD, payload, (uint32_t)total);
     cml_free(payload);
-    if (ret != 0) return -1;
+    if (ret != 0)
+        return -1;
 
     uint32_t status, psize = 0;
-    if (recv_resp(dev->sock_fd, &status, NULL, &psize) != 0) return -1;
+    if (recv_resp(dev->sock_fd, &status, NULL, &psize) != 0)
+        return -1;
     return (status == CML_REMOTE_STATUS_OK) ? 0 : -1;
 }
 
 int cml_remote_download(CMLRemoteDevice* dev, uint64_t handle, void* data, size_t n) {
-    if (!cml_remote_is_connected(dev) || !data) return -1;
+    if (!cml_remote_is_connected(dev) || !data)
+        return -1;
 
     uint8_t payload[16];
     memcpy(payload, &handle, sizeof(handle));
@@ -247,21 +268,25 @@ int cml_remote_download(CMLRemoteDevice* dev, uint64_t handle, void* data, size_
 
     uint32_t status;
     RespHeader rhdr;
-    if (recv_all(dev->sock_fd, &rhdr, sizeof(rhdr)) != 0) return -1;
-    status = ntohl(rhdr.status);
+    if (recv_all(dev->sock_fd, &rhdr, sizeof(rhdr)) != 0)
+        return -1;
+    status             = ntohl(rhdr.status);
     uint32_t resp_size = ntohl(rhdr.payload_size);
 
-    if (status != CML_REMOTE_STATUS_OK) return -1;
+    if (status != CML_REMOTE_STATUS_OK)
+        return -1;
 
     size_t to_read = (resp_size < n) ? resp_size : n;
-    if (recv_all(dev->sock_fd, data, to_read) != 0) return -1;
+    if (recv_all(dev->sock_fd, data, to_read) != 0)
+        return -1;
 
     if (resp_size > to_read) {
         uint8_t discard[4096];
         size_t remaining = resp_size - to_read;
         while (remaining > 0) {
             size_t chunk = remaining < sizeof(discard) ? remaining : sizeof(discard);
-            if (recv_all(dev->sock_fd, discard, chunk) != 0) return -1;
+            if (recv_all(dev->sock_fd, discard, chunk) != 0)
+                return -1;
             remaining -= chunk;
         }
     }
@@ -269,36 +294,43 @@ int cml_remote_download(CMLRemoteDevice* dev, uint64_t handle, void* data, size_
     return 0;
 }
 
-int cml_remote_execute(CMLRemoteDevice* dev, const char* kernel_source,
-                       uint64_t* buffer_handles, int num_buffers,
-                       uint32_t grid[3], uint32_t block[3]) {
-    if (!cml_remote_is_connected(dev) || !kernel_source) return -1;
+int cml_remote_execute(CMLRemoteDevice* dev, const char* kernel_source, uint64_t* buffer_handles,
+                       int num_buffers, uint32_t grid[3], uint32_t block[3]) {
+    if (!cml_remote_is_connected(dev) || !kernel_source)
+        return -1;
 
-    uint32_t src_len = (uint32_t)strlen(kernel_source) + 1;
-    uint32_t num_buf = (uint32_t)num_buffers;
+    uint32_t src_len    = (uint32_t)strlen(kernel_source) + 1;
+    uint32_t num_buf    = (uint32_t)num_buffers;
     size_t handles_size = (size_t)num_buffers * sizeof(uint64_t);
 
     /* payload: [src_len(4)][source][num_buf(4)][handles...][grid(12)][block(12)] */
-    size_t total = sizeof(uint32_t) + src_len + sizeof(uint32_t) + handles_size + 24;
+    size_t total     = sizeof(uint32_t) + src_len + sizeof(uint32_t) + handles_size + 24;
     uint8_t* payload = (uint8_t*)cml_malloc(total);
-    if (!payload) return -1;
+    if (!payload)
+        return -1;
 
     size_t off = 0;
-    memcpy(payload + off, &src_len, 4); off += 4;
-    memcpy(payload + off, kernel_source, src_len); off += src_len;
-    memcpy(payload + off, &num_buf, 4); off += 4;
+    memcpy(payload + off, &src_len, 4);
+    off += 4;
+    memcpy(payload + off, kernel_source, src_len);
+    off += src_len;
+    memcpy(payload + off, &num_buf, 4);
+    off += 4;
     if (num_buffers > 0 && buffer_handles)
         memcpy(payload + off, buffer_handles, handles_size);
     off += handles_size;
-    memcpy(payload + off, grid, 12); off += 12;
+    memcpy(payload + off, grid, 12);
+    off += 12;
     memcpy(payload + off, block, 12);
 
     int ret = send_msg(dev->sock_fd, CML_REMOTE_OP_EXECUTE, payload, (uint32_t)total);
     cml_free(payload);
-    if (ret != 0) return -1;
+    if (ret != 0)
+        return -1;
 
     uint32_t status, psize = 0;
-    if (recv_resp(dev->sock_fd, &status, NULL, &psize) != 0) return -1;
+    if (recv_resp(dev->sock_fd, &status, NULL, &psize) != 0)
+        return -1;
     return (status == CML_REMOTE_STATUS_OK) ? 0 : -1;
 }
 
@@ -313,30 +345,33 @@ typedef struct {
 } AllocEntry;
 
 static AllocEntry g_allocs[MAX_ALLOCS];
-static int g_num_allocs = 0;
+static int g_num_allocs       = 0;
 static uint64_t g_next_handle = 1;
 
 static uint64_t server_alloc(size_t size) {
-    if (g_num_allocs >= MAX_ALLOCS) return 0;
+    if (g_num_allocs >= MAX_ALLOCS)
+        return 0;
 
     DeviceType best = device_get_best_available();
-    void* ptr = device_alloc(size, best);
+    void* ptr       = device_alloc(size, best);
     if (!ptr) {
         ptr = cml_malloc(size);
-        if (!ptr) return 0;
+        if (!ptr)
+            return 0;
     }
 
-    uint64_t h = g_next_handle++;
+    uint64_t h                    = g_next_handle++;
     g_allocs[g_num_allocs].handle = h;
-    g_allocs[g_num_allocs].ptr = ptr;
-    g_allocs[g_num_allocs].size = size;
+    g_allocs[g_num_allocs].ptr    = ptr;
+    g_allocs[g_num_allocs].size   = size;
     g_num_allocs++;
     return h;
 }
 
 static AllocEntry* server_find(uint64_t handle) {
     for (int i = 0; i < g_num_allocs; i++) {
-        if (g_allocs[i].handle == handle) return &g_allocs[i];
+        if (g_allocs[i].handle == handle)
+            return &g_allocs[i];
     }
     return NULL;
 }
@@ -364,15 +399,17 @@ static void server_free_all(void) {
 static void handle_client(int client_fd) {
     while (1) {
         MsgHeader hdr;
-        if (recv_all(client_fd, &hdr, sizeof(hdr)) != 0) break;
+        if (recv_all(client_fd, &hdr, sizeof(hdr)) != 0)
+            break;
 
         uint32_t opcode = ntohl(hdr.opcode);
-        uint32_t psize = ntohl(hdr.payload_size);
+        uint32_t psize  = ntohl(hdr.payload_size);
 
         uint8_t* payload = NULL;
         if (psize > 0) {
             payload = (uint8_t*)cml_malloc(psize);
-            if (!payload) break;
+            if (!payload)
+                break;
             if (recv_all(client_fd, payload, psize) != 0) {
                 cml_free(payload);
                 break;
@@ -389,7 +426,7 @@ static void handle_client(int client_fd) {
             uint64_t req_size = 0;
             if (psize >= sizeof(uint64_t))
                 memcpy(&req_size, payload, sizeof(uint64_t));
-            uint64_t h = server_alloc((size_t)req_size);
+            uint64_t h  = server_alloc((size_t)req_size);
             uint32_t st = (h != 0) ? CML_REMOTE_STATUS_OK : CML_REMOTE_STATUS_ERROR;
             send_resp(client_fd, st, &h, sizeof(h));
             break;
@@ -449,15 +486,17 @@ static void handle_client(int client_fd) {
                 send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
                 break;
             }
-            size_t off2 = 0;
+            size_t off2       = 0;
             uint32_t src_len2 = 0;
-            memcpy(&src_len2, payload + off2, 4); off2 += 4;
+            memcpy(&src_len2, payload + off2, 4);
+            off2 += 4;
             if (src_len2 == 0 || off2 + src_len2 > psize) {
                 LOG_ERROR("remote_server: execute bad src_len %u", src_len2);
                 send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
                 break;
             }
-            char* kernel_src = (char*)(payload + off2); off2 += src_len2;
+            char* kernel_src = (char*)(payload + off2);
+            off2 += src_len2;
             /* ensure NUL-terminated within payload */
             kernel_src[src_len2 - 1] = '\0';
 
@@ -467,7 +506,8 @@ static void handle_client(int client_fd) {
                 break;
             }
             uint32_t num_buf2 = 0;
-            memcpy(&num_buf2, payload + off2, 4); off2 += 4;
+            memcpy(&num_buf2, payload + off2, 4);
+            off2 += 4;
 
             size_t handles_bytes = (size_t)num_buf2 * sizeof(uint64_t);
             if (off2 + handles_bytes + 24 > psize) {
@@ -475,9 +515,11 @@ static void handle_client(int client_fd) {
                 send_resp(client_fd, CML_REMOTE_STATUS_ERROR, NULL, 0);
                 break;
             }
-            uint64_t* handles2 = (uint64_t*)(payload + off2); off2 += handles_bytes;
+            uint64_t* handles2 = (uint64_t*)(payload + off2);
+            off2 += handles_bytes;
             uint32_t grid2[3], block2[3];
-            memcpy(grid2,  payload + off2, 12); off2 += 12;
+            memcpy(grid2, payload + off2, 12);
+            off2 += 12;
             memcpy(block2, payload + off2, 12);
 
             /* Resolve handles to buffer pointers */
@@ -521,7 +563,7 @@ static void handle_client(int client_fd) {
             }
             /* Derive .so path by replacing the last 2 chars (.c) with .so */
             memcpy(so_path, src_path, sizeof(src_path));
-            size_t slen = strlen(so_path);
+            size_t slen       = strlen(so_path);
             so_path[slen - 2] = '.';
             so_path[slen - 1] = 's';
             /* need one more char; so_path has room — adjust: use a local buf */
@@ -530,10 +572,11 @@ static void handle_client(int client_fd) {
 
             /* Write kernel source */
             size_t src_written = 0;
-            size_t src_total = (size_t)(src_len2 - 1); /* exclude NUL */
+            size_t src_total   = (size_t)(src_len2 - 1); /* exclude NUL */
             while (src_written < src_total) {
                 ssize_t nw = write(src_fd2, kernel_src + src_written, src_total - src_written);
-                if (nw <= 0) break;
+                if (nw <= 0)
+                    break;
                 src_written += (size_t)nw;
             }
             close(src_fd2);
@@ -543,8 +586,7 @@ static void handle_client(int client_fd) {
             snprintf(compile_cmd, sizeof(compile_cmd),
                      "gcc -O2 -shared -fPIC -o %s %s 2>/dev/null || "
                      "cc  -O2 -shared -fPIC -o %s %s 2>/dev/null",
-                     so_path2, src_path,
-                     so_path2, src_path);
+                     so_path2, src_path, so_path2, src_path);
             int compile_ret = system(compile_cmd);
             unlink(src_path);
 
@@ -566,7 +608,8 @@ static void handle_client(int client_fd) {
                 break;
             }
 
-            typedef void (*kernel_fn_t)(float** bufs, int num_bufs, uint32_t* grid, uint32_t* block);
+            typedef void (*kernel_fn_t)(float** bufs, int num_bufs, uint32_t* grid,
+                                        uint32_t* block);
             kernel_fn_t kfn = (kernel_fn_t)dlsym(dl, "cml_kernel");
             if (!kfn) {
                 LOG_ERROR("remote_server: dlsym(cml_kernel) failed: %s", dlerror());
@@ -604,12 +647,14 @@ static void handle_client(int client_fd) {
 /* Server lifecycle */
 
 CMLRemoteServer* cml_remote_server_create(int port) {
-    if (port <= 0) return NULL;
+    if (port <= 0)
+        return NULL;
 
     CMLRemoteServer* srv = (CMLRemoteServer*)cml_calloc(1, sizeof(CMLRemoteServer));
-    if (!srv) return NULL;
+    if (!srv)
+        return NULL;
 
-    srv->port = port;
+    srv->port      = port;
     srv->listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (srv->listen_fd < 0) {
         LOG_ERROR("remote_server: socket() failed: %s", strerror(errno));
@@ -621,9 +666,9 @@ CMLRemoteServer* cml_remote_server_create(int port) {
     setsockopt(srv->listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
     struct sockaddr_in addr = {0};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons((uint16_t)port);
+    addr.sin_family         = AF_INET;
+    addr.sin_addr.s_addr    = INADDR_ANY;
+    addr.sin_port           = htons((uint16_t)port);
 
     if (bind(srv->listen_fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         LOG_ERROR("remote_server: bind() port %d failed: %s", port, strerror(errno));
@@ -644,7 +689,8 @@ CMLRemoteServer* cml_remote_server_create(int port) {
 }
 
 int cml_remote_server_run(CMLRemoteServer* srv) {
-    if (!srv) return -1;
+    if (!srv)
+        return -1;
     srv->running = true;
 
     LOG_INFO("Remote server listening on port %d", srv->port);
@@ -652,10 +698,12 @@ int cml_remote_server_run(CMLRemoteServer* srv) {
     while (srv->running) {
         struct sockaddr_in client_addr;
         socklen_t addr_len = sizeof(client_addr);
-        int client_fd = accept(srv->listen_fd, (struct sockaddr*)&client_addr, &addr_len);
+        int client_fd      = accept(srv->listen_fd, (struct sockaddr*)&client_addr, &addr_len);
         if (client_fd < 0) {
-            if (!srv->running) break;
-            if (errno == EINTR) continue;
+            if (!srv->running)
+                break;
+            if (errno == EINTR)
+                continue;
             LOG_ERROR("remote_server: accept() failed: %s", strerror(errno));
             continue;
         }
@@ -665,8 +713,8 @@ int cml_remote_server_run(CMLRemoteServer* srv) {
 
         char addr_str[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &client_addr.sin_addr, addr_str, sizeof(addr_str));
-        LOG_INFO("Remote server: client connected from %s:%d",
-                 addr_str, ntohs(client_addr.sin_port));
+        LOG_INFO("Remote server: client connected from %s:%d", addr_str,
+                 ntohs(client_addr.sin_port));
 
         handle_client(client_fd);
 
@@ -678,7 +726,8 @@ int cml_remote_server_run(CMLRemoteServer* srv) {
 }
 
 void cml_remote_server_stop(CMLRemoteServer* srv) {
-    if (!srv) return;
+    if (!srv)
+        return;
     srv->running = false;
     if (srv->listen_fd >= 0) {
         shutdown(srv->listen_fd, SHUT_RDWR);
@@ -686,7 +735,8 @@ void cml_remote_server_stop(CMLRemoteServer* srv) {
 }
 
 void cml_remote_server_free(CMLRemoteServer* srv) {
-    if (!srv) return;
+    if (!srv)
+        return;
     cml_remote_server_stop(srv);
     if (srv->listen_fd >= 0) {
         close(srv->listen_fd);

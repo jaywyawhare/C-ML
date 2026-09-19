@@ -23,7 +23,7 @@
 #endif
 #elif defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN   /* avoid winnls/stralign.h inline-fn parse errors */
+#define WIN32_LEAN_AND_MEAN /* avoid winnls/stralign.h inline-fn parse errors */
 #endif
 #include <windows.h>
 #define CML_DLOPEN(path, mode) LoadLibraryA(path)

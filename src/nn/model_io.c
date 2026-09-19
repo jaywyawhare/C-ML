@@ -10,15 +10,15 @@
 #include "alloc/cml_allocator.h"
 
 #define CML_MODEL_MAGIC "CML\0"
-#define CML_CKPT_MAGIC  "CKP\0"
+#define CML_CKPT_MAGIC "CKP\0"
 #define CML_MODEL_VERSION 1
 
 /* Sanity caps for file-supplied counts: every length/rank/count below comes
  * straight off disk, so each read is bounded before it drives an allocation
  * or a loop. */
-#define CML_IO_MAX_NAME_LEN  4096
-#define CML_IO_MAX_NDIM      16
-#define CML_IO_MAX_PARAMS    (1 << 20)
+#define CML_IO_MAX_NAME_LEN 4096
+#define CML_IO_MAX_NDIM 16
+#define CML_IO_MAX_PARAMS (1 << 20)
 
 /* Checked stdio wrappers: a short read/write or stream error fails loudly
  * instead of silently corrupting the file or continuing past garbage. */
@@ -60,16 +60,14 @@ static bool write_model_params(FILE* f, Module* model) {
 
         Tensor* t = param->tensor;
         tensor_ensure_executed(t);
-        const char* name = param->name ? param->name : "";
-        int32_t name_len = (int32_t)strlen(name);
-        int32_t dtype    = (int32_t)t->dtype;
-        int32_t ndim     = t->ndim;
+        const char* name   = param->name ? param->name : "";
+        int32_t name_len   = (int32_t)strlen(name);
+        int32_t dtype      = (int32_t)t->dtype;
+        int32_t ndim       = t->ndim;
         size_t elem_size   = cml_dtype_size(t->dtype);
         uint64_t data_size = (uint64_t)(t->numel * elem_size);
-        if (!io_write(f, &name_len, sizeof(name_len)) ||
-            !io_write(f, name, (size_t)name_len) ||
-            !io_write(f, &dtype, sizeof(dtype)) ||
-            !io_write(f, &ndim, sizeof(ndim)))
+        if (!io_write(f, &name_len, sizeof(name_len)) || !io_write(f, name, (size_t)name_len) ||
+            !io_write(f, &dtype, sizeof(dtype)) || !io_write(f, &ndim, sizeof(ndim)))
             return false;
         for (int d = 0; d < t->ndim; d++) {
             int32_t dim = t->shape[d];
@@ -86,17 +84,18 @@ static bool write_model_params(FILE* f, Module* model) {
 }
 
 int model_save(Module* model, const char* filepath) {
-    if (!model || !filepath) return -1;
+    if (!model || !filepath)
+        return -1;
 
     FILE* f = fopen(filepath, "wb");
     if (!f) {
         LOG_ERROR("Failed to open file for writing: %s", filepath);
         return -1;
     }
-    bool ok = io_write(f, "CML", 4); // magic (includes null terminator)
+    bool ok          = io_write(f, "CML", 4); // magic (includes null terminator)
     uint32_t version = CML_MODEL_VERSION;
-    ok = ok && io_write(f, &version, sizeof(version));
-    ok = ok && write_model_params(f, model);
+    ok               = ok && io_write(f, &version, sizeof(version));
+    ok               = ok && write_model_params(f, model);
 
     if (fclose(f) != 0)
         ok = false;
@@ -112,17 +111,14 @@ int model_save(Module* model, const char* filepath) {
  * allocation failure. */
 static char* read_param_header(FILE* f, int32_t* dtype, int32_t* ndim) {
     int32_t name_len;
-    if (!io_read(f, &name_len, sizeof(name_len)) ||
-        name_len < 0 || name_len > CML_IO_MAX_NAME_LEN)
+    if (!io_read(f, &name_len, sizeof(name_len)) || name_len < 0 || name_len > CML_IO_MAX_NAME_LEN)
         return NULL;
 
     char* name = cml_malloc((size_t)name_len + 1);
     if (!name)
         return NULL;
-    if (!io_read(f, name, (size_t)name_len) ||
-        !io_read(f, dtype, sizeof(*dtype)) ||
-        !io_read(f, ndim, sizeof(*ndim)) ||
-        *ndim < 0 || *ndim > CML_IO_MAX_NDIM) {
+    if (!io_read(f, name, (size_t)name_len) || !io_read(f, dtype, sizeof(*dtype)) ||
+        !io_read(f, ndim, sizeof(*ndim)) || *ndim < 0 || *ndim > CML_IO_MAX_NDIM) {
         cml_free(name);
         return NULL;
     }
@@ -131,7 +127,8 @@ static char* read_param_header(FILE* f, int32_t* dtype, int32_t* ndim) {
 }
 
 int model_load(Module* model, const char* filepath) {
-    if (!model || !filepath) return -1;
+    if (!model || !filepath)
+        return -1;
 
     FILE* f = fopen(filepath, "rb");
     if (!f) {
@@ -148,14 +145,13 @@ int model_load(Module* model, const char* filepath) {
 
     uint32_t version;
     if (!io_read(f, &version, sizeof(version)) || version != CML_MODEL_VERSION) {
-        LOG_ERROR("Unsupported model file version %u (expected %d)",
-                  version, CML_MODEL_VERSION);
+        LOG_ERROR("Unsupported model file version %u (expected %d)", version, CML_MODEL_VERSION);
         fclose(f);
         return -1;
     }
 
-    if (!io_read(f, &num_params, sizeof(num_params)) ||
-        num_params < 0 || num_params > CML_IO_MAX_PARAMS) {
+    if (!io_read(f, &num_params, sizeof(num_params)) || num_params < 0 ||
+        num_params > CML_IO_MAX_PARAMS) {
         LOG_ERROR("Corrupt model file: bad parameter count");
         fclose(f);
         return -1;
@@ -191,13 +187,12 @@ int model_load(Module* model, const char* filepath) {
         }
 
         Parameter* param = module_get_parameter(model, name);
-        bool consumed = false;
+        bool consumed    = false;
         if (param && param->tensor) {
             tensor_ensure_executed(param->tensor);
-            void* data = tensor_data_ptr(param->tensor);
+            void* data           = tensor_data_ptr(param->tensor);
             size_t expected_size = param->tensor->numel * cml_dtype_size(param->tensor->dtype);
-            if (data && expected_size == (size_t)data_size &&
-                io_read(f, data, (size_t)data_size)) {
+            if (data && expected_size == (size_t)data_size && io_read(f, data, (size_t)data_size)) {
                 consumed = true;
             } else {
                 /* Size mismatch or unreadable tensor: skip the payload. */
@@ -212,8 +207,7 @@ int model_load(Module* model, const char* filepath) {
         }
 
         if (!consumed) {
-            LOG_ERROR("Corrupt model file: parameter '%s' extends past end of file",
-                      name);
+            LOG_ERROR("Corrupt model file: parameter '%s' extends past end of file", name);
             cml_free(name);
             fclose(f);
             return -1;
@@ -227,30 +221,31 @@ int model_load(Module* model, const char* filepath) {
 
 int model_save_checkpoint(Module* model, Optimizer* optimizer, int epoch, float loss,
                           const char* filepath) {
-    if (!model || !filepath) return -1;
+    if (!model || !filepath)
+        return -1;
 
     FILE* f = fopen(filepath, "wb");
     if (!f) {
         LOG_ERROR("Failed to open checkpoint file: %s", filepath);
         return -1;
     }
-    bool ok = io_write(f, "CKP", 4);
+    bool ok          = io_write(f, "CKP", 4);
     uint32_t version = CML_MODEL_VERSION;
-    ok = ok && io_write(f, &version, sizeof(version));
+    ok               = ok && io_write(f, &version, sizeof(version));
 
-    int32_t ep = epoch;
-    ok = ok && io_write(f, &ep, sizeof(ep));
-    ok = ok && io_write(f, &loss, sizeof(loss));
-    ok = ok && write_model_params(f, model);
+    int32_t ep        = epoch;
+    ok                = ok && io_write(f, &ep, sizeof(ep));
+    ok                = ok && io_write(f, &loss, sizeof(loss));
+    ok                = ok && write_model_params(f, model);
     int32_t has_optim = optimizer ? 1 : 0;
-    ok = ok && io_write(f, &has_optim, sizeof(has_optim));
+    ok                = ok && io_write(f, &has_optim, sizeof(has_optim));
 
     if (optimizer && ok) {
         int32_t num_groups = optimizer->num_param_groups;
-        ok = io_write(f, &num_groups, sizeof(num_groups));
+        ok                 = io_write(f, &num_groups, sizeof(num_groups));
         for (int i = 0; ok && i < optimizer->num_param_groups; i++) {
             ParameterGroup* g = &optimizer->param_groups[i];
-            ok = io_write(f, &g->lr, sizeof(g->lr)) &&
+            ok                = io_write(f, &g->lr, sizeof(g->lr)) &&
                  io_write(f, &g->step_count, sizeof(g->step_count));
         }
         /* Per-parameter moments (Adam m/v, momentum buffers, ...) so resuming
@@ -270,7 +265,8 @@ int model_save_checkpoint(Module* model, Optimizer* optimizer, int epoch, float 
 
 int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float* loss,
                           const char* filepath) {
-    if (!model || !filepath) return -1;
+    if (!model || !filepath)
+        return -1;
 
     FILE* f = fopen(filepath, "rb");
     if (!f) {
@@ -287,8 +283,7 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
 
     uint32_t version;
     if (!io_read(f, &version, sizeof(version)) || version != CML_MODEL_VERSION) {
-        LOG_ERROR("Unsupported checkpoint version %u (expected %d)",
-                  version, CML_MODEL_VERSION);
+        LOG_ERROR("Unsupported checkpoint version %u (expected %d)", version, CML_MODEL_VERSION);
         fclose(f);
         return -1;
     }
@@ -301,11 +296,13 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
         fclose(f);
         return -1;
     }
-    if (epoch) *epoch = ep;
-    if (loss) *loss = l;
+    if (epoch)
+        *epoch = ep;
+    if (loss)
+        *loss = l;
 
-    if (!io_read(f, &num_params, sizeof(num_params)) ||
-        num_params < 0 || num_params > CML_IO_MAX_PARAMS) {
+    if (!io_read(f, &num_params, sizeof(num_params)) || num_params < 0 ||
+        num_params > CML_IO_MAX_PARAMS) {
         LOG_ERROR("Corrupt checkpoint: bad parameter count");
         fclose(f);
         return -1;
@@ -340,7 +337,7 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
         Parameter* param = module_get_parameter(model, name);
         if (param && param->tensor) {
             tensor_ensure_executed(param->tensor);
-            void* data = tensor_data_ptr(param->tensor);
+            void* data      = tensor_data_ptr(param->tensor);
             size_t expected = param->tensor->numel * cml_dtype_size(param->tensor->dtype);
             if (data && expected == (size_t)data_size) {
                 if (!io_read(f, data, (size_t)data_size)) {
@@ -351,15 +348,15 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
                 }
             } else if (!io_skip(f, data_size)) {
                 cml_free(name);
-                LOG_ERROR("Corrupt checkpoint: parameter '%s' extends past end of file",
-                          name);
+                LOG_ERROR("Corrupt checkpoint: parameter '%s' extends past end of file", name);
                 fclose(f);
                 return -1;
             }
         } else if (!io_skip(f, data_size)) {
             cml_free(name);
             LOG_ERROR("Corrupt checkpoint: unknown parameter '%s' extends past end of "
-                      "file", name);
+                      "file",
+                      name);
             fclose(f);
             return -1;
         }
@@ -374,13 +371,14 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
 
     if (has_optim && optimizer) {
         int32_t num_groups;
-        if (!io_read(f, &num_groups, sizeof(num_groups)) ||
-            num_groups < 0 || num_groups > CML_IO_MAX_PARAMS) {
+        if (!io_read(f, &num_groups, sizeof(num_groups)) || num_groups < 0 ||
+            num_groups > CML_IO_MAX_PARAMS) {
             LOG_ERROR("Corrupt checkpoint: bad optimizer group count");
             fclose(f);
             return -1;
         }
-        int groups_to_read = num_groups < optimizer->num_param_groups ? num_groups : optimizer->num_param_groups;
+        int groups_to_read =
+            num_groups < optimizer->num_param_groups ? num_groups : optimizer->num_param_groups;
         for (int i = 0; i < groups_to_read; i++) {
             float lr;
             int32_t step;
@@ -389,19 +387,19 @@ int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float
                 fclose(f);
                 return -1;
             }
-            optimizer->param_groups[i].lr = lr;
+            optimizer->param_groups[i].lr         = lr;
             optimizer->param_groups[i].step_count = step;
         }
         for (int i = groups_to_read; i < num_groups; i++) {
-            float lr; int32_t step;
+            float lr;
+            int32_t step;
             if (!io_read(f, &lr, sizeof(lr)) || !io_read(f, &step, sizeof(step))) {
                 LOG_ERROR("Corrupt checkpoint: truncated optimizer group");
                 fclose(f);
                 return -1;
             }
         }
-        if (num_groups == optimizer->num_param_groups &&
-            optimizer_state_load(optimizer, f) != 0) {
+        if (num_groups == optimizer->num_param_groups && optimizer_state_load(optimizer, f) != 0) {
             LOG_WARNING("Checkpoint optimizer state could not be restored; "
                         "moments start from zero");
         }

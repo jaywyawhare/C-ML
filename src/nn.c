@@ -35,11 +35,9 @@ int module_add_buffer(Module* module, Tensor* tensor, const char* name) {
     }
 
     if (module->num_buffers >= module->buffers_capacity) {
-        int new_capacity = module->buffers_capacity == 0 ? 4 : module->buffers_capacity * 2;
-        Tensor** new_buffers = cml_realloc(module->buffers,
-                                           (size_t)new_capacity * sizeof(Tensor*));
-        char** new_names = cml_realloc(module->buffer_names,
-                                       (size_t)new_capacity * sizeof(char*));
+        int new_capacity     = module->buffers_capacity == 0 ? 4 : module->buffers_capacity * 2;
+        Tensor** new_buffers = cml_realloc(module->buffers, (size_t)new_capacity * sizeof(Tensor*));
+        char** new_names = cml_realloc(module->buffer_names, (size_t)new_capacity * sizeof(char*));
         if (!new_buffers || !new_names) {
             LOG_ERROR("Failed to grow buffer registry for module '%s'", module->name);
             return -1;
@@ -113,14 +111,10 @@ void module_free(Module* module) {
     if (!module)
         return;
 
-    
     cml_untrack_module(module);
 
-    
-    
     void (*specialized_free)(Module*) = module->free;
 
-    
     module->free = NULL;
 
     if (module->name) {
@@ -128,7 +122,6 @@ void module_free(Module* module) {
         module->name = NULL;
     }
 
-    
     if (module->parameters) {
         for (int i = 0; i < module->num_parameters; i++) {
             if (module->parameters[i]) {
@@ -168,7 +161,7 @@ void module_free(Module* module) {
     if (specialized_free) {
         specialized_free(module);
     } else {
-        
+
         cml_free(module);
     }
 }
@@ -266,10 +259,9 @@ Parameter* module_get_parameter(Module* module, const char* name) {
 
 Parameter* nn_add_bias_param(Module* module, int size, DType dtype, DeviceType device,
                              void (*init)(Tensor*, int)) {
-    int shape[] = {size};
-    TensorConfig cfg = {
-        .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
-    Tensor* bias = tensor_zeros(shape, 1, &cfg);
+    int shape[]      = {size};
+    TensorConfig cfg = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+    Tensor* bias     = tensor_zeros(shape, 1, &cfg);
     if (!bias) {
         module_free(module);
         return NULL;
@@ -299,10 +291,9 @@ Parameter* nn_add_weight_param(Module* module, Tensor* weight) {
 
 int nn_add_affine_params(Module* module, int size, DType dtype, DeviceType device,
                          Parameter** weight_out, Parameter** bias_out) {
-    int shape[] = {size};
-    TensorConfig cfg = {
-        .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
-    Tensor* weight = tensor_ones(shape, 1, &cfg);
+    int shape[]      = {size};
+    TensorConfig cfg = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+    Tensor* weight   = tensor_ones(shape, 1, &cfg);
     if (!weight) {
         module_free(module);
         return -1;
@@ -313,20 +304,21 @@ int nn_add_affine_params(Module* module, int size, DType dtype, DeviceType devic
         return -1;
     }
     *weight_out = module_get_parameter(module, "weight");
-    *bias_out = nn_add_bias_param(module, size, dtype, device, NULL);
+    *bias_out   = nn_add_bias_param(module, size, dtype, device, NULL);
     return *bias_out ? 0 : -1;
 }
 
 int nn_add_running_stats(Module* module, int size, DType dtype, DeviceType device,
                          Tensor** mean_out, Tensor** var_out) {
-    int shape[] = {size};
-    TensorConfig cfg = {
-        .dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
-    *mean_out = tensor_zeros(shape, 1, &cfg);
-    *var_out  = tensor_ones(shape, 1, &cfg);
+    int shape[]      = {size};
+    TensorConfig cfg = {.dtype = dtype, .device = device, .has_dtype = true, .has_device = true};
+    *mean_out        = tensor_zeros(shape, 1, &cfg);
+    *var_out         = tensor_ones(shape, 1, &cfg);
     if (!*mean_out || !*var_out) {
-        if (*mean_out) tensor_free(*mean_out);
-        if (*var_out)  tensor_free(*var_out);
+        if (*mean_out)
+            tensor_free(*mean_out);
+        if (*var_out)
+            tensor_free(*var_out);
         module_free(module);
         return -1;
     }
@@ -442,7 +434,6 @@ void module_set_next(Module* module, Module* next) {
     }
 }
 
-
 int module_collect_parameters(Module* module, Parameter*** params_out, int* num_params_out,
                               bool recursive) {
     if (!module || !params_out || !num_params_out)
@@ -499,14 +490,12 @@ int module_to_device(Module* module, DeviceType device) {
         return -1;
     }
 
-    
     Parameter** params = NULL;
     int num_params     = 0;
     if (module_collect_parameters(module, &params, &num_params, true) != 0) {
         return -1;
     }
 
-    
     for (int i = 0; i < num_params; i++) {
         if (params[i] && params[i]->tensor) {
             if (device_move_tensor(params[i]->tensor, device) != 0) {

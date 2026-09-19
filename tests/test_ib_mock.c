@@ -16,31 +16,38 @@
 #include "distributed/ib_transport.h"
 
 #define WS 4
-#define N  7   /* not divisible by WS → exercises ring chunk clamping */
+#define N 7 /* not divisible by WS → exercises ring chunk clamping */
 
 static int run_rank(int rank) {
     setenv("IB_MOCK", "1", 1);
 
     CMLIBTransport* ib = cml_ib_create(rank, WS);
-    if (!ib) { fprintf(stderr, "[rank %d] cml_ib_create failed\n", rank); return 1; }
+    if (!ib) {
+        fprintf(stderr, "[rank %d] cml_ib_create failed\n", rank);
+        return 1;
+    }
 
     int fails = 0;
 
     /* Ring all-reduce SUM: rank r contributes (r+1); expect sum_{r}(r+1). */
     float buf[N];
-    for (int i = 0; i < N; i++) buf[i] = (float)(rank + 1);
+    for (int i = 0; i < N; i++)
+        buf[i] = (float)(rank + 1);
     if (cml_ib_allreduce(ib, buf, sizeof(buf), (int)sizeof(float)) != 0) {
         fprintf(stderr, "[rank %d] cml_ib_allreduce failed\n", rank);
         fails |= 1;
     }
-    float expect = (float)(WS * (WS + 1) / 2);   /* 1+2+3+4 = 10 */
+    float expect = (float)(WS * (WS + 1) / 2); /* 1+2+3+4 = 10 */
     for (int i = 0; i < N && !(fails & 1); i++)
         if (fabsf(buf[i] - expect) > 1e-4f) {
             fprintf(stderr, "[rank %d] allreduce buf[%d]=%f want %f\n", rank, i, buf[i], expect);
             fails |= 1;
         }
 
-    if (cml_ib_barrier(ib) != 0) { fprintf(stderr, "[rank %d] barrier failed\n", rank); fails |= 2; }
+    if (cml_ib_barrier(ib) != 0) {
+        fprintf(stderr, "[rank %d] barrier failed\n", rank);
+        fails |= 2;
+    }
 
     cml_ib_free(ib);
     return fails;
@@ -53,14 +60,20 @@ int main(void) {
     pid_t pids[WS];
     for (int r = 1; r < WS; r++) {
         pid_t p = fork();
-        if (p < 0) { perror("fork"); return 1; }
-        if (p == 0) { _exit(run_rank(r) ? 1 : 0); }
+        if (p < 0) {
+            perror("fork");
+            return 1;
+        }
+        if (p == 0) {
+            _exit(run_rank(r) ? 1 : 0);
+        }
         pids[r] = p;
     }
 
     int rc0 = run_rank(0);
-    int ok = (rc0 == 0);
-    if (rc0) fprintf(stderr, "[rank 0] FAILED (mask=%d)\n", rc0);
+    int ok  = (rc0 == 0);
+    if (rc0)
+        fprintf(stderr, "[rank 0] FAILED (mask=%d)\n", rc0);
     for (int r = 1; r < WS; r++) {
         int st = 0;
         waitpid(pids[r], &st, 0);
@@ -70,7 +83,10 @@ int main(void) {
         }
     }
 
-    if (ok) { printf("test_ib_mock: PASSED (mock-verbs ring all-reduce + barrier, %d ranks)\n", WS); return 0; }
+    if (ok) {
+        printf("test_ib_mock: PASSED (mock-verbs ring all-reduce + barrier, %d ranks)\n", WS);
+        return 0;
+    }
     printf("test_ib_mock: FAILED\n");
     return 1;
 }

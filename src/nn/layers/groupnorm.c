@@ -25,8 +25,8 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
         return NULL;
     }
 
-    int N = input->shape[0];
-    int G = gn->num_groups;
+    int N                  = input->shape[0];
+    int G                  = gn->num_groups;
     int channels_per_group = C / G;
 
     int spatial = 1;
@@ -36,10 +36,10 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
     int group_size = channels_per_group * spatial;
 
     ReshapeParams rp;
-    int rs[]         = {N * G, group_size};
-    rp.new_shape     = rs;
-    rp.new_ndim      = 2;
-    Tensor* x2       = uop_reshape(input, &rp);
+    int rs[]     = {N * G, group_size};
+    rp.new_shape = rs;
+    rp.new_ndim  = 2;
+    Tensor* x2   = uop_reshape(input, &rp);
     if (!x2)
         return NULL;
 
@@ -53,8 +53,8 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
     if (!mean_1d)
         return NULL;
 
-    int mean2_shape[] = {N * G, 1};
-    ReshapeParams rmean = {.new_shape = mean2_shape, .new_ndim = 2};
+    int mean2_shape[]    = {N * G, 1};
+    ReshapeParams rmean  = {.new_shape = mean2_shape, .new_ndim = 2};
     Tensor* mean_reduced = uop_reshape(mean_1d, &rmean);
     if (!mean_reduced)
         return NULL;
@@ -83,10 +83,8 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
     if (!var_reduced)
         return NULL;
 
-    TensorConfig cfg = {.dtype      = input->dtype,
-                        .device     = input->device,
-                        .has_dtype  = true,
-                        .has_device = true};
+    TensorConfig cfg = {
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     int eps_sh[]  = {N * G, 1};
     Tensor* eps_t = tensor_full(eps_sh, 2, &cfg, gn->eps);
     if (!eps_t)
@@ -118,7 +116,7 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
         return NULL;
 
     if (gn->affine && gn->weight && gn->bias) {
-        int nd = input->ndim;
+        int nd          = input->ndim;
         int* stat_shape = cml_malloc((size_t)nd * sizeof(int));
         if (!stat_shape)
             return NULL;
@@ -159,8 +157,8 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
 
 static void groupnorm_free(Module* module) { cml_free(module); }
 
-GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine,
-                        DType dtype, DeviceType device) {
+GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine, DType dtype,
+                        DeviceType device) {
     if (num_channels % num_groups != 0) {
         LOG_ERROR("num_channels (%d) must be divisible by num_groups (%d)", num_channels,
                   num_groups);
@@ -182,8 +180,8 @@ GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine
     gn->affine       = affine;
 
     if (affine) {
-        if (nn_add_affine_params((Module*)gn, num_channels, dtype, device,
-                                 &gn->weight, &gn->bias) != 0)
+        if (nn_add_affine_params((Module*)gn, num_channels, dtype, device, &gn->weight,
+                                 &gn->bias) != 0)
             return NULL;
     } else {
         gn->weight = NULL;

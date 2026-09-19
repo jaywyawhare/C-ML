@@ -18,22 +18,22 @@ bool cml_xmx_available(void) {
     typedef int (*clGetDeviceInfo_fn)(void*, unsigned, size_t, void*, size_t*);
 
     clGetPlatformIDs_fn pGetPlatformIDs = dlsym(ocl, "clGetPlatformIDs");
-    clGetDeviceIDs_fn pGetDeviceIDs = dlsym(ocl, "clGetDeviceIDs");
-    clGetDeviceInfo_fn pGetDeviceInfo = dlsym(ocl, "clGetDeviceInfo");
+    clGetDeviceIDs_fn pGetDeviceIDs     = dlsym(ocl, "clGetDeviceIDs");
+    clGetDeviceInfo_fn pGetDeviceInfo   = dlsym(ocl, "clGetDeviceInfo");
 
     if (!pGetPlatformIDs || !pGetDeviceIDs || !pGetDeviceInfo) {
         dlclose(ocl);
         return false;
     }
 
-    void* platform = NULL;
+    void* platform         = NULL;
     unsigned num_platforms = 0;
     if (pGetPlatformIDs(1, &platform, &num_platforms) != 0 || num_platforms == 0) {
         dlclose(ocl);
         return false;
     }
 
-    void* device = NULL;
+    void* device         = NULL;
     unsigned num_devices = 0;
     /* CL_DEVICE_TYPE_GPU = 4 */
     if (pGetDeviceIDs(platform, 4, 1, &device, &num_devices) != 0 || num_devices == 0) {
@@ -56,8 +56,8 @@ bool cml_xmx_available(void) {
 
 CMLXMXConfig cml_xmx_get_config(void) {
     CMLXMXConfig cfg;
-    cfg.dpas_depth = 8;
-    cfg.exec_size = 16;
+    cfg.dpas_depth   = 8;
+    cfg.exec_size    = 16;
     cfg.ops_per_chan = 8;
     return cfg;
 }

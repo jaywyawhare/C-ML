@@ -200,12 +200,13 @@ static char* generate_kernel_code_snippet(struct IRNode* node) {
         break;
     case UOP_MAX:
         if (node->num_inputs >= 2) {
-            offset += snprintf(code + offset, buffer_size - (size_t)offset,
-                               "max(%s, %s)\nfor (int i = 0; i < n; i++) {\n    outputs[0][i] = "
-                               "((inputs[0][i] != inputs[0][i]) || (inputs[1][i] != inputs[1][i])) ? "
-                               "(inputs[0][i] + inputs[1][i]) : "
-                               "fmaxf(inputs[0][i], inputs[1][i]);\n}",
-                               node->input_names[0], node->input_names[1]);
+            offset +=
+                snprintf(code + offset, buffer_size - (size_t)offset,
+                         "max(%s, %s)\nfor (int i = 0; i < n; i++) {\n    outputs[0][i] = "
+                         "((inputs[0][i] != inputs[0][i]) || (inputs[1][i] != inputs[1][i])) ? "
+                         "(inputs[0][i] + inputs[1][i]) : "
+                         "fmaxf(inputs[0][i], inputs[1][i]);\n}",
+                         node->input_names[0], node->input_names[1]);
         }
         break;
     case UOP_MAX_REDUCE:
@@ -213,7 +214,8 @@ static char* generate_kernel_code_snippet(struct IRNode* node) {
             offset +=
                 snprintf(code + offset, buffer_size - (size_t)offset,
                          "max_reduce(%s)\nfloat m = inputs[0][0];\nfor (int i = 1; i < n; i++) {\n "
-                         "   if (inputs[0][i] != inputs[0][i] || inputs[0][i] > m) m = inputs[0][i];\n}\noutputs[0][0] = m;",
+                         "   if (inputs[0][i] != inputs[0][i] || inputs[0][i] > m) m = "
+                         "inputs[0][i];\n}\noutputs[0][0] = m;",
                          node->input_names[0]);
         }
         break;
@@ -455,8 +457,8 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
     // Count nodes and fusion structure.
     int total_nodes   = 0;
     int dead_nodes    = 0;
-    int fused_groups  = 0;   // number of fused kernels (each collapses several ops)
-    int fused_members = 0;   // total ops belonging to some fused kernel
+    int fused_groups  = 0; // number of fused kernels (each collapses several ops)
+    int fused_members = 0; // total ops belonging to some fused kernel
 
     struct IRNode* node = ir->head;
     while (node) {
@@ -474,16 +476,13 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
     // Unoptimized view: one kernel per node; nothing removed; fusion is only an
     // opportunity. Optimized view: dead code removed and fused groups collapsed
     // to a single kernel — this is what makes the before/after differ.
-    int shown_kernels = optimized
-                            ? (total_nodes - dead_nodes) - (fused_members - fused_groups)
-                            : total_nodes;
+    int shown_kernels =
+        optimized ? (total_nodes - dead_nodes) - (fused_members - fused_groups) : total_nodes;
     append_format(&buffer, &offset, &capacity,
                   "\"nodeCount\":%d,\"kernelCount\":%d,\"deadNodes\":%d,\"fusedKernels\":%d,"
                   "\"fusionOpportunities\":%d,",
-                  total_nodes, shown_kernels,
-                  optimized ? 0 : dead_nodes,
-                  optimized ? fused_groups : 0,
-                  optimized ? 0 : fused_groups);
+                  total_nodes, shown_kernels, optimized ? 0 : dead_nodes,
+                  optimized ? fused_groups : 0, optimized ? 0 : fused_groups);
 
     append_format(&buffer, &offset, &capacity, "\"kernels\":[");
 
@@ -493,11 +492,11 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
 
     while (node) {
         if (optimized && !node->is_used && node->use_count == 0) {
-            node = node->next;  // optimized view removes dead code
+            node = node->next; // optimized view removes dead code
             continue;
         }
         if (optimized && node->fused_kernel && node->fused_kernel->ops[0] != node) {
-            node = node->next;  // optimized view collapses fused members into the head
+            node = node->next; // optimized view collapses fused members into the head
             continue;
         }
         // A node renders AS a fused kernel only in the optimized view; the

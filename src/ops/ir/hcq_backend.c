@@ -21,53 +21,71 @@ typedef void (*cml_cpu_kernel_fn)(void** args, int num_args);
 
 static CMLHCQQueue* hcq_cpu_queue_create(void) {
     CMLHCQQueue* q = (CMLHCQQueue*)cml_calloc(1, sizeof(CMLHCQQueue));
-    if (!q) { LOG_ERROR("Failed to allocate CPU HCQ queue"); return NULL; }
+    if (!q) {
+        LOG_ERROR("Failed to allocate CPU HCQ queue");
+        return NULL;
+    }
     q->backend = CML_HCQ_CPU;
     q->active  = true;
     return q;
 }
 
 static void hcq_cpu_queue_destroy(CMLHCQQueue* q) {
-    if (!q) return;
+    if (!q)
+        return;
     q->active = false;
     cml_free(q);
 }
 
 static int hcq_cpu_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* desc) {
     (void)q;
-    if (!desc->compiled_kernel) { LOG_ERROR("CPU kernel function pointer is NULL"); return -1; }
+    if (!desc->compiled_kernel) {
+        LOG_ERROR("CPU kernel function pointer is NULL");
+        return -1;
+    }
     ((cml_cpu_kernel_fn)desc->compiled_kernel)(desc->args, desc->num_args);
     return 0;
 }
 
 static int hcq_cpu_memcpy_h2d(CMLHCQQueue* q, void* dst, const void* src, size_t bytes) {
     (void)q;
-    if (!dst || !src) { LOG_ERROR("NULL pointer in CPU memcpy_h2d"); return -1; }
+    if (!dst || !src) {
+        LOG_ERROR("NULL pointer in CPU memcpy_h2d");
+        return -1;
+    }
     memcpy(dst, src, bytes);
     return 0;
 }
 
 static int hcq_cpu_memcpy_d2h(CMLHCQQueue* q, void* dst, const void* src, size_t bytes) {
     (void)q;
-    if (!dst || !src) { LOG_ERROR("NULL pointer in CPU memcpy_d2h"); return -1; }
+    if (!dst || !src) {
+        LOG_ERROR("NULL pointer in CPU memcpy_d2h");
+        return -1;
+    }
     memcpy(dst, src, bytes);
     return 0;
 }
 
 static int hcq_cpu_queue_synchronize(CMLHCQQueue* q) {
-    if (q) q->num_wait_signals = 0; /* synchronous — nothing to wait for */
+    if (q)
+        q->num_wait_signals = 0; /* synchronous — nothing to wait for */
     return 0;
 }
 
 static CMLHCQSignal* hcq_cpu_signal_create(void) {
     CMLHCQSignal* s = (CMLHCQSignal*)cml_calloc(1, sizeof(CMLHCQSignal));
-    if (!s) { LOG_ERROR("Failed to allocate CPU HCQ signal"); return NULL; }
+    if (!s) {
+        LOG_ERROR("Failed to allocate CPU HCQ signal");
+        return NULL;
+    }
     s->backend = CML_HCQ_CPU;
     return s;
 }
 
 static void hcq_cpu_signal_destroy(CMLHCQSignal* s) {
-    if (s) cml_free(s);
+    if (s)
+        cml_free(s);
 }
 
 static int hcq_cpu_signal_record(CMLHCQQueue* q, CMLHCQSignal* s) {
@@ -186,18 +204,18 @@ extern int cml_hcq_rocm_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal);
 extern int cml_hcq_rocm_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms);
 
 static const CMLHCQBackendOps g_hcq_rocm_ops = {
-    .name = "ROCm",
-    .queue_create = cml_hcq_rocm_queue_create,
-    .queue_destroy = cml_hcq_rocm_queue_destroy,
-    .submit_kernel = cml_hcq_rocm_submit_kernel,
-    .memcpy_h2d = cml_hcq_rocm_memcpy_h2d,
-    .memcpy_d2h = cml_hcq_rocm_memcpy_d2h,
+    .name              = "ROCm",
+    .queue_create      = cml_hcq_rocm_queue_create,
+    .queue_destroy     = cml_hcq_rocm_queue_destroy,
+    .submit_kernel     = cml_hcq_rocm_submit_kernel,
+    .memcpy_h2d        = cml_hcq_rocm_memcpy_h2d,
+    .memcpy_d2h        = cml_hcq_rocm_memcpy_d2h,
     .queue_synchronize = cml_hcq_rocm_queue_synchronize,
-    .signal_create = cml_hcq_rocm_signal_create,
-    .signal_destroy = cml_hcq_rocm_signal_destroy,
-    .signal_record = cml_hcq_rocm_signal_record,
-    .queue_wait = cml_hcq_rocm_queue_wait,
-    .signal_wait_cpu = cml_hcq_rocm_signal_wait_cpu,
+    .signal_create     = cml_hcq_rocm_signal_create,
+    .signal_destroy    = cml_hcq_rocm_signal_destroy,
+    .signal_record     = cml_hcq_rocm_signal_record,
+    .queue_wait        = cml_hcq_rocm_queue_wait,
+    .signal_wait_cpu   = cml_hcq_rocm_signal_wait_cpu,
 };
 
 /* WebGPU adapter (hcq_webgpu.c): real implementation under CML_HAS_WEBGPU,
@@ -215,18 +233,18 @@ extern int cml_hcq_webgpu_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal);
 extern int cml_hcq_webgpu_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms);
 
 static const CMLHCQBackendOps g_hcq_webgpu_ops = {
-    .name = "WebGPU",
-    .queue_create = cml_hcq_webgpu_queue_create,
-    .queue_destroy = cml_hcq_webgpu_queue_destroy,
-    .submit_kernel = cml_hcq_webgpu_submit_kernel,
-    .memcpy_h2d = cml_hcq_webgpu_memcpy_h2d,
-    .memcpy_d2h = cml_hcq_webgpu_memcpy_d2h,
+    .name              = "WebGPU",
+    .queue_create      = cml_hcq_webgpu_queue_create,
+    .queue_destroy     = cml_hcq_webgpu_queue_destroy,
+    .submit_kernel     = cml_hcq_webgpu_submit_kernel,
+    .memcpy_h2d        = cml_hcq_webgpu_memcpy_h2d,
+    .memcpy_d2h        = cml_hcq_webgpu_memcpy_d2h,
     .queue_synchronize = cml_hcq_webgpu_queue_synchronize,
-    .signal_create = cml_hcq_webgpu_signal_create,
-    .signal_destroy = cml_hcq_webgpu_signal_destroy,
-    .signal_record = cml_hcq_webgpu_signal_record,
-    .queue_wait = cml_hcq_webgpu_queue_wait,
-    .signal_wait_cpu = cml_hcq_webgpu_signal_wait_cpu,
+    .signal_create     = cml_hcq_webgpu_signal_create,
+    .signal_destroy    = cml_hcq_webgpu_signal_destroy,
+    .signal_record     = cml_hcq_webgpu_signal_record,
+    .queue_wait        = cml_hcq_webgpu_queue_wait,
+    .signal_wait_cpu   = cml_hcq_webgpu_signal_wait_cpu,
 };
 
 static CMLHCQQueue* hcq_vulkan_queue_create(void) {
@@ -293,81 +311,81 @@ static CMLHCQSignal* hcq_am_signal_create(void) {
 
 #ifdef CML_HAS_CUDA
 static const CMLHCQBackendOps g_hcq_cuda_ops = {
-    .name = "CUDA",
-    .queue_create = cml_hcq_cuda_queue_create,
-    .queue_destroy = cml_hcq_cuda_queue_destroy,
-    .submit_kernel = cml_hcq_cuda_submit_kernel,
-    .memcpy_h2d = cml_hcq_cuda_memcpy_h2d,
-    .memcpy_d2h = cml_hcq_cuda_memcpy_d2h,
+    .name              = "CUDA",
+    .queue_create      = cml_hcq_cuda_queue_create,
+    .queue_destroy     = cml_hcq_cuda_queue_destroy,
+    .submit_kernel     = cml_hcq_cuda_submit_kernel,
+    .memcpy_h2d        = cml_hcq_cuda_memcpy_h2d,
+    .memcpy_d2h        = cml_hcq_cuda_memcpy_d2h,
     .queue_synchronize = cml_hcq_cuda_queue_synchronize,
-    .signal_create = cml_hcq_cuda_signal_create,
-    .signal_destroy = cml_hcq_cuda_signal_destroy,
-    .signal_record = cml_hcq_cuda_signal_record,
-    .queue_wait = cml_hcq_cuda_queue_wait,
-    .signal_wait_cpu = cml_hcq_cuda_signal_wait_cpu,
+    .signal_create     = cml_hcq_cuda_signal_create,
+    .signal_destroy    = cml_hcq_cuda_signal_destroy,
+    .signal_record     = cml_hcq_cuda_signal_record,
+    .queue_wait        = cml_hcq_cuda_queue_wait,
+    .signal_wait_cpu   = cml_hcq_cuda_signal_wait_cpu,
 };
 #endif
 
 #ifdef CML_HAS_OPENCL
 static const CMLHCQBackendOps g_hcq_opencl_ops = {
-    .name = "OpenCL",
-    .queue_create = cml_hcq_opencl_queue_create,
-    .queue_destroy = cml_hcq_opencl_queue_destroy,
-    .submit_kernel = cml_hcq_opencl_submit_kernel,
-    .memcpy_h2d = cml_hcq_opencl_memcpy_h2d,
-    .memcpy_d2h = cml_hcq_opencl_memcpy_d2h,
+    .name              = "OpenCL",
+    .queue_create      = cml_hcq_opencl_queue_create,
+    .queue_destroy     = cml_hcq_opencl_queue_destroy,
+    .submit_kernel     = cml_hcq_opencl_submit_kernel,
+    .memcpy_h2d        = cml_hcq_opencl_memcpy_h2d,
+    .memcpy_d2h        = cml_hcq_opencl_memcpy_d2h,
     .queue_synchronize = cml_hcq_opencl_queue_synchronize,
-    .signal_create = cml_hcq_opencl_signal_create,
-    .signal_destroy = cml_hcq_opencl_signal_destroy,
-    .signal_record = cml_hcq_opencl_signal_record,
-    .queue_wait = cml_hcq_opencl_queue_wait,
-    .signal_wait_cpu = cml_hcq_opencl_signal_wait_cpu,
+    .signal_create     = cml_hcq_opencl_signal_create,
+    .signal_destroy    = cml_hcq_opencl_signal_destroy,
+    .signal_record     = cml_hcq_opencl_signal_record,
+    .queue_wait        = cml_hcq_opencl_queue_wait,
+    .signal_wait_cpu   = cml_hcq_opencl_signal_wait_cpu,
 };
 #endif
 
 static const CMLHCQBackendOps g_hcq_vulkan_ops = {
-    .name = "Vulkan",
-    .queue_create = hcq_vulkan_queue_create,
-    .queue_destroy = cml_hcq_vulkan_queue_destroy,
-    .submit_kernel = cml_hcq_vulkan_submit_kernel,
-    .memcpy_h2d = cml_hcq_vulkan_memcpy_h2d,
-    .memcpy_d2h = cml_hcq_vulkan_memcpy_d2h,
+    .name              = "Vulkan",
+    .queue_create      = hcq_vulkan_queue_create,
+    .queue_destroy     = cml_hcq_vulkan_queue_destroy,
+    .submit_kernel     = cml_hcq_vulkan_submit_kernel,
+    .memcpy_h2d        = cml_hcq_vulkan_memcpy_h2d,
+    .memcpy_d2h        = cml_hcq_vulkan_memcpy_d2h,
     .queue_synchronize = cml_hcq_vulkan_synchronize,
-    .signal_create = hcq_vulkan_signal_create,
-    .signal_destroy = cml_hcq_vulkan_signal_destroy,
-    .signal_record = hcq_vulkan_signal_record,
-    .queue_wait = hcq_vulkan_queue_wait,
-    .signal_wait_cpu = cml_hcq_vulkan_signal_wait,
+    .signal_create     = hcq_vulkan_signal_create,
+    .signal_destroy    = cml_hcq_vulkan_signal_destroy,
+    .signal_record     = hcq_vulkan_signal_record,
+    .queue_wait        = hcq_vulkan_queue_wait,
+    .signal_wait_cpu   = cml_hcq_vulkan_signal_wait,
 };
 
 static const CMLHCQBackendOps g_hcq_nv_ops = {
-    .name = "NV",
-    .queue_create = cml_hcq_nv_queue_create,
-    .queue_destroy = cml_hcq_nv_queue_destroy,
-    .submit_kernel = cml_hcq_nv_submit_kernel,
-    .memcpy_h2d = cml_hcq_nv_memcpy_h2d,
-    .memcpy_d2h = cml_hcq_nv_memcpy_d2h,
+    .name              = "NV",
+    .queue_create      = cml_hcq_nv_queue_create,
+    .queue_destroy     = cml_hcq_nv_queue_destroy,
+    .submit_kernel     = cml_hcq_nv_submit_kernel,
+    .memcpy_h2d        = cml_hcq_nv_memcpy_h2d,
+    .memcpy_d2h        = cml_hcq_nv_memcpy_d2h,
     .queue_synchronize = cml_hcq_nv_queue_synchronize,
-    .signal_create = cml_hcq_nv_signal_create,
-    .signal_destroy = cml_hcq_nv_signal_destroy,
-    .signal_record = cml_hcq_nv_signal_record,
-    .queue_wait = cml_hcq_nv_queue_wait,
-    .signal_wait_cpu = cml_hcq_nv_signal_wait_cpu,
+    .signal_create     = cml_hcq_nv_signal_create,
+    .signal_destroy    = cml_hcq_nv_signal_destroy,
+    .signal_record     = cml_hcq_nv_signal_record,
+    .queue_wait        = cml_hcq_nv_queue_wait,
+    .signal_wait_cpu   = cml_hcq_nv_signal_wait_cpu,
 };
 
 static const CMLHCQBackendOps g_hcq_am_ops = {
-    .name = "AM",
-    .queue_create = hcq_am_queue_create,
-    .queue_destroy = cml_hcq_am_queue_destroy,
-    .submit_kernel = cml_hcq_am_submit_kernel,
-    .memcpy_h2d = cml_hcq_am_memcpy_h2d,
-    .memcpy_d2h = cml_hcq_am_memcpy_d2h,
+    .name              = "AM",
+    .queue_create      = hcq_am_queue_create,
+    .queue_destroy     = cml_hcq_am_queue_destroy,
+    .submit_kernel     = cml_hcq_am_submit_kernel,
+    .memcpy_h2d        = cml_hcq_am_memcpy_h2d,
+    .memcpy_d2h        = cml_hcq_am_memcpy_d2h,
     .queue_synchronize = cml_hcq_am_synchronize,
-    .signal_create = hcq_am_signal_create,
-    .signal_destroy = cml_hcq_am_signal_destroy,
-    .signal_record = cml_hcq_am_signal_record,
-    .queue_wait = cml_hcq_am_queue_wait,
-    .signal_wait_cpu = cml_hcq_am_signal_wait,
+    .signal_create     = hcq_am_signal_create,
+    .signal_destroy    = cml_hcq_am_signal_destroy,
+    .signal_record     = cml_hcq_am_signal_record,
+    .queue_wait        = cml_hcq_am_queue_wait,
+    .signal_wait_cpu   = cml_hcq_am_signal_wait,
 };
 
 const CMLHCQBackendOps* cml_hcq_backend_ops(CMLHCQBackendType backend) {

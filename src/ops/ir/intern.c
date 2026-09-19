@@ -5,8 +5,8 @@
 #include <string.h>
 
 #define INTERN_INITIAL_CAPACITY 64
-#define INTERN_LOAD_FACTOR_NUM  3
-#define INTERN_LOAD_FACTOR_DEN  4
+#define INTERN_LOAD_FACTOR_NUM 3
+#define INTERN_LOAD_FACTOR_DEN 4
 
 #define FNV_OFFSET_BASIS CML_FNV_OFFSET_BASIS
 
@@ -22,15 +22,16 @@ uint64_t cml_fnv1a_bytes(uint64_t h, const void* data, size_t len) {
 /* Structural graph hash and output-slot capture, shared by the trace cache and
  * the tiny JIT: both key their caches on the same notion of "same graph". */
 uint64_t cml_ir_graph_hash(CMLGraph_t ir) {
-    if (!ir) return 0;
+    if (!ir)
+        return 0;
 
     uint64_t hash = CML_FNV_OFFSET_BASIS;
     for (struct IRNode* node = ir->head; node; node = node->next) {
         int type_val = (int)node->type;
-        hash = cml_fnv1a_bytes(hash, &type_val, sizeof(type_val));
+        hash         = cml_fnv1a_bytes(hash, &type_val, sizeof(type_val));
         if (node->output_shape && node->output_ndim > 0)
-            hash = cml_fnv1a_bytes(hash, node->output_shape,
-                                   sizeof(int) * (size_t)node->output_ndim);
+            hash =
+                cml_fnv1a_bytes(hash, node->output_shape, sizeof(int) * (size_t)node->output_ndim);
         hash = cml_fnv1a_bytes(hash, &node->num_inputs, sizeof(node->num_inputs));
     }
     return hash;
@@ -43,23 +44,19 @@ int cml_ir_output_slots(CMLGraph_t ir, void** ptrs, int max) {
     return n;
 }
 
-static uint64_t fnv1a_u64(uint64_t h, uint64_t v) {
-    return cml_fnv1a_bytes(h, &v, sizeof(v));
-}
+static uint64_t fnv1a_u64(uint64_t h, uint64_t v) { return cml_fnv1a_bytes(h, &v, sizeof(v)); }
 
-static uint64_t fnv1a_i32(uint64_t h, int v) {
-    return cml_fnv1a_bytes(h, &v, sizeof(v));
-}
+static uint64_t fnv1a_i32(uint64_t h, int v) { return cml_fnv1a_bytes(h, &v, sizeof(v)); }
 
-uint64_t cml_intern_hash_node(int op_type, int dtype, struct IRNode** inputs,
-                              int num_inputs, const void* arg_bytes, size_t arg_len) {
+uint64_t cml_intern_hash_node(int op_type, int dtype, struct IRNode** inputs, int num_inputs,
+                              const void* arg_bytes, size_t arg_len) {
     uint64_t h = FNV_OFFSET_BASIS;
-    h = fnv1a_i32(h, op_type);
-    h = fnv1a_i32(h, dtype);
-    h = fnv1a_i32(h, num_inputs);
+    h          = fnv1a_i32(h, op_type);
+    h          = fnv1a_i32(h, dtype);
+    h          = fnv1a_i32(h, num_inputs);
     for (int i = 0; i < num_inputs; i++) {
         uint64_t input_hash = inputs[i] ? inputs[i]->hash : 0;
-        h = fnv1a_u64(h, input_hash);
+        h                   = fnv1a_u64(h, input_hash);
     }
     if (arg_bytes && arg_len > 0)
         h = cml_fnv1a_bytes(h, arg_bytes, arg_len);
@@ -70,12 +67,12 @@ uint64_t cml_intern_hash_node(int op_type, int dtype, struct IRNode** inputs,
 #include "alloc/cml_allocator.h"
 
 uint64_t cml_intern_hash_node_ex(int op_type, int dtype, struct IRNode** inputs,
-                                 Tensor** raw_inputs, int num_inputs,
-                                 const void* arg_bytes, size_t arg_len) {
+                                 Tensor** raw_inputs, int num_inputs, const void* arg_bytes,
+                                 size_t arg_len) {
     uint64_t h = FNV_OFFSET_BASIS;
-    h = fnv1a_i32(h, op_type);
-    h = fnv1a_i32(h, dtype);
-    h = fnv1a_i32(h, num_inputs);
+    h          = fnv1a_i32(h, op_type);
+    h          = fnv1a_i32(h, dtype);
+    h          = fnv1a_i32(h, num_inputs);
     for (int i = 0; i < num_inputs; i++) {
         if (inputs[i]) {
             h = fnv1a_u64(h, inputs[i]->hash);
@@ -92,8 +89,8 @@ uint64_t cml_intern_hash_node_ex(int op_type, int dtype, struct IRNode** inputs,
 }
 
 static int entries_match(struct IRNode* node, uint64_t hash, int op_type, int dtype,
-                         struct IRNode** inputs, int num_inputs,
-                         const void* arg_bytes, size_t arg_len) {
+                         struct IRNode** inputs, int num_inputs, const void* arg_bytes,
+                         size_t arg_len) {
     if (node->hash != hash)
         return 0;
     if ((int)node->type != op_type)
@@ -115,8 +112,7 @@ static int entries_match(struct IRNode* node, uint64_t hash, int op_type, int dt
 }
 
 static int entries_match_ex(struct IRNode* node, uint64_t hash, int op_type, int dtype,
-                            struct IRNode** inputs, Tensor** raw_inputs,
-                            int num_inputs,
+                            struct IRNode** inputs, Tensor** raw_inputs, int num_inputs,
                             const void* arg_bytes, size_t arg_len) {
     if (node->hash != hash)
         return 0;
@@ -172,7 +168,7 @@ static size_t probe_index(uint64_t hash, size_t capacity) {
 }
 
 static int intern_resize(CMLInternTable* table) {
-    size_t new_cap = table->capacity * 2;
+    size_t new_cap              = table->capacity * 2;
     CMLInternEntry* new_entries = cml_calloc(new_cap, sizeof(CMLInternEntry));
     if (!new_entries)
         return -1;
@@ -192,9 +188,9 @@ static int intern_resize(CMLInternTable* table) {
     return 0;
 }
 
-struct IRNode* cml_intern_lookup(CMLInternTable* table, uint64_t hash, int op_type,
-                                 int dtype, struct IRNode** inputs, int num_inputs,
-                                 const void* arg_bytes, size_t arg_len) {
+struct IRNode* cml_intern_lookup(CMLInternTable* table, uint64_t hash, int op_type, int dtype,
+                                 struct IRNode** inputs, int num_inputs, const void* arg_bytes,
+                                 size_t arg_len) {
     if (!table || table->count == 0)
         return NULL;
 
@@ -203,17 +199,16 @@ struct IRNode* cml_intern_lookup(CMLInternTable* table, uint64_t hash, int op_ty
         CMLInternEntry* e = &table->entries[idx];
         if (!e->node)
             return NULL;
-        if (e->hash == hash && entries_match(e->node, hash, op_type, dtype,
-                                             inputs, num_inputs, arg_bytes, arg_len))
+        if (e->hash == hash &&
+            entries_match(e->node, hash, op_type, dtype, inputs, num_inputs, arg_bytes, arg_len))
             return e->node;
         idx = (idx + 1) & (table->capacity - 1);
     }
     return NULL;
 }
 
-struct IRNode* cml_intern_lookup_ex(CMLInternTable* table, uint64_t hash, int op_type,
-                                    int dtype, struct IRNode** inputs,
-                                    Tensor** raw_inputs, int num_inputs,
+struct IRNode* cml_intern_lookup_ex(CMLInternTable* table, uint64_t hash, int op_type, int dtype,
+                                    struct IRNode** inputs, Tensor** raw_inputs, int num_inputs,
                                     const void* arg_bytes, size_t arg_len) {
     if (!table || table->count == 0)
         return NULL;
@@ -223,9 +218,8 @@ struct IRNode* cml_intern_lookup_ex(CMLInternTable* table, uint64_t hash, int op
         CMLInternEntry* e = &table->entries[idx];
         if (!e->node)
             return NULL;
-        if (e->hash == hash && entries_match_ex(e->node, hash, op_type, dtype,
-                                                inputs, raw_inputs, num_inputs,
-                                                arg_bytes, arg_len))
+        if (e->hash == hash && entries_match_ex(e->node, hash, op_type, dtype, inputs, raw_inputs,
+                                                num_inputs, arg_bytes, arg_len))
             return e->node;
         idx = (idx + 1) & (table->capacity - 1);
     }
@@ -242,7 +236,7 @@ int cml_intern_insert(CMLInternTable* table, struct IRNode* node) {
     }
 
     uint64_t hash = node->hash;
-    size_t idx = probe_index(hash, table->capacity);
+    size_t idx    = probe_index(hash, table->capacity);
     while (table->entries[idx].node)
         idx = (idx + 1) & (table->capacity - 1);
 
@@ -257,7 +251,7 @@ void cml_intern_remove(CMLInternTable* table, struct IRNode* node) {
         return;
 
     uint64_t hash = node->hash;
-    size_t idx = probe_index(hash, table->capacity);
+    size_t idx    = probe_index(hash, table->capacity);
 
     for (size_t probes = 0; probes < table->capacity; probes++) {
         CMLInternEntry* e = &table->entries[idx];
@@ -270,7 +264,7 @@ void cml_intern_remove(CMLInternTable* table, struct IRNode* node) {
 
             size_t next = (idx + 1) & (table->capacity - 1);
             while (table->entries[next].node) {
-                CMLInternEntry displaced = table->entries[next];
+                CMLInternEntry displaced  = table->entries[next];
                 table->entries[next].node = NULL;
                 table->entries[next].hash = 0;
                 table->count--;

@@ -15,14 +15,16 @@ typedef struct {
 
 static void collect_group_inputs(const CMLFusionGroup* g, GroupSignature* sig) {
     sig->num_inputs = 0;
-    sig->type = g->type;
+    sig->type       = g->type;
 
     for (int i = 0; i < g->num_nodes; i++) {
         struct IRNode* node = g->nodes[i];
-        if (!node) continue;
+        if (!node)
+            continue;
 
         for (int j = 0; j < node->num_inputs; j++) {
-            if (!node->inputs || !node->inputs[j]) continue;
+            if (!node->inputs || !node->inputs[j])
+                continue;
             Tensor* inp = node->inputs[j];
 
             int is_internal = 0;
@@ -32,7 +34,8 @@ static void collect_group_inputs(const CMLFusionGroup* g, GroupSignature* sig) {
                     break;
                 }
             }
-            if (is_internal) continue;
+            if (is_internal)
+                continue;
 
             int already_tracked = 0;
             for (int k = 0; k < sig->num_inputs; k++) {
@@ -49,8 +52,10 @@ static void collect_group_inputs(const CMLFusionGroup* g, GroupSignature* sig) {
 }
 
 static int signatures_match(const GroupSignature* a, const GroupSignature* b) {
-    if (a->type != b->type) return 0;
-    if (a->num_inputs != b->num_inputs) return 0;
+    if (a->type != b->type)
+        return 0;
+    if (a->num_inputs != b->num_inputs)
+        return 0;
 
     for (int i = 0; i < a->num_inputs; i++) {
         int found = 0;
@@ -60,32 +65,39 @@ static int signatures_match(const GroupSignature* a, const GroupSignature* b) {
                 break;
             }
         }
-        if (!found) return 0;
+        if (!found)
+            return 0;
     }
     return 1;
 }
 
 static int groups_have_distinct_outputs(const CMLFusionGroup* a, const CMLFusionGroup* b) {
     for (int i = 0; i < a->num_nodes; i++) {
-        if (!a->nodes[i] || !a->nodes[i]->output) continue;
+        if (!a->nodes[i] || !a->nodes[i]->output)
+            continue;
         for (int j = 0; j < b->num_nodes; j++) {
-            if (!b->nodes[j] || !b->nodes[j]->output) continue;
-            if (a->nodes[i]->output == b->nodes[j]->output) return 0;
+            if (!b->nodes[j] || !b->nodes[j]->output)
+                continue;
+            if (a->nodes[i]->output == b->nodes[j]->output)
+                return 0;
         }
     }
     return 1;
 }
 
 int cml_multi_output_analyze(CMLFusionSchedule* sched, int** merge_groups, int* num_merges) {
-    if (!sched || !merge_groups || !num_merges) return -1;
+    if (!sched || !merge_groups || !num_merges)
+        return -1;
     *merge_groups = NULL;
-    *num_merges = 0;
+    *num_merges   = 0;
 
     int ng = sched->num_groups;
-    if (ng < 2) return 0;
+    if (ng < 2)
+        return 0;
 
     GroupSignature* sigs = cml_calloc((size_t)ng, sizeof(GroupSignature));
-    if (!sigs) return -1;
+    if (!sigs)
+        return -1;
 
     for (int i = 0; i < ng; i++) {
         if (sched->groups[i])
@@ -93,24 +105,36 @@ int cml_multi_output_analyze(CMLFusionSchedule* sched, int** merge_groups, int* 
     }
 
     int* pairs = cml_calloc((size_t)(ng * 2), sizeof(int));
-    if (!pairs) { cml_free(sigs); return -1; }
+    if (!pairs) {
+        cml_free(sigs);
+        return -1;
+    }
     int count = 0;
 
     int* merged = cml_calloc((size_t)ng, sizeof(int));
-    if (!merged) { cml_free(sigs); cml_free(pairs); return -1; }
+    if (!merged) {
+        cml_free(sigs);
+        cml_free(pairs);
+        return -1;
+    }
 
     for (int i = 0; i < ng; i++) {
-        if (merged[i]) continue;
-        if (!sched->groups[i]) continue;
-        if (sigs[i].type != SCHED_ELEMENTWISE) continue;
+        if (merged[i])
+            continue;
+        if (!sched->groups[i])
+            continue;
+        if (sigs[i].type != SCHED_ELEMENTWISE)
+            continue;
 
         for (int j = i + 1; j < ng; j++) {
-            if (merged[j]) continue;
-            if (!sched->groups[j]) continue;
+            if (merged[j])
+                continue;
+            if (!sched->groups[j])
+                continue;
 
             if (signatures_match(&sigs[i], &sigs[j]) &&
                 groups_have_distinct_outputs(sched->groups[i], sched->groups[j])) {
-                pairs[count * 2] = i;
+                pairs[count * 2]     = i;
                 pairs[count * 2 + 1] = j;
                 count++;
                 merged[j] = 1;
@@ -128,26 +152,34 @@ int cml_multi_output_analyze(CMLFusionSchedule* sched, int** merge_groups, int* 
     }
 
     int* tmp = cml_realloc(pairs, (size_t)(count * 2) * sizeof(int));
-    if (!tmp) { cml_free(pairs); *merge_groups = NULL; *num_merges = 0; return 0; }
+    if (!tmp) {
+        cml_free(pairs);
+        *merge_groups = NULL;
+        *num_merges   = 0;
+        return 0;
+    }
     *merge_groups = tmp;
-    *num_merges = count;
+    *num_merges   = count;
     return count;
 }
 
 int cml_multi_output_fuse(CMLFusionSchedule* sched, int* merge_groups, int num_merges) {
-    if (!sched || !merge_groups || num_merges <= 0) return -1;
+    if (!sched || !merge_groups || num_merges <= 0)
+        return -1;
 
     for (int m = 0; m < num_merges; m++) {
         int gi = merge_groups[m * 2];
         int gj = merge_groups[m * 2 + 1];
 
-        CMLFusionGroup* primary = sched->groups[gi];
+        CMLFusionGroup* primary   = sched->groups[gi];
         CMLFusionGroup* secondary = sched->groups[gj];
-        if (!primary || !secondary) continue;
+        if (!primary || !secondary)
+            continue;
 
         for (int i = 0; i < secondary->num_nodes; i++) {
             struct IRNode* node = secondary->nodes[i];
-            if (!node) continue;
+            if (!node)
+                continue;
 
             int duplicate = 0;
             for (int k = 0; k < primary->num_nodes; k++) {
@@ -156,14 +188,16 @@ int cml_multi_output_fuse(CMLFusionSchedule* sched, int* merge_groups, int num_m
                     break;
                 }
             }
-            if (duplicate) continue;
+            if (duplicate)
+                continue;
 
             if (primary->num_nodes >= primary->node_capacity) {
                 int nc = primary->node_capacity * 2;
-                struct IRNode** tmp = cml_realloc(primary->nodes,
-                                              (size_t)nc * sizeof(struct IRNode*));
-                if (!tmp) return -1;
-                primary->nodes = tmp;
+                struct IRNode** tmp =
+                    cml_realloc(primary->nodes, (size_t)nc * sizeof(struct IRNode*));
+                if (!tmp)
+                    return -1;
+                primary->nodes         = tmp;
                 primary->node_capacity = nc;
             }
             primary->nodes[primary->num_nodes++] = node;
@@ -183,7 +217,7 @@ int cml_multi_output_fuse(CMLFusionSchedule* sched, int* merge_groups, int num_m
             sched->groups[write++] = sched->groups[i];
         }
     }
-    sched->num_groups = write;
+    sched->num_groups         = write;
     sched->total_groups_after = write;
 
     if (sched->execution_order) {

@@ -87,7 +87,7 @@ static void test_generate_kernel(void) {
 
     if (!cml_wmma_available()) {
         char* stub_src = cml_wmma_generate_kernel(&config, 256, 256, 256);
-        REQUIRE(stub_src == NULL);  /* stub contract: no fake kernel source */
+        REQUIRE(stub_src == NULL); /* stub contract: no fake kernel source */
         printf(" PASS (stub contract: generate_kernel == NULL)\n");
         return;
     }
@@ -170,8 +170,8 @@ static void test_wmma_matmul_if_available(void) {
      * We would need device memory, so this test is only run on capable hardware.
      */
     int M = 16, N = 16, K = 16;
-    size_t fp16_size = M * K * 2;  /* 2 bytes per fp16 */
-    size_t fp32_size = M * N * 4;  /* 4 bytes per fp32 */
+    size_t fp16_size = M * K * 2; /* 2 bytes per fp16 */
+    size_t fp32_size = M * N * 4; /* 4 bytes per fp32 */
 
     /* Allocate host buffers (simplified: using calloc for zero-init) */
     void* A = cml_calloc(1, fp16_size);

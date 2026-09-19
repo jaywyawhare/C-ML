@@ -15,8 +15,7 @@ extern "C" {
 #define CML_VERSION_PATCH 2
 #define CML_VERSION_STRING "0.0.3"
 
-#define CML_VERSION_ENCODE(major, minor, patch) \
-    ((major) * 10000 + (minor) * 100 + (patch))
+#define CML_VERSION_ENCODE(major, minor, patch) ((major) * 10000 + (minor) * 100 + (patch))
 
 #define CML_VERSION CML_VERSION_ENCODE(CML_VERSION_MAJOR, CML_VERSION_MINOR, CML_VERSION_PATCH)
 

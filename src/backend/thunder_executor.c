@@ -12,53 +12,52 @@ typedef struct {
 } ThunderOpMapping;
 
 static const ThunderOpMapping op_table[] = {
-    {"torch.add",       UOP_ADD},
-    {"torch.sub",       UOP_SUB},
-    {"torch.mul",       UOP_MUL},
-    {"torch.div",       UOP_DIV},
-    {"torch.matmul",    UOP_MATMUL},
-    {"torch.neg",       UOP_NEG},
-    {"torch.exp",       UOP_EXP},
-    {"torch.log",       UOP_LOG},
-    {"torch.sqrt",      UOP_SQRT},
-    {"torch.abs",       UOP_ABS},
-    {"torch.sin",       UOP_SIN},
-    {"torch.cos",       UOP_COS},
-    {"torch.tanh",      UOP_TANH},
-    {"torch.sigmoid",   UOP_SIGMOID},
-    {"torch.relu",      UOP_RELU},
-    {"torch.sum",       UOP_SUM},
-    {"torch.max",       UOP_MAX_REDUCE},
-    {"torch.mean",      UOP_MEAN},
-    {"torch.reshape",   UOP_RESHAPE},
-    {"torch.permute",   UOP_PERMUTE},
-    {"torch.where",     UOP_WHERE},
-    {"torch.pow",       UOP_POW},
-    {"torch.conv2d",    UOP_CONV2D},
-    {"torch.gather",    UOP_GATHER},
-    {"torch.sign",      UOP_SIGN},
-    {"torch.floor",     UOP_FLOOR},
-    {"torch.ceil",      UOP_CEIL},
-    {"torch.round",     UOP_ROUND},
-    {"torch.erf",       UOP_ERF},
-    {"torch.rsqrt",     UOP_RSQRT},
+    {"torch.add", UOP_ADD},
+    {"torch.sub", UOP_SUB},
+    {"torch.mul", UOP_MUL},
+    {"torch.div", UOP_DIV},
+    {"torch.matmul", UOP_MATMUL},
+    {"torch.neg", UOP_NEG},
+    {"torch.exp", UOP_EXP},
+    {"torch.log", UOP_LOG},
+    {"torch.sqrt", UOP_SQRT},
+    {"torch.abs", UOP_ABS},
+    {"torch.sin", UOP_SIN},
+    {"torch.cos", UOP_COS},
+    {"torch.tanh", UOP_TANH},
+    {"torch.sigmoid", UOP_SIGMOID},
+    {"torch.relu", UOP_RELU},
+    {"torch.sum", UOP_SUM},
+    {"torch.max", UOP_MAX_REDUCE},
+    {"torch.mean", UOP_MEAN},
+    {"torch.reshape", UOP_RESHAPE},
+    {"torch.permute", UOP_PERMUTE},
+    {"torch.where", UOP_WHERE},
+    {"torch.pow", UOP_POW},
+    {"torch.conv2d", UOP_CONV2D},
+    {"torch.gather", UOP_GATHER},
+    {"torch.sign", UOP_SIGN},
+    {"torch.floor", UOP_FLOOR},
+    {"torch.ceil", UOP_CEIL},
+    {"torch.round", UOP_ROUND},
+    {"torch.erf", UOP_ERF},
+    {"torch.rsqrt", UOP_RSQRT},
     {"torch.reciprocal", UOP_RECIP},
-    {"torch.mm",        UOP_MATMUL},
-    {"torch.bmm",       UOP_MATMUL},
-    {"torch.relu6",     UOP_RELU6},
+    {"torch.mm", UOP_MATMUL},
+    {"torch.bmm", UOP_MATMUL},
+    {"torch.relu6", UOP_RELU6},
     /* torch.gelu and torch.leaky_relu decompose into other uops and have no
      * dedicated UOpType, so they are intentionally absent from this table
      * (thunder_lookup_op returns "unsupported" for unknown names). */
-    {"torch.silu",      UOP_SILU},
-    {"torch.mish",      UOP_MISH},
+    {"torch.silu", UOP_SILU},
+    {"torch.mish", UOP_MISH},
     {"torch.hardswish", UOP_HARDSWISH},
-    {"torch.selu",      UOP_SELU},
-    {"torch.elu",       UOP_ELU},
-    {"torch.log2",      UOP_LOG2},
-    {"torch.exp2",      UOP_EXP2},
-    {"torch.maximum",   UOP_MAX},
-    {NULL,              0}
-};
+    {"torch.selu", UOP_SELU},
+    {"torch.elu", UOP_ELU},
+    {"torch.log2", UOP_LOG2},
+    {"torch.exp2", UOP_EXP2},
+    {"torch.maximum", UOP_MAX},
+    {NULL, 0}};
 
 static UOpType thunder_lookup_op(const char* name) {
     for (int i = 0; op_table[i].thunder_name; i++) {
@@ -69,17 +68,23 @@ static UOpType thunder_lookup_op(const char* name) {
 }
 
 static CMLBackendType parse_backend(const char* name) {
-    if (!name) return CML_BACKEND_CPU_FALLBACK;
-    if (strcmp(name, "cml_cuda") == 0)  return CML_BACKEND_CUDA;
-    if (strcmp(name, "cml_metal") == 0) return CML_BACKEND_METAL;
-    if (strcmp(name, "cml_rocm") == 0)  return CML_BACKEND_ROCM;
-    if (strcmp(name, "cml_cpu") == 0)   return CML_BACKEND_CPU_FALLBACK;
+    if (!name)
+        return CML_BACKEND_CPU_FALLBACK;
+    if (strcmp(name, "cml_cuda") == 0)
+        return CML_BACKEND_CUDA;
+    if (strcmp(name, "cml_metal") == 0)
+        return CML_BACKEND_METAL;
+    if (strcmp(name, "cml_rocm") == 0)
+        return CML_BACKEND_ROCM;
+    if (strcmp(name, "cml_cpu") == 0)
+        return CML_BACKEND_CPU_FALLBACK;
     return CML_BACKEND_CPU_FALLBACK;
 }
 
 CMLThunderExecutor* cml_thunder_create(const char* backend) {
     CMLThunderExecutor* exec = cml_calloc(1, sizeof(CMLThunderExecutor));
-    if (!exec) return NULL;
+    if (!exec)
+        return NULL;
 
     if (backend)
         strncpy(exec->backend_name, backend, sizeof(exec->backend_name) - 1);
@@ -97,33 +102,35 @@ CMLThunderExecutor* cml_thunder_create(const char* backend) {
     cml_dispatch_set_preferred(ctx, bt);
 
     exec->dispatch_ctx = ctx;
-    exec->initialized = true;
+    exec->initialized  = true;
 
     LOG_INFO("[thunder] Executor created: backend=%s", exec->backend_name);
     return exec;
 }
 
 void cml_thunder_free(CMLThunderExecutor* exec) {
-    if (!exec) return;
+    if (!exec)
+        return;
     if (exec->dispatch_ctx)
         cml_dispatch_free((CMLDispatchContext*)exec->dispatch_ctx);
     cml_free(exec);
 }
 
 int cml_thunder_execute(CMLThunderExecutor* exec, CMLThunderOp* ops, int num_ops) {
-    if (!exec || !exec->initialized || !ops) return -1;
+    if (!exec || !exec->initialized || !ops)
+        return -1;
 
     CMLDispatchContext* ctx = (CMLDispatchContext*)exec->dispatch_ctx;
 
     for (int i = 0; i < num_ops; i++) {
         CMLThunderOp* op = &ops[i];
-        UOpType uop = thunder_lookup_op(op->op_name);
+        UOpType uop      = thunder_lookup_op(op->op_name);
         if ((int)uop == -1) {
             LOG_ERROR("[thunder] Unsupported op: %s", op->op_name);
             return -1;
         }
 
-        Tensor** inputs = (Tensor**)op->inputs;
+        Tensor** inputs  = (Tensor**)op->inputs;
         Tensor** outputs = (Tensor**)op->outputs;
 
         Tensor* result = NULL;

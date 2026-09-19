@@ -10,14 +10,14 @@
 extern "C" {
 #endif
 
-#define CML_REMOTE_OP_ALLOC    1
-#define CML_REMOTE_OP_FREE     2
-#define CML_REMOTE_OP_UPLOAD   3
+#define CML_REMOTE_OP_ALLOC 1
+#define CML_REMOTE_OP_FREE 2
+#define CML_REMOTE_OP_UPLOAD 3
 #define CML_REMOTE_OP_DOWNLOAD 4
-#define CML_REMOTE_OP_EXECUTE  5
-#define CML_REMOTE_OP_PING     6
+#define CML_REMOTE_OP_EXECUTE 5
+#define CML_REMOTE_OP_PING 6
 
-#define CML_REMOTE_STATUS_OK    0
+#define CML_REMOTE_STATUS_OK 0
 #define CML_REMOTE_STATUS_ERROR 1
 
 typedef struct CMLRemoteDevice {
@@ -37,9 +37,8 @@ void cml_remote_free(CMLRemoteDevice* dev, uint64_t handle);
 int cml_remote_upload(CMLRemoteDevice* dev, uint64_t handle, const void* data, size_t n);
 int cml_remote_download(CMLRemoteDevice* dev, uint64_t handle, void* data, size_t n);
 
-int cml_remote_execute(CMLRemoteDevice* dev, const char* kernel_source,
-                       uint64_t* buffer_handles, int num_buffers,
-                       uint32_t grid[3], uint32_t block[3]);
+int cml_remote_execute(CMLRemoteDevice* dev, const char* kernel_source, uint64_t* buffer_handles,
+                       int num_buffers, uint32_t grid[3], uint32_t block[3]);
 
 typedef struct CMLRemoteServer {
     int listen_fd;

@@ -7,27 +7,50 @@
 #include "test_harness.h"
 
 #undef TEST
-#define TEST(name) \
-    do { printf("  TEST: %-50s ", #name); } while(0)
+#define TEST(name)                                                                                 \
+    do {                                                                                           \
+        printf("  TEST: %-50s ", #name);                                                           \
+    } while (0)
 
-#define PASS() \
-    do { printf("[PASS]\n"); tests_run++; tests_passed++; } while(0)
+#define PASS()                                                                                     \
+    do {                                                                                           \
+        printf("[PASS]\n");                                                                        \
+        tests_run++;                                                                               \
+        tests_passed++;                                                                            \
+    } while (0)
 
-#define FAIL(msg) \
-    do { printf("[FAIL] %s\n", (msg)); tests_run++; } while(0)
+#define FAIL(msg)                                                                                  \
+    do {                                                                                           \
+        printf("[FAIL] %s\n", (msg));                                                              \
+        tests_run++;                                                                               \
+    } while (0)
 
-#define ASSERT_EQ(a, b) \
-    do { if ((a) != (b)) { \
-        char _msg[256]; \
-        snprintf(_msg, sizeof(_msg), "Expected %lld, got %lld", (long long)(b), (long long)(a)); \
-        FAIL(_msg); return; \
-    }} while(0)
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if ((a) != (b)) {                                                                          \
+            char _msg[256];                                                                        \
+            snprintf(_msg, sizeof(_msg), "Expected %lld, got %lld", (long long)(b),                \
+                     (long long)(a));                                                              \
+            FAIL(_msg);                                                                            \
+            return;                                                                                \
+        }                                                                                          \
+    } while (0)
 
-#define ASSERT_TRUE(cond) \
-    do { if (!(cond)) { FAIL(#cond " is false"); return; } } while(0)
+#define ASSERT_TRUE(cond)                                                                          \
+    do {                                                                                           \
+        if (!(cond)) {                                                                             \
+            FAIL(#cond " is false");                                                               \
+            return;                                                                                \
+        }                                                                                          \
+    } while (0)
 
-#define ASSERT_NOT_NULL(ptr) \
-    do { if ((ptr) == NULL) { FAIL(#ptr " is NULL"); return; } } while(0)
+#define ASSERT_NOT_NULL(ptr)                                                                       \
+    do {                                                                                           \
+        if ((ptr) == NULL) {                                                                       \
+            FAIL(#ptr " is NULL");                                                                 \
+            return;                                                                                \
+        }                                                                                          \
+    } while (0)
 
 static void test_const_creation(void) {
     TEST(const_creation);
@@ -138,8 +161,8 @@ static void test_const_folding_max(void) {
 
 static void test_symbolic_add_no_fold(void) {
     TEST(symbolic_add_no_fold);
-    SymExpr* v = sym_var("N", 1, 100);
-    SymExpr* c = sym_const(5);
+    SymExpr* v   = sym_var("N", 1, 100);
+    SymExpr* c   = sym_const(5);
     SymExpr* sum = sym_add(v, c);
     ASSERT_NOT_NULL(sum);
     ASSERT_EQ(sum->type, SYM_ADD); // Not folded since one is var
@@ -256,9 +279,9 @@ static void test_bounds_max(void) {
 
 static void test_eval_var(void) {
     TEST(eval_var);
-    SymExpr* v = sym_var("N", 1, 100);
-    const char* names[] = { "N" };
-    int64_t vals[] = { 42 };
+    SymExpr* v          = sym_var("N", 1, 100);
+    const char* names[] = {"N"};
+    int64_t vals[]      = {42};
     int64_t result;
     ASSERT_EQ(sym_eval(v, names, vals, 1, &result), 0);
     ASSERT_EQ(result, 42);
@@ -269,13 +292,13 @@ static void test_eval_var(void) {
 static void test_eval_complex(void) {
     TEST(eval_complex);
     // (N + 1) * 2
-    SymExpr* n = sym_var("N", 0, 100);
-    SymExpr* one = sym_const(1);
-    SymExpr* two = sym_const(2);
-    SymExpr* np1 = sym_add(n, one);
+    SymExpr* n           = sym_var("N", 0, 100);
+    SymExpr* one         = sym_const(1);
+    SymExpr* two         = sym_const(2);
+    SymExpr* np1         = sym_add(n, one);
     SymExpr* result_expr = sym_mul(np1, two);
-    const char* names[] = { "N" };
-    int64_t vals[] = { 10 };
+    const char* names[]  = {"N"};
+    int64_t vals[]       = {10};
     int64_t result;
     ASSERT_EQ(sym_eval(result_expr, names, vals, 1, &result), 0);
     ASSERT_EQ(result, 22);
@@ -290,13 +313,13 @@ static void test_eval_complex(void) {
 static void test_eval_multi_var(void) {
     TEST(eval_multi_var);
     // A + B * 2
-    SymExpr* a = sym_var("A", 0, 100);
-    SymExpr* b = sym_var("B", 0, 50);
-    SymExpr* two = sym_const(2);
-    SymExpr* b2 = sym_mul(b, two);
-    SymExpr* e = sym_add(a, b2);
-    const char* names[] = { "A", "B" };
-    int64_t vals[] = { 10, 5 };
+    SymExpr* a          = sym_var("A", 0, 100);
+    SymExpr* b          = sym_var("B", 0, 50);
+    SymExpr* two        = sym_const(2);
+    SymExpr* b2         = sym_mul(b, two);
+    SymExpr* e          = sym_add(a, b2);
+    const char* names[] = {"A", "B"};
+    int64_t vals[]      = {10, 5};
     int64_t result;
     ASSERT_EQ(sym_eval(e, names, vals, 2, &result), 0);
     ASSERT_EQ(result, 20);
@@ -310,9 +333,9 @@ static void test_eval_multi_var(void) {
 
 static void test_eval_unknown_var(void) {
     TEST(eval_unknown_var);
-    SymExpr* v = sym_var("X", 1, 100);
-    const char* names[] = { "N" };
-    int64_t vals[] = { 42 };
+    SymExpr* v          = sym_var("X", 1, 100);
+    const char* names[] = {"N"};
+    int64_t vals[]      = {42};
     int64_t result;
     ASSERT_EQ(sym_eval(v, names, vals, 1, &result), -1);
     sym_expr_release(v);
@@ -321,10 +344,10 @@ static void test_eval_unknown_var(void) {
 
 static void test_simplify_add_zero(void) {
     TEST(simplify_add_zero);
-    SymExpr* v = sym_var("x", 1, 10);
+    SymExpr* v    = sym_var("x", 1, 10);
     SymExpr* zero = sym_const(0);
-    SymExpr* e = sym_add(v, zero);
-    SymExpr* s = sym_simplify(e);
+    SymExpr* e    = sym_add(v, zero);
+    SymExpr* s    = sym_simplify(e);
     ASSERT_NOT_NULL(s);
     ASSERT_EQ(s->type, SYM_VAR);
     ASSERT_TRUE(strcmp(s->var.name, "x") == 0);
@@ -337,10 +360,10 @@ static void test_simplify_add_zero(void) {
 
 static void test_simplify_mul_one(void) {
     TEST(simplify_mul_one);
-    SymExpr* v = sym_var("x", 1, 10);
+    SymExpr* v   = sym_var("x", 1, 10);
     SymExpr* one = sym_const(1);
-    SymExpr* e = sym_mul(v, one);
-    SymExpr* s = sym_simplify(e);
+    SymExpr* e   = sym_mul(v, one);
+    SymExpr* s   = sym_simplify(e);
     ASSERT_NOT_NULL(s);
     ASSERT_EQ(s->type, SYM_VAR);
     sym_expr_release(v);
@@ -352,10 +375,10 @@ static void test_simplify_mul_one(void) {
 
 static void test_simplify_mul_zero(void) {
     TEST(simplify_mul_zero);
-    SymExpr* v = sym_var("x", 1, 10);
+    SymExpr* v    = sym_var("x", 1, 10);
     SymExpr* zero = sym_const(0);
-    SymExpr* e = sym_mul(v, zero);
-    SymExpr* s = sym_simplify(e);
+    SymExpr* e    = sym_mul(v, zero);
+    SymExpr* s    = sym_simplify(e);
     ASSERT_NOT_NULL(s);
     ASSERT_EQ(s->type, SYM_CONST);
     ASSERT_EQ(s->const_val, 0);
@@ -368,10 +391,10 @@ static void test_simplify_mul_zero(void) {
 
 static void test_simplify_div_one(void) {
     TEST(simplify_div_one);
-    SymExpr* v = sym_var("x", 1, 10);
+    SymExpr* v   = sym_var("x", 1, 10);
     SymExpr* one = sym_const(1);
-    SymExpr* e = sym_div(v, one);
-    SymExpr* s = sym_simplify(e);
+    SymExpr* e   = sym_div(v, one);
+    SymExpr* s   = sym_simplify(e);
     ASSERT_NOT_NULL(s);
     ASSERT_EQ(s->type, SYM_VAR);
     sym_expr_release(v);
@@ -383,10 +406,10 @@ static void test_simplify_div_one(void) {
 
 static void test_simplify_mod_one(void) {
     TEST(simplify_mod_one);
-    SymExpr* v = sym_var("x", 1, 10);
+    SymExpr* v   = sym_var("x", 1, 10);
     SymExpr* one = sym_const(1);
-    SymExpr* e = sym_mod(v, one);
-    SymExpr* s = sym_simplify(e);
+    SymExpr* e   = sym_mod(v, one);
+    SymExpr* s   = sym_simplify(e);
     ASSERT_NOT_NULL(s);
     ASSERT_EQ(s->type, SYM_CONST);
     ASSERT_EQ(s->const_val, 0);
@@ -400,12 +423,12 @@ static void test_simplify_mod_one(void) {
 static void test_simplify_nested(void) {
     TEST(simplify_nested);
     // (x + 0) * 1 should simplify to x
-    SymExpr* x = sym_var("x", 1, 10);
+    SymExpr* x    = sym_var("x", 1, 10);
     SymExpr* zero = sym_const(0);
-    SymExpr* one = sym_const(1);
-    SymExpr* xp0 = sym_add(x, zero);
-    SymExpr* e = sym_mul(xp0, one);
-    SymExpr* s = sym_simplify(e);
+    SymExpr* one  = sym_const(1);
+    SymExpr* xp0  = sym_add(x, zero);
+    SymExpr* e    = sym_mul(xp0, one);
+    SymExpr* s    = sym_simplify(e);
     ASSERT_NOT_NULL(s);
     ASSERT_EQ(s->type, SYM_VAR);
     ASSERT_TRUE(strcmp(s->var.name, "x") == 0);
@@ -436,7 +459,7 @@ static void test_to_string(void) {
 
 static void test_shape_from_concrete(void) {
     TEST(shape_from_concrete);
-    int dims[] = { 3, 32, 32 };
+    int dims[]  = {3, 32, 32};
     SymShape* s = sym_shape_from_concrete(dims, 3);
     ASSERT_NOT_NULL(s);
     ASSERT_EQ(s->ndim, 3);
@@ -450,11 +473,11 @@ static void test_shape_from_concrete(void) {
 
 static void test_shape_broadcast_concrete(void) {
     TEST(shape_broadcast_concrete);
-    int a_dims[] = { 3, 1, 5 };
-    int b_dims[] = { 1, 4, 5 };
-    SymShape* a = sym_shape_from_concrete(a_dims, 3);
-    SymShape* b = sym_shape_from_concrete(b_dims, 3);
-    SymShape* c = sym_shape_broadcast(a, b);
+    int a_dims[] = {3, 1, 5};
+    int b_dims[] = {1, 4, 5};
+    SymShape* a  = sym_shape_from_concrete(a_dims, 3);
+    SymShape* b  = sym_shape_from_concrete(b_dims, 3);
+    SymShape* c  = sym_shape_broadcast(a, b);
     ASSERT_NOT_NULL(c);
     ASSERT_EQ(c->ndim, 3);
     ASSERT_EQ(c->dims[0].concrete, 3);
@@ -471,15 +494,15 @@ static void test_shape_broadcast_symbolic(void) {
     // Shape (N, 1) broadcast with (1, 5) -> (N, 5)
     SymExpr* n = sym_var("N", 1, 64);
 
-    SymShape* a = (SymShape*)calloc(1, sizeof(SymShape));
-    a->ndim = 2;
+    SymShape* a  = (SymShape*)calloc(1, sizeof(SymShape));
+    a->ndim      = 2;
     a->ref_count = 1;
-    a->dims = (SymDim*)calloc(2, sizeof(SymDim));
-    a->dims[0] = sym_dim_symbolic(n);
-    a->dims[1] = sym_dim_concrete(1);
+    a->dims      = (SymDim*)calloc(2, sizeof(SymDim));
+    a->dims[0]   = sym_dim_symbolic(n);
+    a->dims[1]   = sym_dim_concrete(1);
 
-    int b_dims[] = { 1, 5 };
-    SymShape* b = sym_shape_from_concrete(b_dims, 2);
+    int b_dims[] = {1, 5};
+    SymShape* b  = sym_shape_from_concrete(b_dims, 2);
 
     SymShape* c = sym_shape_broadcast(a, b);
     ASSERT_NOT_NULL(c);
@@ -499,15 +522,15 @@ static void test_shape_eval(void) {
     TEST(shape_eval);
     SymExpr* n = sym_var("N", 1, 64);
 
-    SymShape* s = (SymShape*)calloc(1, sizeof(SymShape));
-    s->ndim = 2;
+    SymShape* s  = (SymShape*)calloc(1, sizeof(SymShape));
+    s->ndim      = 2;
     s->ref_count = 1;
-    s->dims = (SymDim*)calloc(2, sizeof(SymDim));
-    s->dims[0] = sym_dim_symbolic(n);
-    s->dims[1] = sym_dim_concrete(10);
+    s->dims      = (SymDim*)calloc(2, sizeof(SymDim));
+    s->dims[0]   = sym_dim_symbolic(n);
+    s->dims[1]   = sym_dim_concrete(10);
 
-    const char* names[] = { "N" };
-    int64_t vals[] = { 32 };
+    const char* names[] = {"N"};
+    int64_t vals[]      = {32};
     int out[2];
     int rc = sym_shape_eval(s, names, vals, 1, out);
     ASSERT_EQ(rc, 0);
@@ -523,12 +546,12 @@ static void test_shape_to_string(void) {
     TEST(shape_to_string);
     SymExpr* n = sym_var("N", 1, 64);
 
-    SymShape* s = (SymShape*)calloc(1, sizeof(SymShape));
-    s->ndim = 2;
+    SymShape* s  = (SymShape*)calloc(1, sizeof(SymShape));
+    s->ndim      = 2;
     s->ref_count = 1;
-    s->dims = (SymDim*)calloc(2, sizeof(SymDim));
-    s->dims[0] = sym_dim_symbolic(n);
-    s->dims[1] = sym_dim_concrete(10);
+    s->dims      = (SymDim*)calloc(2, sizeof(SymDim));
+    s->dims[0]   = sym_dim_symbolic(n);
+    s->dims[1]   = sym_dim_concrete(10);
 
     char buf[256];
     sym_shape_to_string(s, buf, sizeof(buf));
@@ -555,11 +578,11 @@ static void test_ref_counting(void) {
 
 static void test_shape_broadcast_incompatible(void) {
     TEST(shape_broadcast_incompatible);
-    int a_dims[] = { 3, 4 };
-    int b_dims[] = { 5, 4 };
-    SymShape* a = sym_shape_from_concrete(a_dims, 2);
-    SymShape* b = sym_shape_from_concrete(b_dims, 2);
-    SymShape* c = sym_shape_broadcast(a, b);
+    int a_dims[] = {3, 4};
+    int b_dims[] = {5, 4};
+    SymShape* a  = sym_shape_from_concrete(a_dims, 2);
+    SymShape* b  = sym_shape_from_concrete(b_dims, 2);
+    SymShape* c  = sym_shape_broadcast(a, b);
     ASSERT_TRUE(c == NULL); // Should fail - 3 vs 5 not broadcastable
     sym_shape_release(a);
     sym_shape_release(b);

@@ -13,13 +13,13 @@ extern "C" {
 #define CML_TINYFS_MAX_SHARDS 64
 
 typedef struct CMLTinyFSShard {
-    char path[256];         /* Path to shard file */
-    size_t offset;          /* Offset within shard */
-    size_t size;            /* Size of data in this shard */
+    char path[256]; /* Path to shard file */
+    size_t offset;  /* Offset within shard */
+    size_t size;    /* Size of data in this shard */
     int shard_id;
-    bool is_remote;         /* Whether shard is on remote node */
-    char host[128];         /* Remote host (if is_remote) */
-    int port;               /* Remote port (if is_remote) */
+    bool is_remote; /* Whether shard is on remote node */
+    char host[128]; /* Remote host (if is_remote) */
+    int port;       /* Remote port (if is_remote) */
 } CMLTinyFSShard;
 
 typedef struct CMLTinyFS {
@@ -27,7 +27,7 @@ typedef struct CMLTinyFS {
     CMLTinyFSShard shards[CML_TINYFS_MAX_SHARDS];
     int num_shards;
     int replication_factor;
-    size_t shard_size;       /* Target shard size in bytes */
+    size_t shard_size; /* Target shard size in bytes */
     bool initialized;
 } CMLTinyFS;
 

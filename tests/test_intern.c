@@ -9,9 +9,16 @@
 
 static int test_create_free(void) {
     CMLInternTable* table = cml_intern_table_create();
-    if (!table) return 0;
-    if (table->capacity < 1) { cml_intern_table_free(table); return 0; }
-    if (table->count != 0) { cml_intern_table_free(table); return 0; }
+    if (!table)
+        return 0;
+    if (table->capacity < 1) {
+        cml_intern_table_free(table);
+        return 0;
+    }
+    if (table->count != 0) {
+        cml_intern_table_free(table);
+        return 0;
+    }
     cml_intern_table_free(table);
     return 1;
 }
@@ -41,7 +48,8 @@ static int test_hash_varies_by_dtype(void) {
 
 static int test_insert_lookup(void) {
     CMLInternTable* table = cml_intern_table_create();
-    if (!table) return 0;
+    if (!table)
+        return 0;
 
     struct IRNode node;
     memset(&node, 0, sizeof(node));
@@ -58,26 +66,26 @@ static int test_insert_lookup(void) {
         return 0;
     }
 
-    struct IRNode* found = cml_intern_lookup(table, node.hash, UOP_ADD, 0,
-                                             NULL, 0, NULL, 0);
+    struct IRNode* found = cml_intern_lookup(table, node.hash, UOP_ADD, 0, NULL, 0, NULL, 0);
     cml_intern_table_free(table);
     return found == &node;
 }
 
 static int test_lookup_miss(void) {
     CMLInternTable* table = cml_intern_table_create();
-    if (!table) return 0;
+    if (!table)
+        return 0;
 
-    uint64_t hash = cml_intern_hash_node(UOP_MUL, 0, NULL, 0, NULL, 0);
-    struct IRNode* found = cml_intern_lookup(table, hash, UOP_MUL, 0,
-                                             NULL, 0, NULL, 0);
+    uint64_t hash        = cml_intern_hash_node(UOP_MUL, 0, NULL, 0, NULL, 0);
+    struct IRNode* found = cml_intern_lookup(table, hash, UOP_MUL, 0, NULL, 0, NULL, 0);
     cml_intern_table_free(table);
     return found == NULL;
 }
 
 static int test_remove(void) {
     CMLInternTable* table = cml_intern_table_create();
-    if (!table) return 0;
+    if (!table)
+        return 0;
 
     struct IRNode node;
     memset(&node, 0, sizeof(node));
@@ -93,8 +101,7 @@ static int test_remove(void) {
         return 0;
     }
 
-    struct IRNode* found = cml_intern_lookup(table, node.hash, UOP_SUB, 0,
-                                             NULL, 0, NULL, 0);
+    struct IRNode* found = cml_intern_lookup(table, node.hash, UOP_SUB, 0, NULL, 0, NULL, 0);
     cml_intern_table_free(table);
     return found == NULL;
 }
@@ -109,7 +116,8 @@ static int test_remove_null(void) {
 
 static int test_many_inserts_trigger_resize(void) {
     CMLInternTable* table = cml_intern_table_create();
-    if (!table) return 0;
+    if (!table)
+        return 0;
 
     size_t initial_cap = table->capacity;
 
@@ -136,9 +144,8 @@ static int test_many_inserts_trigger_resize(void) {
     }
 
     for (int i = 0; i < 100; i++) {
-        struct IRNode* found = cml_intern_lookup(table, nodes[i].hash,
-                                                 nodes[i].type, i,
-                                                 NULL, 0, NULL, 0);
+        struct IRNode* found =
+            cml_intern_lookup(table, nodes[i].hash, nodes[i].type, i, NULL, 0, NULL, 0);
         if (found != &nodes[i]) {
             cml_intern_table_free(table);
             return 0;
@@ -151,7 +158,8 @@ static int test_many_inserts_trigger_resize(void) {
 
 static int test_graph_has_intern_table(void) {
     CMLGraph_t graph = cml_ir_new(IR_TARGET_C);
-    if (!graph) return 0;
+    if (!graph)
+        return 0;
 
     int ok = (graph->intern_table != NULL);
     cml_ir_free(graph);
@@ -160,20 +168,19 @@ static int test_graph_has_intern_table(void) {
 
 static int test_node_has_hash(void) {
     CMLGraph_t graph = cml_ir_new(IR_TARGET_C);
-    if (!graph) return 0;
+    if (!graph)
+        return 0;
 
-    int shape[] = {2, 3};
+    int shape[]      = {2, 3};
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* a = tensor_zeros(shape, 2, &cfg);
     Tensor* b = tensor_zeros(shape, 2, &cfg);
     if (!a || !b) {
-        if (a) tensor_free(a);
-        if (b) tensor_free(b);
+        if (a)
+            tensor_free(a);
+        if (b)
+            tensor_free(b);
         cml_ir_free(graph);
         return 0;
     }
@@ -182,7 +189,7 @@ static int test_node_has_hash(void) {
     cml_ir_add_uop(graph, UOP_ADD, inputs, 2, NULL);
 
     struct IRNode* tail = cml_ir_get_tail(graph);
-    int ok = (tail != NULL && tail->hash != 0 && tail->ref_count == 1);
+    int ok              = (tail != NULL && tail->hash != 0 && tail->ref_count == 1);
 
     tensor_free(a);
     tensor_free(b);
@@ -192,17 +199,17 @@ static int test_node_has_hash(void) {
 
 static int test_ref_count_on_graph_free(void) {
     CMLGraph_t graph = cml_ir_new(IR_TARGET_C);
-    if (!graph) return 0;
+    if (!graph)
+        return 0;
 
-    int shape[] = {4};
+    int shape[]      = {4};
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* a = tensor_zeros(shape, 1, &cfg);
-    if (!a) { cml_ir_free(graph); return 0; }
+    if (!a) {
+        cml_ir_free(graph);
+        return 0;
+    }
 
     Tensor* inputs[] = {a};
     cml_ir_add_uop(graph, UOP_NEG, inputs, 1, NULL);

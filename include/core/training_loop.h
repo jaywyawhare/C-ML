@@ -82,13 +82,13 @@ LRScheduler* lr_scheduler_exponential(Optimizer* optimizer, float gamma);
 LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min);
 
 LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int total_steps,
-                                     float pct_start, float div_factor, float final_div_factor);
+                                    float pct_start, float div_factor, float final_div_factor);
 LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int num_milestones,
-                                      float gamma);
+                                     float gamma);
 
 /* lr = (initial_lr - min_lr) * (1 - epoch/total_iters)^power + min_lr */
 LRScheduler* lr_scheduler_polynomial(Optimizer* optimizer, int total_iters, float power,
-                                      float min_lr);
+                                     float min_lr);
 
 /* Linear warmup for first N steps, then delegates to inner scheduler */
 LRScheduler* lr_scheduler_warmup(LRScheduler* inner, int warmup_steps, float warmup_start_factor);
@@ -126,19 +126,19 @@ typedef struct TrainingConfig {
     bool early_stopping;
     int early_stopping_patience;
     float early_stopping_min_delta;
-    bool use_checkpointing;           // Enable gradient checkpointing
-    int checkpoint_every_n_layers;    // Checkpoint every N layers (0 = auto)
-    bool static_graph;                // Zero-rebuild static graph: build the
-                                      // fwd+bwd graph once, then reuse it every
-                                      // batch (memcpy new data into fixed input
-                                      // buffers + cml_ir_reexecute + in-place SGD)
-                                      // instead of resetting/rebuilding per batch.
-                                      // Requires a constant batch shape and an SGD
-                                      // optimizer for a fully rebuild-free step.
-                                      // The reused graph relies on global context
-                                      // state, so run one static training per
-                                      // process (don't mix with other full-graph
-                                      // executions in the same process).
+    bool use_checkpointing;        // Enable gradient checkpointing
+    int checkpoint_every_n_layers; // Checkpoint every N layers (0 = auto)
+    bool static_graph;             // Zero-rebuild static graph: build the
+                                   // fwd+bwd graph once, then reuse it every
+                                   // batch (memcpy new data into fixed input
+                                   // buffers + cml_ir_reexecute + in-place SGD)
+                                   // instead of resetting/rebuilding per batch.
+                                   // Requires a constant batch shape and an SGD
+                                   // optimizer for a fully rebuild-free step.
+                                   // The reused graph relies on global context
+                                   // state, so run one static training per
+                                   // process (don't mix with other full-graph
+                                   // executions in the same process).
 } TrainingConfig;
 
 void training_config_default(TrainingConfig* config);

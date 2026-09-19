@@ -17,24 +17,31 @@
 #include "cml.h"
 #include "test_harness.h"
 
-static TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                           .has_dtype = true, .has_device = true};
+static TensorConfig cfg = {
+    .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
 typedef Tensor* (*OpFn)(Tensor*);
-static int   g_rows = 1, g_cols = 6;
+static int g_rows = 1, g_cols = 6;
 static float g_lo = 0.35f, g_hi = 0.95f;
 
 static float forward_sum(OpFn op, const float* xs, int n) {
     cml_reset_ir_context();
-    int sh[2] = { g_rows, g_cols };
+    int sh[2] = {g_rows, g_cols};
     Tensor* x = tensor_zeros(sh, g_rows > 1 ? 2 : 1, &cfg);
-    if (!x) return NAN;
+    if (!x)
+        return NAN;
     memcpy(tensor_data_ptr(x), xs, sizeof(float) * (size_t)n);
     Tensor* y = op(x);
-    if (!y) { cml_reset_ir_context(); return NAN; }
+    if (!y) {
+        cml_reset_ir_context();
+        return NAN;
+    }
     ReduceParams rp = {0};
-    Tensor* s = uop_sum(y, &rp);
-    if (!s) { cml_reset_ir_context(); return NAN; }
+    Tensor* s       = uop_sum(y, &rp);
+    if (!s) {
+        cml_reset_ir_context();
+        return NAN;
+    }
     tensor_ensure_executed(s);
     float v = ((float*)tensor_data_ptr(s))[0];
     cml_reset_ir_context();
@@ -45,22 +52,33 @@ static float forward_sum(OpFn op, const float* xs, int n) {
 static int grad_matches(OpFn op) {
     const int n = g_rows * g_cols;
     float xs[64];
-    for (int i = 0; i < n; i++) xs[i] = g_lo + (g_hi - g_lo) * (i + 0.5f) / n;
+    for (int i = 0; i < n; i++)
+        xs[i] = g_lo + (g_hi - g_lo) * (i + 0.5f) / n;
 
     cml_reset_ir_context();
-    int sh[2] = { g_rows, g_cols };
+    int sh[2] = {g_rows, g_cols};
     Tensor* x = tensor_zeros(sh, g_rows > 1 ? 2 : 1, &cfg);
-    if (!x) return 0;
+    if (!x)
+        return 0;
     memcpy(tensor_data_ptr(x), xs, sizeof(float) * (size_t)n);
     x->requires_grad = true;
 
     Tensor* y = op(x);
-    if (!y) { cml_reset_ir_context(); return 0; }
+    if (!y) {
+        cml_reset_ir_context();
+        return 0;
+    }
     ReduceParams rp = {0};
-    Tensor* s = uop_sum(y, &rp);
-    if (!s) { cml_reset_ir_context(); return 0; }
+    Tensor* s       = uop_sum(y, &rp);
+    if (!s) {
+        cml_reset_ir_context();
+        return 0;
+    }
     tensor_backward(s, NULL, false, false);
-    if (!x->grad) { cml_reset_ir_context(); return 0; }
+    if (!x->grad) {
+        cml_reset_ir_context();
+        return 0;
+    }
 
     float ana[64];
     memcpy(ana, (float*)tensor_data_ptr(x->grad), sizeof(float) * (size_t)n);
@@ -69,10 +87,13 @@ static int grad_matches(OpFn op) {
     const float eps = 1e-3f;
     for (int i = 0; i < n; i++) {
         float saved = xs[i];
-        xs[i] = saved + eps; float fp = forward_sum(op, xs, n);
-        xs[i] = saved - eps; float fm = forward_sum(op, xs, n);
-        xs[i] = saved;
-        if (isnan(fp) || isnan(fm)) return 0;
+        xs[i]       = saved + eps;
+        float fp    = forward_sum(op, xs, n);
+        xs[i]       = saved - eps;
+        float fm    = forward_sum(op, xs, n);
+        xs[i]       = saved;
+        if (isnan(fp) || isnan(fm))
+            return 0;
         float num = (fp - fm) / (2.0f * eps);
         float den = fmaxf(1.0f, fmaxf(fabsf(num), fabsf(ana[i])));
         if (fabsf(num - ana[i]) / den > 0.02f) {
@@ -85,79 +106,97 @@ static int grad_matches(OpFn op) {
 
 /* Ops needing extra arguments get a wrapper with the sizes this test uses. */
 static Tensor* w_hard_tanh(Tensor* a) { return uop_hard_tanh(a); }
-static Tensor* w_relu6(Tensor* a)     { return uop_relu6(a); }
-static Tensor* w_qgelu(Tensor* a)     { return uop_quick_gelu(a); }
-static Tensor* w_gelu(Tensor* a)      { return uop_gelu(a); }
-static Tensor* w_leaky_relu(Tensor* a){ return uop_leaky_relu(a, 0.01f); }
-static Tensor* w_triu(Tensor* a)      { return uop_triu(a, 0); }
-static Tensor* w_tril(Tensor* a)      { return uop_tril(a, 1); }
-static Tensor* w_roll(Tensor* a)      { return uop_roll(a, 1, 1); }
-static Tensor* w_cumsum(Tensor* a)    { return uop_cumsum(a, 1); }
-static Tensor* w_cumprod(Tensor* a)   { return uop_cumprod(a, 1); }
-static Tensor* w_lcse(Tensor* a)      { return uop_logcumsumexp(a, 1); }
-static Tensor* w_prod(Tensor* a)      { ReduceParams p = {0}; return uop_prod(a, &p); }
-static Tensor* w_lse(Tensor* a)       { ReduceParams p = {0}; return uop_logsumexp(a, &p); }
-static Tensor* w_trace(Tensor* a)     { return uop_trace(a); }
-static Tensor* w_flatten(Tensor* a)   { return uop_flatten(a, 0, 1); }
-static Tensor* w_tile(Tensor* a)      { int r[2] = {2, 3}; return uop_tile(a, r, 2); }
-static Tensor* w_ri1(Tensor* a)       { return uop_repeat_interleave(a, 3, 1); }
-static Tensor* w_ri0(Tensor* a)       { return uop_repeat_interleave(a, 2, 0); }
-static Tensor* w_diagonal(Tensor* a)  { return uop_diagonal(a, 0, 0, 1); }
-static Tensor* w_sort(Tensor* a)      { return uop_sort(a, 1, false); }
+static Tensor* w_relu6(Tensor* a) { return uop_relu6(a); }
+static Tensor* w_qgelu(Tensor* a) { return uop_quick_gelu(a); }
+static Tensor* w_gelu(Tensor* a) { return uop_gelu(a); }
+static Tensor* w_leaky_relu(Tensor* a) { return uop_leaky_relu(a, 0.01f); }
+static Tensor* w_triu(Tensor* a) { return uop_triu(a, 0); }
+static Tensor* w_tril(Tensor* a) { return uop_tril(a, 1); }
+static Tensor* w_roll(Tensor* a) { return uop_roll(a, 1, 1); }
+static Tensor* w_cumsum(Tensor* a) { return uop_cumsum(a, 1); }
+static Tensor* w_cumprod(Tensor* a) { return uop_cumprod(a, 1); }
+static Tensor* w_lcse(Tensor* a) { return uop_logcumsumexp(a, 1); }
+static Tensor* w_prod(Tensor* a) {
+    ReduceParams p = {0};
+    return uop_prod(a, &p);
+}
+static Tensor* w_lse(Tensor* a) {
+    ReduceParams p = {0};
+    return uop_logsumexp(a, &p);
+}
+static Tensor* w_trace(Tensor* a) { return uop_trace(a); }
+static Tensor* w_flatten(Tensor* a) { return uop_flatten(a, 0, 1); }
+static Tensor* w_tile(Tensor* a) {
+    int r[2] = {2, 3};
+    return uop_tile(a, r, 2);
+}
+static Tensor* w_ri1(Tensor* a) { return uop_repeat_interleave(a, 3, 1); }
+static Tensor* w_ri0(Tensor* a) { return uop_repeat_interleave(a, 2, 0); }
+static Tensor* w_diagonal(Tensor* a) { return uop_diagonal(a, 0, 0, 1); }
+static Tensor* w_sort(Tensor* a) { return uop_sort(a, 1, false); }
 static Tensor* w_sort_desc(Tensor* a) { return uop_sort(a, 1, true); }
-static Tensor* w_topk(Tensor* a)      { Tensor* i = NULL; return uop_topk(a, 2, 1, true, &i); }
+static Tensor* w_topk(Tensor* a) {
+    Tensor* i = NULL;
+    return uop_topk(a, 2, 1, true, &i);
+}
 
 /* ── 1-D elementwise: domain chosen so each op stays differentiable ─────── */
 #define ELEMENTWISE(name, fn, lo, hi)                                                              \
     static int test_##name(void) {                                                                 \
-        g_rows = 1; g_cols = 6; g_lo = (lo); g_hi = (hi);                                           \
-        return grad_matches(fn);                                                                    \
+        g_rows = 1;                                                                                \
+        g_cols = 6;                                                                                \
+        g_lo   = (lo);                                                                             \
+        g_hi   = (hi);                                                                             \
+        return grad_matches(fn);                                                                   \
     }
-ELEMENTWISE(asin,        uop_asin,        -0.8f, 0.8f)
-ELEMENTWISE(acos,        uop_acos,        -0.8f, 0.8f)
-ELEMENTWISE(atan,        uop_atan,        -2.0f, 2.0f)
-ELEMENTWISE(asinh,       uop_asinh,       -2.0f, 2.0f)
-ELEMENTWISE(acosh,       uop_acosh,        1.5f, 3.0f)
-ELEMENTWISE(atanh,       uop_atanh,       -0.7f, 0.7f)
-ELEMENTWISE(erf,         uop_erf,         -1.5f, 1.5f)
-ELEMENTWISE(sinh,        uop_sinh,        -1.5f, 1.5f)
-ELEMENTWISE(cosh,        uop_cosh,        -1.5f, 1.5f)
-ELEMENTWISE(log2,        uop_log2,         0.5f, 3.0f)
-ELEMENTWISE(log10,       uop_log10,        0.5f, 3.0f)
-ELEMENTWISE(exp2,        uop_exp2,        -1.5f, 1.5f)
+ELEMENTWISE(asin, uop_asin, -0.8f, 0.8f)
+ELEMENTWISE(acos, uop_acos, -0.8f, 0.8f)
+ELEMENTWISE(atan, uop_atan, -2.0f, 2.0f)
+ELEMENTWISE(asinh, uop_asinh, -2.0f, 2.0f)
+ELEMENTWISE(acosh, uop_acosh, 1.5f, 3.0f)
+ELEMENTWISE(atanh, uop_atanh, -0.7f, 0.7f)
+ELEMENTWISE(erf, uop_erf, -1.5f, 1.5f)
+ELEMENTWISE(sinh, uop_sinh, -1.5f, 1.5f)
+ELEMENTWISE(cosh, uop_cosh, -1.5f, 1.5f)
+ELEMENTWISE(log2, uop_log2, 0.5f, 3.0f)
+ELEMENTWISE(log10, uop_log10, 0.5f, 3.0f)
+ELEMENTWISE(exp2, uop_exp2, -1.5f, 1.5f)
 ELEMENTWISE(hard_sigmoid, uop_hard_sigmoid, -2.0f, 2.0f)
-ELEMENTWISE(hard_tanh,   w_hard_tanh,     -0.8f, 0.8f)
-ELEMENTWISE(relu6,       w_relu6,          0.5f, 5.0f)
-ELEMENTWISE(quick_gelu,  w_qgelu,         -1.5f, 1.5f)
-ELEMENTWISE(gelu,        w_gelu,          -1.5f, 1.5f)
-ELEMENTWISE(leaky_relu,  w_leaky_relu,    -1.5f, 1.5f)
-ELEMENTWISE(softplus,    uop_softplus,    -1.5f, 1.5f)
-ELEMENTWISE(softsign,    uop_softsign,    -1.5f, 1.5f)
-ELEMENTWISE(logsigmoid,  uop_logsigmoid,  -1.5f, 1.5f)
+ELEMENTWISE(hard_tanh, w_hard_tanh, -0.8f, 0.8f)
+ELEMENTWISE(relu6, w_relu6, 0.5f, 5.0f)
+ELEMENTWISE(quick_gelu, w_qgelu, -1.5f, 1.5f)
+ELEMENTWISE(gelu, w_gelu, -1.5f, 1.5f)
+ELEMENTWISE(leaky_relu, w_leaky_relu, -1.5f, 1.5f)
+ELEMENTWISE(softplus, uop_softplus, -1.5f, 1.5f)
+ELEMENTWISE(softsign, uop_softsign, -1.5f, 1.5f)
+ELEMENTWISE(logsigmoid, uop_logsigmoid, -1.5f, 1.5f)
 
 /* ── 3x3: structural, reduction and cumulative rules ───────────────────── */
 #define MATRIX(name, fn)                                                                           \
     static int test_##name(void) {                                                                 \
-        g_rows = 3; g_cols = 3; g_lo = 0.35f; g_hi = 0.95f;                                         \
-        return grad_matches(fn);                                                                    \
+        g_rows = 3;                                                                                \
+        g_cols = 3;                                                                                \
+        g_lo   = 0.35f;                                                                            \
+        g_hi   = 0.95f;                                                                            \
+        return grad_matches(fn);                                                                   \
     }
-MATRIX(triu,          w_triu)
-MATRIX(tril,          w_tril)
-MATRIX(roll,          w_roll)
-MATRIX(flatten,       w_flatten)
-MATRIX(cumsum,        w_cumsum)
-MATRIX(cumprod,       w_cumprod)
-MATRIX(logcumsumexp,  w_lcse)
-MATRIX(prod,          w_prod)
-MATRIX(logsumexp,     w_lse)
-MATRIX(trace,         w_trace)
-MATRIX(tile,          w_tile)
+MATRIX(triu, w_triu)
+MATRIX(tril, w_tril)
+MATRIX(roll, w_roll)
+MATRIX(flatten, w_flatten)
+MATRIX(cumsum, w_cumsum)
+MATRIX(cumprod, w_cumprod)
+MATRIX(logcumsumexp, w_lcse)
+MATRIX(prod, w_prod)
+MATRIX(logsumexp, w_lse)
+MATRIX(trace, w_trace)
+MATRIX(tile, w_tile)
 MATRIX(repeat_interleave_dim1, w_ri1)
 MATRIX(repeat_interleave_dim0, w_ri0)
-MATRIX(diagonal,      w_diagonal)
-MATRIX(sort,          w_sort)
+MATRIX(diagonal, w_diagonal)
+MATRIX(sort, w_sort)
 MATRIX(sort_descending, w_sort_desc)
-MATRIX(topk,          w_topk)
+MATRIX(topk, w_topk)
 
 /* Derivative is zero almost everywhere. What matters is that the chain
  * terminates with zeros rather than breaking: returning no gradient leaves
@@ -166,24 +205,30 @@ static int zero_grad_op(OpFn op) {
     cml_reset_ir_context();
     int sh[1] = {6};
     Tensor* x = tensor_rand(sh, 1, &cfg);
-    if (!x) return 0;
+    if (!x)
+        return 0;
     x->requires_grad = true;
-    Tensor* y = op(x);
-    if (!y) { cml_reset_ir_context(); return 0; }
+    Tensor* y        = op(x);
+    if (!y) {
+        cml_reset_ir_context();
+        return 0;
+    }
     ReduceParams rp = {0};
     tensor_backward(uop_sum(y, &rp), NULL, false, false);
     int ok = x->grad != NULL;
     if (ok) {
         float* g = (float*)tensor_data_ptr(x->grad);
-        for (size_t i = 0; i < x->numel && ok; i++) if (g[i] != 0.0f) ok = 0;
+        for (size_t i = 0; i < x->numel && ok; i++)
+            if (g[i] != 0.0f)
+                ok = 0;
     }
     cml_reset_ir_context();
     return ok;
 }
 static int test_floor_zero_grad(void) { return zero_grad_op(uop_floor); }
-static int test_ceil_zero_grad(void)  { return zero_grad_op(uop_ceil); }
+static int test_ceil_zero_grad(void) { return zero_grad_op(uop_ceil); }
 static int test_round_zero_grad(void) { return zero_grad_op(uop_round); }
-static int test_sign_zero_grad(void)  { return zero_grad_op(uop_sign); }
+static int test_sign_zero_grad(void) { return zero_grad_op(uop_sign); }
 
 /* Multi-axis reduce: both the shape inference and the kernels read only
  * dims[0], so a two-axis request used to reduce one axis and return a shape
@@ -192,13 +237,19 @@ static int test_reduce_multi_axis(void) {
     cml_reset_ir_context();
     int sh[3] = {2, 2, 2};
     Tensor* a = tensor_zeros(sh, 3, &cfg);
-    if (!a) return 0;
-    float v[8]; for (int i = 0; i < 8; i++) v[i] = (float)(i + 1);
+    if (!a)
+        return 0;
+    float v[8];
+    for (int i = 0; i < 8; i++)
+        v[i] = (float)(i + 1);
     memcpy(tensor_data_ptr(a), v, sizeof v);
-    int dims[2] = {0, 2};
-    ReduceParams p = { dims, 2, false };
-    Tensor* r = uop_sum(a, &p);
-    if (!r) { cml_reset_ir_context(); return 0; }
+    int dims[2]    = {0, 2};
+    ReduceParams p = {dims, 2, false};
+    Tensor* r      = uop_sum(a, &p);
+    if (!r) {
+        cml_reset_ir_context();
+        return 0;
+    }
     tensor_ensure_executed(r);
     float* o = (float*)tensor_data_ptr(r);
     /* a[0]=[[1,2],[3,4]] a[1]=[[5,6],[7,8]] -> j=0: 1+2+5+6, j=1: 3+4+7+8 */
@@ -213,19 +264,22 @@ static int test_topk_values_and_indices(void) {
     cml_reset_ir_context();
     int sh[2] = {2, 3};
     Tensor* a = tensor_zeros(sh, 2, &cfg);
-    if (!a) return 0;
+    if (!a)
+        return 0;
     float v[6] = {3, 1, 2, 9, 7, 8};
     memcpy(tensor_data_ptr(a), v, sizeof v);
-    Tensor* idx = NULL;
+    Tensor* idx  = NULL;
     Tensor* vals = uop_topk(a, 2, 1, true, &idx);
-    if (!vals || !idx) { cml_reset_ir_context(); return 0; }
+    if (!vals || !idx) {
+        cml_reset_ir_context();
+        return 0;
+    }
     tensor_ensure_executed(vals);
     tensor_ensure_executed(idx);
     float* vd = (float*)tensor_data_ptr(vals);
     float* id = (float*)tensor_data_ptr(idx);
-    int ok = vd && id
-          && vd[0] == 3 && vd[1] == 2 && vd[2] == 9 && vd[3] == 8
-          && id[0] == 0 && id[1] == 2 && id[2] == 0 && id[3] == 2;
+    int ok    = vd && id && vd[0] == 3 && vd[1] == 2 && vd[2] == 9 && vd[3] == 8 && id[0] == 0 &&
+             id[1] == 2 && id[2] == 0 && id[3] == 2;
     cml_reset_ir_context();
     return ok;
 }
@@ -243,28 +297,40 @@ static int reshape_then_reduce_backward(int rank, int axis) {
     cml_reset_ir_context();
     int sh[2] = {3, 9};
     Tensor* a = tensor_rand(sh, 2, &cfg);
-    if (!a) return 0;
+    if (!a)
+        return 0;
     a->requires_grad = true;
 
     int v3[3] = {3, 3, 3}, v4[4] = {3, 3, 3, 1};
     Tensor* r = rank == 3 ? uop_reshape_to(a, v3, 3) : uop_reshape_to(a, v4, 4);
-    if (!r) { cml_reset_ir_context(); return 0; }
+    if (!r) {
+        cml_reset_ir_context();
+        return 0;
+    }
 
-    int d[1] = { axis };
-    ReduceParams p = { d, 1, false };
-    Tensor* s = uop_sum(r, &p);
-    if (!s) { cml_reset_ir_context(); return 0; }
+    int d[1]       = {axis};
+    ReduceParams p = {d, 1, false};
+    Tensor* s      = uop_sum(r, &p);
+    if (!s) {
+        cml_reset_ir_context();
+        return 0;
+    }
 
     ReduceParams rp = {0};
-    Tensor* tot = uop_sum(s, &rp);
-    if (!tot) { cml_reset_ir_context(); return 0; }
+    Tensor* tot     = uop_sum(s, &rp);
+    if (!tot) {
+        cml_reset_ir_context();
+        return 0;
+    }
     tensor_backward(tot, NULL, false, false);
 
     /* Summing everything means every input contributes exactly once. */
     int ok = a->grad != NULL;
     if (ok) {
         float* g = (float*)tensor_data_ptr(a->grad);
-        for (size_t i = 0; i < a->numel && ok; i++) if (fabsf(g[i] - 1.0f) > 1e-4f) ok = 0;
+        for (size_t i = 0; i < a->numel && ok; i++)
+            if (fabsf(g[i] - 1.0f) > 1e-4f)
+                ok = 0;
     }
     cml_reset_ir_context();
     return ok;
@@ -283,35 +349,46 @@ static int test_reshape4_reduce_axis2(void) { return reshape_then_reduce_backwar
 static int test_gather_grad_dtype_and_value(void) {
     cml_reset_ir_context();
     int wsh[2] = {4, 2};
-    Tensor* w = tensor_zeros(wsh, 2, &cfg);
-    if (!w) return 0;
+    Tensor* w  = tensor_zeros(wsh, 2, &cfg);
+    if (!w)
+        return 0;
     float wv[8] = {1, 2, 3, 4, 5, 6, 7, 8};
     memcpy(tensor_data_ptr(w), wv, sizeof wv);
     w->requires_grad = true;
 
-    TensorConfig icfg = {.dtype = DTYPE_INT32, .device = DEVICE_CPU,
-                         .has_dtype = true, .has_device = true};
-    int ish[1] = {3};
+    TensorConfig icfg = {
+        .dtype = DTYPE_INT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    int ish[1]  = {3};
     Tensor* idx = tensor_zeros(ish, 1, &icfg);
-    if (!idx) { cml_reset_ir_context(); return 0; }
-    int32_t iv[3] = {0, 2, 2};   /* duplicate row exercises accumulation */
+    if (!idx) {
+        cml_reset_ir_context();
+        return 0;
+    }
+    int32_t iv[3] = {0, 2, 2}; /* duplicate row exercises accumulation */
     memcpy(tensor_data_ptr(idx), iv, sizeof iv);
 
     Tensor* g = uop_gather(w, idx, 0);
-    if (!g || g->dtype != DTYPE_FLOAT32) { cml_reset_ir_context(); return 0; }
+    if (!g || g->dtype != DTYPE_FLOAT32) {
+        cml_reset_ir_context();
+        return 0;
+    }
 
     ReduceParams rp = {0};
-    Tensor* tot = uop_sum(g, &rp);
-    if (!tot) { cml_reset_ir_context(); return 0; }
+    Tensor* tot     = uop_sum(g, &rp);
+    if (!tot) {
+        cml_reset_ir_context();
+        return 0;
+    }
     tensor_backward(tot, NULL, false, false);
 
     int ok = w->grad != NULL && w->grad->dtype == DTYPE_FLOAT32;
     if (ok) {
         /* d(sum)/dw = counts of each index: row0 -> 1, row2 -> 2 */
         float expect[8] = {1, 1, 0, 0, 2, 2, 0, 0};
-        float* gd = (float*)tensor_data_ptr(w->grad);
+        float* gd       = (float*)tensor_data_ptr(w->grad);
         for (size_t i = 0; i < 8 && ok; i++)
-            if (fabsf(gd[i] - expect[i]) > 1e-4f) ok = 0;
+            if (fabsf(gd[i] - expect[i]) > 1e-4f)
+                ok = 0;
     }
     cml_reset_ir_context();
     return ok;
@@ -321,23 +398,55 @@ int main(void) {
     cml_init();
     printf("=== per-op autodiff ===\n");
 
-    TEST(asin); TEST(acos); TEST(atan); TEST(asinh); TEST(acosh); TEST(atanh);
-    TEST(erf); TEST(sinh); TEST(cosh); TEST(log2); TEST(log10); TEST(exp2);
-    TEST(hard_sigmoid); TEST(hard_tanh); TEST(relu6); TEST(quick_gelu);
-    TEST(gelu); TEST(leaky_relu);
-    TEST(softplus); TEST(softsign); TEST(logsigmoid);
+    TEST(asin);
+    TEST(acos);
+    TEST(atan);
+    TEST(asinh);
+    TEST(acosh);
+    TEST(atanh);
+    TEST(erf);
+    TEST(sinh);
+    TEST(cosh);
+    TEST(log2);
+    TEST(log10);
+    TEST(exp2);
+    TEST(hard_sigmoid);
+    TEST(hard_tanh);
+    TEST(relu6);
+    TEST(quick_gelu);
+    TEST(gelu);
+    TEST(leaky_relu);
+    TEST(softplus);
+    TEST(softsign);
+    TEST(logsigmoid);
 
-    TEST(triu); TEST(tril); TEST(roll); TEST(flatten);
-    TEST(cumsum); TEST(cumprod); TEST(logcumsumexp);
-    TEST(prod); TEST(logsumexp); TEST(trace);
-    TEST(tile); TEST(repeat_interleave_dim1); TEST(repeat_interleave_dim0);
-    TEST(diagonal); TEST(sort); TEST(sort_descending); TEST(topk);
+    TEST(triu);
+    TEST(tril);
+    TEST(roll);
+    TEST(flatten);
+    TEST(cumsum);
+    TEST(cumprod);
+    TEST(logcumsumexp);
+    TEST(prod);
+    TEST(logsumexp);
+    TEST(trace);
+    TEST(tile);
+    TEST(repeat_interleave_dim1);
+    TEST(repeat_interleave_dim0);
+    TEST(diagonal);
+    TEST(sort);
+    TEST(sort_descending);
+    TEST(topk);
 
-    TEST(floor_zero_grad); TEST(ceil_zero_grad);
-    TEST(round_zero_grad); TEST(sign_zero_grad);
+    TEST(floor_zero_grad);
+    TEST(ceil_zero_grad);
+    TEST(round_zero_grad);
+    TEST(sign_zero_grad);
 
-    TEST(reshape3_reduce_axis0); TEST(reshape3_reduce_axis1);
-    TEST(reshape3_reduce_axis2); TEST(reshape4_reduce_axis0);
+    TEST(reshape3_reduce_axis0);
+    TEST(reshape3_reduce_axis1);
+    TEST(reshape3_reduce_axis2);
+    TEST(reshape4_reduce_axis0);
     TEST(reshape4_reduce_axis2);
 
     TEST(reduce_multi_axis);

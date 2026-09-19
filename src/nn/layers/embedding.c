@@ -18,9 +18,9 @@ static Tensor* embedding_forward(Module* module, Tensor* input) {
     if (nidx <= 0)
         return NULL;
 
-    int flat_shape[] = {nidx};
-    ReshapeParams rpf  = {.new_shape = flat_shape, .new_ndim = 1};
-    Tensor* idxf       = uop_reshape(input, &rpf);
+    int flat_shape[]  = {nidx};
+    ReshapeParams rpf = {.new_shape = flat_shape, .new_ndim = 1};
+    Tensor* idxf      = uop_reshape(input, &rpf);
     if (!idxf)
         return NULL;
 
@@ -30,10 +30,8 @@ static Tensor* embedding_forward(Module* module, Tensor* input) {
 
     Tensor* out_body = gathered;
     if (emb->padding_idx >= 0 && emb->padding_idx < emb->num_embeddings) {
-        TensorConfig cfg = {.dtype      = input->dtype,
-                            .device     = input->device,
-                            .has_dtype  = true,
-                            .has_device = true};
+        TensorConfig cfg = {
+            .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
         Tensor* padv = tensor_full(flat_shape, 1, &cfg, (float)emb->padding_idx);
         if (!padv)
             return NULL;
@@ -42,13 +40,13 @@ static Tensor* embedding_forward(Module* module, Tensor* input) {
         if (!mask1)
             return NULL;
 
-        int m21[] = {nidx, 1};
+        int m21[]        = {nidx, 1};
         ReshapeParams rm = {.new_shape = m21, .new_ndim = 2};
         Tensor* mask2    = uop_reshape(mask1, &rm);
         if (!mask2)
             return NULL;
 
-        int exp_s[] = {nidx, emb->embedding_dim};
+        int exp_s[]     = {nidx, emb->embedding_dim};
         ExpandParams ep = {.new_shape = exp_s, .new_ndim = 2};
         Tensor* mask_e  = uop_expand(mask2, &ep);
         if (!mask_e)
@@ -59,12 +57,12 @@ static Tensor* embedding_forward(Module* module, Tensor* input) {
             return NULL;
 
         WhereParams wp = {.cond = mask_e, .a = z, .b = gathered};
-        out_body         = uop_where(&wp);
+        out_body       = uop_where(&wp);
         if (!out_body)
             return NULL;
     }
 
-    int out_ndim = input->ndim + 1;
+    int out_ndim   = input->ndim + 1;
     int* out_shape = cml_malloc((size_t)out_ndim * sizeof(int));
     if (!out_shape)
         return NULL;
@@ -80,8 +78,8 @@ static Tensor* embedding_forward(Module* module, Tensor* input) {
 
 static void embedding_free(Module* module) { cml_free(module); }
 
-Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx,
-                        DType dtype, DeviceType device) {
+Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx, DType dtype,
+                        DeviceType device) {
     Embedding* emb = cml_malloc(sizeof(Embedding));
     if (!emb)
         return NULL;

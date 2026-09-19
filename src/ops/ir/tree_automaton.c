@@ -55,15 +55,16 @@ static uint64_t fnv1a_int(uint64_t hash, int value) {
 
 static uint64_t transition_key(int op_type, const int* child_states, int arity) {
     uint64_t h = fnv1a_init();
-    h = fnv1a_int(h, op_type);
-    h = fnv1a_int(h, arity);
+    h          = fnv1a_int(h, op_type);
+    h          = fnv1a_int(h, arity);
     for (int i = 0; i < arity; i++)
         h = fnv1a_int(h, child_states[i]);
     return h;
 }
 
 static int transition_lookup(const CMLAutomaton* aut, uint64_t key) {
-    if (aut->table_capacity == 0) return AUTOMATON_DEAD_STATE;
+    if (aut->table_capacity == 0)
+        return AUTOMATON_DEAD_STATE;
     uint64_t idx = key % (uint64_t)aut->table_capacity;
     for (int probe = 0; probe < aut->table_capacity; probe++) {
         uint64_t slot = (idx + (uint64_t)probe) % (uint64_t)aut->table_capacity;
@@ -85,9 +86,9 @@ static void transition_insert(CMLAutomaton* aut, uint64_t key, int result_state)
     for (int probe = 0; probe < aut->table_capacity; probe++) {
         uint64_t slot = (idx + (uint64_t)probe) % (uint64_t)aut->table_capacity;
         if (!aut->transitions[slot].occupied) {
-            aut->transitions[slot].key = key;
+            aut->transitions[slot].key          = key;
             aut->transitions[slot].result_state = result_state;
-            aut->transitions[slot].occupied = true;
+            aut->transitions[slot].occupied     = true;
             aut->num_transitions++;
             return;
         }
@@ -99,12 +100,12 @@ static void transition_insert(CMLAutomaton* aut, uint64_t key, int result_state)
 }
 
 static void transition_grow(CMLAutomaton* aut) {
-    int old_cap = aut->table_capacity;
+    int old_cap        = aut->table_capacity;
     CMLTransition* old = aut->transitions;
 
-    int new_cap = old_cap < 16 ? 16 : old_cap * 2;
-    aut->transitions = cml_calloc((size_t)new_cap, sizeof(CMLTransition));
-    aut->table_capacity = new_cap;
+    int new_cap          = old_cap < 16 ? 16 : old_cap * 2;
+    aut->transitions     = cml_calloc((size_t)new_cap, sizeof(CMLTransition));
+    aut->table_capacity  = new_cap;
     aut->num_transitions = 0;
 
     for (int i = 0; i < old_cap; i++) {
@@ -117,23 +118,27 @@ static void transition_grow(CMLAutomaton* aut) {
 static int automaton_add_state(CMLAutomaton* aut) {
     if (aut->num_states >= aut->states_capacity) {
         int new_cap = aut->states_capacity * 2;
-        if (new_cap < 16) new_cap = 16;
-        CMLAutomatonState* ns = cml_realloc(aut->states, (size_t)new_cap * sizeof(CMLAutomatonState));
-        if (!ns) return -1;
-        aut->states = ns;
+        if (new_cap < 16)
+            new_cap = 16;
+        CMLAutomatonState* ns =
+            cml_realloc(aut->states, (size_t)new_cap * sizeof(CMLAutomatonState));
+        if (!ns)
+            return -1;
+        aut->states          = ns;
         aut->states_capacity = new_cap;
     }
-    int id = aut->num_states;
+    int id               = aut->num_states;
     CMLAutomatonState* s = &aut->states[id];
-    s->id = id;
-    s->matched_rules = NULL;
-    s->num_matched = 0;
+    s->id                = id;
+    s->matched_rules     = NULL;
+    s->num_matched       = 0;
     aut->num_states++;
     return id;
 }
 
 static void state_add_rule(CMLAutomaton* aut, int state_id, int rule_idx) {
-    if (state_id < 0 || state_id >= aut->num_states) return;
+    if (state_id < 0 || state_id >= aut->num_states)
+        return;
     CMLAutomatonState* s = &aut->states[state_id];
 
     for (int i = 0; i < s->num_matched; i++) {
@@ -141,8 +146,7 @@ static void state_add_rule(CMLAutomaton* aut, int state_id, int rule_idx) {
             return;
     }
 
-    s->matched_rules = cml_realloc(s->matched_rules,
-                                (size_t)(s->num_matched + 1) * sizeof(int));
+    s->matched_rules = cml_realloc(s->matched_rules, (size_t)(s->num_matched + 1) * sizeof(int));
     s->matched_rules[s->num_matched] = rule_idx;
     s->num_matched++;
 }
@@ -153,9 +157,10 @@ static void state_add_rule(CMLAutomaton* aut, int state_id, int rule_idx) {
  * from child states to a new state; CML_PAT_ANY and CML_PAT_CAPTURE both
  * map to the wildcard state.
  */
-static int compile_pattern_node(CMLAutomaton* aut, const CMLPatternNode* pat,
-                                int rule_idx, bool is_root) {
-    if (!pat) return AUTOMATON_DEAD_STATE;
+static int compile_pattern_node(CMLAutomaton* aut, const CMLPatternNode* pat, int rule_idx,
+                                bool is_root) {
+    if (!pat)
+        return AUTOMATON_DEAD_STATE;
 
     switch (pat->kind) {
     case CML_PAT_ANY:
@@ -177,7 +182,8 @@ static int compile_pattern_node(CMLAutomaton* aut, const CMLPatternNode* pat,
         }
 
         int new_state = automaton_add_state(aut);
-        if (new_state < 0) return AUTOMATON_DEAD_STATE;
+        if (new_state < 0)
+            return AUTOMATON_DEAD_STATE;
         transition_insert(aut, key, new_state);
 
         if (is_root)
@@ -211,21 +217,23 @@ typedef struct {
     bool is_root;
 } PendingWildcard;
 
-static void expand_wildcard_transitions(CMLAutomaton* aut,
-                                        PendingWildcard* pending, int num_pending) {
-    if (num_pending == 0) return;
+static void expand_wildcard_transitions(CMLAutomaton* aut, PendingWildcard* pending,
+                                        int num_pending) {
+    if (num_pending == 0)
+        return;
 
     bool changed = true;
     while (changed) {
         changed = false;
         for (int p = 0; p < num_pending; p++) {
             PendingWildcard* pw = &pending[p];
-            bool has_wildcard = false;
+            bool has_wildcard   = false;
             for (int c = 0; c < pw->arity; c++) {
                 if (pw->child_pattern_states[c] == aut->wildcard_state)
                     has_wildcard = true;
             }
-            if (!has_wildcard) continue;
+            if (!has_wildcard)
+                continue;
 
             /* Enumerate all concrete states to substitute for wildcards.
              * For simplicity we try each concrete state in each wildcard
@@ -256,18 +264,20 @@ static void expand_wildcard_transitions(CMLAutomaton* aut,
 }
 
 CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
-    if (!registry || registry->num_rules == 0) return NULL;
+    if (!registry || registry->num_rules == 0)
+        return NULL;
 
     CMLAutomaton* aut = cml_calloc(1, sizeof(CMLAutomaton));
-    if (!aut) return NULL;
+    if (!aut)
+        return NULL;
 
-    aut->registry = registry;
-    aut->states = NULL;
-    aut->num_states = 0;
+    aut->registry        = registry;
+    aut->states          = NULL;
+    aut->num_states      = 0;
     aut->states_capacity = 0;
-    aut->transitions = NULL;
+    aut->transitions     = NULL;
     aut->num_transitions = 0;
-    aut->table_capacity = 0;
+    aut->table_capacity  = 0;
 
     /* State 0 = dead, state 1 = wildcard */
     automaton_add_state(aut); /* dead */
@@ -275,13 +285,14 @@ CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
     aut->wildcard_state = AUTOMATON_WILDCARD_STATE;
 
     /* Allocate pending wildcard records for expansion pass */
-    int pending_cap = registry->num_rules * AUTOMATON_MAX_ARITY;
+    int pending_cap          = registry->num_rules * AUTOMATON_MAX_ARITY;
     PendingWildcard* pending = cml_calloc((size_t)pending_cap, sizeof(PendingWildcard));
-    int num_pending = 0;
+    int num_pending          = 0;
 
     for (int r = 0; r < registry->num_rules; r++) {
         CMLRewriteRule* rule = &registry->rules[r];
-        if (!rule->pattern) continue;
+        if (!rule->pattern)
+            continue;
 
         int root_state = compile_pattern_node(aut, rule->pattern, r, true);
         (void)root_state;
@@ -289,11 +300,11 @@ CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
         /* Record wildcard positions for root-level OP patterns */
         if (rule->pattern->kind == CML_PAT_OP && num_pending < pending_cap) {
             PendingWildcard* pw = &pending[num_pending];
-            pw->op_type = (int)rule->pattern->op_type;
-            pw->arity = rule->pattern->num_inputs;
-            pw->target_state = root_state;
-            pw->rule_idx = r;
-            pw->is_root = true;
+            pw->op_type         = (int)rule->pattern->op_type;
+            pw->arity           = rule->pattern->num_inputs;
+            pw->target_state    = root_state;
+            pw->rule_idx        = r;
+            pw->is_root         = true;
             for (int c = 0; c < rule->pattern->num_inputs; c++) {
                 pw->child_pattern_states[c] =
                     compile_pattern_node(aut, rule->pattern->inputs[c], r, false);
@@ -309,7 +320,8 @@ CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
 }
 
 void cml_automaton_free(CMLAutomaton* automaton) {
-    if (!automaton) return;
+    if (!automaton)
+        return;
     for (int i = 0; i < automaton->num_states; i++)
         cml_free(automaton->states[i].matched_rules);
     cml_free(automaton->states);
@@ -317,17 +329,16 @@ void cml_automaton_free(CMLAutomaton* automaton) {
     cml_free(automaton);
 }
 
-
 /*
  * Compute the automaton state for a single IR node given its children's
  * states. Tries the exact (op, child_states) key first. If that misses
  * and some children have the wildcard state, falls back to wildcard
  * expansion by trying the wildcard state in each child position.
  */
-static int compute_node_state(const CMLAutomaton* aut, struct IRNode* node,
-                              const int* child_states, int arity) {
+static int compute_node_state(const CMLAutomaton* aut, struct IRNode* node, const int* child_states,
+                              int arity) {
     uint64_t key = transition_key((int)node->type, child_states, arity);
-    int state = transition_lookup(aut, key);
+    int state    = transition_lookup(aut, key);
     if (state != AUTOMATON_DEAD_STATE)
         return state;
 
@@ -338,9 +349,9 @@ static int compute_node_state(const CMLAutomaton* aut, struct IRNode* node,
     /* Single-wildcard fallback per position */
     for (int i = 0; i < arity; i++) {
         int saved = trial[i];
-        trial[i] = AUTOMATON_WILDCARD_STATE;
-        key = transition_key((int)node->type, trial, arity);
-        state = transition_lookup(aut, key);
+        trial[i]  = AUTOMATON_WILDCARD_STATE;
+        key       = transition_key((int)node->type, trial, arity);
+        state     = transition_lookup(aut, key);
         if (state != AUTOMATON_DEAD_STATE)
             return state;
         trial[i] = saved;
@@ -356,18 +367,16 @@ static int compute_node_state(const CMLAutomaton* aut, struct IRNode* node,
 static atomic_int g_rewrite_counter = 0;
 
 static char* rewrite_unique_name(void) {
-    int id = atomic_fetch_add(&g_rewrite_counter, 1);
+    int id     = atomic_fetch_add(&g_rewrite_counter, 1);
     char* name = cml_malloc(32);
     if (name)
         snprintf(name, 32, "_rw%d", id);
     return name;
 }
 
-
-
-
 static void free_unlinked_node(struct IRNode* node) {
-    if (!node) return;
+    if (!node)
+        return;
 
     if (node->input_names) {
         for (int i = 0; i < node->num_inputs; i++)
@@ -378,23 +387,26 @@ static void free_unlinked_node(struct IRNode* node) {
     cml_free(node->users);
 
     if (node->output) {
-        node->output->ir_node = NULL;
+        node->output->ir_node    = NULL;
         node->output->ir_context = NULL;
     }
 
     cml_free(node);
 }
 
-static bool match_node_recursive(CMLGraph_t ir, const CMLPatternNode* pattern,
-                                 struct IRNode* node, CMLMatchResult* result) {
-    if (!pattern || !node) return false;
+static bool match_node_recursive(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNode* node,
+                                 CMLMatchResult* result) {
+    if (!pattern || !node)
+        return false;
 
     switch (pattern->kind) {
     case CML_PAT_ANY:
         return true;
     case CML_PAT_CAPTURE: {
-        if (!result) return false;
-        if (result->num_captures >= CML_PATTERN_MAX_CAPTURES) return false;
+        if (!result)
+            return false;
+        if (result->num_captures >= CML_PATTERN_MAX_CAPTURES)
+            return false;
         for (int i = 0; i < result->num_captures; i++) {
             if (strcmp(result->captures[i].name, pattern->capture_name) == 0)
                 return (result->captures[i].node == node);
@@ -406,12 +418,16 @@ static bool match_node_recursive(CMLGraph_t ir, const CMLPatternNode* pattern,
         return true;
     }
     case CML_PAT_OP: {
-        if (node->type != pattern->op_type) return false;
-        if (pattern->num_inputs != node->num_inputs) return false;
+        if (node->type != pattern->op_type)
+            return false;
+        if (pattern->num_inputs != node->num_inputs)
+            return false;
         for (int i = 0; i < pattern->num_inputs; i++) {
-            if (!pattern->inputs[i]) return false;
+            if (!pattern->inputs[i])
+                return false;
             struct IRNode* producer = cml_ir_find_by_output(ir, node->input_names[i]);
-            if (!producer) return false;
+            if (!producer)
+                return false;
             if (!match_node_recursive(ir, pattern->inputs[i], producer, result))
                 return false;
         }
@@ -423,29 +439,39 @@ static bool match_node_recursive(CMLGraph_t ir, const CMLPatternNode* pattern,
 }
 
 int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
-    if (!automaton || !graph) return -1;
-    if (!automaton->registry || automaton->registry->num_rules == 0) return 0;
+    if (!automaton || !graph)
+        return -1;
+    if (!automaton->registry || automaton->registry->num_rules == 0)
+        return 0;
 
-    int max_iter = CML_REWRITE_DEFAULT_MAX_ITER;
+    int max_iter       = CML_REWRITE_DEFAULT_MAX_ITER;
     int total_rewrites = 0;
 
     for (int iter = 0; iter < max_iter; iter++) {
         /* Phase 1: topological order (children before parents) */
-        int cap = graph->node_count > 0 ? graph->node_count : 16;
+        int cap              = graph->node_count > 0 ? graph->node_count : 16;
         struct IRNode** topo = cml_malloc((size_t)cap * sizeof(struct IRNode*));
-        int* node_states = cml_calloc((size_t)cap, sizeof(int));
-        if (!topo || !node_states) { cml_free(topo); cml_free(node_states); return -1; }
+        int* node_states     = cml_calloc((size_t)cap, sizeof(int));
+        if (!topo || !node_states) {
+            cml_free(topo);
+            cml_free(node_states);
+            return -1;
+        }
 
-        int topo_count = 0;
+        int topo_count   = 0;
         struct IRNode* n = graph->head;
         while (n) {
             if (topo_count >= cap) {
                 cap *= 2;
-                topo = cml_realloc(topo, (size_t)cap * sizeof(struct IRNode*));
+                topo        = cml_realloc(topo, (size_t)cap * sizeof(struct IRNode*));
                 node_states = cml_realloc(node_states, (size_t)cap * sizeof(int));
-                if (!topo || !node_states) { cml_free(topo); cml_free(node_states); return -1; }
+                if (!topo || !node_states) {
+                    cml_free(topo);
+                    cml_free(node_states);
+                    return -1;
+                }
             }
-            topo[topo_count] = n;
+            topo[topo_count]        = n;
             node_states[topo_count] = AUTOMATON_DEAD_STATE;
             topo_count++;
             n = n->next;
@@ -456,15 +482,17 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
          * consumers) due to the way the IR builder appends nodes, so
          * iterating forward assigns children before parents. */
         for (int i = 0; i < topo_count; i++) {
-            struct IRNode* node = topo[i];
+            struct IRNode* node                   = topo[i];
             int child_states[AUTOMATON_MAX_ARITY] = {0};
-            int arity = node->num_inputs < AUTOMATON_MAX_ARITY
-                            ? node->num_inputs : AUTOMATON_MAX_ARITY;
+            int arity =
+                node->num_inputs < AUTOMATON_MAX_ARITY ? node->num_inputs : AUTOMATON_MAX_ARITY;
 
             for (int c = 0; c < arity; c++) {
-                if (!node->input_names[c]) continue;
+                if (!node->input_names[c])
+                    continue;
                 struct IRNode* producer = cml_ir_find_by_output(graph, node->input_names[c]);
-                if (!producer) continue;
+                if (!producer)
+                    continue;
 
                 /* Find producer's index to get its state */
                 for (int j = 0; j < topo_count; j++) {
@@ -483,14 +511,17 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
 
         for (int i = 0; i < topo_count; i++) {
             int state = node_states[i];
-            if (state <= AUTOMATON_WILDCARD_STATE) continue;
-            if (state >= automaton->num_states) continue;
+            if (state <= AUTOMATON_WILDCARD_STATE)
+                continue;
+            if (state >= automaton->num_states)
+                continue;
 
             CMLAutomatonState* as = &automaton->states[state];
-            if (as->num_matched == 0) continue;
+            if (as->num_matched == 0)
+                continue;
 
             struct IRNode* node = topo[i];
-            bool replaced = false;
+            bool replaced       = false;
 
             for (int m = 0; m < as->num_matched && !replaced; m++) {
                 int rule_idx = as->matched_rules[m];
@@ -507,7 +538,8 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
                     continue;
 
                 struct IRNode* replacement = rule->emit(graph, &result);
-                if (!replacement || replacement == node) continue;
+                if (!replacement || replacement == node)
+                    continue;
 
                 if (!replacement->output_name)
                     replacement->output_name = rewrite_unique_name();
@@ -516,7 +548,10 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
                 {
                     struct IRNode* scan = graph->head;
                     while (scan) {
-                        if (scan == replacement) { already_in_graph = true; break; }
+                        if (scan == replacement) {
+                            already_in_graph = true;
+                            break;
+                        }
                         scan = scan->next;
                     }
                 }
@@ -524,11 +559,10 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
                     cml_ir_insert_before(graph, replacement, node);
 
                 if (node->output_name && replacement->output_name)
-                    cml_ir_replace_refs(graph, node->output_name,
-                                              replacement->output_name);
+                    cml_ir_replace_refs(graph, node->output_name, replacement->output_name);
 
                 if (node->output && replacement->output) {
-                    node->output->ir_node = replacement;
+                    node->output->ir_node    = replacement;
                     node->output->ir_context = graph;
                 }
 

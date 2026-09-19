@@ -25,7 +25,8 @@ typedef struct CMLShardedTensor {
 } CMLShardedTensor;
 
 CMLShardedTensor* tensor_shard(Tensor* t, DeviceType* devices, int num_devices, int axis);
-CMLShardedTensor* tensor_shard_with_sizes(Tensor* t, DeviceType* devices, int num_devices, int axis, int* sizes);
+CMLShardedTensor* tensor_shard_with_sizes(Tensor* t, DeviceType* devices, int num_devices, int axis,
+                                          int* sizes);
 Tensor* tensor_unshard(CMLShardedTensor* st);
 void sharded_tensor_free(CMLShardedTensor* st);
 

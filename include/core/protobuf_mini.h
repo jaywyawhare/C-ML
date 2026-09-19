@@ -23,8 +23,8 @@ typedef struct {
         uint64_t varint;
         uint32_t fixed32;
         uint64_t fixed64;
-        float    float_val;
-        double   double_val;
+        float float_val;
+        double double_val;
         struct {
             const uint8_t* data;
             size_t length;

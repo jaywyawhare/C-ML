@@ -68,11 +68,11 @@ typedef enum {
 } CMLZooModel;
 
 typedef struct {
-    bool pretrained;        /* Load pretrained weights */
-    int num_classes;        /* Output classes (0 = default) */
-    DType dtype;            /* Data type */
-    DeviceType device;      /* Device */
-    const char* weights_dir;/* Weights directory (NULL = ~/.cml/weights/) */
+    bool pretrained;         /* Load pretrained weights */
+    int num_classes;         /* Output classes (0 = default) */
+    DType dtype;             /* Data type */
+    DeviceType device;       /* Device */
+    const char* weights_dir; /* Weights directory (NULL = ~/.cml/weights/) */
 } CMLZooConfig;
 
 CMLZooConfig cml_zoo_default_config(void);
@@ -148,7 +148,6 @@ Module* cml_zoo_mask_rcnn(const CMLZooConfig* config);
 Module* cml_zoo_unet3d(const CMLZooConfig* config);
 
 Module* cml_zoo_rnnt(const CMLZooConfig* config);
-
 
 /* Pre-norm transformer block: x + attn(norm1(x)), then + mlp(norm2(x)).
  * ViT and both CLIP towers are this same shape. */

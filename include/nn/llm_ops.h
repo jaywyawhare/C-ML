@@ -11,10 +11,10 @@ extern "C" {
 #endif
 
 typedef struct CMLKVCache {
-    Tensor* key_cache;     /* [max_seq_len, num_kv_heads, head_dim] */
-    Tensor* value_cache;   /* [max_seq_len, num_kv_heads, head_dim] */
+    Tensor* key_cache;   /* [max_seq_len, num_kv_heads, head_dim] */
+    Tensor* value_cache; /* [max_seq_len, num_kv_heads, head_dim] */
     int max_seq_len;
-    int current_len;       /* Current sequence length in cache */
+    int current_len; /* Current sequence length in cache */
     int num_kv_heads;
     int head_dim;
 } CMLKVCache;
@@ -36,18 +36,18 @@ Tensor* cml_kv_cache_get_keys(CMLKVCache* cache);
 Tensor* cml_kv_cache_get_values(CMLKVCache* cache);
 
 typedef struct CMLGQAConfig {
-    int num_heads;          /* Total attention heads (Q) */
-    int num_kv_heads;       /* Number of KV heads (K, V) - can be < num_heads */
-    int head_dim;           /* Dimension per head */
-    float scale;            /* Attention scale (default: 1/sqrt(head_dim)) */
-    bool causal;            /* Apply causal mask */
-    int window_size;        /* Sliding window size (0 = unlimited) */
+    int num_heads;    /* Total attention heads (Q) */
+    int num_kv_heads; /* Number of KV heads (K, V) - can be < num_heads */
+    int head_dim;     /* Dimension per head */
+    float scale;      /* Attention scale (default: 1/sqrt(head_dim)) */
+    bool causal;      /* Apply causal mask */
+    int window_size;  /* Sliding window size (0 = unlimited) */
 } CMLGQAConfig;
 
 typedef struct CMLFlashAttentionConfig {
-    int tile_size_q;        /* Tile size for Q dimension (default: 64) */
-    int tile_size_kv;       /* Tile size for KV dimension (default: 64) */
-    bool enabled;           /* Enable flash attention */
+    int tile_size_q;  /* Tile size for Q dimension (default: 64) */
+    int tile_size_kv; /* Tile size for KV dimension (default: 64) */
+    bool enabled;     /* Enable flash attention */
 } CMLFlashAttentionConfig;
 
 CMLFlashAttentionConfig cml_flash_attention_default_config(void);
@@ -58,14 +58,12 @@ CMLFlashAttentionConfig cml_flash_attention_default_config(void);
  * V: [batch, kv_len, num_kv_heads * head_dim]
  * Returns: [batch, seq_len, num_heads * head_dim]
  */
-Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
-                               const CMLGQAConfig* config,
-                               const CMLFlashAttentionConfig* flash_config);
+Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config,
+                              const CMLFlashAttentionConfig* flash_config);
 
-Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
-                                      CMLKVCache* kv_cache,
-                                      const CMLGQAConfig* config,
-                                      const CMLFlashAttentionConfig* flash_config);
+Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_cache,
+                                     const CMLGQAConfig* config,
+                                     const CMLFlashAttentionConfig* flash_config);
 
 /** Grouped Query Attention forward pass
  * Q: [batch, seq_len, num_heads * head_dim]
@@ -73,17 +71,15 @@ Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
  * V: [batch, kv_len, num_kv_heads * head_dim]
  * Returns: [batch, seq_len, num_heads * head_dim]
  */
-Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config,
-                         Tensor* mask);
+Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config, Tensor* mask);
 
-Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
-                                CMLKVCache* kv_cache,
-                                const CMLGQAConfig* config);
+Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_cache,
+                               const CMLGQAConfig* config);
 
 typedef struct CMLRoPEConfig {
-    int dim;               /* Embedding dimension */
-    int max_seq_len;       /* Maximum sequence length */
-    float base;            /* Base frequency (default: 10000.0) */
+    int dim;         /* Embedding dimension */
+    int max_seq_len; /* Maximum sequence length */
+    float base;      /* Base frequency (default: 10000.0) */
 } CMLRoPEConfig;
 
 /** Apply RoPE to Q and K tensors in-place
@@ -93,19 +89,19 @@ typedef struct CMLRoPEConfig {
 Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config);
 
 typedef struct CMLMoEConfig {
-    int num_experts;       /* Total number of experts */
-    int top_k;             /* Number of experts to route to */
-    int input_dim;         /* Input dimension */
-    int hidden_dim;        /* Expert hidden dimension */
-    float capacity_factor; /* Load balancing capacity factor */
-    bool normalize_weights;/* Normalize gating weights to sum to 1 */
+    int num_experts;        /* Total number of experts */
+    int top_k;              /* Number of experts to route to */
+    int input_dim;          /* Input dimension */
+    int hidden_dim;         /* Expert hidden dimension */
+    float capacity_factor;  /* Load balancing capacity factor */
+    bool normalize_weights; /* Normalize gating weights to sum to 1 */
 } CMLMoEConfig;
 
 typedef struct CMLMoELayer {
     CMLMoEConfig config;
-    Tensor* gate_weight;           /* [input_dim, num_experts] - gating network */
-    Tensor** expert_w1;            /* [num_experts] x [input_dim, hidden_dim] */
-    Tensor** expert_w2;            /* [num_experts] x [hidden_dim, input_dim] */
+    Tensor* gate_weight; /* [input_dim, num_experts] - gating network */
+    Tensor** expert_w1;  /* [num_experts] x [input_dim, hidden_dim] */
+    Tensor** expert_w2;  /* [num_experts] x [hidden_dim, input_dim] */
     int ref_count;
 } CMLMoELayer;
 
@@ -125,16 +121,16 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input);
 Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input);
 
 typedef struct CMLBPEMerge {
-    char* pair;            /* "ab" merged token */
-    int new_token_id;      /* ID of merged token */
+    char* pair;       /* "ab" merged token */
+    int new_token_id; /* ID of merged token */
 } CMLBPEMerge;
 
 typedef struct CMLTokenizer {
-    char** vocab;          /* Token strings indexed by ID */
+    char** vocab; /* Token strings indexed by ID */
     int vocab_size;
-    CMLBPEMerge* merges;   /* BPE merge rules */
+    CMLBPEMerge* merges; /* BPE merge rules */
     int num_merges;
-    int* token_to_id;      /* Hash-based token to ID lookup (internal) */
+    int* token_to_id; /* Hash-based token to ID lookup (internal) */
     int hash_size;
     /* Special tokens */
     int bos_token_id;
@@ -143,8 +139,8 @@ typedef struct CMLTokenizer {
     int unk_token_id;
 } CMLTokenizer;
 
-CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
-                                     char** merge_pairs, int num_merges);
+CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size, char** merge_pairs,
+                                   int num_merges);
 
 void cml_tokenizer_free(CMLTokenizer* tok);
 

@@ -49,8 +49,8 @@ int main(void) {
     /* Test 4: List supported ops returns a reasonable count */
     printf("  test_onnx_list_supported_ops...");
     const char** ops = NULL;
-    int count = 0;
-    int ret = cml_onnx_list_supported_ops(&ops, &count);
+    int count        = 0;
+    int ret          = cml_onnx_list_supported_ops(&ops, &count);
     REQUIRE(ret == 0);
     REQUIRE(count > 20);
     REQUIRE(ops != NULL);
@@ -61,9 +61,12 @@ int main(void) {
     for (int i = 0; i < count; i++) {
         REQUIRE(ops[i] != NULL);
         REQUIRE(strlen(ops[i]) > 0);
-        if (strcmp(ops[i], "Add") == 0) found_add = 1;
-        if (strcmp(ops[i], "Relu") == 0) found_relu = 1;
-        if (strcmp(ops[i], "MatMul") == 0) found_matmul = 1;
+        if (strcmp(ops[i], "Add") == 0)
+            found_add = 1;
+        if (strcmp(ops[i], "Relu") == 0)
+            found_relu = 1;
+        if (strcmp(ops[i], "MatMul") == 0)
+            found_matmul = 1;
     }
     REQUIRE(found_add == 1);
     REQUIRE(found_relu == 1);

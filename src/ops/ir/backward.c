@@ -39,14 +39,17 @@ int cml_ir_build_backward(CMLGraph_t ir, struct IRNode* output_node) {
         bool any = false;
         for (int i = 0; i < n->num_inputs && n->inputs; i++) {
             Tensor* inp = n->inputs[i];
-            bool inp_grad = inp && (inp->requires_grad ||
-                                    (inp->ir_node && inp->ir_node->requires_grad));
-            if (i < 8) n->needs_input_grad[i] = inp_grad;
-            if (inp_grad) any = true;
+            bool inp_grad =
+                inp && (inp->requires_grad || (inp->ir_node && inp->ir_node->requires_grad));
+            if (i < 8)
+                n->needs_input_grad[i] = inp_grad;
+            if (inp_grad)
+                any = true;
         }
         n->requires_grad = any;
-        n->is_used = true;
-        if (n == output_node) break;
+        n->is_used       = true;
+        if (n == output_node)
+            break;
         n = n->next;
     }
 
@@ -89,17 +92,17 @@ static void accumulate_grad(Tensor* t, float* grad_data, size_t numel) {
         /* Scalar gradient: sum all */
         float sum = 0.0f;
 #ifdef __AVX__
-        size_t i = 0;
+        size_t i    = 0;
         __m256 vsum = _mm256_setzero_ps();
         for (; i + 8 <= numel; i += 8)
             vsum = _mm256_add_ps(vsum, _mm256_loadu_ps(grad_data + i));
         /* Horizontal sum of 8 floats */
         __m128 lo = _mm256_castps256_ps128(vsum);
         __m128 hi = _mm256_extractf128_ps(vsum, 1);
-        lo = _mm_add_ps(lo, hi);
-        lo = _mm_add_ps(lo, _mm_movehl_ps(lo, lo));
-        lo = _mm_add_ss(lo, _mm_shuffle_ps(lo, lo, 1));
-        sum = _mm_cvtss_f32(lo);
+        lo        = _mm_add_ps(lo, hi);
+        lo        = _mm_add_ps(lo, _mm_movehl_ps(lo, lo));
+        lo        = _mm_add_ss(lo, _mm_shuffle_ps(lo, lo, 1));
+        sum       = _mm_cvtss_f32(lo);
         for (; i < numel; i++)
             sum += grad_data[i];
 #else
@@ -201,18 +204,18 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in2 && in2->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data   = (float*)g1->data;
-                bool   in2_owned = false;
-                float* in2_data  = backward_contiguous(in2, &in2_owned);
+                float* g1_data  = (float*)g1->data;
+                bool in2_owned  = false;
+                float* in2_data = backward_contiguous(in2, &in2_owned);
                 if (in1->numel == out_numel && in2->numel == out_numel) {
                     /* Fast path: no broadcast, SIMD fused multiply-add */
                     size_t i = 0;
 #ifdef __AVX__
                     for (; i + 8 <= out_numel; i += 8) {
-                        __m256 og = _mm256_loadu_ps(out_grad + i);
-                        __m256 b  = _mm256_loadu_ps(in2_data + i);
+                        __m256 og  = _mm256_loadu_ps(out_grad + i);
+                        __m256 b   = _mm256_loadu_ps(in2_data + i);
                         __m256 cur = _mm256_loadu_ps(g1_data + i);
-                        cur = _mm256_add_ps(cur, _mm256_mul_ps(og, b));
+                        cur        = _mm256_add_ps(cur, _mm256_mul_ps(og, b));
                         _mm256_storeu_ps(g1_data + i, cur);
                     }
 #endif
@@ -229,17 +232,17 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in2 && in2->requires_grad && in1 && in1->data) {
             Tensor* g2 = ensure_grad(in2);
             if (g2 && g2->data) {
-                float* g2_data   = (float*)g2->data;
-                bool   in1_owned = false;
-                float* in1_data  = backward_contiguous(in1, &in1_owned);
+                float* g2_data  = (float*)g2->data;
+                bool in1_owned  = false;
+                float* in1_data = backward_contiguous(in1, &in1_owned);
                 if (in1->numel == out_numel && in2->numel == out_numel) {
                     size_t i = 0;
 #ifdef __AVX__
                     for (; i + 8 <= out_numel; i += 8) {
-                        __m256 og = _mm256_loadu_ps(out_grad + i);
-                        __m256 a  = _mm256_loadu_ps(in1_data + i);
+                        __m256 og  = _mm256_loadu_ps(out_grad + i);
+                        __m256 a   = _mm256_loadu_ps(in1_data + i);
                         __m256 cur = _mm256_loadu_ps(g2_data + i);
-                        cur = _mm256_add_ps(cur, _mm256_mul_ps(og, a));
+                        cur        = _mm256_add_ps(cur, _mm256_mul_ps(og, a));
                         _mm256_storeu_ps(g2_data + i, cur);
                     }
 #endif
@@ -412,7 +415,7 @@ static int cpu_backward_node(struct IRNode* node) {
             Tensor* in_a = node->inputs[1];
             Tensor* in_b = node->inputs[2];
             if (cond && cond->data) {
-                float* cond_data = (float*)cond->data;
+                float* cond_data  = (float*)cond->data;
                 size_t cond_numel = cond->numel;
                 if (in_a && in_a->requires_grad) {
                     Tensor* ga = ensure_grad(in_a);
@@ -481,15 +484,16 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data   = (float*)g1->data;
                 ReduceParams* rp = (ReduceParams*)node->params;
 
                 /* Global reduce (no dims specified) — broadcast scalar grad */
                 if (!rp || rp->num_dims == 0) {
                     float scale = (node->type == UOP_MEAN && in1->numel > 0)
-                                  ? 1.0f / (float)in1->numel : 1.0f;
-                    float val = out_grad[0] * scale;
-                    size_t i = 0;
+                                      ? 1.0f / (float)in1->numel
+                                      : 1.0f;
+                    float val   = out_grad[0] * scale;
+                    size_t i    = 0;
 #ifdef __AVX__
                     __m256 vval = _mm256_set1_ps(val);
                     for (; i + 8 <= in1->numel; i += 8) {
@@ -512,13 +516,16 @@ static int cpu_backward_node(struct IRNode* node) {
                     /* Handle first reduce dim — general single-dim path works for the
                      * common case; multi-dim reduce falls back to modulo broadcast. */
                     int rd = rp->dims[0];
-                    if (rd < 0) rd += ndim;
+                    if (rd < 0)
+                        rd += ndim;
 
                     size_t outer = 1;
-                    for (int d = 0; d < rd; d++) outer *= (size_t)in1->shape[d];
+                    for (int d = 0; d < rd; d++)
+                        outer *= (size_t)in1->shape[d];
                     size_t reduce_size = (size_t)in1->shape[rd];
-                    size_t inner = 1;
-                    for (int d = rd + 1; d < ndim; d++) inner *= (size_t)in1->shape[d];
+                    size_t inner       = 1;
+                    for (int d = rd + 1; d < ndim; d++)
+                        inner *= (size_t)in1->shape[d];
 
                     float scale = (node->type == UOP_MEAN) ? 1.0f / (float)reduce_size : 1.0f;
 
@@ -603,7 +610,7 @@ static int cpu_backward_node(struct IRNode* node) {
         size_t batch = in1->numel / ((size_t)M * K);
 
         CMLBlasContext* blas = get_blas_context();
-        int M_flat = (int)(batch * (size_t)M);
+        int M_flat           = (int)(batch * (size_t)M);
 
         if (in1->requires_grad && in2->data) {
             Tensor* g1 = ensure_grad(in1);
@@ -612,8 +619,8 @@ static int cpu_backward_node(struct IRNode* node) {
                 float* in2_data = (float*)in2->data;
                 if (blas && blas->initialized) {
                     /* g1[M_flat, K] = out_grad[M_flat, N] @ in2[K, N]^T */
-                    cml_blas_sgemm_ex(blas, out_grad, in2_data, g1_data,
-                                      M_flat, K, N, 1.0f, 1.0f, false, true);
+                    cml_blas_sgemm_ex(blas, out_grad, in2_data, g1_data, M_flat, K, N, 1.0f, 1.0f,
+                                      false, true);
                 } else {
                     for (int m = 0; m < M_flat; m++)
                         for (int k = 0; k < K; k++) {
@@ -633,8 +640,8 @@ static int cpu_backward_node(struct IRNode* node) {
                 float* in1_data = (float*)in1->data;
                 if (blas && blas->initialized) {
                     /* g2[K, N] += in1[M_flat, K]^T @ out_grad[M_flat, N] */
-                    cml_blas_sgemm_ex(blas, in1_data, out_grad, g2_data,
-                                      K, N, M_flat, 1.0f, 1.0f, true, false);
+                    cml_blas_sgemm_ex(blas, in1_data, out_grad, g2_data, K, N, M_flat, 1.0f, 1.0f,
+                                      true, false);
                 } else {
                     for (int k = 0; k < K; k++)
                         for (int n = 0; n < N; n++) {
@@ -706,9 +713,9 @@ static int cpu_backward_node(struct IRNode* node) {
 
         /* input: [..., M, K],  weight: [N, K],  out: [..., M, N]
          * Flatten all leading batch dims: M_flat = numel/K */
-        int K = in1->shape[in1->ndim - 1];
-        int N = in2->shape[0];
-        int M_flat = (int)(in1->numel / (size_t)K);  /* batch * M */
+        int K      = in1->shape[in1->ndim - 1];
+        int N      = in2->shape[0];
+        int M_flat = (int)(in1->numel / (size_t)K); /* batch * M */
 
         CMLBlasContext* blas = get_blas_context();
 
@@ -719,8 +726,7 @@ static int cpu_backward_node(struct IRNode* node) {
                 float* w_data  = (float*)in2->data;
                 /* g1[M_flat, K] = out_grad[M_flat, N] @ weight[N, K] */
                 if (blas && blas->initialized) {
-                    cml_blas_sgemm(blas, out_grad, w_data, g1_data,
-                                   M_flat, K, N, 1.0f, 1.0f);
+                    cml_blas_sgemm(blas, out_grad, w_data, g1_data, M_flat, K, N, 1.0f, 1.0f);
                 } else {
                     for (int m = 0; m < M_flat; m++)
                         for (int k = 0; k < K; k++) {
@@ -740,8 +746,8 @@ static int cpu_backward_node(struct IRNode* node) {
                 float* i_data  = (float*)in1->data;
                 /* g2[N, K] += out_grad[M_flat, N]^T @ input[M_flat, K] */
                 if (blas && blas->initialized) {
-                    cml_blas_sgemm_ex(blas, out_grad, i_data, g2_data,
-                                      N, K, M_flat, 1.0f, 1.0f, true, false);
+                    cml_blas_sgemm_ex(blas, out_grad, i_data, g2_data, N, K, M_flat, 1.0f, 1.0f,
+                                      true, false);
                 } else {
                     for (int n = 0; n < N; n++)
                         for (int k = 0; k < K; k++) {
@@ -783,7 +789,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data   = (float*)g1->data;
                 ShrinkParams* sp = (ShrinkParams*)node->params;
                 if (sp) {
                     if (in1->ndim == 1) {
@@ -792,8 +798,8 @@ static int cpu_backward_node(struct IRNode* node) {
                         for (int i = 0; i < len; i++)
                             g1_data[start + i] += out_grad[i];
                     } else if (in1->ndim == 2) {
-                        int in_cols  = in1->shape[1];
-                        int r_start  = sp->starts[0], c_start = sp->starts[1];
+                        int in_cols = in1->shape[1];
+                        int r_start = sp->starts[0], c_start = sp->starts[1];
                         int out_rows = sp->ends[0] - r_start;
                         int out_cols = sp->ends[1] - c_start;
                         for (int r = 0; r < out_rows; r++)
@@ -824,11 +830,14 @@ static int cpu_backward_node(struct IRNode* node) {
                             g1_data[j * N + i] += out_grad[i * M + j];
                 } else {
                     PermuteParams* pp = (PermuteParams*)node->params;
-                    int nd = in1->ndim;
+                    int nd            = in1->ndim;
                     if (pp && pp->perm && nd <= 16) {
                         size_t in_strides[16];
                         size_t s = 1;
-                        for (int i = nd - 1; i >= 0; i--) { in_strides[i] = s; s *= (size_t)in1->shape[i]; }
+                        for (int i = nd - 1; i >= 0; i--) {
+                            in_strides[i] = s;
+                            s *= (size_t)in1->shape[i];
+                        }
                         int out_coord[16];
                         for (size_t o = 0; o < out_numel; o++) {
                             size_t rem = o;
@@ -859,10 +868,10 @@ static int cpu_backward_node(struct IRNode* node) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data && out->data) {
                 float* g1_data = (float*)g1->data;
-                int    ond     = out->ndim;
-                int    ind     = in1->ndim;
+                int ond        = out->ndim;
+                int ind        = in1->ndim;
                 if (ond <= 16 && ind <= 16 && ind <= ond && out->shape && in1->shape) {
-                    int    prepend = ond - ind;
+                    int prepend = ond - ind;
                     size_t in_str[16];
                     size_t acc = 1;
                     for (int d = ind - 1; d >= 0; d--) {
@@ -903,22 +912,22 @@ static int cpu_backward_node(struct IRNode* node) {
             break;
 
         Conv2DParams* cp = (Conv2DParams*)node->params;
-        int groups = (cp && cp->groups > 0) ? cp->groups : 1;
-        int pad_h  = (cp && cp->padding)  ? cp->padding[0]  : 0;
-        int pad_w  = (cp && cp->padding)  ? cp->padding[1]  : 0;
-        int str_h  = (cp && cp->stride)   ? cp->stride[0]   : 1;
-        int str_w  = (cp && cp->stride)   ? cp->stride[1]   : 1;
-        int dil_h  = (cp && cp->dilation) ? cp->dilation[0] : 1;
-        int dil_w  = (cp && cp->dilation) ? cp->dilation[1] : 1;
+        int groups       = (cp && cp->groups > 0) ? cp->groups : 1;
+        int pad_h        = (cp && cp->padding) ? cp->padding[0] : 0;
+        int pad_w        = (cp && cp->padding) ? cp->padding[1] : 0;
+        int str_h        = (cp && cp->stride) ? cp->stride[0] : 1;
+        int str_w        = (cp && cp->stride) ? cp->stride[1] : 1;
+        int dil_h        = (cp && cp->dilation) ? cp->dilation[0] : 1;
+        int dil_w        = (cp && cp->dilation) ? cp->dilation[1] : 1;
 
         int NB = in1->shape[0], C_in = in1->shape[1];
-        int H  = in1->shape[2], W    = in1->shape[3];
+        int H = in1->shape[2], W = in1->shape[3];
         int C_out = in2->shape[0];
         int kH = in2->shape[2], kW = in2->shape[3];
         int oH = out->shape[2], oW = out->shape[3];
 
-        int cig = C_in  / groups;   /* input  channels per group */
-        int cog = C_out / groups;   /* output channels per group */
+        int cig   = C_in / groups;  /* input  channels per group */
+        int cog   = C_out / groups; /* output channels per group */
         int col_h = cig * kH * kW;
         int col_w = oH * oW;
 
@@ -931,7 +940,7 @@ static int cpu_backward_node(struct IRNode* node) {
                 for (int n = 0; n < NB; n++) {
                     for (int c = 0; c < C_out; c++) {
                         const float* og = out_grad + ((size_t)n * C_out + c) * oH * oW;
-                        float s = 0.0f;
+                        float s         = 0.0f;
                         for (int j = 0; j < oH * oW; j++)
                             s += og[j];
                         gb_data[c] += s;
@@ -944,7 +953,8 @@ static int cpu_backward_node(struct IRNode* node) {
 
         if (blas && blas->initialized) {
             float* col_buf = (float*)cml_malloc((size_t)col_h * col_w * sizeof(float));
-            if (!col_buf) break;
+            if (!col_buf)
+                break;
 
             for (int g = 0; g < groups; g++) {
                 int ci_start = g * cig, co_start = g * cog;
@@ -958,22 +968,23 @@ static int cpu_backward_node(struct IRNode* node) {
                         /* Weight slice for group g: [cog, cig, kH, kW] starting at co_start */
                         const float* wg = w_data + (size_t)co_start * cig * kH * kW;
                         for (int n = 0; n < NB; n++) {
-                            const float* og_n = out_grad
-                                + ((size_t)n * C_out + co_start) * oH * oW;
+                            const float* og_n = out_grad + ((size_t)n * C_out + co_start) * oH * oW;
                             /* col[col_h, col_w] = wg^T[cog, col_h]^T @ og_n[cog, col_w] */
-                            cml_blas_sgemm_ex(blas, wg, og_n, col_buf,
-                                              col_h, col_w, cog, 1.0f, 0.0f, true, false);
+                            cml_blas_sgemm_ex(blas, wg, og_n, col_buf, col_h, col_w, cog, 1.0f,
+                                              0.0f, true, false);
                             /* col2im with stride/dilation/padding */
                             for (int ci = 0; ci < cig; ci++) {
                                 for (int kh = 0; kh < kH; kh++) {
                                     for (int kw = 0; kw < kW; kw++) {
-                                        int col_row = (ci * kH + kh) * kW + kw;
+                                        int col_row        = (ci * kH + kh) * kW + kw;
                                         const float* col_r = col_buf + (size_t)col_row * col_w;
                                         for (int oh = 0; oh < oH; oh++) {
                                             int ih = oh * str_h - pad_h + kh * dil_h;
-                                            if (ih < 0 || ih >= H) continue;
-                                            float* g1_row = g1_data
-                                                + ((size_t)(n * C_in + ci_start + ci) * H + ih) * W;
+                                            if (ih < 0 || ih >= H)
+                                                continue;
+                                            float* g1_row =
+                                                g1_data +
+                                                ((size_t)(n * C_in + ci_start + ci) * H + ih) * W;
                                             const float* cr = col_r + oh * oW;
                                             for (int ow = 0; ow < oW; ow++) {
                                                 int iw = ow * str_w - pad_w + kw * dil_w;
@@ -999,29 +1010,29 @@ static int cpu_backward_node(struct IRNode* node) {
                             /* im2col for group g's input channels, with stride/dilation/padding */
                             memset(col_buf, 0, (size_t)col_h * col_w * sizeof(float));
                             for (int ci = 0; ci < cig; ci++) {
-                                const float* in_ch = in_data
-                                    + ((size_t)n * C_in + ci_start + ci) * H * W;
+                                const float* in_ch =
+                                    in_data + ((size_t)n * C_in + ci_start + ci) * H * W;
                                 for (int kh = 0; kh < kH; kh++) {
                                     for (int kw = 0; kw < kW; kw++) {
-                                        int col_row = (ci * kH + kh) * kW + kw;
+                                        int col_row  = (ci * kH + kh) * kW + kw;
                                         float* col_r = col_buf + (size_t)col_row * col_w;
                                         for (int oh = 0; oh < oH; oh++) {
                                             int ih = oh * str_h - pad_h + kh * dil_h;
-                                            if (ih < 0 || ih >= H) continue;
+                                            if (ih < 0 || ih >= H)
+                                                continue;
                                             for (int ow = 0; ow < oW; ow++) {
                                                 int iw = ow * str_w - pad_w + kw * dil_w;
-                                                col_r[oh * oW + ow] = (iw >= 0 && iw < W)
-                                                    ? in_ch[ih * W + iw] : 0.f;
+                                                col_r[oh * oW + ow] =
+                                                    (iw >= 0 && iw < W) ? in_ch[ih * W + iw] : 0.f;
                                             }
                                         }
                                     }
                                 }
                             }
-                            const float* og_n = out_grad
-                                + ((size_t)n * C_out + co_start) * oH * oW;
+                            const float* og_n = out_grad + ((size_t)n * C_out + co_start) * oH * oW;
                             /* wg_grad[cog, col_h] += og_n[cog, col_w] @ col^T */
-                            cml_blas_sgemm_ex(blas, og_n, col_buf, wg_grad,
-                                              cog, col_h, col_w, 1.0f, 1.0f, false, true);
+                            cml_blas_sgemm_ex(blas, og_n, col_buf, wg_grad, cog, col_h, col_w, 1.0f,
+                                              1.0f, false, true);
                         }
                     }
                 }
@@ -1047,13 +1058,25 @@ static int cpu_backward_node(struct IRNode* node) {
                                                 for (int kw = 0; kw < kW; kw++) {
                                                     int oh = (h + pad_h - kh * dil_h);
                                                     int ow = (w_idx + pad_w - kw * dil_w);
-                                                    if (oh < 0 || oh % str_h || ow < 0 || ow % str_w) continue;
-                                                    oh /= str_h; ow /= str_w;
-                                                    if (oh >= oH || ow >= oW) continue;
-                                                    sum += out_grad[((n * C_out + co_start + co) * oH + oh) * oW + ow]
-                                                         * w_data[(((co_start + co) * cig + ci) * kH + kh) * kW + kw];
+                                                    if (oh < 0 || oh % str_h || ow < 0 ||
+                                                        ow % str_w)
+                                                        continue;
+                                                    oh /= str_h;
+                                                    ow /= str_w;
+                                                    if (oh >= oH || ow >= oW)
+                                                        continue;
+                                                    sum +=
+                                                        out_grad[((n * C_out + co_start + co) * oH +
+                                                                  oh) *
+                                                                     oW +
+                                                                 ow] *
+                                                        w_data[(((co_start + co) * cig + ci) * kH +
+                                                                kh) *
+                                                                   kW +
+                                                               kw];
                                                 }
-                                        g1_data[((n * C_in + ci_start + ci) * H + h) * W + w_idx] += sum;
+                                        g1_data[((n * C_in + ci_start + ci) * H + h) * W + w_idx] +=
+                                            sum;
                                     }
                     }
                 }
@@ -1075,11 +1098,20 @@ static int cpu_backward_node(struct IRNode* node) {
                                                 for (int ow = 0; ow < oW; ow++) {
                                                     int ih = oh * str_h - pad_h + kh * dil_h;
                                                     int iw = ow * str_w - pad_w + kw * dil_w;
-                                                    if (ih < 0 || ih >= H || iw < 0 || iw >= W) continue;
-                                                    sum += out_grad[((n * C_out + co_start + co) * oH + oh) * oW + ow]
-                                                         * in_data[((n * C_in + ci_start + ci) * H + ih) * W + iw];
+                                                    if (ih < 0 || ih >= H || iw < 0 || iw >= W)
+                                                        continue;
+                                                    sum +=
+                                                        out_grad[((n * C_out + co_start + co) * oH +
+                                                                  oh) *
+                                                                     oW +
+                                                                 ow] *
+                                                        in_data[((n * C_in + ci_start + ci) * H +
+                                                                 ih) *
+                                                                    W +
+                                                                iw];
                                                 }
-                                        g2_data[(((co_start + co) * cig + ci) * kH + kh) * kW + kw] += sum;
+                                        g2_data[(((co_start + co) * cig + ci) * kH + kh) * kW +
+                                                kw] += sum;
                                     }
                     }
                 }
@@ -1093,13 +1125,13 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data && out->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 float* out_data = (float*)out->data;
                 ClampParams* cp = (ClampParams*)node->params;
-                float alpha = cp ? cp->min_val : 1.0f;
+                float alpha     = cp ? cp->min_val : 1.0f;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
+                    float x    = in1_data[i % in1->numel];
                     float grad = (x > 0.0f) ? 1.0f : (out_data[i] + alpha);
                     g1_data[i % in1->numel] += out_grad[i] * grad;
                 }
@@ -1113,12 +1145,12 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
-                float* in1_data = (float*)in1->data;
+                float* g1_data         = (float*)g1->data;
+                float* in1_data        = (float*)in1->data;
                 const float selu_alpha = 1.6732632423543772f;
                 const float selu_scale = 1.0507009873554805f;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
+                    float x    = in1_data[i % in1->numel];
                     float grad = selu_scale * (x > 0.0f ? 1.0f : selu_alpha * expf(x));
                     g1_data[i % in1->numel] += out_grad[i] * grad;
                 }
@@ -1134,15 +1166,15 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
-                    float sp = fmaxf(x, 0.0f) + logf(1.0f + expf(-fabsf(x)));
-                    float tsp = tanhf(sp);
-                    float sig = 1.0f / (1.0f + expf(-x));
+                    float x     = in1_data[i % in1->numel];
+                    float sp    = fmaxf(x, 0.0f) + logf(1.0f + expf(-fabsf(x)));
+                    float tsp   = tanhf(sp);
+                    float sig   = 1.0f / (1.0f + expf(-x));
                     float sech2 = 1.0f - tsp * tsp;
-                    float grad = tsp + x * sech2 * sig;
+                    float grad  = tsp + x * sech2 * sig;
                     g1_data[i % in1->numel] += out_grad[i] * grad;
                 }
             }
@@ -1155,11 +1187,11 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
-                    float sig = 1.0f / (1.0f + expf(-x));
+                    float x    = in1_data[i % in1->numel];
+                    float sig  = 1.0f / (1.0f + expf(-x));
                     float grad = sig * (1.0f + x * (1.0f - sig));
                     g1_data[i % in1->numel] += out_grad[i] * grad;
                 }
@@ -1172,10 +1204,10 @@ static int cpu_backward_node(struct IRNode* node) {
         // d(leaky_relu)/dx = x > 0 ? 1 : slope
         if (in1 && in1->requires_grad && in1->data) {
             ClampParams* cp = (ClampParams*)node->params;
-            float slope = cp ? cp->min_val : 0.01f;
-            Tensor* g1 = ensure_grad(in1);
+            float slope     = cp ? cp->min_val : 0.01f;
+            Tensor* g1      = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float x = in1_data[i % in1->numel];
@@ -1191,14 +1223,17 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float x = in1_data[i % in1->numel];
                     float grad;
-                    if (x >= 3.0f) grad = 1.0f;
-                    else if (x <= -3.0f) grad = 0.0f;
-                    else grad = (2.0f * x + 3.0f) / 6.0f;
+                    if (x >= 3.0f)
+                        grad = 1.0f;
+                    else if (x <= -3.0f)
+                        grad = 0.0f;
+                    else
+                        grad = (2.0f * x + 3.0f) / 6.0f;
                     g1_data[i % in1->numel] += out_grad[i] * grad;
                 }
             }
@@ -1211,10 +1246,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
+                    float x   = in1_data[i % in1->numel];
                     float sig = 1.0f / (1.0f + expf(-x));
                     g1_data[i % in1->numel] += out_grad[i] * sig;
                 }
@@ -1228,27 +1263,27 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
-                size_t i = 0;
+                size_t i        = 0;
 #ifdef __AVX__
                 __m256 zero = _mm256_setzero_ps();
                 for (; i + 8 <= out_numel; i += 8) {
-                    __m256 x = _mm256_loadu_ps(in1_data + i);
-                    __m256 g = _mm256_loadu_ps(out_grad + i);
+                    __m256 x    = _mm256_loadu_ps(in1_data + i);
+                    __m256 g    = _mm256_loadu_ps(out_grad + i);
                     __m256 mask = _mm256_cmp_ps(x, zero, _CMP_GE_OQ);
-                    __m256 cur = _mm256_loadu_ps(g1_data + i);
-                    cur = _mm256_add_ps(cur, _mm256_and_ps(g, mask));
+                    __m256 cur  = _mm256_loadu_ps(g1_data + i);
+                    cur         = _mm256_add_ps(cur, _mm256_and_ps(g, mask));
                     _mm256_storeu_ps(g1_data + i, cur);
                 }
 #elif defined(__SSE__)
                 __m128 zero = _mm_setzero_ps();
                 for (; i + 4 <= out_numel; i += 4) {
-                    __m128 x = _mm_loadu_ps(in1_data + i);
-                    __m128 g = _mm_loadu_ps(out_grad + i);
+                    __m128 x    = _mm_loadu_ps(in1_data + i);
+                    __m128 g    = _mm_loadu_ps(out_grad + i);
                     __m128 mask = _mm_cmpge_ps(x, zero);
-                    __m128 cur = _mm_loadu_ps(g1_data + i);
-                    cur = _mm_add_ps(cur, _mm_and_ps(g, mask));
+                    __m128 cur  = _mm_loadu_ps(g1_data + i);
+                    cur         = _mm_add_ps(cur, _mm_and_ps(g, mask));
                     _mm_storeu_ps(g1_data + i, cur);
                 }
 #endif
@@ -1266,10 +1301,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
+                    float x    = in1_data[i % in1->numel];
                     float grad = (x > 0.0f && x < 6.0f) ? 1.0f : 0.0f;
                     g1_data[i % in1->numel] += out_grad[i] * grad;
                 }
@@ -1283,10 +1318,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
+                    float x    = in1_data[i % in1->numel];
                     float grad = (x > -3.0f && x < 3.0f) ? (1.0f / 6.0f) : 0.0f;
                     g1_data[i % in1->numel] += out_grad[i] * grad;
                 }
@@ -1300,10 +1335,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
+                    float x    = in1_data[i % in1->numel];
                     float grad = (x > -1.0f && x < 1.0f) ? 1.0f : 0.0f;
                     g1_data[i % in1->numel] += out_grad[i] * grad;
                 }
@@ -1317,12 +1352,12 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 ClampParams* cp = (ClampParams*)node->params;
-                float alpha = cp ? cp->min_val : 1.0f;
+                float alpha     = cp ? cp->min_val : 1.0f;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
+                    float x    = in1_data[i % in1->numel];
                     float grad = x > 0.0f ? 1.0f : expf(x / alpha);
                     g1_data[i % in1->numel] += out_grad[i] * grad;
                 }
@@ -1336,10 +1371,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
+                    float x   = in1_data[i % in1->numel];
                     float sig = 1.0f / (1.0f + expf(-x));
                     g1_data[i % in1->numel] += out_grad[i] * (1.0f - sig);
                 }
@@ -1354,11 +1389,11 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
-                    float sig = 1.0f / (1.0f + expf(-1.702f * x));
+                    float x    = in1_data[i % in1->numel];
+                    float sig  = 1.0f / (1.0f + expf(-1.702f * x));
                     float grad = sig + x * 1.702f * sig * (1.0f - sig);
                     g1_data[i % in1->numel] += out_grad[i] * grad;
                 }
@@ -1372,10 +1407,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1_data = (float*)g1->data;
+                float* g1_data  = (float*)g1->data;
                 float* in1_data = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
-                    float x = in1_data[i % in1->numel];
+                    float x     = in1_data[i % in1->numel];
                     float denom = 1.0f + fabsf(x);
                     g1_data[i % in1->numel] += out_grad[i] / (denom * denom);
                 }
@@ -1423,16 +1458,18 @@ static int cpu_backward_node(struct IRNode* node) {
         // Forward: out[i] = input[i, indices[i]]  (2D input, 1D indices, dim=1)
         // Backward: grad_input[i, indices[i]] += grad_output[i]
         if (node->num_inputs >= 2) {
-            Tensor* input_t = node->inputs[0];
+            Tensor* input_t   = node->inputs[0];
             Tensor* indices_t = node->inputs[1];
-            if (input_t && input_t->requires_grad && input_t->data && indices_t && indices_t->data) {
+            if (input_t && input_t->requires_grad && input_t->data && indices_t &&
+                indices_t->data) {
                 Tensor* g1 = ensure_grad(input_t);
                 if (g1 && g1->data) {
-                    float* g1_data = (float*)g1->data;
-                    float* idx_data = (float*)indices_t->data;
+                    float* g1_data       = (float*)g1->data;
+                    float* idx_data      = (float*)indices_t->data;
                     GatherParams* params = (GatherParams*)node->params;
-                    int dim = params ? params->dim : -1;
-                    if (dim < 0) dim = input_t->ndim + dim;
+                    int dim              = params ? params->dim : -1;
+                    if (dim < 0)
+                        dim = input_t->ndim + dim;
 
                     if (input_t->ndim == 2 && indices_t->ndim == 1 && dim == 1) {
                         size_t n_cols = (size_t)input_t->shape[1];
@@ -1458,11 +1495,12 @@ static int cpu_backward_node(struct IRNode* node) {
                         }
                     } else {
                         /* Generic N-dim gather backward: scatter grad_output into grad_input.
-                         * out[i0,..,i_{dim-1}, j, i_{dim+1},...] = input[i0,..., idx[i0,...,j,...], ...]
-                         * So grad_input[..., idx[i...], ...] += grad_out[i...] */
+                         * out[i0,..,i_{dim-1}, j, i_{dim+1},...] = input[i0,..., idx[i0,...,j,...],
+                         * ...] So grad_input[..., idx[i...], ...] += grad_out[i...] */
                         if (input_t->ndim >= 1 && indices_t->ndim >= 1) {
                             size_t idx_numel = indices_t->numel;
-                            if (dim < 0 || dim >= input_t->ndim) dim = input_t->ndim - 1;
+                            if (dim < 0 || dim >= input_t->ndim)
+                                dim = input_t->ndim - 1;
                             /* Compute strides for input and indices */
                             size_t in_stride_dim = 1;
                             for (int sd = dim + 1; sd < input_t->ndim; sd++)
@@ -1473,23 +1511,26 @@ static int cpu_backward_node(struct IRNode* node) {
                             size_t outer = 1;
                             for (int sd = 0; sd < dim && sd < indices_t->ndim; sd++)
                                 outer *= (size_t)indices_t->shape[sd];
-                            size_t inner = idx_stride_dim;
+                            size_t inner     = idx_stride_dim;
                             int idx_dim_size = (dim < indices_t->ndim) ? indices_t->shape[dim] : 1;
-                            size_t flat = 0;
+                            size_t flat      = 0;
                             for (size_t o = 0; o < outer; o++) {
                                 for (int dj = 0; dj < idx_dim_size; dj++) {
                                     for (size_t iv = 0; iv < inner; iv++, flat++) {
-                                        if (flat >= idx_numel) goto gather_ndim_done;
+                                        if (flat >= idx_numel)
+                                            goto gather_ndim_done;
                                         int idx_val = (int)idx_data[flat];
-                                        if (idx_val < 0 || idx_val >= input_t->shape[dim]) continue;
-                                        size_t in_flat = o * (size_t)input_t->shape[dim] * in_stride_dim
-                                                       + (size_t)idx_val * in_stride_dim + iv;
+                                        if (idx_val < 0 || idx_val >= input_t->shape[dim])
+                                            continue;
+                                        size_t in_flat =
+                                            o * (size_t)input_t->shape[dim] * in_stride_dim +
+                                            (size_t)idx_val * in_stride_dim + iv;
                                         if (in_flat < input_t->numel)
                                             g1_data[in_flat] += out_grad[flat];
                                     }
                                 }
                             }
-                            gather_ndim_done:;
+                        gather_ndim_done:;
                         }
                     }
                 }
@@ -1498,14 +1539,14 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── Unary math ops ─────────────────────────────────────── */
+        /* ── Unary math ops ─────────────────────────────────────── */
 
     case UOP_COS:
         // d(cos(x))/dx = -sin(x)
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++)
                     g1d[i % in1->numel] += out_grad[i] * (-sinf(x[i % in1->numel]));
             }
@@ -1517,7 +1558,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float c = cosf(x[i % in1->numel]);
                     g1d[i % in1->numel] += out_grad[i] / (c * c + 1e-12f);
@@ -1531,7 +1572,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float v = x[i % in1->numel];
                     g1d[i % in1->numel] += out_grad[i] * (v > 0.f ? 1.f : v < 0.f ? -1.f : 0.f);
@@ -1547,7 +1588,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float v = x[i % in1->numel];
                     g1d[i % in1->numel] += out_grad[i] * ((v > lo && v < hi) ? 1.f : 0.f);
@@ -1560,7 +1601,7 @@ static int cpu_backward_node(struct IRNode* node) {
     case UOP_MINIMUM:
         // min(a,b): grad to a where a<=b, grad to b where b<a
         if (in1 && in2 && in1->data && in2->data) {
-            float* d1 = (float*)in1->data, *d2 = (float*)in2->data;
+            float *d1 = (float*)in1->data, *d2 = (float*)in2->data;
             if (in1->requires_grad) {
                 Tensor* g1 = ensure_grad(in1);
                 if (g1 && g1->data) {
@@ -1587,7 +1628,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && out->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *od = (float*)out->data;
+                float *g1d = (float*)g1->data, *od = (float*)out->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float r = od[i];
                     g1d[i % in1->numel] += out_grad[i] * (-0.5f * r * r * r);
@@ -1601,7 +1642,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 const float ln2 = 0.6931471805599453f;
                 for (size_t i = 0; i < out_numel; i++)
                     g1d[i % in1->numel] += out_grad[i] / ((x[i % in1->numel] + 1e-8f) * ln2);
@@ -1614,7 +1655,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 const float ln10 = 2.302585092994046f;
                 for (size_t i = 0; i < out_numel; i++)
                     g1d[i % in1->numel] += out_grad[i] / ((x[i % in1->numel] + 1e-8f) * ln10);
@@ -1627,7 +1668,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && out->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *od = (float*)out->data;
+                float *g1d = (float*)g1->data, *od = (float*)out->data;
                 const float ln2 = 0.6931471805599453f;
                 for (size_t i = 0; i < out_numel; i++)
                     g1d[i % in1->numel] += out_grad[i] * od[i] * ln2;
@@ -1640,10 +1681,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float v = x[i % in1->numel];
-                    g1d[i % in1->numel] += out_grad[i] / sqrtf(fmaxf(1.f - v*v, 1e-12f));
+                    g1d[i % in1->numel] += out_grad[i] / sqrtf(fmaxf(1.f - v * v, 1e-12f));
                 }
             }
         }
@@ -1654,10 +1695,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float v = x[i % in1->numel];
-                    g1d[i % in1->numel] -= out_grad[i] / sqrtf(fmaxf(1.f - v*v, 1e-12f));
+                    g1d[i % in1->numel] -= out_grad[i] / sqrtf(fmaxf(1.f - v * v, 1e-12f));
                 }
             }
         }
@@ -1668,10 +1709,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float v = x[i % in1->numel];
-                    g1d[i % in1->numel] += out_grad[i] / (1.f + v*v);
+                    g1d[i % in1->numel] += out_grad[i] / (1.f + v * v);
                 }
             }
         }
@@ -1682,7 +1723,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++)
                     g1d[i % in1->numel] += out_grad[i] * coshf(x[i % in1->numel]);
             }
@@ -1694,7 +1735,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++)
                     g1d[i % in1->numel] += out_grad[i] * sinhf(x[i % in1->numel]);
             }
@@ -1706,10 +1747,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float v = x[i % in1->numel];
-                    g1d[i % in1->numel] += out_grad[i] / sqrtf(v*v + 1.f);
+                    g1d[i % in1->numel] += out_grad[i] / sqrtf(v * v + 1.f);
                 }
             }
         }
@@ -1720,10 +1761,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float v = x[i % in1->numel];
-                    g1d[i % in1->numel] += out_grad[i] / sqrtf(fmaxf(v*v - 1.f, 1e-12f));
+                    g1d[i % in1->numel] += out_grad[i] / sqrtf(fmaxf(v * v - 1.f, 1e-12f));
                 }
             }
         }
@@ -1734,10 +1775,10 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 for (size_t i = 0; i < out_numel; i++) {
                     float v = x[i % in1->numel];
-                    g1d[i % in1->numel] += out_grad[i] / fmaxf(1.f - v*v, 1e-12f);
+                    g1d[i % in1->numel] += out_grad[i] / fmaxf(1.f - v * v, 1e-12f);
                 }
             }
         }
@@ -1748,11 +1789,11 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 const float two_over_sqrtpi = 1.1283791670955126f;
                 for (size_t i = 0; i < out_numel; i++) {
                     float v = x[i % in1->numel];
-                    g1d[i % in1->numel] += out_grad[i] * two_over_sqrtpi * expf(-v*v);
+                    g1d[i % in1->numel] += out_grad[i] * two_over_sqrtpi * expf(-v * v);
                 }
             }
         }
@@ -1763,11 +1804,11 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 const float two_over_sqrtpi = 1.1283791670955126f;
                 for (size_t i = 0; i < out_numel; i++) {
                     float v = x[i % in1->numel];
-                    g1d[i % in1->numel] -= out_grad[i] * two_over_sqrtpi * expf(-v*v);
+                    g1d[i % in1->numel] -= out_grad[i] * two_over_sqrtpi * expf(-v * v);
                 }
             }
         }
@@ -1776,15 +1817,15 @@ static int cpu_backward_node(struct IRNode* node) {
     case UOP_LOGADDEXP:
         // d/da = exp(a)/(exp(a)+exp(b)), d/db = exp(b)/(exp(a)+exp(b))
         if (in1 && in2 && in1->data && in2->data) {
-            float* d1 = (float*)in1->data, *d2 = (float*)in2->data;
+            float *d1 = (float*)in1->data, *d2 = (float*)in2->data;
             if (in1->requires_grad) {
                 Tensor* g1 = ensure_grad(in1);
                 if (g1 && g1->data) {
                     float* g1d = (float*)g1->data;
                     for (size_t i = 0; i < out_numel; i++) {
-                        float a = d1[i%in1->numel], b = d2[i%in2->numel];
-                        float ea = expf(a - fmaxf(a,b)), eb = expf(b - fmaxf(a,b));
-                        g1d[i%in1->numel] += out_grad[i] * ea / (ea + eb + 1e-12f);
+                        float a = d1[i % in1->numel], b = d2[i % in2->numel];
+                        float ea = expf(a - fmaxf(a, b)), eb = expf(b - fmaxf(a, b));
+                        g1d[i % in1->numel] += out_grad[i] * ea / (ea + eb + 1e-12f);
                     }
                 }
             }
@@ -1793,16 +1834,16 @@ static int cpu_backward_node(struct IRNode* node) {
                 if (g2 && g2->data) {
                     float* g2d = (float*)g2->data;
                     for (size_t i = 0; i < out_numel; i++) {
-                        float a = d1[i%in1->numel], b = d2[i%in2->numel];
-                        float ea = expf(a - fmaxf(a,b)), eb = expf(b - fmaxf(a,b));
-                        g2d[i%in2->numel] += out_grad[i] * eb / (ea + eb + 1e-12f);
+                        float a = d1[i % in1->numel], b = d2[i % in2->numel];
+                        float ea = expf(a - fmaxf(a, b)), eb = expf(b - fmaxf(a, b));
+                        g2d[i % in2->numel] += out_grad[i] * eb / (ea + eb + 1e-12f);
                     }
                 }
             }
         }
         break;
 
-    /* ── View / shape ops (identity backward) ────────────────── */
+        /* ── View / shape ops (identity backward) ────────────────── */
 
     case UOP_RESHAPE:
     case UOP_FLATTEN:
@@ -1814,31 +1855,31 @@ static int cpu_backward_node(struct IRNode* node) {
         }
         break;
 
-    /* ── Slice: scatter gradient into the original region ────── */
+        /* ── Slice: scatter gradient into the original region ────── */
 
     case UOP_SLICE: {
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data;
+                float* g1d      = (float*)g1->data;
                 SliceParams* sp = (SliceParams*)node->params;
                 if (!sp || in1->ndim == 0) {
                     accumulate_grad(in1, out_grad, out_numel);
                 } else if (in1->ndim == 1) {
-                    int st = sp->start ? sp->start[0] : 0;
+                    int st   = sp->start ? sp->start[0] : 0;
                     int step = (sp->step && sp->step[0] != 0) ? sp->step[0] : 1;
                     for (size_t i = 0; i < out_numel; i++)
                         g1d[st + (int)i * step] += out_grad[i];
                 } else if (in1->ndim == 2) {
-                    int r0 = sp->start ? sp->start[0] : 0;
-                    int c0 = sp->start ? sp->start[1] : 0;
-                    int rs = (sp->step && sp->step[0]) ? sp->step[0] : 1;
-                    int cs = (sp->step && sp->step[1]) ? sp->step[1] : 1;
+                    int r0       = sp->start ? sp->start[0] : 0;
+                    int c0       = sp->start ? sp->start[1] : 0;
+                    int rs       = (sp->step && sp->step[0]) ? sp->step[0] : 1;
+                    int cs       = (sp->step && sp->step[1]) ? sp->step[1] : 1;
                     int out_cols = out->shape[1];
                     int in_cols  = in1->shape[1];
                     for (int r = 0; r < out->shape[0]; r++)
                         for (int c = 0; c < out_cols; c++)
-                            g1d[(r0 + r*rs) * in_cols + c0 + c*cs] +=
+                            g1d[(r0 + r * rs) * in_cols + c0 + c * cs] +=
                                 out_grad[r * out_cols + c];
                 } else {
                     accumulate_grad(in1, out_grad, out_numel);
@@ -1848,19 +1889,19 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── Pad (constant): crop the padded gradient back ─────── */
+        /* ── Pad (constant): crop the padded gradient back ─────── */
 
     case UOP_PAD: {
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data;
+                float* g1d    = (float*)g1->data;
                 PadParams* pp = (PadParams*)node->params;
                 if (!pp || pp->mode != PAD_CONSTANT) {
                     // Reflect / replicate: full accumulate as fallback
                     accumulate_grad(in1, out_grad, out_numel);
                 } else if (in1->ndim == 1) {
-                    int pb = pp->pad_widths[0];
+                    int pb  = pp->pad_widths[0];
                     int len = (int)in1->numel;
                     for (int i = 0; i < len; i++)
                         g1d[i] += out_grad[pb + i];
@@ -1870,8 +1911,7 @@ static int cpu_backward_node(struct IRNode* node) {
                     int out_c = out->shape[1];
                     for (int r = 0; r < in_r; r++)
                         for (int c = 0; c < in_c; c++)
-                            g1d[r * in_c + c] +=
-                                out_grad[(r + pr) * out_c + (c + pc)];
+                            g1d[r * in_c + c] += out_grad[(r + pr) * out_c + (c + pc)];
                 } else {
                     accumulate_grad(in1, out_grad, out_numel);
                 }
@@ -1880,11 +1920,11 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── Cat: split gradient along cat dim back to each input ── */
+        /* ── Cat: split gradient along cat dim back to each input ── */
 
     case UOP_CAT: {
         CatParams* cp = (CatParams*)node->params;
-        int cat_dim = cp ? cp->dim : 0;
+        int cat_dim   = cp ? cp->dim : 0;
 
         if (in1 && in1->ndim == 1) {
             // 1-D: simple offset split
@@ -1899,7 +1939,8 @@ static int cpu_backward_node(struct IRNode* node) {
                             gid[k] += out_grad[offset + k];
                     }
                 }
-                if (inp) offset += inp->numel;
+                if (inp)
+                    offset += inp->numel;
             }
         } else if (out->ndim == 2) {
             if (cat_dim == 0) {
@@ -1914,7 +1955,8 @@ static int cpu_backward_node(struct IRNode* node) {
                                 gid[k] += out_grad[offset + k];
                         }
                     }
-                    if (inp) offset += inp->numel;
+                    if (inp)
+                        offset += inp->numel;
                 }
             } else { // cat_dim == 1
                 int out_cols = out->shape[1], rows = out->shape[0];
@@ -1925,26 +1967,26 @@ static int cpu_backward_node(struct IRNode* node) {
                         Tensor* gi = ensure_grad(inp);
                         if (gi && gi->data) {
                             float* gid = (float*)gi->data;
-                            int tcols = inp->shape[1];
+                            int tcols  = inp->shape[1];
                             for (int r = 0; r < rows; r++)
                                 for (int c = 0; c < tcols; c++)
-                                    gid[r*tcols + c] +=
-                                        out_grad[r*out_cols + col_offset + c];
+                                    gid[r * tcols + c] += out_grad[r * out_cols + col_offset + c];
                         }
                     }
-                    if (inp && inp->ndim >= 2) col_offset += inp->shape[1];
+                    if (inp && inp->ndim >= 2)
+                        col_offset += inp->shape[1];
                 }
             }
         }
         break;
     }
 
-    /* ── Stack: un-stack gradient along stack dim ───────────── */
+        /* ── Stack: un-stack gradient along stack dim ───────────── */
 
     case UOP_STACK: {
         StackParams* sp = (StackParams*)node->params;
-        int stack_dim = sp ? sp->dim : 0;
-        int num_t = node->num_inputs;
+        int stack_dim   = sp ? sp->dim : 0;
+        int num_t       = node->num_inputs;
 
         if (stack_dim == 0) {
             size_t per = out_numel / (size_t)(num_t > 0 ? num_t : 1);
@@ -1977,22 +2019,23 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── TRIU / TRIL: apply same mask to gradient ─────────── */
+        /* ── TRIU / TRIL: apply same mask to gradient ─────────── */
 
     case UOP_TRIU: {
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data;
+                float* g1d    = (float*)g1->data;
                 TriParams* tp = (TriParams*)node->params;
-                int diag = tp ? tp->diagonal : 0;
-                int rows = in1->shape[in1->ndim-2], cols = in1->shape[in1->ndim-1];
+                int diag      = tp ? tp->diagonal : 0;
+                int rows = in1->shape[in1->ndim - 2], cols = in1->shape[in1->ndim - 1];
                 size_t batch = out_numel / (size_t)(rows * cols);
                 for (size_t b = 0; b < batch; b++)
                     for (int r = 0; r < rows; r++)
                         for (int c = 0; c < cols; c++) {
-                            size_t idx = b*(size_t)(rows*cols) + (size_t)(r*cols+c);
-                            if (c >= r + diag) g1d[idx] += out_grad[idx];
+                            size_t idx = b * (size_t)(rows * cols) + (size_t)(r * cols + c);
+                            if (c >= r + diag)
+                                g1d[idx] += out_grad[idx];
                         }
             }
         }
@@ -2003,32 +2046,33 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data;
+                float* g1d    = (float*)g1->data;
                 TriParams* tp = (TriParams*)node->params;
-                int diag = tp ? tp->diagonal : 0;
-                int rows = in1->shape[in1->ndim-2], cols = in1->shape[in1->ndim-1];
+                int diag      = tp ? tp->diagonal : 0;
+                int rows = in1->shape[in1->ndim - 2], cols = in1->shape[in1->ndim - 1];
                 size_t batch = out_numel / (size_t)(rows * cols);
                 for (size_t b = 0; b < batch; b++)
                     for (int r = 0; r < rows; r++)
                         for (int c = 0; c < cols; c++) {
-                            size_t idx = b*(size_t)(rows*cols) + (size_t)(r*cols+c);
-                            if (c <= r + diag) g1d[idx] += out_grad[idx];
+                            size_t idx = b * (size_t)(rows * cols) + (size_t)(r * cols + c);
+                            if (c <= r + diag)
+                                g1d[idx] += out_grad[idx];
                         }
             }
         }
         break;
     }
 
-    /* ── ROLL: reverse-roll the gradient ─────────────────── */
+        /* ── ROLL: reverse-roll the gradient ─────────────────── */
 
     case UOP_ROLL: {
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data;
+                float* g1d     = (float*)g1->data;
                 RollParams* rp = (RollParams*)node->params;
-                int shift = rp ? rp->shift : 0;
-                size_t n = in1->numel;
+                int shift      = rp ? rp->shift : 0;
+                size_t n       = in1->numel;
                 // Reverse roll: shift by -shift
                 int s = (int)((n + (size_t)((-shift) % (int)n)) % n);
                 for (size_t i = 0; i < out_numel; i++)
@@ -2038,14 +2082,14 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── TILE: sum tiled copies back ──────────────────────── */
+        /* ── TILE: sum tiled copies back ──────────────────────── */
 
     case UOP_TILE: {
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
                 float* g1d = (float*)g1->data;
-                size_t n = in1->numel;
+                size_t n   = in1->numel;
                 for (size_t i = 0; i < out_numel; i++)
                     g1d[i % n] += out_grad[i];
             }
@@ -2053,16 +2097,17 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── REPEAT_INTERLEAVE: sum repeated elements ─────────── */
+        /* ── REPEAT_INTERLEAVE: sum repeated elements ─────────── */
 
     case UOP_REPEAT_INTERLEAVE: {
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data;
+                float* g1d                 = (float*)g1->data;
                 RepeatInterleaveParams* rp = (RepeatInterleaveParams*)node->params;
-                int reps = rp ? rp->repeats : 1;
-                if (reps < 1) reps = 1;
+                int reps                   = rp ? rp->repeats : 1;
+                if (reps < 1)
+                    reps = 1;
                 for (size_t i = 0; i < out_numel; i++)
                     g1d[(i / (size_t)reps) % in1->numel] += out_grad[i];
             }
@@ -2070,25 +2115,28 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── CUMSUM: reverse cumsum of gradient ───────────────── */
+        /* ── CUMSUM: reverse cumsum of gradient ───────────────── */
 
     case UOP_CUMSUM: {
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data;
+                float* g1d       = (float*)g1->data;
                 CumsumParams* cp = (CumsumParams*)node->params;
-                int cdim = cp ? cp->dim : 0;
-                if (cdim < 0) cdim += in1->ndim;
+                int cdim         = cp ? cp->dim : 0;
+                if (cdim < 0)
+                    cdim += in1->ndim;
 
                 /* Reverse cumsum along cdim: g_in[i] = sum(g_out[i..end]) along that dim.
                  * Use outer × dim × inner layout for arbitrary ndim. */
-                int ndim = in1->ndim;
+                int ndim     = in1->ndim;
                 size_t outer = 1;
-                for (int d = 0; d < cdim; d++) outer *= (size_t)in1->shape[d];
+                for (int d = 0; d < cdim; d++)
+                    outer *= (size_t)in1->shape[d];
                 size_t dim_size = (size_t)in1->shape[cdim];
-                size_t inner = 1;
-                for (int d = cdim + 1; d < ndim; d++) inner *= (size_t)in1->shape[d];
+                size_t inner    = 1;
+                for (int d = cdim + 1; d < ndim; d++)
+                    inner *= (size_t)in1->shape[d];
 
                 for (size_t o = 0; o < outer; o++) {
                     for (size_t iv = 0; iv < inner; iv++) {
@@ -2105,38 +2153,46 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── MAX_REDUCE: gradient to argmax position ─────────── */
+        /* ── MAX_REDUCE: gradient to argmax position ─────────── */
 
     case UOP_MAX_REDUCE: {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 ReduceParams* rp = (ReduceParams*)node->params;
 
                 if (!rp || rp->num_dims == 0) {
                     /* Global max */
                     size_t am = 0;
                     for (size_t i = 1; i < in1->numel; i++)
-                        if (x[i] > x[am]) am = i;
+                        if (x[i] > x[am])
+                            am = i;
                     g1d[am] += out_grad[0];
                 } else {
                     /* Dim-specific: outer × reduce × inner layout */
-                    int rd = rp->dims[0]; if (rd < 0) rd += in1->ndim;
+                    int rd = rp->dims[0];
+                    if (rd < 0)
+                        rd += in1->ndim;
                     size_t outer = 1;
-                    for (int d = 0; d < rd; d++) outer *= (size_t)in1->shape[d];
+                    for (int d = 0; d < rd; d++)
+                        outer *= (size_t)in1->shape[d];
                     size_t reduce_size = (size_t)in1->shape[rd];
-                    size_t inner = 1;
-                    for (int d = rd + 1; d < in1->ndim; d++) inner *= (size_t)in1->shape[d];
+                    size_t inner       = 1;
+                    for (int d = rd + 1; d < in1->ndim; d++)
+                        inner *= (size_t)in1->shape[d];
 
                     for (size_t o = 0; o < outer; o++) {
                         for (size_t iv = 0; iv < inner; iv++) {
                             /* Find argmax along reduce dim */
-                            size_t am = 0;
+                            size_t am  = 0;
                             float best = x[o * reduce_size * inner + iv];
                             for (size_t r = 1; r < reduce_size; r++) {
                                 float v = x[(o * reduce_size + r) * inner + iv];
-                                if (v > best) { best = v; am = r; }
+                                if (v > best) {
+                                    best = v;
+                                    am   = r;
+                                }
                             }
                             size_t in_idx  = (o * reduce_size + am) * inner + iv;
                             size_t out_idx = o * inner + iv;
@@ -2149,35 +2205,43 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── MIN_REDUCE: gradient to argmin position ─────────── */
+        /* ── MIN_REDUCE: gradient to argmin position ─────────── */
 
     case UOP_MIN_REDUCE: {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 ReduceParams* rp = (ReduceParams*)node->params;
 
                 if (!rp || rp->num_dims == 0) {
                     size_t am = 0;
                     for (size_t i = 1; i < in1->numel; i++)
-                        if (x[i] < x[am]) am = i;
+                        if (x[i] < x[am])
+                            am = i;
                     g1d[am] += out_grad[0];
                 } else {
-                    int rd = rp->dims[0]; if (rd < 0) rd += in1->ndim;
+                    int rd = rp->dims[0];
+                    if (rd < 0)
+                        rd += in1->ndim;
                     size_t outer = 1;
-                    for (int d = 0; d < rd; d++) outer *= (size_t)in1->shape[d];
+                    for (int d = 0; d < rd; d++)
+                        outer *= (size_t)in1->shape[d];
                     size_t reduce_size = (size_t)in1->shape[rd];
-                    size_t inner = 1;
-                    for (int d = rd + 1; d < in1->ndim; d++) inner *= (size_t)in1->shape[d];
+                    size_t inner       = 1;
+                    for (int d = rd + 1; d < in1->ndim; d++)
+                        inner *= (size_t)in1->shape[d];
 
                     for (size_t o = 0; o < outer; o++) {
                         for (size_t iv = 0; iv < inner; iv++) {
-                            size_t am = 0;
+                            size_t am  = 0;
                             float best = x[o * reduce_size * inner + iv];
                             for (size_t r = 1; r < reduce_size; r++) {
                                 float v = x[(o * reduce_size + r) * inner + iv];
-                                if (v < best) { best = v; am = r; }
+                                if (v < best) {
+                                    best = v;
+                                    am   = r;
+                                }
                             }
                             size_t in_idx  = (o * reduce_size + am) * inner + iv;
                             size_t out_idx = o * inner + iv;
@@ -2190,18 +2254,21 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── LOGSUMEXP: gradient is softmax(x) ─────────────── */
+        /* ── LOGSUMEXP: gradient is softmax(x) ─────────────── */
 
     case UOP_LOGSUMEXP: {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 // Global logsumexp: softmax weights
                 float mx = x[0];
-                for (size_t i = 1; i < in1->numel; i++) if (x[i] > mx) mx = x[i];
+                for (size_t i = 1; i < in1->numel; i++)
+                    if (x[i] > mx)
+                        mx = x[i];
                 float sum_exp = 0.f;
-                for (size_t i = 0; i < in1->numel; i++) sum_exp += expf(x[i] - mx);
+                for (size_t i = 0; i < in1->numel; i++)
+                    sum_exp += expf(x[i] - mx);
                 for (size_t i = 0; i < in1->numel; i++)
                     g1d[i] += out_grad[0] * expf(x[i] - mx) / (sum_exp + 1e-12f);
             }
@@ -2209,39 +2276,42 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── PROD: product rule ─────────────────────────────── */
+        /* ── PROD: product rule ─────────────────────────────── */
 
     case UOP_PROD: {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 size_t n = in1->numel;
                 // Compute prefix and suffix products to avoid division by zero
                 float* prefix = (float*)cml_calloc(n + 1, sizeof(float));
                 float* suffix = (float*)cml_calloc(n + 1, sizeof(float));
                 if (prefix && suffix) {
                     prefix[0] = 1.f;
-                    for (size_t i = 0; i < n; i++) prefix[i+1] = prefix[i] * x[i];
-                    suffix[n] = 1.f;
-                    for (int i = (int)n - 1; i >= 0; i--) suffix[i] = suffix[i+1] * x[i];
                     for (size_t i = 0; i < n; i++)
-                        g1d[i] += out_grad[0] * prefix[i] * suffix[i+1];
+                        prefix[i + 1] = prefix[i] * x[i];
+                    suffix[n] = 1.f;
+                    for (int i = (int)n - 1; i >= 0; i--)
+                        suffix[i] = suffix[i + 1] * x[i];
+                    for (size_t i = 0; i < n; i++)
+                        g1d[i] += out_grad[0] * prefix[i] * suffix[i + 1];
                 }
-                cml_free(prefix); cml_free(suffix);
+                cml_free(prefix);
+                cml_free(suffix);
             }
         }
         break;
     }
 
-    /* ── TRACE: gradient is scalar * identity ─────────── */
+        /* ── TRACE: gradient is scalar * identity ─────────── */
 
     case UOP_TRACE: {
         if (in1 && in1->requires_grad && in1->ndim == 2) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
                 float* g1d = (float*)g1->data;
-                int n = in1->shape[0] < in1->shape[1] ? in1->shape[0] : in1->shape[1];
+                int n      = in1->shape[0] < in1->shape[1] ? in1->shape[0] : in1->shape[1];
                 for (int i = 0; i < n; i++)
                     g1d[i * in1->shape[1] + i] += out_grad[0];
             }
@@ -2249,15 +2319,15 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── DIAG: backward swaps 1D↔2D role ─────────────── */
+        /* ── DIAG: backward swaps 1D↔2D role ─────────────── */
 
     case UOP_DIAG: {
         if (in1 && in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data;
+                float* g1d     = (float*)g1->data;
                 DiagParams* dp = (DiagParams*)node->params;
-                int diag = dp ? dp->offset : 0;
+                int diag       = dp ? dp->offset : 0;
                 if (in1->ndim == 1) {
                     // Forward: 1D→2D. Backward: extract diagonal of out_grad.
                     int n = out->shape[0];
@@ -2282,16 +2352,17 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── VAR / STD: variance / std-dev backward ─────── */
+        /* ── VAR / STD: variance / std-dev backward ─────── */
 
     case UOP_VAR: {
         if (in1 && in1->requires_grad && in1->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
-                size_t n = in1->numel;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
+                size_t n   = in1->numel;
                 float mean = 0.f;
-                for (size_t i = 0; i < n; i++) mean += x[i];
+                for (size_t i = 0; i < n; i++)
+                    mean += x[i];
                 mean /= (float)n;
                 // biased: d var / dx_i = 2*(x_i - mean) / n
                 float scale = 2.f / (float)n;
@@ -2306,11 +2377,12 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1 && in1->requires_grad && in1->data && out->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data, *x = (float*)in1->data;
+                float *g1d = (float*)g1->data, *x = (float*)in1->data;
                 float std_val = ((float*)out->data)[0];
-                size_t n = in1->numel;
-                float mean = 0.f;
-                for (size_t i = 0; i < n; i++) mean += x[i];
+                size_t n      = in1->numel;
+                float mean    = 0.f;
+                for (size_t i = 0; i < n; i++)
+                    mean += x[i];
                 mean /= (float)n;
                 float denom = (float)n * fmaxf(std_val, 1e-8f);
                 for (size_t i = 0; i < n; i++)
@@ -2332,13 +2404,13 @@ static int cpu_backward_node(struct IRNode* node) {
         // Non-differentiable or complex-gradient ops - no gradient
         break;
 
-    /* ── AVGPOOL2D: distribute grad uniformly over window ───── */
+        /* ── AVGPOOL2D: distribute grad uniformly over window ───── */
 
     case UOP_AVGPOOL2D: {
         if (!in1 || !in1->requires_grad || !in1->data || !node->params)
             break;
         Pool2DParams* p = (Pool2DParams*)node->params;
-        Tensor* g1 = ensure_grad(in1);
+        Tensor* g1      = ensure_grad(in1);
         if (!g1 || !g1->data)
             break;
         float* g1d = (float*)g1->data;
@@ -2356,7 +2428,7 @@ static int cpu_backward_node(struct IRNode* node) {
             for (int c = 0; c < channels; c++) {
                 for (int oh = 0; oh < out_h; oh++) {
                     for (int ow2 = 0; ow2 < out_w; ow2++) {
-                        int count = 0;
+                        int count  = 0;
                         int hstart = oh * sh - ph;
                         int wstart = ow2 * sw - pw;
                         for (int fh = 0; fh < kh; fh++) {
@@ -2369,15 +2441,17 @@ static int cpu_backward_node(struct IRNode* node) {
                                     count++;
                             }
                         }
-                        if (count == 0) continue;
+                        if (count == 0)
+                            continue;
                         size_t out_idx = (((size_t)n * channels + c) * out_h + oh) * out_w + ow2;
-                        float go = out_grad[out_idx] / (float)count;
+                        float go       = out_grad[out_idx] / (float)count;
                         for (int fh = 0; fh < kh; fh++) {
                             int ih = hstart + fh * dh;
                             for (int fw = 0; fw < kw; fw++) {
                                 int iw2 = wstart + fw * dw;
                                 if (ih >= 0 && ih < in_h && iw2 >= 0 && iw2 < in_w)
-                                    g1d[(((size_t)n * channels + c) * in_h + ih) * in_w + iw2] += go;
+                                    g1d[(((size_t)n * channels + c) * in_h + ih) * in_w + iw2] +=
+                                        go;
                             }
                         }
                     }
@@ -2387,16 +2461,16 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── MAXPOOL2D: grad to argmax position (recompute from input) ── */
+        /* ── MAXPOOL2D: grad to argmax position (recompute from input) ── */
 
     case UOP_MAXPOOL2D: {
         if (!in1 || !in1->requires_grad || !in1->data || !node->params)
             break;
         Pool2DParams* p = (Pool2DParams*)node->params;
-        Tensor* g1 = ensure_grad(in1);
+        Tensor* g1      = ensure_grad(in1);
         if (!g1 || !g1->data)
             break;
-        float* g1d = (float*)g1->data;
+        float* g1d     = (float*)g1->data;
         float* in_data = (float*)in1->data;
         int batch = in1->shape[0], channels = in1->shape[1];
         int in_h = in1->shape[2], in_w = in1->shape[3];
@@ -2423,17 +2497,20 @@ static int cpu_backward_node(struct IRNode* node) {
                                 int iw2 = wstart + fw * dw;
                                 if (ih < 0 || ih >= in_h || iw2 < 0 || iw2 >= in_w)
                                     continue;
-                                float v = in_data[(((size_t)n * channels + c) * in_h + ih) * in_w + iw2];
+                                float v =
+                                    in_data[(((size_t)n * channels + c) * in_h + ih) * in_w + iw2];
                                 if (v > max_val) {
                                     max_val = v;
-                                    max_ih = ih;
-                                    max_iw = iw2;
+                                    max_ih  = ih;
+                                    max_iw  = iw2;
                                 }
                             }
                         }
                         if (max_ih >= 0 && max_iw >= 0) {
-                            size_t out_idx = (((size_t)n * channels + c) * out_h + oh) * out_w + ow2;
-                            g1d[(((size_t)n * channels + c) * in_h + max_ih) * in_w + max_iw] += out_grad[out_idx];
+                            size_t out_idx =
+                                (((size_t)n * channels + c) * out_h + oh) * out_w + ow2;
+                            g1d[(((size_t)n * channels + c) * in_h + max_ih) * in_w + max_iw] +=
+                                out_grad[out_idx];
                         }
                     }
                 }
@@ -2442,7 +2519,7 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── CONV3D: naive 3D convolution backward ────────────────── */
+        /* ── CONV3D: naive 3D convolution backward ────────────────── */
 
     case UOP_CONV3D: {
         if (!in1 || !in2 || !node->params)
@@ -2459,7 +2536,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data;
+                float* g1d    = (float*)g1->data;
                 float* w_data = (float*)in2->data;
                 for (int b = 0; b < batch; b++)
                     for (int ic = 0; ic < in_ch; ic++)
@@ -2470,26 +2547,46 @@ static int cpu_backward_node(struct IRNode* node) {
                                     for (int oc = 0; oc < out_ch; oc++)
                                         for (int fkd = 0; fkd < kd; fkd++) {
                                             int od2 = id2 - fkd * p->dilation[0] + p->padding[0];
-                                            if (od2 < 0 || od2 % p->stride[0] != 0) continue;
+                                            if (od2 < 0 || od2 % p->stride[0] != 0)
+                                                continue;
                                             od2 /= p->stride[0];
-                                            if (od2 >= out_d) continue;
+                                            if (od2 >= out_d)
+                                                continue;
                                             for (int fkh = 0; fkh < kh; fkh++) {
-                                                int oh2 = ih2 - fkh * p->dilation[1] + p->padding[1];
-                                                if (oh2 < 0 || oh2 % p->stride[1] != 0) continue;
+                                                int oh2 =
+                                                    ih2 - fkh * p->dilation[1] + p->padding[1];
+                                                if (oh2 < 0 || oh2 % p->stride[1] != 0)
+                                                    continue;
                                                 oh2 /= p->stride[1];
-                                                if (oh2 >= out_h) continue;
+                                                if (oh2 >= out_h)
+                                                    continue;
                                                 for (int fkw = 0; fkw < kw2; fkw++) {
-                                                    int ow3 = iw3 - fkw * p->dilation[2] + p->padding[2];
-                                                    if (ow3 < 0 || ow3 % p->stride[2] != 0) continue;
+                                                    int ow3 =
+                                                        iw3 - fkw * p->dilation[2] + p->padding[2];
+                                                    if (ow3 < 0 || ow3 % p->stride[2] != 0)
+                                                        continue;
                                                     ow3 /= p->stride[2];
-                                                    if (ow3 >= out_w) continue;
-                                                    size_t og_idx = ((((size_t)b * out_ch + oc) * out_d + od2) * out_h + oh2) * out_w + ow3;
-                                                    size_t w_idx  = ((((size_t)oc * in_ch + ic) * kd + fkd) * kh + fkh) * kw2 + fkw;
+                                                    if (ow3 >= out_w)
+                                                        continue;
+                                                    size_t og_idx =
+                                                        ((((size_t)b * out_ch + oc) * out_d + od2) *
+                                                             out_h +
+                                                         oh2) *
+                                                            out_w +
+                                                        ow3;
+                                                    size_t w_idx =
+                                                        ((((size_t)oc * in_ch + ic) * kd + fkd) *
+                                                             kh +
+                                                         fkh) *
+                                                            kw2 +
+                                                        fkw;
                                                     s += out_grad[og_idx] * w_data[w_idx];
                                                 }
                                             }
                                         }
-                                    g1d[((((size_t)b * in_ch + ic) * in_d + id2) * in_h + ih2) * in_w + iw3] += s;
+                                    g1d[((((size_t)b * in_ch + ic) * in_d + id2) * in_h + ih2) *
+                                            in_w +
+                                        iw3] += s;
                                 }
             }
         }
@@ -2497,7 +2594,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in2->requires_grad) {
             Tensor* g2 = ensure_grad(in2);
             if (g2 && g2->data) {
-                float* g2d = (float*)g2->data;
+                float* g2d     = (float*)g2->data;
                 float* in_data = (float*)in1->data;
                 for (int oc = 0; oc < out_ch; oc++)
                     for (int ic = 0; ic < in_ch; ic++)
@@ -2509,16 +2606,31 @@ static int cpu_backward_node(struct IRNode* node) {
                                         for (int od2 = 0; od2 < out_d; od2++)
                                             for (int oh2 = 0; oh2 < out_h; oh2++)
                                                 for (int ow3 = 0; ow3 < out_w; ow3++) {
-                                                    int id2 = od2 * p->stride[0] - p->padding[0] + fkd * p->dilation[0];
-                                                    int ih2 = oh2 * p->stride[1] - p->padding[1] + fkh * p->dilation[1];
-                                                    int iw3 = ow3 * p->stride[2] - p->padding[2] + fkw * p->dilation[2];
-                                                    if (id2 < 0 || id2 >= in_d || ih2 < 0 || ih2 >= in_h || iw3 < 0 || iw3 >= in_w)
+                                                    int id2 = od2 * p->stride[0] - p->padding[0] +
+                                                              fkd * p->dilation[0];
+                                                    int ih2 = oh2 * p->stride[1] - p->padding[1] +
+                                                              fkh * p->dilation[1];
+                                                    int iw3 = ow3 * p->stride[2] - p->padding[2] +
+                                                              fkw * p->dilation[2];
+                                                    if (id2 < 0 || id2 >= in_d || ih2 < 0 ||
+                                                        ih2 >= in_h || iw3 < 0 || iw3 >= in_w)
                                                         continue;
-                                                    size_t og_idx = ((((size_t)b * out_ch + oc) * out_d + od2) * out_h + oh2) * out_w + ow3;
-                                                    size_t in_idx = ((((size_t)b * in_ch + ic) * in_d + id2) * in_h + ih2) * in_w + iw3;
+                                                    size_t og_idx =
+                                                        ((((size_t)b * out_ch + oc) * out_d + od2) *
+                                                             out_h +
+                                                         oh2) *
+                                                            out_w +
+                                                        ow3;
+                                                    size_t in_idx =
+                                                        ((((size_t)b * in_ch + ic) * in_d + id2) *
+                                                             in_h +
+                                                         ih2) *
+                                                            in_w +
+                                                        iw3;
                                                     s += out_grad[og_idx] * in_data[in_idx];
                                                 }
-                                    g2d[((((size_t)oc * in_ch + ic) * kd + fkd) * kh + fkh) * kw2 + fkw] += s;
+                                    g2d[((((size_t)oc * in_ch + ic) * kd + fkd) * kh + fkh) * kw2 +
+                                        fkw] += s;
                                 }
             }
         }
@@ -2526,7 +2638,7 @@ static int cpu_backward_node(struct IRNode* node) {
         /* Bias grad: sum over batch, depth, height, width */
         if (node->num_inputs >= 3 && node->inputs[2] && node->inputs[2]->requires_grad) {
             Tensor* bias = node->inputs[2];
-            Tensor* gb = ensure_grad(bias);
+            Tensor* gb   = ensure_grad(bias);
             if (gb && gb->data) {
                 float* gbd = (float*)gb->data;
                 for (int oc = 0; oc < out_ch; oc++) {
@@ -2535,7 +2647,10 @@ static int cpu_backward_node(struct IRNode* node) {
                         for (int od2 = 0; od2 < out_d; od2++)
                             for (int oh2 = 0; oh2 < out_h; oh2++)
                                 for (int ow3 = 0; ow3 < out_w; ow3++)
-                                    s += out_grad[((((size_t)b * out_ch + oc) * out_d + od2) * out_h + oh2) * out_w + ow3];
+                                    s += out_grad
+                                        [((((size_t)b * out_ch + oc) * out_d + od2) * out_h + oh2) *
+                                             out_w +
+                                         ow3];
                     gbd[oc] += s;
                 }
             }
@@ -2543,7 +2658,7 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── CONV_TRANSPOSE2D: backward is a regular convolution ─── */
+        /* ── CONV_TRANSPOSE2D: backward is a regular convolution ─── */
 
     case UOP_CONV_TRANSPOSE2D: {
         if (!in1 || !in2 || !node->params)
@@ -2557,11 +2672,12 @@ static int cpu_backward_node(struct IRNode* node) {
         int kh = in2->shape[2], kw = in2->shape[3];
         int out_h = out->shape[2], out_w = out->shape[3];
 
-        /* grad_input[b, ic, ih, iw] = sum_{oc, kh, kw} out_grad[b, oc, ih*s-p+kh, iw*s-p+kw] * weight[ic, oc, kh, kw] */
+        /* grad_input[b, ic, ih, iw] = sum_{oc, kh, kw} out_grad[b, oc, ih*s-p+kh, iw*s-p+kw] *
+         * weight[ic, oc, kh, kw] */
         if (in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data;
+                float* g1d    = (float*)g1->data;
                 float* w_data = (float*)in2->data;
                 for (int b = 0; b < batch; b++)
                     for (int ic = 0; ic < in_ch; ic++)
@@ -2570,13 +2686,20 @@ static int cpu_backward_node(struct IRNode* node) {
                                 float s = 0.f;
                                 for (int oc = 0; oc < out_ch; oc++)
                                     for (int fkh = 0; fkh < kh; fkh++) {
-                                        int oh = ih * p->stride[0] - p->padding[0] + fkh * p->dilation[0];
-                                        if (oh < 0 || oh >= out_h) continue;
+                                        int oh = ih * p->stride[0] - p->padding[0] +
+                                                 fkh * p->dilation[0];
+                                        if (oh < 0 || oh >= out_h)
+                                            continue;
                                         for (int fkw = 0; fkw < kw; fkw++) {
-                                            int ow2 = iw2 * p->stride[1] - p->padding[1] + fkw * p->dilation[1];
-                                            if (ow2 < 0 || ow2 >= out_w) continue;
-                                            size_t og_idx = (((size_t)b * out_ch + oc) * out_h + oh) * out_w + ow2;
-                                            size_t w_idx  = (((size_t)ic * out_ch + oc) * kh + fkh) * kw + fkw;
+                                            int ow2 = iw2 * p->stride[1] - p->padding[1] +
+                                                      fkw * p->dilation[1];
+                                            if (ow2 < 0 || ow2 >= out_w)
+                                                continue;
+                                            size_t og_idx =
+                                                (((size_t)b * out_ch + oc) * out_h + oh) * out_w +
+                                                ow2;
+                                            size_t w_idx =
+                                                (((size_t)ic * out_ch + oc) * kh + fkh) * kw + fkw;
                                             s += out_grad[og_idx] * w_data[w_idx];
                                         }
                                     }
@@ -2585,11 +2708,12 @@ static int cpu_backward_node(struct IRNode* node) {
             }
         }
 
-        /* grad_weight[ic, oc, kh, kw] = sum_{b, ih, iw} input[b, ic, ih, iw] * out_grad[b, oc, ih*s-p+kh, iw*s-p+kw] */
+        /* grad_weight[ic, oc, kh, kw] = sum_{b, ih, iw} input[b, ic, ih, iw] * out_grad[b, oc,
+         * ih*s-p+kh, iw*s-p+kw] */
         if (in2->requires_grad) {
             Tensor* g2 = ensure_grad(in2);
             if (g2 && g2->data) {
-                float* g2d = (float*)g2->data;
+                float* g2d     = (float*)g2->data;
                 float* in_data = (float*)in1->data;
                 for (int ic = 0; ic < in_ch; ic++)
                     for (int oc = 0; oc < out_ch; oc++)
@@ -2598,13 +2722,20 @@ static int cpu_backward_node(struct IRNode* node) {
                                 float s = 0.f;
                                 for (int b = 0; b < batch; b++)
                                     for (int ih = 0; ih < in_h; ih++) {
-                                        int oh = ih * p->stride[0] - p->padding[0] + fkh * p->dilation[0];
-                                        if (oh < 0 || oh >= out_h) continue;
+                                        int oh = ih * p->stride[0] - p->padding[0] +
+                                                 fkh * p->dilation[0];
+                                        if (oh < 0 || oh >= out_h)
+                                            continue;
                                         for (int iw2 = 0; iw2 < in_w; iw2++) {
-                                            int ow2 = iw2 * p->stride[1] - p->padding[1] + fkw * p->dilation[1];
-                                            if (ow2 < 0 || ow2 >= out_w) continue;
-                                            size_t in_idx = (((size_t)b * in_ch + ic) * in_h + ih) * in_w + iw2;
-                                            size_t og_idx = (((size_t)b * out_ch + oc) * out_h + oh) * out_w + ow2;
+                                            int ow2 = iw2 * p->stride[1] - p->padding[1] +
+                                                      fkw * p->dilation[1];
+                                            if (ow2 < 0 || ow2 >= out_w)
+                                                continue;
+                                            size_t in_idx =
+                                                (((size_t)b * in_ch + ic) * in_h + ih) * in_w + iw2;
+                                            size_t og_idx =
+                                                (((size_t)b * out_ch + oc) * out_h + oh) * out_w +
+                                                ow2;
                                             s += in_data[in_idx] * out_grad[og_idx];
                                         }
                                     }
@@ -2615,7 +2746,7 @@ static int cpu_backward_node(struct IRNode* node) {
 
         if (node->num_inputs >= 3 && node->inputs[2] && node->inputs[2]->requires_grad) {
             Tensor* bias = node->inputs[2];
-            Tensor* gb = ensure_grad(bias);
+            Tensor* gb   = ensure_grad(bias);
             if (gb && gb->data) {
                 float* gbd = (float*)gb->data;
                 for (int oc = 0; oc < out_ch; oc++) {
@@ -2623,7 +2754,8 @@ static int cpu_backward_node(struct IRNode* node) {
                     for (int b = 0; b < batch; b++)
                         for (int oh = 0; oh < out_h; oh++)
                             for (int ow2 = 0; ow2 < out_w; ow2++)
-                                s += out_grad[(((size_t)b * out_ch + oc) * out_h + oh) * out_w + ow2];
+                                s += out_grad[(((size_t)b * out_ch + oc) * out_h + oh) * out_w +
+                                              ow2];
                     gbd[oc] += s;
                 }
             }
@@ -2631,7 +2763,7 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── CONV_TRANSPOSE3D: backward ─────────────────────────── */
+        /* ── CONV_TRANSPOSE3D: backward ─────────────────────────── */
 
     case UOP_CONV_TRANSPOSE3D: {
         if (!in1 || !in2 || !node->params)
@@ -2648,7 +2780,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in1->requires_grad) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
-                float* g1d = (float*)g1->data;
+                float* g1d    = (float*)g1->data;
                 float* w_data = (float*)in2->data;
                 for (int b = 0; b < batch; b++)
                     for (int ic = 0; ic < in_ch; ic++)
@@ -2658,21 +2790,39 @@ static int cpu_backward_node(struct IRNode* node) {
                                     float s = 0.f;
                                     for (int oc = 0; oc < out_ch; oc++)
                                         for (int fkd = 0; fkd < kd; fkd++) {
-                                            int od2 = id2 * p->stride[0] - p->padding[0] + fkd * p->dilation[0];
-                                            if (od2 < 0 || od2 >= out_d) continue;
+                                            int od2 = id2 * p->stride[0] - p->padding[0] +
+                                                      fkd * p->dilation[0];
+                                            if (od2 < 0 || od2 >= out_d)
+                                                continue;
                                             for (int fkh = 0; fkh < kh; fkh++) {
-                                                int oh2 = ih2 * p->stride[1] - p->padding[1] + fkh * p->dilation[1];
-                                                if (oh2 < 0 || oh2 >= out_h) continue;
+                                                int oh2 = ih2 * p->stride[1] - p->padding[1] +
+                                                          fkh * p->dilation[1];
+                                                if (oh2 < 0 || oh2 >= out_h)
+                                                    continue;
                                                 for (int fkw = 0; fkw < kw2; fkw++) {
-                                                    int ow3 = iw3 * p->stride[2] - p->padding[2] + fkw * p->dilation[2];
-                                                    if (ow3 < 0 || ow3 >= out_w) continue;
-                                                    size_t og_idx = ((((size_t)b * out_ch + oc) * out_d + od2) * out_h + oh2) * out_w + ow3;
-                                                    size_t w_idx  = ((((size_t)ic * out_ch + oc) * kd + fkd) * kh + fkh) * kw2 + fkw;
+                                                    int ow3 = iw3 * p->stride[2] - p->padding[2] +
+                                                              fkw * p->dilation[2];
+                                                    if (ow3 < 0 || ow3 >= out_w)
+                                                        continue;
+                                                    size_t og_idx =
+                                                        ((((size_t)b * out_ch + oc) * out_d + od2) *
+                                                             out_h +
+                                                         oh2) *
+                                                            out_w +
+                                                        ow3;
+                                                    size_t w_idx =
+                                                        ((((size_t)ic * out_ch + oc) * kd + fkd) *
+                                                             kh +
+                                                         fkh) *
+                                                            kw2 +
+                                                        fkw;
                                                     s += out_grad[og_idx] * w_data[w_idx];
                                                 }
                                             }
                                         }
-                                    g1d[((((size_t)b * in_ch + ic) * in_d + id2) * in_h + ih2) * in_w + iw3] += s;
+                                    g1d[((((size_t)b * in_ch + ic) * in_d + id2) * in_h + ih2) *
+                                            in_w +
+                                        iw3] += s;
                                 }
             }
         }
@@ -2680,7 +2830,7 @@ static int cpu_backward_node(struct IRNode* node) {
         if (in2->requires_grad) {
             Tensor* g2 = ensure_grad(in2);
             if (g2 && g2->data) {
-                float* g2d = (float*)g2->data;
+                float* g2d     = (float*)g2->data;
                 float* in_data = (float*)in1->data;
                 for (int ic = 0; ic < in_ch; ic++)
                     for (int oc = 0; oc < out_ch; oc++)
@@ -2690,30 +2840,47 @@ static int cpu_backward_node(struct IRNode* node) {
                                     float s = 0.f;
                                     for (int b = 0; b < batch; b++)
                                         for (int id2 = 0; id2 < in_d; id2++) {
-                                            int od2 = id2 * p->stride[0] - p->padding[0] + fkd * p->dilation[0];
-                                            if (od2 < 0 || od2 >= out_d) continue;
+                                            int od2 = id2 * p->stride[0] - p->padding[0] +
+                                                      fkd * p->dilation[0];
+                                            if (od2 < 0 || od2 >= out_d)
+                                                continue;
                                             for (int ih2 = 0; ih2 < in_h; ih2++) {
-                                                int oh2 = ih2 * p->stride[1] - p->padding[1] + fkh * p->dilation[1];
-                                                if (oh2 < 0 || oh2 >= out_h) continue;
+                                                int oh2 = ih2 * p->stride[1] - p->padding[1] +
+                                                          fkh * p->dilation[1];
+                                                if (oh2 < 0 || oh2 >= out_h)
+                                                    continue;
                                                 for (int iw3 = 0; iw3 < in_w; iw3++) {
-                                                    int ow3 = iw3 * p->stride[2] - p->padding[2] + fkw * p->dilation[2];
-                                                    if (ow3 < 0 || ow3 >= out_w) continue;
-                                                    size_t in_idx = ((((size_t)b * in_ch + ic) * in_d + id2) * in_h + ih2) * in_w + iw3;
-                                                    size_t og_idx = ((((size_t)b * out_ch + oc) * out_d + od2) * out_h + oh2) * out_w + ow3;
+                                                    int ow3 = iw3 * p->stride[2] - p->padding[2] +
+                                                              fkw * p->dilation[2];
+                                                    if (ow3 < 0 || ow3 >= out_w)
+                                                        continue;
+                                                    size_t in_idx =
+                                                        ((((size_t)b * in_ch + ic) * in_d + id2) *
+                                                             in_h +
+                                                         ih2) *
+                                                            in_w +
+                                                        iw3;
+                                                    size_t og_idx =
+                                                        ((((size_t)b * out_ch + oc) * out_d + od2) *
+                                                             out_h +
+                                                         oh2) *
+                                                            out_w +
+                                                        ow3;
                                                     s += in_data[in_idx] * out_grad[og_idx];
                                                 }
                                             }
                                         }
-                                    g2d[((((size_t)ic * out_ch + oc) * kd + fkd) * kh + fkh) * kw2 + fkw] += s;
+                                    g2d[((((size_t)ic * out_ch + oc) * kd + fkd) * kh + fkh) * kw2 +
+                                        fkw] += s;
                                 }
             }
         }
 
         if (node->num_inputs >= 3 && node->inputs[2] && node->inputs[2]->requires_grad) {
             Tensor* bias = node->inputs[2];
-            Tensor* gb = ensure_grad(bias);
+            Tensor* gb   = ensure_grad(bias);
             if (gb && gb->data) {
-                float* gbd = (float*)gb->data;
+                float* gbd  = (float*)gb->data;
                 int spatial = out_d * out_h * out_w;
                 for (int oc = 0; oc < out_ch; oc++) {
                     float s = 0.f;
@@ -2729,19 +2896,21 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── SCATTER: grad_src = gather(grad_out, idx); grad_input passes through ── */
+        /* ── SCATTER: grad_src = gather(grad_out, idx); grad_input passes through ── */
 
     case UOP_SCATTER: {
         /* Forward: out = input.copy(); out[dim, idx[i]] = src[i]
          * in[0]=input, in[1]=index, in[2]=src */
-        if (node->num_inputs < 3) break;
+        if (node->num_inputs < 3)
+            break;
         Tensor* input_t = node->inputs[0];
         Tensor* idx_t   = node->inputs[1];
         Tensor* src_t   = node->inputs[2];
-        if (!idx_t || !idx_t->data) break;
-        float* idx_data = (float*)idx_t->data;
+        if (!idx_t || !idx_t->data)
+            break;
+        float* idx_data   = (float*)idx_t->data;
         ScatterParams* sp = (ScatterParams*)node->params;
-        int sdim = sp ? sp->dim : 0;
+        int sdim          = sp ? sp->dim : 0;
 
         /* grad for src: grad_src[i] = grad_out at the position we wrote to */
         if (src_t && src_t->requires_grad) {
@@ -2800,20 +2969,20 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── UNFOLD: fold (transpose of unfold) — add overlapping windows ─── */
+        /* ── UNFOLD: fold (transpose of unfold) — add overlapping windows ─── */
 
     case UOP_UNFOLD: {
         if (!in1 || !in1->requires_grad || !node->params)
             break;
         UnfoldParams* up = (UnfoldParams*)node->params;
-        int ks = up->kernel_size;
-        int stride = up->stride;
-        Tensor* g1 = ensure_grad(in1);
+        int ks           = up->kernel_size;
+        int stride       = up->stride;
+        Tensor* g1       = ensure_grad(in1);
         if (!g1 || !g1->data)
             break;
-        float* g1d = (float*)g1->data;
-        int ndim_in = in1->ndim;
-        int last_dim = in1->shape[ndim_in - 1];
+        float* g1d      = (float*)g1->data;
+        int ndim_in     = in1->ndim;
+        int last_dim    = in1->shape[ndim_in - 1];
         int num_windows = (last_dim - ks) / stride + 1;
 
         if (ndim_in == 1) {
@@ -2825,7 +2994,8 @@ static int cpu_backward_node(struct IRNode* node) {
             for (int n = 0; n < N; n++)
                 for (int w = 0; w < num_windows; w++)
                     for (int k = 0; k < ks; k++)
-                        g1d[n * last_dim + w * stride + k] += out_grad[(n * num_windows + w) * ks + k];
+                        g1d[n * last_dim + w * stride + k] +=
+                            out_grad[(n * num_windows + w) * ks + k];
         } else {
             size_t batch_size = 1;
             for (int d = 0; d < ndim_in - 1; d++)
@@ -2833,12 +3003,13 @@ static int cpu_backward_node(struct IRNode* node) {
             for (size_t b = 0; b < batch_size; b++)
                 for (int w = 0; w < num_windows; w++)
                     for (int k = 0; k < ks; k++)
-                        g1d[b * (size_t)last_dim + w * stride + k] += out_grad[(b * (size_t)num_windows + w) * ks + k];
+                        g1d[b * (size_t)last_dim + w * stride + k] +=
+                            out_grad[(b * (size_t)num_windows + w) * ks + k];
         }
         break;
     }
 
-    /* ── CUMPROD: exclusive cumprod suffix sum trick ─────────── */
+        /* ── CUMPROD: exclusive cumprod suffix sum trick ─────────── */
 
     case UOP_CUMPROD: {
         if (!in1 || !in1->requires_grad || !in1->data || !out->data)
@@ -2846,12 +3017,13 @@ static int cpu_backward_node(struct IRNode* node) {
         Tensor* g1 = ensure_grad(in1);
         if (!g1 || !g1->data)
             break;
-        float* g1d = (float*)g1->data;
-        float* x = (float*)in1->data;
-        float* p_data = (float*)out->data; /* cumprod output */
+        float* g1d       = (float*)g1->data;
+        float* x         = (float*)in1->data;
+        float* p_data    = (float*)out->data; /* cumprod output */
         CumsumParams* cp = (CumsumParams*)node->params;
-        int dim = cp ? cp->dim : 0;
-        if (dim < 0) dim += in1->ndim;
+        int dim          = cp ? cp->dim : 0;
+        if (dim < 0)
+            dim += in1->ndim;
 
         if (in1->ndim == 1) {
             int n = (int)in1->numel;
@@ -2866,7 +3038,8 @@ static int cpu_backward_node(struct IRNode* node) {
                 } else {
                     /* Zero element: use prefix/suffix products to compute contribution */
                     float prefix = 1.f;
-                    for (int j = 0; j < k; j++) prefix *= x[j];
+                    for (int j = 0; j < k; j++)
+                        prefix *= x[j];
                     float suffix = 1.f;
                     for (int i = k; i < n; i++) {
                         g1d[k] += out_grad[i] * prefix * suffix;
@@ -2887,11 +3060,13 @@ static int cpu_backward_node(struct IRNode* node) {
                             g1d[r * cols + k] += sfx / xk;
                         } else {
                             float prefix = 1.f;
-                            for (int j = 0; j < k; j++) prefix *= x[r * cols + j];
+                            for (int j = 0; j < k; j++)
+                                prefix *= x[r * cols + j];
                             float suffix = 1.f;
                             for (int i = k; i < cols; i++) {
                                 g1d[r * cols + k] += out_grad[r * cols + i] * prefix * suffix;
-                                if (i + 1 < cols) suffix *= x[r * cols + i + 1];
+                                if (i + 1 < cols)
+                                    suffix *= x[r * cols + i + 1];
                             }
                         }
                     }
@@ -2907,11 +3082,13 @@ static int cpu_backward_node(struct IRNode* node) {
                             g1d[k * cols + c] += sfx / xk;
                         } else {
                             float prefix = 1.f;
-                            for (int j = 0; j < k; j++) prefix *= x[j * cols + c];
+                            for (int j = 0; j < k; j++)
+                                prefix *= x[j * cols + c];
                             float suffix = 1.f;
                             for (int i = k; i < rows; i++) {
                                 g1d[k * cols + c] += out_grad[i * cols + c] * prefix * suffix;
-                                if (i + 1 < rows) suffix *= x[(i + 1) * cols + c];
+                                if (i + 1 < rows)
+                                    suffix *= x[(i + 1) * cols + c];
                             }
                         }
                     }
@@ -2932,11 +3109,11 @@ static int cpu_backward_node(struct IRNode* node) {
         Tensor* g1 = ensure_grad(in1);
         if (!g1 || !g1->data)
             break;
-        float* g1d = (float*)g1->data;
-        float* x = (float*)in1->data;
-        float* cm = (float*)out->data;
+        float* g1d       = (float*)g1->data;
+        float* x         = (float*)in1->data;
+        float* cm        = (float*)out->data;
         CumsumParams* cp = (CumsumParams*)node->params;
-        int cdim = cp ? cp->dim : 0;
+        int cdim         = cp ? cp->dim : 0;
 
         if (in1->ndim == 1) {
             int n = (int)in1->numel;
@@ -2944,7 +3121,10 @@ static int cpu_backward_node(struct IRNode* node) {
             for (int j = n - 1; j >= 0; j--) {
                 int src = 0;
                 for (int i = 0; i <= j; i++)
-                    if (x[i] == cm[j]) { src = i; break; }
+                    if (x[i] == cm[j]) {
+                        src = i;
+                        break;
+                    }
                 g1d[src] += out_grad[j];
             }
         } else if (in1->ndim == 2) {
@@ -2954,7 +3134,10 @@ static int cpu_backward_node(struct IRNode* node) {
                     for (int j = rows - 1; j >= 0; j--) {
                         int src = 0;
                         for (int i = 0; i <= j; i++)
-                            if (x[i * cols + c] == cm[j * cols + c]) { src = i; break; }
+                            if (x[i * cols + c] == cm[j * cols + c]) {
+                                src = i;
+                                break;
+                            }
                         g1d[src * cols + c] += out_grad[j * cols + c];
                     }
             } else {
@@ -2962,7 +3145,10 @@ static int cpu_backward_node(struct IRNode* node) {
                     for (int j = cols - 1; j >= 0; j--) {
                         int src = 0;
                         for (int i = 0; i <= j; i++)
-                            if (x[r * cols + i] == cm[r * cols + j]) { src = i; break; }
+                            if (x[r * cols + i] == cm[r * cols + j]) {
+                                src = i;
+                                break;
+                            }
                         g1d[r * cols + src] += out_grad[r * cols + j];
                     }
             }
@@ -2970,7 +3156,7 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-    /* ── LOGCUMSUMEXP: grad_x[k] = exp(x[k]) * suffix_sum(grad_out * exp(-out)) ── */
+        /* ── LOGCUMSUMEXP: grad_x[k] = exp(x[k]) * suffix_sum(grad_out * exp(-out)) ── */
 
     case UOP_LOGCUMSUMEXP: {
         if (!in1 || !in1->requires_grad || !in1->data || !out->data)
@@ -2978,11 +3164,11 @@ static int cpu_backward_node(struct IRNode* node) {
         Tensor* g1 = ensure_grad(in1);
         if (!g1 || !g1->data)
             break;
-        float* g1d = (float*)g1->data;
-        float* x = (float*)in1->data;
-        float* lse = (float*)out->data;
+        float* g1d       = (float*)g1->data;
+        float* x         = (float*)in1->data;
+        float* lse       = (float*)out->data;
         CumsumParams* cp = (CumsumParams*)node->params;
-        int dim = cp ? cp->dim : 0;
+        int dim          = cp ? cp->dim : 0;
 
         if (in1->ndim == 1) {
             int n = (int)in1->numel;
@@ -3032,8 +3218,12 @@ static int cpu_backward_node(struct IRNode* node) {
                 for (size_t i = 0; i < out_numel; i++) {
                     float xi = x[i % in1->numel];
                     float yi = y[i % in2->numel];
-                    float s  = (yi > 0.f ? 1.f : yi < 0.f ? -1.f : 0.f)
-                             * (xi > 0.f ? 1.f : xi < 0.f ? -1.f : 0.f);
+                    float s  = (yi > 0.f   ? 1.f
+                                : yi < 0.f ? -1.f
+                                           : 0.f) *
+                              (xi > 0.f   ? 1.f
+                               : xi < 0.f ? -1.f
+                                          : 0.f);
                     g1d[i % in1->numel] += out_grad[i] * s;
                 }
             }
@@ -3042,8 +3232,8 @@ static int cpu_backward_node(struct IRNode* node) {
 
     case UOP_MASKED_FILL: {
         /* out = mask ? value : in1  ->  d/in1 = grad where mask == 0 */
-        if (in1 && in1->requires_grad && in1->data && node->num_inputs > 1 &&
-            node->inputs[1] && node->inputs[1]->data) {
+        if (in1 && in1->requires_grad && in1->data && node->num_inputs > 1 && node->inputs[1] &&
+            node->inputs[1]->data) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
                 float* g1_data   = (float*)g1->data;
@@ -3060,23 +3250,26 @@ static int cpu_backward_node(struct IRNode* node) {
 
     case UOP_SCATTER_ADD: {
         /* adjoint of gather: dsrc[i] = grad[index[i]] (index gets no grad) */
-        if (node->num_inputs >= 2 && node->params && in2 && in2->requires_grad &&
-            in2->data && node->inputs[0] && node->inputs[0]->data) {
+        if (node->num_inputs >= 2 && node->params && in2 && in2->requires_grad && in2->data &&
+            node->inputs[0] && node->inputs[0]->data) {
             Tensor* g2 = ensure_grad(in2);
             if (g2 && g2->data) {
-                float* idx_data = (float*)node->inputs[0]->data;
+                float* idx_data      = (float*)node->inputs[0]->data;
                 ScatterAddParams* sp = (ScatterAddParams*)node->params;
-                int dim = sp->dim;
+                int dim              = sp->dim;
                 size_t outer = 1, inner = 1;
-                for (int d = 0; d < dim; d++) outer *= (size_t)in2->shape[d];
-                for (int d = dim + 1; d < in2->ndim; d++) inner *= (size_t)in2->shape[d];
+                for (int d = 0; d < dim; d++)
+                    outer *= (size_t)in2->shape[d];
+                for (int d = dim + 1; d < in2->ndim; d++)
+                    inner *= (size_t)in2->shape[d];
                 size_t src_dim = (size_t)in2->shape[dim];
                 size_t out_dim = (size_t)sp->dim_size;
                 float* g2_data = (float*)g2->data;
                 for (size_t o = 0; o < outer; o++)
                     for (size_t j = 0; j < src_dim; j++) {
                         int idx = (int)idx_data[dim == 0 ? j : (o * src_dim + j)];
-                        if (idx < 0 || idx >= (int)out_dim) continue;
+                        if (idx < 0 || idx >= (int)out_dim)
+                            continue;
                         for (size_t k = 0; k < inner; k++)
                             g2_data[(o * src_dim + j) * inner + k] +=
                                 out_grad[(o * out_dim + (size_t)idx) * inner + k];
@@ -3088,16 +3281,15 @@ static int cpu_backward_node(struct IRNode* node) {
 
     case UOP_IM2COL: {
         /* adjoint: col2im — scatter-add overlapping windows back to [N,C,H,W] */
-        if (in1 && in1->requires_grad && in1->data && node->params &&
-            in1->ndim == 4) {
+        if (in1 && in1->requires_grad && in1->data && node->params && in1->ndim == 4) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
                 Im2colParams* ip = (Im2colParams*)node->params;
                 int N = in1->shape[0], C = in1->shape[1];
                 int H = in1->shape[2], W = in1->shape[3];
-                int OH = (H + 2 * ip->ph - ip->dh * (ip->kh - 1) - 1) / ip->sh + 1;
-                int OW = (W + 2 * ip->pw - ip->dw * (ip->kw - 1) - 1) / ip->sw + 1;
-                size_t K = (size_t)C * ip->kh * ip->kw;
+                int OH         = (H + 2 * ip->ph - ip->dh * (ip->kh - 1) - 1) / ip->sh + 1;
+                int OW         = (W + 2 * ip->pw - ip->dw * (ip->kw - 1) - 1) / ip->sw + 1;
+                size_t K       = (size_t)C * ip->kh * ip->kw;
                 float* g1_data = (float*)g1->data;
                 memset(g1_data, 0, in1->numel * sizeof(float));
                 for (int n = 0; n < N; n++)
@@ -3108,10 +3300,12 @@ static int cpu_backward_node(struct IRNode* node) {
                                 size_t col = ((size_t)c * ip->kh + ki) * ip->kw + kj;
                                 for (int oh = 0; oh < OH; oh++) {
                                     int ih = oh * ip->sh + ki * ip->dh - ip->ph;
-                                    if (ih < 0 || ih >= H) continue;
+                                    if (ih < 0 || ih >= H)
+                                        continue;
                                     for (int ow = 0; ow < OW; ow++) {
                                         int iw = ow * ip->sw + kj * ip->dw - ip->pw;
-                                        if (iw < 0 || iw >= W) continue;
+                                        if (iw < 0 || iw >= W)
+                                            continue;
                                         size_t row = (size_t)(n * OH + oh) * OW + ow;
                                         och[(size_t)ih * W + iw] += out_grad[row * K + col];
                                     }
@@ -3130,10 +3324,10 @@ static int cpu_backward_node(struct IRNode* node) {
             if (g1 && g1->data) {
                 Col2imParams* cp = (Col2imParams*)node->params;
                 int C = cp->C, H = cp->H, W = cp->W;
-                int OH = (H + 2 * cp->ph - cp->dh * (cp->kh - 1) - 1) / cp->sh + 1;
-                int OW = (W + 2 * cp->pw - cp->dw * (cp->kw - 1) - 1) / cp->sw + 1;
-                size_t K = (size_t)C * cp->kh * cp->kw;
-                int N = (OH * OW > 0) ? (int)(in1->shape[0] / (OH * OW)) : 0;
+                int OH         = (H + 2 * cp->ph - cp->dh * (cp->kh - 1) - 1) / cp->sh + 1;
+                int OW         = (W + 2 * cp->pw - cp->dw * (cp->kw - 1) - 1) / cp->sw + 1;
+                size_t K       = (size_t)C * cp->kh * cp->kw;
+                int N          = (OH * OW > 0) ? (int)(in1->shape[0] / (OH * OW)) : 0;
                 float* g1_data = (float*)g1->data;
                 memset(g1_data, 0, in1->numel * sizeof(float));
                 for (int n = 0; n < N; n++)
@@ -3143,12 +3337,16 @@ static int cpu_backward_node(struct IRNode* node) {
                                 size_t col = ((size_t)c * cp->kh + ki) * cp->kw + kj;
                                 for (int oh = 0; oh < OH; oh++) {
                                     int ih = oh * cp->sh + ki * cp->dh - cp->ph;
-                                    if (ih < 0 || ih >= H) continue;
+                                    if (ih < 0 || ih >= H)
+                                        continue;
                                     for (int ow = 0; ow < OW; ow++) {
                                         int iw = ow * cp->sw + kj * cp->dw - cp->pw;
-                                        if (iw < 0 || iw >= W) continue;
+                                        if (iw < 0 || iw >= W)
+                                            continue;
                                         size_t row = (size_t)(n * OH + oh) * OW + ow;
-                                        g1_data[row * K + col] += out_grad[((size_t)n * C + c) * H * W + (size_t)ih * W + iw];
+                                        g1_data[row * K + col] +=
+                                            out_grad[((size_t)n * C + c) * H * W + (size_t)ih * W +
+                                                     iw];
                                     }
                                 }
                             }
@@ -3163,24 +3361,21 @@ static int cpu_backward_node(struct IRNode* node) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
                 FoldParams* fp = (FoldParams*)node->params;
-                int ndim_in = in1->ndim;
-                size_t batch = 1;
+                int ndim_in    = in1->ndim;
+                size_t batch   = 1;
                 for (int d = 0; d < ndim_in - 2; d++)
                     batch *= (size_t)in1->shape[d];
-                int nw = fp->output_len > 0
-                             ? (in1->shape[ndim_in - 2])
-                             : 0;
-                size_t L = in1->numel /
-                           ((size_t)(nw > 0 ? nw : 1) *
-                            (size_t)(fp->kernel_size > 0 ? fp->kernel_size : 1));
+                int nw         = fp->output_len > 0 ? (in1->shape[ndim_in - 2]) : 0;
+                size_t L       = in1->numel / ((size_t)(nw > 0 ? nw : 1) *
+                                         (size_t)(fp->kernel_size > 0 ? fp->kernel_size : 1));
                 float* g1_data = (float*)g1->data;
                 memset(g1_data, 0, in1->numel * sizeof(float));
                 for (size_t b = 0; b < batch; b++)
                     for (int w = 0; w < nw; w++)
                         for (int k = 0; k < fp->kernel_size; k++) {
                             size_t dst = b * L + (size_t)(w * fp->stride + k);
-                            size_t src = (b * (size_t)nw + (size_t)w) *
-                                             (size_t)fp->kernel_size + (size_t)k;
+                            size_t src =
+                                (b * (size_t)nw + (size_t)w) * (size_t)fp->kernel_size + (size_t)k;
                             if (dst < in1->numel)
                                 g1_data[dst] += out_grad[src];
                         }
@@ -3192,49 +3387,74 @@ static int cpu_backward_node(struct IRNode* node) {
     /* zero gradient: piecewise-constant and boolean-producing ops. The
      * derivative is 0 almost everywhere, so an explicit no-op is the correct
      * rule (matching what FLOOR/CEIL/ROUND already do above). */
-    case UOP_CEIL: case UOP_ROUND: case UOP_TRUNC:
-    case UOP_CMPEQ: case UOP_CMPGE: case UOP_CMPGT:
-    case UOP_CMPLE: case UOP_CMPNE:
-    case UOP_ISINF: case UOP_ISNAN: case UOP_ISFINITE:
-    case UOP_LOGICAL_AND: case UOP_LOGICAL_OR: case UOP_LOGICAL_NOT:
-    case UOP_ALL: case UOP_ANY:
+    case UOP_CEIL:
+    case UOP_ROUND:
+    case UOP_TRUNC:
+    case UOP_CMPEQ:
+    case UOP_CMPGE:
+    case UOP_CMPGT:
+    case UOP_CMPLE:
+    case UOP_CMPNE:
+    case UOP_ISINF:
+    case UOP_ISNAN:
+    case UOP_ISFINITE:
+    case UOP_LOGICAL_AND:
+    case UOP_LOGICAL_OR:
+    case UOP_LOGICAL_NOT:
+    case UOP_ALL:
+    case UOP_ANY:
         break;
 
     /* no gradient: constants / creation ops */
-    case UOP_FILL: case UOP_CONST: case UOP_ALLOC: case UOP_EYE_OP:
-    case UOP_ARANGE_OP: case UOP_RAND_UNIFORM: case UOP_RAND_NORMAL:
-    case UOP_RAND_INT: case UOP_ONE_HOT:
+    case UOP_FILL:
+    case UOP_CONST:
+    case UOP_ALLOC:
+    case UOP_EYE_OP:
+    case UOP_ARANGE_OP:
+    case UOP_RAND_UNIFORM:
+    case UOP_RAND_NORMAL:
+    case UOP_RAND_INT:
+    case UOP_ONE_HOT:
         break;
 
     /* no gradient: discrete / index-producing ops */
-    case UOP_ARGMAX: case UOP_ARGMIN: case UOP_ARGSORT: case UOP_NONZERO:
+    case UOP_ARGMAX:
+    case UOP_ARGMIN:
+    case UOP_ARGSORT:
+    case UOP_NONZERO:
         break;
 
     /* no gradient: integer / bitwise ops */
-    case UOP_BITWISE_AND: case UOP_BITWISE_OR: case UOP_BITWISE_XOR:
-    case UOP_BITWISE_NOT: case UOP_LSHIFT: case UOP_RSHIFT:
+    case UOP_BITWISE_AND:
+    case UOP_BITWISE_OR:
+    case UOP_BITWISE_XOR:
+    case UOP_BITWISE_NOT:
+    case UOP_LSHIFT:
+    case UOP_RSHIFT:
         break;
 
     /* no gradient: in-place optimizer steps sit outside differentiation */
-    case UOP_SGD_STEP: case UOP_ADAM_STEP:
+    case UOP_SGD_STEP:
+    case UOP_ADAM_STEP:
         break;
 
     default:
         // Unsupported op - gradients not computed
-    {
-        static int strict = -1;
-        if (strict < 0) {
-            const char* s = getenv("CML_STRICT_GRAD");
-            strict = (s && s[0] == '1') ? 1 : 0;
+        {
+            static int strict = -1;
+            if (strict < 0) {
+                const char* s = getenv("CML_STRICT_GRAD");
+                strict        = (s && s[0] == '1') ? 1 : 0;
+            }
+            if (strict) {
+                LOG_ERROR("CPU backward: no gradient rule for op type %d "
+                          "(CML_STRICT_GRAD=1)",
+                          node->type);
+                return -1;
+            }
+            LOG_DEBUG("CPU backward: no gradient rule for op type %d", node->type);
         }
-        if (strict) {
-            LOG_ERROR("CPU backward: no gradient rule for op type %d "
-                      "(CML_STRICT_GRAD=1)", node->type);
-            return -1;
-        }
-        LOG_DEBUG("CPU backward: no gradient rule for op type %d", node->type);
-    }
-    break;
+        break;
     }
 
     return 0;
@@ -3256,8 +3476,8 @@ static int cpu_execute_backward(CMLGraph_t ir, struct IRNode* loss_node) {
 
     /* Use stack buffer for small graphs to avoid malloc/free overhead */
     struct IRNode* stack_buf[64];
-    struct IRNode** nodes = (node_count <= 64) ? stack_buf
-                                               : cml_malloc(node_count * sizeof(struct IRNode*));
+    struct IRNode** nodes =
+        (node_count <= 64) ? stack_buf : cml_malloc(node_count * sizeof(struct IRNode*));
     if (!nodes) {
         LOG_ERROR("Failed to allocate node array for backward pass");
         return -1;
@@ -3302,18 +3522,18 @@ static int cpu_execute_backward(CMLGraph_t ir, struct IRNode* loss_node) {
         map[slot].key = nodes[i];
         map[slot].idx = i;
     }
-#define BWD_IDX(p)                                                                          \
-    ({                                                                                      \
-        size_t _slot = ((uintptr_t)(p) >> 3) & (map_cap - 1);                               \
-        int _found   = -1;                                                                  \
-        while (map[_slot].key) {                                                            \
-            if (map[_slot].key == (p)) {                                                    \
-                _found = map[_slot].idx;                                                    \
-                break;                                                                      \
-            }                                                                               \
-            _slot = (_slot + 1) & (map_cap - 1);                                            \
-        }                                                                                   \
-        _found;                                                                             \
+#define BWD_IDX(p)                                                                                 \
+    ({                                                                                             \
+        size_t _slot = ((uintptr_t)(p) >> 3) & (map_cap - 1);                                      \
+        int _found   = -1;                                                                         \
+        while (map[_slot].key) {                                                                   \
+            if (map[_slot].key == (p)) {                                                           \
+                _found = map[_slot].idx;                                                           \
+                break;                                                                             \
+            }                                                                                      \
+            _slot = (_slot + 1) & (map_cap - 1);                                                   \
+        }                                                                                          \
+        _found;                                                                                    \
     })
 
     reach[node_count - 1] = 1; /* provisional: tail is a root */

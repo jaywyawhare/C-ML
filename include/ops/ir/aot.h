@@ -29,24 +29,24 @@ typedef enum {
     AOT_OPT_O1 = 1,
     AOT_OPT_O2 = 2,
     AOT_OPT_O3 = 3,
-    AOT_OPT_Os = 4  /* Optimize for size */
+    AOT_OPT_Os = 4 /* Optimize for size */
 } AOTOptLevel;
 
 typedef struct {
-    const char* target_triple;  /* e.g. "x86_64-unknown-linux-gnu" (NULL = host) */
-    const char* cpu;            /* e.g. "skylake" (NULL = generic) */
-    const char* features;       /* e.g. "+avx2,+fma" (NULL = default) */
+    const char* target_triple; /* e.g. "x86_64-unknown-linux-gnu" (NULL = host) */
+    const char* cpu;           /* e.g. "skylake" (NULL = generic) */
+    const char* features;      /* e.g. "+avx2,+fma" (NULL = default) */
     AOTOptLevel opt_level;
-    bool include_weights;       /* Bundle weights into the binary */
-    bool generate_header;       /* Generate companion .h file */
-    const char* function_name;  /* Entry point name (default: "cml_model_forward") */
+    bool include_weights;      /* Bundle weights into the binary */
+    bool generate_header;      /* Generate companion .h file */
+    const char* function_name; /* Entry point name (default: "cml_model_forward") */
     AOTOutputFormat format;
-    bool position_independent;  /* -fPIC (default: true for shared libs) */
+    bool position_independent; /* -fPIC (default: true for shared libs) */
 } AOTCompileOptions;
 
 typedef struct CMLAOTModel {
-    void* handle;               /* dlopen handle */
-    void* forward_fn;           /* Function pointer to forward pass */
+    void* handle;     /* dlopen handle */
+    void* forward_fn; /* Function pointer to forward pass */
     const char* path;
     int num_inputs;
     int num_outputs;
@@ -62,14 +62,14 @@ AOTCompileOptions cml_aot_default_options(void);
 int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOptions* options);
 
 /* Traces the module's forward pass with sample input to capture IR, then compiles. */
-int cml_aot_compile_module(struct Module* module, Tensor* sample_input,
-                           const char* output_path, const AOTCompileOptions* options);
+int cml_aot_compile_module(struct Module* module, Tensor* sample_input, const char* output_path,
+                           const AOTCompileOptions* options);
 
 /* Uses dlopen/dlsym. Zero compilation dependency at runtime. */
 CMLAOTModel* cml_aot_load(const char* path);
 
-int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs,
-                    Tensor** outputs, int num_outputs);
+int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs, Tensor** outputs,
+                    int num_outputs);
 void cml_aot_free(CMLAOTModel* model);
 int cml_aot_generate_header(CMLGraph_t ir, const char* header_path, const char* function_name);
 

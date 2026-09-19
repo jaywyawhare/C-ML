@@ -8,80 +8,149 @@
 
 bool cml_schedule_is_elementwise(UOpType type) {
     switch (type) {
-        
-        case UOP_ADD: case UOP_SUB: case UOP_MUL: case UOP_DIV:
-        case UOP_MAX: case UOP_CMPLT: case UOP_POW:
-        
-        case UOP_NEG: case UOP_EXP: case UOP_LOG: case UOP_SQRT:
-        case UOP_RECIP: case UOP_ABS: case UOP_SIN: case UOP_COS:
-        case UOP_TAN: case UOP_TANH: case UOP_SIGMOID:
-        
-        case UOP_SIGN: case UOP_FLOOR: case UOP_CEIL: case UOP_ROUND:
-        case UOP_LOG2: case UOP_EXP2: case UOP_ASIN: case UOP_ACOS:
-        case UOP_ATAN: case UOP_SQUARE: case UOP_RSQRT: case UOP_ERF:
-        case UOP_CLAMP:
-        
-        case UOP_LOG10: case UOP_SINH: case UOP_COSH:
-        case UOP_ASINH: case UOP_ACOSH: case UOP_ATANH:
-        case UOP_TRUNC: case UOP_ISINF: case UOP_ISNAN: case UOP_ISFINITE:
-        case UOP_LOGICAL_NOT: case UOP_ERFC:
-        
-        case UOP_IDIV: case UOP_MOD: case UOP_MINIMUM:
-        case UOP_COPYSIGN: case UOP_LOGADDEXP:
-        case UOP_LERP:
-        
-        case UOP_BITWISE_AND: case UOP_BITWISE_OR:
-        case UOP_BITWISE_XOR: case UOP_BITWISE_NOT:
-        case UOP_LSHIFT: case UOP_RSHIFT:
-        
-        case UOP_LOGICAL_AND: case UOP_LOGICAL_OR:
-        
-        case UOP_CMPEQ: case UOP_CMPNE: case UOP_CMPLE:
-        case UOP_CMPGT: case UOP_CMPGE:
-        
-        case UOP_WHERE: case UOP_FILL: case UOP_MASKED_FILL:
-        
-        case UOP_RELU6: case UOP_HARD_SIGMOID: case UOP_HARD_TANH:
-        case UOP_CELU: case UOP_QUICK_GELU: case UOP_SOFTPLUS:
-        case UOP_SOFTSIGN: case UOP_LOGSIGMOID:
-        case UOP_ELU: case UOP_SELU: case UOP_MISH:
-        case UOP_SILU: case UOP_HARDSWISH:
-            return true;
-        default:
-            return false;
+
+    case UOP_ADD:
+    case UOP_SUB:
+    case UOP_MUL:
+    case UOP_DIV:
+    case UOP_MAX:
+    case UOP_CMPLT:
+    case UOP_POW:
+
+    case UOP_NEG:
+    case UOP_EXP:
+    case UOP_LOG:
+    case UOP_SQRT:
+    case UOP_RECIP:
+    case UOP_ABS:
+    case UOP_SIN:
+    case UOP_COS:
+    case UOP_TAN:
+    case UOP_TANH:
+    case UOP_SIGMOID:
+
+    case UOP_SIGN:
+    case UOP_FLOOR:
+    case UOP_CEIL:
+    case UOP_ROUND:
+    case UOP_LOG2:
+    case UOP_EXP2:
+    case UOP_ASIN:
+    case UOP_ACOS:
+    case UOP_ATAN:
+    case UOP_SQUARE:
+    case UOP_RSQRT:
+    case UOP_ERF:
+    case UOP_CLAMP:
+
+    case UOP_LOG10:
+    case UOP_SINH:
+    case UOP_COSH:
+    case UOP_ASINH:
+    case UOP_ACOSH:
+    case UOP_ATANH:
+    case UOP_TRUNC:
+    case UOP_ISINF:
+    case UOP_ISNAN:
+    case UOP_ISFINITE:
+    case UOP_LOGICAL_NOT:
+    case UOP_ERFC:
+
+    case UOP_IDIV:
+    case UOP_MOD:
+    case UOP_MINIMUM:
+    case UOP_COPYSIGN:
+    case UOP_LOGADDEXP:
+    case UOP_LERP:
+
+    case UOP_BITWISE_AND:
+    case UOP_BITWISE_OR:
+    case UOP_BITWISE_XOR:
+    case UOP_BITWISE_NOT:
+    case UOP_LSHIFT:
+    case UOP_RSHIFT:
+
+    case UOP_LOGICAL_AND:
+    case UOP_LOGICAL_OR:
+
+    case UOP_CMPEQ:
+    case UOP_CMPNE:
+    case UOP_CMPLE:
+    case UOP_CMPGT:
+    case UOP_CMPGE:
+
+    case UOP_WHERE:
+    case UOP_FILL:
+    case UOP_MASKED_FILL:
+
+    case UOP_RELU6:
+    case UOP_HARD_SIGMOID:
+    case UOP_HARD_TANH:
+    case UOP_CELU:
+    case UOP_QUICK_GELU:
+    case UOP_SOFTPLUS:
+    case UOP_SOFTSIGN:
+    case UOP_LOGSIGMOID:
+    case UOP_ELU:
+    case UOP_SELU:
+    case UOP_MISH:
+    case UOP_SILU:
+    case UOP_HARDSWISH:
+        return true;
+    default:
+        return false;
     }
 }
 
 bool cml_schedule_is_reduction(UOpType type) {
     switch (type) {
-        case UOP_SUM: case UOP_MAX_REDUCE: case UOP_MEAN:
-        case UOP_PROD: case UOP_ARGMAX: case UOP_ARGMIN:
-        case UOP_MIN_REDUCE: case UOP_VAR: case UOP_STD:
-        case UOP_ANY: case UOP_ALL: case UOP_LOGSUMEXP:
-            return true;
-        default:
-            return false;
+    case UOP_SUM:
+    case UOP_MAX_REDUCE:
+    case UOP_MEAN:
+    case UOP_PROD:
+    case UOP_ARGMAX:
+    case UOP_ARGMIN:
+    case UOP_MIN_REDUCE:
+    case UOP_VAR:
+    case UOP_STD:
+    case UOP_ANY:
+    case UOP_ALL:
+    case UOP_LOGSUMEXP:
+        return true;
+    default:
+        return false;
     }
 }
 
 bool cml_schedule_is_movement(UOpType type) {
     switch (type) {
-        case UOP_RESHAPE: case UOP_PERMUTE: case UOP_EXPAND:
-        case UOP_STRIDE: case UOP_SLICE: case UOP_FLATTEN:
-        case UOP_UNFLATTEN: case UOP_SHRINK:
-        case UOP_CAT: case UOP_STACK:
-            return true;
-        default:
-            return false;
+    case UOP_RESHAPE:
+    case UOP_PERMUTE:
+    case UOP_EXPAND:
+    case UOP_STRIDE:
+    case UOP_SLICE:
+    case UOP_FLATTEN:
+    case UOP_UNFLATTEN:
+    case UOP_SHRINK:
+    case UOP_CAT:
+    case UOP_STACK:
+        return true;
+    default:
+        return false;
     }
 }
 
 static CMLScheduleItemType classify_op(UOpType type) {
-    if (type == UOP_MATMUL)  return SCHED_MATMUL;
-    if (type == UOP_CONV2D)  return SCHED_CONV;
-    if (cml_schedule_is_elementwise(type)) return SCHED_ELEMENTWISE;
-    if (cml_schedule_is_reduction(type))   return SCHED_REDUCE;
-    if (cml_schedule_is_movement(type))    return SCHED_MOVEMENT;
+    if (type == UOP_MATMUL)
+        return SCHED_MATMUL;
+    if (type == UOP_CONV2D)
+        return SCHED_CONV;
+    if (cml_schedule_is_elementwise(type))
+        return SCHED_ELEMENTWISE;
+    if (cml_schedule_is_reduction(type))
+        return SCHED_REDUCE;
+    if (cml_schedule_is_movement(type))
+        return SCHED_MOVEMENT;
     return SCHED_CUSTOM;
 }
 
@@ -89,44 +158,47 @@ bool cml_schedule_can_fuse(UOpType a, UOpType b) {
     CMLScheduleItemType ta = classify_op(a);
     CMLScheduleItemType tb = classify_op(b);
 
-    
-    if (ta == SCHED_MOVEMENT || tb == SCHED_MOVEMENT) return true;
+    if (ta == SCHED_MOVEMENT || tb == SCHED_MOVEMENT)
+        return true;
 
-    
-    if (ta == SCHED_ELEMENTWISE && tb == SCHED_ELEMENTWISE) return true;
+    if (ta == SCHED_ELEMENTWISE && tb == SCHED_ELEMENTWISE)
+        return true;
 
-    
-    if (ta == SCHED_ELEMENTWISE && tb == SCHED_REDUCE) return true;
+    if (ta == SCHED_ELEMENTWISE && tb == SCHED_REDUCE)
+        return true;
 
-    
     if ((ta == SCHED_MATMUL || ta == SCHED_CONV) && tb == SCHED_ELEMENTWISE)
         return true;
 
-    
-    if (ta == SCHED_REDUCE) return false;
+    if (ta == SCHED_REDUCE)
+        return false;
 
     return false;
 }
 
 CMLScheduleOptions cml_schedule_default_options(void) {
     CMLScheduleOptions opts;
-    opts.enable_fusion       = true;
-    opts.enable_movement_fold = true;
-    opts.max_fused_ops       = CML_SCHEDULE_MAX_FUSED_OPS;
-    opts.estimate_costs      = true;
-    opts.topological_sort    = true;
+    opts.enable_fusion            = true;
+    opts.enable_movement_fold     = true;
+    opts.max_fused_ops            = CML_SCHEDULE_MAX_FUSED_OPS;
+    opts.estimate_costs           = true;
+    opts.topological_sort         = true;
     opts.allow_reduce_elem_fusion = true;
-    opts.schedule_order      = CML_SCHEDULE_ORDER_TOPO;
+    opts.schedule_order           = CML_SCHEDULE_ORDER_TOPO;
     return opts;
 }
 
 static CMLScheduleItem* sched_item_create(CMLScheduleItemType type) {
     CMLScheduleItem* item = cml_calloc(1, sizeof(CMLScheduleItem));
-    if (!item) return NULL;
+    if (!item)
+        return NULL;
     item->type        = type;
     item->op_capacity = 8;
     item->ops         = cml_calloc((size_t)item->op_capacity, sizeof(struct IRNode*));
-    if (!item->ops) { cml_free(item); return NULL; }
+    if (!item->ops) {
+        cml_free(item);
+        return NULL;
+    }
     item->num_ops     = 0;
     item->inputs      = NULL;
     item->num_inputs  = 0;
@@ -138,13 +210,14 @@ static CMLScheduleItem* sched_item_create(CMLScheduleItemType type) {
 }
 
 static int sched_item_add_op(CMLScheduleItem* item, struct IRNode* node) {
-    if (!item || !node) return -1;
+    if (!item || !node)
+        return -1;
     if (item->num_ops >= item->op_capacity) {
-        int new_cap = item->op_capacity * 2;
-        struct IRNode** tmp = cml_realloc(item->ops,
-                                      (size_t)new_cap * sizeof(struct IRNode*));
-        if (!tmp) return -1;
-        item->ops = tmp;
+        int new_cap         = item->op_capacity * 2;
+        struct IRNode** tmp = cml_realloc(item->ops, (size_t)new_cap * sizeof(struct IRNode*));
+        if (!tmp)
+            return -1;
+        item->ops         = tmp;
         item->op_capacity = new_cap;
     }
     item->ops[item->num_ops++] = node;
@@ -152,7 +225,8 @@ static int sched_item_add_op(CMLScheduleItem* item, struct IRNode* node) {
 }
 
 static void sched_item_free(CMLScheduleItem* item) {
-    if (!item) return;
+    if (!item)
+        return;
     cml_free(item->ops);
     cml_free(item->inputs);
     cml_free(item->outputs);
@@ -160,13 +234,14 @@ static void sched_item_free(CMLScheduleItem* item) {
 }
 
 static void compute_item_io(CMLScheduleItem* item) {
-    if (!item || item->num_ops == 0) return;
+    if (!item || item->num_ops == 0)
+        return;
 
-    
-    int out_cap = item->num_ops;
+    int out_cap       = item->num_ops;
     Tensor** produced = cml_calloc((size_t)out_cap, sizeof(Tensor*));
-    int num_produced = 0;
-    if (!produced) return;
+    int num_produced  = 0;
+    if (!produced)
+        return;
 
     for (int i = 0; i < item->num_ops; i++) {
         struct IRNode* nd = item->ops[i];
@@ -175,34 +250,50 @@ static void compute_item_io(CMLScheduleItem* item) {
         }
     }
 
-    
-    int in_cap = 8;
+    int in_cap      = 8;
     Tensor** ext_in = cml_calloc((size_t)in_cap, sizeof(Tensor*));
-    int num_ext = 0;
-    if (!ext_in) { cml_free(produced); return; }
+    int num_ext     = 0;
+    if (!ext_in) {
+        cml_free(produced);
+        return;
+    }
 
     for (int i = 0; i < item->num_ops; i++) {
         struct IRNode* nd = item->ops[i];
-        if (!nd) continue;
+        if (!nd)
+            continue;
         for (int j = 0; j < nd->num_inputs; j++) {
             Tensor* t = nd->inputs ? nd->inputs[j] : NULL;
-            if (!t) continue;
-            
+            if (!t)
+                continue;
+
             bool local = false;
             for (int k = 0; k < num_produced; k++) {
-                if (produced[k] == t) { local = true; break; }
+                if (produced[k] == t) {
+                    local = true;
+                    break;
+                }
             }
-            if (local) continue;
-            
+            if (local)
+                continue;
+
             bool dup = false;
             for (int k = 0; k < num_ext; k++) {
-                if (ext_in[k] == t) { dup = true; break; }
+                if (ext_in[k] == t) {
+                    dup = true;
+                    break;
+                }
             }
-            if (dup) continue;
+            if (dup)
+                continue;
             if (num_ext >= in_cap) {
                 in_cap *= 2;
                 Tensor** tmp = cml_realloc(ext_in, (size_t)in_cap * sizeof(Tensor*));
-                if (!tmp) { cml_free(produced); cml_free(ext_in); return; }
+                if (!tmp) {
+                    cml_free(produced);
+                    cml_free(ext_in);
+                    return;
+                }
                 ext_in = tmp;
             }
             ext_in[num_ext++] = t;
@@ -212,92 +303,93 @@ static void compute_item_io(CMLScheduleItem* item) {
     item->inputs     = ext_in;
     item->num_inputs = num_ext;
 
-    
     item->outputs     = produced;
     item->num_outputs = num_produced;
 }
 
 static size_t tensor_total_elements(const Tensor* t) {
-    if (!t || !t->shape || t->ndim <= 0) return 0;
+    if (!t || !t->shape || t->ndim <= 0)
+        return 0;
     size_t n = 1;
     for (int i = 0; i < t->ndim; i++) {
-        if (!t->shape || t->shape[i] <= 0) return 0;
+        if (!t->shape || t->shape[i] <= 0)
+            return 0;
         n *= (size_t)t->shape[i];
     }
     return n;
 }
 
 static void estimate_item_cost(CMLScheduleItem* item) {
-    if (!item) return;
+    if (!item)
+        return;
 
     size_t total_flops = 0;
     size_t total_mem   = 0;
 
     for (int i = 0; i < item->num_ops; i++) {
         struct IRNode* nd = item->ops[i];
-        if (!nd) continue;
-        
-        if (!nd->output && nd->num_inputs > 0) continue;
+        if (!nd)
+            continue;
 
-        size_t out_elems = nd->output ? tensor_total_elements(nd->output) : 0;
+        if (!nd->output && nd->num_inputs > 0)
+            continue;
+
+        size_t out_elems         = nd->output ? tensor_total_elements(nd->output) : 0;
         CMLScheduleItemType kind = classify_op(nd->type);
 
         switch (kind) {
-            case SCHED_ELEMENTWISE:
-                total_flops += out_elems;  
-                break;
+        case SCHED_ELEMENTWISE:
+            total_flops += out_elems;
+            break;
 
-            case SCHED_REDUCE:
-                
-                if (nd->inputs && nd->num_inputs > 0 && nd->inputs[0]) {
-                    total_flops += tensor_total_elements(nd->inputs[0]) * 2;
-                } else {
-                    total_flops += out_elems * 2;
-                }
-                break;
+        case SCHED_REDUCE:
 
-            case SCHED_MATMUL: {
-                
-                Tensor* a = (nd->inputs && nd->num_inputs > 0) ? nd->inputs[0] : NULL;
-                Tensor* b = (nd->inputs && nd->num_inputs > 1) ? nd->inputs[1] : NULL;
-                if (a && b && a->ndim >= 2 && b->ndim >= 2) {
-                    size_t M = (size_t)a->shape[a->ndim - 2];
-                    size_t K = (size_t)a->shape[a->ndim - 1];
-                    size_t N = (size_t)b->shape[b->ndim - 1];
-                    total_flops += 2 * M * N * K;
-                }
-                break;
+            if (nd->inputs && nd->num_inputs > 0 && nd->inputs[0]) {
+                total_flops += tensor_total_elements(nd->inputs[0]) * 2;
+            } else {
+                total_flops += out_elems * 2;
             }
+            break;
 
-            case SCHED_CONV: {
-                
-                if (nd->output && nd->output->ndim >= 4 &&
-                    nd->inputs && nd->num_inputs > 1 && nd->inputs[1] &&
-                    nd->inputs[1]->ndim >= 4) {
-                    Tensor* w = nd->inputs[1];
-                    size_t batch   = (size_t)nd->output->shape[0];
-                    size_t out_c   = (size_t)nd->output->shape[1];
-                    size_t out_h   = (size_t)nd->output->shape[2];
-                    size_t out_w   = (size_t)nd->output->shape[3];
-                    size_t kern_h  = (size_t)w->shape[2];
-                    size_t kern_w  = (size_t)w->shape[3];
-                    size_t in_c    = (size_t)w->shape[1];
-                    total_flops += 2 * batch * out_c * out_h * out_w *
-                                   kern_h * kern_w * in_c;
-                }
-                break;
+        case SCHED_MATMUL: {
+
+            Tensor* a = (nd->inputs && nd->num_inputs > 0) ? nd->inputs[0] : NULL;
+            Tensor* b = (nd->inputs && nd->num_inputs > 1) ? nd->inputs[1] : NULL;
+            if (a && b && a->ndim >= 2 && b->ndim >= 2) {
+                size_t M = (size_t)a->shape[a->ndim - 2];
+                size_t K = (size_t)a->shape[a->ndim - 1];
+                size_t N = (size_t)b->shape[b->ndim - 1];
+                total_flops += 2 * M * N * K;
             }
-
-            case SCHED_MOVEMENT:
-                
-                break;
-
-            default:
-                total_flops += out_elems;
-                break;
+            break;
         }
 
-        
+        case SCHED_CONV: {
+
+            if (nd->output && nd->output->ndim >= 4 && nd->inputs && nd->num_inputs > 1 &&
+                nd->inputs[1] && nd->inputs[1]->ndim >= 4) {
+                Tensor* w     = nd->inputs[1];
+                size_t batch  = (size_t)nd->output->shape[0];
+                size_t out_c  = (size_t)nd->output->shape[1];
+                size_t out_h  = (size_t)nd->output->shape[2];
+                size_t out_w  = (size_t)nd->output->shape[3];
+                size_t kern_h = (size_t)w->shape[2];
+                size_t kern_w = (size_t)w->shape[3];
+                size_t in_c   = (size_t)w->shape[1];
+                total_flops += 2 * batch * out_c * out_h * out_w * kern_h * kern_w * in_c;
+            }
+            break;
+        }
+
+        case SCHED_MOVEMENT:
+
+            break;
+
+        default:
+            total_flops += out_elems;
+            break;
+        }
+
         if (nd->output) {
             total_mem += tensor_total_elements(nd->output) * sizeof(float);
         }
@@ -308,11 +400,9 @@ static void estimate_item_cost(CMLScheduleItem* item) {
         }
     }
 
-    item->flops        = total_flops;
-    item->memory_bytes = total_mem;
-    item->arithmetic_intensity = (total_mem > 0)
-        ? (float)total_flops / (float)total_mem
-        : 0.0f;
+    item->flops                = total_flops;
+    item->memory_bytes         = total_mem;
+    item->arithmetic_intensity = (total_mem > 0) ? (float)total_flops / (float)total_mem : 0.0f;
 }
 
 /* Append `item` to the schedule, growing the array as needed. A failed grow
@@ -320,12 +410,11 @@ static void estimate_item_cost(CMLScheduleItem* item) {
  * inline behaviour. */
 static void sched_push(CMLSchedule* sched, CMLScheduleItem* item) {
     if (sched->num_items >= sched->item_capacity) {
-        int nc = sched->item_capacity * 2;
-        CMLScheduleItem** tmp =
-            cml_realloc(sched->items, (size_t)nc * sizeof(CMLScheduleItem*));
+        int nc                = sched->item_capacity * 2;
+        CMLScheduleItem** tmp = cml_realloc(sched->items, (size_t)nc * sizeof(CMLScheduleItem*));
         if (!tmp)
             return;
-        sched->items = tmp;
+        sched->items         = tmp;
         sched->item_capacity = nc;
     }
     sched->items[sched->num_items++] = item;
@@ -341,24 +430,29 @@ static void sched_push_single(CMLSchedule* sched, CMLScheduleItemType kind, stru
 }
 
 static void build_dependencies(CMLSchedule* sched) {
-    if (!sched || sched->num_items == 0) return;
+    if (!sched || sched->num_items == 0)
+        return;
 
     sched->dependencies = cml_calloc((size_t)sched->num_items, sizeof(int*));
     sched->dep_counts   = cml_calloc((size_t)sched->num_items, sizeof(int));
-    if (!sched->dependencies || !sched->dep_counts) return;
+    if (!sched->dependencies || !sched->dep_counts)
+        return;
 
     for (int i = 0; i < sched->num_items; i++) {
         CMLScheduleItem* consumer = sched->items[i];
-        if (!consumer) continue;
+        if (!consumer)
+            continue;
 
-        int dep_cap  = 4;
-        int* deps    = cml_calloc((size_t)dep_cap, sizeof(int));
-        int dep_cnt  = 0;
-        if (!deps) continue;
+        int dep_cap = 4;
+        int* deps   = cml_calloc((size_t)dep_cap, sizeof(int));
+        int dep_cnt = 0;
+        if (!deps)
+            continue;
 
         for (int j = 0; j < i; j++) {
             CMLScheduleItem* producer = sched->items[j];
-            if (!producer) continue;
+            if (!producer)
+                continue;
 
             bool found = false;
             for (int ci = 0; ci < consumer->num_inputs && !found; ci++) {
@@ -372,7 +466,8 @@ static void build_dependencies(CMLSchedule* sched) {
                 if (dep_cnt >= dep_cap) {
                     dep_cap *= 2;
                     int* tmp = cml_realloc(deps, (size_t)dep_cap * sizeof(int));
-                    if (!tmp) break;
+                    if (!tmp)
+                        break;
                     deps = tmp;
                 }
                 deps[dep_cnt++] = j;
@@ -388,40 +483,40 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
     CMLScheduleOptions default_opts;
     if (!opts) {
         default_opts = cml_schedule_default_options();
-        opts = &default_opts;
+        opts         = &default_opts;
     }
 
     CMLSchedule* sched = cml_calloc(1, sizeof(CMLSchedule));
-    if (!sched) return NULL;
+    if (!sched)
+        return NULL;
 
-    
     if (!graph || !graph->head || graph->node_count == 0) {
-        sched->items        = NULL;
-        sched->num_items    = 0;
+        sched->items         = NULL;
+        sched->num_items     = 0;
         sched->item_capacity = 0;
-        sched->total_ops    = 0;
+        sched->total_ops     = 0;
         sched->total_kernels = 0;
-        sched->fusion_ratio = 0.0f;
-        sched->total_flops  = 0;
-        sched->peak_memory  = 0;
-        sched->dependencies = NULL;
-        sched->dep_counts   = NULL;
+        sched->fusion_ratio  = 0.0f;
+        sched->total_flops   = 0;
+        sched->peak_memory   = 0;
+        sched->dependencies  = NULL;
+        sched->dep_counts    = NULL;
         return sched;
     }
 
-    
-    int cap = graph->node_count < 16 ? 16 : graph->node_count;
+    int cap      = graph->node_count < 16 ? 16 : graph->node_count;
     sched->items = cml_calloc((size_t)cap, sizeof(CMLScheduleItem*));
-    if (!sched->items) { cml_free(sched); return NULL; }
+    if (!sched->items) {
+        cml_free(sched);
+        return NULL;
+    }
     sched->item_capacity = cap;
     sched->num_items     = 0;
 
     int total_ops = 0;
 
-    
     CMLScheduleItem* cur = NULL;
 
-    
     struct IRNode* node = graph->head;
     while (node) {
         total_ops++;
@@ -430,14 +525,14 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
 
         if (kind == SCHED_MOVEMENT) {
             if (opts->enable_movement_fold && cur) {
-                
+
                 sched_item_add_op(cur, node);
             } else {
-                
+
                 CMLScheduleItem* mv = sched_item_create(SCHED_MOVEMENT);
                 if (mv) {
                     sched_item_add_op(mv, node);
-                    
+
                     sched_push(sched, mv);
                 }
             }
@@ -447,35 +542,34 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
 
         if (kind == SCHED_ELEMENTWISE && opts->enable_fusion) {
             if (cur &&
-                (cur->type == SCHED_ELEMENTWISE ||
-                 cur->type == SCHED_MATMUL ||
+                (cur->type == SCHED_ELEMENTWISE || cur->type == SCHED_MATMUL ||
                  cur->type == SCHED_CONV) &&
                 cur->num_ops < opts->max_fused_ops) {
                 sched_item_add_op(cur, node);
                 node = node->next;
                 continue;
             }
-            
+
             if (cur) {
-                
+
                 sched_push(sched, cur);
             }
             cur = sched_item_create(SCHED_ELEMENTWISE);
-            if (cur) sched_item_add_op(cur, node);
+            if (cur)
+                sched_item_add_op(cur, node);
             node = node->next;
             continue;
         }
 
         if (kind == SCHED_REDUCE) {
-            
+
             if (cur) {
-                if (opts->enable_fusion &&
-                    cur->type == SCHED_ELEMENTWISE &&
+                if (opts->enable_fusion && cur->type == SCHED_ELEMENTWISE &&
                     cur->num_ops < opts->max_fused_ops) {
-                    
+
                     CMLScheduleItem* red = sched_item_create(SCHED_REDUCE);
                     if (red) {
-                        
+
                         for (int i = 0; i < cur->num_ops; i++) {
                             sched_item_add_op(red, cur->ops[i]);
                         }
@@ -485,15 +579,14 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
                         sched_push(sched, red);
                     }
                 } else {
-                    
+
                     sched_push(sched, cur);
                     cur = NULL;
 
-                    
                     sched_push_single(sched, SCHED_REDUCE, node);
                 }
             } else {
-                
+
                 sched_push_single(sched, SCHED_REDUCE, node);
             }
             node = node->next;
@@ -505,7 +598,8 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
                 sched_push(sched, cur);
             }
             cur = sched_item_create(kind);
-            if (cur) sched_item_add_op(cur, node);
+            if (cur)
+                sched_item_add_op(cur, node);
             node = node->next;
             continue;
         }
@@ -524,59 +618,62 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
         node = node->next;
     }
 
-    
     if (cur) {
         sched_push(sched, cur);
         cur = NULL;
     }
 
-    
-    size_t grand_flops  = 0;
-    size_t peak_mem     = 0;
+    size_t grand_flops = 0;
+    size_t peak_mem    = 0;
     for (int i = 0; i < sched->num_items; i++) {
         compute_item_io(sched->items[i]);
         if (opts->estimate_costs) {
             estimate_item_cost(sched->items[i]);
             grand_flops += sched->items[i]->flops;
             size_t item_mem = sched->items[i]->memory_bytes;
-            if (item_mem > peak_mem) peak_mem = item_mem;
+            if (item_mem > peak_mem)
+                peak_mem = item_mem;
         }
     }
 
-    
     build_dependencies(sched);
 
-    
     sched->total_ops     = total_ops;
     sched->total_kernels = sched->num_items;
-    sched->fusion_ratio  = (sched->num_items > 0)
-                            ? (float)total_ops / (float)sched->num_items
-                            : 0.0f;
-    sched->total_flops   = grand_flops;
-    sched->peak_memory   = peak_mem;
+    sched->fusion_ratio =
+        (sched->num_items > 0) ? (float)total_ops / (float)sched->num_items : 0.0f;
+    sched->total_flops = grand_flops;
+    sched->peak_memory = peak_mem;
 
     return sched;
 }
 
-int cml_schedule_num_kernels(const CMLSchedule* sched) {
-    return sched ? sched->num_items : 0;
-}
+int cml_schedule_num_kernels(const CMLSchedule* sched) { return sched ? sched->num_items : 0; }
 
 const CMLScheduleItem* cml_schedule_get_item(const CMLSchedule* sched, int index) {
-    if (!sched || index < 0 || index >= sched->num_items) return NULL;
+    if (!sched || index < 0 || index >= sched->num_items)
+        return NULL;
     return sched->items[index];
 }
 
 static const char* sched_type_name(CMLScheduleItemType type) {
     switch (type) {
-        case SCHED_ELEMENTWISE: return "ELEMENTWISE";
-        case SCHED_REDUCE:      return "REDUCE";
-        case SCHED_MATMUL:      return "MATMUL";
-        case SCHED_CONV:        return "CONV";
-        case SCHED_MOVEMENT:    return "MOVEMENT";
-        case SCHED_COPY:        return "COPY";
-        case SCHED_CUSTOM:      return "CUSTOM";
-        default:                return "UNKNOWN";
+    case SCHED_ELEMENTWISE:
+        return "ELEMENTWISE";
+    case SCHED_REDUCE:
+        return "REDUCE";
+    case SCHED_MATMUL:
+        return "MATMUL";
+    case SCHED_CONV:
+        return "CONV";
+    case SCHED_MOVEMENT:
+        return "MOVEMENT";
+    case SCHED_COPY:
+        return "COPY";
+    case SCHED_CUSTOM:
+        return "CUSTOM";
+    default:
+        return "UNKNOWN";
     }
 }
 
@@ -595,27 +692,28 @@ void cml_schedule_print(const CMLSchedule* sched) {
 
     for (int i = 0; i < sched->num_items; i++) {
         const CMLScheduleItem* it = sched->items[i];
-        if (!it) continue;
-        printf("  [%d] %-12s  ops=%d  in=%d  out=%d  flops=%zu  mem=%zu",
-               i, sched_type_name(it->type),
-               it->num_ops, it->num_inputs, it->num_outputs,
-               it->flops, it->memory_bytes);
+        if (!it)
+            continue;
+        printf("  [%d] %-12s  ops=%d  in=%d  out=%d  flops=%zu  mem=%zu", i,
+               sched_type_name(it->type), it->num_ops, it->num_inputs, it->num_outputs, it->flops,
+               it->memory_bytes);
         if (it->arithmetic_intensity > 0.0f) {
             printf("  AI=%.2f", (double)it->arithmetic_intensity);
         }
         printf("\n");
-        
+
         for (int j = 0; j < it->num_ops; j++) {
             struct IRNode* nd = it->ops[j];
             if (nd) {
                 printf("       op[%d]: %s\n", j, uop_type_to_string(nd->type));
             }
         }
-        
+
         if (sched->dep_counts && sched->dep_counts[i] > 0) {
             printf("       deps: [");
             for (int d = 0; d < sched->dep_counts[i]; d++) {
-                if (d > 0) printf(", ");
+                if (d > 0)
+                    printf(", ");
                 printf("%d", sched->dependencies[i][d]);
             }
             printf("]\n");
@@ -625,9 +723,9 @@ void cml_schedule_print(const CMLSchedule* sched) {
 }
 
 char* cml_schedule_to_string(const CMLSchedule* sched) {
-    if (!sched) return NULL;
+    if (!sched)
+        return NULL;
 
-    
     size_t buf_size = 512 + (size_t)sched->num_items * 256;
     for (int i = 0; i < sched->num_items; i++) {
         if (sched->items[i]) {
@@ -636,7 +734,8 @@ char* cml_schedule_to_string(const CMLSchedule* sched) {
     }
 
     char* buf = cml_malloc(buf_size);
-    if (!buf) return NULL;
+    if (!buf)
+        return NULL;
 
     int off = 0;
     off += snprintf(buf + off, buf_size - (size_t)off,
@@ -647,23 +746,21 @@ char* cml_schedule_to_string(const CMLSchedule* sched) {
                     "  Total FLOPs:  %zu\n"
                     "  Peak memory:  %zu bytes\n"
                     "\n",
-                    sched->total_ops, sched->total_kernels,
-                    (double)sched->fusion_ratio,
+                    sched->total_ops, sched->total_kernels, (double)sched->fusion_ratio,
                     sched->total_flops, sched->peak_memory);
 
     for (int i = 0; i < sched->num_items && (size_t)off < buf_size - 128; i++) {
         const CMLScheduleItem* it = sched->items[i];
-        if (!it) continue;
+        if (!it)
+            continue;
         off += snprintf(buf + off, buf_size - (size_t)off,
-                        "  [%d] %-12s  ops=%d  in=%d  out=%d  flops=%zu  mem=%zu\n",
-                        i, sched_type_name(it->type),
-                        it->num_ops, it->num_inputs, it->num_outputs,
+                        "  [%d] %-12s  ops=%d  in=%d  out=%d  flops=%zu  mem=%zu\n", i,
+                        sched_type_name(it->type), it->num_ops, it->num_inputs, it->num_outputs,
                         it->flops, it->memory_bytes);
         for (int j = 0; j < it->num_ops && (size_t)off < buf_size - 128; j++) {
             struct IRNode* nd = it->ops[j];
             if (nd) {
-                off += snprintf(buf + off, buf_size - (size_t)off,
-                                "       op[%d]: %s\n", j,
+                off += snprintf(buf + off, buf_size - (size_t)off, "       op[%d]: %s\n", j,
                                 uop_type_to_string(nd->type));
             }
         }
@@ -673,7 +770,8 @@ char* cml_schedule_to_string(const CMLSchedule* sched) {
 }
 
 void cml_schedule_free(CMLSchedule* sched) {
-    if (!sched) return;
+    if (!sched)
+        return;
 
     for (int i = 0; i < sched->num_items; i++) {
         sched_item_free(sched->items[i]);

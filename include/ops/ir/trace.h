@@ -17,8 +17,8 @@ extern "C" {
 #endif
 
 #define CML_TRACE_MAX_ENTRIES 256
-#define CML_TRACE_MAX_ARGS    16
-#define CML_TRACE_CACHE_SIZE  64
+#define CML_TRACE_MAX_ARGS 16
+#define CML_TRACE_CACHE_SIZE 64
 
 typedef enum {
     CML_TRACE_KERNEL = 0,
@@ -29,7 +29,7 @@ typedef enum {
 typedef struct {
     CMLTraceEntryType type;
     uint64_t kernel_hash;
-    void* compiled_kernel;       /* cached compiled kernel pointer */
+    void* compiled_kernel; /* cached compiled kernel pointer */
 
     size_t grid[3];
     size_t block[3];
@@ -53,7 +53,7 @@ typedef struct {
 
     bool is_recording;
     bool is_complete;
-    uint64_t graph_hash;    /* hash of the IR graph that produced this trace */
+    uint64_t graph_hash; /* hash of the IR graph that produced this trace */
 } CMLTrace;
 
 typedef struct {
@@ -71,12 +71,12 @@ void cml_trace_free(CMLTrace* trace);
 int cml_trace_begin(CMLTrace* trace, uint64_t graph_hash);
 int cml_trace_end(CMLTrace* trace);
 
-int cml_trace_record_kernel(CMLTrace* trace, uint64_t kernel_hash,
-                            void* compiled_kernel, const size_t grid[3],
-                            const size_t block[3], int* arg_indices, int num_args);
+int cml_trace_record_kernel(CMLTrace* trace, uint64_t kernel_hash, void* compiled_kernel,
+                            const size_t grid[3], const size_t block[3], int* arg_indices,
+                            int num_args);
 
-int cml_trace_record_memcpy(CMLTrace* trace, CMLTraceEntryType type,
-                            int src_slot, int dst_slot, size_t bytes);
+int cml_trace_record_memcpy(CMLTrace* trace, CMLTraceEntryType type, int src_slot, int dst_slot,
+                            size_t bytes);
 
 int cml_trace_replay(CMLTrace* trace, void** tensor_ptrs, int num_tensors);
 

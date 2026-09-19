@@ -36,79 +36,123 @@ struct SafeTensorsContext {
 
 static const char* dtype_to_safetensor_str(DType dtype) {
     switch (dtype) {
-        case DTYPE_FLOAT32: return "F32";
-        case DTYPE_FLOAT64: return "F64";
-        case DTYPE_FLOAT16: return "F16";
-        case DTYPE_BFLOAT16: return "BF16";
-        case DTYPE_INT8:    return "I8";
-        case DTYPE_UINT8:   return "U8";
-        case DTYPE_INT16:   return "I16";
-        case DTYPE_UINT16:  return "U16";
-        case DTYPE_INT32:   return "I32";
-        case DTYPE_INT64:   return "I64";
-        case DTYPE_UINT32:  return "U32";
-        case DTYPE_UINT64:  return "U64";
-        case DTYPE_BOOL:    return "BOOL";
-        case DTYPE_FLOAT8_E4M3: return "F8_E4M3";
-        case DTYPE_FLOAT8_E5M2: return "F8_E5M2";
-        case DTYPE_FLOAT8_E4M3_FNUZ: return "F8_E4M3FNUZ";
-        case DTYPE_FLOAT8_E5M2_FNUZ: return "F8_E5M2FNUZ";
-        default: return "F32";
+    case DTYPE_FLOAT32:
+        return "F32";
+    case DTYPE_FLOAT64:
+        return "F64";
+    case DTYPE_FLOAT16:
+        return "F16";
+    case DTYPE_BFLOAT16:
+        return "BF16";
+    case DTYPE_INT8:
+        return "I8";
+    case DTYPE_UINT8:
+        return "U8";
+    case DTYPE_INT16:
+        return "I16";
+    case DTYPE_UINT16:
+        return "U16";
+    case DTYPE_INT32:
+        return "I32";
+    case DTYPE_INT64:
+        return "I64";
+    case DTYPE_UINT32:
+        return "U32";
+    case DTYPE_UINT64:
+        return "U64";
+    case DTYPE_BOOL:
+        return "BOOL";
+    case DTYPE_FLOAT8_E4M3:
+        return "F8_E4M3";
+    case DTYPE_FLOAT8_E5M2:
+        return "F8_E5M2";
+    case DTYPE_FLOAT8_E4M3_FNUZ:
+        return "F8_E4M3FNUZ";
+    case DTYPE_FLOAT8_E5M2_FNUZ:
+        return "F8_E5M2FNUZ";
+    default:
+        return "F32";
     }
 }
 
 static DType safetensor_str_to_dtype(const char* str) {
-    if (!str) return DTYPE_FLOAT32;
-    if (strcmp(str, "F32") == 0) return DTYPE_FLOAT32;
-    if (strcmp(str, "F64") == 0) return DTYPE_FLOAT64;
-    if (strcmp(str, "F16") == 0) return DTYPE_FLOAT16;
-    if (strcmp(str, "BF16") == 0) return DTYPE_BFLOAT16;
-    if (strcmp(str, "I8") == 0) return DTYPE_INT8;
-    if (strcmp(str, "U8") == 0) return DTYPE_UINT8;
-    if (strcmp(str, "I16") == 0) return DTYPE_INT16;
-    if (strcmp(str, "U16") == 0) return DTYPE_UINT16;
-    if (strcmp(str, "I32") == 0) return DTYPE_INT32;
-    if (strcmp(str, "I64") == 0) return DTYPE_INT64;
-    if (strcmp(str, "U32") == 0) return DTYPE_UINT32;
-    if (strcmp(str, "U64") == 0) return DTYPE_UINT64;
-    if (strcmp(str, "BOOL") == 0) return DTYPE_BOOL;
-    if (strcmp(str, "F8_E4M3") == 0) return DTYPE_FLOAT8_E4M3;
-    if (strcmp(str, "F8_E5M2") == 0) return DTYPE_FLOAT8_E5M2;
-    if (strcmp(str, "F8_E4M3FNUZ") == 0) return DTYPE_FLOAT8_E4M3_FNUZ;
-    if (strcmp(str, "F8_E5M2FNUZ") == 0) return DTYPE_FLOAT8_E5M2_FNUZ;
+    if (!str)
+        return DTYPE_FLOAT32;
+    if (strcmp(str, "F32") == 0)
+        return DTYPE_FLOAT32;
+    if (strcmp(str, "F64") == 0)
+        return DTYPE_FLOAT64;
+    if (strcmp(str, "F16") == 0)
+        return DTYPE_FLOAT16;
+    if (strcmp(str, "BF16") == 0)
+        return DTYPE_BFLOAT16;
+    if (strcmp(str, "I8") == 0)
+        return DTYPE_INT8;
+    if (strcmp(str, "U8") == 0)
+        return DTYPE_UINT8;
+    if (strcmp(str, "I16") == 0)
+        return DTYPE_INT16;
+    if (strcmp(str, "U16") == 0)
+        return DTYPE_UINT16;
+    if (strcmp(str, "I32") == 0)
+        return DTYPE_INT32;
+    if (strcmp(str, "I64") == 0)
+        return DTYPE_INT64;
+    if (strcmp(str, "U32") == 0)
+        return DTYPE_UINT32;
+    if (strcmp(str, "U64") == 0)
+        return DTYPE_UINT64;
+    if (strcmp(str, "BOOL") == 0)
+        return DTYPE_BOOL;
+    if (strcmp(str, "F8_E4M3") == 0)
+        return DTYPE_FLOAT8_E4M3;
+    if (strcmp(str, "F8_E5M2") == 0)
+        return DTYPE_FLOAT8_E5M2;
+    if (strcmp(str, "F8_E4M3FNUZ") == 0)
+        return DTYPE_FLOAT8_E4M3_FNUZ;
+    if (strcmp(str, "F8_E5M2FNUZ") == 0)
+        return DTYPE_FLOAT8_E5M2_FNUZ;
     return DTYPE_FLOAT32;
 }
 
 static char* skip_ws(char* p) {
-    while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++;
+    while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t')
+        p++;
     return p;
 }
 
 static char* parse_string(char* p, char** out) {
-    if (*p != '"') return NULL;
+    if (*p != '"')
+        return NULL;
     p++;
     char* start = p;
     while (*p && *p != '"') {
-        if (*p == '\\') p++;
+        if (*p == '\\')
+            p++;
         p++;
     }
     size_t len = p - start;
-    *out = cml_malloc(len + 1);
+    *out       = cml_malloc(len + 1);
     memcpy(*out, start, len);
     (*out)[len] = '\0';
-    if (*p == '"') p++;
+    if (*p == '"')
+        p++;
     return p;
 }
 
 static char* parse_int(char* p, int64_t* out) {
-    *out = 0;
+    *out    = 0;
     int neg = 0;
-    if (*p == '-') { neg = 1; p++; }
+    if (*p == '-') {
+        neg = 1;
+        p++;
+    }
     while (*p >= '0' && *p <= '9') {
         *out = *out * 10 + (*p - '0');
         p++;
     }
-    if (neg) *out = -*out;
+    if (neg)
+        *out = -*out;
     return p;
 }
 
@@ -120,107 +164,152 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
     }
 
     uint64_t header_size;
-    if (fread(&header_size, 8, 1, f) != 1) { fclose(f); return NULL; }
-    if (header_size > 100 * 1024 * 1024) { fclose(f); return NULL; } // Sanity check
+    if (fread(&header_size, 8, 1, f) != 1) {
+        fclose(f);
+        return NULL;
+    }
+    if (header_size > 100 * 1024 * 1024) {
+        fclose(f);
+        return NULL;
+    } // Sanity check
 
     char* header = cml_malloc(header_size + 1);
-    if (!header) { fclose(f); return NULL; }
-    if (fread(header, 1, header_size, f) != header_size) { cml_free(header); fclose(f); return NULL; }
+    if (!header) {
+        fclose(f);
+        return NULL;
+    }
+    if (fread(header, 1, header_size, f) != header_size) {
+        cml_free(header);
+        fclose(f);
+        return NULL;
+    }
     header[header_size] = '\0';
 
     SafeTensorsContext* ctx = cml_calloc(1, sizeof(SafeTensorsContext));
-    if (!ctx) { cml_free(header); fclose(f); return NULL; }
-    ctx->file = f;
-    ctx->filepath = cml_strdup(filepath);
-    ctx->is_write = false;
+    if (!ctx) {
+        cml_free(header);
+        fclose(f);
+        return NULL;
+    }
+    ctx->file        = f;
+    ctx->filepath    = cml_strdup(filepath);
+    ctx->is_write    = false;
     ctx->header_size = header_size;
-    ctx->tensors = cml_calloc(MAX_TENSORS, sizeof(SafeTensorInfo));
-    if (!ctx->tensors) { cml_free(header); safetensors_close(ctx); return NULL; }
+    ctx->tensors     = cml_calloc(MAX_TENSORS, sizeof(SafeTensorInfo));
+    if (!ctx->tensors) {
+        cml_free(header);
+        safetensors_close(ctx);
+        return NULL;
+    }
 
     char* p = header;
-    p = skip_ws(p);
-    if (*p == '{') p++;
+    p       = skip_ws(p);
+    if (*p == '{')
+        p++;
 
     while (*p && *p != '}' && ctx->num_tensors < MAX_TENSORS) {
         p = skip_ws(p);
-        if (*p == '}') break;
-        if (*p == ',') p++;
+        if (*p == '}')
+            break;
+        if (*p == ',')
+            p++;
         p = skip_ws(p);
 
         char* name = NULL;
-        p = parse_string(p, &name);
-        if (!p || !name) break;
+        p          = parse_string(p, &name);
+        if (!p || !name)
+            break;
 
         if (strcmp(name, "__metadata__") == 0) {
             cml_free(name);
             p = skip_ws(p);
-            if (*p == ':') p++;
+            if (*p == ':')
+                p++;
             int depth = 0;
             do {
-                if (*p == '{') depth++;
-                else if (*p == '}') depth--;
+                if (*p == '{')
+                    depth++;
+                else if (*p == '}')
+                    depth--;
                 p++;
             } while (*p && depth > 0);
             continue;
         }
 
         SafeTensorInfo* info = &ctx->tensors[ctx->num_tensors];
-        info->name = name;
+        info->name           = name;
 
         p = skip_ws(p);
-        if (*p == ':') p++;
+        if (*p == ':')
+            p++;
         p = skip_ws(p);
 
-        if (*p != '{') { cml_free(name); break; }
+        if (*p != '{') {
+            cml_free(name);
+            break;
+        }
         p++;
 
         while (*p && *p != '}') {
             p = skip_ws(p);
-            if (*p == ',') p++;
+            if (*p == ',')
+                p++;
             p = skip_ws(p);
-            if (*p == '}') break;
+            if (*p == '}')
+                break;
 
             char* key = NULL;
-            p = parse_string(p, &key);
-            if (!p || !key) break;
+            p         = parse_string(p, &key);
+            if (!p || !key)
+                break;
             p = skip_ws(p);
-            if (*p == ':') p++;
+            if (*p == ':')
+                p++;
             p = skip_ws(p);
 
             if (strcmp(key, "dtype") == 0) {
                 char* dtype_str = NULL;
-                p = parse_string(p, &dtype_str);
+                p               = parse_string(p, &dtype_str);
                 info->dtype_str = dtype_str;
             } else if (strcmp(key, "shape") == 0) {
-                if (*p == '[') p++;
+                if (*p == '[')
+                    p++;
                 info->ndim = 0;
                 while (*p && *p != ']') {
                     p = skip_ws(p);
-                    if (*p == ',') p++;
+                    if (*p == ',')
+                        p++;
                     p = skip_ws(p);
-                    if (*p == ']') break;
+                    if (*p == ']')
+                        break;
                     int64_t dim;
                     p = parse_int(p, &dim);
-                    if (info->ndim < 8) info->shape[info->ndim++] = (int)dim;
+                    if (info->ndim < 8)
+                        info->shape[info->ndim++] = (int)dim;
                 }
-                if (*p == ']') p++;
+                if (*p == ']')
+                    p++;
             } else if (strcmp(key, "data_offsets") == 0) {
-                if (*p == '[') p++;
+                if (*p == '[')
+                    p++;
                 p = skip_ws(p);
                 int64_t start, end;
                 p = parse_int(p, &start);
                 p = skip_ws(p);
-                if (*p == ',') p++;
+                if (*p == ',')
+                    p++;
                 p = skip_ws(p);
                 p = parse_int(p, &end);
                 p = skip_ws(p);
-                if (*p == ']') p++;
+                if (*p == ']')
+                    p++;
                 info->data_start = (size_t)start;
-                info->data_end = (size_t)end;
+                info->data_end   = (size_t)end;
             }
             cml_free(key);
         }
-        if (*p == '}') p++;
+        if (*p == '}')
+            p++;
         ctx->num_tensors++;
     }
 
@@ -230,24 +319,29 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
 
 SafeTensorsContext* safetensors_open_write(const char* filepath) {
     SafeTensorsContext* ctx = cml_calloc(1, sizeof(SafeTensorsContext));
-    if (!ctx) return NULL;
-    ctx->filepath = cml_strdup(filepath);
-    ctx->is_write = true;
-    ctx->tensors = cml_calloc(MAX_TENSORS, sizeof(SafeTensorInfo));
+    if (!ctx)
+        return NULL;
+    ctx->filepath       = cml_strdup(filepath);
+    ctx->is_write       = true;
+    ctx->tensors        = cml_calloc(MAX_TENSORS, sizeof(SafeTensorInfo));
     ctx->write_data_cap = 4096;
-    ctx->write_data = cml_malloc(ctx->write_data_cap);
-    if (!ctx->tensors || !ctx->write_data) { safetensors_close(ctx); return NULL; }
+    ctx->write_data     = cml_malloc(ctx->write_data_cap);
+    if (!ctx->tensors || !ctx->write_data) {
+        safetensors_close(ctx);
+        return NULL;
+    }
     return ctx;
 }
 
 void safetensors_close(SafeTensorsContext* ctx) {
-    if (!ctx) return;
+    if (!ctx)
+        return;
 
     if (ctx->is_write && ctx->filepath && ctx->write_count > 0) {
         size_t json_cap = 4096;
-        char* json = cml_malloc(json_cap);
+        char* json      = cml_malloc(json_cap);
         if (json) {
-            size_t pos = 0;
+            size_t pos  = 0;
             json[pos++] = '{';
 
             for (int i = 0; i < ctx->write_count; i++) {
@@ -256,17 +350,17 @@ void safetensors_close(SafeTensorsContext* ctx) {
                     json_cap *= 2;
                     json = cml_realloc(json, json_cap);
                 }
-                if (i > 0) json[pos++] = ',';
-                pos += snprintf(json + pos, json_cap - pos,
-                    "\"%s\":{\"dtype\":\"%s\",\"shape\":[",
-                    info->name, info->dtype_str);
+                if (i > 0)
+                    json[pos++] = ',';
+                pos += snprintf(json + pos, json_cap - pos, "\"%s\":{\"dtype\":\"%s\",\"shape\":[",
+                                info->name, info->dtype_str);
                 for (int d = 0; d < info->ndim; d++) {
-                    if (d > 0) json[pos++] = ',';
+                    if (d > 0)
+                        json[pos++] = ',';
                     pos += snprintf(json + pos, json_cap - pos, "%d", info->shape[d]);
                 }
-                pos += snprintf(json + pos, json_cap - pos,
-                    "],\"data_offsets\":[%zu,%zu]}",
-                    info->data_start, info->data_end);
+                pos += snprintf(json + pos, json_cap - pos, "],\"data_offsets\":[%zu,%zu]}",
+                                info->data_start, info->data_end);
             }
             json[pos++] = '}';
 
@@ -282,7 +376,8 @@ void safetensors_close(SafeTensorsContext* ctx) {
         }
     }
 
-    if (ctx->file) fclose(ctx->file);
+    if (ctx->file)
+        fclose(ctx->file);
     if (ctx->tensors) {
         int count = ctx->is_write ? ctx->write_count : ctx->num_tensors;
         for (int i = 0; i < count; i++) {
@@ -296,33 +391,37 @@ void safetensors_close(SafeTensorsContext* ctx) {
     cml_free(ctx);
 }
 
-int safetensors_get_num_tensors(SafeTensorsContext* ctx) {
-    return ctx ? ctx->num_tensors : 0;
-}
+int safetensors_get_num_tensors(SafeTensorsContext* ctx) { return ctx ? ctx->num_tensors : 0; }
 
 const char* safetensors_get_tensor_name(SafeTensorsContext* ctx, int index) {
-    if (!ctx || index < 0 || index >= ctx->num_tensors) return NULL;
+    if (!ctx || index < 0 || index >= ctx->num_tensors)
+        return NULL;
     return ctx->tensors[index].name;
 }
 
 Tensor* safetensors_read_tensor(SafeTensorsContext* ctx, const char* name) {
-    if (!ctx || !name || ctx->is_write) return NULL;
+    if (!ctx || !name || ctx->is_write)
+        return NULL;
 
     int idx = -1;
     for (int i = 0; i < ctx->num_tensors; i++) {
         if (ctx->tensors[i].name && strcmp(ctx->tensors[i].name, name) == 0) {
-            idx = i; break;
+            idx = i;
+            break;
         }
     }
-    if (idx < 0) return NULL;
+    if (idx < 0)
+        return NULL;
 
     SafeTensorInfo* info = &ctx->tensors[idx];
-    DType dtype = safetensor_str_to_dtype(info->dtype_str);
-    size_t data_size = info->data_end - info->data_start;
+    DType dtype          = safetensor_str_to_dtype(info->dtype_str);
+    size_t data_size     = info->data_end - info->data_start;
 
-    TensorConfig config = {.dtype = dtype, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    TensorConfig config = {
+        .dtype = dtype, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* t = tensor_empty(info->shape, info->ndim, &config);
-    if (!t) return NULL;
+    if (!t)
+        return NULL;
     tensor_ensure_executed(t);
 
     long data_offset = 8 + (long)ctx->header_size + (long)info->data_start;
@@ -335,27 +434,32 @@ Tensor* safetensors_read_tensor(SafeTensorsContext* ctx, const char* name) {
 }
 
 int safetensors_write_tensor(SafeTensorsContext* ctx, const char* name, Tensor* tensor) {
-    if (!ctx || !name || !tensor || !ctx->is_write) return -1;
-    if (ctx->write_count >= MAX_TENSORS) return -1;
+    if (!ctx || !name || !tensor || !ctx->is_write)
+        return -1;
+    if (ctx->write_count >= MAX_TENSORS)
+        return -1;
 
     tensor_ensure_executed(tensor);
-    if (!tensor->data) return -1;
+    if (!tensor->data)
+        return -1;
 
     size_t data_size = tensor->numel * cml_dtype_size(tensor->dtype);
 
     while (ctx->write_data_size + data_size > ctx->write_data_cap) {
         ctx->write_data_cap *= 2;
         ctx->write_data = cml_realloc(ctx->write_data, ctx->write_data_cap);
-        if (!ctx->write_data) return -1;
+        if (!ctx->write_data)
+            return -1;
     }
 
     SafeTensorInfo* info = &ctx->tensors[ctx->write_count];
-    info->name = cml_strdup(name);
-    info->dtype_str = cml_strdup(dtype_to_safetensor_str(tensor->dtype));
-    info->ndim = tensor->ndim;
-    for (int d = 0; d < tensor->ndim; d++) info->shape[d] = tensor->shape[d];
+    info->name           = cml_strdup(name);
+    info->dtype_str      = cml_strdup(dtype_to_safetensor_str(tensor->dtype));
+    info->ndim           = tensor->ndim;
+    for (int d = 0; d < tensor->ndim; d++)
+        info->shape[d] = tensor->shape[d];
     info->data_start = ctx->write_data_size;
-    info->data_end = ctx->write_data_size + data_size;
+    info->data_end   = ctx->write_data_size + data_size;
 
     memcpy(ctx->write_data + ctx->write_data_size, tensor->data, data_size);
     ctx->write_data_size += data_size;
@@ -364,14 +468,19 @@ int safetensors_write_tensor(SafeTensorsContext* ctx, const char* name, Tensor* 
 }
 
 int module_save_safetensors(Module* module, const char* filepath) {
-    if (!module || !filepath) return -1;
+    if (!module || !filepath)
+        return -1;
 
     NamedParameter* named_params = NULL;
-    int num_params = 0;
-    if (module_named_parameters(module, &named_params, &num_params) != 0) return -1;
+    int num_params               = 0;
+    if (module_named_parameters(module, &named_params, &num_params) != 0)
+        return -1;
 
     SafeTensorsContext* ctx = safetensors_open_write(filepath);
-    if (!ctx) { module_named_parameters_free(named_params, num_params); return -1; }
+    if (!ctx) {
+        module_named_parameters_free(named_params, num_params);
+        return -1;
+    }
 
     for (int i = 0; i < num_params; i++) {
         if (named_params[i].parameter && named_params[i].parameter->tensor) {
@@ -385,13 +494,15 @@ int module_save_safetensors(Module* module, const char* filepath) {
 }
 
 int module_load_safetensors(Module* module, const char* filepath) {
-    if (!module || !filepath) return -1;
+    if (!module || !filepath)
+        return -1;
 
     SafeTensorsContext* ctx = safetensors_open_read(filepath);
-    if (!ctx) return -1;
+    if (!ctx)
+        return -1;
 
     NamedParameter* named_params = NULL;
-    int num_params = 0;
+    int num_params               = 0;
     if (module_named_parameters(module, &named_params, &num_params) != 0) {
         safetensors_close(ctx);
         return -1;

@@ -26,7 +26,7 @@ CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha
     }
 
     int out_features = base_weight->shape[0];
-    int in_features = base_weight->shape[1];
+    int in_features  = base_weight->shape[1];
 
     CMLLoRALinear* lora = (CMLLoRALinear*)cml_calloc(1, sizeof(CMLLoRALinear));
     if (!lora) {
@@ -34,24 +34,20 @@ CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha
         return NULL;
     }
 
-    lora->in_features = in_features;
+    lora->in_features  = in_features;
     lora->out_features = out_features;
-    lora->rank = rank;
-    lora->alpha = alpha;
-    lora->scaling = alpha / (float)rank;
-    lora->base_weight = base_weight;  /* not owned */
-    lora->frozen_base = NULL;
-    lora->merged = false;
+    lora->rank         = rank;
+    lora->alpha        = alpha;
+    lora->scaling      = alpha / (float)rank;
+    lora->base_weight  = base_weight; /* not owned */
+    lora->frozen_base  = NULL;
+    lora->merged       = false;
 
     TensorConfig cfg = {
-        .dtype = DTYPE_FLOAT32,
-        .device = DEVICE_CPU,
-        .has_dtype = true,
-        .has_device = true
-    };
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Initialize lora_A with Xavier/small random values */
-    int shape_A[2] = {rank, in_features};
+    int shape_A[2]     = {rank, in_features};
     float xavier_scale = sqrtf(2.0f / (float)(rank + in_features));
 
     lora->lora_A = tensor_empty(shape_A, 2, &cfg);
@@ -71,7 +67,7 @@ CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha
 
     /* Initialize lora_B with zeros */
     int shape_B[2] = {out_features, rank};
-    lora->lora_B = tensor_zeros(shape_B, 2, &cfg);
+    lora->lora_B   = tensor_zeros(shape_B, 2, &cfg);
     if (!lora->lora_B) {
         LOG_ERROR("Failed to allocate lora_B");
         tensor_free(lora->lora_A);
@@ -83,7 +79,8 @@ CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha
 }
 
 void cml_lora_linear_free(CMLLoRALinear* lora) {
-    if (!lora) return;
+    if (!lora)
+        return;
 
     if (lora->lora_A) {
         tensor_free(lora->lora_A);
@@ -112,7 +109,7 @@ Tensor* cml_lora_linear_forward(CMLLoRALinear* lora, Tensor* input) {
     }
 
     int batch = input->shape[0];
-    int in_f = input->shape[1];
+    int in_f  = input->shape[1];
 
     if (in_f != lora->in_features) {
         LOG_ERROR("Input in_features mismatch: got %d, expected %d", in_f, lora->in_features);
@@ -124,22 +121,27 @@ Tensor* cml_lora_linear_forward(CMLLoRALinear* lora, Tensor* input) {
     /* Lazy: out = input·Wᵀ + scaling·((input·Aᵀ)·Bᵀ). Builds IR, defers
      * execution, and is autograd-differentiable (was: eager triple matmul on
      * raw data pointers). uop_linear(x, w, b) computes x·wᵀ + b. */
-    Tensor* base = uop_linear(input, lora->base_weight, NULL);   /* [batch, out_f] */
-    if (!base) return NULL;
+    Tensor* base = uop_linear(input, lora->base_weight, NULL); /* [batch, out_f] */
+    if (!base)
+        return NULL;
     if (lora->merged) {
-        return base;   /* LoRA contribution baked into W already */
+        return base; /* LoRA contribution baked into W already */
     }
 
-    Tensor* tmp = uop_linear(input, lora->lora_A, NULL);         /* [batch, rank]  */
-    if (!tmp) return NULL;
-    Tensor* delta = uop_linear(tmp, lora->lora_B, NULL);         /* [batch, out_f] */
-    if (!delta) return NULL;
+    Tensor* tmp = uop_linear(input, lora->lora_A, NULL); /* [batch, rank]  */
+    if (!tmp)
+        return NULL;
+    Tensor* delta = uop_linear(tmp, lora->lora_B, NULL); /* [batch, out_f] */
+    if (!delta)
+        return NULL;
 
     int sshape[2] = {batch, out_f};
     Tensor* scale = uop_fill_ex(sshape, 2, lora->scaling, DTYPE_FLOAT32, DEVICE_CPU);
-    if (!scale) return NULL;
+    if (!scale)
+        return NULL;
     Tensor* scaled = uop_mul(delta, scale);
-    if (!scaled) return NULL;
+    if (!scaled)
+        return NULL;
     return uop_add(base, scaled);
 }
 
@@ -154,8 +156,8 @@ int cml_lora_linear_merge(CMLLoRALinear* lora) {
     }
 
     int out_f = lora->out_features;
-    int in_f = lora->in_features;
-    int r = lora->rank;
+    int in_f  = lora->in_features;
+    int r     = lora->rank;
 
     /* Save a frozen copy of the base weight before merging */
     lora->frozen_base = tensor_clone(lora->base_weight);
@@ -216,12 +218,12 @@ int cml_lora_linear_unmerge(CMLLoRALinear* lora) {
     }
 
     int out_f = lora->out_features;
-    int in_f = lora->in_features;
+    int in_f  = lora->in_features;
 
     tensor_ensure_executed(lora->base_weight);
     tensor_ensure_executed(lora->frozen_base);
 
-    float* W_data = (float*)tensor_data_ptr(lora->base_weight);
+    float* W_data      = (float*)tensor_data_ptr(lora->base_weight);
     float* frozen_data = (float*)tensor_data_ptr(lora->frozen_base);
 
     if (!W_data || !frozen_data) {
@@ -259,17 +261,18 @@ CMLLoRAAdapter* cml_lora_adapter_create(const char* name, int rank, float alpha)
 
     strncpy(adapter->name, name, sizeof(adapter->name) - 1);
     adapter->name[sizeof(adapter->name) - 1] = '\0';
-    adapter->rank = rank;
-    adapter->alpha = alpha;
-    adapter->scaling = alpha / (float)rank;
-    adapter->num_layers = 0;
-    adapter->layers = NULL;
-    adapter->merged = false;
+    adapter->rank                            = rank;
+    adapter->alpha                           = alpha;
+    adapter->scaling                         = alpha / (float)rank;
+    adapter->num_layers                      = 0;
+    adapter->layers                          = NULL;
+    adapter->merged                          = false;
     return adapter;
 }
 
 void cml_lora_adapter_free(CMLLoRAAdapter* adapter) {
-    if (!adapter) return;
+    if (!adapter)
+        return;
 
     for (int i = 0; i < adapter->num_layers; i++) {
         if (adapter->layers[i]) {
@@ -287,16 +290,16 @@ int cml_lora_adapter_add_layer(CMLLoRAAdapter* adapter, CMLLoRALinear* layer) {
     }
 
     int new_count = adapter->num_layers + 1;
-    CMLLoRALinear** new_layers = (CMLLoRALinear**)cml_realloc(
-        adapter->layers, (size_t)new_count * sizeof(CMLLoRALinear*));
+    CMLLoRALinear** new_layers =
+        (CMLLoRALinear**)cml_realloc(adapter->layers, (size_t)new_count * sizeof(CMLLoRALinear*));
     if (!new_layers) {
         LOG_ERROR("Failed to reallocate adapter layers array");
         return -1;
     }
 
     new_layers[adapter->num_layers] = layer;
-    adapter->layers = new_layers;
-    adapter->num_layers = new_count;
+    adapter->layers                 = new_layers;
+    adapter->num_layers             = new_count;
     return 0;
 }
 

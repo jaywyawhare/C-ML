@@ -20,9 +20,7 @@
 
 #define TORCH_MEMORY_ALIGN 64
 
-static size_t align_up(size_t n, size_t align) {
-    return (n + align - 1) & ~(align - 1);
-}
+static size_t align_up(size_t n, size_t align) { return (n + align - 1) & ~(align - 1); }
 
 TorchMemoryOptions torch_memory_default_options(void) {
     TorchMemoryOptions opts = {.alignment = TORCH_MEMORY_ALIGN, .track_peak = true};
@@ -38,17 +36,18 @@ TorchMemoryManager* torch_memory_create(size_t size) {
         return NULL;
 
     size_t aligned_size = align_up(size, TORCH_MEMORY_ALIGN);
-    mgr->arena_buffer = aligned_alloc(TORCH_MEMORY_ALIGN, aligned_size);
+    mgr->arena_buffer   = aligned_alloc(TORCH_MEMORY_ALIGN, aligned_size);
     if (!mgr->arena_buffer) {
         free(mgr);
         return NULL;
     }
 
-    mgr->arena_size   = aligned_size;
-    mgr->bump_ptr     = (uint8_t*)mgr->arena_buffer;
-    mgr->owns_buffer  = true;
+    mgr->arena_size  = aligned_size;
+    mgr->bump_ptr    = (uint8_t*)mgr->arena_buffer;
+    mgr->owns_buffer = true;
 
-    CMLContextParams params = {.mem_size = size, .mem_buffer = mgr->arena_buffer, .no_alloc = false};
+    CMLContextParams params = {
+        .mem_size = size, .mem_buffer = mgr->arena_buffer, .no_alloc = false};
     mgr->context = cml_context_new(params);
     if (!mgr->context) {
         TORCH_ALIGNED_FREE(mgr->arena_buffer);
@@ -74,13 +73,13 @@ TorchMemoryManager* torch_memory_from_buffer(void* buffer, size_t size) {
     if (!mgr)
         return NULL;
 
-    mgr->arena_buffer  = buffer;
-    mgr->arena_size    = size;
-    mgr->bump_ptr      = (uint8_t*)buffer;
-    mgr->owns_buffer   = false;
+    mgr->arena_buffer = buffer;
+    mgr->arena_size   = size;
+    mgr->bump_ptr     = (uint8_t*)buffer;
+    mgr->owns_buffer  = false;
 
     CMLContextParams params = {.mem_size = size, .mem_buffer = buffer, .no_alloc = false};
-    mgr->context = cml_context_new(params);
+    mgr->context            = cml_context_new(params);
     if (!mgr->context) {
         free(mgr);
         return NULL;
@@ -123,13 +122,9 @@ void* torch_memory_alloc(TorchMemoryManager* mgr, size_t size) {
     return ptr;
 }
 
-size_t torch_memory_used(const TorchMemoryManager* mgr) {
-    return mgr ? mgr->used_bytes : 0;
-}
+size_t torch_memory_used(const TorchMemoryManager* mgr) { return mgr ? mgr->used_bytes : 0; }
 
-size_t torch_memory_peak(const TorchMemoryManager* mgr) {
-    return mgr ? mgr->peak_bytes : 0;
-}
+size_t torch_memory_peak(const TorchMemoryManager* mgr) { return mgr ? mgr->peak_bytes : 0; }
 
 size_t torch_memory_remaining(const TorchMemoryManager* mgr) {
     if (!mgr)
@@ -150,6 +145,4 @@ bool torch_memory_reserve_graph(TorchMemoryManager* mgr, CMLGraph_t graph) {
     return cml_graph_allocator_reserve(mgr->graph_allocator, graph);
 }
 
-CMLContext_t torch_memory_get_context(TorchMemoryManager* mgr) {
-    return mgr ? mgr->context : NULL;
-}
+CMLContext_t torch_memory_get_context(TorchMemoryManager* mgr) { return mgr ? mgr->context : NULL; }

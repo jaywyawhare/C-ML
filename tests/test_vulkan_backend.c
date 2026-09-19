@@ -11,30 +11,49 @@
 
 static int test_spirv_codegen_create(void) {
     CMLSPIRVCodegen* cg = cml_spirv_codegen_create();
-    if (!cg) return 0;
-    if (!cg->initialized) { cml_spirv_codegen_destroy(cg); return 0; }
-    if (cg->local_size_x != 256) { cml_spirv_codegen_destroy(cg); return 0; }
+    if (!cg)
+        return 0;
+    if (!cg->initialized) {
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
+    if (cg->local_size_x != 256) {
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
     cml_spirv_codegen_destroy(cg);
     return 1;
 }
 
 static int test_spirv_gen_unary_neg(void) {
     CMLSPIRVCodegen* cg = cml_spirv_codegen_create();
-    if (!cg) return 0;
+    if (!cg)
+        return 0;
 
-    size_t size = 0;
+    size_t size     = 0;
     uint32_t* spirv = cml_spirv_gen_unary(cg, UOP_NEG, "test_neg", &size);
-    if (!spirv) { cml_spirv_codegen_destroy(cg); return 0; }
-    if (size == 0) { cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
+    if (!spirv) {
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
+    if (size == 0) {
+        cml_free(spirv);
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
 
     /* Verify SPIR-V magic number */
     if (spirv[0] != 0x07230203) {
-        cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0;
+        cml_free(spirv);
+        cml_spirv_codegen_destroy(cg);
+        return 0;
     }
 
     /* Verify size is multiple of 4 bytes */
     if (size % 4 != 0) {
-        cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0;
+        cml_free(spirv);
+        cml_spirv_codegen_destroy(cg);
+        return 0;
     }
 
     cml_free(spirv);
@@ -44,12 +63,20 @@ static int test_spirv_gen_unary_neg(void) {
 
 static int test_spirv_gen_unary_exp(void) {
     CMLSPIRVCodegen* cg = cml_spirv_codegen_create();
-    if (!cg) return 0;
+    if (!cg)
+        return 0;
 
-    size_t size = 0;
+    size_t size     = 0;
     uint32_t* spirv = cml_spirv_gen_unary(cg, UOP_EXP, "test_exp", &size);
-    if (!spirv || size == 0) { cml_spirv_codegen_destroy(cg); return 0; }
-    if (spirv[0] != 0x07230203) { cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
+    if (!spirv || size == 0) {
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
+    if (spirv[0] != 0x07230203) {
+        cml_free(spirv);
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
 
     cml_free(spirv);
     cml_spirv_codegen_destroy(cg);
@@ -58,12 +85,20 @@ static int test_spirv_gen_unary_exp(void) {
 
 static int test_spirv_gen_unary_sqrt(void) {
     CMLSPIRVCodegen* cg = cml_spirv_codegen_create();
-    if (!cg) return 0;
+    if (!cg)
+        return 0;
 
-    size_t size = 0;
+    size_t size     = 0;
     uint32_t* spirv = cml_spirv_gen_unary(cg, UOP_SQRT, "test_sqrt", &size);
-    if (!spirv || size == 0) { cml_spirv_codegen_destroy(cg); return 0; }
-    if (spirv[0] != 0x07230203) { cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
+    if (!spirv || size == 0) {
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
+    if (spirv[0] != 0x07230203) {
+        cml_free(spirv);
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
 
     cml_free(spirv);
     cml_spirv_codegen_destroy(cg);
@@ -72,12 +107,20 @@ static int test_spirv_gen_unary_sqrt(void) {
 
 static int test_spirv_gen_binary_add(void) {
     CMLSPIRVCodegen* cg = cml_spirv_codegen_create();
-    if (!cg) return 0;
+    if (!cg)
+        return 0;
 
-    size_t size = 0;
+    size_t size     = 0;
     uint32_t* spirv = cml_spirv_gen_binary(cg, UOP_ADD, "test_add", &size);
-    if (!spirv || size == 0) { cml_spirv_codegen_destroy(cg); return 0; }
-    if (spirv[0] != 0x07230203) { cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
+    if (!spirv || size == 0) {
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
+    if (spirv[0] != 0x07230203) {
+        cml_free(spirv);
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
 
     cml_free(spirv);
     cml_spirv_codegen_destroy(cg);
@@ -86,12 +129,20 @@ static int test_spirv_gen_binary_add(void) {
 
 static int test_spirv_gen_binary_mul(void) {
     CMLSPIRVCodegen* cg = cml_spirv_codegen_create();
-    if (!cg) return 0;
+    if (!cg)
+        return 0;
 
-    size_t size = 0;
+    size_t size     = 0;
     uint32_t* spirv = cml_spirv_gen_binary(cg, UOP_MUL, "test_mul", &size);
-    if (!spirv || size == 0) { cml_spirv_codegen_destroy(cg); return 0; }
-    if (spirv[0] != 0x07230203) { cml_free(spirv); cml_spirv_codegen_destroy(cg); return 0; }
+    if (!spirv || size == 0) {
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
+    if (spirv[0] != 0x07230203) {
+        cml_free(spirv);
+        cml_spirv_codegen_destroy(cg);
+        return 0;
+    }
 
     cml_free(spirv);
     cml_spirv_codegen_destroy(cg);
@@ -100,21 +151,30 @@ static int test_spirv_gen_binary_mul(void) {
 
 static int test_spirv_builder(void) {
     SPIRVBuilder* b = spirv_builder_create();
-    if (!b) return 0;
+    if (!b)
+        return 0;
 
     spirv_builder_emit(b, 0x07230203);
     spirv_builder_emit(b, 0x00010300);
-    if (b->len != 2) { spirv_builder_destroy(b); return 0; }
+    if (b->len != 2) {
+        spirv_builder_destroy(b);
+        return 0;
+    }
 
     uint32_t id1 = spirv_builder_alloc_id(b);
     uint32_t id2 = spirv_builder_alloc_id(b);
-    if (id1 == id2) { spirv_builder_destroy(b); return 0; }
-    if (id2 != id1 + 1) { spirv_builder_destroy(b); return 0; }
+    if (id1 == id2) {
+        spirv_builder_destroy(b);
+        return 0;
+    }
+    if (id2 != id1 + 1) {
+        spirv_builder_destroy(b);
+        return 0;
+    }
 
     spirv_builder_destroy(b);
     return 1;
 }
-
 
 static int test_vulkan_available(void) {
     /* Just test that the function doesn't crash */
@@ -130,7 +190,8 @@ static int test_vulkan_backend_create_free(void) {
     }
 
     CMLVulkanBackend* backend = cml_vulkan_backend_create();
-    if (!backend) return 0;
+    if (!backend)
+        return 0;
 
     int rc = cml_vulkan_backend_init(backend);
     if (rc != 0) {
@@ -155,7 +216,8 @@ static int test_vulkan_buffer_ops(void) {
     }
 
     CMLVulkanBackend* backend = cml_vulkan_backend_create();
-    if (!backend) return 0;
+    if (!backend)
+        return 0;
     if (cml_vulkan_backend_init(backend) != 0) {
         cml_vulkan_backend_free(backend);
         printf("(skipped: init failed) ");
@@ -164,17 +226,29 @@ static int test_vulkan_buffer_ops(void) {
 
     /* Test host-visible buffer */
     CMLVulkanBuffer* buf = cml_vulkan_buffer_create(backend, 1024, false);
-    if (!buf) { cml_vulkan_backend_free(backend); return 0; }
+    if (!buf) {
+        cml_vulkan_backend_free(backend);
+        return 0;
+    }
 
     float data[256];
-    for (int i = 0; i < 256; i++) data[i] = (float)i;
+    for (int i = 0; i < 256; i++)
+        data[i] = (float)i;
 
     int rc = cml_vulkan_buffer_upload(backend, buf, data, sizeof(data));
-    if (rc != 0) { cml_vulkan_buffer_free(backend, buf); cml_vulkan_backend_free(backend); return 0; }
+    if (rc != 0) {
+        cml_vulkan_buffer_free(backend, buf);
+        cml_vulkan_backend_free(backend);
+        return 0;
+    }
 
     float result[256] = {0};
-    rc = cml_vulkan_buffer_download(backend, buf, result, sizeof(result));
-    if (rc != 0) { cml_vulkan_buffer_free(backend, buf); cml_vulkan_backend_free(backend); return 0; }
+    rc                = cml_vulkan_buffer_download(backend, buf, result, sizeof(result));
+    if (rc != 0) {
+        cml_vulkan_buffer_free(backend, buf);
+        cml_vulkan_backend_free(backend);
+        return 0;
+    }
 
     for (int i = 0; i < 256; i++) {
         if (fabsf(result[i] - data[i]) > 1e-6f) {
@@ -196,7 +270,8 @@ static int test_vulkan_kernel_dispatch(void) {
     }
 
     CMLVulkanBackend* backend = cml_vulkan_backend_create();
-    if (!backend) return 0;
+    if (!backend)
+        return 0;
     if (cml_vulkan_backend_init(backend) != 0) {
         cml_vulkan_backend_free(backend);
         printf("(skipped: init failed) ");
@@ -205,8 +280,8 @@ static int test_vulkan_kernel_dispatch(void) {
 
     /* Generate a simple unary negation SPIR-V shader */
     CMLSPIRVCodegen* cg = cml_spirv_codegen_create();
-    size_t spirv_size = 0;
-    uint32_t* spirv = cml_spirv_gen_unary(cg, UOP_NEG, "main", &spirv_size);
+    size_t spirv_size   = 0;
+    uint32_t* spirv     = cml_spirv_gen_unary(cg, UOP_NEG, "main", &spirv_size);
     if (!spirv) {
         cml_spirv_codegen_destroy(cg);
         cml_vulkan_backend_free(backend);

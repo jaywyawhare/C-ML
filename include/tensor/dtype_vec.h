@@ -3,7 +3,7 @@
 #ifndef CML_DTYPE_VEC_H
 #define CML_DTYPE_VEC_H
 
-#include "tensor/tensor.h"  
+#include "tensor/tensor.h"
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -20,12 +20,15 @@ typedef enum {
 } VecWidth;
 
 typedef struct VecDType {
-    DType    scalar;    
-    int      n;         
+    DType scalar;
+    int n;
 } VecDType;
 
 static inline VecDType dtype_scalar(DType d) {
-    VecDType vt; vt.scalar = d; vt.n = 1; return vt;
+    VecDType vt;
+    vt.scalar = d;
+    vt.n      = 1;
+    return vt;
 }
 
 VecDType dtype_vec(DType d, int n);
@@ -48,11 +51,10 @@ int dtype_vec_max_width(DType d);
 
 int dtype_vec_splat(VecDType vt, double val, char* buf, size_t buf_size);
 
-int dtype_vec_lane(VecDType vt, int lane, const char* vec_name,
-                   char* buf, size_t buf_size);
+int dtype_vec_lane(VecDType vt, int lane, const char* vec_name, char* buf, size_t buf_size);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif 
+#endif

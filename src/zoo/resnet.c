@@ -67,72 +67,80 @@ static ResidualBlock* residual_block_new(const char* name, int in_channels, int 
     block->downsample = NULL;
     if (in_channels != out_channels || stride != 1) {
         block->downsample = nn_sequential();
-        sequential_add(block->downsample,
-                       (Module*)nn_conv2d(in_channels, out_channels, 1, stride, 0, 1, false,
-                                          dtype, device));
-        sequential_add(block->downsample,
-                       (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype,
-                                               device));
+        sequential_add(block->downsample, (Module*)nn_conv2d(in_channels, out_channels, 1, stride,
+                                                             0, 1, false, dtype, device));
+        sequential_add(block->downsample, (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true,
+                                                                  true, dtype, device));
     }
 
     return block;
 }
 
-static Module* create_bottleneck(int in_channels, int mid_channels, int out_channels,
-                                  int stride, DType dtype, DeviceType device) {
+static Module* create_bottleneck(int in_channels, int mid_channels, int out_channels, int stride,
+                                 DType dtype, DeviceType device) {
     ResidualBlock* block =
         residual_block_new("Bottleneck", in_channels, out_channels, stride, dtype, device);
     if (!block)
         return NULL;
 
-    sequential_add(block->conv, (Module*)nn_conv2d(in_channels, mid_channels, 1, 1, 0, 1, false, dtype, device));
-    sequential_add(block->conv, (Module*)nn_batchnorm2d(mid_channels, 1e-5f, 0.1f, true, true, dtype, device));
+    sequential_add(block->conv,
+                   (Module*)nn_conv2d(in_channels, mid_channels, 1, 1, 0, 1, false, dtype, device));
+    sequential_add(block->conv,
+                   (Module*)nn_batchnorm2d(mid_channels, 1e-5f, 0.1f, true, true, dtype, device));
     sequential_add(block->conv, (Module*)nn_relu(false));
 
-    sequential_add(block->conv, (Module*)nn_conv2d(mid_channels, mid_channels, 3, stride, 1, 1, false, dtype, device));
-    sequential_add(block->conv, (Module*)nn_batchnorm2d(mid_channels, 1e-5f, 0.1f, true, true, dtype, device));
+    sequential_add(block->conv, (Module*)nn_conv2d(mid_channels, mid_channels, 3, stride, 1, 1,
+                                                   false, dtype, device));
+    sequential_add(block->conv,
+                   (Module*)nn_batchnorm2d(mid_channels, 1e-5f, 0.1f, true, true, dtype, device));
     sequential_add(block->conv, (Module*)nn_relu(false));
 
-    sequential_add(block->conv, (Module*)nn_conv2d(mid_channels, out_channels, 1, 1, 0, 1, false, dtype, device));
-    sequential_add(block->conv, (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype, device));
-
+    sequential_add(block->conv, (Module*)nn_conv2d(mid_channels, out_channels, 1, 1, 0, 1, false,
+                                                   dtype, device));
+    sequential_add(block->conv,
+                   (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype, device));
 
     return (Module*)block;
 }
 
-static Module* create_basic_block(int in_channels, int out_channels, int stride,
-                                   DType dtype, DeviceType device) {
+static Module* create_basic_block(int in_channels, int out_channels, int stride, DType dtype,
+                                  DeviceType device) {
     ResidualBlock* block =
         residual_block_new("BasicBlock", in_channels, out_channels, stride, dtype, device);
     if (!block)
         return NULL;
 
-    sequential_add(block->conv, (Module*)nn_conv2d(in_channels, out_channels, 3, stride, 1, 1, false, dtype, device));
-    sequential_add(block->conv, (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype, device));
+    sequential_add(block->conv, (Module*)nn_conv2d(in_channels, out_channels, 3, stride, 1, 1,
+                                                   false, dtype, device));
+    sequential_add(block->conv,
+                   (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype, device));
     sequential_add(block->conv, (Module*)nn_relu(false));
-    sequential_add(block->conv, (Module*)nn_conv2d(out_channels, out_channels, 3, 1, 1, 1, false, dtype, device));
-    sequential_add(block->conv, (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype, device));
-
+    sequential_add(block->conv, (Module*)nn_conv2d(out_channels, out_channels, 3, 1, 1, 1, false,
+                                                   dtype, device));
+    sequential_add(block->conv,
+                   (Module*)nn_batchnorm2d(out_channels, 1e-5f, 0.1f, true, true, dtype, device));
 
     return (Module*)block;
 }
 
 static Module* build_bottleneck_stage(int num_blocks, int in_channels, int mid_channels,
-                                       int out_channels, int stride,
-                                       DType dtype, DeviceType device) {
+                                      int out_channels, int stride, DType dtype,
+                                      DeviceType device) {
     Sequential* stage = nn_sequential();
     if (!stage)
         return NULL;
 
-    sequential_add(stage, create_bottleneck(in_channels, mid_channels, out_channels, stride, dtype, device));
+    sequential_add(
+        stage, create_bottleneck(in_channels, mid_channels, out_channels, stride, dtype, device));
     for (int i = 1; i < num_blocks; i++)
-        sequential_add(stage, create_bottleneck(out_channels, mid_channels, out_channels, 1, dtype, device));
+        sequential_add(
+            stage, create_bottleneck(out_channels, mid_channels, out_channels, 1, dtype, device));
 
     return (Module*)stage;
 }
 
-static Module* build_basic_stage(int num_blocks, int in_channels, int out_channels,
-                                  int stride, DType dtype, DeviceType device) {
+static Module* build_basic_stage(int num_blocks, int in_channels, int out_channels, int stride,
+                                 DType dtype, DeviceType device) {
     Sequential* stage = nn_sequential();
     if (!stage)
         return NULL;

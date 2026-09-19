@@ -19,7 +19,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdatomic.h>
-#include <stdio.h>   /* only for optional stats print, remove if want zero dep */
+#include <stdio.h> /* only for optional stats print, remove if want zero dep */
 
 /* System backing allocator for internal slab/large acquisition only.
  * We must NEVER call our own cml_* here for bootstrapping the allocator itself.
@@ -29,50 +29,49 @@
 #ifdef _WIN32
 #include <malloc.h>
 static inline void* system_malloc(size_t sz) { return _aligned_malloc(sz ? sz : 1, 16); }
-static inline void  system_free(void* p)     { _aligned_free(p); }
-static inline int   system_posix_memalign(void** memptr, size_t alignment, size_t size) {
+static inline void system_free(void* p) { _aligned_free(p); }
+static inline int system_posix_memalign(void** memptr, size_t alignment, size_t size) {
     void* q = _aligned_malloc(size ? size : 1, alignment);
     *memptr = q;
-    return q ? 0 : 12;   /* 12 == ENOMEM */
+    return q ? 0 : 12; /* 12 == ENOMEM */
 }
 #else
 static inline void* system_malloc(size_t sz) { return malloc(sz); }
-static inline void  system_free(void* p)     { free(p); }
-static inline int   system_posix_memalign(void** memptr, size_t alignment, size_t size) {
+static inline void system_free(void* p) { free(p); }
+static inline int system_posix_memalign(void** memptr, size_t alignment, size_t size) {
     return posix_memalign(memptr, alignment, size);
 }
 #endif
 
 /* Tunables for "fast as fuck" */
-#define CML_SLAB_SIZE          (256 * 1024)   /* 256 KiB slabs - sweet spot for cache + TLB */
-#define CML_MAX_LOCAL_CACHE    64             /* max free objects kept per class in TLS before flushing batch */
-#define CML_LARGE_THRESHOLD    (128 * 1024)   /* >=128KiB: direct path */
-#define CML_MIN_ALIGN          16
-#define CML_HEADER_SIZE        16             /* 16B header => good default alignment for returned ptrs */
+#define CML_SLAB_SIZE (256 * 1024) /* 256 KiB slabs - sweet spot for cache + TLB */
+#define CML_MAX_LOCAL_CACHE 64 /* max free objects kept per class in TLS before flushing batch */
+#define CML_LARGE_THRESHOLD (128 * 1024) /* >=128KiB: direct path */
+#define CML_MIN_ALIGN 16
+#define CML_HEADER_SIZE 16 /* 16B header => good default alignment for returned ptrs */
 
-_Static_assert(CML_HEADER_SIZE >= 16 && (CML_HEADER_SIZE % 16) == 0, "header must preserve alignment");
+_Static_assert(CML_HEADER_SIZE >= 16 && (CML_HEADER_SIZE % 16) == 0,
+               "header must preserve alignment");
 
 /* Per-allocation header. Lives immediately before user pointer.
  * size is size_t so large tensors / buffers well beyond 4 GiB are representable. */
 typedef struct {
-    size_t   size;       /* requested user bytes */
-    uint16_t class_idx;  /* which size class (0xffff for large/direct) */
-    uint16_t magic;      /* 0xC4A1 for sanity */
+    size_t size;        /* requested user bytes */
+    uint16_t class_idx; /* which size class (0xffff for large/direct) */
+    uint16_t magic;     /* 0xC4A1 for sanity */
 } AllocHeader;
 
-_Static_assert(sizeof(AllocHeader) <= CML_HEADER_SIZE,
-               "AllocHeader must fit in CML_HEADER_SIZE");
+_Static_assert(sizeof(AllocHeader) <= CML_HEADER_SIZE, "AllocHeader must fit in CML_HEADER_SIZE");
 
 #define ALLOC_MAGIC 0xC4A1
 
 static inline AllocHeader* header_from_user(void* user) {
-    if (!user) return NULL;
+    if (!user)
+        return NULL;
     return (AllocHeader*)((char*)user - CML_HEADER_SIZE);
 }
 
-static inline void* user_from_header(AllocHeader* h) {
-    return (char*)h + CML_HEADER_SIZE;
-}
+static inline void* user_from_header(AllocHeader* h) { return (char*)h + CML_HEADER_SIZE; }
 
 /* ---------------- Size classes ----------------
  * We use a compact table of increasing sizes. Good balance of internal fragmentation vs #classes.
@@ -80,7 +79,7 @@ static inline void* user_from_header(AllocHeader* h) {
  */
 static const size_t SIZE_CLASSES[] = {
     /* 0-15: 16B granularity for tiny */
-    16,  32,  48,  64,  80,  96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256,
+    16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256,
     /* 16-23: 32B steps */
     288, 320, 352, 384, 416, 448, 480, 512,
     /* 24-29: 64B steps */
@@ -100,21 +99,24 @@ static const size_t SIZE_CLASSES[] = {
     /* 60-62: bigger for "medium" */
     28672, 32768, 40960,
     /* last few before large threshold */
-    49152, 65536, 98304
-};
+    49152, 65536, 98304};
 #define NUM_SIZE_CLASSES (sizeof(SIZE_CLASSES) / sizeof(SIZE_CLASSES[0]))
 
 static inline int size_to_class(size_t size) {
-    if (size <= SIZE_CLASSES[0]) return 0;
-    /* Linear scan is fine: NUM_SIZE_CLASSES ~ 65, called only on slow paths or first alloc per size. */
+    if (size <= SIZE_CLASSES[0])
+        return 0;
+    /* Linear scan is fine: NUM_SIZE_CLASSES ~ 65, called only on slow paths or first alloc per
+     * size. */
     for (size_t i = 0; i < NUM_SIZE_CLASSES; ++i) {
-        if (size <= SIZE_CLASSES[i]) return i;
+        if (size <= SIZE_CLASSES[i])
+            return i;
     }
     return -1; /* large */
 }
 
 static inline size_t class_to_size(int cls) {
-    if (cls < 0 || (size_t)cls >= NUM_SIZE_CLASSES) return 0;
+    if (cls < 0 || (size_t)cls >= NUM_SIZE_CLASSES)
+        return 0;
     return SIZE_CLASSES[cls];
 }
 
@@ -125,47 +127,46 @@ typedef struct FreeNode {
 } FreeNode;
 
 typedef struct Slab {
-    struct Slab*   next;
-    void*          system_base; /* original pointer from system_malloc; used for system_free */
-    uint32_t       class_idx;
-    uint32_t       num_blocks;
-    uint32_t       used_blocks;
+    struct Slab* next;
+    void* system_base; /* original pointer from system_malloc; used for system_free */
+    uint32_t class_idx;
+    uint32_t num_blocks;
+    uint32_t used_blocks;
     /* Without this pad the fields above total 28 bytes, so data[] -- and hence
      * every AllocHeader and every user pointer carved from the slab -- landed
      * on a 4-mod-8 address. That is undefined behaviour on the header's size_t
      * and silently broke the alignment guarantee callers expect for double and
      * for SIMD loads. Every size class is a multiple of 16, so a 32-byte slab
      * header keeps every block 16-aligned. */
-    uint32_t       _pad;
-    char           data[];   /* flexible: the carved blocks start here */
+    uint32_t _pad;
+    char data[]; /* flexible: the carved blocks start here */
 } Slab;
 
-_Static_assert(offsetof(Slab, data) % 16 == 0,
-               "slab payload must start 16-byte aligned");
+_Static_assert(offsetof(Slab, data) % 16 == 0, "slab payload must start 16-byte aligned");
 
 /* Track live slabs so we can eventually system_free their original base.
  * Currently slabs are process-lifetime (standard for this style of allocator),
  * but we must not lose the system_malloc pointer after alignment. */
 static pthread_mutex_t g_slab_list_lock = PTHREAD_MUTEX_INITIALIZER;
-static Slab* g_slab_list = NULL;
+static Slab* g_slab_list                = NULL;
 
 /* One central freelist + mutex per size class */
 typedef struct {
     pthread_mutex_t lock;
-    FreeNode*       head;
-    size_t          total_slabs;   /* approx */
+    FreeNode* head;
+    size_t total_slabs; /* approx */
 } CentralBin;
 
 /* Thread-local cache */
 typedef struct {
     FreeNode* heads[NUM_SIZE_CLASSES];
-    uint16_t  counts[NUM_SIZE_CLASSES];
-    bool      initialized;
+    uint16_t counts[NUM_SIZE_CLASSES];
+    bool initialized;
 } ThreadCache;
 
-static CentralBin   g_central[NUM_SIZE_CLASSES];
+static CentralBin g_central[NUM_SIZE_CLASSES];
 static pthread_mutex_t g_init_lock = PTHREAD_MUTEX_INITIALIZER;
-static bool         g_initialized = false;
+static bool g_initialized          = false;
 
 /* Thread local */
 static __thread ThreadCache tl_cache = {0};
@@ -178,24 +179,24 @@ static _Atomic size_t g_alloc_count           = 0;
 /* Fault injection: -1 = disabled, >=0 = fail after this many more allocs */
 static _Atomic long g_fault_countdown = -1;
 /* Monotonic allocation index (for pinpointing the failing site) */
-static _Atomic long g_alloc_index     = 0;
+static _Atomic long g_alloc_index = 0;
 
 /* Forward */
-static void*  alloc_from_class(int cls, size_t user_size);
-static void   free_to_class(int cls, void* user_ptr, size_t user_size);
-static void*  alloc_large(size_t size);
-static void   free_large(void* ptr);
-static void   init_once(void);
-static Slab*  carve_new_slab(int cls);
-static void   refill_from_central(int cls);
-static void   flush_local_to_central(int cls, int keep);
+static void* alloc_from_class(int cls, size_t user_size);
+static void free_to_class(int cls, void* user_ptr, size_t user_size);
+static void* alloc_large(size_t size);
+static void free_large(void* ptr);
+static void init_once(void);
+static Slab* carve_new_slab(int cls);
+static void refill_from_central(int cls);
+static void flush_local_to_central(int cls, int keep);
 
 /* ---------------- Initialization ---------------- */
 
 static void init_central_bins(void) {
     for (size_t i = 0; i < NUM_SIZE_CLASSES; ++i) {
         pthread_mutex_init(&g_central[i].lock, NULL);
-        g_central[i].head = NULL;
+        g_central[i].head        = NULL;
         g_central[i].total_slabs = 0;
     }
 }
@@ -223,12 +224,13 @@ static inline void ensure_init(void) {
 
 static Slab* carve_new_slab(int cls) {
     size_t bin_size = class_to_size(cls);
-    if (bin_size == 0) return NULL;
+    if (bin_size == 0)
+        return NULL;
 
     /* We allocate the slab header + data region with libc malloc.
      * This cost is amortized over hundreds of objects per slab.
      */
-    size_t usable = CML_SLAB_SIZE - sizeof(Slab);
+    size_t usable     = CML_SLAB_SIZE - sizeof(Slab);
     size_t num_blocks = usable / (CML_HEADER_SIZE + bin_size);
     if (num_blocks < 1) {
         /* Extremely large class inside "small" path - fall back */
@@ -238,35 +240,38 @@ static Slab* carve_new_slab(int cls) {
     size_t alloc_sz = sizeof(Slab) + num_blocks * (CML_HEADER_SIZE + bin_size);
     /* Align the slab allocation a bit; keep the original system pointer so we can free it. */
     void* raw = system_malloc(alloc_sz + 64);
-    if (!raw) return NULL;
+    if (!raw)
+        return NULL;
 
     /* Align start of Slab structure for cleanliness */
-    uintptr_t base = (uintptr_t)raw;
+    uintptr_t base         = (uintptr_t)raw;
     uintptr_t aligned_base = (base + 63) & ~(uintptr_t)63;
-    Slab* slab = (Slab*)aligned_base;
+    Slab* slab             = (Slab*)aligned_base;
 
-    slab->next = NULL;
+    slab->next        = NULL;
     slab->system_base = raw; /* MUST retain: system_free(raw), not system_free(slab) */
-    slab->class_idx = (uint32_t)cls;
-    slab->num_blocks = (uint32_t)num_blocks;
+    slab->class_idx   = (uint32_t)cls;
+    slab->num_blocks  = (uint32_t)num_blocks;
     slab->used_blocks = 0;
 
     /* Build intrusive free list for this slab directly into the central for this class */
-    char* p = (char*)slab->data;
+    char* p         = (char*)slab->data;
     FreeNode* first = NULL;
-    FreeNode* prev = NULL;
+    FreeNode* prev  = NULL;
 
     for (uint32_t i = 0; i < num_blocks; ++i) {
         AllocHeader* hdr = (AllocHeader*)p;
-        hdr->size = 0;
-        hdr->class_idx = (uint16_t)cls;
-        hdr->magic = ALLOC_MAGIC;
+        hdr->size        = 0;
+        hdr->class_idx   = (uint16_t)cls;
+        hdr->magic       = ALLOC_MAGIC;
 
         FreeNode* node = (FreeNode*)(p + CML_HEADER_SIZE);
-        node->next = NULL;
+        node->next     = NULL;
 
-        if (!first) first = node;
-        if (prev) prev->next = node;
+        if (!first)
+            first = node;
+        if (prev)
+            prev->next = node;
         prev = node;
 
         p += CML_HEADER_SIZE + bin_size;
@@ -275,7 +280,7 @@ static Slab* carve_new_slab(int cls) {
     /* Insert the whole chain into central under caller lock (or we can do it here) */
     if (first) {
         pthread_mutex_lock(&g_central[cls].lock);
-        prev->next = g_central[cls].head;
+        prev->next          = g_central[cls].head;
         g_central[cls].head = first;
         g_central[cls].total_slabs++;
         pthread_mutex_unlock(&g_central[cls].lock);
@@ -283,7 +288,7 @@ static Slab* carve_new_slab(int cls) {
 
     /* Register slab so its system_base is never lost (process-lifetime today). */
     pthread_mutex_lock(&g_slab_list_lock);
-    slab->next = g_slab_list;
+    slab->next  = g_slab_list;
     g_slab_list = slab;
     pthread_mutex_unlock(&g_slab_list_lock);
 
@@ -294,51 +299,55 @@ static Slab* carve_new_slab(int cls) {
 
 static void refill_from_central(int cls) {
     /* Steal a batch from central into thread local */
-    const int want = 32; /* batch size */
+    const int want   = 32; /* batch size */
     FreeNode* stolen = NULL;
-    int got = 0;
+    int got          = 0;
 
     pthread_mutex_lock(&g_central[cls].lock);
-    FreeNode* cur = g_central[cls].head;
+    FreeNode* cur  = g_central[cls].head;
     FreeNode* prev = NULL;
     while (cur && got < want) {
         FreeNode* next = cur->next;
         /* unlink */
-        if (prev) prev->next = next;
-        else g_central[cls].head = next;
+        if (prev)
+            prev->next = next;
+        else
+            g_central[cls].head = next;
         cur->next = stolen;
-        stolen = cur;
-        cur = next;
+        stolen    = cur;
+        cur       = next;
         ++got;
     }
     pthread_mutex_unlock(&g_central[cls].lock);
 
     if (got > 0) {
-        tl_cache.heads[cls] = stolen;
+        tl_cache.heads[cls]  = stolen;
         tl_cache.counts[cls] = (uint16_t)got;
     }
 }
 
 static void flush_local_to_central(int cls, int keep) {
     FreeNode* list = tl_cache.heads[cls];
-    uint16_t cnt = tl_cache.counts[cls];
-    if (!list || cnt <= (uint16_t)keep) return;
+    uint16_t cnt   = tl_cache.counts[cls];
+    if (!list || cnt <= (uint16_t)keep)
+        return;
 
     /* Detach the excess tail */
     FreeNode* keep_head = list;
-    FreeNode* tail = list;
-    int keep_cnt = 0;
+    FreeNode* tail      = list;
+    int keep_cnt        = 0;
     while (keep_cnt < keep && tail) {
         ++keep_cnt;
-        if (keep_cnt < keep) tail = tail->next;
+        if (keep_cnt < keep)
+            tail = tail->next;
     }
     if (!tail) {
         /* nothing to flush */
         return;
     }
     FreeNode* flush_head = tail->next;
-    tail->next = NULL;
-    tl_cache.heads[cls] = keep_head;
+    tail->next           = NULL;
+    tl_cache.heads[cls]  = keep_head;
     tl_cache.counts[cls] = (uint16_t)keep_cnt;
 
     if (flush_head) {
@@ -346,13 +355,13 @@ static void flush_local_to_central(int cls, int keep) {
         pthread_mutex_lock(&g_central[cls].lock);
         /* Find end of flush list to splice */
         FreeNode* f = flush_head;
-        while (f->next) f = f->next;
-        f->next = g_central[cls].head;
+        while (f->next)
+            f = f->next;
+        f->next             = g_central[cls].head;
         g_central[cls].head = flush_head;
         pthread_mutex_unlock(&g_central[cls].lock);
     }
 }
-
 
 /* ---------------- Pool bypass (diagnostics) ----------------
  *
@@ -399,23 +408,38 @@ long cml_malloc_alloc_index(void) {
     return atomic_load_explicit(&g_alloc_index, memory_order_relaxed);
 }
 
-void* cml_malloc(size_t size)                    { if (pt_fault_hit()) return NULL;
-                                                   return malloc(size ? size : 1); }
-void* cml_calloc(size_t n, size_t sz)            { if (pt_fault_hit()) return NULL;
-                                                   return calloc(n ? n : 1, sz ? sz : 1); }
-void* cml_realloc(void* p, size_t n)             { if (pt_fault_hit()) return NULL;
-                                                   return realloc(p, n ? n : 1); }
-void  cml_free(void* p)                          { free(p); }
-char* cml_strdup(const char* s)                  { if (!s) return NULL;
-                                                   if (pt_fault_hit()) return NULL;
-                                                   return strdup(s); }
-void* cml_aligned_alloc(size_t size, size_t al)  {
+void* cml_malloc(size_t size) {
+    if (pt_fault_hit())
+        return NULL;
+    return malloc(size ? size : 1);
+}
+void* cml_calloc(size_t n, size_t sz) {
+    if (pt_fault_hit())
+        return NULL;
+    return calloc(n ? n : 1, sz ? sz : 1);
+}
+void* cml_realloc(void* p, size_t n) {
+    if (pt_fault_hit())
+        return NULL;
+    return realloc(p, n ? n : 1);
+}
+void cml_free(void* p) { free(p); }
+char* cml_strdup(const char* s) {
+    if (!s)
+        return NULL;
+    if (pt_fault_hit())
+        return NULL;
+    return strdup(s);
+}
+void* cml_aligned_alloc(size_t size, size_t al) {
     void* p = NULL;
-    if (al < sizeof(void*)) al = sizeof(void*);
-    if (posix_memalign(&p, al, size ? size : 1) != 0) return NULL;
+    if (al < sizeof(void*))
+        al = sizeof(void*);
+    if (posix_memalign(&p, al, size ? size : 1) != 0)
+        return NULL;
     return p;
 }
-void  cml_aligned_free(void* p)                  { free(p); }
+void cml_aligned_free(void* p) { free(p); }
 #else
 
 /* ---------------- Allocation paths ---------------- */
@@ -429,15 +453,15 @@ static void* alloc_from_class(int cls, size_t user_size) {
         tl_cache.heads[cls] = node->next;
         tl_cache.counts[cls]--;
         AllocHeader* hdr = (AllocHeader*)((char*)node - CML_HEADER_SIZE);
-        hdr->size = user_size;
-        hdr->class_idx = (uint16_t)cls;
-        hdr->magic = ALLOC_MAGIC;
+        hdr->size        = user_size;
+        hdr->class_idx   = (uint16_t)cls;
+        hdr->magic       = ALLOC_MAGIC;
 
         /* update stats */
         atomic_fetch_add_explicit(&g_total_allocated_bytes, user_size, memory_order_relaxed);
         atomic_fetch_add_explicit(&g_alloc_count, 1, memory_order_relaxed);
         size_t cur = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
-        size_t pk = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
+        size_t pk  = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
         if (cur > pk) {
             atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
         }
@@ -460,12 +484,13 @@ static void* alloc_from_class(int cls, size_t user_size) {
     if (!node) {
         /* OOM fallback: try libc directly for this bin size */
         size_t bin = class_to_size(cls);
-        void* raw = system_malloc(CML_HEADER_SIZE + bin);
-        if (!raw) return NULL;
+        void* raw  = system_malloc(CML_HEADER_SIZE + bin);
+        if (!raw)
+            return NULL;
         AllocHeader* hdr = (AllocHeader*)raw;
-        hdr->size = user_size;
-        hdr->class_idx = (uint16_t)cls;
-        hdr->magic = ALLOC_MAGIC;
+        hdr->size        = user_size;
+        hdr->class_idx   = (uint16_t)cls;
+        hdr->magic       = ALLOC_MAGIC;
         return user_from_header(hdr);
     }
 
@@ -473,15 +498,16 @@ static void* alloc_from_class(int cls, size_t user_size) {
     tl_cache.counts[cls]--;
 
     AllocHeader* hdr = (AllocHeader*)((char*)node - CML_HEADER_SIZE);
-    hdr->size = user_size;
-    hdr->class_idx = (uint16_t)cls;
-    hdr->magic = ALLOC_MAGIC;
+    hdr->size        = user_size;
+    hdr->class_idx   = (uint16_t)cls;
+    hdr->magic       = ALLOC_MAGIC;
 
     atomic_fetch_add_explicit(&g_total_allocated_bytes, user_size, memory_order_relaxed);
     atomic_fetch_add_explicit(&g_alloc_count, 1, memory_order_relaxed);
     size_t cur = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
-    size_t pk = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
-    if (cur > pk) atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
+    size_t pk  = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
+    if (cur > pk)
+        atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
 
     return user_from_header(hdr);
 }
@@ -494,24 +520,27 @@ static void* alloc_large(size_t size) {
     void* raw = NULL;
     if (system_posix_memalign(&raw, 64, total) != 0) {
         raw = system_malloc(total);
-        if (!raw) return NULL;
+        if (!raw)
+            return NULL;
     }
     AllocHeader* hdr = (AllocHeader*)raw;
-    hdr->size = size;
-    hdr->class_idx = 0xffff;
-    hdr->magic = ALLOC_MAGIC;
+    hdr->size        = size;
+    hdr->class_idx   = 0xffff;
+    hdr->magic       = ALLOC_MAGIC;
 
     atomic_fetch_add_explicit(&g_total_allocated_bytes, size, memory_order_relaxed);
     atomic_fetch_add_explicit(&g_alloc_count, 1, memory_order_relaxed);
     size_t cur = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
-    size_t pk = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
-    if (cur > pk) atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
+    size_t pk  = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
+    if (cur > pk)
+        atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
 
     return user_from_header(hdr);
 }
 
 void* cml_malloc(size_t size) {
-    if (size == 0) size = 1; /* classic */
+    if (size == 0)
+        size = 1; /* classic */
 
     /* Fault injection: if a countdown is active, decrement it and fail when it hits 0. */
     long cd = atomic_load_explicit(&g_fault_countdown, memory_order_relaxed);
@@ -538,7 +567,8 @@ void* cml_malloc(size_t size) {
 
 void* cml_calloc(size_t nmemb, size_t size) {
     size_t bytes;
-    if (__builtin_mul_overflow(nmemb, size, &bytes)) return NULL;
+    if (__builtin_mul_overflow(nmemb, size, &bytes))
+        return NULL;
     void* p = cml_malloc(bytes);
     if (p) {
         memset(p, 0, bytes);
@@ -547,7 +577,8 @@ void* cml_calloc(size_t nmemb, size_t size) {
 }
 
 void* cml_realloc(void* ptr, size_t new_size) {
-    if (!ptr) return cml_malloc(new_size);
+    if (!ptr)
+        return cml_malloc(new_size);
     if (new_size == 0) {
         cml_free(ptr);
         return NULL;
@@ -565,13 +596,15 @@ void* cml_realloc(void* ptr, size_t new_size) {
         /* Shrink: keep same block, just update header */
         hdr->size = new_size;
         /* Note: we do not give memory back to freelist for shrink here (common & fast) */
-        atomic_fetch_sub_explicit(&g_total_allocated_bytes, (old_size - new_size), memory_order_relaxed);
+        atomic_fetch_sub_explicit(&g_total_allocated_bytes, (old_size - new_size),
+                                  memory_order_relaxed);
         return ptr;
     }
 
     /* Grow: allocate new + copy */
     void* newp = cml_malloc(new_size);
-    if (!newp) return NULL;
+    if (!newp)
+        return NULL;
     memcpy(newp, ptr, old_size < new_size ? old_size : new_size);
     cml_free(ptr);
     return newp;
@@ -582,13 +615,14 @@ static void free_to_class(int cls, void* user_ptr, size_t user_size) {
     ensure_init();
 
     AllocHeader* hdr = header_from_user(user_ptr);
-    if (!hdr || hdr->magic != ALLOC_MAGIC) return;
+    if (!hdr || hdr->magic != ALLOC_MAGIC)
+        return;
 
     /* Mark as freed for double-free detection (optional) */
     hdr->magic = 0xdead;
 
-    FreeNode* node = (FreeNode*)user_ptr;  /* user_ptr is exactly after header */
-    node->next = tl_cache.heads[cls];
+    FreeNode* node      = (FreeNode*)user_ptr; /* user_ptr is exactly after header */
+    node->next          = tl_cache.heads[cls];
     tl_cache.heads[cls] = node;
     tl_cache.counts[cls]++;
 
@@ -602,8 +636,9 @@ static void free_to_class(int cls, void* user_ptr, size_t user_size) {
 
 static void free_large(void* ptr) {
     AllocHeader* hdr = header_from_user(ptr);
-    if (!hdr || hdr->magic != ALLOC_MAGIC) return;
-    size_t sz = hdr->size;
+    if (!hdr || hdr->magic != ALLOC_MAGIC)
+        return;
+    size_t sz  = hdr->size;
     hdr->magic = 0xdead;
 
     atomic_fetch_sub_explicit(&g_total_allocated_bytes, sz, memory_order_relaxed);
@@ -613,7 +648,8 @@ static void free_large(void* ptr) {
 }
 
 void cml_free(void* ptr) {
-    if (!ptr) return;
+    if (!ptr)
+        return;
 
     AllocHeader* hdr = header_from_user(ptr);
     if (!hdr || hdr->magic != ALLOC_MAGIC) {
@@ -621,7 +657,7 @@ void cml_free(void* ptr) {
         return;
     }
 
-    int cls = hdr->class_idx;
+    int cls   = hdr->class_idx;
     size_t sz = hdr->size;
 
     if (cls == 0xffff || sz >= CML_LARGE_THRESHOLD) {
@@ -633,15 +669,18 @@ void cml_free(void* ptr) {
 }
 
 char* cml_strdup(const char* s) {
-    if (!s) return NULL;
+    if (!s)
+        return NULL;
     size_t len = strlen(s) + 1;
-    char* p = (char*)cml_malloc(len);
-    if (p) memcpy(p, s, len);
+    char* p    = (char*)cml_malloc(len);
+    if (p)
+        memcpy(p, s, len);
     return p;
 }
 
 void* cml_aligned_alloc(size_t size, size_t alignment) {
-    if (alignment < CML_MIN_ALIGN) alignment = CML_MIN_ALIGN;
+    if (alignment < CML_MIN_ALIGN)
+        alignment = CML_MIN_ALIGN;
     if ((alignment & (alignment - 1)) != 0) {
         /* not power of 2: normalize */
         alignment--;
@@ -655,11 +694,12 @@ void* cml_aligned_alloc(size_t size, size_t alignment) {
 
     /* We allocate extra space so we can store header + satisfy alignment */
     size_t header_and_pad = CML_HEADER_SIZE + alignment - 1;
-    void* raw = cml_malloc(size + header_and_pad);
-    if (!raw) return NULL;
+    void* raw             = cml_malloc(size + header_and_pad);
+    if (!raw)
+        return NULL;
 
     /* Find aligned user position after header */
-    uintptr_t addr = (uintptr_t)raw + CML_HEADER_SIZE;
+    uintptr_t addr    = (uintptr_t)raw + CML_HEADER_SIZE;
     uintptr_t aligned = (addr + alignment - 1) & ~(alignment - 1);
 
     /* We need to store the original base (raw) so free can find the header.
@@ -667,11 +707,12 @@ void* cml_aligned_alloc(size_t size, size_t alignment) {
      * For speed we store the delta to the real header start in the first bytes after padding.
      * Simpler approach: use a slightly larger header area for aligned.
      *
-     * For this impl we record the "backing header" by writing a small prefix right before the aligned user ptr.
-     * We will store at (aligned - 8) the distance back to our AllocHeader.
+     * For this impl we record the "backing header" by writing a small prefix right before the
+     * aligned user ptr. We will store at (aligned - 8) the distance back to our AllocHeader.
      */
     ptrdiff_t delta = (ptrdiff_t)(aligned - (uintptr_t)raw);
-    /* Store delta just before user data. We use 8 bytes for delta (fits in the alignment padding). */
+    /* Store delta just before user data. We use 8 bytes for delta (fits in the alignment padding).
+     */
     *((ptrdiff_t*)((char*)aligned - sizeof(ptrdiff_t))) = delta;
 
     /* Return the aligned address. The header lives at (aligned - delta) */
@@ -679,7 +720,8 @@ void* cml_aligned_alloc(size_t size, size_t alignment) {
 }
 
 void cml_aligned_free(void* ptr) {
-    if (!ptr) return;
+    if (!ptr)
+        return;
     /* Recover the original header using stored delta */
     ptrdiff_t delta = *((ptrdiff_t*)((char*)ptr - sizeof(ptrdiff_t)));
     void* real_user = (char*)ptr - delta;
@@ -687,13 +729,17 @@ void cml_aligned_free(void* ptr) {
 }
 
 void cml_allocator_get_stats(size_t* bytes_allocated, size_t* peak_bytes, size_t* alloc_count) {
-    if (bytes_allocated) *bytes_allocated = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
-    if (peak_bytes)      *peak_bytes      = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
-    if (alloc_count)     *alloc_count     = atomic_load_explicit(&g_alloc_count, memory_order_relaxed);
+    if (bytes_allocated)
+        *bytes_allocated = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
+    if (peak_bytes)
+        *peak_bytes = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
+    if (alloc_count)
+        *alloc_count = atomic_load_explicit(&g_alloc_count, memory_order_relaxed);
 }
 
 void cml_allocator_flush_thread_cache(void) {
-    if (!tl_cache.initialized) return;
+    if (!tl_cache.initialized)
+        return;
     for (size_t c = 0; c < NUM_SIZE_CLASSES; ++c) {
         if (tl_cache.counts[c] > 0) {
             flush_local_to_central(c, 0);

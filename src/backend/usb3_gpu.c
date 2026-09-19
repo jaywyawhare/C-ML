@@ -13,47 +13,49 @@
 #include <linux/usbdevice_fs.h>
 #include "alloc/cml_allocator.h"
 
-#define ASM2464PD_VENDOR     0x174c
-#define ASM2464PD_PRODUCT    0x2362
+#define ASM2464PD_VENDOR 0x174c
+#define ASM2464PD_PRODUCT 0x2362
 
-#define USB3_MAX_PACKET      1024
-#define USB3_BULK_BUF_SIZE   (64 * 1024)
-#define USB3_TIMEOUT_MS      5000
+#define USB3_MAX_PACKET 1024
+#define USB3_BULK_BUF_SIZE (64 * 1024)
+#define USB3_TIMEOUT_MS 5000
 
-#define SCSI_VENDOR_CMD      0xE4
-#define SCSI_PCIE_READ       0x01
-#define SCSI_PCIE_WRITE      0x02
-#define SCSI_BAR_READ        0x03
-#define SCSI_BAR_WRITE       0x04
+#define SCSI_VENDOR_CMD 0xE4
+#define SCSI_PCIE_READ 0x01
+#define SCSI_PCIE_WRITE 0x02
+#define SCSI_BAR_READ 0x03
+#define SCSI_BAR_WRITE 0x04
 
-#define DEFAULT_BAR0_SIZE    (16 * 1024 * 1024)
-#define DEFAULT_EP_IN        0x81
-#define DEFAULT_EP_OUT       0x02
+#define DEFAULT_BAR0_SIZE (16 * 1024 * 1024)
+#define DEFAULT_EP_IN 0x81
+#define DEFAULT_EP_OUT 0x02
 
 #pragma pack(push, 1)
 typedef struct {
-    uint8_t  bLength;
-    uint8_t  bDescriptorType;
+    uint8_t bLength;
+    uint8_t bDescriptorType;
     uint16_t bcdUSB;
-    uint8_t  bDeviceClass;
-    uint8_t  bDeviceSubClass;
-    uint8_t  bDeviceProtocol;
-    uint8_t  bMaxPacketSize0;
+    uint8_t bDeviceClass;
+    uint8_t bDeviceSubClass;
+    uint8_t bDeviceProtocol;
+    uint8_t bMaxPacketSize0;
     uint16_t idVendor;
     uint16_t idProduct;
     uint16_t bcdDevice;
-    uint8_t  iManufacturer;
-    uint8_t  iProduct;
-    uint8_t  iSerialNumber;
-    uint8_t  bNumConfigurations;
+    uint8_t iManufacturer;
+    uint8_t iProduct;
+    uint8_t iSerialNumber;
+    uint8_t bNumConfigurations;
 } usb3_dev_desc_t;
 #pragma pack(pop)
 
 static int read_dev_descriptor(int fd, usb3_dev_desc_t* desc) {
     /* usbfs exposes the descriptor at the start of the device file */
-    if (lseek(fd, 0, SEEK_SET) != 0) return -1;
+    if (lseek(fd, 0, SEEK_SET) != 0)
+        return -1;
     ssize_t n = read(fd, desc, sizeof(*desc));
-    if (n < (ssize_t)sizeof(*desc)) return -1;
+    if (n < (ssize_t)sizeof(*desc))
+        return -1;
     return 0;
 }
 
@@ -67,10 +69,10 @@ static int usb3_release_interface(int fd, int iface) {
 
 static int usb3_bulk_xfer(int fd, int ep, void* data, size_t size, int timeout_ms) {
     struct usbdevfs_bulktransfer bulk = {
-        .ep = (unsigned int)ep,
-        .len = (unsigned int)size,
+        .ep      = (unsigned int)ep,
+        .len     = (unsigned int)size,
         .timeout = (unsigned int)timeout_ms,
-        .data = data,
+        .data    = data,
     };
     int ret = ioctl(fd, USBDEVFS_BULK, &bulk);
     return ret;
@@ -78,26 +80,31 @@ static int usb3_bulk_xfer(int fd, int ep, void* data, size_t size, int timeout_m
 
 static int scan_usb_bus(char* path, size_t path_size) {
     DIR* buses = opendir("/dev/bus/usb");
-    if (!buses) return -1;
+    if (!buses)
+        return -1;
 
     struct dirent* bus_ent;
     while ((bus_ent = readdir(buses)) != NULL) {
-        if (bus_ent->d_name[0] == '.') continue;
+        if (bus_ent->d_name[0] == '.')
+            continue;
 
         char bus_path[512];
         snprintf(bus_path, sizeof(bus_path), "/dev/bus/usb/%s", bus_ent->d_name);
         DIR* devs = opendir(bus_path);
-        if (!devs) continue;
+        if (!devs)
+            continue;
 
         struct dirent* dev_ent;
         while ((dev_ent = readdir(devs)) != NULL) {
-            if (dev_ent->d_name[0] == '.') continue;
+            if (dev_ent->d_name[0] == '.')
+                continue;
 
             char dev_path[1024];
             snprintf(dev_path, sizeof(dev_path), "%s/%.200s", bus_path, dev_ent->d_name);
 
             int fd = open(dev_path, O_RDWR);
-            if (fd < 0) continue;
+            if (fd < 0)
+                continue;
 
             usb3_dev_desc_t desc;
             if (read_dev_descriptor(fd, &desc) == 0 && desc.idVendor == ASM2464PD_VENDOR) {
@@ -153,19 +160,20 @@ CMLUSB3GPU* cml_usb3_gpu_open(void) {
         return NULL;
     }
 
-    dev->fd = fd;
-    dev->vendor_id = desc.idVendor;
+    dev->fd         = fd;
+    dev->vendor_id  = desc.idVendor;
     dev->product_id = desc.idProduct;
-    snprintf(dev->device_name, sizeof(dev->device_name), "ASM2464PD PCIe-USB3 Bridge (pid=0x%04x)", desc.idProduct);
+    snprintf(dev->device_name, sizeof(dev->device_name), "ASM2464PD PCIe-USB3 Bridge (pid=0x%04x)",
+             desc.idProduct);
     dev->connected = true;
     dev->bar0_addr = 0;
     dev->bar0_size = DEFAULT_BAR0_SIZE;
-    dev->bar0_map = NULL;
-    dev->ep_in = DEFAULT_EP_IN;
-    dev->ep_out = DEFAULT_EP_OUT;
+    dev->bar0_map  = NULL;
+    dev->ep_in     = DEFAULT_EP_IN;
+    dev->ep_out    = DEFAULT_EP_OUT;
 
     dev->bulk_buf_size = USB3_BULK_BUF_SIZE;
-    dev->bulk_buf = (uint8_t*)cml_malloc(dev->bulk_buf_size);
+    dev->bulk_buf      = (uint8_t*)cml_malloc(dev->bulk_buf_size);
     if (!dev->bulk_buf) {
         usb3_release_interface(fd, 0);
         close(fd);
@@ -178,7 +186,8 @@ CMLUSB3GPU* cml_usb3_gpu_open(void) {
 }
 
 void cml_usb3_gpu_close(CMLUSB3GPU* dev) {
-    if (!dev) return;
+    if (!dev)
+        return;
 
     if (dev->bar0_map && dev->bar0_size > 0) {
         munmap(dev->bar0_map, dev->bar0_size);
@@ -194,10 +203,12 @@ void cml_usb3_gpu_close(CMLUSB3GPU* dev) {
     cml_free(dev);
 }
 
-int cml_usb3_gpu_scsi_cmd(CMLUSB3GPU* dev, const uint8_t* cdb, int cdb_len,
-                          void* data, size_t data_size, bool is_write) {
-    if (!dev || !dev->connected || dev->fd < 0) return -1;
-    if (!cdb || cdb_len <= 0 || cdb_len > 16) return -1;
+int cml_usb3_gpu_scsi_cmd(CMLUSB3GPU* dev, const uint8_t* cdb, int cdb_len, void* data,
+                          size_t data_size, bool is_write) {
+    if (!dev || !dev->connected || dev->fd < 0)
+        return -1;
+    if (!cdb || cdb_len <= 0 || cdb_len > 16)
+        return -1;
 
     /* Build SCSI passthrough via usbfs control transfer.
      * The ASM2464PD accepts vendor-specific SCSI commands over bulk endpoints. */
@@ -217,8 +228,10 @@ int cml_usb3_gpu_scsi_cmd(CMLUSB3GPU* dev, const uint8_t* cdb, int cdb_len,
             size_t offset = 0;
             while (offset < data_size) {
                 size_t chunk = data_size - offset;
-                if (chunk > USB3_MAX_PACKET) chunk = USB3_MAX_PACKET;
-                ret = usb3_bulk_xfer(dev->fd, dev->ep_out, (uint8_t*)data + offset, chunk, USB3_TIMEOUT_MS);
+                if (chunk > USB3_MAX_PACKET)
+                    chunk = USB3_MAX_PACKET;
+                ret = usb3_bulk_xfer(dev->fd, dev->ep_out, (uint8_t*)data + offset, chunk,
+                                     USB3_TIMEOUT_MS);
                 if (ret < 0) {
                     LOG_ERROR("USB3 GPU: SCSI write data failed at offset %zu", offset);
                     return -1;
@@ -229,8 +242,10 @@ int cml_usb3_gpu_scsi_cmd(CMLUSB3GPU* dev, const uint8_t* cdb, int cdb_len,
             size_t offset = 0;
             while (offset < data_size) {
                 size_t chunk = data_size - offset;
-                if (chunk > USB3_MAX_PACKET) chunk = USB3_MAX_PACKET;
-                ret = usb3_bulk_xfer(dev->fd, dev->ep_in, (uint8_t*)data + offset, chunk, USB3_TIMEOUT_MS);
+                if (chunk > USB3_MAX_PACKET)
+                    chunk = USB3_MAX_PACKET;
+                ret = usb3_bulk_xfer(dev->fd, dev->ep_in, (uint8_t*)data + offset, chunk,
+                                     USB3_TIMEOUT_MS);
                 if (ret < 0) {
                     LOG_ERROR("USB3 GPU: SCSI read data failed at offset %zu", offset);
                     return -1;
@@ -244,7 +259,8 @@ int cml_usb3_gpu_scsi_cmd(CMLUSB3GPU* dev, const uint8_t* cdb, int cdb_len,
 }
 
 int cml_usb3_gpu_read32(CMLUSB3GPU* dev, uint64_t offset, uint32_t* value) {
-    if (!dev || !dev->connected || !value) return -1;
+    if (!dev || !dev->connected || !value)
+        return -1;
 
     uint8_t cdb[10];
     memset(cdb, 0, sizeof(cdb));
@@ -260,15 +276,17 @@ int cml_usb3_gpu_read32(CMLUSB3GPU* dev, uint64_t offset, uint32_t* value) {
     cdb[9] = 0;
 
     uint32_t buf = 0;
-    int ret = cml_usb3_gpu_scsi_cmd(dev, cdb, 10, &buf, sizeof(buf), false);
-    if (ret != 0) return -1;
+    int ret      = cml_usb3_gpu_scsi_cmd(dev, cdb, 10, &buf, sizeof(buf), false);
+    if (ret != 0)
+        return -1;
 
     *value = buf;
     return 0;
 }
 
 int cml_usb3_gpu_write32(CMLUSB3GPU* dev, uint64_t offset, uint32_t value) {
-    if (!dev || !dev->connected) return -1;
+    if (!dev || !dev->connected)
+        return -1;
 
     uint8_t cdb[10];
     memset(cdb, 0, sizeof(cdb));
@@ -300,14 +318,16 @@ static void usb3_build_pcie_cdb(uint8_t* cdb, uint8_t sub_cmd, uint64_t addr, ui
 }
 
 int cml_usb3_gpu_upload(CMLUSB3GPU* dev, uint64_t gpu_addr, const void* data, size_t size) {
-    if (!dev || !dev->connected || !data || size == 0) return -1;
+    if (!dev || !dev->connected || !data || size == 0)
+        return -1;
 
     const uint8_t* src = (const uint8_t*)data;
-    size_t offset = 0;
+    size_t offset      = 0;
 
     while (offset < size) {
         size_t chunk = size - offset;
-        if (chunk > dev->bulk_buf_size) chunk = dev->bulk_buf_size;
+        if (chunk > dev->bulk_buf_size)
+            chunk = dev->bulk_buf_size;
 
         uint8_t cdb[16];
         usb3_build_pcie_cdb(cdb, SCSI_PCIE_WRITE, gpu_addr + offset, (uint32_t)chunk);
@@ -325,14 +345,16 @@ int cml_usb3_gpu_upload(CMLUSB3GPU* dev, uint64_t gpu_addr, const void* data, si
 }
 
 int cml_usb3_gpu_download(CMLUSB3GPU* dev, uint64_t gpu_addr, void* data, size_t size) {
-    if (!dev || !dev->connected || !data || size == 0) return -1;
+    if (!dev || !dev->connected || !data || size == 0)
+        return -1;
 
-    uint8_t* dst = (uint8_t*)data;
+    uint8_t* dst  = (uint8_t*)data;
     size_t offset = 0;
 
     while (offset < size) {
         size_t chunk = size - offset;
-        if (chunk > dev->bulk_buf_size) chunk = dev->bulk_buf_size;
+        if (chunk > dev->bulk_buf_size)
+            chunk = dev->bulk_buf_size;
 
         uint8_t cdb[16];
         usb3_build_pcie_cdb(cdb, SCSI_PCIE_READ, gpu_addr + offset, (uint32_t)chunk);
@@ -356,28 +378,43 @@ CMLUSB3GPU* cml_usb3_gpu_open(void) { return NULL; }
 void cml_usb3_gpu_close(CMLUSB3GPU* dev) { (void)dev; }
 
 int cml_usb3_gpu_read32(CMLUSB3GPU* dev, uint64_t offset, uint32_t* value) {
-    (void)dev; (void)offset; (void)value;
+    (void)dev;
+    (void)offset;
+    (void)value;
     return -1;
 }
 
 int cml_usb3_gpu_write32(CMLUSB3GPU* dev, uint64_t offset, uint32_t value) {
-    (void)dev; (void)offset; (void)value;
+    (void)dev;
+    (void)offset;
+    (void)value;
     return -1;
 }
 
 int cml_usb3_gpu_upload(CMLUSB3GPU* dev, uint64_t gpu_addr, const void* data, size_t size) {
-    (void)dev; (void)gpu_addr; (void)data; (void)size;
+    (void)dev;
+    (void)gpu_addr;
+    (void)data;
+    (void)size;
     return -1;
 }
 
 int cml_usb3_gpu_download(CMLUSB3GPU* dev, uint64_t gpu_addr, void* data, size_t size) {
-    (void)dev; (void)gpu_addr; (void)data; (void)size;
+    (void)dev;
+    (void)gpu_addr;
+    (void)data;
+    (void)size;
     return -1;
 }
 
-int cml_usb3_gpu_scsi_cmd(CMLUSB3GPU* dev, const uint8_t* cdb, int cdb_len,
-                          void* data, size_t data_size, bool is_write) {
-    (void)dev; (void)cdb; (void)cdb_len; (void)data; (void)data_size; (void)is_write;
+int cml_usb3_gpu_scsi_cmd(CMLUSB3GPU* dev, const uint8_t* cdb, int cdb_len, void* data,
+                          size_t data_size, bool is_write) {
+    (void)dev;
+    (void)cdb;
+    (void)cdb_len;
+    (void)data;
+    (void)data_size;
+    (void)is_write;
     return -1;
 }
 

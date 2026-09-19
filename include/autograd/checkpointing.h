@@ -24,8 +24,8 @@ Tensor* autograd_recompute(Tensor* tensor);
 void autograd_checkpointing_cleanup(void);
 
 typedef struct CheckpointConfig {
-    bool enabled;             // Whether checkpointing is active
-    int checkpoint_every_n;   // Checkpoint every N layers in sequential models
+    bool enabled;           // Whether checkpointing is active
+    int checkpoint_every_n; // Checkpoint every N layers in sequential models
 } CheckpointConfig;
 
 Tensor* checkpoint_forward(Module* module, Tensor* input);

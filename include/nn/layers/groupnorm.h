@@ -17,8 +17,8 @@ typedef struct GroupNorm {
     Parameter* bias;   // [num_channels]
 } GroupNorm;
 
-GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine,
-                        DType dtype, DeviceType device);
+GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine, DType dtype,
+                        DeviceType device);
 
 #ifdef __cplusplus
 }

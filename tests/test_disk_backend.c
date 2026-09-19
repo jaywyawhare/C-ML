@@ -6,22 +6,26 @@
 #include "tensor/tensor.h"
 #include "test_harness.h"
 
-#define RUN_TEST(test) do { \
-    tests_run++; \
-    printf("  [%d] %-50s ", tests_run, #test); \
-    if (test()) { tests_passed++; printf("PASS\n"); } \
-    else { printf("FAIL\n"); } \
-} while(0)
+#define RUN_TEST(test)                                                                             \
+    do {                                                                                           \
+        tests_run++;                                                                               \
+        printf("  [%d] %-50s ", tests_run, #test);                                                 \
+        if (test()) {                                                                              \
+            tests_passed++;                                                                        \
+            printf("PASS\n");                                                                      \
+        } else {                                                                                   \
+            printf("FAIL\n");                                                                      \
+        }                                                                                          \
+    } while (0)
 
 static const char* TEST_DIR = "/tmp/cml_test_disk";
 
-static void setup_test_dir(void) {
-    mkdir(TEST_DIR, 0755);
-}
+static void setup_test_dir(void) { mkdir(TEST_DIR, 0755); }
 
 static int test_create_destroy(void) {
     CMLDiskBackend* b = cml_disk_backend_create(TEST_DIR, CML_DISK_SYNC);
-    if (!b) return 0;
+    if (!b)
+        return 0;
     cml_disk_backend_free(b);
     return 1;
 }
@@ -29,27 +33,40 @@ static int test_create_destroy(void) {
 static int test_save_load_tensor(void) {
     setup_test_dir();
     CMLDiskBackend* b = cml_disk_backend_create(TEST_DIR, CML_DISK_SYNC);
-    if (!b) return 0;
+    if (!b)
+        return 0;
 
-    int shape[] = {3, 4};
+    int shape[]     = {3, 4};
     TensorConfig tc = {0};
-    Tensor* t = tensor_empty(shape, 2, &tc);
-    if (!t) { cml_disk_backend_free(b); return 0; }
+    Tensor* t       = tensor_empty(shape, 2, &tc);
+    if (!t) {
+        cml_disk_backend_free(b);
+        return 0;
+    }
 
     /* Fill with known data */
     for (size_t i = 0; i < t->numel; i++)
         ((float*)t->data)[i] = (float)i * 0.5f;
 
     int ret = cml_disk_save_tensor(b, "test_tensor", t);
-    if (ret != 0) { tensor_free(t); cml_disk_backend_free(b); return 0; }
+    if (ret != 0) {
+        tensor_free(t);
+        cml_disk_backend_free(b);
+        return 0;
+    }
 
     Tensor* loaded = cml_disk_load_tensor(b, "test_tensor");
-    if (!loaded) { tensor_free(t); cml_disk_backend_free(b); return 0; }
+    if (!loaded) {
+        tensor_free(t);
+        cml_disk_backend_free(b);
+        return 0;
+    }
 
     /* Verify data */
     int ok = (loaded->numel == t->numel);
     for (size_t i = 0; i < t->numel && ok; i++) {
-        if (((float*)loaded->data)[i] != ((float*)t->data)[i]) ok = 0;
+        if (((float*)loaded->data)[i] != ((float*)t->data)[i])
+            ok = 0;
     }
 
     tensor_free(loaded);
@@ -60,9 +77,10 @@ static int test_save_load_tensor(void) {
 
 static int test_load_nonexistent(void) {
     CMLDiskBackend* b = cml_disk_backend_create(TEST_DIR, CML_DISK_SYNC);
-    if (!b) return 0;
+    if (!b)
+        return 0;
     Tensor* t = cml_disk_load_tensor(b, "nonexistent_xyz");
-    int ok = (t == NULL);
+    int ok    = (t == NULL);
     cml_disk_backend_free(b);
     return ok;
 }
@@ -70,12 +88,16 @@ static int test_load_nonexistent(void) {
 static int test_stats(void) {
     setup_test_dir();
     CMLDiskBackend* b = cml_disk_backend_create(TEST_DIR, CML_DISK_SYNC);
-    if (!b) return 0;
+    if (!b)
+        return 0;
 
-    int shape[] = {2};
+    int shape[]     = {2};
     TensorConfig tc = {0};
-    Tensor* t = tensor_empty(shape, 1, &tc);
-    if (!t) { cml_disk_backend_free(b); return 0; }
+    Tensor* t       = tensor_empty(shape, 1, &tc);
+    if (!t) {
+        cml_disk_backend_free(b);
+        return 0;
+    }
 
     cml_disk_save_tensor(b, "stats_test", t);
     Tensor* loaded = cml_disk_load_tensor(b, "stats_test");
@@ -93,30 +115,36 @@ static int test_stats(void) {
 static int test_mmap_tensor(void) {
     setup_test_dir();
     CMLDiskBackend* b = cml_disk_backend_create(TEST_DIR, CML_DISK_MMAP);
-    if (!b) return 0;
+    if (!b)
+        return 0;
 
-    int shape[] = {4};
+    int shape[]     = {4};
     TensorConfig tc = {0};
-    Tensor* t = tensor_empty(shape, 1, &tc);
-    if (!t) { cml_disk_backend_free(b); return 0; }
+    Tensor* t       = tensor_empty(shape, 1, &tc);
+    if (!t) {
+        cml_disk_backend_free(b);
+        return 0;
+    }
     for (size_t i = 0; i < t->numel; i++)
         ((float*)t->data)[i] = (float)i;
 
     cml_disk_save_tensor(b, "mmap_test", t);
 
     CMLDiskTensor* dt = cml_disk_mmap_tensor(b, "mmap_test");
-    int ok = (dt != NULL);
+    int ok            = (dt != NULL);
 
     if (ok && dt->is_mapped) {
         float buf[4];
         int ret = cml_disk_tensor_read(dt, buf, 0, sizeof(buf));
-        ok = (ret == 0);
+        ok      = (ret == 0);
         for (int i = 0; i < 4 && ok; i++) {
-            if (buf[i] != (float)i) ok = 0;
+            if (buf[i] != (float)i)
+                ok = 0;
         }
     }
 
-    if (dt) cml_disk_tensor_free(dt);
+    if (dt)
+        cml_disk_tensor_free(dt);
     tensor_free(t);
     cml_disk_backend_free(b);
     return ok;
@@ -125,22 +153,28 @@ static int test_mmap_tensor(void) {
 static int test_disk_tensor_to_tensor(void) {
     setup_test_dir();
     CMLDiskBackend* b = cml_disk_backend_create(TEST_DIR, CML_DISK_SYNC);
-    if (!b) return 0;
+    if (!b)
+        return 0;
 
-    int shape[] = {3};
+    int shape[]     = {3};
     TensorConfig tc = {0};
-    Tensor* t = tensor_empty(shape, 1, &tc);
-    if (!t) { cml_disk_backend_free(b); return 0; }
-    ((float*)t->data)[0] = 1.0f; ((float*)t->data)[1] = 2.0f; ((float*)t->data)[2] = 3.0f;
+    Tensor* t       = tensor_empty(shape, 1, &tc);
+    if (!t) {
+        cml_disk_backend_free(b);
+        return 0;
+    }
+    ((float*)t->data)[0] = 1.0f;
+    ((float*)t->data)[1] = 2.0f;
+    ((float*)t->data)[2] = 3.0f;
 
     cml_disk_save_tensor(b, "convert_test", t);
 
     CMLDiskTensor* dt = cml_disk_mmap_tensor(b, "convert_test");
-    int ok = (dt != NULL);
+    int ok            = (dt != NULL);
 
     if (ok) {
         Tensor* converted = cml_disk_tensor_to_tensor(dt);
-        ok = (converted != NULL);
+        ok                = (converted != NULL);
         if (ok) {
             ok = (((float*)converted->data)[0] == 1.0f && ((float*)converted->data)[2] == 3.0f);
             tensor_free(converted);
@@ -172,28 +206,41 @@ static int test_free_null(void) {
 static int test_async_read(void) {
     setup_test_dir();
     CMLDiskBackend* b = cml_disk_backend_create(TEST_DIR, CML_DISK_ASYNC);
-    if (!b) return 0;
+    if (!b)
+        return 0;
 
-    int shape[] = {2, 5};
+    int shape[]     = {2, 5};
     TensorConfig tc = {0};
-    Tensor* t = tensor_empty(shape, 2, &tc);
-    if (!t) { cml_disk_backend_free(b); return 0; }
+    Tensor* t       = tensor_empty(shape, 2, &tc);
+    if (!t) {
+        cml_disk_backend_free(b);
+        return 0;
+    }
     for (size_t i = 0; i < t->numel; i++)
         ((float*)t->data)[i] = (float)i + 100.0f;
 
     if (cml_disk_save_tensor(b, "async_test", t) != 0) {
-        tensor_free(t); cml_disk_backend_free(b); return 0;
+        tensor_free(t);
+        cml_disk_backend_free(b);
+        return 0;
     }
 
     size_t bytes = t->numel * sizeof(float);
-    float* buf = (float*)malloc(bytes);
-    if (!buf) { tensor_free(t); cml_disk_backend_free(b); return 0; }
+    float* buf   = (float*)malloc(bytes);
+    if (!buf) {
+        tensor_free(t);
+        cml_disk_backend_free(b);
+        return 0;
+    }
 
     int ok = 1;
-    if (cml_disk_async_read(b, "async_test", buf, bytes) != 0) ok = 0;
-    if (ok && cml_disk_wait(b) != 0) ok = 0;
+    if (cml_disk_async_read(b, "async_test", buf, bytes) != 0)
+        ok = 0;
+    if (ok && cml_disk_wait(b) != 0)
+        ok = 0;
     for (size_t i = 0; i < t->numel && ok; i++)
-        if (buf[i] != ((float*)t->data)[i]) ok = 0;
+        if (buf[i] != ((float*)t->data)[i])
+            ok = 0;
 
     free(buf);
     tensor_free(t);

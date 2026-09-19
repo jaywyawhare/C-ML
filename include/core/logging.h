@@ -28,7 +28,6 @@ void cml_log_message(LogLevel level, const char* file, int line, const char* fun
     cml_log_message(LOG_LEVEL_WARNING, __FILE__, __LINE__, __func__, __VA_ARGS__)
 #define LOG_ERROR(...) cml_log_message(LOG_LEVEL_ERROR, __FILE__, __LINE__, __func__, __VA_ARGS__)
 
-
 /* Write `s` as a JSON string literal (quotes, backslashes and control
  * characters escaped), or the bare token `null`. Shared by the metrics and
  * autograd JSON exporters. */

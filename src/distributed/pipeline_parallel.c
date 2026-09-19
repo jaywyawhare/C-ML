@@ -7,7 +7,7 @@
 #include "alloc/cml_allocator.h"
 
 CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
-                                          const PipelineConfig* config) {
+                                         const PipelineConfig* config) {
     if (!stages || num_stages <= 0) {
         LOG_ERROR("Invalid pipeline stages");
         return NULL;
@@ -25,7 +25,7 @@ CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
         return NULL;
 
     pipeline->num_stages = num_stages;
-    pipeline->stages = cml_malloc(num_stages * sizeof(PipelineStage));
+    pipeline->stages     = cml_malloc(num_stages * sizeof(PipelineStage));
     if (!pipeline->stages) {
         cml_free(pipeline);
         return NULL;
@@ -36,12 +36,12 @@ CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
         pipeline->config = *config;
     } else {
         pipeline->config.num_micro_batches = 4;
-        pipeline->config.num_stages = num_stages;
-        pipeline->config.interleaved = false;
+        pipeline->config.num_stages        = num_stages;
+        pipeline->config.interleaved       = false;
     }
 
     pipeline->num_micro_batches = pipeline->config.num_micro_batches;
-    pipeline->group = cml_dist_get_default_group();
+    pipeline->group             = cml_dist_get_default_group();
 
     /* Allocate micro-batch output buffers: [num_stages][num_micro_batches] */
     pipeline->micro_batch_outputs = cml_calloc(num_stages, sizeof(Tensor**));
@@ -63,8 +63,8 @@ CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
         }
     }
 
-    LOG_INFO("Pipeline created: %d stages, %d micro-batches",
-             num_stages, pipeline->num_micro_batches);
+    LOG_INFO("Pipeline created: %d stages, %d micro-batches", num_stages,
+             pipeline->num_micro_batches);
     return pipeline;
 }
 
@@ -74,28 +74,33 @@ static Tensor* slice_batch_dim(Tensor* input, int start, int end) {
 
     tensor_ensure_executed(input);
     const float* src = (const float*)tensor_data_ptr(input);
-    if (!src) return NULL;
+    if (!src)
+        return NULL;
 
-    int slice_rows = end - start;
-    size_t row_elems = input->numel / (size_t)input->shape[0];
+    int slice_rows     = end - start;
+    size_t row_elems   = input->numel / (size_t)input->shape[0];
     size_t slice_elems = (size_t)slice_rows * row_elems;
     if (row_elems > 0 && slice_elems / row_elems != (size_t)slice_rows) {
         return NULL; /* overflow */
     }
 
     float* slice_data = cml_malloc(slice_elems * sizeof(float));
-    if (!slice_data) return NULL;
+    if (!slice_data)
+        return NULL;
 
     memcpy(slice_data, src + (size_t)start * row_elems, slice_elems * sizeof(float));
 
     /* Build shape: same as input but dim 0 = slice_rows */
     int* shape = cml_malloc(input->ndim * sizeof(int));
-    if (!shape) { cml_free(slice_data); return NULL; }
+    if (!shape) {
+        cml_free(slice_data);
+        return NULL;
+    }
     memcpy(shape, input->shape, input->ndim * sizeof(int));
     shape[0] = slice_rows;
 
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(slice_data, shape, input->ndim, &cfg);
     cml_free(slice_data);
     cml_free(shape);
@@ -108,11 +113,12 @@ static Tensor* concat_batch_dim(Tensor** tensors, int count) {
 
     /* Compute total batch size */
     size_t total_batch = 0;
-    int ndim = tensors[0]->ndim;
-    size_t row_elems = tensors[0]->numel / (size_t)tensors[0]->shape[0];
+    int ndim           = tensors[0]->ndim;
+    size_t row_elems   = tensors[0]->numel / (size_t)tensors[0]->shape[0];
 
     for (int i = 0; i < count; i++) {
-        if (!tensors[i]) return NULL;
+        if (!tensors[i])
+            return NULL;
         total_batch += (size_t)tensors[i]->shape[0];
     }
 
@@ -121,25 +127,32 @@ static Tensor* concat_batch_dim(Tensor** tensors, int count) {
         return NULL; /* overflow */
     }
     float* out_data = cml_malloc(total_elems * sizeof(float));
-    if (!out_data) return NULL;
+    if (!out_data)
+        return NULL;
 
     size_t offset = 0;
     for (int i = 0; i < count; i++) {
         tensor_ensure_executed(tensors[i]);
         const float* src = (const float*)tensor_data_ptr(tensors[i]);
-        if (!src) { cml_free(out_data); return NULL; }
+        if (!src) {
+            cml_free(out_data);
+            return NULL;
+        }
         size_t chunk = tensors[i]->numel * sizeof(float);
         memcpy(out_data + offset, src, chunk);
         offset += tensors[i]->numel;
     }
 
     int* shape = cml_malloc(ndim * sizeof(int));
-    if (!shape) { cml_free(out_data); return NULL; }
+    if (!shape) {
+        cml_free(out_data);
+        return NULL;
+    }
     memcpy(shape, tensors[0]->shape, ndim * sizeof(int));
     shape[0] = (int)total_batch;
 
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(out_data, shape, ndim, &cfg);
     cml_free(out_data);
     cml_free(shape);
@@ -147,15 +160,16 @@ static Tensor* concat_batch_dim(Tensor** tensors, int count) {
 }
 
 Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input) {
-    if (!pipeline || !input) return NULL;
+    if (!pipeline || !input)
+        return NULL;
 
-    int num_mb = pipeline->num_micro_batches;
+    int num_mb     = pipeline->num_micro_batches;
     int num_stages = pipeline->num_stages;
     int batch_size = input->shape[0];
 
     if (batch_size <= 0 || num_mb <= 0) {
-        LOG_ERROR("Pipeline forward: invalid batch_size=%d or num_micro_batches=%d",
-                  batch_size, num_mb);
+        LOG_ERROR("Pipeline forward: invalid batch_size=%d or num_micro_batches=%d", batch_size,
+                  num_mb);
         return NULL;
     }
 
@@ -170,15 +184,17 @@ Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input) {
     }
 
     int mb_size = batch_size / num_mb;
-    if (mb_size < 1) mb_size = 1;
+    if (mb_size < 1)
+        mb_size = 1;
 
     /* Split input into micro-batches along dim 0 */
     Tensor** input_slices = cml_malloc(num_mb * sizeof(Tensor*));
-    if (!input_slices) return NULL;
+    if (!input_slices)
+        return NULL;
 
     for (int mb = 0; mb < num_mb; mb++) {
-        int start = mb * mb_size;
-        int end = (mb == num_mb - 1) ? batch_size : start + mb_size;
+        int start        = mb * mb_size;
+        int end          = (mb == num_mb - 1) ? batch_size : start + mb_size;
         input_slices[mb] = slice_batch_dim(input, start, end);
         if (!input_slices[mb]) {
             LOG_ERROR("Pipeline forward: failed to slice input for micro-batch %d", mb);
@@ -230,8 +246,7 @@ Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input) {
     cml_free(input_slices);
 
     /* Concatenate the final stage's micro-batch outputs along dim 0 */
-    Tensor* final_output = concat_batch_dim(
-        pipeline->micro_batch_outputs[num_stages - 1], num_mb);
+    Tensor* final_output = concat_batch_dim(pipeline->micro_batch_outputs[num_stages - 1], num_mb);
 
     if (!final_output) {
         LOG_ERROR("Pipeline forward: failed to concatenate final outputs");
@@ -241,28 +256,31 @@ Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input) {
 }
 
 int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
-    if (!pipeline || !grad_output) return -1;
+    if (!pipeline || !grad_output)
+        return -1;
 
-    int num_mb = pipeline->num_micro_batches;
+    int num_mb     = pipeline->num_micro_batches;
     int num_stages = pipeline->num_stages;
     int batch_size = grad_output->shape[0];
 
     if (batch_size <= 0 || num_mb <= 0) {
-        LOG_ERROR("Pipeline backward: invalid batch_size=%d or num_micro_batches=%d",
-                  batch_size, num_mb);
+        LOG_ERROR("Pipeline backward: invalid batch_size=%d or num_micro_batches=%d", batch_size,
+                  num_mb);
         return -1;
     }
 
     int mb_size = batch_size / num_mb;
-    if (mb_size < 1) mb_size = 1;
+    if (mb_size < 1)
+        mb_size = 1;
 
     /* Split grad_output into micro-batch gradients matching the forward split */
     Tensor** grad_slices = cml_malloc(num_mb * sizeof(Tensor*));
-    if (!grad_slices) return -1;
+    if (!grad_slices)
+        return -1;
 
     for (int mb = 0; mb < num_mb; mb++) {
-        int start = mb * mb_size;
-        int end = (mb == num_mb - 1) ? batch_size : start + mb_size;
+        int start       = mb * mb_size;
+        int end         = (mb == num_mb - 1) ? batch_size : start + mb_size;
         grad_slices[mb] = slice_batch_dim(grad_output, start, end);
         if (!grad_slices[mb]) {
             LOG_ERROR("Pipeline backward: failed to slice grad for micro-batch %d", mb);
@@ -305,8 +323,7 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
         tensor_free(grad_slices[mb]);
     cml_free(grad_slices);
 
-    LOG_DEBUG("Pipeline backward completed: %d stages, %d micro-batches",
-              num_stages, num_mb);
+    LOG_DEBUG("Pipeline backward completed: %d stages, %d micro-batches", num_stages, num_mb);
     return 0;
 }
 
@@ -323,7 +340,8 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
 
 static int pipe_send_tensor(Tensor* t, int dst, int mb) {
     tensor_ensure_executed(t);
-    if (!t->data) return -1;
+    if (!t->data)
+        return -1;
 
     float meta[PIPE_META_LEN];
     memset(meta, 0, sizeof(meta));
@@ -331,39 +349,63 @@ static int pipe_send_tensor(Tensor* t, int dst, int mb) {
     for (int i = 0; i < t->ndim && i < PIPE_MAX_NDIM; i++)
         meta[1 + i] = (float)t->shape[i];
 
-    int mshape[1] = { PIPE_META_LEN };
-    Tensor mt; memset(&mt, 0, sizeof(mt));
-    mt.data = meta; mt.numel = PIPE_META_LEN; mt.ndim = 1; mt.shape = mshape;
-    mt.dtype = DTYPE_FLOAT32; mt.device = DEVICE_CPU;
+    int mshape[1] = {PIPE_META_LEN};
+    Tensor mt;
+    memset(&mt, 0, sizeof(mt));
+    mt.data   = meta;
+    mt.numel  = PIPE_META_LEN;
+    mt.ndim   = 1;
+    mt.shape  = mshape;
+    mt.dtype  = DTYPE_FLOAT32;
+    mt.device = DEVICE_CPU;
 
-    if (cml_dist_send(&mt, dst, 2 * mb) != 0) return -1;
+    if (cml_dist_send(&mt, dst, 2 * mb) != 0)
+        return -1;
     return cml_dist_send(t, dst, 2 * mb + 1);
 }
 
 static Tensor* pipe_recv_tensor(int src, int mb) {
     float meta[PIPE_META_LEN];
-    int mshape[1] = { PIPE_META_LEN };
-    Tensor mt; memset(&mt, 0, sizeof(mt));
-    mt.data = meta; mt.numel = PIPE_META_LEN; mt.ndim = 1; mt.shape = mshape;
-    mt.dtype = DTYPE_FLOAT32; mt.device = DEVICE_CPU;
-    if (cml_dist_recv(&mt, src, 2 * mb) != 0) return NULL;
+    int mshape[1] = {PIPE_META_LEN};
+    Tensor mt;
+    memset(&mt, 0, sizeof(mt));
+    mt.data   = meta;
+    mt.numel  = PIPE_META_LEN;
+    mt.ndim   = 1;
+    mt.shape  = mshape;
+    mt.dtype  = DTYPE_FLOAT32;
+    mt.device = DEVICE_CPU;
+    if (cml_dist_recv(&mt, src, 2 * mb) != 0)
+        return NULL;
 
     int ndim = (int)meta[0];
-    if (ndim < 1 || ndim > PIPE_MAX_NDIM) return NULL;
+    if (ndim < 1 || ndim > PIPE_MAX_NDIM)
+        return NULL;
     int shape[PIPE_MAX_NDIM];
     size_t numel = 0;
-    for (int i = 0; i < ndim; i++) shape[i] = (int)meta[1 + i];
-    if (!tensor_numel_checked(shape, ndim, &numel)) return NULL;
+    for (int i = 0; i < ndim; i++)
+        shape[i] = (int)meta[1 + i];
+    if (!tensor_numel_checked(shape, ndim, &numel))
+        return NULL;
 
     float* data = (float*)cml_malloc(numel * sizeof(float));
-    if (!data) return NULL;
-    Tensor rt; memset(&rt, 0, sizeof(rt));
-    rt.data = data; rt.numel = numel; rt.ndim = ndim; rt.shape = shape;
-    rt.dtype = DTYPE_FLOAT32; rt.device = DEVICE_CPU;
-    if (cml_dist_recv(&rt, src, 2 * mb + 1) != 0) { cml_free(data); return NULL; }
+    if (!data)
+        return NULL;
+    Tensor rt;
+    memset(&rt, 0, sizeof(rt));
+    rt.data   = data;
+    rt.numel  = numel;
+    rt.ndim   = ndim;
+    rt.shape  = shape;
+    rt.dtype  = DTYPE_FLOAT32;
+    rt.device = DEVICE_CPU;
+    if (cml_dist_recv(&rt, src, 2 * mb + 1) != 0) {
+        cml_free(data);
+        return NULL;
+    }
 
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* out = tensor_from_data(data, shape, ndim, &cfg);
     cml_free(data);
     return out;
@@ -372,20 +414,23 @@ static Tensor* pipe_recv_tensor(int src, int mb) {
 static void dist_free_cache(CMLPipelineParallel* p) {
     if (p->dist_stage_inputs) {
         for (int mb = 0; mb < p->num_micro_batches; mb++)
-            if (p->dist_stage_inputs[mb]) tensor_free(p->dist_stage_inputs[mb]);
+            if (p->dist_stage_inputs[mb])
+                tensor_free(p->dist_stage_inputs[mb]);
         cml_free(p->dist_stage_inputs);
         p->dist_stage_inputs = NULL;
     }
     if (p->dist_stage_outputs) {
         for (int mb = 0; mb < p->num_micro_batches; mb++)
-            if (p->dist_stage_outputs[mb]) tensor_free(p->dist_stage_outputs[mb]);
+            if (p->dist_stage_outputs[mb])
+                tensor_free(p->dist_stage_outputs[mb]);
         cml_free(p->dist_stage_outputs);
         p->dist_stage_outputs = NULL;
     }
 }
 
 Tensor* cml_pipeline_dist_forward(CMLPipelineParallel* pipeline, Tensor* input) {
-    if (!pipeline) return NULL;
+    if (!pipeline)
+        return NULL;
     DistProcessGroup* g = pipeline->group;
     if (!g || g->world_size != pipeline->num_stages) {
         LOG_ERROR("dist pipeline: world_size (%d) must equal num_stages (%d)",
@@ -393,11 +438,14 @@ Tensor* cml_pipeline_dist_forward(CMLPipelineParallel* pipeline, Tensor* input) 
         return NULL;
     }
 
-    int rank = g->rank;
-    int P = pipeline->num_stages;
-    int M = pipeline->num_micro_batches;
+    int rank      = g->rank;
+    int P         = pipeline->num_stages;
+    int M         = pipeline->num_micro_batches;
     Module* stage = pipeline->stages[rank].module;
-    if (!stage) { LOG_ERROR("dist pipeline: rank %d has no stage module", rank); return NULL; }
+    if (!stage) {
+        LOG_ERROR("dist pipeline: rank %d has no stage module", rank);
+        return NULL;
+    }
 
     dist_free_cache(pipeline);
     pipeline->dist_stage_inputs  = cml_calloc((size_t)M, sizeof(Tensor*));
@@ -407,7 +455,7 @@ Tensor* cml_pipeline_dist_forward(CMLPipelineParallel* pipeline, Tensor* input) 
         return NULL;
     }
 
-    int batch = (rank == 0 && input) ? input->shape[0] : 0;
+    int batch   = (rank == 0 && input) ? input->shape[0] : 0;
     int mb_size = (batch > 0) ? (batch / M > 0 ? batch / M : 1) : 0;
 
     Tensor** last_outputs = (rank == P - 1) ? cml_calloc((size_t)M, sizeof(Tensor*)) : NULL;
@@ -416,34 +464,48 @@ Tensor* cml_pipeline_dist_forward(CMLPipelineParallel* pipeline, Tensor* input) 
         Tensor* x;
         if (rank == 0) {
             int start = mb * mb_size;
-            int end = (mb == M - 1) ? batch : start + mb_size;
-            if (!input || start >= end) { LOG_ERROR("dist pipeline: bad input slice"); goto fail; }
+            int end   = (mb == M - 1) ? batch : start + mb_size;
+            if (!input || start >= end) {
+                LOG_ERROR("dist pipeline: bad input slice");
+                goto fail;
+            }
             x = slice_batch_dim(input, start, end);
         } else {
             x = pipe_recv_tensor(rank - 1, mb);
         }
-        if (!x) { LOG_ERROR("dist pipeline: rank %d could not obtain input mb %d", rank, mb); goto fail; }
+        if (!x) {
+            LOG_ERROR("dist pipeline: rank %d could not obtain input mb %d", rank, mb);
+            goto fail;
+        }
 
         /* Grad on the stage input so backward can produce the upstream gradient. */
         tensor_set_requires_grad(x, true);
         Tensor* y = module_forward(stage, x);
-        if (!y) { tensor_free(x); LOG_ERROR("dist pipeline: stage forward failed"); goto fail; }
+        if (!y) {
+            tensor_free(x);
+            LOG_ERROR("dist pipeline: stage forward failed");
+            goto fail;
+        }
         tensor_ensure_executed(y);
 
         pipeline->dist_stage_inputs[mb]  = x;
         pipeline->dist_stage_outputs[mb] = y;
 
         if (rank < P - 1) {
-            if (pipe_send_tensor(y, rank + 1, mb) != 0) { LOG_ERROR("dist pipeline: send failed"); goto fail; }
+            if (pipe_send_tensor(y, rank + 1, mb) != 0) {
+                LOG_ERROR("dist pipeline: send failed");
+                goto fail;
+            }
         } else {
-            last_outputs[mb] = tensor_clone(y);  /* clone so cache stays owned for backward */
+            last_outputs[mb] = tensor_clone(y); /* clone so cache stays owned for backward */
         }
     }
 
     if (rank == P - 1) {
         Tensor* out = concat_batch_dim(last_outputs, M);
         for (int mb = 0; mb < M; mb++)
-            if (last_outputs[mb]) tensor_free(last_outputs[mb]);
+            if (last_outputs[mb])
+                tensor_free(last_outputs[mb]);
         cml_free(last_outputs);
         return out;
     }
@@ -452,20 +514,23 @@ Tensor* cml_pipeline_dist_forward(CMLPipelineParallel* pipeline, Tensor* input) 
 fail:
     if (last_outputs) {
         for (int mb = 0; mb < M; mb++)
-            if (last_outputs[mb]) tensor_free(last_outputs[mb]);
+            if (last_outputs[mb])
+                tensor_free(last_outputs[mb]);
         cml_free(last_outputs);
     }
     return NULL;
 }
 
 int cml_pipeline_dist_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
-    if (!pipeline) return -1;
+    if (!pipeline)
+        return -1;
     DistProcessGroup* g = pipeline->group;
-    if (!g || g->world_size != pipeline->num_stages) return -1;
+    if (!g || g->world_size != pipeline->num_stages)
+        return -1;
 
     int rank = g->rank;
-    int P = pipeline->num_stages;
-    int M = pipeline->num_micro_batches;
+    int P    = pipeline->num_stages;
+    int M    = pipeline->num_micro_batches;
     if (!pipeline->dist_stage_outputs || !pipeline->dist_stage_inputs) {
         LOG_ERROR("dist pipeline backward: run cml_pipeline_dist_forward first");
         return -1;
@@ -473,27 +538,32 @@ int cml_pipeline_dist_backward(CMLPipelineParallel* pipeline, Tensor* grad_outpu
 
     int mb_size = 0;
     if (rank == P - 1) {
-        if (!grad_output) { LOG_ERROR("dist pipeline backward: last rank needs grad_output"); return -1; }
-        int gb = grad_output->shape[0];
+        if (!grad_output) {
+            LOG_ERROR("dist pipeline backward: last rank needs grad_output");
+            return -1;
+        }
+        int gb  = grad_output->shape[0];
         mb_size = gb / M > 0 ? gb / M : 1;
     }
 
     for (int mb = 0; mb < M; mb++) {
         Tensor* out = pipeline->dist_stage_outputs[mb];
         Tensor* in  = pipeline->dist_stage_inputs[mb];
-        if (!out || !in) return -1;
+        if (!out || !in)
+            return -1;
 
         /* Gradient wrt this stage's output: sliced from the loss on the last
          * rank, received from downstream otherwise. */
         Tensor* gout;
         if (rank == P - 1) {
             int start = mb * mb_size;
-            int end = (mb == M - 1) ? grad_output->shape[0] : start + mb_size;
-            gout = slice_batch_dim(grad_output, start, end);
+            int end   = (mb == M - 1) ? grad_output->shape[0] : start + mb_size;
+            gout      = slice_batch_dim(grad_output, start, end);
         } else {
             gout = pipe_recv_tensor(rank + 1, mb);
         }
-        if (!gout) return -1;
+        if (!gout)
+            return -1;
 
         /* Backprop the stage: seeds out->grad with gout, accumulates this
          * stage's weight grads and computes in->grad (across micro-batches the
@@ -503,18 +573,22 @@ int cml_pipeline_dist_backward(CMLPipelineParallel* pipeline, Tensor* grad_outpu
 
         /* Stream the input-gradient upstream (rank 0 has no upstream). */
         if (rank > 0) {
-            if (!in->grad) { LOG_ERROR("dist pipeline backward: no input grad at rank %d", rank); return -1; }
-            if (pipe_send_tensor(in->grad, rank - 1, mb) != 0) return -1;
+            if (!in->grad) {
+                LOG_ERROR("dist pipeline backward: no input grad at rank %d", rank);
+                return -1;
+            }
+            if (pipe_send_tensor(in->grad, rank - 1, mb) != 0)
+                return -1;
         }
     }
     return 0;
 }
 
 void cml_pipeline_free(CMLPipelineParallel* pipeline) {
-    if (!pipeline) return;
+    if (!pipeline)
+        return;
 
     dist_free_cache(pipeline);
-
 
     if (pipeline->micro_batch_outputs) {
         for (int s = 0; s < pipeline->num_stages; s++) {

@@ -32,8 +32,8 @@ static __thread Module* g_current_model           = NULL;
 static __thread bool g_architecture_exported      = false;
 static __thread bool g_manual_epoch_control       = false;
 /* Set by classification losses; read once during the following loss capture. */
-static __thread Tensor* g_acc_pred                 = NULL;
-static __thread Tensor* g_acc_target               = NULL;
+static __thread Tensor* g_acc_pred   = NULL;
+static __thread Tensor* g_acc_target = NULL;
 
 void training_metrics_note_prediction(Tensor* prediction, Tensor* target) {
     g_acc_pred   = prediction;
@@ -51,7 +51,7 @@ static float compute_classification_accuracy(Tensor* pred, Tensor* target) {
         return -1.0f;
     if (pred->dtype != DTYPE_FLOAT32 || !pred->data || pred->ndim < 1)
         return -1.0f;
-    int    C = pred->shape[pred->ndim - 1];
+    int C = pred->shape[pred->ndim - 1];
     if (C < 1)
         return -1.0f;
     size_t N = pred->numel / (size_t)C;
@@ -130,8 +130,8 @@ static int training_metrics_ensure_capacity(TrainingMetrics* metrics, size_t num
     /* The distribution arrays are indexed by epoch like every array above, so
      * they have to grow in step or a longer-than-declared run writes past them. */
     if (metrics->epoch_grad_dist) {
-        metrics->epoch_grad_dist = cml_realloc(
-            metrics->epoch_grad_dist, (size_t)new_capacity * sizeof(DistributionSummary));
+        metrics->epoch_grad_dist   = cml_realloc(metrics->epoch_grad_dist,
+                                                 (size_t)new_capacity * sizeof(DistributionSummary));
         metrics->epoch_weight_dist = cml_realloc(
             metrics->epoch_weight_dist, (size_t)new_capacity * sizeof(DistributionSummary));
         if (metrics->epoch_grad_dist && metrics->epoch_weight_dist) {
@@ -173,36 +173,36 @@ TrainingMetrics* training_metrics_create(size_t num_epochs) {
     if (!metrics)
         return NULL;
 
-    metrics->num_epochs = num_epochs;
-    metrics->epoch_training_losses     = cml_malloc(num_epochs * sizeof(float));
-    metrics->epoch_training_accuracies = cml_malloc(num_epochs * sizeof(float));
-    metrics->epoch_testing_losses     = NULL;
-    metrics->epoch_testing_accuracies = NULL;
+    metrics->num_epochs                  = num_epochs;
+    metrics->epoch_training_losses       = cml_malloc(num_epochs * sizeof(float));
+    metrics->epoch_training_accuracies   = cml_malloc(num_epochs * sizeof(float));
+    metrics->epoch_testing_losses        = NULL;
+    metrics->epoch_testing_accuracies    = NULL;
     metrics->epoch_validation_losses     = NULL;
     metrics->epoch_validation_accuracies = NULL;
 
-    metrics->epoch_times      = cml_malloc(num_epochs * sizeof(float));
-    metrics->total_time       = 0.0f;
-    metrics->epoch_start_time = 0;
+    metrics->epoch_times          = cml_malloc(num_epochs * sizeof(float));
+    metrics->total_time           = 0.0f;
+    metrics->epoch_start_time     = 0;
     metrics->epoch_learning_rates = cml_malloc(num_epochs * sizeof(float));
 
-    metrics->best_loss        = 0.0f;
-    metrics->best_accuracy    = 0.0f;
-    metrics->total_params     = 0;
-    metrics->trainable_params = 0;
-    metrics->model_summary    = NULL;
-    metrics->learning_rate      = 0.0f;
-    metrics->lr_schedule        = NULL;
-    metrics->lr_schedule_params = NULL;
-    metrics->gradient_norm      = 0.0f;
-    metrics->epoch_grad_dist    = cml_calloc(num_epochs, sizeof(DistributionSummary));
-    metrics->epoch_weight_dist  = cml_calloc(num_epochs, sizeof(DistributionSummary));
-    metrics->has_distributions  = false;
+    metrics->best_loss           = 0.0f;
+    metrics->best_accuracy       = 0.0f;
+    metrics->total_params        = 0;
+    metrics->trainable_params    = 0;
+    metrics->model_summary       = NULL;
+    metrics->learning_rate       = 0.0f;
+    metrics->lr_schedule         = NULL;
+    metrics->lr_schedule_params  = NULL;
+    metrics->gradient_norm       = 0.0f;
+    metrics->epoch_grad_dist     = cml_calloc(num_epochs, sizeof(DistributionSummary));
+    metrics->epoch_weight_dist   = cml_calloc(num_epochs, sizeof(DistributionSummary));
+    metrics->has_distributions   = false;
     metrics->loss_reduction_rate = 0.0f;
     metrics->loss_stability      = 0.0f;
-    metrics->early_stopped   = false;
-    metrics->expected_epochs = num_epochs;
-    metrics->actual_epochs   = num_epochs; // Initially same as expected
+    metrics->early_stopped       = false;
+    metrics->expected_epochs     = num_epochs;
+    metrics->actual_epochs       = num_epochs; // Initially same as expected
 
     if (!metrics->epoch_training_losses || !metrics->epoch_training_accuracies ||
         !metrics->epoch_times || !metrics->epoch_learning_rates) {
@@ -234,7 +234,6 @@ void training_metrics_start_epoch(TrainingMetrics* metrics) {
     metrics->epoch_start_time = clock();
 }
 
-
 /* Summarise the model's parameters for `epoch` using whatever model most
  * recently ran a forward pass. Hand-written training loops never call
  * cml_train, so hooking the loop would have covered only the built-in one;
@@ -253,7 +252,7 @@ static void capture_distributions_for_epoch(TrainingMetrics* metrics, size_t epo
         return;
 
     Parameter** params = NULL;
-    int num_params = 0;
+    int num_params     = 0;
     if (module_collect_parameters(model, &params, &num_params, true) != 0 || !params)
         return;
     training_metrics_record_distributions(metrics, epoch, (void**)params, num_params);
@@ -280,7 +279,6 @@ void training_metrics_record_epoch(TrainingMetrics* metrics, size_t epoch, float
     if (epoch == 0 || accuracy > metrics->best_accuracy) {
         metrics->best_accuracy = accuracy;
     }
-
 }
 
 void training_metrics_record_epoch_full(TrainingMetrics* metrics, size_t epoch, float train_loss,
@@ -333,7 +331,6 @@ void training_metrics_record_epoch_full(TrainingMetrics* metrics, size_t epoch, 
     if (epoch == 0 || train_accuracy > metrics->best_accuracy) {
         metrics->best_accuracy = train_accuracy;
     }
-
 }
 
 void training_metrics_set_summary(TrainingMetrics* metrics, const char* summary) {
@@ -462,8 +459,6 @@ float training_metrics_calculate_gradient_norm(TrainingMetrics* metrics, void** 
     return grad_norm;
 }
 
-
-
 float* cml_tensor_float_buffer(Tensor* t, size_t* num_elements) {
     float* data = (float*)tensor_data_ptr(t);
     if (!data)
@@ -495,7 +490,7 @@ static void dist_accumulate(void** parameters, int num_parameters, bool want_gra
         if (!t)
             continue;
 
-        size_t n = 0;
+        size_t n          = 0;
         const float* data = cml_tensor_float_buffer(t, &n);
         if (data && n)
             visit(data, n, ctx);
@@ -512,11 +507,14 @@ static void dist_pass1(const float* data, size_t n, void* ctx) {
     DistPass1* a = (DistPass1*)ctx;
     for (size_t i = 0; i < n; i++) {
         float v = data[i];
-        if (v < a->min) a->min = v;
-        if (v > a->max) a->max = v;
+        if (v < a->min)
+            a->min = v;
+        if (v > a->max)
+            a->max = v;
         a->sum += (double)v;
         a->sumsq += (double)v * (double)v;
-        if (v == 0.0f) a->zeros++;
+        if (v == 0.0f)
+            a->zeros++;
     }
     a->count += n;
 }
@@ -530,8 +528,10 @@ static void dist_pass2(const float* data, size_t n, void* ctx) {
     DistPass2* h = (DistPass2*)ctx;
     for (size_t i = 0; i < n; i++) {
         int b = (int)((data[i] - h->lo) * h->scale);
-        if (b < 0) b = 0;
-        if (b >= DIST_BINS) b = DIST_BINS - 1;
+        if (b < 0)
+            b = 0;
+        if (b >= DIST_BINS)
+            b = DIST_BINS - 1;
         h->bins[b]++;
     }
 }
@@ -539,7 +539,7 @@ static void dist_pass2(const float* data, size_t n, void* ctx) {
 /* Value at the bin where the running count first crosses `target`. */
 static float dist_quantile(const int* bins, size_t total, double q, float lo, float bin_width) {
     size_t target = (size_t)(q * (double)total);
-    size_t seen = 0;
+    size_t seen   = 0;
     for (int b = 0; b < DIST_BINS; b++) {
         seen += (size_t)bins[b];
         if (seen >= target)
@@ -555,8 +555,8 @@ static void summarize_population(void** parameters, int num_parameters, bool wan
     if (a.count == 0)
         return;
 
-    double mean = a.sum / (double)a.count;
-    double var  = a.sumsq / (double)a.count - mean * mean;
+    double mean    = a.sum / (double)a.count;
+    double var     = a.sumsq / (double)a.count - mean * mean;
     out->mean      = (float)mean;
     out->std       = (float)sqrt(var > 0.0 ? var : 0.0);
     out->min       = a.min;
@@ -578,9 +578,9 @@ static void summarize_population(void** parameters, int num_parameters, bool wan
     dist_accumulate(parameters, num_parameters, want_grad, dist_pass2, &h);
 
     float bin_width = range / (float)DIST_BINS;
-    out->p25 = dist_quantile(bins, a.count, 0.25, a.min, bin_width);
-    out->p50 = dist_quantile(bins, a.count, 0.50, a.min, bin_width);
-    out->p75 = dist_quantile(bins, a.count, 0.75, a.min, bin_width);
+    out->p25        = dist_quantile(bins, a.count, 0.25, a.min, bin_width);
+    out->p50        = dist_quantile(bins, a.count, 0.50, a.min, bin_width);
+    out->p75        = dist_quantile(bins, a.count, 0.75, a.min, bin_width);
     cml_free(bins);
 }
 
@@ -591,7 +591,7 @@ void training_metrics_record_distributions(TrainingMetrics* metrics, size_t epoc
     if (!metrics->epoch_grad_dist || !metrics->epoch_weight_dist)
         return;
 
-    summarize_population(parameters, num_parameters, true,  &metrics->epoch_grad_dist[epoch]);
+    summarize_population(parameters, num_parameters, true, &metrics->epoch_grad_dist[epoch]);
     summarize_population(parameters, num_parameters, false, &metrics->epoch_weight_dist[epoch]);
     metrics->has_distributions = true;
 }
@@ -614,8 +614,8 @@ static void export_epoch_series(FILE* f, const char* name, const float* series, 
 /* Emit the percentile bands as parallel arrays -- one array per band rather
  * than an array of objects, so the chart can bind a band directly without
  * re-walking the epochs. */
-static void export_distribution_series(FILE* f, const char* name,
-                                       const DistributionSummary* dist, size_t n) {
+static void export_distribution_series(FILE* f, const char* name, const DistributionSummary* dist,
+                                       size_t n) {
     static const char* fields[] = {"min", "p25", "p50", "p75", "max", "mean", "std", "frac_zero"};
     fprintf(f, "  \"%s\": {", name);
     for (int k = 0; k < 8; k++) {
@@ -624,9 +624,9 @@ static void export_distribution_series(FILE* f, const char* name,
         fprintf(f, "\"%s\": [", fields[k]);
         for (size_t i = 0; i < n && dist; i++) {
             const DistributionSummary* d = &dist[i];
-            const float vals[] = {d->min, d->p25, d->p50, d->p75,
-                                  d->max, d->mean, d->std, d->frac_zero};
-            float v = vals[k];
+            const float vals[]           = {d->min, d->p25,  d->p50, d->p75,
+                                            d->max, d->mean, d->std, d->frac_zero};
+            float v                      = vals[k];
             if (i > 0)
                 fputs(", ", f);
             fprintf(f, "%.8f", (isinf(v) || isnan(v)) ? 0.0 : (double)v);
@@ -1117,7 +1117,7 @@ int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn
     }
     float accuracy = num_samples > 0 ? (float)correct / (float)num_samples : 0.0f;
     *accuracy_out  = accuracy;
-    Tensor* loss = loss_fn(outputs, y);
+    Tensor* loss   = loss_fn(outputs, y);
     if (!loss) {
         LOG_ERROR("Loss computation failed");
         tensor_free(outputs);
@@ -1205,7 +1205,7 @@ void training_metrics_set_expected_epochs(size_t num_epochs) {
         training_metrics_ensure_capacity(g_global_metrics, num_epochs);
     }
     g_global_metrics->expected_epochs = num_epochs;
-    g_global_metrics->num_epochs = num_epochs;
+    g_global_metrics->num_epochs      = num_epochs;
     if (g_global_metrics->actual_epochs == 0 || g_global_metrics->actual_epochs > num_epochs) {
         g_global_metrics->actual_epochs = num_epochs;
     }
@@ -1418,7 +1418,7 @@ void training_metrics_auto_capture_validation(float val_loss, float val_accuracy
             !g_global_metrics->epoch_validation_accuracies) {
             return;
         }
-            for (size_t i = 0; i < g_global_metrics->num_epochs; i++) {
+        for (size_t i = 0; i < g_global_metrics->num_epochs; i++) {
             g_global_metrics->epoch_validation_losses[i]     = INFINITY;
             g_global_metrics->epoch_validation_accuracies[i] = INFINITY;
         }
@@ -1428,7 +1428,7 @@ void training_metrics_auto_capture_validation(float val_loss, float val_accuracy
     if (epoch_index < g_global_metrics->num_epochs) {
         g_global_metrics->epoch_validation_losses[epoch_index]     = val_loss;
         g_global_metrics->epoch_validation_accuracies[epoch_index] = val_accuracy;
-        const char* metrics_path = "training.json";
+        const char* metrics_path                                   = "training.json";
         training_metrics_export_json(g_global_metrics, metrics_path, true);
     }
 }
@@ -1444,7 +1444,7 @@ void training_metrics_auto_capture_test(float test_loss, float test_accuracy) {
             !g_global_metrics->epoch_testing_accuracies) {
             return;
         }
-            for (size_t i = 0; i < g_global_metrics->num_epochs; i++) {
+        for (size_t i = 0; i < g_global_metrics->num_epochs; i++) {
             g_global_metrics->epoch_testing_losses[i]     = INFINITY;
             g_global_metrics->epoch_testing_accuracies[i] = INFINITY;
         }
@@ -1456,7 +1456,7 @@ void training_metrics_auto_capture_test(float test_loss, float test_accuracy) {
     if (last_epoch < g_global_metrics->num_epochs) {
         g_global_metrics->epoch_testing_losses[last_epoch]     = test_loss;
         g_global_metrics->epoch_testing_accuracies[last_epoch] = test_accuracy;
-        const char* metrics_path = "training.json";
+        const char* metrics_path                               = "training.json";
         training_metrics_export_json(g_global_metrics, metrics_path, true);
     }
 }

@@ -40,39 +40,45 @@
 
 /* claim word: high 32 bits = generation, low 32 bits = next chunk index */
 #define CLAIM_MAKE(gen, idx) (((uint64_t)(uint32_t)(gen) << 32) | (uint32_t)(idx))
-#define CLAIM_GEN(c)         ((uint32_t)((c) >> 32))
-#define CLAIM_IDX(c)         ((uint32_t)((c) & 0xffffffffu))
+#define CLAIM_GEN(c) ((uint32_t)((c) >> 32))
+#define CLAIM_IDX(c) ((uint32_t)((c) & 0xffffffffu))
 
 struct ThreadPool {
-    pthread_t*      threads;
-    size_t          num_threads;
+    pthread_t* threads;
+    size_t num_threads;
     pthread_mutex_t mutex;
-    pthread_cond_t  work_ready;   /* workers wait here for a new batch     */
-    pthread_cond_t  work_done;    /* the submitter waits here for the batch */
+    pthread_cond_t work_ready; /* workers wait here for a new batch     */
+    pthread_cond_t work_done;  /* the submitter waits here for the batch */
 
     /* Current batch (published under mutex, then read lock-free). */
-    TaskFunc          func;
-    void*             data;
-    size_t            total;      /* number of items                        */
-    size_t            chunk;      /* ceil(total / num_threads)              */
-    size_t            num_chunks; /* == num_threads for a live batch        */
-    _Atomic uint64_t  claim;      /* (generation << 32) | next chunk index  */
+    TaskFunc func;
+    void* data;
+    size_t total;           /* number of items                        */
+    size_t chunk;           /* ceil(total / num_threads)              */
+    size_t num_chunks;      /* == num_threads for a live batch        */
+    _Atomic uint64_t claim; /* (generation << 32) | next chunk index  */
     /* (generation << 32) | completed-chunk count for THAT generation. Packing
      * matters: a straggler finishing a chunk of batch N while batch N+1 is
      * live must not count toward N+1 — an unpacked counter let stale
      * completions release the submitter before every chunk had run
      * (use-after-free / hang). */
-    _Atomic uint64_t  done;       /* (generation << 32) | chunks finished   */
-    uint64_t          generation; /* bumped per batch; workers track last   */
-    bool              shutdown;
+    _Atomic uint64_t done; /* (generation << 32) | chunks finished   */
+    uint64_t generation;   /* bumped per batch; workers track last   */
+    bool shutdown;
 };
 
 static pthread_mutex_t g_pool_lock;
-static bool            g_pool_lock_initialized = false;
-static ThreadPool*     g_global_pool           = NULL;
+static bool g_pool_lock_initialized = false;
+static ThreadPool* g_global_pool    = NULL;
 
-static inline void pool_lock(void)   { if (g_pool_lock_initialized) pthread_mutex_lock(&g_pool_lock); }
-static inline void pool_unlock(void) { if (g_pool_lock_initialized) pthread_mutex_unlock(&g_pool_lock); }
+static inline void pool_lock(void) {
+    if (g_pool_lock_initialized)
+        pthread_mutex_lock(&g_pool_lock);
+}
+static inline void pool_unlock(void) {
+    if (g_pool_lock_initialized)
+        pthread_mutex_unlock(&g_pool_lock);
+}
 
 /* A thread's private copy of the batch descriptor, taken while it holds the
  * mutex. The pool's own fields are recycled by the next submit, and a thread can
@@ -80,10 +86,10 @@ static inline void pool_unlock(void) { if (g_pool_lock_initialized) pthread_mute
  * race on every one of them. Copying once per batch costs a few words. */
 typedef struct {
     TaskFunc func;
-    void*    data;
-    size_t   total;
-    size_t   chunk;
-    size_t   num_chunks;
+    void* data;
+    size_t total;
+    size_t chunk;
+    size_t num_chunks;
     uint32_t gen;
 } Batch;
 
@@ -106,7 +112,8 @@ static Batch batch_snapshot(const ThreadPool* pool) {
 static void run_chunk(ThreadPool* pool, const Batch* b, size_t c) {
     size_t start = c * b->chunk;
     size_t end   = start + b->chunk;
-    if (end > b->total) end = b->total;
+    if (end > b->total)
+        end = b->total;
     if (start < end)
         b->func(b->data, start, end);
 
@@ -114,8 +121,7 @@ static void run_chunk(ThreadPool* pool, const Batch* b, size_t c) {
         uint64_t cur = atomic_load(&pool->done);
         if (CLAIM_GEN(cur) != b->gen)
             return; /* batch already superseded; our result was accounted for */
-        if (atomic_compare_exchange_weak(&pool->done, &cur,
-                                         CLAIM_MAKE(b->gen, CLAIM_IDX(cur) + 1)))
+        if (atomic_compare_exchange_weak(&pool->done, &cur, CLAIM_MAKE(b->gen, CLAIM_IDX(cur) + 1)))
             break;
     }
     if (CLAIM_IDX(atomic_load(&pool->done)) == b->num_chunks) {
@@ -134,11 +140,12 @@ static void run_chunk(ThreadPool* pool, const Batch* b, size_t c) {
 static void drain_chunks(ThreadPool* pool, const Batch* b) {
     uint64_t cur = atomic_load(&pool->claim);
     for (;;) {
-        if (CLAIM_GEN(cur) != b->gen) return;           /* batch moved on */
+        if (CLAIM_GEN(cur) != b->gen)
+            return; /* batch moved on */
         uint32_t idx = CLAIM_IDX(cur);
-        if (idx >= (uint32_t)b->num_chunks) return;     /* batch exhausted */
-        if (atomic_compare_exchange_weak(&pool->claim, &cur,
-                                         CLAIM_MAKE(b->gen, idx + 1))) {
+        if (idx >= (uint32_t)b->num_chunks)
+            return; /* batch exhausted */
+        if (atomic_compare_exchange_weak(&pool->claim, &cur, CLAIM_MAKE(b->gen, idx + 1))) {
             run_chunk(pool, b, idx);
             cur = atomic_load(&pool->claim);
         }
@@ -147,7 +154,7 @@ static void drain_chunks(ThreadPool* pool, const Batch* b) {
 }
 
 static void* worker_thread(void* arg) {
-    ThreadPool* pool = (ThreadPool*)arg;
+    ThreadPool* pool  = (ThreadPool*)arg;
     uint64_t last_gen = 0;
     for (;;) {
         pthread_mutex_lock(&pool->mutex);
@@ -178,7 +185,7 @@ ThreadPool* threadpool_create(size_t num_threads) {
         GetSystemInfo(&si);
         num_threads = si.dwNumberOfProcessors > 0 ? (size_t)si.dwNumberOfProcessors : 1;
 #else
-        long n = sysconf(_SC_NPROCESSORS_ONLN);
+        long n      = sysconf(_SC_NPROCESSORS_ONLN);
         num_threads = (n > 0) ? (size_t)n : 1;
 #endif
     }
@@ -199,7 +206,7 @@ ThreadPool* threadpool_create(size_t num_threads) {
 
     /* One fewer OS thread than num_threads: the submitting thread participates
      * in every batch, so `num_threads` total workers execute chunks. */
-    size_t spawn = num_threads > 0 ? num_threads - 1 : 0;
+    size_t spawn  = num_threads > 0 ? num_threads - 1 : 0;
     pool->threads = spawn ? cml_calloc(spawn, sizeof(pthread_t)) : NULL;
     if (spawn && !pool->threads) {
         cml_free(pool);
@@ -208,7 +215,7 @@ ThreadPool* threadpool_create(size_t num_threads) {
     for (size_t i = 0; i < spawn; i++) {
         if (pthread_create(&pool->threads[i], NULL, worker_thread, pool) != 0) {
             /* Shrink to the threads we actually created; still correct. */
-            pool->num_threads = i + 1;  /* +1 for the submitter */
+            pool->num_threads = i + 1; /* +1 for the submitter */
             break;
         }
     }
@@ -217,7 +224,8 @@ ThreadPool* threadpool_create(size_t num_threads) {
 }
 
 void threadpool_destroy(ThreadPool* pool) {
-    if (!pool) return;
+    if (!pool)
+        return;
 
     pthread_mutex_lock(&pool->mutex);
     pool->shutdown = true;
@@ -237,10 +245,12 @@ void threadpool_destroy(ThreadPool* pool) {
 }
 
 void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t n) {
-    if (!pool) pool = threadpool_get_global();
-    if (n == 0 || !func) return;
+    if (!pool)
+        pool = threadpool_get_global();
+    if (n == 0 || !func)
+        return;
     if (!pool || pool->num_threads <= 1) {
-        func(data, 0, n);   /* single chunk == slot 0; matches sum's slot math */
+        func(data, 0, n); /* single chunk == slot 0; matches sum's slot math */
         return;
     }
 
@@ -248,7 +258,7 @@ void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t
     pool->func       = func;
     pool->data       = data;
     pool->total      = n;
-    pool->chunk      = (n + pool->num_threads - 1) / pool->num_threads;  /* ceil */
+    pool->chunk      = (n + pool->num_threads - 1) / pool->num_threads; /* ceil */
     pool->num_chunks = pool->num_threads;
     pool->generation++;
     atomic_store(&pool->done, CLAIM_MAKE((uint32_t)pool->generation, 0));
@@ -273,7 +283,8 @@ void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t
 /* Legacy API kept for source compatibility (no current external caller). submit
  * runs the task synchronously via the parallel machinery; wait is then a no-op. */
 int threadpool_submit(ThreadPool* pool, Task* task) {
-    if (!task) return -1;
+    if (!task)
+        return -1;
     threadpool_parallel_for(pool, task->func, task->data, task->total_size);
     return 0;
 }

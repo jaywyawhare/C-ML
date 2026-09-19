@@ -1,6 +1,6 @@
 #include "ops/ir/gpu/nak_backend.h"
 #include "core/logging.h"
-#include "alloc/cml_allocator.h"   /* cml_calloc/cml_free used on all platforms */
+#include "alloc/cml_allocator.h" /* cml_calloc/cml_free used on all platforms */
 
 #include <stdlib.h>
 #include <string.h>
@@ -10,9 +10,9 @@
 #else
 #include <windows.h>
 #define dlopen(path, flags) ((void*)LoadLibraryA(path))
-#define dlsym(handle, sym)  ((void*)GetProcAddress((HMODULE)(handle), (sym)))
-#define dlclose(handle)     FreeLibrary((HMODULE)(handle))
-#define dlerror()           "dlopen not available"
+#define dlsym(handle, sym) ((void*)GetProcAddress((HMODULE)(handle), (sym)))
+#define dlclose(handle) FreeLibrary((HMODULE)(handle))
+#define dlerror() "dlopen not available"
 #define RTLD_LAZY 0
 #endif
 
@@ -35,41 +35,41 @@ typedef struct NAKFunctions {
 static NAKFunctions g_nak_fns;
 static bool g_nak_fns_loaded = false;
 
-static const char* nak_lib_names[] = {
-    "libnak.so",
-    "libnak.so.0",
-    "libnak.so.1",
-    NULL
-};
+static const char* nak_lib_names[] = {"libnak.so", "libnak.so.0", "libnak.so.1", NULL};
 
 static void* try_open_nak(void) {
     for (int i = 0; nak_lib_names[i]; i++) {
         void* lib = dlopen(nak_lib_names[i], RTLD_LAZY);
-        if (lib) return lib;
+        if (lib)
+            return lib;
     }
 
     const char* mesa_path = getenv("NAK_LIB");
     if (mesa_path) {
         void* lib = dlopen(mesa_path, RTLD_LAZY);
-        if (lib) return lib;
+        if (lib)
+            return lib;
     }
     return NULL;
 }
 
 static int load_nak_symbols(void* lib) {
-    if (g_nak_fns_loaded) return 0;
+    if (g_nak_fns_loaded)
+        return 0;
 
-#define LOAD(field, name) do {                          \
-    void* _s = dlsym(lib, name);                        \
-    if (!_s) return -1;                                 \
-    memcpy(&g_nak_fns.field, &_s, sizeof(_s));          \
-} while (0)
+#define LOAD(field, name)                                                                          \
+    do {                                                                                           \
+        void* _s = dlsym(lib, name);                                                               \
+        if (!_s)                                                                                   \
+            return -1;                                                                             \
+        memcpy(&g_nak_fns.field, &_s, sizeof(_s));                                                 \
+    } while (0)
 
     LOAD(compile_shader, "nak_compile_shader");
-    LOAD(bin_size,       "nak_shader_bin_size");
-    LOAD(bin_data,       "nak_shader_bin_data");
-    LOAD(shader_free,    "nak_shader_free");
-    LOAD(from_spirv,     "nak_from_spirv");
+    LOAD(bin_size, "nak_shader_bin_size");
+    LOAD(bin_data, "nak_shader_bin_data");
+    LOAD(shader_free, "nak_shader_free");
+    LOAD(from_spirv, "nak_from_spirv");
 
 #undef LOAD
     g_nak_fns_loaded = true;
@@ -78,7 +78,8 @@ static int load_nak_symbols(void* lib) {
 
 bool cml_nak_available(void) {
     void* lib = try_open_nak();
-    if (!lib) return false;
+    if (!lib)
+        return false;
     bool ok = (dlsym(lib, "nak_compile_shader") != NULL);
     dlclose(lib);
     return ok;
@@ -86,10 +87,11 @@ bool cml_nak_available(void) {
 
 CMLNAKBackend* cml_nak_create(int gpu_arch) {
     CMLNAKBackend* nak = cml_calloc(1, sizeof(CMLNAKBackend));
-    if (!nak) return NULL;
+    if (!nak)
+        return NULL;
 
     nak->gpu_arch = gpu_arch;
-    nak->nak_lib = try_open_nak();
+    nak->nak_lib  = try_open_nak();
 
     if (!nak->nak_lib) {
         LOG_INFO("NAK: library not found, backend will be non-functional");
@@ -109,18 +111,21 @@ CMLNAKBackend* cml_nak_create(int gpu_arch) {
 }
 
 void cml_nak_free(CMLNAKBackend* nak) {
-    if (!nak) return;
+    if (!nak)
+        return;
     if (nak->nak_lib)
         dlclose(nak->nak_lib);
     cml_free(nak);
 }
 
-int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader,
-                    void** binary, size_t* binary_size) {
-    if (!nak || !nak->initialized) return -1;
-    if (!nir_shader || !binary || !binary_size) return -1;
+int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader, void** binary,
+                    size_t* binary_size) {
+    if (!nak || !nak->initialized)
+        return -1;
+    if (!nir_shader || !binary || !binary_size)
+        return -1;
 
-    *binary = NULL;
+    *binary      = NULL;
     *binary_size = 0;
 
     void* compiled = g_nak_fns.compile_shader(nir_shader, NULL);
@@ -129,7 +134,7 @@ int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader,
         return -1;
     }
 
-    size_t size = g_nak_fns.bin_size(compiled);
+    size_t size      = g_nak_fns.bin_size(compiled);
     const void* data = g_nak_fns.bin_data(compiled);
 
     if (!data || size == 0) {
@@ -145,22 +150,23 @@ int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader,
     }
     memcpy(result, data, size);
 
-    *binary = result;
+    *binary      = result;
     *binary_size = size;
 
-    LOG_INFO("NAK: compiled %zu bytes of native GPU code for sm_%d",
-             size, nak->gpu_arch);
+    LOG_INFO("NAK: compiled %zu bytes of native GPU code for sm_%d", size, nak->gpu_arch);
 
     g_nak_fns.shader_free(compiled);
     return 0;
 }
 
-int cml_nak_compile_spirv(CMLNAKBackend* nak, const void* spirv,
-                          size_t spirv_size, void** binary, size_t* binary_size) {
-    if (!nak || !nak->initialized) return -1;
-    if (!spirv || !spirv_size || !binary || !binary_size) return -1;
+int cml_nak_compile_spirv(CMLNAKBackend* nak, const void* spirv, size_t spirv_size, void** binary,
+                          size_t* binary_size) {
+    if (!nak || !nak->initialized)
+        return -1;
+    if (!spirv || !spirv_size || !binary || !binary_size)
+        return -1;
 
-    *binary = NULL;
+    *binary      = NULL;
     *binary_size = 0;
 
     void* nir = g_nak_fns.from_spirv(spirv, spirv_size, nak->gpu_arch);
@@ -176,18 +182,28 @@ int cml_nak_compile_spirv(CMLNAKBackend* nak, const void* spirv,
 #else /* !CML_HAS_NAK */
 
 bool cml_nak_available(void) { return false; }
-CMLNAKBackend* cml_nak_create(int gpu_arch) { (void)gpu_arch; return NULL; }
+CMLNAKBackend* cml_nak_create(int gpu_arch) {
+    (void)gpu_arch;
+    return NULL;
+}
 void cml_nak_free(CMLNAKBackend* nak) { (void)nak; }
 
-int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader,
-                    void** binary, size_t* binary_size) {
-    (void)nak; (void)nir_shader; (void)binary; (void)binary_size;
+int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader, void** binary,
+                    size_t* binary_size) {
+    (void)nak;
+    (void)nir_shader;
+    (void)binary;
+    (void)binary_size;
     return -1;
 }
 
-int cml_nak_compile_spirv(CMLNAKBackend* nak, const void* spirv,
-                          size_t spirv_size, void** binary, size_t* binary_size) {
-    (void)nak; (void)spirv; (void)spirv_size; (void)binary; (void)binary_size;
+int cml_nak_compile_spirv(CMLNAKBackend* nak, const void* spirv, size_t spirv_size, void** binary,
+                          size_t* binary_size) {
+    (void)nak;
+    (void)spirv;
+    (void)spirv_size;
+    (void)binary;
+    (void)binary_size;
     return -1;
 }
 

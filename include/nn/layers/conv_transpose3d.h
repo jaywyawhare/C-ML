@@ -12,7 +12,7 @@ typedef struct ConvTranspose3d {
 
     int in_channels;
     int out_channels;
-    int kernel_size[3];     // [depth, height, width]
+    int kernel_size[3]; // [depth, height, width]
     int stride[3];
     int padding[3];
     int output_padding[3];
@@ -23,9 +23,9 @@ typedef struct ConvTranspose3d {
     Parameter* bias;   // [out_channels]
 } ConvTranspose3d;
 
-ConvTranspose3d* nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size,
-                                      int stride, int padding, int output_padding,
-                                      bool use_bias, DType dtype, DeviceType device);
+ConvTranspose3d* nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size, int stride,
+                                     int padding, int output_padding, bool use_bias, DType dtype,
+                                     DeviceType device);
 
 Tensor* conv_transpose3d_forward(Module* module, Tensor* input);
 

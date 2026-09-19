@@ -23,9 +23,9 @@ typedef struct ConvTranspose2d {
     Parameter* bias;   // [out_channels]
 } ConvTranspose2d;
 
-ConvTranspose2d* nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size,
-                                      int stride, int padding, int output_padding,
-                                      bool use_bias, DType dtype, DeviceType device);
+ConvTranspose2d* nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size, int stride,
+                                     int padding, int output_padding, bool use_bias, DType dtype,
+                                     DeviceType device);
 
 #ifdef __cplusplus
 }

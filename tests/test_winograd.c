@@ -77,20 +77,19 @@ static void test_winograd_conv2d_basic(void) {
     }
 
     /* Output dimensions with padding=1: same as input -> 8x8 */
-    int out_h = H;
-    int out_w = W;
+    int out_h     = H;
+    int out_w     = W;
     float* output = (float*)cml_calloc(batch * out_c * out_h * out_w, sizeof(float));
     REQUIRE(output != NULL);
 
     WinogradConfig config;
-    config.variant = WINOGRAD_F2x2_3x3;
-    config.tile_size = 4;
+    config.variant     = WINOGRAD_F2x2_3x3;
+    config.tile_size   = 4;
     config.output_tile = 2;
     config.kernel_size = 3;
 
-    int ret = winograd_conv2d(input, weight, NULL, output,
-                               batch, in_c, out_c, H, W,
-                               pad_h, pad_w, groups, &config);
+    int ret = winograd_conv2d(input, weight, NULL, output, batch, in_c, out_c, H, W, pad_h, pad_w,
+                              groups, &config);
     REQUIRE(ret == 0);
 
     /*

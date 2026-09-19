@@ -27,7 +27,7 @@ typedef struct {
     CMLTrace* trace;
 
     /* Shape signature for invalidation */
-    int shape_sig[32];  /* flattened first-node output shape */
+    int shape_sig[32]; /* flattened first-node output shape */
     int shape_len;
 
     bool occupied;
@@ -49,8 +49,7 @@ void cml_tinyjit_free(CMLTinyJit* jit);
    Subsequent calls: replay cached trace if graph hash + shapes match. */
 int cml_tinyjit_execute(CMLTinyJit* jit, CMLGraph_t ir);
 
-void cml_tinyjit_stats(const CMLTinyJit* jit,
-                       size_t* hits, size_t* misses, size_t* invalidations);
+void cml_tinyjit_stats(const CMLTinyJit* jit, size_t* hits, size_t* misses, size_t* invalidations);
 
 #ifdef __cplusplus
 }

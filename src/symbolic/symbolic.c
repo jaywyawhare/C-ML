@@ -7,11 +7,11 @@
 
 static _Atomic int g_var_id_counter = 0;
 
-
 static SymExpr* sym_alloc(SymExprType type) {
     SymExpr* e = (SymExpr*)calloc(1, sizeof(SymExpr));
-    if (!e) return NULL;
-    e->type = type;
+    if (!e)
+        return NULL;
+    e->type      = type;
     e->ref_count = 1;
     return e;
 }
@@ -23,43 +23,57 @@ static int sym_fold_binop(SymExprType type, int64_t left, int64_t right, int64_t
     if (!out)
         return 0;
     switch (type) {
-    case SYM_ADD: *out = left + right; return 1;
-    case SYM_MUL: *out = left * right; return 1;
+    case SYM_ADD:
+        *out = left + right;
+        return 1;
+    case SYM_MUL:
+        *out = left * right;
+        return 1;
     case SYM_DIV:
-        if (right == 0) return 0;
+        if (right == 0)
+            return 0;
         *out = left / right;
         return 1;
     case SYM_MOD:
-        if (right == 0) return 0;
+        if (right == 0)
+            return 0;
         *out = left % right;
         return 1;
-    case SYM_MIN: *out = i64_min(left, right); return 1;
-    case SYM_MAX: *out = i64_max(left, right); return 1;
-    default: return 0;
+    case SYM_MIN:
+        *out = i64_min(left, right);
+        return 1;
+    case SYM_MAX:
+        *out = i64_max(left, right);
+        return 1;
+    default:
+        return 0;
     }
 }
 
 SymExpr* sym_const(int64_t value) {
     SymExpr* e = sym_alloc(SYM_CONST);
-    if (e) e->const_val = value;
+    if (e)
+        e->const_val = value;
     return e;
 }
 
 SymExpr* sym_var(const char* name, int64_t vmin, int64_t vmax) {
-    if (!name) return NULL;
+    if (!name)
+        return NULL;
     SymExpr* e = sym_alloc(SYM_VAR);
-    if (!e) return NULL;
+    if (!e)
+        return NULL;
     strncpy(e->var.name, name, sizeof(e->var.name) - 1);
     e->var.name[sizeof(e->var.name) - 1] = '\0';
-    e->var.vmin = vmin;
-    e->var.vmax = vmax;
-    e->var.id = atomic_fetch_add(&g_var_id_counter, 1);
+    e->var.vmin                          = vmin;
+    e->var.vmax                          = vmax;
+    e->var.id                            = atomic_fetch_add(&g_var_id_counter, 1);
     return e;
 }
 
-
 static SymExpr* sym_binop(SymExprType type, SymExpr* a, SymExpr* b) {
-    if (!a || !b) return NULL;
+    if (!a || !b)
+        return NULL;
 
     if (a->type == SYM_CONST && b->type == SYM_CONST) {
         int64_t result;
@@ -69,10 +83,11 @@ static SymExpr* sym_binop(SymExprType type, SymExpr* a, SymExpr* b) {
     }
 
     SymExpr* e = sym_alloc(type);
-    if (!e) return NULL;
+    if (!e)
+        return NULL;
     sym_expr_retain(a);
     sym_expr_retain(b);
-    e->binop.left = a;
+    e->binop.left  = a;
     e->binop.right = b;
     return e;
 }
@@ -84,13 +99,16 @@ SymExpr* sym_mod(SymExpr* a, SymExpr* b) { return sym_binop(SYM_MOD, a, b); }
 SymExpr* sym_min_expr(SymExpr* a, SymExpr* b) { return sym_binop(SYM_MIN, a, b); }
 SymExpr* sym_max_expr(SymExpr* a, SymExpr* b) { return sym_binop(SYM_MAX, a, b); }
 
-
 int64_t sym_expr_min(const SymExpr* e) {
-    if (!e) return 0;
+    if (!e)
+        return 0;
     switch (e->type) {
-    case SYM_CONST: return e->const_val;
-    case SYM_VAR:   return e->var.vmin;
-    case SYM_ADD:   return sym_expr_min(e->binop.left) + sym_expr_min(e->binop.right);
+    case SYM_CONST:
+        return e->const_val;
+    case SYM_VAR:
+        return e->var.vmin;
+    case SYM_ADD:
+        return sym_expr_min(e->binop.left) + sym_expr_min(e->binop.right);
     case SYM_MUL: {
         // For MUL, consider all 4 combinations (handles negative ranges)
         int64_t a_min = sym_expr_min(e->binop.left);
@@ -107,31 +125,40 @@ int64_t sym_expr_min(const SymExpr* e) {
         int64_t a_min = sym_expr_min(e->binop.left);
         int64_t a_max = sym_expr_max(e->binop.left);
         // Avoid division by zero in bounds; if range includes 0, conservative
-        if (b_min <= 0 && b_max >= 0) return INT64_MIN;
+        if (b_min <= 0 && b_max >= 0)
+            return INT64_MIN;
         int64_t p1 = a_min / b_min, p2 = a_min / b_max;
         int64_t p3 = a_max / b_min, p4 = a_max / b_max;
         return i64_min(i64_min(p1, p2), i64_min(p3, p4));
     }
     case SYM_MOD: {
         int64_t b_max = sym_expr_max(e->binop.right);
-        if (b_max <= 0) return 0;
+        if (b_max <= 0)
+            return 0;
         // Mod result is in [0, |b|-1] if a >= 0, else [-(|b|-1), 0]
         int64_t a_min = sym_expr_min(e->binop.left);
-        if (a_min >= 0) return 0;
+        if (a_min >= 0)
+            return 0;
         return -(b_max - 1);
     }
-    case SYM_MIN: return i64_min(sym_expr_min(e->binop.left), sym_expr_min(e->binop.right));
-    case SYM_MAX: return i64_max(sym_expr_min(e->binop.left), sym_expr_min(e->binop.right));
+    case SYM_MIN:
+        return i64_min(sym_expr_min(e->binop.left), sym_expr_min(e->binop.right));
+    case SYM_MAX:
+        return i64_max(sym_expr_min(e->binop.left), sym_expr_min(e->binop.right));
     }
     return 0;
 }
 
 int64_t sym_expr_max(const SymExpr* e) {
-    if (!e) return 0;
+    if (!e)
+        return 0;
     switch (e->type) {
-    case SYM_CONST: return e->const_val;
-    case SYM_VAR:   return e->var.vmax;
-    case SYM_ADD:   return sym_expr_max(e->binop.left) + sym_expr_max(e->binop.right);
+    case SYM_CONST:
+        return e->const_val;
+    case SYM_VAR:
+        return e->var.vmax;
+    case SYM_ADD:
+        return sym_expr_max(e->binop.left) + sym_expr_max(e->binop.right);
     case SYM_MUL: {
         int64_t a_min = sym_expr_min(e->binop.left);
         int64_t a_max = sym_expr_max(e->binop.left);
@@ -146,24 +173,28 @@ int64_t sym_expr_max(const SymExpr* e) {
         int64_t b_max = sym_expr_max(e->binop.right);
         int64_t a_min = sym_expr_min(e->binop.left);
         int64_t a_max = sym_expr_max(e->binop.left);
-        if (b_min <= 0 && b_max >= 0) return INT64_MAX;
+        if (b_min <= 0 && b_max >= 0)
+            return INT64_MAX;
         int64_t p1 = a_min / b_min, p2 = a_min / b_max;
         int64_t p3 = a_max / b_min, p4 = a_max / b_max;
         return i64_max(i64_max(p1, p2), i64_max(p3, p4));
     }
     case SYM_MOD: {
         int64_t b_max = sym_expr_max(e->binop.right);
-        if (b_max <= 0) return 0;
+        if (b_max <= 0)
+            return 0;
         int64_t a_max_val = sym_expr_max(e->binop.left);
-        if (a_max_val >= 0) return b_max - 1;
+        if (a_max_val >= 0)
+            return b_max - 1;
         return 0;
     }
-    case SYM_MIN: return i64_min(sym_expr_max(e->binop.left), sym_expr_max(e->binop.right));
-    case SYM_MAX: return i64_max(sym_expr_max(e->binop.left), sym_expr_max(e->binop.right));
+    case SYM_MIN:
+        return i64_min(sym_expr_max(e->binop.left), sym_expr_max(e->binop.right));
+    case SYM_MAX:
+        return i64_max(sym_expr_max(e->binop.left), sym_expr_max(e->binop.right));
     }
     return 0;
 }
-
 
 int sym_eval(const SymExpr* e, const char** var_names, const int64_t* values, int num_vars,
              int64_t* out) {
@@ -198,9 +229,9 @@ int sym_eval(const SymExpr* e, const char** var_names, const int64_t* values, in
     return -1;
 }
 
-
 SymExpr* sym_simplify(SymExpr* e) {
-    if (!e) return NULL;
+    if (!e)
+        return NULL;
 
     // Constants and vars are already simplified
     if (e->type == SYM_CONST || e->type == SYM_VAR) {
@@ -209,11 +240,13 @@ SymExpr* sym_simplify(SymExpr* e) {
     }
 
     // Recursively simplify children
-    SymExpr* left = sym_simplify(e->binop.left);
+    SymExpr* left  = sym_simplify(e->binop.left);
     SymExpr* right = sym_simplify(e->binop.right);
     if (!left || !right) {
-        if (left) sym_expr_release(left);
-        if (right) sym_expr_release(right);
+        if (left)
+            sym_expr_release(left);
+        if (right)
+            sym_expr_release(right);
         return NULL;
     }
 
@@ -223,7 +256,8 @@ SymExpr* sym_simplify(SymExpr* e) {
         bool valid = sym_fold_binop(e->type, left->const_val, right->const_val, &result);
         sym_expr_release(left);
         sym_expr_release(right);
-        if (valid) return sym_const(result);
+        if (valid)
+            return sym_const(result);
         return NULL;
     }
 
@@ -291,19 +325,21 @@ SymExpr* sym_simplify(SymExpr* e) {
         sym_expr_release(right);
         return NULL;
     }
-    out->binop.left = left;   // already retained via sym_simplify
+    out->binop.left  = left; // already retained via sym_simplify
     out->binop.right = right;
     return out;
 }
 
-
 void sym_expr_retain(SymExpr* e) {
-    if (e) e->ref_count++;
+    if (e)
+        e->ref_count++;
 }
 
 void sym_expr_release(SymExpr* e) {
-    if (!e) return;
-    if (--e->ref_count > 0) return;
+    if (!e)
+        return;
+    if (--e->ref_count > 0)
+        return;
 
     if (e->type != SYM_CONST && e->type != SYM_VAR) {
         sym_expr_release(e->binop.left);
@@ -312,9 +348,9 @@ void sym_expr_release(SymExpr* e) {
     free(e);
 }
 
-
 int sym_expr_to_string(const SymExpr* e, char* buf, int buf_size) {
-    if (!e || !buf || buf_size <= 0) return 0;
+    if (!e || !buf || buf_size <= 0)
+        return 0;
 
     switch (e->type) {
     case SYM_CONST:
@@ -324,15 +360,29 @@ int sym_expr_to_string(const SymExpr* e, char* buf, int buf_size) {
     default: {
         const char* op;
         switch (e->type) {
-        case SYM_ADD: op = "+"; break;
-        case SYM_MUL: op = "*"; break;
-        case SYM_DIV: op = "/"; break;
+        case SYM_ADD:
+            op = "+";
+            break;
+        case SYM_MUL:
+            op = "*";
+            break;
+        case SYM_DIV:
+            op = "/";
+            break;
         /* Single %: `op` is inserted through a "%s" conversion below, so it is
          * not format-processed. Written "%%" it rendered as "(a %% b)". */
-        case SYM_MOD: op = "%"; break;
-        case SYM_MIN: op = "min"; break;
-        case SYM_MAX: op = "max"; break;
-        default: op = "?"; break;
+        case SYM_MOD:
+            op = "%";
+            break;
+        case SYM_MIN:
+            op = "min";
+            break;
+        case SYM_MAX:
+            op = "max";
+            break;
+        default:
+            op = "?";
+            break;
         }
 
         char left_buf[256], right_buf[256];
@@ -347,19 +397,19 @@ int sym_expr_to_string(const SymExpr* e, char* buf, int buf_size) {
     }
 }
 
-
 SymDim sym_dim_concrete(int value) {
     SymDim d;
     d.is_symbolic = false;
-    d.concrete = value;
+    d.concrete    = value;
     return d;
 }
 
 SymDim sym_dim_symbolic(SymExpr* expr) {
     SymDim d;
     d.is_symbolic = true;
-    d.expr = expr;
-    if (expr) sym_expr_retain(expr);
+    d.expr        = expr;
+    if (expr)
+        sym_expr_retain(expr);
     return d;
 }
 
@@ -371,14 +421,19 @@ void sym_dim_release(SymDim* dim) {
 }
 
 SymShape* sym_shape_from_concrete(const int* dims, int ndim) {
-    if (!dims || ndim <= 0) return NULL;
+    if (!dims || ndim <= 0)
+        return NULL;
 
     SymShape* s = (SymShape*)calloc(1, sizeof(SymShape));
-    if (!s) return NULL;
+    if (!s)
+        return NULL;
     s->dims = (SymDim*)calloc((size_t)ndim, sizeof(SymDim));
-    if (!s->dims) { free(s); return NULL; }
+    if (!s->dims) {
+        free(s);
+        return NULL;
+    }
 
-    s->ndim = ndim;
+    s->ndim      = ndim;
     s->ref_count = 1;
     for (int i = 0; i < ndim; i++) {
         s->dims[i] = sym_dim_concrete(dims[i]);
@@ -387,14 +442,19 @@ SymShape* sym_shape_from_concrete(const int* dims, int ndim) {
 }
 
 SymShape* sym_shape_broadcast(const SymShape* a, const SymShape* b) {
-    if (!a || !b) return NULL;
+    if (!a || !b)
+        return NULL;
 
-    int max_ndim = a->ndim > b->ndim ? a->ndim : b->ndim;
+    int max_ndim  = a->ndim > b->ndim ? a->ndim : b->ndim;
     SymShape* out = (SymShape*)calloc(1, sizeof(SymShape));
-    if (!out) return NULL;
+    if (!out)
+        return NULL;
     out->dims = (SymDim*)calloc((size_t)max_ndim, sizeof(SymDim));
-    if (!out->dims) { free(out); return NULL; }
-    out->ndim = max_ndim;
+    if (!out->dims) {
+        free(out);
+        return NULL;
+    }
+    out->ndim      = max_ndim;
     out->ref_count = 1;
 
     for (int i = 0; i < max_ndim; i++) {
@@ -453,13 +513,13 @@ SymShape* sym_shape_broadcast(const SymShape* a, const SymShape* b) {
                 }
             } else if (a_sym && b_sym) {
                 // Both symbolic: result is max(a, b)
-                SymExpr* mx = sym_max_expr(a->dims[ai].expr, b->dims[bi].expr);
+                SymExpr* mx  = sym_max_expr(a->dims[ai].expr, b->dims[bi].expr);
                 out->dims[i] = sym_dim_symbolic(mx);
                 sym_expr_release(mx); // sym_dim_symbolic retains
             } else {
                 // One symbolic, one non-1 concrete => use symbolic
                 SymExpr* sym_e = a_sym ? a->dims[ai].expr : b->dims[bi].expr;
-                out->dims[i] = sym_dim_symbolic(sym_e);
+                out->dims[i]   = sym_dim_symbolic(sym_e);
             }
         }
     }
@@ -469,7 +529,8 @@ SymShape* sym_shape_broadcast(const SymShape* a, const SymShape* b) {
 
 int sym_shape_eval(const SymShape* shape, const char** var_names, const int64_t* values,
                    int num_vars, int* out_dims) {
-    if (!shape || !out_dims) return -1;
+    if (!shape || !out_dims)
+        return -1;
 
     for (int i = 0; i < shape->ndim; i++) {
         if (shape->dims[i].is_symbolic) {
@@ -485,13 +546,15 @@ int sym_shape_eval(const SymShape* shape, const char** var_names, const int64_t*
 }
 
 int sym_shape_to_string(const SymShape* shape, char* buf, int buf_size) {
-    if (!shape || !buf || buf_size <= 0) return 0;
+    if (!shape || !buf || buf_size <= 0)
+        return 0;
 
     int written = 0;
     written += snprintf(buf + written, (size_t)(buf_size - written), "(");
 
     for (int i = 0; i < shape->ndim; i++) {
-        if (i > 0) written += snprintf(buf + written, (size_t)(buf_size - written), ", ");
+        if (i > 0)
+            written += snprintf(buf + written, (size_t)(buf_size - written), ", ");
 
         if (shape->dims[i].is_symbolic) {
             written += sym_expr_to_string(shape->dims[i].expr, buf + written, buf_size - written);
@@ -506,12 +569,15 @@ int sym_shape_to_string(const SymShape* shape, char* buf, int buf_size) {
 }
 
 void sym_shape_retain(SymShape* shape) {
-    if (shape) shape->ref_count++;
+    if (shape)
+        shape->ref_count++;
 }
 
 void sym_shape_release(SymShape* shape) {
-    if (!shape) return;
-    if (--shape->ref_count > 0) return;
+    if (!shape)
+        return;
+    if (--shape->ref_count > 0)
+        return;
 
     for (int i = 0; i < shape->ndim; i++) {
         sym_dim_release(&shape->dims[i]);

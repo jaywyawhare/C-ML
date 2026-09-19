@@ -10,9 +10,12 @@
 
 static int test_config_defaults(void) {
     CMLHeuristicConfig cfg = cml_heuristic_get_config();
-    if (cfg.max_local_size != CML_HEURISTIC_DEFAULT_LOCAL_SIZE) return 0;
-    if (cfg.preferred_vec_width != CML_HEURISTIC_DEFAULT_VEC_WIDTH) return 0;
-    if (!cfg.use_local_memory) return 0;
+    if (cfg.max_local_size != CML_HEURISTIC_DEFAULT_LOCAL_SIZE)
+        return 0;
+    if (cfg.preferred_vec_width != CML_HEURISTIC_DEFAULT_VEC_WIDTH)
+        return 0;
+    if (!cfg.use_local_memory)
+        return 0;
     return 1;
 }
 
@@ -20,36 +23,47 @@ static int test_config_set_get(void) {
     CMLHeuristicConfig original = cml_heuristic_get_config();
 
     CMLHeuristicConfig cfg = {
-        .max_local_size = 512,
+        .max_local_size      = 512,
         .preferred_vec_width = 8,
-        .use_local_memory = false,
+        .use_local_memory    = false,
     };
     cml_heuristic_set_config(&cfg);
 
     CMLHeuristicConfig got = cml_heuristic_get_config();
     cml_heuristic_set_config(&original);
 
-    if (got.max_local_size != 512) return 0;
-    if (got.preferred_vec_width != 8) return 0;
-    if (got.use_local_memory) return 0;
+    if (got.max_local_size != 512)
+        return 0;
+    if (got.preferred_vec_width != 8)
+        return 0;
+    if (got.use_local_memory)
+        return 0;
     return 1;
 }
 
 static int test_null_prog(void) {
     CMLOptList* opts = cml_heuristic_optimize(NULL);
-    if (!opts) return 0;
-    if (opts->num_opts != 0) { cml_opt_list_free(opts); return 0; }
+    if (!opts)
+        return 0;
+    if (opts->num_opts != 0) {
+        cml_opt_list_free(opts);
+        return 0;
+    }
     cml_opt_list_free(opts);
     return 1;
 }
 
 static int test_elementwise_generates_upcast(void) {
-    int extents[] = {256, 64};
+    int extents[]       = {256, 64};
     LinearProgram* prog = make_prog(2, extents, UOP_ADD);
-    if (!prog) return 0;
+    if (!prog)
+        return 0;
 
     CMLOptList* opts = cml_heuristic_optimize(prog);
-    if (!opts) { linear_program_free(prog); return 0; }
+    if (!opts) {
+        linear_program_free(prog);
+        return 0;
+    }
 
     bool has_upcast = false;
     for (int i = 0; i < opts->num_opts; i++) {
@@ -63,12 +77,16 @@ static int test_elementwise_generates_upcast(void) {
 }
 
 static int test_elementwise_generates_group(void) {
-    int extents[] = {1024};
+    int extents[]       = {1024};
     LinearProgram* prog = make_prog(1, extents, UOP_MUL);
-    if (!prog) return 0;
+    if (!prog)
+        return 0;
 
     CMLOptList* opts = cml_heuristic_optimize(prog);
-    if (!opts) { linear_program_free(prog); return 0; }
+    if (!opts) {
+        linear_program_free(prog);
+        return 0;
+    }
 
     bool has_group = false;
     for (int i = 0; i < opts->num_opts; i++) {
@@ -82,12 +100,16 @@ static int test_elementwise_generates_group(void) {
 }
 
 static int test_reduce_generates_local(void) {
-    int extents[] = {64, 256};
+    int extents[]       = {64, 256};
     LinearProgram* prog = make_prog(2, extents, UOP_SUM);
-    if (!prog) return 0;
+    if (!prog)
+        return 0;
 
     CMLOptList* opts = cml_heuristic_optimize(prog);
-    if (!opts) { linear_program_free(prog); return 0; }
+    if (!opts) {
+        linear_program_free(prog);
+        return 0;
+    }
 
     bool has_local = false;
     for (int i = 0; i < opts->num_opts; i++) {
@@ -101,12 +123,16 @@ static int test_reduce_generates_local(void) {
 }
 
 static int test_matmul_generates_local(void) {
-    int extents[] = {128, 128, 64};
+    int extents[]       = {128, 128, 64};
     LinearProgram* prog = make_prog(3, extents, UOP_MATMUL);
-    if (!prog) return 0;
+    if (!prog)
+        return 0;
 
     CMLOptList* opts = cml_heuristic_optimize(prog);
-    if (!opts) { linear_program_free(prog); return 0; }
+    if (!opts) {
+        linear_program_free(prog);
+        return 0;
+    }
 
     int local_count = 0;
     bool has_unroll = false;
@@ -123,12 +149,16 @@ static int test_matmul_generates_local(void) {
 }
 
 static int test_conv_generates_spatial_local(void) {
-    int extents[] = {32, 32, 64};
+    int extents[]       = {32, 32, 64};
     LinearProgram* prog = make_prog(3, extents, UOP_CONV2D);
-    if (!prog) return 0;
+    if (!prog)
+        return 0;
 
     CMLOptList* opts = cml_heuristic_optimize(prog);
-    if (!opts) { linear_program_free(prog); return 0; }
+    if (!opts) {
+        linear_program_free(prog);
+        return 0;
+    }
 
     int local_count = 0;
     bool has_unroll = false;
@@ -145,12 +175,16 @@ static int test_conv_generates_spatial_local(void) {
 }
 
 static int test_opts_are_valid(void) {
-    int extents[] = {256, 64};
+    int extents[]       = {256, 64};
     LinearProgram* prog = make_prog(2, extents, UOP_ADD);
-    if (!prog) return 0;
+    if (!prog)
+        return 0;
 
     CMLOptList* opts = cml_heuristic_optimize(prog);
-    if (!opts) { linear_program_free(prog); return 0; }
+    if (!opts) {
+        linear_program_free(prog);
+        return 0;
+    }
 
     for (int i = 0; i < opts->num_opts; i++) {
         if (opts->opts[i].amount <= 0) {
@@ -173,15 +207,23 @@ static int test_opts_are_valid(void) {
 }
 
 static int test_opts_can_be_applied(void) {
-    int extents[] = {256, 64};
+    int extents[]       = {256, 64};
     LinearProgram* prog = make_prog(2, extents, UOP_ADD);
-    if (!prog) return 0;
+    if (!prog)
+        return 0;
 
     CMLOptList* opts = cml_heuristic_optimize(prog);
-    if (!opts) { linear_program_free(prog); return 0; }
+    if (!opts) {
+        linear_program_free(prog);
+        return 0;
+    }
 
     LinearProgram* fresh = make_prog(2, extents, UOP_ADD);
-    if (!fresh) { cml_opt_list_free(opts); linear_program_free(prog); return 0; }
+    if (!fresh) {
+        cml_opt_list_free(opts);
+        linear_program_free(prog);
+        return 0;
+    }
 
     int rc = cml_opt_apply(opts, fresh);
 
@@ -193,18 +235,24 @@ static int test_opts_can_be_applied(void) {
 
 static int test_no_local_memory_config(void) {
     CMLHeuristicConfig original = cml_heuristic_get_config();
-    CMLHeuristicConfig cfg = original;
-    cfg.use_local_memory = false;
+    CMLHeuristicConfig cfg      = original;
+    cfg.use_local_memory        = false;
     cml_heuristic_set_config(&cfg);
 
-    int extents[] = {64, 256};
+    int extents[]       = {64, 256};
     LinearProgram* prog = make_prog(2, extents, UOP_SUM);
-    if (!prog) { cml_heuristic_set_config(&original); return 0; }
+    if (!prog) {
+        cml_heuristic_set_config(&original);
+        return 0;
+    }
 
     CMLOptList* opts = cml_heuristic_optimize(prog);
     cml_heuristic_set_config(&original);
 
-    if (!opts) { linear_program_free(prog); return 0; }
+    if (!opts) {
+        linear_program_free(prog);
+        return 0;
+    }
 
     for (int i = 0; i < opts->num_opts; i++) {
         if (opts->opts[i].type == OPT_LOCAL) {
@@ -221,12 +269,16 @@ static int test_no_local_memory_config(void) {
 }
 
 static int test_single_element_axis(void) {
-    int extents[] = {1};
+    int extents[]       = {1};
     LinearProgram* prog = make_prog(1, extents, UOP_ADD);
-    if (!prog) return 0;
+    if (!prog)
+        return 0;
 
     CMLOptList* opts = cml_heuristic_optimize(prog);
-    if (!opts) { linear_program_free(prog); return 0; }
+    if (!opts) {
+        linear_program_free(prog);
+        return 0;
+    }
 
     if (opts->num_opts != 0) {
         printf("(expected 0 opts for trivial axis, got %d) ", opts->num_opts);
@@ -241,12 +293,16 @@ static int test_single_element_axis(void) {
 }
 
 static int test_power_of_two_amounts(void) {
-    int extents[] = {256, 128};
+    int extents[]       = {256, 128};
     LinearProgram* prog = make_prog(2, extents, UOP_ADD);
-    if (!prog) return 0;
+    if (!prog)
+        return 0;
 
     CMLOptList* opts = cml_heuristic_optimize(prog);
-    if (!opts) { linear_program_free(prog); return 0; }
+    if (!opts) {
+        linear_program_free(prog);
+        return 0;
+    }
 
     for (int i = 0; i < opts->num_opts; i++) {
         int a = opts->opts[i].amount;

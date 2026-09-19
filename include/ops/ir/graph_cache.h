@@ -18,8 +18,8 @@ typedef struct CMLGraph* CMLGraph_t;
 typedef struct CMLExecutionPlan {
     struct IRNode** nodes; // Topologically sorted nodes
     size_t num_nodes;
-    float** buffers;       // Pre-allocated output buffers
-    size_t* buffer_sizes;  // Buffer sizes in floats
+    float** buffers;      // Pre-allocated output buffers
+    size_t* buffer_sizes; // Buffer sizes in floats
     /** Parallel to @a buffers: output tensors that may borrow a buffer (evict / free detaches). */
     struct Tensor** output_tensors;
     uint64_t signature; // Graph structure hash

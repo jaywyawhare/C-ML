@@ -11,12 +11,14 @@
 #include "alloc/cml_allocator.h"
 
 void cml_dataset_compute_stats(Dataset* ds) {
-    if (!ds || !ds->X || ds->num_samples == 0 || ds->input_size == 0) return;
+    if (!ds || !ds->X || ds->num_samples == 0 || ds->input_size == 0)
+        return;
 
-    int n = ds->num_samples;
-    int nf = ds->input_size;
+    int n    = ds->num_samples;
+    int nf   = ds->input_size;
     float* X = (float*)tensor_data_ptr(ds->X);
-    if (!X) return;
+    if (!X)
+        return;
 
     ds->feature_means = cml_calloc(nf, sizeof(float));
     ds->feature_stds  = cml_calloc(nf, sizeof(float));
@@ -34,8 +36,10 @@ void cml_dataset_compute_stats(Dataset* ds) {
         for (int j = 0; j < nf; j++) {
             float v = X[i * nf + j];
             ds->feature_means[j] += v;
-            if (v < ds->feature_mins[j]) ds->feature_mins[j] = v;
-            if (v > ds->feature_maxs[j]) ds->feature_maxs[j] = v;
+            if (v < ds->feature_mins[j])
+                ds->feature_mins[j] = v;
+            if (v > ds->feature_maxs[j])
+                ds->feature_maxs[j] = v;
         }
     }
     for (int j = 0; j < nf; j++)
@@ -58,7 +62,8 @@ static char g_cache_dir[512] = "";
 const char* cml_dataset_cache_dir(void) {
     if (g_cache_dir[0] == '\0') {
         const char* home = getenv("HOME");
-        if (!home) home = "/tmp";
+        if (!home)
+            home = "/tmp";
         snprintf(g_cache_dir, sizeof(g_cache_dir), "%s/.cml/datasets", home);
     }
     return g_cache_dir;
@@ -71,7 +76,8 @@ void cml_dataset_set_cache_dir(const char* dir) {
 
 static int ensure_dir(const char* path) {
     struct stat st;
-    if (stat(path, &st) == 0) return 0;
+    if (stat(path, &st) == 0)
+        return 0;
     char cmd[1024];
     snprintf(cmd, sizeof(cmd), "mkdir -p '%s'", path);
     return system(cmd);
@@ -121,8 +127,8 @@ const char* cml_dataset_download(const char* url, const char* filename) {
 }
 
 /* Helper: decompress .gz file */
-static const char* download_and_gunzip(const char* url, const char* gz_name,
-                                       const char* final_name, char* out, size_t outsz) {
+static const char* download_and_gunzip(const char* url, const char* gz_name, const char* final_name,
+                                       char* out, size_t outsz) {
     const char* dir = cml_dataset_cache_dir();
     snprintf(out, outsz, "%s/%s", dir, final_name);
 
@@ -133,12 +139,15 @@ static const char* download_and_gunzip(const char* url, const char* gz_name,
 
     /* Download .gz */
     const char* gz_path = cml_dataset_download(url, gz_name);
-    if (!gz_path) return NULL;
+    if (!gz_path)
+        return NULL;
 
     /* Decompress */
     char cmd[2048];
-    snprintf(cmd, sizeof(cmd), "gunzip -kf '%s' 2>/dev/null || gzip -dkf '%s' 2>/dev/null", gz_path, gz_path);
-    if (system(cmd) != 0) { /* best-effort; downstream handles missing files */ }
+    snprintf(cmd, sizeof(cmd), "gunzip -kf '%s' 2>/dev/null || gzip -dkf '%s' 2>/dev/null", gz_path,
+             gz_path);
+    if (system(cmd) != 0) { /* best-effort; downstream handles missing files */
+    }
 
     if (stat(out, &st) == 0 && st.st_size > 0)
         return out;
@@ -149,11 +158,12 @@ static const char* download_and_gunzip(const char* url, const char* gz_name,
 
 static Dataset* load_iris(void) {
     const char* path = cml_dataset_download(
-        "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data",
-        "iris.data");
-    if (!path) return NULL;
+        "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data", "iris.data");
+    if (!path)
+        return NULL;
 
-    float* X = NULL; float* y = NULL;
+    float* X = NULL;
+    float* y = NULL;
     int n = 0, nf = 0, nc = 0;
     char** class_names = NULL;
     if (cml_csv_parse(path, -1, &X, &y, &n, &nf, &nc, &class_names) != 0)
@@ -161,76 +171,92 @@ static Dataset* load_iris(void) {
 
     Dataset* ds = dataset_from_arrays(X, y, n, nf, 1);
     if (ds) {
-        ds->name = "iris";
+        ds->name        = "iris";
         ds->num_classes = nc;
         ds->class_names = class_names;
     }
-    cml_free(X); cml_free(y);
+    cml_free(X);
+    cml_free(y);
     return ds;
 }
 
 static Dataset* load_wine(void) {
     const char* path = cml_dataset_download(
-        "https://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data",
-        "wine.data");
-    if (!path) return NULL;
+        "https://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data", "wine.data");
+    if (!path)
+        return NULL;
 
-    float* X = NULL; float* y = NULL;
+    float* X = NULL;
+    float* y = NULL;
     int n = 0, nf = 0, nc = 0;
     if (cml_csv_parse(path, 0, &X, &y, &n, &nf, &nc, NULL) != 0)
         return NULL;
 
     Dataset* ds = dataset_from_arrays(X, y, n, nf, 1);
     if (ds) {
-        ds->name = "wine";
+        ds->name        = "wine";
         ds->num_classes = nc;
     }
-    cml_free(X); cml_free(y);
+    cml_free(X);
+    cml_free(y);
     return ds;
 }
 
 static Dataset* load_breast_cancer(void) {
-    const char* path = cml_dataset_download(
-        "https://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/wdbc.data",
-        "wdbc.data");
-    if (!path) return NULL;
+    const char* path =
+        cml_dataset_download("https://archive.ics.uci.edu/ml/machine-learning-databases/"
+                             "breast-cancer-wisconsin/wdbc.data",
+                             "wdbc.data");
+    if (!path)
+        return NULL;
 
     /* wdbc.data: ID(col0), Diagnosis(col1=M/B), 30 features(col2-31) */
     /* We need custom parsing: skip col0, col1 is target */
     FILE* f = fopen(path, "r");
-    if (!f) return NULL;
+    if (!f)
+        return NULL;
 
     /* Count lines */
     int n = 0;
     char line[4096];
     while (fgets(line, sizeof(line), f)) {
-        if (strlen(line) > 5) n++;
+        if (strlen(line) > 5)
+            n++;
     }
     rewind(f);
 
     float* X = cml_malloc(sizeof(float) * n * 30);
     float* y = cml_malloc(sizeof(float) * n);
-    if (!X || !y) { cml_free(X); cml_free(y); fclose(f); return NULL; }
+    if (!X || !y) {
+        cml_free(X);
+        cml_free(y);
+        fclose(f);
+        return NULL;
+    }
 
     int idx = 0;
     while (fgets(line, sizeof(line), f) && idx < n) {
-        if (strlen(line) < 5) continue;
+        if (strlen(line) < 5)
+            continue;
 
         /* Skip ID field */
         char* p = strchr(line, ',');
-        if (!p) continue;
+        if (!p)
+            continue;
         p++;
 
         /* Read diagnosis: M=1, B=0 */
         y[idx] = (*p == 'M') ? 1.0f : 0.0f;
-        p = strchr(p, ',');
-        if (!p) continue;
+        p      = strchr(p, ',');
+        if (!p)
+            continue;
         p++;
 
         /* Read 30 features */
         for (int j = 0; j < 30; j++) {
             X[idx * 30 + j] = (float)strtod(p, &p);
-            if (*p == ',') p++;
+            if (*p == ',')
+                p++;
         }
         idx++;
     }
@@ -238,10 +264,11 @@ static Dataset* load_breast_cancer(void) {
 
     Dataset* ds = dataset_from_arrays(X, y, idx, 30, 1);
     if (ds) {
-        ds->name = "breast_cancer";
+        ds->name        = "breast_cancer";
         ds->num_classes = 2;
     }
-    cml_free(X); cml_free(y);
+    cml_free(X);
+    cml_free(y);
     return ds;
 }
 
@@ -249,33 +276,34 @@ static Dataset* load_boston(void) {
     const char* path = cml_dataset_download(
         "https://raw.githubusercontent.com/selva86/datasets/master/BostonHousing.csv",
         "boston.csv");
-    if (!path) return NULL;
+    if (!path)
+        return NULL;
 
-    float* X = NULL; float* y = NULL;
+    float* X = NULL;
+    float* y = NULL;
     int n = 0, nf = 0, nc = 0;
     if (cml_csv_parse(path, -1, &X, &y, &n, &nf, &nc, NULL) != 0)
         return NULL;
 
     Dataset* ds = dataset_from_arrays(X, y, n, nf, 1);
     if (ds) {
-        ds->name = "boston";
+        ds->name        = "boston";
         ds->num_classes = 0; /* regression */
     }
-    cml_free(X); cml_free(y);
+    cml_free(X);
+    cml_free(y);
     return ds;
 }
 
 static Dataset* load_mnist_dataset(const char* name, const char* base_url) {
     struct stat st;
     static char local_paths[4][1024];
-    const char* p_ti = NULL, *p_tl = NULL, *p_vi = NULL, *p_vl = NULL;
+    const char *p_ti = NULL, *p_tl = NULL, *p_vi = NULL, *p_vl = NULL;
 
     /* First check local data/ directory (already present, no download needed) */
-    const char* local_names[] = {
-        "train-images-idx3-ubyte", "train-labels-idx1-ubyte",
-        "t10k-images-idx3-ubyte", "t10k-labels-idx1-ubyte"
-    };
-    const char** ptrs[] = {&p_ti, &p_tl, &p_vi, &p_vl};
+    const char* local_names[] = {"train-images-idx3-ubyte", "train-labels-idx1-ubyte",
+                                 "t10k-images-idx3-ubyte", "t10k-labels-idx1-ubyte"};
+    const char** ptrs[]       = {&p_ti, &p_tl, &p_vi, &p_vl};
 
     for (int i = 0; i < 4; i++) {
         snprintf(local_paths[i], sizeof(local_paths[i]), "data/%s", local_names[i]);
@@ -307,14 +335,14 @@ static Dataset* load_mnist_dataset(const char* name, const char* base_url) {
 
         /* Write results into the same slots used by the local-data check;
          * separate buffers per file, or all four pointers would alias. */
-        p_ti = download_and_gunzip(url_train_img, gz_ti, fn_ti,
-                                   local_paths[0], sizeof(local_paths[0]));
-        p_tl = download_and_gunzip(url_train_lbl, gz_tl, fn_tl,
-                                   local_paths[1], sizeof(local_paths[1]));
-        p_vi = download_and_gunzip(url_test_img, gz_vi, fn_vi,
-                                   local_paths[2], sizeof(local_paths[2]));
-        p_vl = download_and_gunzip(url_test_lbl, gz_vl, fn_vl,
-                                   local_paths[3], sizeof(local_paths[3]));
+        p_ti = download_and_gunzip(url_train_img, gz_ti, fn_ti, local_paths[0],
+                                   sizeof(local_paths[0]));
+        p_tl = download_and_gunzip(url_train_lbl, gz_tl, fn_tl, local_paths[1],
+                                   sizeof(local_paths[1]));
+        p_vi =
+            download_and_gunzip(url_test_img, gz_vi, fn_vi, local_paths[2], sizeof(local_paths[2]));
+        p_vl =
+            download_and_gunzip(url_test_lbl, gz_vl, fn_vl, local_paths[3], sizeof(local_paths[3]));
     }
 
     if (!p_ti || !p_tl) {
@@ -328,12 +356,13 @@ static Dataset* load_mnist_dataset(const char* name, const char* base_url) {
     float* train_lbl = cml_idx_load_labels(p_tl, &n_train_lbl);
 
     if (!train_img || !train_lbl) {
-        cml_free(train_img); cml_free(train_lbl);
+        cml_free(train_img);
+        cml_free(train_lbl);
         return NULL;
     }
 
     int total_n = n_train;
-    int feat = rows * cols;
+    int feat    = rows * cols;
 
     float* all_X = NULL;
     float* all_y = NULL;
@@ -346,32 +375,37 @@ static Dataset* load_mnist_dataset(const char* name, const char* base_url) {
 
         if (test_img && test_lbl) {
             total_n = n_train + n_test;
-            all_X = cml_malloc(sizeof(float) * total_n * feat);
-            all_y = cml_malloc(sizeof(float) * total_n);
+            all_X   = cml_malloc(sizeof(float) * total_n * feat);
+            all_y   = cml_malloc(sizeof(float) * total_n);
             memcpy(all_X, train_img, sizeof(float) * n_train * feat);
             memcpy(all_X + n_train * feat, test_img, sizeof(float) * n_test * feat);
             memcpy(all_y, train_lbl, sizeof(float) * n_train);
             memcpy(all_y + n_train, test_lbl, sizeof(float) * n_test);
         }
-        cml_free(test_img); cml_free(test_lbl);
+        cml_free(test_img);
+        cml_free(test_lbl);
     }
 
     if (!all_X) {
         /* Only training data */
-        all_X = train_img;
-        all_y = train_lbl;
+        all_X     = train_img;
+        all_y     = train_lbl;
         train_img = NULL;
         train_lbl = NULL;
     }
 
     Dataset* ds = dataset_from_arrays(all_X, all_y, total_n, feat, 1);
     if (ds) {
-        ds->name = name;
+        ds->name        = name;
         ds->num_classes = 10;
     }
 
-    if (all_X != train_img) { cml_free(all_X); cml_free(all_y); }
-    cml_free(train_img); cml_free(train_lbl);
+    if (all_X != train_img) {
+        cml_free(all_X);
+        cml_free(all_y);
+    }
+    cml_free(train_img);
+    cml_free(train_lbl);
     return ds;
 }
 
@@ -381,38 +415,41 @@ static Dataset* load_mnist(void) {
 
 static Dataset* load_fashion_mnist(void) {
     return load_mnist_dataset("fashion_mnist",
-        "http://fashion-mnist.s3-website.eu-central-1.amazonaws.com");
+                              "http://fashion-mnist.s3-website.eu-central-1.amazonaws.com");
 }
 
 static Dataset* load_cifar10(void) {
     const char* path = cml_dataset_download(
-        "https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz",
-        "cifar-10-binary.tar.gz");
-    if (!path) return NULL;
+        "https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz", "cifar-10-binary.tar.gz");
+    if (!path)
+        return NULL;
 
     /* Extract */
     const char* dir = cml_dataset_cache_dir();
     char cmd[2048];
     snprintf(cmd, sizeof(cmd), "tar -xzf '%s' -C '%s' 2>/dev/null", path, dir);
-    if (system(cmd) != 0) { /* best-effort; downstream handles missing files */ }
+    if (system(cmd) != 0) { /* best-effort; downstream handles missing files */
+    }
 
     /* Read 5 training batches + 1 test batch */
     int total = 60000;
-    int feat = 3072;
-    float* X = cml_malloc(sizeof(float) * total * feat);
-    float* y = cml_malloc(sizeof(float) * total);
-    if (!X || !y) { cml_free(X); cml_free(y); return NULL; }
+    int feat  = 3072;
+    float* X  = cml_malloc(sizeof(float) * total * feat);
+    float* y  = cml_malloc(sizeof(float) * total);
+    if (!X || !y) {
+        cml_free(X);
+        cml_free(y);
+        return NULL;
+    }
 
-    int offset = 0;
-    const char* batch_files[] = {
-        "cifar-10-batches-bin/data_batch_1.bin",
-        "cifar-10-batches-bin/data_batch_2.bin",
-        "cifar-10-batches-bin/data_batch_3.bin",
-        "cifar-10-batches-bin/data_batch_4.bin",
-        "cifar-10-batches-bin/data_batch_5.bin",
-        "cifar-10-batches-bin/test_batch.bin",
-        NULL
-    };
+    int offset                = 0;
+    const char* batch_files[] = {"cifar-10-batches-bin/data_batch_1.bin",
+                                 "cifar-10-batches-bin/data_batch_2.bin",
+                                 "cifar-10-batches-bin/data_batch_3.bin",
+                                 "cifar-10-batches-bin/data_batch_4.bin",
+                                 "cifar-10-batches-bin/data_batch_5.bin",
+                                 "cifar-10-batches-bin/test_batch.bin",
+                                 NULL};
 
     for (int b = 0; batch_files[b]; b++) {
         char fpath[1024];
@@ -426,11 +463,13 @@ static Dataset* load_cifar10(void) {
         /* Each record: 1 byte label + 3072 bytes pixel data */
         for (int i = 0; i < 10000 && offset < total; i++) {
             uint8_t label;
-            if (fread(&label, 1, 1, f) != 1) break;
+            if (fread(&label, 1, 1, f) != 1)
+                break;
             y[offset] = (float)label;
 
             uint8_t pixels[3072];
-            if (fread(pixels, 1, 3072, f) != 3072) break;
+            if (fread(pixels, 1, 3072, f) != 3072)
+                break;
             for (int j = 0; j < 3072; j++)
                 X[offset * feat + j] = pixels[j] / 255.0f;
             offset++;
@@ -440,10 +479,11 @@ static Dataset* load_cifar10(void) {
 
     Dataset* ds = dataset_from_arrays(X, y, offset, feat, 1);
     if (ds) {
-        ds->name = "cifar10";
+        ds->name        = "cifar10";
         ds->num_classes = 10;
     }
-    cml_free(X); cml_free(y);
+    cml_free(X);
+    cml_free(y);
     return ds;
 }
 
@@ -453,7 +493,11 @@ static Dataset* load_airline(void) {
 
     float* X = cml_malloc(sizeof(float) * n);
     float* y = cml_malloc(sizeof(float) * n);
-    if (!X || !y) { cml_free(X); cml_free(y); return NULL; }
+    if (!X || !y) {
+        cml_free(X);
+        cml_free(y);
+        return NULL;
+    }
 
     memcpy(X, data, sizeof(float) * n);
     /* For time series: y is same as X (predict value) */
@@ -461,10 +505,11 @@ static Dataset* load_airline(void) {
 
     Dataset* ds = dataset_from_arrays(X, y, n, 1, 1);
     if (ds) {
-        ds->name = "airline";
+        ds->name        = "airline";
         ds->num_classes = 0;
     }
-    cml_free(X); cml_free(y);
+    cml_free(X);
+    cml_free(y);
     return ds;
 }
 
@@ -477,17 +522,22 @@ static Dataset* load_digits(void) {
     /* Copy to mutable buffers for dataset_from_arrays */
     float* X = cml_malloc(sizeof(float) * n * feat);
     float* y = cml_malloc(sizeof(float) * n);
-    if (!X || !y) { cml_free(X); cml_free(y); return NULL; }
+    if (!X || !y) {
+        cml_free(X);
+        cml_free(y);
+        return NULL;
+    }
 
     memcpy(X, data, sizeof(float) * n * feat);
     memcpy(y, labels, sizeof(float) * n);
 
     Dataset* ds = dataset_from_arrays(X, y, n, feat, 1);
     if (ds) {
-        ds->name = "digits";
+        ds->name        = "digits";
         ds->num_classes = 10;
     }
-    cml_free(X); cml_free(y);
+    cml_free(X);
+    cml_free(y);
     return ds;
 }
 
@@ -498,18 +548,16 @@ typedef struct {
     LoadFn load;
 } DatasetEntry;
 
-static const DatasetEntry g_registry[] = {
-    {"iris",          load_iris},
-    {"wine",          load_wine},
-    {"breast_cancer", load_breast_cancer},
-    {"boston",         load_boston},
-    {"mnist",         load_mnist},
-    {"fashion_mnist", load_fashion_mnist},
-    {"cifar10",       load_cifar10},
-    {"airline",       load_airline},
-    {"digits",        load_digits},
-    {NULL, NULL}
-};
+static const DatasetEntry g_registry[] = {{"iris", load_iris},
+                                          {"wine", load_wine},
+                                          {"breast_cancer", load_breast_cancer},
+                                          {"boston", load_boston},
+                                          {"mnist", load_mnist},
+                                          {"fashion_mnist", load_fashion_mnist},
+                                          {"cifar10", load_cifar10},
+                                          {"airline", load_airline},
+                                          {"digits", load_digits},
+                                          {NULL, NULL}};
 
 Dataset* cml_dataset_load(const char* name) {
     if (!name) {
@@ -523,8 +571,8 @@ Dataset* cml_dataset_load(const char* name) {
             Dataset* ds = g_registry[i].load();
             if (ds) {
                 cml_dataset_compute_stats(ds);
-                LOG_INFO("[datasets] Loaded '%s': %d samples, %d features",
-                         name, ds->num_samples, ds->input_size);
+                LOG_INFO("[datasets] Loaded '%s': %d samples, %d features", name, ds->num_samples,
+                         ds->input_size);
             }
             return ds;
         }

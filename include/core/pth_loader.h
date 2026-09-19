@@ -27,9 +27,9 @@ typedef struct CMLPthStateDict {
     int entry_capacity;
 
     /* Metadata */
-    char* model_name;          /* If available from pickle data */
-    int pytorch_version;       /* Detected PyTorch version */
-    bool is_half_precision;    /* Model uses fp16 */
+    char* model_name;       /* If available from pickle data */
+    int pytorch_version;    /* Detected PyTorch version */
+    bool is_half_precision; /* Model uses fp16 */
 } CMLPthStateDict;
 
 CMLPthStateDict* cml_pth_load(const char* path);

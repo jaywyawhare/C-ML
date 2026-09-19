@@ -13,15 +13,17 @@
  * receive, odd ranks receive then send — so a blocking sender is always paired
  * with a peer that has already posted (or is about to post) the matching
  * receive. The send and recv buffers are disjoint here, so this is safe. */
-static int ring_sendrecv(DistCommOps* ops, Tensor* send_t, int right,
-                         Tensor* recv_t, int left, int tag, void* ctx, int rank) {
+static int ring_sendrecv(DistCommOps* ops, Tensor* send_t, int right, Tensor* recv_t, int left,
+                         int tag, void* ctx, int rank) {
     if ((rank & 1) == 0) {
         int r = ops->send(send_t, right, tag, ctx);
-        if (r != 0) return r;
+        if (r != 0)
+            return r;
         return ops->recv(recv_t, left, tag, ctx);
     }
     int r = ops->recv(recv_t, left, tag, ctx);
-    if (r != 0) return r;
+    if (r != 0)
+        return r;
     return ops->send(send_t, right, tag, ctx);
 }
 
@@ -36,17 +38,19 @@ static void apply_reduce_op(float* dst, const float* src, size_t n, DistReduceOp
             dst[i] *= src[i];
             break;
         case DIST_REDUCE_MAX:
-            if (src[i] > dst[i]) dst[i] = src[i];
+            if (src[i] > dst[i])
+                dst[i] = src[i];
             break;
         case DIST_REDUCE_MIN:
-            if (src[i] < dst[i]) dst[i] = src[i];
+            if (src[i] < dst[i])
+                dst[i] = src[i];
             break;
         }
     }
 }
 
-int cml_ring_allreduce(float* data, size_t count, int world_size, int rank,
-                       DistReduceOp op, DistCommOps* ops, void* ctx) {
+int cml_ring_allreduce(float* data, size_t count, int world_size, int rank, DistReduceOp op,
+                       DistCommOps* ops, void* ctx) {
     if (!data || !ops || world_size <= 0 || rank < 0 || rank >= world_size)
         return -1;
 
@@ -63,8 +67,9 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank,
         return -1;
 
     size_t chunk_size = (count + (size_t)world_size - 1) / (size_t)world_size;
-    float* recv_buf = (float*)cml_malloc(chunk_size * sizeof(float));
-    if (!recv_buf) return -1;
+    float* recv_buf   = (float*)cml_malloc(chunk_size * sizeof(float));
+    if (!recv_buf)
+        return -1;
 
     int left  = (rank - 1 + world_size) % world_size;
     int right = (rank + 1) % world_size;
@@ -93,23 +98,25 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank,
         recv_shape[0] = (int)recv_count;
 
         Tensor send_tensor = {0};
-        send_tensor.data  = data + send_offset;
-        send_tensor.numel = send_count;
-        send_tensor.ndim  = 1;
-        send_tensor.shape = send_shape;
-        send_tensor.dtype = DTYPE_FLOAT32;
+        send_tensor.data   = data + send_offset;
+        send_tensor.numel  = send_count;
+        send_tensor.ndim   = 1;
+        send_tensor.shape  = send_shape;
+        send_tensor.dtype  = DTYPE_FLOAT32;
 
         Tensor recv_tensor = {0};
-        recv_tensor.data  = recv_buf;
-        recv_tensor.numel = recv_count;
-        recv_tensor.ndim  = 1;
-        recv_tensor.shape = recv_shape;
-        recv_tensor.dtype = DTYPE_FLOAT32;
+        recv_tensor.data   = recv_buf;
+        recv_tensor.numel  = recv_count;
+        recv_tensor.ndim   = 1;
+        recv_tensor.shape  = recv_shape;
+        recv_tensor.dtype  = DTYPE_FLOAT32;
 
         /* Send to right neighbor, recv from left neighbor (parity-ordered) */
-        int ret = ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left,
-                                step, ctx, rank);
-        if (ret != 0) { cml_free(recv_buf); return -1; }
+        int ret = ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left, step, ctx, rank);
+        if (ret != 0) {
+            cml_free(recv_buf);
+            return -1;
+        }
 
         /* Reduce received data into local chunk */
         if (recv_count > 0) {
@@ -136,22 +143,25 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank,
         recv_shape[0] = (int)recv_count;
 
         Tensor send_tensor = {0};
-        send_tensor.data  = data + send_offset;
-        send_tensor.numel = send_count;
-        send_tensor.ndim  = 1;
-        send_tensor.shape = send_shape;
-        send_tensor.dtype = DTYPE_FLOAT32;
+        send_tensor.data   = data + send_offset;
+        send_tensor.numel  = send_count;
+        send_tensor.ndim   = 1;
+        send_tensor.shape  = send_shape;
+        send_tensor.dtype  = DTYPE_FLOAT32;
 
         Tensor recv_tensor = {0};
-        recv_tensor.data  = data + recv_offset;
-        recv_tensor.numel = recv_count;
-        recv_tensor.ndim  = 1;
-        recv_tensor.shape = recv_shape;
-        recv_tensor.dtype = DTYPE_FLOAT32;
+        recv_tensor.data   = data + recv_offset;
+        recv_tensor.numel  = recv_count;
+        recv_tensor.ndim   = 1;
+        recv_tensor.shape  = recv_shape;
+        recv_tensor.dtype  = DTYPE_FLOAT32;
 
-        int ret = ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left,
-                                world_size + step, ctx, rank);
-        if (ret != 0) { cml_free(recv_buf); return -1; }
+        int ret = ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left, world_size + step,
+                                ctx, rank);
+        if (ret != 0) {
+            cml_free(recv_buf);
+            return -1;
+        }
     }
 
     /* Apply averaging if requested */

@@ -20,14 +20,14 @@ typedef struct CMLHEVCFrame {
     int nal_type;
 } CMLHEVCFrame;
 
-#define HEVC_NAL_TRAIL_N     0
-#define HEVC_NAL_TRAIL_R     1
+#define HEVC_NAL_TRAIL_N 0
+#define HEVC_NAL_TRAIL_R 1
 #define HEVC_NAL_IDR_W_RADL 19
-#define HEVC_NAL_IDR_N_LP   20
-#define HEVC_NAL_VPS        32
-#define HEVC_NAL_SPS        33
-#define HEVC_NAL_PPS        34
-#define HEVC_NAL_AUD        35
+#define HEVC_NAL_IDR_N_LP 20
+#define HEVC_NAL_VPS 32
+#define HEVC_NAL_SPS 33
+#define HEVC_NAL_PPS 34
+#define HEVC_NAL_AUD 35
 #define HEVC_NAL_SEI_PREFIX 39
 
 typedef struct CMLHEVCNalUnit {

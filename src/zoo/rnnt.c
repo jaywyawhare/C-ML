@@ -10,15 +10,15 @@
 
 CMLRNNTConfig cml_zoo_rnnt_config_default(void) {
     return (CMLRNNTConfig){
-        .input_features    = 80,
-        .encoder_layers    = 5,
-        .encoder_dim       = 1024,
-        .pred_layers       = 2,
-        .pred_dim          = 320,
-        .joint_dim         = 512,
-        .vocab_size        = 29,
-        .subsample_stride  = 2,
-        .subsample_kernel  = 3,
+        .input_features   = 80,
+        .encoder_layers   = 5,
+        .encoder_dim      = 1024,
+        .pred_layers      = 2,
+        .pred_dim         = 320,
+        .joint_dim        = 512,
+        .vocab_size       = 29,
+        .subsample_stride = 2,
+        .subsample_kernel = 3,
     };
 }
 
@@ -28,95 +28,119 @@ CMLRNNTConfig cml_zoo_rnnt_config_default(void) {
  * cml_rnnt_encode/predict/joint directly instead. */
 static Tensor* rnnt_forward(Module* module, Tensor* input) {
     CMLRNNT* net = (CMLRNNT*)module;
-    if (!net || !input) return NULL;
+    if (!net || !input)
+        return NULL;
 
     Tensor* enc = cml_rnnt_encode(module, input);
-    if (!enc || enc->ndim < 1) return NULL;
+    if (!enc || enc->ndim < 1)
+        return NULL;
 
     int enc_dim = enc->shape[enc->ndim - 1];
-    if (enc_dim <= 0) return NULL;
-    int enc_T = (int)(enc->numel / (size_t)enc_dim);
-    int enc2d_shape[2] = {enc_T, enc_dim};
+    if (enc_dim <= 0)
+        return NULL;
+    int enc_T            = (int)(enc->numel / (size_t)enc_dim);
+    int enc2d_shape[2]   = {enc_T, enc_dim};
     ReshapeParams enc_rp = {enc2d_shape, 2};
-    Tensor* enc2d = uop_reshape(enc, &enc_rp);
-    if (!enc2d) return NULL;
+    Tensor* enc2d        = uop_reshape(enc, &enc_rp);
+    if (!enc2d)
+        return NULL;
 
     /* Blank start token (id 0) for the prediction network. */
-    int tok_shape[1] = {1};
-    TensorConfig tcfg = {.dtype = net->dtype, .device = net->device,
-                         .has_dtype = true, .has_device = true};
+    int tok_shape[1]  = {1};
+    TensorConfig tcfg = {
+        .dtype = net->dtype, .device = net->device, .has_dtype = true, .has_device = true};
     Tensor* blank = tensor_zeros(tok_shape, 1, &tcfg);
-    if (!blank) return NULL;
+    if (!blank)
+        return NULL;
     Tensor* pred = cml_rnnt_predict(module, blank);
-    if (!pred || pred->ndim < 1) return NULL;
+    if (!pred || pred->ndim < 1)
+        return NULL;
 
     int pred_dim = pred->shape[pred->ndim - 1];
-    if (pred_dim <= 0) return NULL;
-    int pred_T = (int)(pred->numel / (size_t)pred_dim);
-    int pred2d_shape[2] = {pred_T, pred_dim};
+    if (pred_dim <= 0)
+        return NULL;
+    int pred_T            = (int)(pred->numel / (size_t)pred_dim);
+    int pred2d_shape[2]   = {pred_T, pred_dim};
     ReshapeParams pred_rp = {pred2d_shape, 2};
-    Tensor* pred2d = uop_reshape(pred, &pred_rp);
-    if (!pred2d) return NULL;
+    Tensor* pred2d        = uop_reshape(pred, &pred_rp);
+    if (!pred2d)
+        return NULL;
 
     /* Keep only the last prediction step, broadcast it across encoder frames. */
     if (pred_T > 1) {
         int starts[2] = {pred_T - 1, 0};
         int ends[2]   = {pred_T, pred_dim};
-        pred2d = uop_shrink(pred2d, starts, ends, 2);
-        if (!pred2d) return NULL;
+        pred2d        = uop_shrink(pred2d, starts, ends, 2);
+        if (!pred2d)
+            return NULL;
     }
     int bcast_shape[2] = {enc_T, pred_dim};
-    ExpandParams ep = {bcast_shape, 2};
+    ExpandParams ep    = {bcast_shape, 2};
     Tensor* pred_bcast = uop_expand(pred2d, &ep);
-    if (!pred_bcast) return NULL;
+    if (!pred_bcast)
+        return NULL;
 
     return cml_rnnt_joint(module, enc2d, pred_bcast);
 }
 
 static void rnnt_free(Module* module) {
     CMLRNNT* net = (CMLRNNT*)module;
-    if (!net) return;
+    if (!net)
+        return;
 
-    if (net->subsample_conv) module_free(net->subsample_conv);
+    if (net->subsample_conv)
+        module_free(net->subsample_conv);
 
     for (int i = 0; i < net->num_enc_layers; i++) {
-        if (net->encoder_lstms[i]) module_free(net->encoder_lstms[i]);
-        if (net->encoder_lnorms[i]) module_free(net->encoder_lnorms[i]);
+        if (net->encoder_lstms[i])
+            module_free(net->encoder_lstms[i]);
+        if (net->encoder_lnorms[i])
+            module_free(net->encoder_lnorms[i]);
     }
     cml_free(net->encoder_lstms);
     cml_free(net->encoder_lnorms);
 
-    if (net->pred_embedding) module_free(net->pred_embedding);
+    if (net->pred_embedding)
+        module_free(net->pred_embedding);
     for (int i = 0; i < net->num_pred_layers; i++) {
-        if (net->pred_lstms[i]) module_free(net->pred_lstms[i]);
-        if (net->pred_lnorms[i]) module_free(net->pred_lnorms[i]);
+        if (net->pred_lstms[i])
+            module_free(net->pred_lstms[i]);
+        if (net->pred_lnorms[i])
+            module_free(net->pred_lnorms[i]);
     }
     cml_free(net->pred_lstms);
     cml_free(net->pred_lnorms);
 
-    if (net->joint_linear1) module_free(net->joint_linear1);
-    if (net->joint_relu) module_free(net->joint_relu);
-    if (net->joint_linear2) module_free(net->joint_linear2);
+    if (net->joint_linear1)
+        module_free(net->joint_linear1);
+    if (net->joint_relu)
+        module_free(net->joint_relu);
+    if (net->joint_linear2)
+        module_free(net->joint_linear2);
 
     cml_free(net);
 }
 
 Tensor* cml_rnnt_encode(Module* module, Tensor* audio_features) {
     CMLRNNT* net = (CMLRNNT*)module;
-    if (!net || !audio_features) return NULL;
+    if (!net || !audio_features)
+        return NULL;
 
     Tensor* x = module_forward(net->subsample_conv, audio_features);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
 
     for (int i = 0; i < net->num_enc_layers; i++) {
-        LSTM* lstm = (LSTM*)net->encoder_lstms[i];
+        LSTM* lstm  = (LSTM*)net->encoder_lstms[i];
         Tensor* out = NULL;
         Tensor* h_n = NULL;
         Tensor* c_n = NULL;
         lstm_forward(lstm, x, NULL, NULL, &out, &h_n, &c_n);
-        if (!out) return NULL;
+        if (!out)
+            return NULL;
         x = module_forward(net->encoder_lnorms[i], out);
-        if (!x) return NULL;
+        if (!x)
+            return NULL;
     }
 
     return x;
@@ -124,20 +148,24 @@ Tensor* cml_rnnt_encode(Module* module, Tensor* audio_features) {
 
 Tensor* cml_rnnt_predict(Module* module, Tensor* prev_tokens) {
     CMLRNNT* net = (CMLRNNT*)module;
-    if (!net || !prev_tokens) return NULL;
+    if (!net || !prev_tokens)
+        return NULL;
 
     Tensor* x = module_forward(net->pred_embedding, prev_tokens);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
 
     for (int i = 0; i < net->num_pred_layers; i++) {
-        LSTM* lstm = (LSTM*)net->pred_lstms[i];
+        LSTM* lstm  = (LSTM*)net->pred_lstms[i];
         Tensor* out = NULL;
         Tensor* h_n = NULL;
         Tensor* c_n = NULL;
         lstm_forward(lstm, x, NULL, NULL, &out, &h_n, &c_n);
-        if (!out) return NULL;
+        if (!out)
+            return NULL;
         x = module_forward(net->pred_lnorms[i], out);
-        if (!x) return NULL;
+        if (!x)
+            return NULL;
     }
 
     return x;
@@ -145,24 +173,30 @@ Tensor* cml_rnnt_predict(Module* module, Tensor* prev_tokens) {
 
 Tensor* cml_rnnt_joint(Module* module, Tensor* enc_out, Tensor* pred_out) {
     CMLRNNT* net = (CMLRNNT*)module;
-    if (!net || !enc_out || !pred_out) return NULL;
+    if (!net || !enc_out || !pred_out)
+        return NULL;
 
     Tensor* cat_tensors[] = {enc_out, pred_out};
-    Tensor* combined = tensor_concat(cat_tensors, 2, -1);
-    if (!combined) return NULL;
+    Tensor* combined      = tensor_concat(cat_tensors, 2, -1);
+    if (!combined)
+        return NULL;
 
     Tensor* x = module_forward(net->joint_linear1, combined);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
     x = module_forward(net->joint_relu, x);
-    if (!x) return NULL;
+    if (!x)
+        return NULL;
     return module_forward(net->joint_linear2, x);
 }
 
 Module* cml_zoo_rnnt_create(const CMLRNNTConfig* config, DType dtype, DeviceType device) {
-    if (!config) return NULL;
+    if (!config)
+        return NULL;
 
     CMLRNNT* net = cml_calloc(1, sizeof(CMLRNNT));
-    if (!net) return NULL;
+    if (!net)
+        return NULL;
 
     if (module_init((Module*)net, "RNN-T", rnnt_forward, rnnt_free) != 0) {
         cml_free(net);
@@ -170,54 +204,48 @@ Module* cml_zoo_rnnt_create(const CMLRNNTConfig* config, DType dtype, DeviceType
     }
 
     net->config = *config;
-    net->dtype = dtype;
+    net->dtype  = dtype;
     net->device = device;
 
     int pad = (config->subsample_kernel - 1) / 2;
-    net->subsample_conv = (Module*)nn_conv1d(
-        config->input_features, config->encoder_dim,
-        config->subsample_kernel, config->subsample_stride,
-        pad, 1, true, dtype, device);
+    net->subsample_conv =
+        (Module*)nn_conv1d(config->input_features, config->encoder_dim, config->subsample_kernel,
+                           config->subsample_stride, pad, 1, true, dtype, device);
 
     net->num_enc_layers = config->encoder_layers;
-    net->encoder_lstms = cml_calloc(config->encoder_layers, sizeof(Module*));
+    net->encoder_lstms  = cml_calloc(config->encoder_layers, sizeof(Module*));
     net->encoder_lnorms = cml_calloc(config->encoder_layers, sizeof(Module*));
 
     for (int i = 0; i < config->encoder_layers; i++) {
         int in_sz = config->encoder_dim;
-        net->encoder_lstms[i] = (Module*)nn_lstm(
-            in_sz, config->encoder_dim, 1,
-            false, true, 0.0f, true, dtype, device);
-        net->encoder_lnorms[i] = (Module*)nn_layernorm(
-            config->encoder_dim, 1e-5f, true, dtype, device);
+        net->encoder_lstms[i] =
+            (Module*)nn_lstm(in_sz, config->encoder_dim, 1, false, true, 0.0f, true, dtype, device);
+        net->encoder_lnorms[i] =
+            (Module*)nn_layernorm(config->encoder_dim, 1e-5f, true, dtype, device);
     }
 
-    net->pred_embedding = (Module*)nn_embedding(
-        config->vocab_size, config->pred_dim, -1, dtype, device);
+    net->pred_embedding =
+        (Module*)nn_embedding(config->vocab_size, config->pred_dim, -1, dtype, device);
 
     net->num_pred_layers = config->pred_layers;
-    net->pred_lstms = cml_calloc(config->pred_layers, sizeof(Module*));
-    net->pred_lnorms = cml_calloc(config->pred_layers, sizeof(Module*));
+    net->pred_lstms      = cml_calloc(config->pred_layers, sizeof(Module*));
+    net->pred_lnorms     = cml_calloc(config->pred_layers, sizeof(Module*));
 
     for (int i = 0; i < config->pred_layers; i++) {
         int in_sz = config->pred_dim;
-        net->pred_lstms[i] = (Module*)nn_lstm(
-            in_sz, config->pred_dim, 1,
-            false, true, 0.0f, true, dtype, device);
-        net->pred_lnorms[i] = (Module*)nn_layernorm(
-            config->pred_dim, 1e-5f, true, dtype, device);
+        net->pred_lstms[i] =
+            (Module*)nn_lstm(in_sz, config->pred_dim, 1, false, true, 0.0f, true, dtype, device);
+        net->pred_lnorms[i] = (Module*)nn_layernorm(config->pred_dim, 1e-5f, true, dtype, device);
     }
 
-    net->joint_linear1 = (Module*)nn_linear(
-        config->encoder_dim + config->pred_dim,
-        config->joint_dim, dtype, device, true);
-    net->joint_relu = (Module*)nn_relu(false);
-    net->joint_linear2 = (Module*)nn_linear(
-        config->joint_dim, config->vocab_size, dtype, device, true);
+    net->joint_linear1 = (Module*)nn_linear(config->encoder_dim + config->pred_dim,
+                                            config->joint_dim, dtype, device, true);
+    net->joint_relu    = (Module*)nn_relu(false);
+    net->joint_linear2 =
+        (Module*)nn_linear(config->joint_dim, config->vocab_size, dtype, device, true);
 
-    LOG_INFO("Created RNN-T (enc=%dx%d, pred=%dx%d, joint=%d, vocab=%d)",
-             config->encoder_layers, config->encoder_dim,
-             config->pred_layers, config->pred_dim,
-             config->joint_dim, config->vocab_size);
+    LOG_INFO("Created RNN-T (enc=%dx%d, pred=%dx%d, joint=%d, vocab=%d)", config->encoder_layers,
+             config->encoder_dim, config->pred_layers, config->pred_dim, config->joint_dim,
+             config->vocab_size);
     return (Module*)net;
 }

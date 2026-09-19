@@ -40,8 +40,8 @@ typedef struct Module {
 
     struct Module* next; // Next module in sequence (for containers)
 
-    bool training;   // Training mode flag
-    void* user_data; // User-defined data
+    bool training;        // Training mode flag
+    void* user_data;      // User-defined data
     void* backward_hooks; /* ModuleHookList*, owned by autograd */
 
     const char* version;     // Module version
@@ -113,14 +113,14 @@ typedef struct BatchNormState {
  * with channels on dimension 1. Returns NULL on failure, having freed whatever
  * it had built. */
 BatchNormState* nn_batchnorm_new(const char* name, int input_ndim, int num_features, float eps,
-                                 float momentum, bool affine, bool track_running_stats,
-                                 DType dtype, DeviceType device);
+                                 float momentum, bool affine, bool track_running_stats, DType dtype,
+                                 DeviceType device);
 
 /* Apply a normalisation layer's affine pair to `x`, broadcasting the 1-D gamma
  * and beta along `channel_dim` of `shape`/`ndim`. Returns `x` untouched when
  * either parameter is absent, NULL on failure. */
-Tensor* nn_norm_affine(Tensor* x, const Parameter* weight, const Parameter* bias,
-                       const int* shape, int ndim, int channel_dim);
+Tensor* nn_norm_affine(Tensor* x, const Parameter* weight, const Parameter* bias, const int* shape,
+                       int ndim, int channel_dim);
 
 /* Standardise `x` over its innermost axis, viewing it as [rows, cols]:
  * (x - mean) / sqrt(var + eps). The result keeps the [rows, cols] shape.

@@ -43,16 +43,16 @@ void cml_exp_log_scalar(CMLRun* run, const char* name, long step, double value);
 void cml_exp_config_set(CMLRun* run, const char* key, const char* value_json);
 
 /* L6: log a histogram of raw values (binned into `bins` buckets in C). */
-void cml_exp_log_histogram(CMLRun* run, const char* name, long step,
-                           const float* values, size_t n, int bins);
+void cml_exp_log_histogram(CMLRun* run, const char* name, long step, const float* values, size_t n,
+                           int bins);
 
 /* L7: sample this process's CPU%/RSS from /proc and log them at `step`. */
 void cml_exp_log_system(CMLRun* run, long step);
 
 /* L8: log an RGB image (row-major, 3 bytes/pixel). Stored raw; the UI renders
  * it onto a canvas. Good for confusion matrices, weight visualizations, etc. */
-void cml_exp_log_image(CMLRun* run, const char* name, long step,
-                       const unsigned char* rgb, int width, int height);
+void cml_exp_log_image(CMLRun* run, const char* name, long step, const unsigned char* rgb,
+                       int width, int height);
 
 /* L8b: log a small table as CSV text (first row = header). */
 void cml_exp_log_table(CMLRun* run, const char* name, long step, const char* csv);
@@ -60,8 +60,8 @@ void cml_exp_log_table(CMLRun* run, const char* name, long step, const char* csv
 /* L10: record an artifact (model/dataset) by path; size + fnv hash captured.
  * aliases is an optional comma-separated list (e.g. "latest,best") for the
  * model registry; may be NULL. */
-void cml_exp_log_artifact(CMLRun* run, const char* name, const char* type,
-                          const char* path, const char* aliases);
+void cml_exp_log_artifact(CMLRun* run, const char* name, const char* type, const char* path,
+                          const char* aliases);
 
 /* Run management (W&B parity extras) --------------------------------------- */
 /* Tag a run (repeatable); tags drive filtering/grouping in the UI. */
@@ -79,8 +79,8 @@ void cml_exp_alert(CMLRun* run, const char* level, const char* message);
 
 /* Log an x/y curve (PR curve, ROC, calibration, ...). Rendered as a line plot
  * in the Curves tab. xlabel/ylabel are axis titles (may be NULL). */
-void cml_exp_log_curve(CMLRun* run, const char* name, const char* xlabel,
-                       const char* ylabel, const float* xs, const float* ys, size_t n);
+void cml_exp_log_curve(CMLRun* run, const char* name, const char* xlabel, const char* ylabel,
+                       const float* xs, const float* ys, size_t n);
 
 /* Mark the run finished ("finished"/"crashed"/...) and flush. Also records
  * end time + duration + captured summary. */

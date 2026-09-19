@@ -7,9 +7,9 @@
 
 static uint32_t read_u32_be(FILE* f) {
     uint8_t b[4];
-    if (fread(b, 1, 4, f) != 4) return 0;
-    return ((uint32_t)b[0] << 24) | ((uint32_t)b[1] << 16) |
-           ((uint32_t)b[2] << 8) | (uint32_t)b[3];
+    if (fread(b, 1, 4, f) != 4)
+        return 0;
+    return ((uint32_t)b[0] << 24) | ((uint32_t)b[1] << 16) | ((uint32_t)b[2] << 8) | (uint32_t)b[3];
 }
 
 float* cml_idx_load_images(const char* path, int* n, int* rows, int* cols) {
@@ -30,17 +30,26 @@ float* cml_idx_load_images(const char* path, int* n, int* rows, int* cols) {
     *rows = (int)read_u32_be(f);
     *cols = (int)read_u32_be(f);
 
-    int px = (*rows) * (*cols);
+    int px      = (*rows) * (*cols);
     float* data = cml_malloc(sizeof(float) * (*n) * px);
-    if (!data) { fclose(f); return NULL; }
+    if (!data) {
+        fclose(f);
+        return NULL;
+    }
 
     uint8_t* buf = cml_malloc(px);
-    if (!buf) { cml_free(data); fclose(f); return NULL; }
+    if (!buf) {
+        cml_free(data);
+        fclose(f);
+        return NULL;
+    }
 
     for (int i = 0; i < *n; i++) {
         if ((int)fread(buf, 1, px, f) != px) {
             LOG_ERROR("[idx] Truncated at image %d", i);
-            cml_free(data); cml_free(buf); fclose(f);
+            cml_free(data);
+            cml_free(buf);
+            fclose(f);
             return NULL;
         }
         for (int j = 0; j < px; j++)
@@ -70,13 +79,17 @@ float* cml_idx_load_labels(const char* path, int* n) {
     *n = (int)read_u32_be(f);
 
     float* data = cml_malloc(sizeof(float) * (*n));
-    if (!data) { fclose(f); return NULL; }
+    if (!data) {
+        fclose(f);
+        return NULL;
+    }
 
     for (int i = 0; i < *n; i++) {
         uint8_t label;
         if (fread(&label, 1, 1, f) != 1) {
             LOG_ERROR("[idx] Truncated at label %d", i);
-            cml_free(data); fclose(f);
+            cml_free(data);
+            fclose(f);
             return NULL;
         }
         data[i] = (float)label;

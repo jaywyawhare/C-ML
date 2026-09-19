@@ -162,14 +162,17 @@ jobs:
         run: cd python && python -m pytest tests/ -q
 
   format-check:
-    # Informational for now: the tree is not yet fully clang-format-clean.
-    # Promote to a hard gate after a one-time repo-wide `clang-format -i`.
+    # Hard gate: the tree is clang-format-clean. Pin clang-format via pip so the
+    # version matches what the code was formatted with (output differs by
+    # version); bump this pin and reformat together.
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - name: Install clang-format
-        run: sudo apt-get install -y clang-format
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install clang-format (pinned)
+        run: python -m pip install "clang-format==20.1.7"
       - name: Check formatting
         run: |
           bad=0
@@ -177,6 +180,6 @@ jobs:
             if ! clang-format --dry-run --Werror "$f" >/dev/null 2>&1; then
               echo "not formatted: $f"; bad=$((bad+1))
             fi
-          done < <(git ls-files 'src/*.c' 'src/**/*.c' 'include/**/*.h' 'tests/*.c')
+          done < <(git ls-files 'src/*.c' 'src/**/*.c' 'include/**/*.h' 'tests/*.c' 'tests/**/*.c' 'src/**/*.h' 'tests/**/*.h')
           echo "non-conforming files: $bad"
           test "$bad" -eq 0

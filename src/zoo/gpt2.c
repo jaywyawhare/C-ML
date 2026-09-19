@@ -11,42 +11,22 @@
 
 GPT2Config cml_zoo_gpt2_config_small(void) {
     return (GPT2Config){
-        .vocab_size = 50257,
-        .n_layer    = 12,
-        .n_head     = 12,
-        .n_embd     = 768,
-        .block_size = 1024
-    };
+        .vocab_size = 50257, .n_layer = 12, .n_head = 12, .n_embd = 768, .block_size = 1024};
 }
 
 GPT2Config cml_zoo_gpt2_config_medium(void) {
     return (GPT2Config){
-        .vocab_size = 50257,
-        .n_layer    = 24,
-        .n_head     = 16,
-        .n_embd     = 1024,
-        .block_size = 1024
-    };
+        .vocab_size = 50257, .n_layer = 24, .n_head = 16, .n_embd = 1024, .block_size = 1024};
 }
 
 GPT2Config cml_zoo_gpt2_config_large(void) {
     return (GPT2Config){
-        .vocab_size = 50257,
-        .n_layer    = 36,
-        .n_head     = 20,
-        .n_embd     = 1280,
-        .block_size = 1024
-    };
+        .vocab_size = 50257, .n_layer = 36, .n_head = 20, .n_embd = 1280, .block_size = 1024};
 }
 
 GPT2Config cml_zoo_gpt2_config_xl(void) {
     return (GPT2Config){
-        .vocab_size = 50257,
-        .n_layer    = 48,
-        .n_head     = 25,
-        .n_embd     = 1600,
-        .block_size = 1024
-    };
+        .vocab_size = 50257, .n_layer = 48, .n_head = 25, .n_embd = 1600, .block_size = 1024};
 }
 
 typedef struct {
@@ -100,7 +80,8 @@ static void gpt2_block_free(Module* module) {
     cml_free(block);
 }
 
-static Module* create_gpt2_block(int n_embd, int n_head, int n_layer, DType dtype, DeviceType device) {
+static Module* create_gpt2_block(int n_embd, int n_head, int n_layer, DType dtype,
+                                 DeviceType device) {
     GPT2Block* block = cml_malloc(sizeof(GPT2Block));
     if (!block)
         return NULL;
@@ -128,7 +109,6 @@ static Module* create_gpt2_block(int n_embd, int n_head, int n_layer, DType dtyp
     Linear* mlp_proj = nn_linear(ff_dim, n_embd, dtype, device, true);
     sequential_add(block->mlp, (Module*)mlp_proj);
 
-    
     /* GPT-2-style residual init keeps deep stacks from exploding. */
     float scale = zoo_residual_scale(n_layer);
     zoo_scale_param(mlp_proj ? mlp_proj->weight : NULL, scale);
@@ -159,11 +139,10 @@ static Tensor* gpt2_forward(Module* module, Tensor* input) {
     if (!tok)
         return NULL;
 
-    
-    int seq_len = input->shape[input->ndim - 1];
-    int pos_shape[] = {1, seq_len};
-    TensorConfig tcfg = {.dtype = input->dtype, .device = input->device,
-                         .has_dtype = true, .has_device = true};
+    int seq_len       = input->shape[input->ndim - 1];
+    int pos_shape[]   = {1, seq_len};
+    TensorConfig tcfg = {
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* positions = tensor_zeros(pos_shape, 2, &tcfg);
     if (positions) {
         float* pos_data = (float*)tensor_data_ptr(positions);
@@ -234,12 +213,13 @@ Module* cml_zoo_gpt2_create(GPT2Config* config, DType dtype, DeviceType device) 
 
     gpt2->blocks = nn_module_list();
     for (int i = 0; i < config->n_layer; i++)
-        module_list_append(gpt2->blocks, create_gpt2_block(config->n_embd, config->n_head, config->n_layer, dtype, device));
+        module_list_append(gpt2->blocks, create_gpt2_block(config->n_embd, config->n_head,
+                                                           config->n_layer, dtype, device));
 
-    gpt2->ln_f = nn_layernorm(config->n_embd, 1e-5f, true, dtype, device);
+    gpt2->ln_f    = nn_layernorm(config->n_embd, 1e-5f, true, dtype, device);
     gpt2->lm_head = nn_linear(config->n_embd, config->vocab_size, dtype, device, false);
 
-    LOG_INFO("Created GPT-2 (%d layers, %d hidden, %d heads, %d vocab)",
-             config->n_layer, config->n_embd, config->n_head, config->vocab_size);
+    LOG_INFO("Created GPT-2 (%d layers, %d hidden, %d heads, %d vocab)", config->n_layer,
+             config->n_embd, config->n_head, config->vocab_size);
     return (Module*)gpt2;
 }

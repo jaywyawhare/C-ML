@@ -6,10 +6,10 @@
 #include <time.h>
 #include <pthread.h>
 
-static DeviceType g_default_device = DEVICE_CPU;
-static DType g_default_dtype       = DTYPE_FLOAT32;
-static uint64_t g_rng_seed         = 0;
-static bool g_rng_seeded           = false;
+static DeviceType g_default_device    = DEVICE_CPU;
+static DType g_default_dtype          = DTYPE_FLOAT32;
+static uint64_t g_rng_seed            = 0;
+static bool g_rng_seeded              = false;
 static pthread_mutex_t g_config_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void cml_set_default_device(DeviceType device) {

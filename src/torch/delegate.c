@@ -218,7 +218,7 @@ TorchDelegatePlan* torch_delegate_partition_graph(CMLGraph_t ir, CMLBackendType 
         return NULL;
     }
     plan->partitions[0].delegate_index = 0;
-    plan->partitions[0].subgraph         = ir;
+    plan->partitions[0].subgraph       = ir;
 
     for (int i = 0; i < g_registry.count; i++) {
         if (g_registry.entries[i].backend == preferred) {
@@ -249,8 +249,7 @@ int torch_delegate_execute_plan(TorchDelegatePlan* plan, Tensor** inputs, int nu
                                     num_outputs);
     }
 
-    if (!g_registry.entries ||
-        plan->partitions[0].delegate_index < 0 ||
+    if (!g_registry.entries || plan->partitions[0].delegate_index < 0 ||
         plan->partitions[0].delegate_index >= g_registry.count)
         return -1;
     TorchDelegate* d = &g_registry.entries[plan->partitions[0].delegate_index];

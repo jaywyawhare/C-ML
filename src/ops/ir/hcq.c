@@ -52,8 +52,7 @@ int cml_hcq_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     return -1;
 }
 
-int cml_hcq_memcpy_h2d(CMLHCQQueue* queue, void* dst_device,
-                        const void* src_host, size_t bytes) {
+int cml_hcq_memcpy_h2d(CMLHCQQueue* queue, void* dst_device, const void* src_host, size_t bytes) {
     if (!queue) {
         LOG_ERROR("NULL queue in memcpy_h2d");
         return -1;
@@ -65,8 +64,7 @@ int cml_hcq_memcpy_h2d(CMLHCQQueue* queue, void* dst_device,
     return -1;
 }
 
-int cml_hcq_memcpy_d2h(CMLHCQQueue* queue, void* dst_host,
-                        const void* src_device, size_t bytes) {
+int cml_hcq_memcpy_d2h(CMLHCQQueue* queue, void* dst_host, const void* src_device, size_t bytes) {
     if (!queue) {
         LOG_ERROR("NULL queue in memcpy_d2h");
         return -1;
@@ -151,8 +149,7 @@ int cml_hcq_queue_synchronize(CMLHCQQueue* queue) {
 }
 
 CMLHCQPipeline* cml_hcq_pipeline_create(void) {
-    CMLHCQPipeline* pipeline =
-        (CMLHCQPipeline*)cml_calloc(1, sizeof(CMLHCQPipeline));
+    CMLHCQPipeline* pipeline = (CMLHCQPipeline*)cml_calloc(1, sizeof(CMLHCQPipeline));
     if (!pipeline) {
         LOG_ERROR("Failed to allocate CMLHCQPipeline");
         return NULL;
@@ -163,7 +160,8 @@ CMLHCQPipeline* cml_hcq_pipeline_create(void) {
 }
 
 void cml_hcq_pipeline_destroy(CMLHCQPipeline* pipeline) {
-    if (!pipeline) return;
+    if (!pipeline)
+        return;
 
     /* Destroy the inter-stage signals that were created during add_stage. */
     for (int i = 0; i < pipeline->num_stages; i++) {
@@ -183,26 +181,24 @@ int cml_hcq_pipeline_add_stage(CMLHCQPipeline* pipeline, CMLHCQQueue* queue) {
         return -1;
     }
     if (pipeline->num_stages >= CML_HCQ_MAX_STAGES) {
-        LOG_ERROR("Pipeline has reached maximum number of stages (%d)",
-                  CML_HCQ_MAX_STAGES);
+        LOG_ERROR("Pipeline has reached maximum number of stages (%d)", CML_HCQ_MAX_STAGES);
         return -1;
     }
 
-    int idx = pipeline->num_stages;
+    int idx               = pipeline->num_stages;
     pipeline->stages[idx] = queue;
 
     /* Create an inter-stage signal so the next stage can wait on this one. */
     CMLHCQSignal* sig = cml_hcq_signal_create(queue->backend);
     if (!sig) {
-        LOG_ERROR("Failed to create inter-stage signal for pipeline stage %d",
-                  idx);
+        LOG_ERROR("Failed to create inter-stage signal for pipeline stage %d", idx);
         return -1;
     }
     pipeline->stage_signals[idx] = sig;
     pipeline->num_stages++;
 
-    LOG_DEBUG("Pipeline %p: added stage %d (queue %p, signal %p)",
-              (void*)pipeline, idx, (void*)queue, (void*)sig);
+    LOG_DEBUG("Pipeline %p: added stage %d (queue %p, signal %p)", (void*)pipeline, idx,
+              (void*)queue, (void*)sig);
     return 0;
 }
 
@@ -216,16 +212,15 @@ int cml_hcq_pipeline_execute(CMLHCQPipeline* pipeline) {
         return 0;
     }
     for (int i = 0; i < pipeline->num_stages; i++) {
-        CMLHCQQueue*  stage  = pipeline->stages[i];
+        CMLHCQQueue* stage   = pipeline->stages[i];
         CMLHCQSignal* signal = pipeline->stage_signals[i];
 
         /* If not the first stage, wait on the previous stage's signal. */
         if (i > 0) {
             CMLHCQSignal* prev_signal = pipeline->stage_signals[i - 1];
-            int ret = cml_hcq_queue_wait(stage, prev_signal);
+            int ret                   = cml_hcq_queue_wait(stage, prev_signal);
             if (ret != 0) {
-                LOG_ERROR("Pipeline stage %d failed to wait on stage %d signal",
-                          i, i - 1);
+                LOG_ERROR("Pipeline stage %d failed to wait on stage %d signal", i, i - 1);
                 return -1;
             }
         }
@@ -253,7 +248,7 @@ int cml_hcq_pipeline_synchronize(CMLHCQPipeline* pipeline) {
 
     /* Wait on the last stage's signal to ensure everything has completed. */
     CMLHCQSignal* last = pipeline->stage_signals[pipeline->num_stages - 1];
-    int ret = cml_hcq_signal_wait_cpu(last, 0);
+    int ret            = cml_hcq_signal_wait_cpu(last, 0);
     if (ret != 0) {
         LOG_ERROR("Pipeline synchronize failed on last stage signal");
         return ret;

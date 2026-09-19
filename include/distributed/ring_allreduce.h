@@ -8,8 +8,8 @@
 extern "C" {
 #endif
 
-int cml_ring_allreduce(float* data, size_t count, int world_size, int rank,
-                       DistReduceOp op, DistCommOps* ops, void* ctx);
+int cml_ring_allreduce(float* data, size_t count, int world_size, int rank, DistReduceOp op,
+                       DistCommOps* ops, void* ctx);
 
 #ifdef __cplusplus
 }

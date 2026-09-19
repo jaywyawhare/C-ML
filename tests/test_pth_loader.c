@@ -4,12 +4,17 @@
 #include "core/pth_loader.h"
 #include "test_harness.h"
 
-#define RUN_TEST(test) do { \
-    tests_run++; \
-    printf("  [%d] %-50s ", tests_run, #test); \
-    if (test()) { tests_passed++; printf("PASS\n"); } \
-    else { printf("FAIL\n"); } \
-} while(0)
+#define RUN_TEST(test)                                                                             \
+    do {                                                                                           \
+        tests_run++;                                                                               \
+        printf("  [%d] %-50s ", tests_run, #test);                                                 \
+        if (test()) {                                                                              \
+            tests_passed++;                                                                        \
+            printf("PASS\n");                                                                      \
+        } else {                                                                                   \
+            printf("FAIL\n");                                                                      \
+        }                                                                                          \
+    } while (0)
 
 static int test_load_nonexistent(void) {
     CMLPthStateDict* sd = cml_pth_load("/nonexistent/path.pth");
@@ -21,29 +26,17 @@ static int test_free_null(void) {
     return 1;
 }
 
-static int test_get_tensor_null(void) {
-    return cml_pth_get_tensor(NULL, "test") == NULL;
-}
+static int test_get_tensor_null(void) { return cml_pth_get_tensor(NULL, "test") == NULL; }
 
-static int test_num_entries_null(void) {
-    return cml_pth_num_entries(NULL) == 0;
-}
+static int test_num_entries_null(void) { return cml_pth_num_entries(NULL) == 0; }
 
-static int test_get_key_null(void) {
-    return cml_pth_get_key(NULL, 0) == NULL;
-}
+static int test_get_key_null(void) { return cml_pth_get_key(NULL, 0) == NULL; }
 
-static int test_has_key_null(void) {
-    return !cml_pth_has_key(NULL, "test");
-}
+static int test_has_key_null(void) { return !cml_pth_has_key(NULL, "test"); }
 
-static int test_total_params_null(void) {
-    return cml_pth_total_params(NULL) == 0;
-}
+static int test_total_params_null(void) { return cml_pth_total_params(NULL) == 0; }
 
-static int test_total_bytes_null(void) {
-    return cml_pth_total_bytes(NULL) == 0;
-}
+static int test_total_bytes_null(void) { return cml_pth_total_bytes(NULL) == 0; }
 
 static int test_print_null(void) {
     cml_pth_print(NULL);

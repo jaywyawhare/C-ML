@@ -11,10 +11,11 @@
 
 void cml_softmax_rows_inplace(float* data, int rows, int cols) {
     for (int r = 0; r < rows; r++) {
-        float* row = data + (size_t)r * cols;
+        float* row    = data + (size_t)r * cols;
         float max_val = row[0];
         for (int c = 1; c < cols; c++) {
-            if (row[c] > max_val) max_val = row[c];
+            if (row[c] > max_val)
+                max_val = row[c];
         }
         float sum = 0.0f;
         for (int c = 0; c < cols; c++) {
@@ -85,22 +86,24 @@ CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim)
         return NULL;
     }
 
-    cache->max_seq_len = max_seq_len;
+    cache->max_seq_len  = max_seq_len;
     cache->num_kv_heads = num_kv_heads;
-    cache->head_dim = head_dim;
-    cache->current_len = 0;
+    cache->head_dim     = head_dim;
+    cache->current_len  = 0;
 
-    int shape[] = {max_seq_len, num_kv_heads, head_dim};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    int shape[]      = {max_seq_len, num_kv_heads, head_dim};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
-    cache->key_cache = tensor_zeros(shape, 3, &cfg);
+    cache->key_cache   = tensor_zeros(shape, 3, &cfg);
     cache->value_cache = tensor_zeros(shape, 3, &cfg);
 
     if (!cache->key_cache || !cache->value_cache) {
         LOG_ERROR("cml_kv_cache_create: failed to allocate cache tensors");
-        if (cache->key_cache) tensor_free(cache->key_cache);
-        if (cache->value_cache) tensor_free(cache->value_cache);
+        if (cache->key_cache)
+            tensor_free(cache->key_cache);
+        if (cache->value_cache)
+            tensor_free(cache->value_cache);
         cml_free(cache);
         return NULL;
     }
@@ -108,9 +111,12 @@ CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim)
 }
 
 void cml_kv_cache_free(CMLKVCache* cache) {
-    if (!cache) return;
-    if (cache->key_cache) tensor_free(cache->key_cache);
-    if (cache->value_cache) tensor_free(cache->value_cache);
+    if (!cache)
+        return;
+    if (cache->key_cache)
+        tensor_free(cache->key_cache);
+    if (cache->value_cache)
+        tensor_free(cache->value_cache);
     cml_free(cache);
 }
 
@@ -127,23 +133,23 @@ int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value) {
      * [1, num_kv_heads, head_dim] for single-token append */
     int append_len = new_key->shape[0];
     if (cache->current_len + append_len > cache->max_seq_len) {
-        LOG_ERROR("cml_kv_cache_append: cache overflow (%d + %d > %d)",
-                  cache->current_len, append_len, cache->max_seq_len);
+        LOG_ERROR("cml_kv_cache_append: cache overflow (%d + %d > %d)", cache->current_len,
+                  append_len, cache->max_seq_len);
         return -1;
     }
 
     float* k_cache_data = (float*)tensor_data_ptr(cache->key_cache);
     float* v_cache_data = (float*)tensor_data_ptr(cache->value_cache);
-    float* k_new_data = (float*)tensor_data_ptr(new_key);
-    float* v_new_data = (float*)tensor_data_ptr(new_value);
+    float* k_new_data   = (float*)tensor_data_ptr(new_key);
+    float* v_new_data   = (float*)tensor_data_ptr(new_value);
 
     if (!k_cache_data || !v_cache_data || !k_new_data || !v_new_data) {
         LOG_ERROR("cml_kv_cache_append: failed to get data pointers");
         return -1;
     }
 
-    size_t row_size = (size_t)cache->num_kv_heads * cache->head_dim;
-    size_t offset = (size_t)cache->current_len * row_size;
+    size_t row_size   = (size_t)cache->num_kv_heads * cache->head_dim;
+    size_t offset     = (size_t)cache->current_len * row_size;
     size_t copy_bytes = (size_t)append_len * row_size * sizeof(float);
 
     memcpy(k_cache_data + offset, k_new_data, copy_bytes);
@@ -154,41 +160,45 @@ int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value) {
 }
 
 void cml_kv_cache_reset(CMLKVCache* cache) {
-    if (!cache) return;
+    if (!cache)
+        return;
     cache->current_len = 0;
 }
 
 Tensor* cml_kv_cache_get_keys(CMLKVCache* cache) {
-    if (!cache || cache->current_len == 0) return NULL;
+    if (!cache || cache->current_len == 0)
+        return NULL;
 
     float* k_data = (float*)tensor_data_ptr(cache->key_cache);
-    if (!k_data) return NULL;
+    if (!k_data)
+        return NULL;
 
-    int shape[] = {cache->current_len, cache->num_kv_heads, cache->head_dim};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    int shape[]      = {cache->current_len, cache->num_kv_heads, cache->head_dim};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     size_t copy_size = (size_t)cache->current_len * cache->num_kv_heads * cache->head_dim;
-    Tensor* result = tensor_from_data(k_data, shape, 3, &cfg);
+    Tensor* result   = tensor_from_data(k_data, shape, 3, &cfg);
     (void)copy_size;
     return result;
 }
 
 Tensor* cml_kv_cache_get_values(CMLKVCache* cache) {
-    if (!cache || cache->current_len == 0) return NULL;
+    if (!cache || cache->current_len == 0)
+        return NULL;
 
     float* v_data = (float*)tensor_data_ptr(cache->value_cache);
-    if (!v_data) return NULL;
+    if (!v_data)
+        return NULL;
 
-    int shape[] = {cache->current_len, cache->num_kv_heads, cache->head_dim};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    int shape[]      = {cache->current_len, cache->num_kv_heads, cache->head_dim};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     return tensor_from_data(v_data, shape, 3, &cfg);
 }
 
-Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config,
-                         Tensor* mask) {
+Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config, Tensor* mask) {
     if (!Q || !K || !V || !config) {
         LOG_ERROR("cml_gqa_forward: NULL argument");
         return NULL;
@@ -203,9 +213,9 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
         return NULL;
     }
 
-    int num_heads = config->num_heads;
+    int num_heads    = config->num_heads;
     int num_kv_heads = config->num_kv_heads;
-    int head_dim = config->head_dim;
+    int head_dim     = config->head_dim;
 
     if (num_heads <= 0 || num_kv_heads <= 0 || head_dim <= 0) {
         LOG_ERROR("cml_gqa_forward: invalid config (num_heads=%d, kv_heads=%d, head_dim=%d)",
@@ -220,8 +230,8 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
     }
 
     int groups = num_heads / num_kv_heads; /* how many Q heads share each KV head */
-    int batch = Q->shape[0];
-    int seq_q = Q->shape[1];
+    int batch  = Q->shape[0];
+    int seq_q  = Q->shape[1];
     int kv_len = K->shape[1];
 
     float scale = config->scale;
@@ -240,7 +250,7 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
 
     /* Allocate output: [batch, seq_q, num_heads * head_dim] */
     size_t out_size = (size_t)batch * seq_q * num_heads * head_dim;
-    float* output = (float*)cml_calloc(out_size, sizeof(float));
+    float* output   = (float*)cml_calloc(out_size, sizeof(float));
     if (!output) {
         LOG_ERROR("cml_gqa_forward: allocation failed");
         return NULL;
@@ -287,11 +297,11 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
                     float dot = 0.0f;
                     for (int d = 0; d < head_dim; d++) {
                         /* Q layout: [batch, seq_q, num_heads*head_dim] */
-                        float q_val = q_data[((size_t)b * seq_q + sq) * num_heads * head_dim
-                                             + h * head_dim + d];
+                        float q_val = q_data[((size_t)b * seq_q + sq) * num_heads * head_dim +
+                                             h * head_dim + d];
                         /* K layout: [batch, kv_len, num_kv_heads*head_dim] */
-                        float k_val = k_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim
-                                             + kv_h * head_dim + d];
+                        float k_val = k_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim +
+                                             kv_h * head_dim + d];
                         dot += q_val * k_val;
                     }
                     scores[sq * kv_len + sk] = dot * scale;
@@ -314,7 +324,8 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
                 for (int sq = 0; sq < seq_q; sq++) {
                     for (int sk = 0; sk < kv_len; sk++) {
                         int dist = sq - sk;
-                        if (dist < 0) dist = -dist;
+                        if (dist < 0)
+                            dist = -dist;
                         if (dist > config->window_size)
                             scores[sq * kv_len + sk] = -1e9f;
                     }
@@ -346,13 +357,13 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
                 for (int d = 0; d < head_dim; d++) {
                     float sum = 0.0f;
                     for (int sk = 0; sk < kv_len; sk++) {
-                        float v_val = v_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim
-                                             + kv_h * head_dim + d];
+                        float v_val = v_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim +
+                                             kv_h * head_dim + d];
                         sum += scores[sq * kv_len + sk] * v_val;
                     }
                     /* output layout: [batch, seq_q, num_heads * head_dim] */
-                    output[((size_t)b * seq_q + sq) * num_heads * head_dim
-                           + h * head_dim + d] = sum;
+                    output[((size_t)b * seq_q + sq) * num_heads * head_dim + h * head_dim + d] =
+                        sum;
                 }
             }
         }
@@ -361,9 +372,9 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
     cml_free(scores);
 
     /* Create output tensor */
-    int out_shape[] = {batch, seq_q, num_heads * head_dim};
-    TensorConfig out_cfg = {.dtype = Q->dtype, .device = Q->device,
-                            .has_dtype = true, .has_device = true};
+    int out_shape[]      = {batch, seq_q, num_heads * head_dim};
+    TensorConfig out_cfg = {
+        .dtype = Q->dtype, .device = Q->device, .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(output, out_shape, 3, &out_cfg);
     cml_free(output);
 
@@ -377,24 +388,25 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
  * `kv_cache`. Returns the new cache length, or -1 on failure. */
 static int kv_cache_append_step(CMLKVCache* kv_cache, float* k_data, float* v_data, int seq_new,
                                 int kv_heads, int head_dim) {
-    int kv_shape[] = {seq_new, kv_heads, head_dim};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    int kv_shape[]   = {seq_new, kv_heads, head_dim};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     Tensor* k_append = tensor_from_data(k_data, kv_shape, 3, &cfg);
     Tensor* v_append = tensor_from_data(v_data, kv_shape, 3, &cfg);
-    int new_len = -1;
+    int new_len      = -1;
     if (k_append && v_append)
         new_len = cml_kv_cache_append(kv_cache, k_append, v_append);
 
-    if (k_append) tensor_free(k_append);
-    if (v_append) tensor_free(v_append);
+    if (k_append)
+        tensor_free(k_append);
+    if (v_append)
+        tensor_free(v_append);
     return new_len;
 }
 
-Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
-                                CMLKVCache* kv_cache,
-                                const CMLGQAConfig* config) {
+Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_cache,
+                               const CMLGQAConfig* config) {
     if (!Q || !K || !V || !kv_cache || !config) {
         LOG_ERROR("cml_gqa_forward_cached: NULL argument");
         return NULL;
@@ -406,7 +418,7 @@ Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
 
     /* Reshape K from [batch, seq, kv_heads*head_dim] to [seq, kv_heads, head_dim]
      * for cache append (assume batch=1 for autoregressive decoding) */
-    int seq_new = K->shape[1];
+    int seq_new  = K->shape[1];
     int kv_heads = config->num_kv_heads;
     int head_dim = config->head_dim;
 
@@ -420,16 +432,18 @@ Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
     if (kv_cache_append_step(kv_cache, k_data, v_data, seq_new, kv_heads, head_dim) < 0)
         return NULL;
 
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Get full cached K, V */
     Tensor* cached_k = cml_kv_cache_get_keys(kv_cache);
     Tensor* cached_v = cml_kv_cache_get_values(kv_cache);
 
     if (!cached_k || !cached_v) {
-        if (cached_k) tensor_free(cached_k);
-        if (cached_v) tensor_free(cached_v);
+        if (cached_k)
+            tensor_free(cached_k);
+        if (cached_v)
+            tensor_free(cached_v);
         return NULL;
     }
 
@@ -439,15 +453,17 @@ Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
     float* cv_data = (float*)tensor_data_ptr(cached_v);
 
     int full_k_shape[] = {1, cached_len, kv_heads * head_dim};
-    Tensor* full_k = tensor_from_data(ck_data, full_k_shape, 3, &cfg);
-    Tensor* full_v = tensor_from_data(cv_data, full_k_shape, 3, &cfg);
+    Tensor* full_k     = tensor_from_data(ck_data, full_k_shape, 3, &cfg);
+    Tensor* full_v     = tensor_from_data(cv_data, full_k_shape, 3, &cfg);
 
     tensor_free(cached_k);
     tensor_free(cached_v);
 
     if (!full_k || !full_v) {
-        if (full_k) tensor_free(full_k);
-        if (full_v) tensor_free(full_v);
+        if (full_k)
+            tensor_free(full_k);
+        if (full_v)
+            tensor_free(full_v);
         return NULL;
     }
 
@@ -460,17 +476,12 @@ Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
 }
 
 CMLFlashAttentionConfig cml_flash_attention_default_config(void) {
-    CMLFlashAttentionConfig cfg = {
-        .tile_size_q  = 64,
-        .tile_size_kv = 64,
-        .enabled      = true
-    };
+    CMLFlashAttentionConfig cfg = {.tile_size_q = 64, .tile_size_kv = 64, .enabled = true};
     return cfg;
 }
 
-Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
-                               const CMLGQAConfig* config,
-                               const CMLFlashAttentionConfig* flash_config) {
+Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config,
+                              const CMLFlashAttentionConfig* flash_config) {
     if (!Q || !K || !V || !config || !flash_config) {
         LOG_ERROR("cml_gqa_flash_forward: NULL argument");
         return NULL;
@@ -485,28 +496,30 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
         return NULL;
     }
 
-    int num_heads = config->num_heads;
+    int num_heads    = config->num_heads;
     int num_kv_heads = config->num_kv_heads;
-    int head_dim = config->head_dim;
+    int head_dim     = config->head_dim;
 
-    if (num_heads <= 0 || num_kv_heads <= 0 || head_dim <= 0 ||
-        num_heads % num_kv_heads != 0) {
+    if (num_heads <= 0 || num_kv_heads <= 0 || head_dim <= 0 || num_heads % num_kv_heads != 0) {
         LOG_ERROR("cml_gqa_flash_forward: invalid config");
         return NULL;
     }
 
     int groups = num_heads / num_kv_heads;
-    int batch = Q->shape[0];
-    int seq_q = Q->shape[1];
+    int batch  = Q->shape[0];
+    int seq_q  = Q->shape[1];
     int kv_len = K->shape[1];
 
     float scale = config->scale;
-    if (scale <= 0.0f) scale = 1.0f / sqrtf((float)head_dim);
+    if (scale <= 0.0f)
+        scale = 1.0f / sqrtf((float)head_dim);
 
-    int tile_q = flash_config->tile_size_q;
+    int tile_q  = flash_config->tile_size_q;
     int tile_kv = flash_config->tile_size_kv;
-    if (tile_q <= 0) tile_q = 64;
-    if (tile_kv <= 0) tile_kv = 64;
+    if (tile_q <= 0)
+        tile_q = 64;
+    if (tile_kv <= 0)
+        tile_kv = 64;
 
     float* q_data = (float*)tensor_data_ptr(Q);
     float* k_data = (float*)tensor_data_ptr(K);
@@ -517,18 +530,22 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
     }
 
     size_t out_size = (size_t)batch * seq_q * num_heads * head_dim;
-    float* output = (float*)cml_calloc(out_size, sizeof(float));
-    if (!output) return NULL;
+    float* output   = (float*)cml_calloc(out_size, sizeof(float));
+    if (!output)
+        return NULL;
 
     /* Per-query-position online softmax state */
-    float* row_max = (float*)cml_malloc((size_t)tile_q * sizeof(float));
-    float* row_sum = (float*)cml_malloc((size_t)tile_q * sizeof(float));
+    float* row_max     = (float*)cml_malloc((size_t)tile_q * sizeof(float));
+    float* row_sum     = (float*)cml_malloc((size_t)tile_q * sizeof(float));
     float* tile_scores = (float*)cml_malloc((size_t)tile_q * tile_kv * sizeof(float));
-    float* acc = (float*)cml_malloc((size_t)tile_q * head_dim * sizeof(float));
+    float* acc         = (float*)cml_malloc((size_t)tile_q * head_dim * sizeof(float));
 
     if (!row_max || !row_sum || !tile_scores || !acc) {
-        cml_free(output); cml_free(row_max); cml_free(row_sum);
-        cml_free(tile_scores); cml_free(acc);
+        cml_free(output);
+        cml_free(row_max);
+        cml_free(row_sum);
+        cml_free(tile_scores);
+        cml_free(acc);
         return NULL;
     }
 
@@ -541,7 +558,8 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
             /* Process Q in tiles */
             for (int tq_start = 0; tq_start < seq_q; tq_start += tile_q) {
                 int tq_end = tq_start + tile_q;
-                if (tq_end > seq_q) tq_end = seq_q;
+                if (tq_end > seq_q)
+                    tq_end = seq_q;
                 int tq_len = tq_end - tq_start;
 
                 /* Initialize online softmax accumulators */
@@ -554,32 +572,37 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
                 /* Process KV in tiles */
                 for (int tkv_start = 0; tkv_start < kv_len; tkv_start += tile_kv) {
                     int tkv_end = tkv_start + tile_kv;
-                    if (tkv_end > kv_len) tkv_end = kv_len;
+                    if (tkv_end > kv_len)
+                        tkv_end = kv_len;
                     int tkv_len = tkv_end - tkv_start;
 
                     /* Compute S = Q_tile @ K_tile^T * scale */
                     for (int qi = 0; qi < tq_len; qi++) {
                         int sq = tq_start + qi;
                         for (int ki = 0; ki < tkv_len; ki++) {
-                            int sk = tkv_start + ki;
+                            int sk    = tkv_start + ki;
                             float dot = 0.0f;
                             for (int d = 0; d < head_dim; d++) {
-                                float qv = q_data[((size_t)b * seq_q + sq) * num_heads * head_dim
-                                                   + h * head_dim + d];
-                                float kv = k_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim
-                                                   + kv_h * head_dim + d];
+                                float qv = q_data[((size_t)b * seq_q + sq) * num_heads * head_dim +
+                                                  h * head_dim + d];
+                                float kv =
+                                    k_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim +
+                                           kv_h * head_dim + d];
                                 dot += qv * kv;
                             }
                             float s = dot * scale;
 
                             /* Causal mask */
-                            if (config->causal && sk > sq) s = -1e30f;
+                            if (config->causal && sk > sq)
+                                s = -1e30f;
 
                             /* Sliding window mask (symmetric) */
                             if (window_size > 0) {
                                 int dist = sq - sk;
-                                if (dist < 0) dist = -dist;
-                                if (dist > window_size) s = -1e30f;
+                                if (dist < 0)
+                                    dist = -dist;
+                                if (dist > window_size)
+                                    s = -1e30f;
                             }
 
                             tile_scores[qi * tkv_len + ki] = s;
@@ -593,7 +616,8 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
                         float tile_max = -1e30f;
                         for (int ki = 0; ki < tkv_len; ki++) {
                             float s = tile_scores[qi * tkv_len + ki];
-                            if (s > tile_max) tile_max = s;
+                            if (s > tile_max)
+                                tile_max = s;
                         }
 
                         /* Compute new global max */
@@ -615,8 +639,9 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
 
                             int sk = tkv_start + ki;
                             for (int d = 0; d < head_dim; d++) {
-                                float vv = v_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim
-                                                   + kv_h * head_dim + d];
+                                float vv =
+                                    v_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim +
+                                           kv_h * head_dim + d];
                                 acc[qi * head_dim + d] += p * vv;
                             }
                         }
@@ -628,11 +653,11 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
 
                 /* Normalize by sum and write output */
                 for (int qi = 0; qi < tq_len; qi++) {
-                    int sq = tq_start + qi;
+                    int sq        = tq_start + qi;
                     float inv_sum = (row_sum[qi] > 0.0f) ? 1.0f / row_sum[qi] : 0.0f;
                     for (int d = 0; d < head_dim; d++) {
-                        output[((size_t)b * seq_q + sq) * num_heads * head_dim
-                               + h * head_dim + d] = acc[qi * head_dim + d] * inv_sum;
+                        output[((size_t)b * seq_q + sq) * num_heads * head_dim + h * head_dim + d] =
+                            acc[qi * head_dim + d] * inv_sum;
                     }
                 }
             }
@@ -644,18 +669,17 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V,
     cml_free(tile_scores);
     cml_free(acc);
 
-    int out_shape[] = {batch, seq_q, num_heads * head_dim};
-    TensorConfig out_cfg = {.dtype = Q->dtype, .device = Q->device,
-                            .has_dtype = true, .has_device = true};
+    int out_shape[]      = {batch, seq_q, num_heads * head_dim};
+    TensorConfig out_cfg = {
+        .dtype = Q->dtype, .device = Q->device, .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(output, out_shape, 3, &out_cfg);
     cml_free(output);
     return result;
 }
 
-Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
-                                      CMLKVCache* kv_cache,
-                                      const CMLGQAConfig* config,
-                                      const CMLFlashAttentionConfig* flash_config) {
+Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_cache,
+                                     const CMLGQAConfig* config,
+                                     const CMLFlashAttentionConfig* flash_config) {
     if (!Q || !K || !V || !kv_cache || !config || !flash_config) {
         LOG_ERROR("cml_gqa_flash_forward_cached: NULL argument");
         return NULL;
@@ -664,25 +688,28 @@ Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
     tensor_ensure_executed(K);
     tensor_ensure_executed(V);
 
-    int seq_new = K->shape[1];
+    int seq_new  = K->shape[1];
     int kv_heads = config->num_kv_heads;
     int head_dim = config->head_dim;
 
     float* k_data = (float*)tensor_data_ptr(K);
     float* v_data = (float*)tensor_data_ptr(V);
-    if (!k_data || !v_data) return NULL;
+    if (!k_data || !v_data)
+        return NULL;
 
     if (kv_cache_append_step(kv_cache, k_data, v_data, seq_new, kv_heads, head_dim) < 0)
         return NULL;
 
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     Tensor* cached_k = cml_kv_cache_get_keys(kv_cache);
     Tensor* cached_v = cml_kv_cache_get_values(kv_cache);
     if (!cached_k || !cached_v) {
-        if (cached_k) tensor_free(cached_k);
-        if (cached_v) tensor_free(cached_v);
+        if (cached_k)
+            tensor_free(cached_k);
+        if (cached_v)
+            tensor_free(cached_v);
         return NULL;
     }
 
@@ -691,14 +718,16 @@ Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
     float* cv_data = (float*)tensor_data_ptr(cached_v);
 
     int full_k_shape[] = {1, cached_len, kv_heads * head_dim};
-    Tensor* full_k = tensor_from_data(ck_data, full_k_shape, 3, &cfg);
-    Tensor* full_v = tensor_from_data(cv_data, full_k_shape, 3, &cfg);
+    Tensor* full_k     = tensor_from_data(ck_data, full_k_shape, 3, &cfg);
+    Tensor* full_v     = tensor_from_data(cv_data, full_k_shape, 3, &cfg);
     tensor_free(cached_k);
     tensor_free(cached_v);
 
     if (!full_k || !full_v) {
-        if (full_k) tensor_free(full_k);
-        if (full_v) tensor_free(full_v);
+        if (full_k)
+            tensor_free(full_k);
+        if (full_v)
+            tensor_free(full_v);
         return NULL;
     }
 
@@ -727,9 +756,10 @@ Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) 
         return NULL;
     }
 
-    int dim = config->dim;
+    int dim    = config->dim;
     float base = config->base;
-    if (base <= 0.0f) base = 10000.0f;
+    if (base <= 0.0f)
+        base = 10000.0f;
 
     /* Compute the total number of vectors to apply RoPE to.
      * The last dimension is head_dim and we rotate pairs within it.
@@ -741,29 +771,29 @@ Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) 
     /* Determine seq_len from the shape. For [batch, seq_len, num_heads, head_dim],
      * seq_len is shape[1]. For [seq_len, head_dim], seq_len is shape[0]. */
     int seq_len;
-    size_t num_outer;    /* number of independent sequences (batch * heads, etc.) */
+    size_t num_outer; /* number of independent sequences (batch * heads, etc.) */
 
     if (x->ndim == 4) {
         /* [batch, seq_len, num_heads, head_dim] */
         int batch_size = x->shape[0];
-        seq_len = x->shape[1];
-        int num_heads = x->shape[2];
-        num_outer = (size_t)batch_size * num_heads;
+        seq_len        = x->shape[1];
+        int num_heads  = x->shape[2];
+        num_outer      = (size_t)batch_size * num_heads;
 
         for (size_t outer = 0; outer < num_outer; outer++) {
             int b = (int)(outer / (size_t)num_heads);
             int h = (int)(outer % (size_t)num_heads);
             for (int s = 0; s < seq_len; s++) {
                 int pos = start_pos + s;
-                size_t base_idx = ((size_t)b * seq_len * num_heads + (size_t)s * num_heads + h)
-                                  * last_dim;
+                size_t base_idx =
+                    ((size_t)b * seq_len * num_heads + (size_t)s * num_heads + h) * last_dim;
                 for (int i = 0; i < half_dim; i++) {
-                    float freq = 1.0f / powf(base, (float)(2 * i) / (float)dim);
-                    float theta = (float)pos * freq;
-                    float cos_t = cosf(theta);
-                    float sin_t = sinf(theta);
-                    float x0 = data[base_idx + 2 * i];
-                    float x1 = data[base_idx + 2 * i + 1];
+                    float freq                 = 1.0f / powf(base, (float)(2 * i) / (float)dim);
+                    float theta                = (float)pos * freq;
+                    float cos_t                = cosf(theta);
+                    float sin_t                = sinf(theta);
+                    float x0                   = data[base_idx + 2 * i];
+                    float x1                   = data[base_idx + 2 * i + 1];
                     data[base_idx + 2 * i]     = x0 * cos_t - x1 * sin_t;
                     data[base_idx + 2 * i + 1] = x0 * sin_t + x1 * cos_t;
                 }
@@ -772,20 +802,20 @@ Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) 
     } else if (x->ndim == 3) {
         /* [batch, seq_len, dim] */
         int batch_size = x->shape[0];
-        seq_len = x->shape[1];
-        num_outer = (size_t)batch_size;
+        seq_len        = x->shape[1];
+        num_outer      = (size_t)batch_size;
 
         for (int b = 0; b < batch_size; b++) {
             for (int s = 0; s < seq_len; s++) {
-                int pos = start_pos + s;
+                int pos         = start_pos + s;
                 size_t base_idx = ((size_t)b * seq_len + s) * last_dim;
                 for (int i = 0; i < half_dim; i++) {
-                    float freq = 1.0f / powf(base, (float)(2 * i) / (float)dim);
-                    float theta = (float)pos * freq;
-                    float cos_t = cosf(theta);
-                    float sin_t = sinf(theta);
-                    float x0 = data[base_idx + 2 * i];
-                    float x1 = data[base_idx + 2 * i + 1];
+                    float freq                 = 1.0f / powf(base, (float)(2 * i) / (float)dim);
+                    float theta                = (float)pos * freq;
+                    float cos_t                = cosf(theta);
+                    float sin_t                = sinf(theta);
+                    float x0                   = data[base_idx + 2 * i];
+                    float x1                   = data[base_idx + 2 * i + 1];
                     data[base_idx + 2 * i]     = x0 * cos_t - x1 * sin_t;
                     data[base_idx + 2 * i + 1] = x0 * sin_t + x1 * cos_t;
                 }
@@ -795,15 +825,15 @@ Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) 
         /* [seq_len, dim] -- simplest case */
         seq_len = x->shape[0];
         for (int s = 0; s < seq_len; s++) {
-            int pos = start_pos + s;
+            int pos         = start_pos + s;
             size_t base_idx = (size_t)s * last_dim;
             for (int i = 0; i < half_dim; i++) {
-                float freq = 1.0f / powf(base, (float)(2 * i) / (float)dim);
-                float theta = (float)pos * freq;
-                float cos_t = cosf(theta);
-                float sin_t = sinf(theta);
-                float x0 = data[base_idx + 2 * i];
-                float x1 = data[base_idx + 2 * i + 1];
+                float freq                 = 1.0f / powf(base, (float)(2 * i) / (float)dim);
+                float theta                = (float)pos * freq;
+                float cos_t                = cosf(theta);
+                float sin_t                = sinf(theta);
+                float x0                   = data[base_idx + 2 * i];
+                float x1                   = data[base_idx + 2 * i + 1];
                 data[base_idx + 2 * i]     = x0 * cos_t - x1 * sin_t;
                 data[base_idx + 2 * i + 1] = x0 * sin_t + x1 * cos_t;
             }
@@ -819,16 +849,16 @@ CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
         return NULL;
     }
 
-    if (config->num_experts <= 0 || config->top_k <= 0 ||
-        config->input_dim <= 0 || config->hidden_dim <= 0) {
+    if (config->num_experts <= 0 || config->top_k <= 0 || config->input_dim <= 0 ||
+        config->hidden_dim <= 0) {
         LOG_ERROR("cml_moe_create: invalid config (experts=%d, top_k=%d, in=%d, hid=%d)",
                   config->num_experts, config->top_k, config->input_dim, config->hidden_dim);
         return NULL;
     }
 
     if (config->top_k > config->num_experts) {
-        LOG_ERROR("cml_moe_create: top_k (%d) > num_experts (%d)",
-                  config->top_k, config->num_experts);
+        LOG_ERROR("cml_moe_create: top_k (%d) > num_experts (%d)", config->top_k,
+                  config->num_experts);
         return NULL;
     }
 
@@ -838,15 +868,15 @@ CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
         return NULL;
     }
 
-    moe->config = *config;
+    moe->config    = *config;
     moe->ref_count = 1;
 
-    int input_dim = config->input_dim;
-    int hidden_dim = config->hidden_dim;
+    int input_dim   = config->input_dim;
+    int hidden_dim  = config->hidden_dim;
     int num_experts = config->num_experts;
 
-    TensorConfig tcfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                         .has_dtype = true, .has_device = true};
+    TensorConfig tcfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
     /* Gate weight: [input_dim, num_experts] */
     int gate_shape[] = {input_dim, num_experts};
@@ -887,20 +917,24 @@ CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
 }
 
 void cml_moe_free(CMLMoELayer* moe) {
-    if (!moe) return;
+    if (!moe)
+        return;
 
-    if (moe->gate_weight) tensor_free(moe->gate_weight);
+    if (moe->gate_weight)
+        tensor_free(moe->gate_weight);
 
     int num_experts = moe->config.num_experts;
     if (moe->expert_w1) {
         for (int e = 0; e < num_experts; e++) {
-            if (moe->expert_w1[e]) tensor_free(moe->expert_w1[e]);
+            if (moe->expert_w1[e])
+                tensor_free(moe->expert_w1[e]);
         }
         cml_free(moe->expert_w1);
     }
     if (moe->expert_w2) {
         for (int e = 0; e < num_experts; e++) {
-            if (moe->expert_w2[e]) tensor_free(moe->expert_w2[e]);
+            if (moe->expert_w2[e])
+                tensor_free(moe->expert_w2[e]);
         }
         cml_free(moe->expert_w2);
     }
@@ -921,16 +955,16 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
         return NULL;
     }
 
-    int batch = input->shape[0];
-    int seq_len = input->shape[1];
-    int input_dim = moe->config.input_dim;
-    int hidden_dim = moe->config.hidden_dim;
-    int num_experts = moe->config.num_experts;
-    int top_k = moe->config.top_k;
+    int batch        = input->shape[0];
+    int seq_len      = input->shape[1];
+    int input_dim    = moe->config.input_dim;
+    int hidden_dim   = moe->config.hidden_dim;
+    int num_experts  = moe->config.num_experts;
+    int top_k        = moe->config.top_k;
     int total_tokens = batch * seq_len;
 
     float* in_data = (float*)tensor_data_ptr(input);
-    float* gate_w = (float*)tensor_data_ptr(moe->gate_weight);
+    float* gate_w  = (float*)tensor_data_ptr(moe->gate_weight);
 
     if (!in_data || !gate_w) {
         LOG_ERROR("cml_moe_forward: failed to get data pointers");
@@ -959,7 +993,7 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
     cml_softmax_rows_inplace(gate_scores, total_tokens, num_experts);
 
     /* Step 3: Find top-k experts per token */
-    int* top_k_indices = (int*)cml_malloc((size_t)total_tokens * top_k * sizeof(int));
+    int* top_k_indices   = (int*)cml_malloc((size_t)total_tokens * top_k * sizeof(int));
     float* top_k_weights = (float*)cml_malloc((size_t)total_tokens * top_k * sizeof(float));
     if (!top_k_indices || !top_k_weights) {
         LOG_ERROR("cml_moe_forward: allocation failed");
@@ -982,7 +1016,7 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
         }
 
         for (int ki = 0; ki < top_k; ki++) {
-            int best_idx = -1;
+            int best_idx   = -1;
             float best_val = -1e30f;
             for (int e = 0; e < num_experts; e++) {
                 if (!selected[e] && row[e] > best_val) {
@@ -992,7 +1026,8 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
             }
             top_k_indices[t * top_k + ki] = best_idx;
             top_k_weights[t * top_k + ki] = best_val;
-            if (best_idx >= 0) selected[best_idx] = true;
+            if (best_idx >= 0)
+                selected[best_idx] = true;
         }
         cml_free(selected);
 
@@ -1014,9 +1049,9 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
     cml_free(gate_scores);
 
     /* Step 4: Compute expert outputs and combine */
-    float* output = (float*)cml_calloc((size_t)total_tokens * input_dim, sizeof(float));
+    float* output        = (float*)cml_calloc((size_t)total_tokens * input_dim, sizeof(float));
     float* expert_hidden = (float*)cml_malloc((size_t)hidden_dim * sizeof(float));
-    float* expert_out = (float*)cml_malloc((size_t)input_dim * sizeof(float));
+    float* expert_out    = (float*)cml_malloc((size_t)input_dim * sizeof(float));
 
     if (!output || !expert_hidden || !expert_out) {
         LOG_ERROR("cml_moe_forward: allocation failed");
@@ -1029,18 +1064,20 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
     }
 
     for (int t = 0; t < total_tokens; t++) {
-        float* token_in = in_data + t * input_dim;
+        float* token_in  = in_data + t * input_dim;
         float* token_out = output + t * input_dim;
 
         for (int ki = 0; ki < top_k; ki++) {
             int expert_idx = top_k_indices[t * top_k + ki];
-            float weight = top_k_weights[t * top_k + ki];
+            float weight   = top_k_weights[t * top_k + ki];
 
-            if (expert_idx < 0 || expert_idx >= num_experts) continue;
+            if (expert_idx < 0 || expert_idx >= num_experts)
+                continue;
 
             float* w1_data = (float*)tensor_data_ptr(moe->expert_w1[expert_idx]);
             float* w2_data = (float*)tensor_data_ptr(moe->expert_w2[expert_idx]);
-            if (!w1_data || !w2_data) continue;
+            if (!w1_data || !w2_data)
+                continue;
 
             /* hidden = ReLU(input @ W1): [input_dim] @ [input_dim, hidden_dim] -> [hidden_dim] */
             for (int h = 0; h < hidden_dim; h++) {
@@ -1074,9 +1111,9 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
     cml_free(top_k_weights);
 
     /* Create output tensor [batch, seq_len, input_dim] */
-    int out_shape[] = {batch, seq_len, input_dim};
-    TensorConfig out_cfg = {.dtype = input->dtype, .device = input->device,
-                            .has_dtype = true, .has_device = true};
+    int out_shape[]      = {batch, seq_len, input_dim};
+    TensorConfig out_cfg = {
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(output, out_shape, 3, &out_cfg);
     cml_free(output);
 
@@ -1104,11 +1141,11 @@ Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input) {
         return NULL;
     }
 
-    int input_dim = moe->config.input_dim;
+    int input_dim   = moe->config.input_dim;
     int num_experts = moe->config.num_experts;
 
     float* in_data = (float*)tensor_data_ptr(input);
-    float* gate_w = (float*)tensor_data_ptr(moe->gate_weight);
+    float* gate_w  = (float*)tensor_data_ptr(moe->gate_weight);
 
     if (!in_data || !gate_w) {
         LOG_ERROR("cml_moe_get_routing: failed to get data pointers");
@@ -1135,19 +1172,19 @@ Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input) {
     /* Softmax */
     cml_softmax_rows_inplace(routing, total_tokens, num_experts);
 
-    int out_shape[] = {total_tokens, num_experts};
-    TensorConfig out_cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                            .has_dtype = true, .has_device = true};
+    int out_shape[]      = {total_tokens, num_experts};
+    TensorConfig out_cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* result = tensor_from_data(routing, out_shape, 2, &out_cfg);
     cml_free(routing);
     return result;
 }
 
-CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
-                                     char** merge_pairs, int num_merges) {
+CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size, char** merge_pairs,
+                                   int num_merges) {
     if (!vocab || vocab_size <= 0) {
-        LOG_ERROR("cml_tokenizer_create: invalid vocab (ptr=%p, size=%d)",
-                  (void*)vocab, vocab_size);
+        LOG_ERROR("cml_tokenizer_create: invalid vocab (ptr=%p, size=%d)", (void*)vocab,
+                  vocab_size);
         return NULL;
     }
 
@@ -1157,7 +1194,7 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
         return NULL;
     }
 
-    tok->vocab_size = vocab_size;
+    tok->vocab_size   = vocab_size;
     tok->bos_token_id = -1;
     tok->eos_token_id = -1;
     tok->pad_token_id = -1;
@@ -1184,7 +1221,8 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
 
     /* Build hash table: size = 2 * vocab_size for low load factor */
     tok->hash_size = vocab_size * 2;
-    if (tok->hash_size < 64) tok->hash_size = 64;
+    if (tok->hash_size < 64)
+        tok->hash_size = 64;
     tok->token_to_id = (int*)cml_malloc((size_t)tok->hash_size * sizeof(int));
     if (!tok->token_to_id) {
         LOG_ERROR("cml_tokenizer_create: failed to allocate hash table");
@@ -1198,8 +1236,7 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
 
     for (int i = 0; i < vocab_size; i++) {
         if (tok->vocab[i]) {
-            hash_insert(tok->token_to_id, tok->hash_size, tok->vocab,
-                        tok->vocab[i], i);
+            hash_insert(tok->token_to_id, tok->hash_size, tok->vocab, tok->vocab[i], i);
         }
     }
 
@@ -1222,8 +1259,7 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
                     return NULL;
                 }
                 /* The merged token should exist in vocab; look it up */
-                int id = hash_lookup(tok->token_to_id, tok->hash_size,
-                                     tok->vocab, merge_pairs[i]);
+                int id = hash_lookup(tok->token_to_id, tok->hash_size, tok->vocab, merge_pairs[i]);
                 tok->merges[i].new_token_id = id; /* -1 if not found */
             }
         }
@@ -1234,7 +1270,8 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size,
 }
 
 void cml_tokenizer_free(CMLTokenizer* tok) {
-    if (!tok) return;
+    if (!tok)
+        return;
 
     if (tok->vocab) {
         for (int i = 0; i < tok->vocab_size; i++) {
@@ -1257,7 +1294,8 @@ void cml_tokenizer_free(CMLTokenizer* tok) {
 int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) {
     if (!tok || !text || !num_tokens) {
         LOG_ERROR("cml_tokenizer_encode: NULL argument");
-        if (num_tokens) *num_tokens = 0;
+        if (num_tokens)
+            *num_tokens = 0;
         return NULL;
     }
 
@@ -1269,8 +1307,8 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
 
     /* Step 1: Split text into initial character tokens.
      * Each character becomes a separate token string. */
-    int capacity = text_len + 16;
-    int count = 0;
+    int capacity  = text_len + 16;
+    int count     = 0;
     char** tokens = (char**)cml_malloc((size_t)capacity * sizeof(char*));
     if (!tokens) {
         *num_tokens = 0;
@@ -1278,10 +1316,11 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
     }
 
     for (int i = 0; i < text_len; i++) {
-        char buf[2] = {text[i], '\0'};
+        char buf[2]   = {text[i], '\0'};
         tokens[count] = cml_strdup(buf);
         if (!tokens[count]) {
-            for (int j = 0; j < count; j++) cml_free(tokens[j]);
+            for (int j = 0; j < count; j++)
+                cml_free(tokens[j]);
             cml_free(tokens);
             *num_tokens = 0;
             return NULL;
@@ -1294,9 +1333,10 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
      * adjacent pairs that concatenate to the merge's pair string,
      * and merge them. */
     for (int m = 0; m < tok->num_merges && count > 1; m++) {
-        if (!tok->merges[m].pair) continue;
+        if (!tok->merges[m].pair)
+            continue;
         const char* merge_str = tok->merges[m].pair;
-        size_t merge_len = strlen(merge_str);
+        size_t merge_len      = strlen(merge_str);
 
         bool found = true;
         while (found && count > 1) {
@@ -1305,11 +1345,13 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
                 /* Check if tokens[i] + tokens[i+1] == merge_str */
                 size_t len_a = strlen(tokens[i]);
                 size_t len_b = strlen(tokens[i + 1]);
-                if (len_a + len_b != merge_len) continue;
+                if (len_a + len_b != merge_len)
+                    continue;
 
                 /* Build concatenated string to compare */
                 char* concat = (char*)cml_malloc(merge_len + 1);
-                if (!concat) continue;
+                if (!concat)
+                    continue;
                 memcpy(concat, tokens[i], len_a);
                 memcpy(concat + len_a, tokens[i + 1], len_b);
                 concat[merge_len] = '\0';
@@ -1336,7 +1378,8 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
     /* Step 3: Convert token strings to IDs */
     int* ids = (int*)cml_malloc((size_t)count * sizeof(int));
     if (!ids) {
-        for (int i = 0; i < count; i++) cml_free(tokens[i]);
+        for (int i = 0; i < count; i++)
+            cml_free(tokens[i]);
         cml_free(tokens);
         *num_tokens = 0;
         return NULL;
@@ -1395,7 +1438,8 @@ char* cml_tokenizer_decode(CMLTokenizer* tok, const int* tokens, int num_tokens)
 }
 
 void cml_tokenizer_set_special(CMLTokenizer* tok, int bos, int eos, int pad, int unk) {
-    if (!tok) return;
+    if (!tok)
+        return;
     tok->bos_token_id = bos;
     tok->eos_token_id = eos;
     tok->pad_token_id = pad;
@@ -1403,6 +1447,7 @@ void cml_tokenizer_set_special(CMLTokenizer* tok, int bos, int eos, int pad, int
 }
 
 int cml_tokenizer_vocab_size(const CMLTokenizer* tok) {
-    if (!tok) return 0;
+    if (!tok)
+        return 0;
     return tok->vocab_size;
 }

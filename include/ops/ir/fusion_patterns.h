@@ -41,7 +41,7 @@ typedef enum {
 typedef struct {
     struct IRNode** matched_nodes; /* Array of matched nodes (owned) */
     int num_matched;
-    void* match_data;              /* Pattern-specific data for emit */
+    void* match_data; /* Pattern-specific data for emit */
 } FusionMatch;
 
 typedef FusionMatch* (*FusionMatchFn)(struct IRNode* start, struct CMLGraph* ir);
@@ -66,16 +66,11 @@ FusionPatternRegistry* cml_fusion_registry_create(void);
 void cml_fusion_registry_free(FusionPatternRegistry* registry);
 FusionPatternRegistry* cml_fusion_registry_get_default(void);
 
-int cml_fusion_register_pattern(FusionPatternRegistry* registry,
-                                const char* name,
-                                FusionPatternKind kind,
-                                FusionTarget target,
-                                int priority,
-                                FusionMatchFn match,
-                                FusionEmitFn emit);
+int cml_fusion_register_pattern(FusionPatternRegistry* registry, const char* name,
+                                FusionPatternKind kind, FusionTarget target, int priority,
+                                FusionMatchFn match, FusionEmitFn emit);
 
-int cml_fusion_apply_patterns(FusionPatternRegistry* registry,
-                              struct CMLGraph* ir,
+int cml_fusion_apply_patterns(FusionPatternRegistry* registry, struct CMLGraph* ir,
                               FusionTarget target);
 
 void cml_fusion_match_free(FusionMatch* match);

@@ -27,10 +27,10 @@ typedef enum {
     DTYPE_UINT16,
     DTYPE_UINT32,
     DTYPE_UINT64,
-    DTYPE_FLOAT8_E4M3,       // 1 sign, 4 exponent, 3 mantissa (range [-448, 448])
-    DTYPE_FLOAT8_E5M2,       // 1 sign, 5 exponent, 2 mantissa (range [-57344, 57344])
-    DTYPE_FLOAT8_E4M3_FNUZ,  // FNUZ: no negative zero, no inf, bias=8 (AMD MI300)
-    DTYPE_FLOAT8_E5M2_FNUZ,  // FNUZ: no negative zero, no inf, bias=16 (AMD MI300)
+    DTYPE_FLOAT8_E4M3,      // 1 sign, 4 exponent, 3 mantissa (range [-448, 448])
+    DTYPE_FLOAT8_E5M2,      // 1 sign, 5 exponent, 2 mantissa (range [-57344, 57344])
+    DTYPE_FLOAT8_E4M3_FNUZ, // FNUZ: no negative zero, no inf, bias=8 (AMD MI300)
+    DTYPE_FLOAT8_E5M2_FNUZ, // FNUZ: no negative zero, no inf, bias=16 (AMD MI300)
 } DType;
 
 struct IRNode;
@@ -75,23 +75,23 @@ typedef struct Tensor {
     CMLGraph_t saved_ir_context;
 
     // Execution state (lazy)
-    bool is_executed; // Has this been executed?
-    void* data;       // NULL until executed (lazy!)
-    bool owns_data;        // Does this tensor own its data?
+    bool is_executed;       // Has this been executed?
+    void* data;             // NULL until executed (lazy!)
+    bool owns_data;         // Does this tensor own its data?
     bool from_buffer_cache; // Data was allocated via cml_buffer_cache_alloc
 
     bool requires_grad;
-    bool retains_grad; /* PyTorch retain_grad(): keep .grad after backward */
+    bool retains_grad;   /* PyTorch retain_grad(): keep .grad after backward */
     struct Tensor* grad; // Gradient tensor (also lazy!)
 
-    int ref_count;       // Reference counting (internal graph/API references)
+    int ref_count; // Reference counting (internal graph/API references)
     /* External references held outside the C core (e.g. a Python/other-language
      * wrapper that will free the tensor itself). While > 0, a graph teardown
      * (cml_ir_free) must NOT free this tensor out from under its owner: it is
      * detached from the graph and kept alive instead. See tensor_pin/
      * tensor_release and tensor_free. */
     int external_refs;
-    struct Tensor* base; // Base tensor (if this is a view)
+    struct Tensor* base;       // Base tensor (if this is a view)
     CMLTensorStorage* storage; // Shared storage block (owner + its views)
 
     size_t* strides;       // Stride array (for efficient views)
@@ -231,8 +231,10 @@ Tensor** tensor_chunk(Tensor* a, int chunks, int dim, int* out_count);
 
 Tensor* tensor_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config);
 Tensor* tensor_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config);
-Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
-Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out, const TensorConfig* config);
+Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out,
+                              const TensorConfig* config);
+Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out,
+                             const TensorConfig* config);
 
 Tensor* tensor_cast(Tensor* a, DType dtype);
 Tensor* tensor_contiguous(Tensor* a);
@@ -271,14 +273,15 @@ typedef enum {
 } ScatterReduceMode;
 
 /* self[index[i]] = reduce(self[index[i]], src[i]) */
-Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src, ScatterReduceMode mode);
+Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
+                              ScatterReduceMode mode);
 
 /* Reinterpret bits, no conversion */
 Tensor* tensor_bitcast(Tensor* a, DType target_dtype);
 
 typedef struct {
-    Tensor* Q;  // Orthogonal matrix [m, m] or [m, k] (reduced)
-    Tensor* R;  // Upper triangular [m, n] or [k, n] (reduced)
+    Tensor* Q; // Orthogonal matrix [m, m] or [m, k] (reduced)
+    Tensor* R; // Upper triangular [m, n] or [k, n] (reduced)
 } QRResult;
 
 /* Householder reflections, reduced form: Q=[m,k], R=[k,n], k=min(m,n) */

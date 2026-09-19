@@ -11,25 +11,31 @@
 /* Helper: create a minimal LinearProgram */
 static CMLLinearProgram* make_test_program(int variant) {
     CMLLinearProgram* prog = cml_calloc(1, sizeof(CMLLinearProgram));
-    if (!prog) return NULL;
+    if (!prog)
+        return NULL;
     prog->capacity = 16;
-    prog->ops = cml_calloc(16, sizeof(CMLLinearOp));
-    if (!prog->ops) { cml_free(prog); return NULL; }
+    prog->ops      = cml_calloc(16, sizeof(CMLLinearOp));
+    if (!prog->ops) {
+        cml_free(prog);
+        return NULL;
+    }
 
     /* LOAD v0, LOAD v1 */
     prog->ops[prog->num_ops++] = (CMLLinearOp){.kind = LINOP_LOAD, .dest_reg = 0};
     prog->ops[prog->num_ops++] = (CMLLinearOp){.kind = LINOP_LOAD, .dest_reg = 1};
 
     /* Variant 0: ADD, Variant 1: MUL */
-    UOpType uop = (variant == 0) ? UOP_ADD : UOP_MUL;
-    prog->ops[prog->num_ops++] = (CMLLinearOp){
-        .kind = LINOP_COMPUTE, .uop = uop, .dest_reg = 2,
-        .src_regs = {0, 1}, .num_srcs = 2, .is_eliminated = false
-    };
+    UOpType uop                = (variant == 0) ? UOP_ADD : UOP_MUL;
+    prog->ops[prog->num_ops++] = (CMLLinearOp){.kind          = LINOP_COMPUTE,
+                                               .uop           = uop,
+                                               .dest_reg      = 2,
+                                               .src_regs      = {0, 1},
+                                               .num_srcs      = 2,
+                                               .is_eliminated = false};
 
     /* STORE v2 */
     prog->ops[prog->num_ops++] = (CMLLinearOp){.kind = LINOP_STORE, .dest_reg = 2};
-    prog->next_vreg = 3;
+    prog->next_vreg            = 3;
     return prog;
 }
 
@@ -165,7 +171,7 @@ static void test_set_backend(void) {
     cml_runtime_compiler_set_backend(rc, CML_FUSED_BACKEND_PTX);
     ASSERT(rc->preferred_backend == CML_FUSED_BACKEND_PTX, "PTX set");
 
-    CMLLinearProgram* prog = make_test_program(0);
+    CMLLinearProgram* prog     = make_test_program(0);
     const CMLCompiledKernel* k = cml_runtime_compile_program(rc, prog, 1024);
     ASSERT(k != NULL, "compile with PTX");
     ASSERT(k->backend == CML_FUSED_BACKEND_PTX, "PTX backend");

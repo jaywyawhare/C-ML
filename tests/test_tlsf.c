@@ -8,35 +8,45 @@
 #include "alloc/cml_allocator.h"
 #include "test_harness.h"
 
-#define RUN_TEST(test) do { \
-    tests_run++; \
-    printf("  [%d] %-50s ", tests_run, #test); \
-    if (test()) { tests_passed++; printf("PASS\n"); } \
-    else { printf("FAIL\n"); } \
-} while(0)
+#define RUN_TEST(test)                                                                             \
+    do {                                                                                           \
+        tests_run++;                                                                               \
+        printf("  [%d] %-50s ", tests_run, #test);                                                 \
+        if (test()) {                                                                              \
+            tests_passed++;                                                                        \
+            printf("PASS\n");                                                                      \
+        } else {                                                                                   \
+            printf("FAIL\n");                                                                      \
+        }                                                                                          \
+    } while (0)
 
-
-static int test_create_destroy(void)
-{
+static int test_create_destroy(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(4096);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
     cml_tlsf_destroy(alloc);
     return 1;
 }
 
-static int test_alloc_free_basic(void)
-{
+static int test_alloc_free_basic(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(4096);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     void* ptr = cml_tlsf_alloc(alloc, 128);
-    if (!ptr) { cml_tlsf_destroy(alloc); return 0; }
+    if (!ptr) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     /* Write and read back */
     memset(ptr, 0xAB, 128);
     unsigned char* bytes = (unsigned char*)ptr;
     for (int i = 0; i < 128; i++) {
-        if (bytes[i] != 0xAB) { cml_tlsf_destroy(alloc); return 0; }
+        if (bytes[i] != 0xAB) {
+            cml_tlsf_destroy(alloc);
+            return 0;
+        }
     }
 
     cml_tlsf_free(alloc, ptr);
@@ -44,21 +54,27 @@ static int test_alloc_free_basic(void)
     return 1;
 }
 
-static int test_alloc_multiple(void)
-{
+static int test_alloc_multiple(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(16384);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     void* ptrs[10];
     for (int i = 0; i < 10; i++) {
         ptrs[i] = cml_tlsf_alloc(alloc, 64 + i * 32);
-        if (!ptrs[i]) { cml_tlsf_destroy(alloc); return 0; }
+        if (!ptrs[i]) {
+            cml_tlsf_destroy(alloc);
+            return 0;
+        }
     }
 
     /* All pointers should be distinct */
     for (int i = 0; i < 10; i++) {
         for (int j = i + 1; j < 10; j++) {
-            if (ptrs[i] == ptrs[j]) { cml_tlsf_destroy(alloc); return 0; }
+            if (ptrs[i] == ptrs[j]) {
+                cml_tlsf_destroy(alloc);
+                return 0;
+            }
         }
     }
 
@@ -71,10 +87,10 @@ static int test_alloc_multiple(void)
     return 1;
 }
 
-static int test_alloc_aligned(void)
-{
+static int test_alloc_aligned(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(65536);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     /* Test various alignments */
     size_t alignments[] = {16, 32, 64, 128, 256};
@@ -82,7 +98,10 @@ static int test_alloc_aligned(void)
 
     for (int i = 0; i < 5; i++) {
         ptrs[i] = cml_tlsf_alloc_aligned(alloc, 100, alignments[i]);
-        if (!ptrs[i]) { cml_tlsf_destroy(alloc); return 0; }
+        if (!ptrs[i]) {
+            cml_tlsf_destroy(alloc);
+            return 0;
+        }
         /* Check alignment */
         if (((uintptr_t)ptrs[i] % alignments[i]) != 0) {
             cml_tlsf_destroy(alloc);
@@ -98,44 +117,62 @@ static int test_alloc_aligned(void)
     return 1;
 }
 
-static int test_alloc_size(void)
-{
+static int test_alloc_size(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(4096);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     void* ptr = cml_tlsf_alloc(alloc, 200);
-    if (!ptr) { cml_tlsf_destroy(alloc); return 0; }
+    if (!ptr) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     size_t sz = cml_tlsf_alloc_size(alloc, ptr);
     /* Should be at least 200 (aligned up to TLSF_ALIGN) */
-    if (sz < 200) { cml_tlsf_destroy(alloc); return 0; }
+    if (sz < 200) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
     /* Should be aligned */
-    if (sz % TLSF_ALIGN != 0) { cml_tlsf_destroy(alloc); return 0; }
+    if (sz % TLSF_ALIGN != 0) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     cml_tlsf_free(alloc, ptr);
     cml_tlsf_destroy(alloc);
     return 1;
 }
 
-static int test_realloc(void)
-{
+static int test_realloc(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(16384);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     void* ptr = cml_tlsf_alloc(alloc, 64);
-    if (!ptr) { cml_tlsf_destroy(alloc); return 0; }
+    if (!ptr) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     /* Fill with pattern */
     memset(ptr, 0xCD, 64);
 
     /* Realloc larger */
     void* ptr2 = cml_tlsf_realloc(alloc, ptr, 256);
-    if (!ptr2) { cml_tlsf_destroy(alloc); return 0; }
+    if (!ptr2) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     /* Check original data is preserved */
     unsigned char* bytes = (unsigned char*)ptr2;
     for (int i = 0; i < 64; i++) {
-        if (bytes[i] != 0xCD) { cml_tlsf_destroy(alloc); return 0; }
+        if (bytes[i] != 0xCD) {
+            cml_tlsf_destroy(alloc);
+            return 0;
+        }
     }
 
     cml_tlsf_free(alloc, ptr2);
@@ -143,19 +180,25 @@ static int test_realloc(void)
     return 1;
 }
 
-static int test_free_and_reuse(void)
-{
+static int test_free_and_reuse(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(4096);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     /* Allocate and free */
     void* ptr1 = cml_tlsf_alloc(alloc, 128);
-    if (!ptr1) { cml_tlsf_destroy(alloc); return 0; }
+    if (!ptr1) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
     cml_tlsf_free(alloc, ptr1);
 
     /* Allocate the same size again: should reuse the same block */
     void* ptr2 = cml_tlsf_alloc(alloc, 128);
-    if (!ptr2) { cml_tlsf_destroy(alloc); return 0; }
+    if (!ptr2) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     /* On a fresh allocator with one free + one alloc of same size,
      * the memory should be reused (same address) */
@@ -169,10 +212,10 @@ static int test_free_and_reuse(void)
     return 1;
 }
 
-static int test_stats(void)
-{
+static int test_stats(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(8192);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     size_t used, peak, nalloc, nfree;
     cml_tlsf_stats(alloc, &used, &peak, &nalloc, &nfree);
@@ -183,31 +226,46 @@ static int test_stats(void)
 
     void* ptr1 = cml_tlsf_alloc(alloc, 100);
     void* ptr2 = cml_tlsf_alloc(alloc, 200);
-    if (!ptr1 || !ptr2) { cml_tlsf_destroy(alloc); return 0; }
+    if (!ptr1 || !ptr2) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     cml_tlsf_stats(alloc, &used, &peak, &nalloc, &nfree);
-    if (nalloc != 2) { cml_tlsf_destroy(alloc); return 0; }
-    if (used == 0) { cml_tlsf_destroy(alloc); return 0; }
+    if (nalloc != 2) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
+    if (used == 0) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     cml_tlsf_free(alloc, ptr1);
     cml_tlsf_stats(alloc, &used, &peak, &nalloc, &nfree);
-    if (nfree != 1) { cml_tlsf_destroy(alloc); return 0; }
+    if (nfree != 1) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     cml_tlsf_free(alloc, ptr2);
     cml_tlsf_destroy(alloc);
     return 1;
 }
 
-static int test_peak_tracking(void)
-{
+static int test_peak_tracking(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(16384);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     /* Allocate three blocks */
     void* p1 = cml_tlsf_alloc(alloc, 100);
     void* p2 = cml_tlsf_alloc(alloc, 200);
     void* p3 = cml_tlsf_alloc(alloc, 300);
-    if (!p1 || !p2 || !p3) { cml_tlsf_destroy(alloc); return 0; }
+    if (!p1 || !p2 || !p3) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     size_t used_after3, peak_after3, na, nf;
     cml_tlsf_stats(alloc, &used_after3, &peak_after3, &na, &nf);
@@ -240,41 +298,60 @@ static int test_peak_tracking(void)
     return 1;
 }
 
-static int test_integrity_check(void)
-{
+static int test_integrity_check(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(8192);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     /* Fresh allocator should pass integrity check */
-    if (!cml_tlsf_check(alloc)) { cml_tlsf_destroy(alloc); return 0; }
+    if (!cml_tlsf_check(alloc)) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     /* After some operations */
     void* p1 = cml_tlsf_alloc(alloc, 100);
     void* p2 = cml_tlsf_alloc(alloc, 200);
-    if (!cml_tlsf_check(alloc)) { cml_tlsf_destroy(alloc); return 0; }
+    if (!cml_tlsf_check(alloc)) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     cml_tlsf_free(alloc, p1);
-    if (!cml_tlsf_check(alloc)) { cml_tlsf_destroy(alloc); return 0; }
+    if (!cml_tlsf_check(alloc)) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     cml_tlsf_free(alloc, p2);
-    if (!cml_tlsf_check(alloc)) { cml_tlsf_destroy(alloc); return 0; }
+    if (!cml_tlsf_check(alloc)) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     cml_tlsf_destroy(alloc);
     return 1;
 }
 
-static int test_create_with_pool(void)
-{
+static int test_create_with_pool(void) {
     /* User-provided pool */
     size_t pool_size = 4096;
-    void* pool = cml_malloc(pool_size);
-    if (!pool) return 0;
+    void* pool       = cml_malloc(pool_size);
+    if (!pool)
+        return 0;
 
     CMLTLSFAllocator* alloc = cml_tlsf_create_with_pool(pool, pool_size);
-    if (!alloc) { cml_free(pool); return 0; }
+    if (!alloc) {
+        cml_free(pool);
+        return 0;
+    }
 
     void* ptr = cml_tlsf_alloc(alloc, 64);
-    if (!ptr) { cml_tlsf_destroy(alloc); cml_free(pool); return 0; }
+    if (!ptr) {
+        cml_tlsf_destroy(alloc);
+        cml_free(pool);
+        return 0;
+    }
 
     /* Pointer should be within the pool */
     if ((char*)ptr < (char*)pool || (char*)ptr >= (char*)pool + pool_size) {
@@ -289,22 +366,25 @@ static int test_create_with_pool(void)
     return 1;
 }
 
-static int test_alloc_zero_returns_null(void)
-{
+static int test_alloc_zero_returns_null(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(4096);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     void* ptr = cml_tlsf_alloc(alloc, 0);
-    if (ptr != NULL) { cml_tlsf_destroy(alloc); return 0; }
+    if (ptr != NULL) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     cml_tlsf_destroy(alloc);
     return 1;
 }
 
-static int test_free_null_safe(void)
-{
+static int test_free_null_safe(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(4096);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     /* Should not crash */
     cml_tlsf_free(alloc, NULL);
@@ -314,17 +394,20 @@ static int test_free_null_safe(void)
     return 1;
 }
 
-static int test_many_alloc_free_cycles(void)
-{
+static int test_many_alloc_free_cycles(void) {
     CMLTLSFAllocator* alloc = cml_tlsf_create(65536);
-    if (!alloc) return 0;
+    if (!alloc)
+        return 0;
 
     /* Stress test: many alloc/free cycles */
     for (int cycle = 0; cycle < 50; cycle++) {
         void* ptrs[8];
         for (int i = 0; i < 8; i++) {
             ptrs[i] = cml_tlsf_alloc(alloc, 32 + i * 16);
-            if (!ptrs[i]) { cml_tlsf_destroy(alloc); return 0; }
+            if (!ptrs[i]) {
+                cml_tlsf_destroy(alloc);
+                return 0;
+            }
             /* Write a pattern */
             memset(ptrs[i], (unsigned char)(i + cycle), 32 + i * 16);
         }
@@ -335,45 +418,56 @@ static int test_many_alloc_free_cycles(void)
     }
 
     /* Should still pass integrity check */
-    if (!cml_tlsf_check(alloc)) { cml_tlsf_destroy(alloc); return 0; }
+    if (!cml_tlsf_check(alloc)) {
+        cml_tlsf_destroy(alloc);
+        return 0;
+    }
 
     cml_tlsf_destroy(alloc);
     return 1;
 }
 
-
-static int test_timeline_create_destroy(void)
-{
+static int test_timeline_create_destroy(void) {
     CMLTimelinePlanner* planner = cml_timeline_planner_create(8);
-    if (!planner) return 0;
+    if (!planner)
+        return 0;
     cml_timeline_planner_destroy(planner);
     return 1;
 }
 
-static int test_timeline_add(void)
-{
+static int test_timeline_add(void) {
     CMLTimelinePlanner* planner = cml_timeline_planner_create(4);
-    if (!planner) return 0;
+    if (!planner)
+        return 0;
 
     int ret = cml_timeline_planner_add(planner, 0, 1024, 0, 5);
-    if (ret != 0) { cml_timeline_planner_destroy(planner); return 0; }
+    if (ret != 0) {
+        cml_timeline_planner_destroy(planner);
+        return 0;
+    }
 
     ret = cml_timeline_planner_add(planner, 1, 2048, 2, 8);
-    if (ret != 0) { cml_timeline_planner_destroy(planner); return 0; }
+    if (ret != 0) {
+        cml_timeline_planner_destroy(planner);
+        return 0;
+    }
 
     /* Invalid: alloc_time > free_time */
     ret = cml_timeline_planner_add(planner, 2, 512, 10, 5);
-    if (ret == 0) { cml_timeline_planner_destroy(planner); return 0; }
+    if (ret == 0) {
+        cml_timeline_planner_destroy(planner);
+        return 0;
+    }
 
     cml_timeline_planner_destroy(planner);
     return 1;
 }
 
-static int test_timeline_solve_simple(void)
-{
+static int test_timeline_solve_simple(void) {
     /* Two non-overlapping tensors should share memory */
     CMLTimelinePlanner* planner = cml_timeline_planner_create(4);
-    if (!planner) return 0;
+    if (!planner)
+        return 0;
 
     /* Tensor 0: size 1024, alive at steps 0-3 */
     cml_timeline_planner_add(planner, 0, 1024, 0, 3);
@@ -381,11 +475,17 @@ static int test_timeline_solve_simple(void)
     cml_timeline_planner_add(planner, 1, 1024, 5, 8);
 
     int ret = cml_timeline_planner_solve(planner);
-    if (ret != 0) { cml_timeline_planner_destroy(planner); return 0; }
+    if (ret != 0) {
+        cml_timeline_planner_destroy(planner);
+        return 0;
+    }
 
     const CMLTimelineRecord* r0 = cml_timeline_planner_get(planner, 0);
     const CMLTimelineRecord* r1 = cml_timeline_planner_get(planner, 1);
-    if (!r0 || !r1) { cml_timeline_planner_destroy(planner); return 0; }
+    if (!r0 || !r1) {
+        cml_timeline_planner_destroy(planner);
+        return 0;
+    }
 
     /* Non-overlapping tensors of same size: they should share the same offset */
     if (r0->offset != r1->offset) {
@@ -404,11 +504,11 @@ static int test_timeline_solve_simple(void)
     return 1;
 }
 
-static int test_timeline_solve_overlap(void)
-{
+static int test_timeline_solve_overlap(void) {
     /* Two overlapping tensors need separate memory */
     CMLTimelinePlanner* planner = cml_timeline_planner_create(4);
-    if (!planner) return 0;
+    if (!planner)
+        return 0;
 
     /* Tensor 0: size 1024, alive at steps 0-5 */
     cml_timeline_planner_add(planner, 0, 1024, 0, 5);
@@ -416,15 +516,21 @@ static int test_timeline_solve_overlap(void)
     cml_timeline_planner_add(planner, 1, 1024, 3, 8);
 
     int ret = cml_timeline_planner_solve(planner);
-    if (ret != 0) { cml_timeline_planner_destroy(planner); return 0; }
+    if (ret != 0) {
+        cml_timeline_planner_destroy(planner);
+        return 0;
+    }
 
     const CMLTimelineRecord* r0 = cml_timeline_planner_get(planner, 0);
     const CMLTimelineRecord* r1 = cml_timeline_planner_get(planner, 1);
-    if (!r0 || !r1) { cml_timeline_planner_destroy(planner); return 0; }
+    if (!r0 || !r1) {
+        cml_timeline_planner_destroy(planner);
+        return 0;
+    }
 
     /* Overlapping tensors must have non-overlapping memory regions */
-    size_t end0 = r0->offset + r0->size;
-    size_t end1 = r1->offset + r1->size;
+    size_t end0          = r0->offset + r0->size;
+    size_t end1          = r1->offset + r1->size;
     bool spatial_overlap = (r0->offset < end1) && (r1->offset < end0);
     if (spatial_overlap) {
         cml_timeline_planner_destroy(planner);
@@ -442,18 +548,21 @@ static int test_timeline_solve_overlap(void)
     return 1;
 }
 
-static int test_timeline_peak_usage(void)
-{
+static int test_timeline_peak_usage(void) {
     CMLTimelinePlanner* planner = cml_timeline_planner_create(8);
-    if (!planner) return 0;
+    if (!planner)
+        return 0;
 
     /* Three tensors, two overlap at step 3 */
-    cml_timeline_planner_add(planner, 0, 256, 0, 4);   /* 256 bytes, steps 0-4 */
-    cml_timeline_planner_add(planner, 1, 512, 3, 6);   /* 512 bytes, steps 3-6 */
-    cml_timeline_planner_add(planner, 2, 128, 7, 9);   /* 128 bytes, steps 7-9 */
+    cml_timeline_planner_add(planner, 0, 256, 0, 4); /* 256 bytes, steps 0-4 */
+    cml_timeline_planner_add(planner, 1, 512, 3, 6); /* 512 bytes, steps 3-6 */
+    cml_timeline_planner_add(planner, 2, 128, 7, 9); /* 128 bytes, steps 7-9 */
 
     int ret = cml_timeline_planner_solve(planner);
-    if (ret != 0) { cml_timeline_planner_destroy(planner); return 0; }
+    if (ret != 0) {
+        cml_timeline_planner_destroy(planner);
+        return 0;
+    }
 
     /* Peak usage should be 256 + 512 = 768 (tensors 0 and 1 overlap at steps 3-4) */
     size_t peak = cml_timeline_planner_peak_usage(planner);
@@ -472,10 +581,10 @@ static int test_timeline_peak_usage(void)
     return 1;
 }
 
-static int test_timeline_total_memory(void)
-{
+static int test_timeline_total_memory(void) {
     CMLTimelinePlanner* planner = cml_timeline_planner_create(8);
-    if (!planner) return 0;
+    if (!planner)
+        return 0;
 
     /* Tensor 0 and 1 overlap, tensor 2 does not overlap with either */
     cml_timeline_planner_add(planner, 0, 1024, 0, 5);
@@ -483,7 +592,10 @@ static int test_timeline_total_memory(void)
     cml_timeline_planner_add(planner, 2, 512, 10, 12);
 
     int ret = cml_timeline_planner_solve(planner);
-    if (ret != 0) { cml_timeline_planner_destroy(planner); return 0; }
+    if (ret != 0) {
+        cml_timeline_planner_destroy(planner);
+        return 0;
+    }
 
     size_t total = cml_timeline_planner_total_memory(planner);
 
@@ -504,18 +616,21 @@ static int test_timeline_total_memory(void)
     return 1;
 }
 
-static int test_timeline_sequential(void)
-{
+static int test_timeline_sequential(void) {
     /* Many tensors used sequentially should all share memory */
     CMLTimelinePlanner* planner = cml_timeline_planner_create(32);
-    if (!planner) return 0;
+    if (!planner)
+        return 0;
 
     for (int i = 0; i < 20; i++) {
         cml_timeline_planner_add(planner, i, 256, i * 2, i * 2 + 1);
     }
 
     int ret = cml_timeline_planner_solve(planner);
-    if (ret != 0) { cml_timeline_planner_destroy(planner); return 0; }
+    if (ret != 0) {
+        cml_timeline_planner_destroy(planner);
+        return 0;
+    }
 
     size_t total = cml_timeline_planner_total_memory(planner);
     /* All 20 tensors are non-overlapping and same size (256).
@@ -529,10 +644,10 @@ static int test_timeline_sequential(void)
     return 1;
 }
 
-static int test_timeline_print(void)
-{
+static int test_timeline_print(void) {
     CMLTimelinePlanner* planner = cml_timeline_planner_create(4);
-    if (!planner) return 0;
+    if (!planner)
+        return 0;
 
     cml_timeline_planner_add(planner, 0, 100, 0, 3);
     cml_timeline_planner_add(planner, 1, 200, 2, 5);
@@ -548,9 +663,7 @@ static int test_timeline_print(void)
     return 1;
 }
 
-
-int main(void)
-{
+int main(void) {
     printf("TLSF Allocator Tests\n\n");
 
     printf("[TLSF Core]\n");

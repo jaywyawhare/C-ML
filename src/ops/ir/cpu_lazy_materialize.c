@@ -11,10 +11,12 @@ static uint16_t lz_float_to_fp16(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
     uint32_t sign = (x >> 16) & 0x8000;
-    int32_t exp = ((x >> 23) & 0xFF) - 127 + 15;
+    int32_t exp   = ((x >> 23) & 0xFF) - 127 + 15;
     uint32_t mant = (x >> 13) & 0x3FF;
-    if (exp <= 0) return (uint16_t)sign;
-    if (exp >= 31) return (uint16_t)(sign | 0x7C00);
+    if (exp <= 0)
+        return (uint16_t)sign;
+    if (exp >= 31)
+        return (uint16_t)(sign | 0x7C00);
     return (uint16_t)(sign | ((uint32_t)exp << 10) | mant);
 }
 
@@ -27,52 +29,64 @@ static uint16_t lz_float_to_bf16(float f) {
 static uint8_t lz_float_to_fp8_e4m3(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
-    uint8_t sign = (x >> 24) & 0x80;
-    int32_t exp = ((x >> 23) & 0xFF) - 127 + 7;
+    uint8_t sign  = (x >> 24) & 0x80;
+    int32_t exp   = ((x >> 23) & 0xFF) - 127 + 7;
     uint32_t mant = (x >> 20) & 0x07;
-    if (exp <= 0) return sign;
-    if (exp >= 15) return (uint8_t)(sign | 0x7E);
+    if (exp <= 0)
+        return sign;
+    if (exp >= 15)
+        return (uint8_t)(sign | 0x7E);
     return (uint8_t)(sign | ((uint8_t)exp << 3) | (uint8_t)mant);
 }
 
 static uint8_t lz_float_to_fp8_e5m2(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
-    uint8_t sign = (x >> 24) & 0x80;
-    int32_t exp = ((x >> 23) & 0xFF) - 127 + 15;
+    uint8_t sign  = (x >> 24) & 0x80;
+    int32_t exp   = ((x >> 23) & 0xFF) - 127 + 15;
     uint32_t mant = (x >> 21) & 0x03;
-    if (exp <= 0) return sign;
-    if (exp >= 31) return (uint8_t)(sign | 0x7C);
+    if (exp <= 0)
+        return sign;
+    if (exp >= 31)
+        return (uint8_t)(sign | 0x7C);
     return (uint8_t)(sign | ((uint8_t)exp << 2) | (uint8_t)mant);
 }
 
 static uint8_t lz_float_to_fp8e4m3fnuz(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
-    uint32_t sign_bit = (x >> 31) & 1;
-    int32_t fp32_exp = ((x >> 23) & 0xFF);
+    uint32_t sign_bit  = (x >> 31) & 1;
+    int32_t fp32_exp   = ((x >> 23) & 0xFF);
     uint32_t fp32_mant = x & 0x7FFFFF;
-    if (fp32_exp == 0xFF || (fp32_exp == 0 && fp32_mant == 0)) return 0x00;
-    if (f == 0.0f || f == -0.0f) return 0x00;
-    int32_t exp = fp32_exp - 127 + 8;
+    if (fp32_exp == 0xFF || (fp32_exp == 0 && fp32_mant == 0))
+        return 0x00;
+    if (f == 0.0f || f == -0.0f)
+        return 0x00;
+    int32_t exp   = fp32_exp - 127 + 8;
     uint32_t mant = (fp32_mant >> 20) & 0x07;
-    if (exp <= 0) return 0x00;
-    if (exp >= 16) return (uint8_t)((sign_bit << 7) | 0x7F);
+    if (exp <= 0)
+        return 0x00;
+    if (exp >= 16)
+        return (uint8_t)((sign_bit << 7) | 0x7F);
     return (uint8_t)((sign_bit << 7) | ((uint8_t)exp << 3) | (uint8_t)mant);
 }
 
 static uint8_t lz_float_to_fp8e5m2fnuz(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
-    uint32_t sign_bit = (x >> 31) & 1;
-    int32_t fp32_exp = ((x >> 23) & 0xFF);
+    uint32_t sign_bit  = (x >> 31) & 1;
+    int32_t fp32_exp   = ((x >> 23) & 0xFF);
     uint32_t fp32_mant = x & 0x7FFFFF;
-    if (fp32_exp == 0xFF || (fp32_exp == 0 && fp32_mant == 0)) return 0x00;
-    if (f == 0.0f || f == -0.0f) return 0x00;
-    int32_t exp = fp32_exp - 127 + 16;
+    if (fp32_exp == 0xFF || (fp32_exp == 0 && fp32_mant == 0))
+        return 0x00;
+    if (f == 0.0f || f == -0.0f)
+        return 0x00;
+    int32_t exp   = fp32_exp - 127 + 16;
     uint32_t mant = (fp32_mant >> 21) & 0x03;
-    if (exp <= 0) return 0x00;
-    if (exp >= 32) return (uint8_t)((sign_bit << 7) | 0x7F);
+    if (exp <= 0)
+        return 0x00;
+    if (exp >= 32)
+        return (uint8_t)((sign_bit << 7) | 0x7F);
     return (uint8_t)((sign_bit << 7) | ((uint8_t)exp << 2) | (uint8_t)mant);
 }
 
@@ -151,7 +165,7 @@ int cml_cpu_lazy_const(Tensor* out, const void* data, size_t data_size) {
     if (esz == 0)
         return -1;
     size_t max_b = out->numel * esz;
-    size_t n = data_size < max_b ? data_size : max_b;
+    size_t n     = data_size < max_b ? data_size : max_b;
     memcpy(out->data, data, n);
     if (n < max_b)
         memset((uint8_t*)out->data + n, 0, max_b - n);
@@ -168,9 +182,11 @@ int cml_cpu_lazy_rand_uniform(Tensor* out) {
     if (!out || !out->data)
         return -1;
     CMLRNGState* rng = cml_rng_get_global();
-    if (!rng) return -1;
+    if (!rng)
+        return -1;
     float* tmp = (float*)cml_malloc(out->numel * sizeof(float));
-    if (!tmp) return -1;
+    if (!tmp)
+        return -1;
     cml_rng_uniform(rng, tmp, out->numel);
     for (size_t i = 0; i < out->numel; i++)
         cml_cpu_lazy_store_float_elem(out->data, i, out->dtype, tmp[i]);
@@ -182,9 +198,11 @@ int cml_cpu_lazy_rand_normal(Tensor* out) {
     if (!out || !out->data)
         return -1;
     CMLRNGState* rng = cml_rng_get_global();
-    if (!rng) return -1;
+    if (!rng)
+        return -1;
     float* tmp = (float*)cml_malloc(out->numel * sizeof(float));
-    if (!tmp) return -1;
+    if (!tmp)
+        return -1;
     cml_rng_normal(rng, tmp, out->numel);
     for (size_t i = 0; i < out->numel; i++)
         cml_cpu_lazy_store_float_elem(out->data, i, out->dtype, tmp[i]);
@@ -215,10 +233,12 @@ int cml_cpu_lazy_rand_int(Tensor* out, int low, int high) {
     if (!out || !out->data || high <= low)
         return -1;
     CMLRNGState* rng = cml_rng_get_global();
-    if (!rng) return -1;
+    if (!rng)
+        return -1;
     uint32_t range = (uint32_t)(high - low);
-    uint32_t* tmp = (uint32_t*)cml_malloc(out->numel * sizeof(uint32_t));
-    if (!tmp) return -1;
+    uint32_t* tmp  = (uint32_t*)cml_malloc(out->numel * sizeof(uint32_t));
+    if (!tmp)
+        return -1;
     cml_rng_uint32(rng, tmp, out->numel);
     for (size_t i = 0; i < out->numel; i++)
         cml_cpu_lazy_store_float_elem(out->data, i, out->dtype,

@@ -17,13 +17,11 @@ typedef struct CMLAMDLLVMCompiler {
 CMLAMDLLVMCompiler* cml_amd_llvm_create(const char* gpu_arch);
 void cml_amd_llvm_free(CMLAMDLLVMCompiler* comp);
 
-int cml_amd_llvm_compile_ir(CMLAMDLLVMCompiler* comp,
-                            const char* ir_source,
-                            void** code_object, size_t* code_size);
+int cml_amd_llvm_compile_ir(CMLAMDLLVMCompiler* comp, const char* ir_source, void** code_object,
+                            size_t* code_size);
 
-int cml_amd_llvm_compile_source(CMLAMDLLVMCompiler* comp,
-                                const char* source,
-                                void** code_object, size_t* code_size);
+int cml_amd_llvm_compile_source(CMLAMDLLVMCompiler* comp, const char* source, void** code_object,
+                                size_t* code_size);
 
 bool cml_amd_llvm_available(void);
 

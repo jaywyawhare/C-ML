@@ -12,7 +12,6 @@
 #include <stdbool.h>
 #include "alloc/cml_allocator.h"
 
-
 static int build_dependency_graph(CMLGraph_t ir) {
     if (!ir)
         return -1;
@@ -62,8 +61,8 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
         node          = node->next;
     }
 
-    int stack_capacity = 256;
-    int stack_top = 0;
+    int stack_capacity    = 256;
+    int stack_top         = 0;
     struct IRNode** stack = cml_malloc((size_t)stack_capacity * sizeof(struct IRNode*));
     if (!stack) {
         LOG_ERROR("Failed to allocate DCE stack; marking all nodes as used");
@@ -126,7 +125,7 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
                         producer->is_used = true;
                         continue;
                     }
-                    stack = new_stack;
+                    stack          = new_stack;
                     stack_capacity = new_capacity;
                 }
                 stack[stack_top++] = producer;
@@ -361,8 +360,8 @@ static char* find_other_input(struct IRNode* producer, struct IRNode* consumer) 
 static void mark_fused_pair(struct IRNode* n1, struct IRNode* n2, FusedKernel* kernel,
                             FusionType fusion_type) {
     n1->fused_kernel = n2->fused_kernel = kernel;
-    n1->is_fused     = n2->is_fused     = true;
-    n1->fusion_type  = n2->fusion_type  = fusion_type;
+    n1->is_fused = n2->is_fused = true;
+    n1->fusion_type = n2->fusion_type = fusion_type;
 }
 
 static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType fusion_type) {
@@ -376,7 +375,7 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
         // MUL + ADD -> FMA: a * b + c
         char* other_input = find_other_input(node1, node2);
         if (other_input && node1->num_inputs >= 2) {
-    
+
             struct IRNode* ops[] = {node1, node2};
             FusedKernel* kernel  = create_fused_kernel(ops, 2, FUSION_FMA);
             if (kernel) {

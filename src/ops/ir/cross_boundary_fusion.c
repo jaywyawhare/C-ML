@@ -20,22 +20,26 @@
  * one-hot target to produce gradients via SUB.
  */
 static bool match_softmax_sequence(struct IRNode* node, int* chain_len) {
-    if (!node || node->type != UOP_EXP) return false;
+    if (!node || node->type != UOP_EXP)
+        return false;
 
     struct IRNode* sum_node = NULL;
     if (node->use_count == 1 && node->users)
         sum_node = node->users[0];
-    if (!sum_node || sum_node->type != UOP_SUM) return false;
+    if (!sum_node || sum_node->type != UOP_SUM)
+        return false;
 
     struct IRNode* recip_node = NULL;
     if (sum_node->use_count >= 1 && sum_node->users)
         recip_node = sum_node->users[0];
-    if (!recip_node || recip_node->type != UOP_RECIP) return false;
+    if (!recip_node || recip_node->type != UOP_RECIP)
+        return false;
 
     struct IRNode* mul_node = NULL;
     if (recip_node->use_count >= 1 && recip_node->users)
         mul_node = recip_node->users[0];
-    if (!mul_node || mul_node->type != UOP_MUL) return false;
+    if (!mul_node || mul_node->type != UOP_MUL)
+        return false;
 
     *chain_len = 4;
     return true;
@@ -49,12 +53,14 @@ static bool match_softmax_sequence(struct IRNode* node, int* chain_len) {
  * Detection: MEAN -> SUB chain with the SUB feeding into SQUARE -> MEAN -> RSQRT.
  */
 static bool match_layernorm_sequence(struct IRNode* node, int* chain_len) {
-    if (!node || node->type != UOP_MEAN) return false;
+    if (!node || node->type != UOP_MEAN)
+        return false;
 
     struct IRNode* sub = NULL;
     if (node->use_count >= 1 && node->users)
         sub = node->users[0];
-    if (!sub || sub->type != UOP_SUB) return false;
+    if (!sub || sub->type != UOP_SUB)
+        return false;
 
     struct IRNode* sq = NULL;
     if (sub->use_count >= 1 && sub->users) {
@@ -65,12 +71,14 @@ static bool match_layernorm_sequence(struct IRNode* node, int* chain_len) {
             }
         }
     }
-    if (!sq) return false;
+    if (!sq)
+        return false;
 
     struct IRNode* var_mean = NULL;
     if (sq->use_count >= 1 && sq->users)
         var_mean = sq->users[0];
-    if (!var_mean || var_mean->type != UOP_MEAN) return false;
+    if (!var_mean || var_mean->type != UOP_MEAN)
+        return false;
 
     *chain_len = 4;
     return true;
@@ -88,7 +96,8 @@ static bool match_layernorm_sequence(struct IRNode* node, int* chain_len) {
  * Detection: MUL node whose one input feeds through SIGMOID.
  */
 static bool match_gelu_sequence(struct IRNode* node, int* chain_len) {
-    if (!node) return false;
+    if (!node)
+        return false;
 
     if (node->type == UOP_QUICK_GELU) {
         *chain_len = 1;
@@ -100,9 +109,11 @@ static bool match_gelu_sequence(struct IRNode* node, int* chain_len) {
         return true;
     }
 
-    if (node->type != UOP_MUL) return false;
+    if (node->type != UOP_MUL)
+        return false;
 
-    if (node->num_inputs < 2 || !node->inputs) return false;
+    if (node->num_inputs < 2 || !node->inputs)
+        return false;
 
     /* Check if either input is a SIGMOID node in the graph */
     for (int i = 0; i < node->num_inputs; i++) {
@@ -132,11 +143,13 @@ static bool match_gelu_sequence(struct IRNode* node, int* chain_len) {
  * intermediate, we can keep it in registers.
  */
 static bool output_only_consumed_by_backward(struct IRNode* fwd_node) {
-    if (!fwd_node || !fwd_node->output) return false;
+    if (!fwd_node || !fwd_node->output)
+        return false;
 
     for (int i = 0; i < fwd_node->use_count; i++) {
         struct IRNode* user = fwd_node->users[i];
-        if (!user) continue;
+        if (!user)
+            continue;
         if (!user->backward_node && !user->forward_node) {
             /* User is neither marked as backward nor has forward link:
              * it's another forward consumer -> cannot fuse */
@@ -150,7 +163,8 @@ static bool output_only_consumed_by_backward(struct IRNode* fwd_node) {
 static int find_node_index_in_schedule(CMLFusionSchedule* sched, struct IRNode* node) {
     for (int g = 0; g < sched->num_groups; g++) {
         CMLFusionGroup* group = sched->groups[g];
-        if (!group) continue;
+        if (!group)
+            continue;
         for (int n = 0; n < group->num_nodes; n++) {
             if (group->nodes[n] == node)
                 return g * 1000 + n;
@@ -159,30 +173,32 @@ static int find_node_index_in_schedule(CMLFusionSchedule* sched, struct IRNode* 
     return -1;
 }
 
-int cml_cross_boundary_analyze(CMLFusionSchedule* sched,
-                               CMLCrossBoundaryFusion** out, int* count) {
-    if (!sched || !out || !count) return -1;
+int cml_cross_boundary_analyze(CMLFusionSchedule* sched, CMLCrossBoundaryFusion** out, int* count) {
+    if (!sched || !out || !count)
+        return -1;
 
-    *out = NULL;
+    *out   = NULL;
     *count = 0;
 
-    int capacity = 16;
-    CMLCrossBoundaryFusion* fusions = cml_calloc((size_t)capacity,
-                                             sizeof(CMLCrossBoundaryFusion));
-    if (!fusions) return -1;
+    int capacity                    = 16;
+    CMLCrossBoundaryFusion* fusions = cml_calloc((size_t)capacity, sizeof(CMLCrossBoundaryFusion));
+    if (!fusions)
+        return -1;
 
     int found = 0;
 
     for (int g = 0; g < sched->num_groups; g++) {
         CMLFusionGroup* group = sched->groups[g];
-        if (!group) continue;
+        if (!group)
+            continue;
 
         for (int n = 0; n < group->num_nodes; n++) {
             struct IRNode* node = group->nodes[n];
-            if (!node || node->is_fused) continue;
+            if (!node || node->is_fused)
+                continue;
 
             int chain_len = 0;
-            int pattern = -1;
+            int pattern   = -1;
 
             if (match_softmax_sequence(node, &chain_len)) {
                 pattern = CBF_SOFTMAX_CE;
@@ -192,9 +208,11 @@ int cml_cross_boundary_analyze(CMLFusionSchedule* sched,
                 pattern = CBF_GELU_BWD;
             }
 
-            if (pattern < 0) continue;
+            if (pattern < 0)
+                continue;
 
-            if (!output_only_consumed_by_backward(node)) continue;
+            if (!output_only_consumed_by_backward(node))
+                continue;
 
             /* Find the backward consumer */
             int bwd_idx = -1;
@@ -204,31 +222,35 @@ int cml_cross_boundary_analyze(CMLFusionSchedule* sched,
                 bwd_idx = find_node_index_in_schedule(sched, node->users[0]);
             }
 
-            if (bwd_idx < 0) continue;
+            if (bwd_idx < 0)
+                continue;
 
             if (found >= capacity) {
                 capacity *= 2;
-                CMLCrossBoundaryFusion* tmp = cml_realloc(fusions,
-                    (size_t)capacity * sizeof(CMLCrossBoundaryFusion));
-                if (!tmp) { cml_free(fusions); return -1; }
+                CMLCrossBoundaryFusion* tmp =
+                    cml_realloc(fusions, (size_t)capacity * sizeof(CMLCrossBoundaryFusion));
+                if (!tmp) {
+                    cml_free(fusions);
+                    return -1;
+                }
                 fusions = tmp;
             }
 
-            fusions[found].forward_node_idx = g * 1000 + n;
+            fusions[found].forward_node_idx  = g * 1000 + n;
             fusions[found].backward_node_idx = bwd_idx;
-            fusions[found].pattern_type = pattern;
+            fusions[found].pattern_type      = pattern;
             found++;
         }
     }
 
     if (found == 0) {
         cml_free(fusions);
-        *out = NULL;
+        *out   = NULL;
         *count = 0;
         return 0;
     }
 
-    *out = fusions;
+    *out   = fusions;
     *count = found;
 
     LOG_INFO("Cross-boundary analysis: %d fusible patterns found", found);
@@ -242,9 +264,9 @@ int cml_cross_boundary_analyze(CMLFusionSchedule* sched,
  *   - Set fusion metadata so the codegen can emit combined kernels
  *   - Update memory estimates (register-kept intermediates save bandwidth)
  */
-int cml_cross_boundary_fuse(CMLFusionSchedule* sched,
-                            CMLCrossBoundaryFusion* fusions, int count) {
-    if (!sched || !fusions || count <= 0) return -1;
+int cml_cross_boundary_fuse(CMLFusionSchedule* sched, CMLCrossBoundaryFusion* fusions, int count) {
+    if (!sched || !fusions || count <= 0)
+        return -1;
 
     int applied = 0;
 
@@ -252,22 +274,24 @@ int cml_cross_boundary_fuse(CMLFusionSchedule* sched,
         CMLCrossBoundaryFusion* f = &fusions[i];
 
         int fwd_group = f->forward_node_idx / 1000;
-        int fwd_node = f->forward_node_idx % 1000;
+        int fwd_node  = f->forward_node_idx % 1000;
         int bwd_group = f->backward_node_idx / 1000;
-        int bwd_node = f->backward_node_idx % 1000;
+        int bwd_node  = f->backward_node_idx % 1000;
 
         if (fwd_group >= sched->num_groups || bwd_group >= sched->num_groups)
             continue;
 
         CMLFusionGroup* fg = sched->groups[fwd_group];
         CMLFusionGroup* bg = sched->groups[bwd_group];
-        if (!fg || !bg) continue;
+        if (!fg || !bg)
+            continue;
         if (fwd_node >= fg->num_nodes || bwd_node >= bg->num_nodes)
             continue;
 
         struct IRNode* fwd = fg->nodes[fwd_node];
         struct IRNode* bwd = bg->nodes[bwd_node];
-        if (!fwd || !bwd) continue;
+        if (!fwd || !bwd)
+            continue;
 
         FusionType ftype;
         switch (f->pattern_type) {
@@ -284,14 +308,14 @@ int cml_cross_boundary_fuse(CMLFusionSchedule* sched,
             continue;
         }
 
-        fwd->is_fused = true;
+        fwd->is_fused    = true;
         fwd->fusion_type = ftype;
-        bwd->is_fused = true;
+        bwd->is_fused    = true;
         bwd->fusion_type = ftype;
 
         /* Link forward and backward nodes for codegen */
         fwd->backward_node = bwd;
-        bwd->forward_node = fwd;
+        bwd->forward_node  = fwd;
 
         /* Estimate memory savings from register-kept intermediates */
         if (fwd->output) {
@@ -307,14 +331,12 @@ int cml_cross_boundary_fuse(CMLFusionSchedule* sched,
     return applied;
 }
 
-void cml_cross_boundary_fusions_free(CMLCrossBoundaryFusion* fusions) {
-    cml_free(fusions);
-}
+void cml_cross_boundary_fusions_free(CMLCrossBoundaryFusion* fusions) { cml_free(fusions); }
 
-CMLCrossBoundaryStats cml_cross_boundary_stats(const CMLCrossBoundaryFusion* fusions,
-                                               int count) {
+CMLCrossBoundaryStats cml_cross_boundary_stats(const CMLCrossBoundaryFusion* fusions, int count) {
     CMLCrossBoundaryStats stats = {0};
-    if (!fusions || count <= 0) return stats;
+    if (!fusions || count <= 0)
+        return stats;
 
     stats.patterns_found = count;
 

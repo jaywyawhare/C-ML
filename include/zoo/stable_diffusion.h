@@ -66,8 +66,8 @@ Module* cml_zoo_stable_diffusion(const StableDiffusionConfig* config);
 
 typedef struct CMLSDScheduler {
     int num_train_timesteps;
-    float* alphas_cumprod;   /* [num_train_timesteps] */
-    int* timesteps;          /* inference subsequence, descending */
+    float* alphas_cumprod; /* [num_train_timesteps] */
+    int* timesteps;        /* inference subsequence, descending */
     int num_inference_steps;
 } CMLSDScheduler;
 
@@ -81,8 +81,8 @@ int cml_sd_scheduler_set_steps(CMLSDScheduler* sched, int num_inference_steps);
 /* One deterministic DDIM (eta=0) update, in place on the latent buffer:
  * x0 = (x_t - sqrt(1-a_t)*eps) / sqrt(a_t);
  * x_prev = sqrt(a_prev)*x0 + sqrt(1-a_prev)*eps. */
-int cml_sd_scheduler_step(CMLSDScheduler* sched, const float* eps, float* latent,
-                          size_t numel, int step_index);
+int cml_sd_scheduler_step(CMLSDScheduler* sched, const float* eps, float* latent, size_t numel,
+                          int step_index);
 
 /* Denoising loop: iterates the scheduler over `num_inference_steps`, calling
  * `unet` on the current latent as the noise predictor each step, then applies

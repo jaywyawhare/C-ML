@@ -111,10 +111,10 @@ static void test_pte_roundtrip(void) {
     torch_nn_sequential_add(model, (Module*)torch_nn_linear(4, 2, true));
 
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    opts = torch_options_device(opts, DEVICE_CPU);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts                    = torch_options_device(opts, DEVICE_CPU);
 
-    int shape[] = {1, 4};
+    int shape[]    = {1, 4};
     Tensor* sample = torch_randn(shape, 2, &opts);
 
     TorchPTEExportOptions export_opts = torch_pte_default_export_options();
@@ -153,14 +153,14 @@ static void test_pte_export_without_weights(void) {
     torch_nn_sequential_add(model, (Module*)torch_nn_linear(4, 2, true));
 
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    opts = torch_options_device(opts, DEVICE_CPU);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts                    = torch_options_device(opts, DEVICE_CPU);
 
-    int shape[] = {1, 4};
+    int shape[]    = {1, 4};
     Tensor* sample = torch_randn(shape, 2, &opts);
 
     TorchPTEExportOptions export_opts = torch_pte_default_export_options();
-    export_opts.include_weights = false;
+    export_opts.include_weights       = false;
     REQUIRE(torch_pte_export_module((Module*)model, sample, path, &export_opts) == 0);
 
     CMLPTEModel* pte = torch_pte_load(path);

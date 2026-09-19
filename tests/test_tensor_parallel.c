@@ -10,15 +10,10 @@
 
 #define EPSILON 1e-4f
 
-static bool float_eq(float a, float b) {
-    return fabsf(a - b) < EPSILON;
-}
+static bool float_eq(float a, float b) { return fabsf(a - b) < EPSILON; }
 
 /* C = A @ B^T: A is [M, K], B is [N, K], C is [M, N] */
-static void ref_matmul_transposed(const float* A, int M, int K,
-                                  const float* B, int N,
-                                  float* C)
-{
+static void ref_matmul_transposed(const float* A, int M, int K, const float* B, int N, float* C) {
     for (int i = 0; i < M; i++) {
         for (int j = 0; j < N; j++) {
             float s = 0.0f;
@@ -31,19 +26,18 @@ static void ref_matmul_transposed(const float* A, int M, int K,
 }
 
 static Tensor* make_tensor_2d(const float* data, int rows, int cols) {
-    int shape[2] = {rows, cols};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    int shape[2]     = {rows, cols};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     return tensor_from_data(data, shape, 2, &cfg);
 }
 
 static Tensor* make_tensor_1d(const float* data, int len) {
-    int shape[1] = {len};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    int shape[1]     = {len};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     return tensor_from_data(data, shape, 1, &cfg);
 }
-
 
 static bool test_weight_shard_dim0(void) {
     /*
@@ -57,31 +51,43 @@ static bool test_weight_shard_dim0(void) {
      *   rank0 -> rows 0-1: [[1,2],[3,4]]
      *   rank1 -> rows 2-3: [[5,6],[7,8]]
      */
-    float w_data[] = {1,2, 3,4, 5,6, 7,8};
+    float w_data[] = {1, 2, 3, 4, 5, 6, 7, 8};
     Tensor* weight = make_tensor_2d(w_data, 4, 2);
-    if (!weight) return false;
+    if (!weight)
+        return false;
 
     Tensor* shard0 = cml_tp_shard_weight(weight, 0, 2, 0);
     Tensor* shard1 = cml_tp_shard_weight(weight, 0, 2, 1);
     if (!shard0 || !shard1) {
         tensor_free(weight);
-        if (shard0) tensor_free(shard0);
-        if (shard1) tensor_free(shard1);
+        if (shard0)
+            tensor_free(shard0);
+        if (shard1)
+            tensor_free(shard1);
         return false;
     }
 
     /* Check shapes */
-    if (shard0->shape[0] != 2 || shard0->shape[1] != 2) { tensor_free(weight); tensor_free(shard0); tensor_free(shard1); return false; }
-    if (shard1->shape[0] != 2 || shard1->shape[1] != 2) { tensor_free(weight); tensor_free(shard0); tensor_free(shard1); return false; }
+    if (shard0->shape[0] != 2 || shard0->shape[1] != 2) {
+        tensor_free(weight);
+        tensor_free(shard0);
+        tensor_free(shard1);
+        return false;
+    }
+    if (shard1->shape[0] != 2 || shard1->shape[1] != 2) {
+        tensor_free(weight);
+        tensor_free(shard0);
+        tensor_free(shard1);
+        return false;
+    }
 
     tensor_ensure_executed(shard0);
     tensor_ensure_executed(shard1);
     const float* s0 = (const float*)tensor_data_ptr(shard0);
     const float* s1 = (const float*)tensor_data_ptr(shard1);
 
-    bool ok = float_eq(s0[0], 1) && float_eq(s0[1], 2) &&
-              float_eq(s0[2], 3) && float_eq(s0[3], 4) &&
-              float_eq(s1[0], 5) && float_eq(s1[1], 6) &&
+    bool ok = float_eq(s0[0], 1) && float_eq(s0[1], 2) && float_eq(s0[2], 3) &&
+              float_eq(s0[3], 4) && float_eq(s1[0], 5) && float_eq(s1[1], 6) &&
               float_eq(s1[2], 7) && float_eq(s1[3], 8);
 
     tensor_free(weight);
@@ -100,30 +106,42 @@ static bool test_weight_shard_dim1(void) {
      *   rank0 -> cols 0-1: [[1,2],[5,6]]
      *   rank1 -> cols 2-3: [[3,4],[7,8]]
      */
-    float w_data[] = {1,2,3,4, 5,6,7,8};
+    float w_data[] = {1, 2, 3, 4, 5, 6, 7, 8};
     Tensor* weight = make_tensor_2d(w_data, 2, 4);
-    if (!weight) return false;
+    if (!weight)
+        return false;
 
     Tensor* shard0 = cml_tp_shard_weight(weight, 1, 2, 0);
     Tensor* shard1 = cml_tp_shard_weight(weight, 1, 2, 1);
     if (!shard0 || !shard1) {
         tensor_free(weight);
-        if (shard0) tensor_free(shard0);
-        if (shard1) tensor_free(shard1);
+        if (shard0)
+            tensor_free(shard0);
+        if (shard1)
+            tensor_free(shard1);
         return false;
     }
 
-    if (shard0->shape[0] != 2 || shard0->shape[1] != 2) { tensor_free(weight); tensor_free(shard0); tensor_free(shard1); return false; }
-    if (shard1->shape[0] != 2 || shard1->shape[1] != 2) { tensor_free(weight); tensor_free(shard0); tensor_free(shard1); return false; }
+    if (shard0->shape[0] != 2 || shard0->shape[1] != 2) {
+        tensor_free(weight);
+        tensor_free(shard0);
+        tensor_free(shard1);
+        return false;
+    }
+    if (shard1->shape[0] != 2 || shard1->shape[1] != 2) {
+        tensor_free(weight);
+        tensor_free(shard0);
+        tensor_free(shard1);
+        return false;
+    }
 
     tensor_ensure_executed(shard0);
     tensor_ensure_executed(shard1);
     const float* s0 = (const float*)tensor_data_ptr(shard0);
     const float* s1 = (const float*)tensor_data_ptr(shard1);
 
-    bool ok = float_eq(s0[0], 1) && float_eq(s0[1], 2) &&
-              float_eq(s0[2], 5) && float_eq(s0[3], 6) &&
-              float_eq(s1[0], 3) && float_eq(s1[1], 4) &&
+    bool ok = float_eq(s0[0], 1) && float_eq(s0[1], 2) && float_eq(s0[2], 5) &&
+              float_eq(s0[3], 6) && float_eq(s1[0], 3) && float_eq(s1[1], 4) &&
               float_eq(s1[2], 7) && float_eq(s1[3], 8);
 
     tensor_free(weight);
@@ -132,54 +150,65 @@ static bool test_weight_shard_dim1(void) {
     return ok;
 }
 
-
 static bool test_column_parallel_forward(void) {
     float w_data[] = {
-        1, 0,    /* row 0 */
-        0, 1,    /* row 1 */
-        2, 0,    /* row 2 */
-        0, 2     /* row 3 */
+        1, 0, /* row 0 */
+        0, 1, /* row 1 */
+        2, 0, /* row 2 */
+        0, 2  /* row 3 */
     };
-    float x_data[] = {3, 4};  /* [1, 2] */
+    float x_data[] = {3, 4}; /* [1, 2] */
 
     Tensor* weight = make_tensor_2d(w_data, 4, 2);
     Tensor* input  = make_tensor_2d(x_data, 1, 2);
-    if (!weight || !input) return false;
+    if (!weight || !input)
+        return false;
 
     /* Expected full output = [3, 4, 6, 8] */
 
     CMLColumnParallelLinear* cp0 = cml_column_parallel_create(weight, NULL, 2, 0);
     CMLColumnParallelLinear* cp1 = cml_column_parallel_create(weight, NULL, 2, 1);
     if (!cp0 || !cp1) {
-        tensor_free(weight); tensor_free(input);
-        if (cp0) cml_column_parallel_free(cp0);
-        if (cp1) cml_column_parallel_free(cp1);
+        tensor_free(weight);
+        tensor_free(input);
+        if (cp0)
+            cml_column_parallel_free(cp0);
+        if (cp1)
+            cml_column_parallel_free(cp1);
         return false;
     }
 
     /* Each rank's weight should be [2, 2] */
     if (cp0->weight->shape[0] != 2 || cp0->weight->shape[1] != 2) {
-        tensor_free(weight); tensor_free(input);
-        cml_column_parallel_free(cp0); cml_column_parallel_free(cp1);
+        tensor_free(weight);
+        tensor_free(input);
+        cml_column_parallel_free(cp0);
+        cml_column_parallel_free(cp1);
         return false;
     }
 
     Tensor* out0 = cml_column_parallel_forward(cp0, input);
     Tensor* out1 = cml_column_parallel_forward(cp1, input);
     if (!out0 || !out1) {
-        tensor_free(weight); tensor_free(input);
-        cml_column_parallel_free(cp0); cml_column_parallel_free(cp1);
-        if (out0) tensor_free(out0);
-        if (out1) tensor_free(out1);
+        tensor_free(weight);
+        tensor_free(input);
+        cml_column_parallel_free(cp0);
+        cml_column_parallel_free(cp1);
+        if (out0)
+            tensor_free(out0);
+        if (out1)
+            tensor_free(out1);
         return false;
     }
 
     /* out0 shape should be [1, 2], out1 shape should be [1, 2] */
-    if (out0->shape[0] != 1 || out0->shape[1] != 2 ||
-        out1->shape[0] != 1 || out1->shape[1] != 2) {
-        tensor_free(weight); tensor_free(input);
-        cml_column_parallel_free(cp0); cml_column_parallel_free(cp1);
-        tensor_free(out0); tensor_free(out1);
+    if (out0->shape[0] != 1 || out0->shape[1] != 2 || out1->shape[0] != 1 || out1->shape[1] != 2) {
+        tensor_free(weight);
+        tensor_free(input);
+        cml_column_parallel_free(cp0);
+        cml_column_parallel_free(cp1);
+        tensor_free(out0);
+        tensor_free(out1);
         return false;
     }
 
@@ -190,8 +219,8 @@ static bool test_column_parallel_forward(void) {
 
     /* Rank 0: weight rows 0,1 -> [1,0;0,1] -> out = [3, 4] */
     /* Rank 1: weight rows 2,3 -> [2,0;0,2] -> out = [6, 8] */
-    bool ok = float_eq(r0[0], 3.0f) && float_eq(r0[1], 4.0f) &&
-              float_eq(r1[0], 6.0f) && float_eq(r1[1], 8.0f);
+    bool ok = float_eq(r0[0], 3.0f) && float_eq(r0[1], 4.0f) && float_eq(r1[0], 6.0f) &&
+              float_eq(r1[1], 8.0f);
 
     tensor_free(weight);
     tensor_free(input);
@@ -202,26 +231,29 @@ static bool test_column_parallel_forward(void) {
     return ok;
 }
 
-
 static bool test_row_parallel_forward_allreduce(void) {
     float w_data[] = {
-        1, 2, 3, 4,  /* row 0 of W */
-        5, 6, 7, 8   /* row 1 of W */
+        1, 2, 3, 4, /* row 0 of W */
+        5, 6, 7, 8  /* row 1 of W */
     };
-    float x_data[] = {1, 1, 1, 1};  /* [1, 4] */
+    float x_data[] = {1, 1, 1, 1}; /* [1, 4] */
 
     Tensor* weight = make_tensor_2d(w_data, 2, 4);
     Tensor* input  = make_tensor_2d(x_data, 1, 4);
-    if (!weight || !input) return false;
+    if (!weight || !input)
+        return false;
 
     /* Full output = input @ W^T = [1+2+3+4, 5+6+7+8] = [10, 26] */
 
     CMLRowParallelLinear* rp0 = cml_row_parallel_create(weight, NULL, 2, 0);
     CMLRowParallelLinear* rp1 = cml_row_parallel_create(weight, NULL, 2, 1);
     if (!rp0 || !rp1) {
-        tensor_free(weight); tensor_free(input);
-        if (rp0) cml_row_parallel_free(rp0);
-        if (rp1) cml_row_parallel_free(rp1);
+        tensor_free(weight);
+        tensor_free(input);
+        if (rp0)
+            cml_row_parallel_free(rp0);
+        if (rp1)
+            cml_row_parallel_free(rp1);
         return false;
     }
 
@@ -229,25 +261,35 @@ static bool test_row_parallel_forward_allreduce(void) {
     /* Rank 1 gets cols 2-3: W_shard1 = [[3,4],[7,8]], input_shard1 = [1,1] */
 
     /* Create input shards for each rank */
-    float x0_data[] = {1, 1};  /* first 2 features */
-    float x1_data[] = {1, 1};  /* last 2 features */
-    Tensor* in0 = make_tensor_2d(x0_data, 1, 2);
-    Tensor* in1 = make_tensor_2d(x1_data, 1, 2);
+    float x0_data[] = {1, 1}; /* first 2 features */
+    float x1_data[] = {1, 1}; /* last 2 features */
+    Tensor* in0     = make_tensor_2d(x0_data, 1, 2);
+    Tensor* in1     = make_tensor_2d(x1_data, 1, 2);
     if (!in0 || !in1) {
-        tensor_free(weight); tensor_free(input);
-        cml_row_parallel_free(rp0); cml_row_parallel_free(rp1);
-        if (in0) tensor_free(in0);
-        if (in1) tensor_free(in1);
+        tensor_free(weight);
+        tensor_free(input);
+        cml_row_parallel_free(rp0);
+        cml_row_parallel_free(rp1);
+        if (in0)
+            tensor_free(in0);
+        if (in1)
+            tensor_free(in1);
         return false;
     }
 
     Tensor* out0 = cml_row_parallel_forward(rp0, in0);
     Tensor* out1 = cml_row_parallel_forward(rp1, in1);
     if (!out0 || !out1) {
-        tensor_free(weight); tensor_free(input); tensor_free(in0); tensor_free(in1);
-        cml_row_parallel_free(rp0); cml_row_parallel_free(rp1);
-        if (out0) tensor_free(out0);
-        if (out1) tensor_free(out1);
+        tensor_free(weight);
+        tensor_free(input);
+        tensor_free(in0);
+        tensor_free(in1);
+        cml_row_parallel_free(rp0);
+        cml_row_parallel_free(rp1);
+        if (out0)
+            tensor_free(out0);
+        if (out1)
+            tensor_free(out1);
         return false;
     }
 
@@ -259,29 +301,33 @@ static bool test_row_parallel_forward_allreduce(void) {
     const float* p0 = (const float*)tensor_data_ptr(out0);
     const float* p1 = (const float*)tensor_data_ptr(out1);
 
-    bool partial_ok = float_eq(p0[0], 3.0f) && float_eq(p0[1], 11.0f) &&
-                      float_eq(p1[0], 7.0f) && float_eq(p1[1], 15.0f);
+    bool partial_ok = float_eq(p0[0], 3.0f) && float_eq(p0[1], 11.0f) && float_eq(p1[0], 7.0f) &&
+                      float_eq(p1[1], 15.0f);
     if (!partial_ok) {
-        printf("\n    Partial mismatch: rank0=[%.1f,%.1f] rank1=[%.1f,%.1f]\n",
-               p0[0], p0[1], p1[0], p1[1]);
+        printf("\n    Partial mismatch: rank0=[%.1f,%.1f] rank1=[%.1f,%.1f]\n", p0[0], p0[1], p1[0],
+               p1[1]);
     }
 
     /* All-reduce sum: [3+7, 11+15] = [10, 26] */
     Tensor* partials[] = {out0, out1};
-    Tensor* reduced = cml_tp_all_reduce_sum(partials, 2);
+    Tensor* reduced    = cml_tp_all_reduce_sum(partials, 2);
     if (!reduced) {
-        tensor_free(weight); tensor_free(input); tensor_free(in0); tensor_free(in1);
-        cml_row_parallel_free(rp0); cml_row_parallel_free(rp1);
-        tensor_free(out0); tensor_free(out1);
+        tensor_free(weight);
+        tensor_free(input);
+        tensor_free(in0);
+        tensor_free(in1);
+        cml_row_parallel_free(rp0);
+        cml_row_parallel_free(rp1);
+        tensor_free(out0);
+        tensor_free(out1);
         return false;
     }
 
     tensor_ensure_executed(reduced);
     const float* rdata = (const float*)tensor_data_ptr(reduced);
-    bool reduce_ok = float_eq(rdata[0], 10.0f) && float_eq(rdata[1], 26.0f);
+    bool reduce_ok     = float_eq(rdata[0], 10.0f) && float_eq(rdata[1], 26.0f);
     if (!reduce_ok) {
-        printf("\n    Reduced mismatch: [%.1f, %.1f] expected [10.0, 26.0]\n",
-               rdata[0], rdata[1]);
+        printf("\n    Reduced mismatch: [%.1f, %.1f] expected [10.0, 26.0]\n", rdata[0], rdata[1]);
     }
 
     tensor_free(weight);
@@ -296,32 +342,26 @@ static bool test_row_parallel_forward_allreduce(void) {
     return partial_ok && reduce_ok;
 }
 
-
 static bool test_full_tp_simulation(void) {
     /* W1: [4, 2] (out=4, in=2) -- column-parallel splits output to 2 per rank */
-    float w1_data[] = {
-        1, 0,
-        0, 1,
-        1, 1,
-        2, -1
-    };
+    float w1_data[] = {1, 0, 0, 1, 1, 1, 2, -1};
 
     /* W2: [2, 4] (out=2, in=4) -- row-parallel splits input to 2 per rank */
-    float w2_data[] = {
-        1, 0, 1, 0,
-        0, 1, 0, 1
-    };
+    float w2_data[] = {1, 0, 1, 0, 0, 1, 0, 1};
 
     /* Input: [1, 2] */
     float x_data[] = {2, 3};
 
-    Tensor* W1 = make_tensor_2d(w1_data, 4, 2);
-    Tensor* W2 = make_tensor_2d(w2_data, 2, 4);
+    Tensor* W1    = make_tensor_2d(w1_data, 4, 2);
+    Tensor* W2    = make_tensor_2d(w2_data, 2, 4);
     Tensor* input = make_tensor_2d(x_data, 1, 2);
     if (!W1 || !W2 || !input) {
-        if (W1) tensor_free(W1);
-        if (W2) tensor_free(W2);
-        if (input) tensor_free(input);
+        if (W1)
+            tensor_free(W1);
+        if (W2)
+            tensor_free(W2);
+        if (input)
+            tensor_free(input);
         return false;
     }
 
@@ -348,9 +388,13 @@ static bool test_full_tp_simulation(void) {
     CMLColumnParallelLinear* cp0 = cml_column_parallel_create(W1, NULL, 2, 0);
     CMLColumnParallelLinear* cp1 = cml_column_parallel_create(W1, NULL, 2, 1);
     if (!cp0 || !cp1) {
-        tensor_free(W1); tensor_free(W2); tensor_free(input);
-        if (cp0) cml_column_parallel_free(cp0);
-        if (cp1) cml_column_parallel_free(cp1);
+        tensor_free(W1);
+        tensor_free(W2);
+        tensor_free(input);
+        if (cp0)
+            cml_column_parallel_free(cp0);
+        if (cp1)
+            cml_column_parallel_free(cp1);
         return false;
     }
 
@@ -358,10 +402,15 @@ static bool test_full_tp_simulation(void) {
     Tensor* h0 = cml_column_parallel_forward(cp0, input);
     Tensor* h1 = cml_column_parallel_forward(cp1, input);
     if (!h0 || !h1) {
-        tensor_free(W1); tensor_free(W2); tensor_free(input);
-        cml_column_parallel_free(cp0); cml_column_parallel_free(cp1);
-        if (h0) tensor_free(h0);
-        if (h1) tensor_free(h1);
+        tensor_free(W1);
+        tensor_free(W2);
+        tensor_free(input);
+        cml_column_parallel_free(cp0);
+        cml_column_parallel_free(cp1);
+        if (h0)
+            tensor_free(h0);
+        if (h1)
+            tensor_free(h1);
         return false;
     }
 
@@ -369,11 +418,17 @@ static bool test_full_tp_simulation(void) {
     CMLRowParallelLinear* rp0 = cml_row_parallel_create(W2, NULL, 2, 0);
     CMLRowParallelLinear* rp1 = cml_row_parallel_create(W2, NULL, 2, 1);
     if (!rp0 || !rp1) {
-        tensor_free(W1); tensor_free(W2); tensor_free(input);
-        cml_column_parallel_free(cp0); cml_column_parallel_free(cp1);
-        tensor_free(h0); tensor_free(h1);
-        if (rp0) cml_row_parallel_free(rp0);
-        if (rp1) cml_row_parallel_free(rp1);
+        tensor_free(W1);
+        tensor_free(W2);
+        tensor_free(input);
+        cml_column_parallel_free(cp0);
+        cml_column_parallel_free(cp1);
+        tensor_free(h0);
+        tensor_free(h1);
+        if (rp0)
+            cml_row_parallel_free(rp0);
+        if (rp1)
+            cml_row_parallel_free(rp1);
         return false;
     }
 
@@ -381,24 +436,37 @@ static bool test_full_tp_simulation(void) {
     Tensor* o0 = cml_row_parallel_forward(rp0, h0);
     Tensor* o1 = cml_row_parallel_forward(rp1, h1);
     if (!o0 || !o1) {
-        tensor_free(W1); tensor_free(W2); tensor_free(input);
-        cml_column_parallel_free(cp0); cml_column_parallel_free(cp1);
-        tensor_free(h0); tensor_free(h1);
-        cml_row_parallel_free(rp0); cml_row_parallel_free(rp1);
-        if (o0) tensor_free(o0);
-        if (o1) tensor_free(o1);
+        tensor_free(W1);
+        tensor_free(W2);
+        tensor_free(input);
+        cml_column_parallel_free(cp0);
+        cml_column_parallel_free(cp1);
+        tensor_free(h0);
+        tensor_free(h1);
+        cml_row_parallel_free(rp0);
+        cml_row_parallel_free(rp1);
+        if (o0)
+            tensor_free(o0);
+        if (o1)
+            tensor_free(o1);
         return false;
     }
 
     /* All-reduce sum the two partial outputs */
-    Tensor* partials[] = {o0, o1};
+    Tensor* partials[]   = {o0, o1};
     Tensor* final_output = cml_tp_all_reduce_sum(partials, 2);
     if (!final_output) {
-        tensor_free(W1); tensor_free(W2); tensor_free(input);
-        cml_column_parallel_free(cp0); cml_column_parallel_free(cp1);
-        tensor_free(h0); tensor_free(h1);
-        cml_row_parallel_free(rp0); cml_row_parallel_free(rp1);
-        tensor_free(o0); tensor_free(o1);
+        tensor_free(W1);
+        tensor_free(W2);
+        tensor_free(input);
+        cml_column_parallel_free(cp0);
+        cml_column_parallel_free(cp1);
+        tensor_free(h0);
+        tensor_free(h1);
+        cml_row_parallel_free(rp0);
+        cml_row_parallel_free(rp1);
+        tensor_free(o0);
+        tensor_free(o1);
         return false;
     }
 
@@ -407,8 +475,8 @@ static bool test_full_tp_simulation(void) {
 
     bool ok = float_eq(fdata[0], ref_output[0]) && float_eq(fdata[1], ref_output[1]);
     if (!ok) {
-        printf("\n    Full TP mismatch: got [%.2f, %.2f] expected [%.2f, %.2f]\n",
-               fdata[0], fdata[1], ref_output[0], ref_output[1]);
+        printf("\n    Full TP mismatch: got [%.2f, %.2f] expected [%.2f, %.2f]\n", fdata[0],
+               fdata[1], ref_output[0], ref_output[1]);
     }
 
     tensor_free(W1);
@@ -426,14 +494,8 @@ static bool test_full_tp_simulation(void) {
     return ok;
 }
 
-
 static bool test_column_parallel_with_bias(void) {
-    float w_data[] = {
-        1, 0,
-        0, 1,
-        2, 0,
-        0, 2
-    };
+    float w_data[] = {1, 0, 0, 1, 2, 0, 0, 2};
     float b_data[] = {10, 20, 30, 40};
     float x_data[] = {1, 1};
 
@@ -441,28 +503,40 @@ static bool test_column_parallel_with_bias(void) {
     Tensor* bias   = make_tensor_1d(b_data, 4);
     Tensor* input  = make_tensor_2d(x_data, 1, 2);
     if (!weight || !bias || !input) {
-        if (weight) tensor_free(weight);
-        if (bias) tensor_free(bias);
-        if (input) tensor_free(input);
+        if (weight)
+            tensor_free(weight);
+        if (bias)
+            tensor_free(bias);
+        if (input)
+            tensor_free(input);
         return false;
     }
 
     CMLColumnParallelLinear* cp0 = cml_column_parallel_create(weight, bias, 2, 0);
     CMLColumnParallelLinear* cp1 = cml_column_parallel_create(weight, bias, 2, 1);
     if (!cp0 || !cp1) {
-        tensor_free(weight); tensor_free(bias); tensor_free(input);
-        if (cp0) cml_column_parallel_free(cp0);
-        if (cp1) cml_column_parallel_free(cp1);
+        tensor_free(weight);
+        tensor_free(bias);
+        tensor_free(input);
+        if (cp0)
+            cml_column_parallel_free(cp0);
+        if (cp1)
+            cml_column_parallel_free(cp1);
         return false;
     }
 
     Tensor* out0 = cml_column_parallel_forward(cp0, input);
     Tensor* out1 = cml_column_parallel_forward(cp1, input);
     if (!out0 || !out1) {
-        tensor_free(weight); tensor_free(bias); tensor_free(input);
-        cml_column_parallel_free(cp0); cml_column_parallel_free(cp1);
-        if (out0) tensor_free(out0);
-        if (out1) tensor_free(out1);
+        tensor_free(weight);
+        tensor_free(bias);
+        tensor_free(input);
+        cml_column_parallel_free(cp0);
+        cml_column_parallel_free(cp1);
+        if (out0)
+            tensor_free(out0);
+        if (out1)
+            tensor_free(out1);
         return false;
     }
 
@@ -475,8 +549,8 @@ static bool test_column_parallel_with_bias(void) {
      * matmul: [1, 1] + [10, 20] = [11, 21] */
     /* Rank 1: W=[[2,0],[0,2]], b=[30,40], input=[1,1]
      * matmul: [2, 2] + [30, 40] = [32, 42] */
-    bool ok = float_eq(r0[0], 11.0f) && float_eq(r0[1], 21.0f) &&
-              float_eq(r1[0], 32.0f) && float_eq(r1[1], 42.0f);
+    bool ok = float_eq(r0[0], 11.0f) && float_eq(r0[1], 21.0f) && float_eq(r1[0], 32.0f) &&
+              float_eq(r1[1], 42.0f);
 
     tensor_free(weight);
     tensor_free(bias);
@@ -488,7 +562,6 @@ static bool test_column_parallel_with_bias(void) {
     return ok;
 }
 
-
 static bool test_all_reduce_sum(void) {
     float a_data[] = {1, 2, 3, 4, 5, 6};
     float b_data[] = {10, 20, 30, 40, 50, 60};
@@ -498,16 +571,21 @@ static bool test_all_reduce_sum(void) {
     Tensor* b = make_tensor_2d(b_data, 2, 3);
     Tensor* c = make_tensor_2d(c_data, 2, 3);
     if (!a || !b || !c) {
-        if (a) tensor_free(a);
-        if (b) tensor_free(b);
-        if (c) tensor_free(c);
+        if (a)
+            tensor_free(a);
+        if (b)
+            tensor_free(b);
+        if (c)
+            tensor_free(c);
         return false;
     }
 
     Tensor* partials[] = {a, b, c};
-    Tensor* result = cml_tp_all_reduce_sum(partials, 3);
+    Tensor* result     = cml_tp_all_reduce_sum(partials, 3);
     if (!result) {
-        tensor_free(a); tensor_free(b); tensor_free(c);
+        tensor_free(a);
+        tensor_free(b);
+        tensor_free(c);
         return false;
     }
 
@@ -525,21 +603,18 @@ static bool test_all_reduce_sum(void) {
     return ok;
 }
 
-
 static bool test_column_parallel_batch(void) {
     /* Weight [4, 2], batch of 3 inputs [3, 2] */
-    float w_data[] = {1,0, 0,1, 1,1, -1,1};
-    float x_data[] = {
-        1, 0,
-        0, 1,
-        2, 3
-    };
+    float w_data[] = {1, 0, 0, 1, 1, 1, -1, 1};
+    float x_data[] = {1, 0, 0, 1, 2, 3};
 
     Tensor* weight = make_tensor_2d(w_data, 4, 2);
     Tensor* input  = make_tensor_2d(x_data, 3, 2);
     if (!weight || !input) {
-        if (weight) tensor_free(weight);
-        if (input) tensor_free(input);
+        if (weight)
+            tensor_free(weight);
+        if (input)
+            tensor_free(input);
         return false;
     }
 
@@ -552,19 +627,26 @@ static bool test_column_parallel_batch(void) {
     CMLColumnParallelLinear* cp0 = cml_column_parallel_create(weight, NULL, 2, 0);
     CMLColumnParallelLinear* cp1 = cml_column_parallel_create(weight, NULL, 2, 1);
     if (!cp0 || !cp1) {
-        tensor_free(weight); tensor_free(input);
-        if (cp0) cml_column_parallel_free(cp0);
-        if (cp1) cml_column_parallel_free(cp1);
+        tensor_free(weight);
+        tensor_free(input);
+        if (cp0)
+            cml_column_parallel_free(cp0);
+        if (cp1)
+            cml_column_parallel_free(cp1);
         return false;
     }
 
     Tensor* out0 = cml_column_parallel_forward(cp0, input);
     Tensor* out1 = cml_column_parallel_forward(cp1, input);
     if (!out0 || !out1) {
-        tensor_free(weight); tensor_free(input);
-        cml_column_parallel_free(cp0); cml_column_parallel_free(cp1);
-        if (out0) tensor_free(out0);
-        if (out1) tensor_free(out1);
+        tensor_free(weight);
+        tensor_free(input);
+        cml_column_parallel_free(cp0);
+        cml_column_parallel_free(cp1);
+        if (out0)
+            tensor_free(out0);
+        if (out1)
+            tensor_free(out1);
         return false;
     }
 
@@ -573,11 +655,13 @@ static bool test_column_parallel_batch(void) {
     /* out1 [3,2]: rank1 gets W rows 2,3 -> [[1,1],[-1,1]]
      * [1,-1], [1,1], [5,1] */
 
-    if (out0->shape[0] != 3 || out0->shape[1] != 2 ||
-        out1->shape[0] != 3 || out1->shape[1] != 2) {
-        tensor_free(weight); tensor_free(input);
-        cml_column_parallel_free(cp0); cml_column_parallel_free(cp1);
-        tensor_free(out0); tensor_free(out1);
+    if (out0->shape[0] != 3 || out0->shape[1] != 2 || out1->shape[0] != 3 || out1->shape[1] != 2) {
+        tensor_free(weight);
+        tensor_free(input);
+        cml_column_parallel_free(cp0);
+        cml_column_parallel_free(cp1);
+        tensor_free(out0);
+        tensor_free(out1);
         return false;
     }
 
@@ -587,14 +671,14 @@ static bool test_column_parallel_batch(void) {
     const float* r1 = (const float*)tensor_data_ptr(out1);
 
     bool ok = /* row 0 */
-              float_eq(r0[0], 1.0f) && float_eq(r0[1], 0.0f) &&
-              float_eq(r1[0], 1.0f) && float_eq(r1[1], -1.0f) &&
-              /* row 1 */
-              float_eq(r0[2], 0.0f) && float_eq(r0[3], 1.0f) &&
-              float_eq(r1[2], 1.0f) && float_eq(r1[3], 1.0f) &&
-              /* row 2 */
-              float_eq(r0[4], 2.0f) && float_eq(r0[5], 3.0f) &&
-              float_eq(r1[4], 5.0f) && float_eq(r1[5], 1.0f);
+        float_eq(r0[0], 1.0f) && float_eq(r0[1], 0.0f) && float_eq(r1[0], 1.0f) &&
+        float_eq(r1[1], -1.0f) &&
+        /* row 1 */
+        float_eq(r0[2], 0.0f) && float_eq(r0[3], 1.0f) && float_eq(r1[2], 1.0f) &&
+        float_eq(r1[3], 1.0f) &&
+        /* row 2 */
+        float_eq(r0[4], 2.0f) && float_eq(r0[5], 3.0f) && float_eq(r1[4], 5.0f) &&
+        float_eq(r1[5], 1.0f);
 
     tensor_free(weight);
     tensor_free(input);
@@ -604,7 +688,6 @@ static bool test_column_parallel_batch(void) {
     tensor_free(out1);
     return ok;
 }
-
 
 int main(void) {
     printf("Tensor Parallel Tests\n\n");

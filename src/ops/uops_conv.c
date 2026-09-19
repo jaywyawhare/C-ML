@@ -36,32 +36,29 @@ static Tensor* uop_pool2d(Tensor* input, Pool2DParams* params, UOpType type) {
         CML_ERR_NULL("NULL input to uop_pool2d");
     }
     if (input->ndim != 4) {
-        LOG_ERROR("Pool2D expects 4D input [batch, channels, height, width], got %dD",
-                  input->ndim);
+        LOG_ERROR("Pool2D expects 4D input [batch, channels, height, width], got %dD", input->ndim);
         error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
-    int kernel_h = params->kernel_size[0];
-    int kernel_w = params->kernel_size[1];
-    int stride_h = params->stride[0] > 0 ? params->stride[0] : kernel_h;
-    int stride_w = params->stride[1] > 0 ? params->stride[1] : kernel_w;
-    int padding_h = params->padding[0];
-    int padding_w = params->padding[1];
+    int kernel_h   = params->kernel_size[0];
+    int kernel_w   = params->kernel_size[1];
+    int stride_h   = params->stride[0] > 0 ? params->stride[0] : kernel_h;
+    int stride_w   = params->stride[1] > 0 ? params->stride[1] : kernel_w;
+    int padding_h  = params->padding[0];
+    int padding_w  = params->padding[1];
     int dilation_h = params->dilation[0] > 0 ? params->dilation[0] : 1;
     int dilation_w = params->dilation[1] > 0 ? params->dilation[1] : 1;
-    int in_height = input->shape[2];
-    int in_width = input->shape[3];
+    int in_height  = input->shape[2];
+    int in_width   = input->shape[3];
 
-    if (kernel_h <= 0 || kernel_w <= 0 || stride_h <= 0 || stride_w <= 0 ||
-        dilation_h <= 0 || dilation_w <= 0) {
+    if (kernel_h <= 0 || kernel_w <= 0 || stride_h <= 0 || stride_w <= 0 || dilation_h <= 0 ||
+        dilation_w <= 0) {
         CML_ERR_NULL("uop_pool2d: invalid kernel/stride/dilation");
     }
 
-    int out_height =
-        (in_height + 2 * padding_h - dilation_h * (kernel_h - 1) - 1) / stride_h + 1;
-    int out_width =
-        (in_width + 2 * padding_w - dilation_w * (kernel_w - 1) - 1) / stride_w + 1;
+    int out_height = (in_height + 2 * padding_h - dilation_h * (kernel_h - 1) - 1) / stride_h + 1;
+    int out_width  = (in_width + 2 * padding_w - dilation_w * (kernel_w - 1) - 1) / stride_w + 1;
     if (params->ceil_mode) {
         int numer_h = in_height + 2 * padding_h - dilation_h * (kernel_h - 1) - 1;
         int numer_w = in_width + 2 * padding_w - dilation_w * (kernel_w - 1) - 1;
@@ -80,8 +77,8 @@ static Tensor* uop_pool2d(Tensor* input, Pool2DParams* params, UOpType type) {
     if (!params_copy)
         return NULL;
     memcpy(params_copy, params, sizeof(Pool2DParams));
-    params_copy->stride[0] = stride_h;
-    params_copy->stride[1] = stride_w;
+    params_copy->stride[0]   = stride_h;
+    params_copy->stride[1]   = stride_w;
     params_copy->dilation[0] = dilation_h;
     params_copy->dilation[1] = dilation_w;
 
@@ -102,10 +99,10 @@ static Tensor* uop_pool2d(Tensor* input, Pool2DParams* params, UOpType type) {
         return NULL;
 
     int output_shape[4] = {input->shape[0], input->shape[1], out_height, out_width};
-    node->output_shape = tensor_shape_copy(output_shape, 4);
-    node->output_ndim = 4;
+    node->output_shape  = tensor_shape_copy(output_shape, 4);
+    node->output_ndim   = 4;
     if (input->requires_grad) {
-        node->requires_grad = true;
+        node->requires_grad       = true;
         node->needs_input_grad[0] = true;
     }
 
@@ -121,40 +118,37 @@ static Tensor* uop_conv3d_like(Tensor* input, Tensor* weight, Tensor* bias,
         CML_ERR_NULL("Conv3D expects input [N,C,D,H,W] and weight [O,C,Kd,Kh,Kw]");
     }
 
-    int batch = input->shape[0];
-    int in_channels = input->shape[1];
-    int in_depth = input->shape[2];
-    int in_height = input->shape[3];
-    int in_width = input->shape[4];
-    int out_channels = weight->shape[0];
+    int batch              = input->shape[0];
+    int in_channels        = input->shape[1];
+    int in_depth           = input->shape[2];
+    int in_height          = input->shape[3];
+    int in_width           = input->shape[4];
+    int out_channels       = weight->shape[0];
     int weight_in_channels = weight->shape[1];
-    int kernel_d = weight->shape[2];
-    int kernel_h = weight->shape[3];
-    int kernel_w = weight->shape[4];
+    int kernel_d           = weight->shape[2];
+    int kernel_h           = weight->shape[3];
+    int kernel_w           = weight->shape[4];
 
     if (in_channels != weight_in_channels) {
-        LOG_ERROR("Conv3D: input channels (%d) don't match weight channels (%d)",
-                  in_channels, weight_in_channels);
+        LOG_ERROR("Conv3D: input channels (%d) don't match weight channels (%d)", in_channels,
+                  weight_in_channels);
         error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
 
-    int stride_d = params ? params->stride[0] : 1;
-    int stride_h = params ? params->stride[1] : 1;
-    int stride_w = params ? params->stride[2] : 1;
-    int pad_d = params ? params->padding[0] : 0;
-    int pad_h = params ? params->padding[1] : 0;
-    int pad_w = params ? params->padding[2] : 0;
+    int stride_d   = params ? params->stride[0] : 1;
+    int stride_h   = params ? params->stride[1] : 1;
+    int stride_w   = params ? params->stride[2] : 1;
+    int pad_d      = params ? params->padding[0] : 0;
+    int pad_h      = params ? params->padding[1] : 0;
+    int pad_w      = params ? params->padding[2] : 0;
     int dilation_d = params ? params->dilation[0] : 1;
     int dilation_h = params ? params->dilation[1] : 1;
     int dilation_w = params ? params->dilation[2] : 1;
 
-    int out_depth =
-        (in_depth + 2 * pad_d - dilation_d * (kernel_d - 1) - 1) / stride_d + 1;
-    int out_height =
-        (in_height + 2 * pad_h - dilation_h * (kernel_h - 1) - 1) / stride_h + 1;
-    int out_width =
-        (in_width + 2 * pad_w - dilation_w * (kernel_w - 1) - 1) / stride_w + 1;
+    int out_depth  = (in_depth + 2 * pad_d - dilation_d * (kernel_d - 1) - 1) / stride_d + 1;
+    int out_height = (in_height + 2 * pad_h - dilation_h * (kernel_h - 1) - 1) / stride_h + 1;
+    int out_width  = (in_width + 2 * pad_w - dilation_w * (kernel_w - 1) - 1) / stride_w + 1;
     if (out_depth <= 0 || out_height <= 0 || out_width <= 0)
         return NULL;
 
@@ -178,7 +172,7 @@ static Tensor* uop_conv3d_like(Tensor* input, Tensor* weight, Tensor* bias,
     }
 
     Tensor* inputs[3] = {input, weight, bias};
-    int num_inputs = bias ? 3 : 2;
+    int num_inputs    = bias ? 3 : 2;
     if (cml_ir_add_uop(ir, UOP_CONV3D, inputs, num_inputs, params_copy) != 0) {
         cml_free(params_copy);
         return NULL;
@@ -186,8 +180,8 @@ static Tensor* uop_conv3d_like(Tensor* input, Tensor* weight, Tensor* bias,
 
     struct IRNode* node = cml_ir_get_tail(ir);
     int output_shape[5] = {batch, out_channels, out_depth, out_height, out_width};
-    node->output_shape = tensor_shape_copy(output_shape, 5);
-    node->output_ndim = 5;
+    node->output_shape  = tensor_shape_copy(output_shape, 5);
+    node->output_ndim   = 5;
     return tensor_from_ir_node(node, ir);
 }
 
@@ -200,14 +194,14 @@ static Tensor* uop_conv_transpose2d_like(Tensor* input, Tensor* weight, Tensor* 
         CML_ERR_NULL("ConvTranspose2D expects input [N,C,H,W] and weight [Cin,Cout,Kh,Kw]");
     }
 
-    int batch = input->shape[0];
-    int in_channels = input->shape[1];
-    int in_height = input->shape[2];
-    int in_width = input->shape[3];
+    int batch              = input->shape[0];
+    int in_channels        = input->shape[1];
+    int in_height          = input->shape[2];
+    int in_width           = input->shape[3];
     int weight_in_channels = weight->shape[0];
-    int out_channels = weight->shape[1];
-    int kernel_h = weight->shape[2];
-    int kernel_w = weight->shape[3];
+    int out_channels       = weight->shape[1];
+    int kernel_h           = weight->shape[2];
+    int kernel_w           = weight->shape[3];
     if (in_channels != weight_in_channels)
         return NULL;
 
@@ -231,7 +225,7 @@ static Tensor* uop_conv_transpose2d_like(Tensor* input, Tensor* weight, Tensor* 
         return NULL;
     }
     Tensor* inputs[3] = {input, weight, bias};
-    int num_inputs = bias ? 3 : 2;
+    int num_inputs    = bias ? 3 : 2;
     if (cml_ir_add_uop(ir, UOP_CONV_TRANSPOSE2D, inputs, num_inputs, params_copy) != 0) {
         cml_free(params_copy);
         return NULL;
@@ -239,8 +233,8 @@ static Tensor* uop_conv_transpose2d_like(Tensor* input, Tensor* weight, Tensor* 
 
     struct IRNode* node = cml_ir_get_tail(ir);
     int output_shape[4] = {batch, out_channels, out_height, out_width};
-    node->output_shape = tensor_shape_copy(output_shape, 4);
-    node->output_ndim = 4;
+    node->output_shape  = tensor_shape_copy(output_shape, 4);
+    node->output_ndim   = 4;
     return tensor_from_ir_node(node, ir);
 }
 
@@ -253,16 +247,16 @@ static Tensor* uop_conv_transpose3d_like(Tensor* input, Tensor* weight, Tensor* 
         CML_ERR_NULL("ConvTranspose3D expects input [N,C,D,H,W] and weight [Cin,Cout,Kd,Kh,Kw]");
     }
 
-    int batch = input->shape[0];
-    int in_channels = input->shape[1];
-    int in_depth = input->shape[2];
-    int in_height = input->shape[3];
-    int in_width = input->shape[4];
+    int batch              = input->shape[0];
+    int in_channels        = input->shape[1];
+    int in_depth           = input->shape[2];
+    int in_height          = input->shape[3];
+    int in_width           = input->shape[4];
     int weight_in_channels = weight->shape[0];
-    int out_channels = weight->shape[1];
-    int kernel_d = weight->shape[2];
-    int kernel_h = weight->shape[3];
-    int kernel_w = weight->shape[4];
+    int out_channels       = weight->shape[1];
+    int kernel_d           = weight->shape[2];
+    int kernel_h           = weight->shape[3];
+    int kernel_w           = weight->shape[4];
     if (in_channels != weight_in_channels)
         return NULL;
 
@@ -289,7 +283,7 @@ static Tensor* uop_conv_transpose3d_like(Tensor* input, Tensor* weight, Tensor* 
         return NULL;
     }
     Tensor* inputs[3] = {input, weight, bias};
-    int num_inputs = bias ? 3 : 2;
+    int num_inputs    = bias ? 3 : 2;
     if (cml_ir_add_uop(ir, UOP_CONV_TRANSPOSE3D, inputs, num_inputs, params_copy) != 0) {
         cml_free(params_copy);
         return NULL;
@@ -297,8 +291,8 @@ static Tensor* uop_conv_transpose3d_like(Tensor* input, Tensor* weight, Tensor* 
 
     struct IRNode* node = cml_ir_get_tail(ir);
     int output_shape[5] = {batch, out_channels, out_depth, out_height, out_width};
-    node->output_shape = tensor_shape_copy(output_shape, 5);
-    node->output_ndim = 5;
+    node->output_shape  = tensor_shape_copy(output_shape, 5);
+    node->output_ndim   = 5;
     return tensor_from_ir_node(node, ir);
 }
 
@@ -406,8 +400,8 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
     params_copy->dilation[1]    = dilation_w;
     params_copy->groups         = params ? params->groups : 1;
 
-    params_copy->use_winograd = winograd_applicable(
-        kernel_h, kernel_w, stride_h, stride_w, dilation_h, dilation_w);
+    params_copy->use_winograd =
+        winograd_applicable(kernel_h, kernel_w, stride_h, stride_w, dilation_h, dilation_w);
 
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir) {

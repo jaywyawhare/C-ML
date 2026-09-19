@@ -10,28 +10,23 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-static const int BLOCK_SIZES[]   = {32, 64, 128, 256, 512, 1024};
+static const int BLOCK_SIZES[]    = {32, 64, 128, 256, 512, 1024};
 static const int UNROLL_FACTORS[] = {1, 2, 4};
-static const int VEC_WIDTHS[]    = {1, 2, 4};
+static const int VEC_WIDTHS[]     = {1, 2, 4};
 
-#define NUM_BLOCK_SIZES   (int)(sizeof(BLOCK_SIZES)   / sizeof(BLOCK_SIZES[0]))
+#define NUM_BLOCK_SIZES (int)(sizeof(BLOCK_SIZES) / sizeof(BLOCK_SIZES[0]))
 #define NUM_UNROLL_FACTORS (int)(sizeof(UNROLL_FACTORS) / sizeof(UNROLL_FACTORS[0]))
-#define NUM_VEC_WIDTHS    (int)(sizeof(VEC_WIDTHS)    / sizeof(VEC_WIDTHS[0]))
+#define NUM_VEC_WIDTHS (int)(sizeof(VEC_WIDTHS) / sizeof(VEC_WIDTHS[0]))
 
 /**
  * Map a kernel hash to a cache slot index (simple modular hash).
  */
-static int cache_slot(uint64_t hash) {
-    return (int)(hash % 256);
-}
+static int cache_slot(uint64_t hash) { return (int)(hash % 256); }
 
-bool cml_beam_search_enabled(void) {
-    return cml_flag(CML_FLAG_BEAM) > 0;
-}
+bool cml_beam_search_enabled(void) { return cml_flag(CML_FLAG_BEAM) > 0; }
 
 CMLBeamSearchCtx* cml_beam_search_create(void) {
-    CMLBeamSearchCtx* ctx =
-        (CMLBeamSearchCtx*)cml_calloc(1, sizeof(CMLBeamSearchCtx));
+    CMLBeamSearchCtx* ctx = (CMLBeamSearchCtx*)cml_calloc(1, sizeof(CMLBeamSearchCtx));
     if (!ctx) {
         LOG_ERROR("Failed to allocate CMLBeamSearchCtx");
         return NULL;
@@ -51,22 +46,24 @@ CMLBeamSearchCtx* cml_beam_search_create(void) {
         ctx->cache[i].occupied = false;
     }
 
-    LOG_INFO("BEAM search context created (width=%d, warmup=%d, timing=%d)",
-             ctx->beam_width, ctx->warmup_runs, ctx->timing_runs);
+    LOG_INFO("BEAM search context created (width=%d, warmup=%d, timing=%d)", ctx->beam_width,
+             ctx->warmup_runs, ctx->timing_runs);
     return ctx;
 }
 
 void cml_beam_search_free(CMLBeamSearchCtx* ctx) {
-    if (!ctx) return;
+    if (!ctx)
+        return;
     cml_free(ctx);
 }
 
-int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
-                           CMLBeamConfig* best_out) {
-    if (!ctx || !best_out) return -1;
+int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, CMLBeamConfig* best_out) {
+    if (!ctx || !best_out)
+        return -1;
 
     /* IGNORE_BEAM_CACHE forces a fresh search by treating every lookup as a miss. */
-    if (cml_flag_enabled(CML_FLAG_IGNORE_BEAM_CACHE)) return -1;
+    if (cml_flag_enabled(CML_FLAG_IGNORE_BEAM_CACHE))
+        return -1;
 
     int slot = cache_slot(kernel_hash);
 
@@ -83,8 +80,7 @@ int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
         if (ctx->cache[idx].hash == kernel_hash) {
             *best_out = ctx->cache[idx].config;
             LOG_DEBUG("BEAM cache hit for hash 0x%016llx (slot %d, time=%.2f us)",
-                      (unsigned long long)kernel_hash, idx,
-                      ctx->cache[idx].time_us);
+                      (unsigned long long)kernel_hash, idx, ctx->cache[idx].time_us);
             return 0;
         }
     }
@@ -92,9 +88,10 @@ int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
     return -1; /* Cache full and key not found. */
 }
 
-int cml_beam_search_store(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
-                          const CMLBeamConfig* config, double time_us) {
-    if (!ctx || !config) return -1;
+int cml_beam_search_store(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, const CMLBeamConfig* config,
+                          double time_us) {
+    if (!ctx || !config)
+        return -1;
 
     int slot = cache_slot(kernel_hash);
 
@@ -114,8 +111,7 @@ int cml_beam_search_store(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
             ctx->cache_count++;
             LOG_DEBUG("BEAM cache store: hash 0x%016llx -> slot %d "
                       "(time=%.2f us, count=%d)",
-                      (unsigned long long)kernel_hash, idx, time_us,
-                      ctx->cache_count);
+                      (unsigned long long)kernel_hash, idx, time_us, ctx->cache_count);
             return 0;
         }
 
@@ -159,13 +155,11 @@ static double heuristic_score(const CMLBeamConfig* cfg, size_t total_elements) {
      * Penalize configurations whose effective parallelism (block * vec * unroll)
      * overshoots total_elements by a lot -- they waste work on guard checks.
      */
-    double effective = (double)cfg->block_size_x *
-                       (double)cfg->vec_width *
-                       (double)cfg->unroll_factor;
+    double effective =
+        (double)cfg->block_size_x * (double)cfg->vec_width * (double)cfg->unroll_factor;
     double overshoot_penalty = 0.0;
     if (effective > (double)total_elements) {
-        overshoot_penalty = (effective - (double)total_elements) /
-                            ((double)total_elements + 1.0);
+        overshoot_penalty = (effective - (double)total_elements) / ((double)total_elements + 1.0);
     }
 
     return norm_dist + 0.5 * overshoot_penalty;
@@ -179,12 +173,11 @@ static double heuristic_score(const CMLBeamConfig* cfg, size_t total_elements) {
  *
  * The result is in arbitrary units -- only the *relative* ordering matters.
  */
-static double estimate_time_cpu(const CMLBeamConfig* cfg,
-                                size_t total_elements) {
-    double throughput = (double)cfg->block_size_x *
-                        (double)cfg->vec_width *
-                        (double)cfg->unroll_factor;
-    if (throughput < 1.0) throughput = 1.0;
+static double estimate_time_cpu(const CMLBeamConfig* cfg, size_t total_elements) {
+    double throughput =
+        (double)cfg->block_size_x * (double)cfg->vec_width * (double)cfg->unroll_factor;
+    if (throughput < 1.0)
+        throughput = 1.0;
     return (double)total_elements / throughput;
 }
 
@@ -195,8 +188,10 @@ static double estimate_time_cpu(const CMLBeamConfig* cfg,
 static int cmp_beam_result(const void* a, const void* b) {
     const CMLBeamResult* ra = (const CMLBeamResult*)a;
     const CMLBeamResult* rb = (const CMLBeamResult*)b;
-    if (ra->time_us < rb->time_us) return -1;
-    if (ra->time_us > rb->time_us) return  1;
+    if (ra->time_us < rb->time_us)
+        return -1;
+    if (ra->time_us > rb->time_us)
+        return 1;
     return 0;
 }
 
@@ -218,7 +213,7 @@ static int generate_candidates(CMLBeamResult* out, size_t total_elements) {
                 r->config.vec_width     = VEC_WIDTHS[vi];
                 r->config.shared_mem    = 0;
 
-                size_t threads = (size_t)r->config.block_size_x;
+                size_t threads     = (size_t)r->config.block_size_x;
                 r->config.block[0] = threads;
                 r->config.block[1] = 1;
                 r->config.block[2] = 1;
@@ -234,9 +229,8 @@ static int generate_candidates(CMLBeamResult* out, size_t total_elements) {
     return num;
 }
 
-int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
-                         size_t total_elements, int ndim, const int* shape,
-                         CMLBeamConfig* best_out) {
+int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, size_t total_elements,
+                         int ndim, const int* shape, CMLBeamConfig* best_out) {
     if (!ctx || !best_out) {
         LOG_ERROR("NULL context or output in beam_search_tune");
         return -1;
@@ -265,30 +259,26 @@ int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
     }
 
     /* 3. Quick filter: sort by heuristic score and keep top beam_width. */
-    qsort(all_candidates, (size_t)num_all, sizeof(CMLBeamResult),
-          cmp_beam_result);
+    qsort(all_candidates, (size_t)num_all, sizeof(CMLBeamResult), cmp_beam_result);
 
     int keep = ctx->beam_width;
-    if (keep > num_all) keep = num_all;
-    if (keep > CML_BEAM_MAX_CANDIDATES) keep = CML_BEAM_MAX_CANDIDATES;
+    if (keep > num_all)
+        keep = num_all;
+    if (keep > CML_BEAM_MAX_CANDIDATES)
+        keep = CML_BEAM_MAX_CANDIDATES;
 
-    LOG_DEBUG("BEAM tune: generated %d candidates, keeping top %d",
-              num_all, keep);
+    LOG_DEBUG("BEAM tune: generated %d candidates, keeping top %d", num_all, keep);
 
     /* Copy the survivors into the context's candidate array. */
-    memcpy(ctx->candidates, all_candidates,
-           (size_t)keep * sizeof(CMLBeamResult));
+    memcpy(ctx->candidates, all_candidates, (size_t)keep * sizeof(CMLBeamResult));
     ctx->num_candidates = keep;
 
     /* 4. Estimate execution time for each surviving candidate (CPU model). */
     for (int i = 0; i < keep; i++) {
-        ctx->candidates[i].time_us =
-            estimate_time_cpu(&ctx->candidates[i].config, total_elements);
-        LOG_DEBUG("  candidate %d: block=%d unroll=%d vec=%d -> est %.2f us",
-                  i, ctx->candidates[i].config.block_size_x,
-                  ctx->candidates[i].config.unroll_factor,
-                  ctx->candidates[i].config.vec_width,
-                  ctx->candidates[i].time_us);
+        ctx->candidates[i].time_us = estimate_time_cpu(&ctx->candidates[i].config, total_elements);
+        LOG_DEBUG("  candidate %d: block=%d unroll=%d vec=%d -> est %.2f us", i,
+                  ctx->candidates[i].config.block_size_x, ctx->candidates[i].config.unroll_factor,
+                  ctx->candidates[i].config.vec_width, ctx->candidates[i].time_us);
     }
 
     /* 5. Pick the best (lowest estimated time). */
@@ -303,22 +293,16 @@ int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
 
     LOG_INFO("BEAM tune: best config for hash 0x%016llx: "
              "block=%d unroll=%d vec=%d (est %.2f us)",
-             (unsigned long long)kernel_hash,
-             best_out->block_size_x, best_out->unroll_factor,
-             best_out->vec_width,
-             ctx->candidates[best_idx].time_us);
+             (unsigned long long)kernel_hash, best_out->block_size_x, best_out->unroll_factor,
+             best_out->vec_width, ctx->candidates[best_idx].time_us);
 
     /* 6. Store in cache. */
-    cml_beam_search_store(ctx, kernel_hash, best_out,
-                          ctx->candidates[best_idx].time_us);
+    cml_beam_search_store(ctx, kernel_hash, best_out, ctx->candidates[best_idx].time_us);
     return 0;
 }
 
-int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
-                             size_t total_elements,
-                             CMLBeamTimingFn timing_fn, void* user_data,
-                             CMLBeamConfig* best_out)
-{
+int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, size_t total_elements,
+                            CMLBeamTimingFn timing_fn, void* user_data, CMLBeamConfig* best_out) {
     if (!ctx || !timing_fn || !best_out) {
         LOG_ERROR("NULL arguments in beam_search_tune_hw");
         return -1;
@@ -333,35 +317,35 @@ int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
     CMLBeamResult all_candidates[CML_BEAM_MAX_CANDIDATES];
     int num_all = generate_candidates(all_candidates, total_elements);
 
-    if (num_all == 0) return -1;
+    if (num_all == 0)
+        return -1;
 
     /* 3. Heuristic pre-filter: keep top beam_width * 2 candidates. */
-    qsort(all_candidates, (size_t)num_all, sizeof(CMLBeamResult),
-          cmp_beam_result);
+    qsort(all_candidates, (size_t)num_all, sizeof(CMLBeamResult), cmp_beam_result);
 
     int pre_filter = ctx->beam_width * 2;
-    if (pre_filter > num_all) pre_filter = num_all;
+    if (pre_filter > num_all)
+        pre_filter = num_all;
 
-    LOG_INFO("BEAM hw tune: %d candidates -> pre-filter to %d",
-             num_all, pre_filter);
+    LOG_INFO("BEAM hw tune: %d candidates -> pre-filter to %d", num_all, pre_filter);
 
     /* 4. Time each surviving candidate on hardware. */
-    int best_idx = -1;
+    int best_idx     = -1;
     double best_time = 1e18;
 
     for (int i = 0; i < pre_filter; i++) {
         CMLBeamVariant variant;
         memset(&variant, 0, sizeof(variant));
-        variant.config = all_candidates[i].config;
+        variant.config          = all_candidates[i].config;
         variant.compiled_kernel = NULL;
-        variant.source_code = NULL;
+        variant.source_code     = NULL;
 
         double t = timing_fn(&variant, user_data);
         if (t >= 0.0) {
             all_candidates[i].time_us = t;
             if (t < best_time) {
                 best_time = t;
-                best_idx = i;
+                best_idx  = i;
             }
         } else {
             all_candidates[i].valid = false;
@@ -377,15 +361,14 @@ int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
     cml_beam_search_store(ctx, kernel_hash, best_out, best_time);
 
     LOG_INFO("BEAM hw tune: best config block=%d unroll=%d vec=%d (%.2f us)",
-             best_out->block_size_x, best_out->unroll_factor,
-             best_out->vec_width, best_time);
+             best_out->block_size_x, best_out->unroll_factor, best_out->vec_width, best_time);
 
     return 0;
 }
 
-int cml_beam_cache_save(CMLBeamSearchCtx* ctx, const char* path)
-{
-    if (!ctx || !path) return -1;
+int cml_beam_cache_save(CMLBeamSearchCtx* ctx, const char* path) {
+    if (!ctx || !path)
+        return -1;
 
     FILE* fp = fopen(path, "wb");
     if (!fp) {
@@ -400,7 +383,8 @@ int cml_beam_cache_save(CMLBeamSearchCtx* ctx, const char* path)
 
     /* Write occupied entries */
     for (int i = 0; i < 256; i++) {
-        if (!ctx->cache[i].occupied) continue;
+        if (!ctx->cache[i].occupied)
+            continue;
         fwrite(&ctx->cache[i].hash, sizeof(uint64_t), 1, fp);
         fwrite(&ctx->cache[i].config, sizeof(CMLBeamConfig), 1, fp);
         fwrite(&ctx->cache[i].time_us, sizeof(double), 1, fp);
@@ -411,9 +395,9 @@ int cml_beam_cache_save(CMLBeamSearchCtx* ctx, const char* path)
     return 0;
 }
 
-int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path)
-{
-    if (!ctx || !path) return -1;
+int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path) {
+    if (!ctx || !path)
+        return -1;
 
     FILE* fp = fopen(path, "rb");
     if (!fp) {
@@ -440,9 +424,12 @@ int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path)
         CMLBeamConfig config;
         double time_us;
 
-        if (fread(&hash, sizeof(hash), 1, fp) != 1) break;
-        if (fread(&config, sizeof(config), 1, fp) != 1) break;
-        if (fread(&time_us, sizeof(time_us), 1, fp) != 1) break;
+        if (fread(&hash, sizeof(hash), 1, fp) != 1)
+            break;
+        if (fread(&config, sizeof(config), 1, fp) != 1)
+            break;
+        if (fread(&time_us, sizeof(time_us), 1, fp) != 1)
+            break;
 
         if (cml_beam_search_store(ctx, hash, &config, time_us) == 0) {
             loaded++;
@@ -455,58 +442,59 @@ int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path)
 }
 
 int cml_beam_search_tune_opt(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
-                              struct LinearProgram* prog,
-                              CMLBeamTimingFn timing_fn, void* user_data,
-                              CMLBeamConfig* best_out) {
-    if (!ctx || !prog || !best_out) return -1;
+                             struct LinearProgram* prog, CMLBeamTimingFn timing_fn, void* user_data,
+                             CMLBeamConfig* best_out) {
+    if (!ctx || !prog || !best_out)
+        return -1;
 
     if (cml_beam_search_lookup(ctx, kernel_hash, best_out) == 0)
         return 0;
 
     CMLOptList** opt_lists = NULL;
-    int num_configs = 0;
-    int max_configs = CML_BEAM_MAX_CANDIDATES;
+    int num_configs        = 0;
+    int max_configs        = CML_BEAM_MAX_CANDIDATES;
 
     if (cml_opt_enumerate(prog, &opt_lists, &num_configs, max_configs) != 0)
         return -1;
 
-    LOG_INFO("BEAM opt tune: %d opt configurations for hash 0x%016llx",
-             num_configs, (unsigned long long)kernel_hash);
+    LOG_INFO("BEAM opt tune: %d opt configurations for hash 0x%016llx", num_configs,
+             (unsigned long long)kernel_hash);
 
-    int best_idx = -1;
+    int best_idx     = -1;
     double best_time = 1e18;
 
     int keep = ctx->beam_width * 2;
-    if (keep > num_configs) keep = num_configs;
+    if (keep > num_configs)
+        keep = num_configs;
 
     for (int i = 0; i < keep; i++) {
         /* Build a config from the opt list. */
         CMLBeamConfig cfg;
         memset(&cfg, 0, sizeof(cfg));
 
-        cfg.block_size_x = 256;
-        cfg.block_size_y = 1;
-        cfg.block_size_z = 1;
+        cfg.block_size_x  = 256;
+        cfg.block_size_y  = 1;
+        cfg.block_size_z  = 1;
         cfg.unroll_factor = 1;
-        cfg.vec_width = 1;
+        cfg.vec_width     = 1;
 
         for (int j = 0; j < opt_lists[i]->num_opts; j++) {
             CMLOpt* o = &opt_lists[i]->opts[j];
             switch (o->type) {
-                case OPT_UNROLL:
-                    cfg.unroll_factor = o->amount;
-                    break;
-                case OPT_UPCAST:
-                    cfg.vec_width = o->amount;
-                    break;
-                case OPT_GROUP:
-                    cfg.block_size_x = o->amount;
-                    break;
-                case OPT_LOCAL:
-                    cfg.shared_mem = (size_t)o->amount * sizeof(float);
-                    break;
-                default:
-                    break;
+            case OPT_UNROLL:
+                cfg.unroll_factor = o->amount;
+                break;
+            case OPT_UPCAST:
+                cfg.vec_width = o->amount;
+                break;
+            case OPT_GROUP:
+                cfg.block_size_x = o->amount;
+                break;
+            case OPT_LOCAL:
+                cfg.shared_mem = (size_t)o->amount * sizeof(float);
+                break;
+            default:
+                break;
             }
         }
 
@@ -519,19 +507,20 @@ int cml_beam_search_tune_opt(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
             CMLBeamVariant variant;
             memset(&variant, 0, sizeof(variant));
             variant.config = cfg;
-            t = timing_fn(&variant, user_data);
-            if (t < 0.0) continue;
+            t              = timing_fn(&variant, user_data);
+            if (t < 0.0)
+                continue;
         } else {
-            double throughput = (double)cfg.block_size_x *
-                                (double)cfg.vec_width *
-                                (double)cfg.unroll_factor;
-            if (throughput < 1.0) throughput = 1.0;
+            double throughput =
+                (double)cfg.block_size_x * (double)cfg.vec_width * (double)cfg.unroll_factor;
+            if (throughput < 1.0)
+                throughput = 1.0;
             t = 1.0 / throughput;
         }
 
         if (t < best_time) {
             best_time = t;
-            best_idx = i;
+            best_idx  = i;
             *best_out = cfg;
         }
     }
@@ -547,7 +536,7 @@ int cml_beam_search_tune_opt(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
 
     cml_beam_search_store(ctx, kernel_hash, best_out, best_time);
     LOG_INFO("BEAM opt tune: best block=%d unroll=%d vec=%d shared=%zu (%.2f us)",
-             best_out->block_size_x, best_out->unroll_factor,
-             best_out->vec_width, best_out->shared_mem, best_time);
+             best_out->block_size_x, best_out->unroll_factor, best_out->vec_width,
+             best_out->shared_mem, best_time);
     return 0;
 }

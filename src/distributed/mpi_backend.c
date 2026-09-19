@@ -42,10 +42,15 @@ static MPIContext* mpi_get_ctx(void* ctx) {
 
 static int mpi_op_to_const(DistReduceOp op) {
     switch (op) {
-    case DIST_REDUCE_SUM: case DIST_REDUCE_AVG: return CML_MPI_SUM;
-    case DIST_REDUCE_PRODUCT: return CML_MPI_PROD;
-    case DIST_REDUCE_MAX: return CML_MPI_MAX;
-    case DIST_REDUCE_MIN: return CML_MPI_MIN;
+    case DIST_REDUCE_SUM:
+    case DIST_REDUCE_AVG:
+        return CML_MPI_SUM;
+    case DIST_REDUCE_PRODUCT:
+        return CML_MPI_PROD;
+    case DIST_REDUCE_MAX:
+        return CML_MPI_MAX;
+    case DIST_REDUCE_MIN:
+        return CML_MPI_MIN;
     }
     return CML_MPI_SUM;
 }
@@ -62,8 +67,8 @@ static int mpi_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     if (!recvbuf)
         return -1;
 
-    int result = mpi->MPI_Allreduce(sendbuf, recvbuf, (int)tensor->numel,
-                                     CML_MPI_FLOAT, mpi_op, CML_MPI_COMM_WORLD);
+    int result = mpi->MPI_Allreduce(sendbuf, recvbuf, (int)tensor->numel, CML_MPI_FLOAT, mpi_op,
+                                    CML_MPI_COMM_WORLD);
 
     if (result == 0)
         memcpy(tensor->data, recvbuf, tensor->numel * sizeof(float));
@@ -85,8 +90,8 @@ static int mpi_broadcast(Tensor* tensor, int src_rank, void* ctx) {
     if (!mpi || !mpi->MPI_Bcast || !tensor || !tensor->data)
         return -1;
 
-    return mpi->MPI_Bcast(tensor->data, (int)tensor->numel, CML_MPI_FLOAT,
-                           src_rank, CML_MPI_COMM_WORLD);
+    return mpi->MPI_Bcast(tensor->data, (int)tensor->numel, CML_MPI_FLOAT, src_rank,
+                          CML_MPI_COMM_WORLD);
 }
 
 static int mpi_barrier(void* ctx) {
@@ -103,21 +108,19 @@ static int mpi_allgather(Tensor** output, Tensor* input, void* ctx) {
         return -1;
 
     int world_size = cml_dist_get_world_size();
-    int sendcount = (int)input->numel;
+    int sendcount  = (int)input->numel;
 
     float* recvbuf = (float*)cml_malloc((size_t)world_size * sendcount * sizeof(float));
     if (!recvbuf)
         return -1;
 
-    int result = mpi->MPI_Allgather(input->data, sendcount, CML_MPI_FLOAT,
-                                     recvbuf, sendcount, CML_MPI_FLOAT,
-                                     CML_MPI_COMM_WORLD);
+    int result = mpi->MPI_Allgather(input->data, sendcount, CML_MPI_FLOAT, recvbuf, sendcount,
+                                    CML_MPI_FLOAT, CML_MPI_COMM_WORLD);
 
     if (result == 0) {
         for (int i = 0; i < world_size; i++) {
             if (output[i] && output[i]->data) {
-                memcpy(output[i]->data, recvbuf + i * sendcount,
-                       sendcount * sizeof(float));
+                memcpy(output[i]->data, recvbuf + i * sendcount, sendcount * sizeof(float));
             }
         }
     }
@@ -128,13 +131,12 @@ static int mpi_allgather(Tensor** output, Tensor* input, void* ctx) {
 
 static int mpi_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, void* ctx) {
     MPIContext* mpi = mpi_get_ctx(ctx);
-    if (!mpi || !mpi->MPI_Reduce_scatter || !output || !input ||
-        !output->data || !input->data)
+    if (!mpi || !mpi->MPI_Reduce_scatter || !output || !input || !output->data || !input->data)
         return -1;
 
     int world_size = cml_dist_get_world_size();
     int chunk_size = (int)(input->numel / (size_t)world_size);
-    int mpi_op = mpi_op_to_const(op);
+    int mpi_op     = mpi_op_to_const(op);
 
     int* recvcounts = (int*)cml_malloc((size_t)world_size * sizeof(int));
     if (!recvcounts)
@@ -143,9 +145,8 @@ static int mpi_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, vo
     for (int i = 0; i < world_size; i++)
         recvcounts[i] = chunk_size;
 
-    int result = mpi->MPI_Reduce_scatter(input->data, output->data,
-                                          recvcounts, CML_MPI_FLOAT,
-                                          mpi_op, CML_MPI_COMM_WORLD);
+    int result = mpi->MPI_Reduce_scatter(input->data, output->data, recvcounts, CML_MPI_FLOAT,
+                                         mpi_op, CML_MPI_COMM_WORLD);
 
     cml_free(recvcounts);
 
@@ -164,8 +165,8 @@ static int mpi_send(Tensor* tensor, int dst_rank, int tag, void* ctx) {
     if (!mpi || !mpi->MPI_Send || !tensor || !tensor->data)
         return -1;
 
-    return mpi->MPI_Send(tensor->data, (int)tensor->numel, CML_MPI_FLOAT,
-                          dst_rank, tag, CML_MPI_COMM_WORLD);
+    return mpi->MPI_Send(tensor->data, (int)tensor->numel, CML_MPI_FLOAT, dst_rank, tag,
+                         CML_MPI_COMM_WORLD);
 }
 
 static int mpi_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
@@ -173,8 +174,8 @@ static int mpi_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
     if (!mpi || !mpi->MPI_Recv || !tensor || !tensor->data)
         return -1;
 
-    return mpi->MPI_Recv(tensor->data, (int)tensor->numel, CML_MPI_FLOAT,
-                          src_rank, tag, CML_MPI_COMM_WORLD, NULL);
+    return mpi->MPI_Recv(tensor->data, (int)tensor->numel, CML_MPI_FLOAT, src_rank, tag,
+                         CML_MPI_COMM_WORLD, NULL);
 }
 
 /* Async metadata, kept in its OWN allocation rather than packed into the
@@ -183,11 +184,11 @@ static int mpi_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
  * during Iallreduce/Wait could corrupt the packed pointers (and vice-versa).
  * `request` is a separate opaque buffer sized generously for any MPI_Request. */
 typedef struct MPIAsyncWork {
-    void*   request;   /* opaque MPI_Request storage (MPI writes here) */
-    float*  recvbuf;   /* out-of-place result buffer */
-    Tensor* tensor;    /* destination tensor */
-    size_t  numel;
-    int     scale_ws;  /* >0 → this was an AVG: divide by scale_ws after wait */
+    void* request;  /* opaque MPI_Request storage (MPI writes here) */
+    float* recvbuf; /* out-of-place result buffer */
+    Tensor* tensor; /* destination tensor */
+    size_t numel;
+    int scale_ws; /* >0 → this was an AVG: divide by scale_ws after wait */
 } MPIAsyncWork;
 
 static DistWork* mpi_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx) {
@@ -203,35 +204,41 @@ static DistWork* mpi_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx)
 
     if (mpi->MPI_Iallreduce) {
         MPIAsyncWork* aw = (MPIAsyncWork*)cml_calloc(1, sizeof(MPIAsyncWork));
-        if (!aw) { cml_free(work); return NULL; }
+        if (!aw) {
+            cml_free(work);
+            return NULL;
+        }
 
         aw->recvbuf = (float*)cml_malloc(tensor->numel * sizeof(float));
         aw->request = cml_calloc(1, 128); /* opaque MPI_Request storage */
         if (!aw->recvbuf || !aw->request) {
-            cml_free(aw->recvbuf); cml_free(aw->request);
-            cml_free(aw); cml_free(work);
+            cml_free(aw->recvbuf);
+            cml_free(aw->request);
+            cml_free(aw);
+            cml_free(work);
             return NULL;
         }
         aw->tensor   = tensor;
         aw->numel    = tensor->numel;
         aw->scale_ws = (op == DIST_REDUCE_AVG) ? cml_dist_get_world_size() : 0;
 
-        int result = mpi->MPI_Iallreduce(tensor->data, aw->recvbuf,
-                                          (int)tensor->numel, CML_MPI_FLOAT,
-                                          mpi_op, CML_MPI_COMM_WORLD, aw->request);
+        int result = mpi->MPI_Iallreduce(tensor->data, aw->recvbuf, (int)tensor->numel,
+                                         CML_MPI_FLOAT, mpi_op, CML_MPI_COMM_WORLD, aw->request);
         if (result != 0) {
-            cml_free(aw->recvbuf); cml_free(aw->request);
-            cml_free(aw); cml_free(work);
+            cml_free(aw->recvbuf);
+            cml_free(aw->request);
+            cml_free(aw);
+            cml_free(work);
             return NULL;
         }
 
-        work->internal  = aw;   /* freed by cml_dist_work_free after mpi_wait */
-        work->completed = false;
+        work->internal   = aw; /* freed by cml_dist_work_free after mpi_wait */
+        work->completed  = false;
         work->error_code = 0;
     } else {
         /* No non-blocking allreduce available: fall back to synchronous. */
-        int result = mpi_allreduce(tensor, op, ctx);
-        work->completed = true;
+        int result       = mpi_allreduce(tensor, op, ctx);
+        work->completed  = true;
         work->error_code = result;
     }
 
@@ -244,7 +251,7 @@ static int mpi_wait(DistWork* work) {
     if (work->completed)
         return work->error_code;
 
-    MPIContext* mpi = g_mpi_ctx;
+    MPIContext* mpi  = g_mpi_ctx;
     MPIAsyncWork* aw = (MPIAsyncWork*)work->internal;
     if (!mpi || !mpi->MPI_Wait || !aw)
         return -1;
@@ -255,16 +262,19 @@ static int mpi_wait(DistWork* work) {
         memcpy(aw->tensor->data, aw->recvbuf, aw->numel * sizeof(float));
         if (aw->scale_ws > 0) {
             float scale = 1.0f / (float)aw->scale_ws;
-            float* d = (float*)aw->tensor->data;
-            for (size_t i = 0; i < aw->numel; i++) d[i] *= scale;
+            float* d    = (float*)aw->tensor->data;
+            for (size_t i = 0; i < aw->numel; i++)
+                d[i] *= scale;
         }
     }
 
     /* Release the sub-allocations now; cml_dist_work_free frees `aw` itself. */
-    cml_free(aw->recvbuf); aw->recvbuf = NULL;
-    cml_free(aw->request); aw->request = NULL;
+    cml_free(aw->recvbuf);
+    aw->recvbuf = NULL;
+    cml_free(aw->request);
+    aw->request = NULL;
 
-    work->completed = true;
+    work->completed  = true;
     work->error_code = result;
     return result;
 }
@@ -290,10 +300,10 @@ static int mpi_init(void* ctx, int world_size, int rank) {
         if (mpi->MPI_Comm_rank(CML_MPI_COMM_WORLD, &real_rank) != 0 ||
             mpi->MPI_Comm_size(CML_MPI_COMM_WORLD, &real_size) != 0)
             return -1;
-        if ((world_size > 0 && real_size != world_size) ||
-            (rank >= 0 && real_rank != rank)) {
+        if ((world_size > 0 && real_size != world_size) || (rank >= 0 && real_rank != rank)) {
             LOG_ERROR("MPI backend: launcher says rank %d/%d but MPI reports "
-                      "rank %d of %d", rank, world_size, real_rank, real_size);
+                      "rank %d of %d",
+                      rank, world_size, real_rank, real_size);
             return -1;
         }
     }
@@ -354,19 +364,19 @@ DistCommOps* cml_dist_create_mpi_backend(void) {
 
     mpi->handle = handle;
 
-    *(void**)&mpi->MPI_Init = CML_DLSYM(handle, "MPI_Init");
-    *(void**)&mpi->MPI_Finalize = CML_DLSYM(handle, "MPI_Finalize");
-    *(void**)&mpi->MPI_Comm_rank = CML_DLSYM(handle, "MPI_Comm_rank");
-    *(void**)&mpi->MPI_Comm_size = CML_DLSYM(handle, "MPI_Comm_size");
-    *(void**)&mpi->MPI_Allreduce = CML_DLSYM(handle, "MPI_Allreduce");
-    *(void**)&mpi->MPI_Bcast = CML_DLSYM(handle, "MPI_Bcast");
-    *(void**)&mpi->MPI_Barrier = CML_DLSYM(handle, "MPI_Barrier");
-    *(void**)&mpi->MPI_Send = CML_DLSYM(handle, "MPI_Send");
-    *(void**)&mpi->MPI_Recv = CML_DLSYM(handle, "MPI_Recv");
-    *(void**)&mpi->MPI_Allgather = CML_DLSYM(handle, "MPI_Allgather");
+    *(void**)&mpi->MPI_Init           = CML_DLSYM(handle, "MPI_Init");
+    *(void**)&mpi->MPI_Finalize       = CML_DLSYM(handle, "MPI_Finalize");
+    *(void**)&mpi->MPI_Comm_rank      = CML_DLSYM(handle, "MPI_Comm_rank");
+    *(void**)&mpi->MPI_Comm_size      = CML_DLSYM(handle, "MPI_Comm_size");
+    *(void**)&mpi->MPI_Allreduce      = CML_DLSYM(handle, "MPI_Allreduce");
+    *(void**)&mpi->MPI_Bcast          = CML_DLSYM(handle, "MPI_Bcast");
+    *(void**)&mpi->MPI_Barrier        = CML_DLSYM(handle, "MPI_Barrier");
+    *(void**)&mpi->MPI_Send           = CML_DLSYM(handle, "MPI_Send");
+    *(void**)&mpi->MPI_Recv           = CML_DLSYM(handle, "MPI_Recv");
+    *(void**)&mpi->MPI_Allgather      = CML_DLSYM(handle, "MPI_Allgather");
     *(void**)&mpi->MPI_Reduce_scatter = CML_DLSYM(handle, "MPI_Reduce_scatter");
-    *(void**)&mpi->MPI_Iallreduce = CML_DLSYM(handle, "MPI_Iallreduce");
-    *(void**)&mpi->MPI_Wait = CML_DLSYM(handle, "MPI_Wait");
+    *(void**)&mpi->MPI_Iallreduce     = CML_DLSYM(handle, "MPI_Iallreduce");
+    *(void**)&mpi->MPI_Wait           = CML_DLSYM(handle, "MPI_Wait");
 
     if (!mpi->MPI_Allreduce) {
         LOG_WARNING("MPI loaded but missing MPI_Allreduce");
@@ -385,18 +395,18 @@ DistCommOps* cml_dist_create_mpi_backend(void) {
         return NULL;
     }
 
-    ops->allreduce = mpi_allreduce;
-    ops->broadcast = mpi_broadcast;
-    ops->allgather = mpi_allgather;
-    ops->reduce_scatter = mpi_reduce_scatter;
-    ops->barrier = mpi_barrier;
-    ops->send = mpi_send;
-    ops->recv = mpi_recv;
+    ops->allreduce       = mpi_allreduce;
+    ops->broadcast       = mpi_broadcast;
+    ops->allgather       = mpi_allgather;
+    ops->reduce_scatter  = mpi_reduce_scatter;
+    ops->barrier         = mpi_barrier;
+    ops->send            = mpi_send;
+    ops->recv            = mpi_recv;
     ops->allreduce_async = mpi_allreduce_async;
-    ops->wait = mpi_wait;
-    ops->init = mpi_init;
-    ops->destroy = mpi_destroy;
-    ops->backend_ctx = mpi;
+    ops->wait            = mpi_wait;
+    ops->init            = mpi_init;
+    ops->destroy         = mpi_destroy;
+    ops->backend_ctx     = mpi;
 
     LOG_INFO("MPI backend loaded successfully");
     return ops;

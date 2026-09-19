@@ -23,9 +23,7 @@ int cml_ir_enable_auto_capture(CMLGraph_t ir) {
     return 0;
 }
 
-void cml_ir_disable_auto_capture(void) {
-    atomic_store(&g_auto_capture_ir, NULL);
-}
+void cml_ir_disable_auto_capture(void) { atomic_store(&g_auto_capture_ir, NULL); }
 
 CMLGraph_t cml_ir_get_auto_capture_context(void) { return atomic_load(&g_auto_capture_ir); }
 

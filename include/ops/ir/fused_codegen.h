@@ -48,29 +48,27 @@ typedef enum {
 
 typedef struct CMLFusedKernel {
     CMLFusedBackend backend;
-    char* source;           /* Generated source code (text for PTX/C/WGSL/Metal) */
-    uint32_t* spirv_words;  /* SPIR-V binary words (if backend == SPIRV) */
+    char* source;          /* Generated source code (text for PTX/C/WGSL/Metal) */
+    uint32_t* spirv_words; /* SPIR-V binary words (if backend == SPIRV) */
     int spirv_num_words;
     int num_inputs;
     int num_outputs;
-    int num_vregs;          /* Virtual registers used */
-    size_t work_size;       /* Total elements to process */
+    int num_vregs;    /* Virtual registers used */
+    size_t work_size; /* Total elements to process */
 } CMLFusedKernel;
 
 CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* group);
 void cml_linear_program_free(CMLLinearProgram* prog);
 void cml_linear_program_print(const CMLLinearProgram* prog);
 
-CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog,
-                                    CMLFusedBackend backend,
-                                    size_t work_size);
-CMLFusedKernel* cml_fused_codegen_group(const CMLFusionGroup* group,
-                                          CMLFusedBackend backend);
+CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog, CMLFusedBackend backend,
+                                  size_t work_size);
+CMLFusedKernel* cml_fused_codegen_group(const CMLFusionGroup* group, CMLFusedBackend backend);
 void cml_fused_kernel_free(CMLFusedKernel* kernel);
 void cml_fused_kernel_print(const CMLFusedKernel* kernel);
 char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size);
-uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog,
-                                      size_t work_size, int* out_num_words);
+uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size,
+                                     int* out_num_words);
 
 #ifdef __cplusplus
 }

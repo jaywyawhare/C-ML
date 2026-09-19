@@ -23,15 +23,13 @@
 #include "tensor/realize.h"
 #include "test_harness.h"
 
-static TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                           .has_dtype = true, .has_device = true};
+static TensorConfig cfg = {
+    .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
-static Tensor* mk23(const float* v) {
-    return tensor_from_data((float*)v, (int[]){2, 3}, 2, &cfg);
-}
+static Tensor* mk23(const float* v) { return tensor_from_data((float*)v, (int[]){2, 3}, 2, &cfg); }
 
-static void exec_and_check(const char* name, Tensor* y, const float* want, size_t n,
-                           float tol, int* ok) {
+static void exec_and_check(const char* name, Tensor* y, const float* want, size_t n, float tol,
+                           int* ok) {
     if (!y) {
         printf("  %-34s build failed\n", name);
         *ok = 0;
@@ -60,32 +58,38 @@ static void exec_and_check(const char* name, Tensor* y, const float* want, size_
  * as its primitive expansion. */
 static int test_decompose_composites(void) {
     float a[6] = {1, 2, 3, 4, 5, 6};
-    int ok = 1;
+    int ok     = 1;
 
     /* softmax rows: exp(x - max) / sum */
     {
         Tensor* x = mk23(a);
-        Tensor* y = uop_softmax(x, 1);   /* last axis, explicitly */
+        Tensor* y = uop_softmax(x, 1); /* last axis, explicitly */
         /* row maxes are 3 and 6; verify against hand-computed softmax */
-        static const float want[6] = {
-            0.09003057f, 0.24472847f, 0.66524096f,
-            0.09003057f, 0.24472847f, 0.66524096f};
+        static const float want[6] = {0.09003057f, 0.24472847f, 0.66524096f,
+                                      0.09003057f, 0.24472847f, 0.66524096f};
         exec_and_check("decompose_softmax", y, want, 6, 1e-5f, &ok);
-        tensor_free(x); if (y) tensor_free(y);
+        tensor_free(x);
+        if (y)
+            tensor_free(y);
     }
 
     /* mse loss decomposition */
     {
         Tensor* p = mk23(a);
         Tensor* t = mk23(a);
-        for (int i = 0; i < 6; i++) ((float*)tensor_data_ptr(t))[i] *= 0.5f;
+        for (int i = 0; i < 6; i++)
+            ((float*)tensor_data_ptr(t))[i] *= 0.5f;
         Tensor* l = tensor_mse_loss(p, t);
         /* diffs are p_i - p_i/2 = p_i/2; mean of squares = mean(p^2)/4 */
         float acc = 0.0f;
-        for (int i = 0; i < 6; i++) acc += ((float)(i + 1)) * ((float)(i + 1));
+        for (int i = 0; i < 6; i++)
+            acc += ((float)(i + 1)) * ((float)(i + 1));
         float want = acc / 6.0f / 4.0f;
         exec_and_check("decompose_mse", l, &want, 1, 1e-5f, &ok);
-        tensor_free(p); tensor_free(t); if (l) tensor_free(l);
+        tensor_free(p);
+        tensor_free(t);
+        if (l)
+            tensor_free(l);
     }
 
     return ok;
@@ -95,7 +99,7 @@ static int test_decompose_composites(void) {
 static int test_dce_roots(void) {
     cml_reset_ir_context();
     float a[6] = {1, 2, 3, 4, 5, 6};
-    Tensor* x = mk23(a);
+    Tensor* x  = mk23(a);
 
     /* dead branch: computed then abandoned */
     Tensor* dead = uop_sin(uop_exp(x));
@@ -103,11 +107,12 @@ static int test_dce_roots(void) {
 
     /* live path feeds the result */
     Tensor* live = uop_square(x);
-    Tensor* y = uop_neg(live);
+    Tensor* y    = uop_neg(live);
     tensor_ensure_executed(y);
     int ok = 1;
     for (int i = 0; i < 6; i++) {
-        if (fabsf(((const float*)tensor_data_ptr(y))[i] - (-((float)(i + 1)) * (float)(i + 1))) > 1e-4f)
+        if (fabsf(((const float*)tensor_data_ptr(y))[i] - (-((float)(i + 1)) * (float)(i + 1))) >
+            1e-4f)
             ok = 0;
     }
 
@@ -126,7 +131,11 @@ static int test_dce_roots(void) {
 
     kept->external_refs--;
     tensor_free(kept);
-    tensor_free(y); if (dead) tensor_free(dead); if (live) tensor_free(live);
+    tensor_free(y);
+    if (dead)
+        tensor_free(dead);
+    if (live)
+        tensor_free(live);
     tensor_free(x);
     cml_reset_ir_context();
     return ok;
@@ -137,7 +146,7 @@ static int test_dce_roots(void) {
 static int test_cse_interning(void) {
     cml_reset_ir_context();
     float a[6] = {1, 2, 3, 4, 5, 6};
-    Tensor* x = mk23(a);
+    Tensor* x  = mk23(a);
 
     Tensor* s1 = uop_exp(uop_sqrt(x));
     Tensor* s2 = uop_exp(uop_sqrt(x));
@@ -151,7 +160,11 @@ static int test_cse_interning(void) {
         const float* g = (const float*)tensor_data_ptr(s1);
         ok &= fabsf(g[3] - expf(sqrtf(4.0f))) < 1e-5f;
     }
-    tensor_free(x); if (s1) tensor_free(s1); if (s2) tensor_free(s2);
+    tensor_free(x);
+    if (s1)
+        tensor_free(s1);
+    if (s2)
+        tensor_free(s2);
     cml_reset_ir_context();
     return ok;
 }
@@ -167,18 +180,18 @@ static int test_pattern_matcher_contract(void) {
     CMLPatternNode* add = NULL;
     {
         CMLPatternNode* ins[2] = {any, cap};
-        add = cml_pattern_op(UOP_ADD, ins, 2);
+        add                    = cml_pattern_op(UOP_ADD, ins, 2);
     }
     CMLPatternNode* mul = NULL;
     if (add) {
         CMLPatternNode* ins2[2] = {add, cml_pattern_any()};
-        mul = cml_pattern_op(UOP_MUL, ins2, 2);
+        mul                     = cml_pattern_op(UOP_MUL, ins2, 2);
     }
     ok &= mul != NULL;
     cml_pattern_free(mul);
 
     /* malformed inputs must not crash */
-    cml_pattern_op(UOP_ADD, NULL, 2);       /* NULL inputs with count */
+    cml_pattern_op(UOP_ADD, NULL, 2); /* NULL inputs with count */
     cml_pattern_op(UOP_ADD, NULL, 0);
     cml_pattern_capture(NULL);
     cml_pattern_free(NULL);
@@ -191,9 +204,9 @@ static int test_pattern_matcher_contract(void) {
 static int test_optimize_idempotent(void) {
     cml_reset_ir_context();
     float a[6] = {0.5f, 1.5f, 2.5f, 3.5f, 4.5f, 5.5f};
-    Tensor* x = mk23(a);
+    Tensor* x  = mk23(a);
 
-    Tensor* y = uop_add(uop_mul(x, x), x);   /* x*x + x */
+    Tensor* y     = uop_add(uop_mul(x, x), x); /* x*x + x */
     CMLGraph_t ir = cml_ir_get_or_create_context();
 
     tensor_ensure_executed(y);
@@ -203,13 +216,16 @@ static int test_optimize_idempotent(void) {
     cml_ir_optimize(ir);
     cml_ir_execute(ir);
 
-    int ok = 1;
+    int ok           = 1;
     const float* got = (const float*)tensor_data_ptr(y);
     for (int i = 0; i < 6; i++) {
-        if (fabsf(got[i] - before[i]) > 1e-5f) ok = 0;
+        if (fabsf(got[i] - before[i]) > 1e-5f)
+            ok = 0;
     }
 
-    tensor_free(x); if (y) tensor_free(y);
+    tensor_free(x);
+    if (y)
+        tensor_free(y);
     cml_reset_ir_context();
     return ok;
 }

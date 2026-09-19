@@ -287,7 +287,8 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
     int stack_top      = 0;
     stack[stack_top++] = output;
 
-    CMLGraphNode_t* forward_to_backward = cml_calloc(forward_graph->num_nodes, sizeof(CMLGraphNode_t));
+    CMLGraphNode_t* forward_to_backward =
+        cml_calloc(forward_graph->num_nodes, sizeof(CMLGraphNode_t));
     if (!forward_to_backward) {
         cml_free(stack);
         cml_free(visited);
@@ -540,7 +541,7 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
     if (!graph || graph->num_nodes < 2)
         return 0;
 
-    bool* fused     = cml_calloc(graph->num_nodes, sizeof(bool));
+    bool* fused = cml_calloc(graph->num_nodes, sizeof(bool));
     if (!fused)
         return -1;
 
@@ -576,12 +577,10 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
 
             if (node1->op_type == CML_OP_ADD && consumer->op_type == CML_OP_RELU) {
                 can_fuse = true;
-            }
-            else if (node1->op_type == CML_OP_MUL && consumer->op_type == CML_OP_ADD) {
+            } else if (node1->op_type == CML_OP_MUL && consumer->op_type == CML_OP_ADD) {
                 can_fuse = true;
-            }
-            else if ((node1->op_type == CML_OP_EXP || node1->op_type == CML_OP_LOG) &&
-                     (consumer->op_type == CML_OP_EXP || consumer->op_type == CML_OP_LOG)) {
+            } else if ((node1->op_type == CML_OP_EXP || node1->op_type == CML_OP_LOG) &&
+                       (consumer->op_type == CML_OP_EXP || consumer->op_type == CML_OP_LOG)) {
                 can_fuse = true;
             }
 
@@ -609,7 +608,6 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
                             consumer->num_inputs = node1->num_inputs;
                         }
                     }
-
                 }
             }
         }

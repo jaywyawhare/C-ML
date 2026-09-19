@@ -15,13 +15,13 @@ extern "C" {
  */
 
 /* Core replacements */
-void*  cml_malloc(size_t size);
-void*  cml_calloc(size_t nmemb, size_t size);
-void*  cml_realloc(void* ptr, size_t new_size);
-void   cml_free(void* ptr);
+void* cml_malloc(size_t size);
+void* cml_calloc(size_t nmemb, size_t size);
+void* cml_realloc(void* ptr, size_t new_size);
+void cml_free(void* ptr);
 
 /* String helper */
-char*  cml_strdup(const char* s);
+char* cml_strdup(const char* s);
 
 /* Aligned allocation (alignment must be power of two, >= 16).
  *
@@ -42,14 +42,14 @@ char*  cml_strdup(const char* s);
  * with cml_free() or cml_aligned_free() — those must go through the matching
  * system free() (or cml_malloc/cml_aligned_alloc equivalents end-to-end).
  */
-void*  cml_aligned_alloc(size_t size, size_t alignment);
-void   cml_aligned_free(void* ptr);
+void* cml_aligned_alloc(size_t size, size_t alignment);
+void cml_aligned_free(void* ptr);
 
 /* Stats (approximate, racy) */
-void   cml_allocator_get_stats(size_t* bytes_allocated, size_t* peak_bytes, size_t* alloc_count);
+void cml_allocator_get_stats(size_t* bytes_allocated, size_t* peak_bytes, size_t* alloc_count);
 
 /* Optional: flush this thread's caches back to central (call before thread exit if desired) */
-void   cml_allocator_flush_thread_cache(void);
+void cml_allocator_flush_thread_cache(void);
 
 /* Fault injection for simulation / OOM testing.
  *
@@ -62,9 +62,9 @@ void   cml_allocator_flush_thread_cache(void);
  * cml_malloc_alloc_index(): returns how many allocations have been made since
  *   the last reset — useful to binary-search for the failing site.
  */
-void   cml_malloc_fault_after(int n);
-void   cml_malloc_fault_reset(void);
-long   cml_malloc_alloc_index(void);
+void cml_malloc_fault_after(int n);
+void cml_malloc_fault_reset(void);
+long cml_malloc_alloc_index(void);
 
 #ifdef __cplusplus
 }

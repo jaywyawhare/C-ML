@@ -15,7 +15,8 @@
 
 static int test_dispatch_create(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     if (ctx->initialized) {
         cml_dispatch_free(ctx);
@@ -32,10 +33,10 @@ static int test_dispatch_create(void) {
     return 1;
 }
 
-
 static int test_dispatch_init(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     int result = cml_dispatch_init(ctx);
     if (result != 0) {
@@ -57,10 +58,10 @@ static int test_dispatch_init(void) {
     return 1;
 }
 
-
 static int test_backend_detection(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     int num_backends = cml_dispatch_detect_backends(ctx);
 
@@ -79,33 +80,37 @@ static int test_backend_detection(void) {
     return 1;
 }
 
-
 static int test_backend_names(void) {
     const char* name;
 
     name = cml_dispatch_backend_name(CML_BACKEND_CPU_FALLBACK);
-    if (!name || strlen(name) == 0) return 0;
+    if (!name || strlen(name) == 0)
+        return 0;
 
     name = cml_dispatch_backend_name(CML_BACKEND_CPU_LLVM);
-    if (!name || strlen(name) == 0) return 0;
+    if (!name || strlen(name) == 0)
+        return 0;
 
     name = cml_dispatch_backend_name(CML_BACKEND_CUDA);
-    if (!name || strlen(name) == 0) return 0;
+    if (!name || strlen(name) == 0)
+        return 0;
 
     name = cml_dispatch_backend_name(CML_BACKEND_ROCM);
-    if (!name || strlen(name) == 0) return 0;
+    if (!name || strlen(name) == 0)
+        return 0;
 
     // Invalid backend should return "Unknown"
     name = cml_dispatch_backend_name(CML_BACKEND_COUNT + 1);
-    if (!name) return 0;
+    if (!name)
+        return 0;
 
     return 1;
 }
 
-
 static int test_set_preferred(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     cml_dispatch_detect_backends(ctx);
 
@@ -125,24 +130,27 @@ static int test_set_preferred(void) {
     return 1;
 }
 
-
 static int test_global_context(void) {
     CMLDispatchContext* ctx1 = cml_dispatch_get_global();
-    if (!ctx1) return 0;
+    if (!ctx1)
+        return 0;
 
     CMLDispatchContext* ctx2 = cml_dispatch_get_global();
-    if (!ctx2) return 0;
+    if (!ctx2)
+        return 0;
 
-    if (ctx1 != ctx2) return 0;
-    if (!ctx1->initialized) return 0;
+    if (ctx1 != ctx2)
+        return 0;
+    if (!ctx1->initialized)
+        return 0;
 
     return 1;
 }
 
-
 static int test_backend_info(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     cml_dispatch_detect_backends(ctx);
 
@@ -173,10 +181,10 @@ static int test_backend_info(void) {
     return 1;
 }
 
-
 static int test_best_backend(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     cml_dispatch_detect_backends(ctx);
 
@@ -196,10 +204,10 @@ static int test_best_backend(void) {
     return 1;
 }
 
-
 static int test_dispatch_execute_simple(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     cml_dispatch_init(ctx);
 
@@ -215,8 +223,10 @@ static int test_dispatch_execute_simple(void) {
     Tensor* b = tensor_empty_2d(2, 2);
 
     if (!a || !b) {
-        if (a) tensor_free(a);
-        if (b) tensor_free(b);
+        if (a)
+            tensor_free(a);
+        if (b)
+            tensor_free(b);
         cml_ir_free(ir);
         cml_dispatch_free(ctx);
         return 0;
@@ -248,8 +258,7 @@ static int test_dispatch_execute_simple(void) {
     if (success && result->data) {
         float* r_data = (float*)result->data;
         // Expected: [0+1, 1+2, 2+3, 3+4] = [1, 3, 5, 7]
-        if (r_data[0] != 1.0f || r_data[1] != 3.0f ||
-            r_data[2] != 5.0f || r_data[3] != 7.0f) {
+        if (r_data[0] != 1.0f || r_data[1] != 3.0f || r_data[2] != 5.0f || r_data[3] != 7.0f) {
             success = 0;
         }
     }
@@ -262,16 +271,16 @@ static int test_dispatch_execute_simple(void) {
     return success;
 }
 
-
 static int test_env_backend_selection(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     cml_dispatch_detect_backends(ctx);
 
     // Save original env
     char* original = getenv("BACKEND");
-    char* saved = NULL;
+    char* saved    = NULL;
     if (original) {
         saved = cml_strdup(original);
     }
@@ -302,16 +311,14 @@ static int test_env_backend_selection(void) {
     return 1;
 }
 
-
 static int test_statistics(void) {
     CMLDispatchContext* ctx = cml_dispatch_create();
-    if (!ctx) return 0;
+    if (!ctx)
+        return 0;
 
     cml_dispatch_init(ctx);
 
-    if (ctx->executions_total != 0 ||
-        ctx->cache_hits != 0 ||
-        ctx->cache_misses != 0) {
+    if (ctx->executions_total != 0 || ctx->cache_hits != 0 || ctx->cache_misses != 0) {
         cml_dispatch_free(ctx);
         return 0;
     }
@@ -329,14 +336,16 @@ static int test_statistics(void) {
 
     int success = (ctx->executions_total >= 1);
 
-    if (a) tensor_free(a);
-    if (b) tensor_free(b);
-    if (ir) cml_ir_free(ir);
+    if (a)
+        tensor_free(a);
+    if (b)
+        tensor_free(b);
+    if (ir)
+        cml_ir_free(ir);
     cml_dispatch_free(ctx);
 
     return success;
 }
-
 
 int main(void) {
     printf("\nDispatch Layer Unit Tests\n\n");

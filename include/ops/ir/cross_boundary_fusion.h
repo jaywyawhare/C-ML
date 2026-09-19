@@ -14,9 +14,9 @@ extern "C" {
 #endif
 
 typedef enum {
-    CBF_SOFTMAX_CE = 0,     /* softmax fwd + cross-entropy bwd -> softmax(x) - one_hot(y) */
-    CBF_LAYERNORM_BWD,      /* layernorm fwd + bwd -> keep mean/var in registers */
-    CBF_GELU_BWD,           /* gelu fwd + bwd -> save intermediate sigmoid */
+    CBF_SOFTMAX_CE = 0, /* softmax fwd + cross-entropy bwd -> softmax(x) - one_hot(y) */
+    CBF_LAYERNORM_BWD,  /* layernorm fwd + bwd -> keep mean/var in registers */
+    CBF_GELU_BWD,       /* gelu fwd + bwd -> save intermediate sigmoid */
     CBF_PATTERN_COUNT
 } CMLCrossBoundaryPatternType;
 
@@ -33,16 +33,13 @@ typedef struct CMLCrossBoundaryStats {
     size_t flops_saved;
 } CMLCrossBoundaryStats;
 
-int cml_cross_boundary_analyze(CMLFusionSchedule* sched,
-                               CMLCrossBoundaryFusion** out, int* count);
+int cml_cross_boundary_analyze(CMLFusionSchedule* sched, CMLCrossBoundaryFusion** out, int* count);
 
-int cml_cross_boundary_fuse(CMLFusionSchedule* sched,
-                            CMLCrossBoundaryFusion* fusions, int count);
+int cml_cross_boundary_fuse(CMLFusionSchedule* sched, CMLCrossBoundaryFusion* fusions, int count);
 
 void cml_cross_boundary_fusions_free(CMLCrossBoundaryFusion* fusions);
 
-CMLCrossBoundaryStats cml_cross_boundary_stats(const CMLCrossBoundaryFusion* fusions,
-                                               int count);
+CMLCrossBoundaryStats cml_cross_boundary_stats(const CMLCrossBoundaryFusion* fusions, int count);
 
 #ifdef __cplusplus
 }

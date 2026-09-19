@@ -51,8 +51,9 @@ static void leaky_relu_free(Module* module) { cml_free(module); }
 LeakyReLU* nn_leaky_relu(float negative_slope, bool inplace) {
     LeakyReLU* leaky_relu = cml_malloc(sizeof(LeakyReLU));
     if (!leaky_relu) {
-        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for LeakyReLU layer",
-                         __FILE__, __LINE__, __func__);
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
+                         "Failed to allocate memory for LeakyReLU layer", __FILE__, __LINE__,
+                         __func__);
         return NULL;
     }
 
@@ -149,7 +150,8 @@ static Tensor* gelu_forward(Module* module, Tensor* input) {
         return NULL;
     }
 
-    Tensor* sqrt_const = uop_fill_ex(input_shape, input_ndim, sqrt_2_pi, input->dtype, input->device);
+    Tensor* sqrt_const =
+        uop_fill_ex(input_shape, input_ndim, sqrt_2_pi, input->dtype, input->device);
     if (!sqrt_const) {
         tensor_free(ones);
         tensor_free(half_const);
@@ -264,8 +266,9 @@ static void log_softmax_free(Module* module) { cml_free(module); }
 LogSoftmax* nn_log_softmax(int dim) {
     LogSoftmax* log_softmax = cml_malloc(sizeof(LogSoftmax));
     if (!log_softmax) {
-        error_stack_push(CM_MEMORY_ALLOCATION_ERROR, "Failed to allocate memory for LogSoftmax layer",
-                         __FILE__, __LINE__, __func__);
+        error_stack_push(CM_MEMORY_ALLOCATION_ERROR,
+                         "Failed to allocate memory for LogSoftmax layer", __FILE__, __LINE__,
+                         __func__);
         return NULL;
     }
 
@@ -499,9 +502,9 @@ static Tensor* hardswish_forward(Module* module, Tensor* input) {
     Tensor* x_plus_3 = uop_add(input, three);
 
     Tensor* clamped_low = uop_max(x_plus_3, zeros);
-    Tensor* cmp_six = uop_cmplt(clamped_low, six);
-    WhereParams wp  = {.cond = cmp_six, .a = clamped_low, .b = six};
-    Tensor* clamped = uop_where(&wp);
+    Tensor* cmp_six     = uop_cmplt(clamped_low, six);
+    WhereParams wp      = {.cond = cmp_six, .a = clamped_low, .b = six};
+    Tensor* clamped     = uop_where(&wp);
 
     Tensor* scaled = uop_div(clamped, six);
     return uop_mul(input, scaled);

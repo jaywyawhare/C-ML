@@ -10,8 +10,8 @@
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
 
-SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values,
-                                  const int* dense_shape, int dense_ndim) {
+SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values, const int* dense_shape,
+                                 int dense_ndim) {
     if (!indices || !values || !dense_shape || dense_ndim <= 0) {
         LOG_ERROR("sparse_coo_tensor: invalid arguments");
         return NULL;
@@ -34,8 +34,7 @@ SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values,
     int ndim = indices->shape[1];
 
     if (nnz != values->shape[0]) {
-        LOG_ERROR("sparse_coo_tensor: indices nnz (%d) != values nnz (%d)",
-                  nnz, values->shape[0]);
+        LOG_ERROR("sparse_coo_tensor: indices nnz (%d) != values nnz (%d)", nnz, values->shape[0]);
         return NULL;
     }
 
@@ -56,8 +55,10 @@ SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values,
 
     if (!sparse->indices || !sparse->values) {
         LOG_ERROR("sparse_coo_tensor: failed to clone indices or values");
-        if (sparse->indices) tensor_free(sparse->indices);
-        if (sparse->values) tensor_free(sparse->values);
+        if (sparse->indices)
+            tensor_free(sparse->indices);
+        if (sparse->values)
+            tensor_free(sparse->values);
         cml_free(sparse);
         return NULL;
     }
@@ -108,7 +109,7 @@ SparseCOOData* sparse_from_dense(Tensor* dense) {
     int ndim = dense->ndim;
 
     /* Allocate indices [nnz, ndim] as INT32 and values [nnz] as same dtype */
-    int idx_shape[] = {nnz, ndim};
+    int idx_shape[]         = {nnz, ndim};
     TensorConfig idx_config = (TensorConfig){
         .dtype = DTYPE_INT32, .device = dense->device, .has_dtype = true, .has_device = true};
 
@@ -118,10 +119,10 @@ SparseCOOData* sparse_from_dense(Tensor* dense) {
     } else {
         /* For zero nnz, create a minimal tensor */
         int zero_shape[] = {0, ndim};
-        indices = tensor_empty(zero_shape, 2, &idx_config);
+        indices          = tensor_empty(zero_shape, 2, &idx_config);
     }
 
-    int val_shape[] = {nnz};
+    int val_shape[]         = {nnz};
     TensorConfig val_config = (TensorConfig){
         .dtype = dense->dtype, .device = dense->device, .has_dtype = true, .has_device = true};
     Tensor* values = NULL;
@@ -129,12 +130,14 @@ SparseCOOData* sparse_from_dense(Tensor* dense) {
         values = tensor_empty(val_shape, 1, &val_config);
     } else {
         int zero_shape[] = {0};
-        values = tensor_empty(zero_shape, 1, &val_config);
+        values           = tensor_empty(zero_shape, 1, &val_config);
     }
 
     if (!indices || !values) {
-        if (indices) tensor_free(indices);
-        if (values) tensor_free(values);
+        if (indices)
+            tensor_free(indices);
+        if (values)
+            tensor_free(values);
         LOG_ERROR("sparse_from_dense: failed to allocate index/value tensors");
         return NULL;
     }
@@ -189,8 +192,8 @@ SparseCOOData* sparse_from_dense(Tensor* dense) {
     }
     memcpy(sparse->dense_shape, dense->shape, ndim * sizeof(int));
 
-    LOG_DEBUG("sparse_from_dense: converted to sparse with nnz=%d out of %zu elements",
-              nnz, dense->numel);
+    LOG_DEBUG("sparse_from_dense: converted to sparse with nnz=%d out of %zu elements", nnz,
+              dense->numel);
     return sparse;
 }
 
@@ -230,7 +233,7 @@ Tensor* sparse_to_dense(SparseCOOData* sparse, const TensorConfig* config) {
     /* Place each non-zero value at its coordinate in the dense tensor */
     for (int i = 0; i < sparse->nnz; i++) {
         /* Compute flat index from multi-dimensional coordinates */
-        size_t flat = 0;
+        size_t flat   = 0;
         size_t stride = 1;
         for (int d = ndim - 1; d >= 0; d--) {
             flat += (size_t)idx_data[i * ndim + d] * stride;
@@ -251,11 +254,12 @@ Tensor* sparse_to_dense(SparseCOOData* sparse, const TensorConfig* config) {
  * autograd engines read them without special-casing. Returns NULL on failure
  * and owns nothing else. */
 static Tensor* spmm_split_coords(SparseCOOData* sparse, int column) {
-    int shape[] = {sparse->nnz};
-    TensorConfig cfg =
-        (TensorConfig){.dtype = DTYPE_INT32, .device = sparse->indices->device,
-                       .has_dtype = true, .has_device = true};
-    Tensor* out = tensor_empty(shape, 1, &cfg);
+    int shape[]      = {sparse->nnz};
+    TensorConfig cfg = (TensorConfig){.dtype      = DTYPE_INT32,
+                                      .device     = sparse->indices->device,
+                                      .has_dtype  = true,
+                                      .has_device = true};
+    Tensor* out      = tensor_empty(shape, 1, &cfg);
     if (!out)
         return NULL;
     if (sparse->nnz > 0) {
@@ -292,13 +296,13 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
     int N = dense->shape[1];
 
     if (K != dense->shape[0]) {
-        LOG_ERROR("sparse_matmul: dimension mismatch - sparse cols (%d) != dense rows (%d)",
-                  K, dense->shape[0]);
+        LOG_ERROR("sparse_matmul: dimension mismatch - sparse cols (%d) != dense rows (%d)", K,
+                  dense->shape[0]);
         return NULL;
     }
 
     /* Create output [M, N] */
-    int out_shape[] = {M, N};
+    int out_shape[]     = {M, N};
     TensorConfig config = (TensorConfig){
         .dtype = dense->dtype, .device = dense->device, .has_dtype = true, .has_device = true};
 
@@ -306,8 +310,7 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
      * the FILL node tensor_zeros creates would join the same graph as the
      * SPMM node below, and realizing that node during backward would re-zero
      * the already-computed result. */
-    bool any_grad = dense->requires_grad ||
-                    (sparse->values && sparse->values->requires_grad);
+    bool any_grad  = dense->requires_grad || (sparse->values && sparse->values->requires_grad);
     Tensor* output = NULL;
     if (any_grad) {
         output = tensor_empty(out_shape, 2, &config);
@@ -347,13 +350,13 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
         if (sparse->nnz > 0) {
             const int32_t* idx_data = (const int32_t*)sparse->indices->data;
             for (int i = 0; i < sparse->nnz && coords_valid; i++) {
-                int row = idx_data[i * 2 + 0];
-                int col = idx_data[i * 2 + 1];
+                int row      = idx_data[i * 2 + 0];
+                int col      = idx_data[i * 2 + 1];
                 coords_valid = row >= 0 && row < M && col >= 0 && col < K;
             }
         }
-        Tensor* rows = NULL;
-        Tensor* cols = NULL;
+        Tensor* rows  = NULL;
+        Tensor* cols  = NULL;
         CMLGraph_t ir = NULL;
         bool attached = false;
         if (coords_valid)
@@ -365,25 +368,25 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
         if (ir) {
             SpMMParams* params = cml_malloc(sizeof(SpMMParams));
             if (params) {
-                params->M = M;
-                params->K = K;
+                params->M        = M;
+                params->K        = K;
                 Tensor* inputs[] = {sparse->indices, sparse->values, dense, rows, cols};
                 if (cml_ir_add_uop(ir, UOP_SPMM, inputs, 5, params) == 0) {
                     struct IRNode* node = cml_ir_get_tail(ir);
                     if (node) {
-                        node->output_shape = tensor_shape_copy(out_shape, 2);
-                        node->output_ndim  = 2;
-                        node->output_dtype = dense->dtype;
-                        node->output_device = dense->device;
+                        node->output_shape        = tensor_shape_copy(out_shape, 2);
+                        node->output_ndim         = 2;
+                        node->output_dtype        = dense->dtype;
+                        node->output_device       = dense->device;
                         node->requires_grad       = true;
                         node->needs_input_grad[1] = sparse->values->requires_grad;
                         node->needs_input_grad[2] = dense->requires_grad;
-                        output->ir_node    = node;
-                        output->ir_context = ir;
-                        node->output       = output;
-                        node->is_executed      = true;
-                        output->is_executed    = true;
-                        attached               = true;
+                        output->ir_node           = node;
+                        output->ir_context        = ir;
+                        node->output              = output;
+                        node->is_executed         = true;
+                        output->is_executed       = true;
+                        attached                  = true;
                     }
                 }
             }
@@ -392,8 +395,10 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
             LOG_WARNING("sparse_matmul: could not record SPMM node — "
                         "output will not be differentiable");
             output->requires_grad = false;
-            if (rows) tensor_free(rows);
-            if (cols) tensor_free(cols);
+            if (rows)
+                tensor_free(rows);
+            if (cols)
+                tensor_free(cols);
         }
     }
 
@@ -401,10 +406,10 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
         return output;
     }
 
-    int32_t* idx_data   = (int32_t*)sparse->indices->data;
-    float* val_data     = (float*)sparse->values->data;
-    float* dense_data   = (float*)dense->data;
-    float* out_data     = (float*)output->data;
+    int32_t* idx_data = (int32_t*)sparse->indices->data;
+    float* val_data   = (float*)sparse->values->data;
+    float* dense_data = (float*)dense->data;
+    float* out_data   = (float*)output->data;
 
     if (!idx_data || !val_data || !dense_data || !out_data) {
         LOG_ERROR("sparse_matmul: NULL data pointers");
@@ -426,8 +431,7 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
         }
     }
 
-    LOG_DEBUG("sparse_matmul: [%d,%d] sparse x [%d,%d] dense -> [%d,%d]",
-              M, K, K, N, M, N);
+    LOG_DEBUG("sparse_matmul: [%d,%d] sparse x [%d,%d] dense -> [%d,%d]", M, K, K, N, M, N);
     return output;
 }
 

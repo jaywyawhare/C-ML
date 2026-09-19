@@ -33,10 +33,10 @@ typedef struct MultiHeadAttention {
     FlashAttentionConfig flash_config;
 } MultiHeadAttention;
 
-MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float dropout,
-                                            DType dtype, DeviceType device);
+MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float dropout, DType dtype,
+                                           DeviceType device);
 Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key,
-                                     Tensor* value, Tensor* mask);
+                                    Tensor* value, Tensor* mask);
 /* Like multihead_attention_forward, plus an additive attention bias
  * broadcastable to the per-head score shape [B, H, S_q, S_k] (T5-style). */
 Tensor* multihead_attention_forward_bias(MultiHeadAttention* mha, Tensor* query, Tensor* key,
@@ -61,21 +61,22 @@ typedef struct TransformerEncoderLayer {
 } TransformerEncoderLayer;
 
 TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, int dim_feedforward,
-                                                       float dropout, DType dtype, DeviceType device);
+                                                      float dropout, DType dtype,
+                                                      DeviceType device);
 
 typedef struct TransformerEncoder {
     Module base;
     int num_layers;
     int d_model;
     TransformerEncoderLayer** layers;
-    Parameter* norm_weight;  // Final layer norm [d_model]
-    Parameter* norm_bias;    // Final layer norm [d_model]
+    Parameter* norm_weight; // Final layer norm [d_model]
+    Parameter* norm_bias;   // Final layer norm [d_model]
     float norm_eps;
 } TransformerEncoder;
 
 TransformerEncoder* nn_transformer_encoder(int d_model, int nhead, int dim_feedforward,
-                                            float dropout, int num_layers,
-                                            DType dtype, DeviceType device);
+                                           float dropout, int num_layers, DType dtype,
+                                           DeviceType device);
 
 typedef struct TransformerDecoderLayer {
     Module base;
@@ -83,61 +84,61 @@ typedef struct TransformerDecoderLayer {
     int nhead;
     int dim_feedforward;
     float dropout;
-    MultiHeadAttention* self_attn;   // Self-attention
-    MultiHeadAttention* cross_attn;  // Cross-attention (encoder-decoder)
-    Parameter* linear1_weight;  // [dim_feedforward, d_model]
-    Parameter* linear1_bias;    // [dim_feedforward]
-    Parameter* linear2_weight;  // [d_model, dim_feedforward]
-    Parameter* linear2_bias;    // [d_model]
-    Parameter* norm1_weight;    // [d_model] (after self-attn)
+    MultiHeadAttention* self_attn;  // Self-attention
+    MultiHeadAttention* cross_attn; // Cross-attention (encoder-decoder)
+    Parameter* linear1_weight;      // [dim_feedforward, d_model]
+    Parameter* linear1_bias;        // [dim_feedforward]
+    Parameter* linear2_weight;      // [d_model, dim_feedforward]
+    Parameter* linear2_bias;        // [d_model]
+    Parameter* norm1_weight;        // [d_model] (after self-attn)
     Parameter* norm1_bias;
-    Parameter* norm2_weight;    // [d_model] (after cross-attn)
+    Parameter* norm2_weight; // [d_model] (after cross-attn)
     Parameter* norm2_bias;
-    Parameter* norm3_weight;    // [d_model] (after FFN)
+    Parameter* norm3_weight; // [d_model] (after FFN)
     Parameter* norm3_bias;
     float norm_eps;
 } TransformerDecoderLayer;
 
 TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, int dim_feedforward,
-                                                       float dropout, DType dtype, DeviceType device);
+                                                      float dropout, DType dtype,
+                                                      DeviceType device);
 
 Tensor* transformer_decoder_layer_forward(TransformerDecoderLayer* layer, Tensor* tgt,
-                                           Tensor* memory, Tensor* tgt_mask, Tensor* memory_mask);
+                                          Tensor* memory, Tensor* tgt_mask, Tensor* memory_mask);
 
 typedef struct TransformerDecoder {
     Module base;
     int num_layers;
     int d_model;
     TransformerDecoderLayer** layers;
-    Parameter* norm_weight;  // Final layer norm [d_model]
+    Parameter* norm_weight; // Final layer norm [d_model]
     Parameter* norm_bias;
     float norm_eps;
 } TransformerDecoder;
 
 TransformerDecoder* nn_transformer_decoder(int d_model, int nhead, int dim_feedforward,
-                                            float dropout, int num_layers,
-                                            DType dtype, DeviceType device);
+                                           float dropout, int num_layers, DType dtype,
+                                           DeviceType device);
 
 typedef struct KVCache {
-    Tensor* key_cache;    // [batch, num_heads, max_seq_len, head_dim]
-    Tensor* value_cache;  // [batch, num_heads, max_seq_len, head_dim]
+    Tensor* key_cache;   // [batch, num_heads, max_seq_len, head_dim]
+    Tensor* value_cache; // [batch, num_heads, max_seq_len, head_dim]
     int max_seq_len;
     int current_len;
 } KVCache;
 
-KVCache* kv_cache_create(int batch, int num_heads, int max_seq_len, int head_dim,
-                          DType dtype, DeviceType device);
+KVCache* kv_cache_create(int batch, int num_heads, int max_seq_len, int head_dim, DType dtype,
+                         DeviceType device);
 
 void kv_cache_free(KVCache* cache);
 
 void kv_cache_reset(KVCache* cache);
 
-Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key,
-                                 Tensor* value, Tensor* mask, FlashAttentionConfig* config);
+Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key, Tensor* value,
+                                Tensor* mask, FlashAttentionConfig* config);
 
-Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* query,
-                                            Tensor* key, Tensor* value,
-                                            Tensor* mask, KVCache* cache);
+Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* query, Tensor* key,
+                                           Tensor* value, Tensor* mask, KVCache* cache);
 
 void multihead_attention_set_flash(MultiHeadAttention* mha, bool enabled, bool causal);
 

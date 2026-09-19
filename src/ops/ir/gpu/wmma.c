@@ -13,7 +13,8 @@
 
 static CMLCUDABackend* wmma_get_cuda_backend(void) {
     CMLDispatchContext* ctx = cml_dispatch_get_global();
-    if (!ctx) return NULL;
+    if (!ctx)
+        return NULL;
     return (CMLCUDABackend*)ctx->backend_contexts[CML_BACKEND_CUDA];
 }
 
@@ -29,8 +30,10 @@ bool cml_wmma_available(void) {
 }
 
 int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
-    if (!config) return -1;
-    if (!cml_wmma_available()) return -1;
+    if (!config)
+        return -1;
+    if (!cml_wmma_available())
+        return -1;
 
     memset(config, 0, sizeof(WMMAConfig));
 
@@ -45,19 +48,19 @@ int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
      */
     if (M >= 16 && N >= 16) {
         config->fragment = WMMA_M16N16K16;
-        config->M = 16;
-        config->N = 16;
-        config->K = 16;
+        config->M        = 16;
+        config->N        = 16;
+        config->K        = 16;
     } else if (M >= 32 && N >= 8) {
         config->fragment = WMMA_M32N8K16;
-        config->M = 32;
-        config->N = 8;
-        config->K = 16;
+        config->M        = 32;
+        config->N        = 8;
+        config->K        = 16;
     } else if (M >= 8 && N >= 32) {
         config->fragment = WMMA_M8N32K16;
-        config->M = 8;
-        config->N = 32;
-        config->K = 16;
+        config->M        = 8;
+        config->N        = 32;
+        config->K        = 16;
     } else {
         /* Problem too small for WMMA -- fall back */
         LOG_DEBUG("WMMA: Problem dimensions %dx%dx%d too small", M, N, K);
@@ -69,14 +72,13 @@ int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
      * block_m/n are the number of tiles along M/N covered by one thread
      * block; block_k is the K-dimension tile size.
      */
-    config->warp_m = 1;
-    config->warp_n = 1;
+    config->warp_m  = 1;
+    config->warp_n  = 1;
     config->block_m = config->M * config->warp_m;
     config->block_n = config->N * config->warp_n;
     config->block_k = config->K;
 
-    LOG_DEBUG("WMMA config: fragment=%dx%dx%d  block=%dx%dx%d",
-              config->M, config->N, config->K,
+    LOG_DEBUG("WMMA config: fragment=%dx%dx%d  block=%dx%dx%d", config->M, config->N, config->K,
               config->block_m, config->block_n, config->block_k);
 
     (void)K; /* K only used for logging / future heuristics */
@@ -85,13 +87,13 @@ int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
 
 #define WMMA_SRC_MAX 8192
 
-static void src_appendf(char** buf, size_t* cap, size_t* len,
-                         const char* fmt, ...) {
+static void src_appendf(char** buf, size_t* cap, size_t* len, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
     int needed = vsnprintf(NULL, 0, fmt, ap);
     va_end(ap);
-    if (needed < 0) return;
+    if (needed < 0)
+        return;
 
     while (*len + (size_t)needed + 1 > *cap) {
         *cap *= 2;
@@ -110,13 +112,16 @@ static void src_appendf(char** buf, size_t* cap, size_t* len,
 }
 
 char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
-    if (!config) return NULL;
-    if (M <= 0 || N <= 0 || K <= 0) return NULL;
+    if (!config)
+        return NULL;
+    if (M <= 0 || N <= 0 || K <= 0)
+        return NULL;
 
     size_t cap = WMMA_SRC_MAX;
     size_t len = 0;
-    char* src = (char*)cml_malloc(cap);
-    if (!src) return NULL;
+    char* src  = (char*)cml_malloc(cap);
+    if (!src)
+        return NULL;
     src[0] = '\0';
 
     int frag_m = config->M;
@@ -124,86 +129,80 @@ char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
     int frag_k = config->K;
 
     src_appendf(&src, &cap, &len,
-        "#include <mma.h>\n"
-        "#include <cuda_fp16.h>\n"
-        "\n"
-        "using namespace nvcuda;\n"
-        "\n");
+                "#include <mma.h>\n"
+                "#include <cuda_fp16.h>\n"
+                "\n"
+                "using namespace nvcuda;\n"
+                "\n");
 
     src_appendf(&src, &cap, &len,
-        "extern \"C\" __global__\n"
-        "void wmma_matmul(const half* __restrict__ A,\n"
-        "                  const half* __restrict__ B,\n"
-        "                  float*      __restrict__ C,\n"
-        "                  int M_total, int N_total, int K_total) {\n"
-        "\n");
+                "extern \"C\" __global__\n"
+                "void wmma_matmul(const half* __restrict__ A,\n"
+                "                  const half* __restrict__ B,\n"
+                "                  float*      __restrict__ C,\n"
+                "                  int M_total, int N_total, int K_total) {\n"
+                "\n");
 
     src_appendf(&src, &cap, &len,
-        "    // Fragment dimensions: %dx%dx%d\n"
-        "    wmma::fragment<wmma::matrix_a, %d, %d, %d, half, wmma::row_major> frag_a;\n"
-        "    wmma::fragment<wmma::matrix_b, %d, %d, %d, half, wmma::row_major> frag_b;\n"
-        "    wmma::fragment<wmma::accumulator, %d, %d, %d, float> frag_c;\n"
-        "\n",
-        frag_m, frag_n, frag_k,
-        frag_m, frag_n, frag_k,
-        frag_m, frag_n, frag_k,
-        frag_m, frag_n, frag_k);
+                "    // Fragment dimensions: %dx%dx%d\n"
+                "    wmma::fragment<wmma::matrix_a, %d, %d, %d, half, wmma::row_major> frag_a;\n"
+                "    wmma::fragment<wmma::matrix_b, %d, %d, %d, half, wmma::row_major> frag_b;\n"
+                "    wmma::fragment<wmma::accumulator, %d, %d, %d, float> frag_c;\n"
+                "\n",
+                frag_m, frag_n, frag_k, frag_m, frag_n, frag_k, frag_m, frag_n, frag_k, frag_m,
+                frag_n, frag_k);
 
     src_appendf(&src, &cap, &len,
-        "    // Each warp computes one %dx%d output tile\n"
-        "    int warpId = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;\n"
-        "    int numWarpsN = (N_total + %d - 1) / %d;\n"
-        "    int warpRow = (warpId / numWarpsN) * %d;\n"
-        "    int warpCol = (warpId %% numWarpsN) * %d;\n"
-        "\n"
-        "    // Bounds check: skip warps outside the output matrix\n"
-        "    if (warpRow >= M_total || warpCol >= N_total) return;\n"
-        "\n",
-        frag_m, frag_n,
-        frag_n, frag_n,
-        frag_m,
-        frag_n);
+                "    // Each warp computes one %dx%d output tile\n"
+                "    int warpId = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;\n"
+                "    int numWarpsN = (N_total + %d - 1) / %d;\n"
+                "    int warpRow = (warpId / numWarpsN) * %d;\n"
+                "    int warpCol = (warpId %% numWarpsN) * %d;\n"
+                "\n"
+                "    // Bounds check: skip warps outside the output matrix\n"
+                "    if (warpRow >= M_total || warpCol >= N_total) return;\n"
+                "\n",
+                frag_m, frag_n, frag_n, frag_n, frag_m, frag_n);
 
     src_appendf(&src, &cap, &len,
-        "    // Zero the accumulator fragment\n"
-        "    wmma::fill_fragment(frag_c, 0.0f);\n"
-        "\n");
+                "    // Zero the accumulator fragment\n"
+                "    wmma::fill_fragment(frag_c, 0.0f);\n"
+                "\n");
 
     src_appendf(&src, &cap, &len,
-        "    // Tiled loop over K dimension\n"
-        "    for (int k = 0; k < K_total; k += %d) {\n"
-        "        // Load A tile: A[warpRow .. warpRow+%d, k .. k+%d]\n"
-        "        const half* a_ptr = A + warpRow * K_total + k;\n"
-        "        wmma::load_matrix_sync(frag_a, a_ptr, K_total);\n"
-        "\n"
-        "        // Load B tile: B[k .. k+%d, warpCol .. warpCol+%d]\n"
-        "        const half* b_ptr = B + k * N_total + warpCol;\n"
-        "        wmma::load_matrix_sync(frag_b, b_ptr, N_total);\n"
-        "\n"
-        "        // Multiply-accumulate: C += A * B\n"
-        "        wmma::mma_sync(frag_c, frag_a, frag_b, frag_c);\n"
-        "    }\n"
-        "\n",
-        frag_k,
-        frag_m, frag_k,
-        frag_k, frag_n);
+                "    // Tiled loop over K dimension\n"
+                "    for (int k = 0; k < K_total; k += %d) {\n"
+                "        // Load A tile: A[warpRow .. warpRow+%d, k .. k+%d]\n"
+                "        const half* a_ptr = A + warpRow * K_total + k;\n"
+                "        wmma::load_matrix_sync(frag_a, a_ptr, K_total);\n"
+                "\n"
+                "        // Load B tile: B[k .. k+%d, warpCol .. warpCol+%d]\n"
+                "        const half* b_ptr = B + k * N_total + warpCol;\n"
+                "        wmma::load_matrix_sync(frag_b, b_ptr, N_total);\n"
+                "\n"
+                "        // Multiply-accumulate: C += A * B\n"
+                "        wmma::mma_sync(frag_c, frag_a, frag_b, frag_c);\n"
+                "    }\n"
+                "\n",
+                frag_k, frag_m, frag_k, frag_k, frag_n);
 
     src_appendf(&src, &cap, &len,
-        "    // Store the result tile to C[warpRow, warpCol]\n"
-        "    float* c_ptr = C + warpRow * N_total + warpCol;\n"
-        "    wmma::store_matrix_sync(c_ptr, frag_c, N_total, wmma::mem_row_major);\n"
-        "}\n");
+                "    // Store the result tile to C[warpRow, warpCol]\n"
+                "    float* c_ptr = C + warpRow * N_total + warpCol;\n"
+                "    wmma::store_matrix_sync(c_ptr, frag_c, N_total, wmma::mem_row_major);\n"
+                "}\n");
 
-    LOG_DEBUG("WMMA: Generated kernel for %dx%dx%d (fragment %dx%dx%d), %zu bytes",
-              M, N, K, frag_m, frag_n, frag_k, len);
+    LOG_DEBUG("WMMA: Generated kernel for %dx%dx%d (fragment %dx%dx%d), %zu bytes", M, N, K, frag_m,
+              frag_n, frag_k, len);
 
     return src;
 }
 
-int cml_wmma_matmul(const void* A, const void* B, void* C,
-                    int M, int N, int K) {
-    if (!A || !B || !C) return -1;
-    if (M <= 0 || N <= 0 || K <= 0) return -1;
+int cml_wmma_matmul(const void* A, const void* B, void* C, int M, int N, int K) {
+    if (!A || !B || !C)
+        return -1;
+    if (M <= 0 || N <= 0 || K <= 0)
+        return -1;
 
     if (!cml_wmma_available()) {
         LOG_WARNING("WMMA not available, cannot perform Tensor Core matmul");
@@ -240,21 +239,18 @@ int cml_wmma_matmul(const void* A, const void* B, void* C,
      * One warp (32 threads) per output tile.
      * Total warps needed = ceil(M/frag_m) * ceil(N/frag_n)
      */
-    int tiles_m = (M + config.M - 1) / config.M;
-    int tiles_n = (N + config.N - 1) / config.N;
-    int total_warps = tiles_m * tiles_n;
+    int tiles_m       = (M + config.M - 1) / config.M;
+    int tiles_n       = (N + config.N - 1) / config.N;
+    int total_warps   = tiles_m * tiles_n;
     int total_threads = total_warps * 32;
 
     int block_size = 256; /* must be multiple of 32 */
-    int grid_size = (total_threads + block_size - 1) / block_size;
+    int grid_size  = (total_threads + block_size - 1) / block_size;
 
     cml_cuda_kernel_set_launch_config(kernel, grid_size, 1, 1, block_size, 1, 1);
 
     int M_arg = M, N_arg = N, K_arg = K;
-    void* args[] = {
-        (void*)&A, (void*)&B, (void*)&C,
-        (void*)&M_arg, (void*)&N_arg, (void*)&K_arg
-    };
+    void* args[] = {(void*)&A, (void*)&B, (void*)&C, (void*)&M_arg, (void*)&N_arg, (void*)&K_arg};
 
     int result = cml_cuda_launch_kernel(cuda, kernel, args, 6);
     if (result == 0)
@@ -270,23 +266,31 @@ int cml_wmma_matmul(const void* A, const void* B, void* C,
 
 #else /* !CML_HAS_CUDA */
 
-bool cml_wmma_available(void) {
-    return false;
-}
+bool cml_wmma_available(void) { return false; }
 
 int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
-    (void)M; (void)N; (void)K; (void)config;
+    (void)M;
+    (void)N;
+    (void)K;
+    (void)config;
     return -1;
 }
 
 char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
-    (void)config; (void)M; (void)N; (void)K;
+    (void)config;
+    (void)M;
+    (void)N;
+    (void)K;
     return NULL;
 }
 
-int cml_wmma_matmul(const void* A, const void* B, void* C,
-                    int M, int N, int K) {
-    (void)A; (void)B; (void)C; (void)M; (void)N; (void)K;
+int cml_wmma_matmul(const void* A, const void* B, void* C, int M, int N, int K) {
+    (void)A;
+    (void)B;
+    (void)C;
+    (void)M;
+    (void)N;
+    (void)K;
     return -1;
 }
 

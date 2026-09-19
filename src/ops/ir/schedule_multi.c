@@ -12,80 +12,94 @@ static bool tensor_on_device(const Tensor* t, int device_id) {
 }
 
 static int device_for_tensor(const Tensor* t, const int* device_ids, int n) {
-    if (!t) return device_ids[0];
+    if (!t)
+        return device_ids[0];
     for (int i = 0; i < n; ++i)
-        if ((int)t->device == device_ids[i]) return i;
+        if ((int)t->device == device_ids[i])
+            return i;
     return 0;
 }
 
-static CrossDeviceOp* xfer_create(XferDirection dir, int src, int dst, Tensor* t) __attribute__((unused));
-static CrossDeviceOp* xfer_create(XferDirection dir,
-                                  int src, int dst, Tensor* t) {
+static CrossDeviceOp* xfer_create(XferDirection dir, int src, int dst, Tensor* t)
+    __attribute__((unused));
+static CrossDeviceOp* xfer_create(XferDirection dir, int src, int dst, Tensor* t) {
     CrossDeviceOp* op = cml_calloc(1, sizeof(CrossDeviceOp));
-    if (!op) return NULL;
-    op->direction    = dir;
+    if (!op)
+        return NULL;
+    op->direction     = dir;
     op->src_device_id = src;
     op->dst_device_id = dst;
-    op->tensor       = t;
-    if (t) op->byte_size = t->numel * cml_dtype_size(t->dtype);
+    op->tensor        = t;
+    if (t)
+        op->byte_size = t->numel * cml_dtype_size(t->dtype);
     op->p2p_possible = devices_p2p_capable(src, dst);
     return op;
 }
 
 bool devices_p2p_capable(int dev_a, int dev_b) {
-    
-    (void)dev_a; (void)dev_b;
+
+    (void)dev_a;
+    (void)dev_b;
     return false;
 }
 
-MultiDeviceSchedule* multi_schedule_build(CMLSchedule* sched,
-                                          const int* device_ids,
+MultiDeviceSchedule* multi_schedule_build(CMLSchedule* sched, const int* device_ids,
                                           int num_devices) {
-    if (!sched || !device_ids || num_devices <= 0) return NULL;
+    if (!sched || !device_ids || num_devices <= 0)
+        return NULL;
 
     MultiDeviceSchedule* ms = cml_calloc(1, sizeof(MultiDeviceSchedule));
-    if (!ms) return NULL;
+    if (!ms)
+        return NULL;
 
-    ms->num_devices    = num_devices;
-    ms->device_ids     = cml_malloc((size_t)num_devices * sizeof(int));
+    ms->num_devices      = num_devices;
+    ms->device_ids       = cml_malloc((size_t)num_devices * sizeof(int));
     ms->device_schedules = cml_calloc((size_t)num_devices, sizeof(CMLSchedule*));
-    if (!ms->device_ids || !ms->device_schedules) goto fail;
+    if (!ms->device_ids || !ms->device_schedules)
+        goto fail;
     memcpy(ms->device_ids, device_ids, (size_t)num_devices * sizeof(int));
 
     for (int d = 0; d < num_devices; ++d) {
         ms->device_schedules[d] = cml_calloc(1, sizeof(CMLSchedule));
-        if (!ms->device_schedules[d]) goto fail;
-        ms->device_schedules[d]->items = cml_malloc(
-            (size_t)sched->num_items * sizeof(CMLScheduleItem*));
-        if (!ms->device_schedules[d]->items) goto fail;
+        if (!ms->device_schedules[d])
+            goto fail;
+        ms->device_schedules[d]->items =
+            cml_malloc((size_t)sched->num_items * sizeof(CMLScheduleItem*));
+        if (!ms->device_schedules[d]->items)
+            goto fail;
         ms->device_schedules[d]->item_capacity = sched->num_items;
     }
 
     int max_xfer = sched->num_items * 2;
     ms->xfer_ops = cml_calloc((size_t)max_xfer, sizeof(CrossDeviceOp));
-    if (!ms->xfer_ops) goto fail;
+    if (!ms->xfer_ops)
+        goto fail;
 
     int max_steps = sched->num_items * 3;
-    ms->steps = cml_malloc((size_t)max_steps * sizeof(ms->steps[0]));
-    if (!ms->steps) goto fail;
+    ms->steps     = cml_malloc((size_t)max_steps * sizeof(ms->steps[0]));
+    if (!ms->steps)
+        goto fail;
 
     for (int i = 0; i < sched->num_items; ++i) {
         CMLScheduleItem* item = sched->items[i];
-        if (!item) continue;
+        if (!item)
+            continue;
 
         int dev_idx = 0;
         if (item->num_outputs > 0 && item->outputs[0]) {
             dev_idx = device_for_tensor(item->outputs[0], device_ids, num_devices);
         }
 
-        CMLSchedule* ds = ms->device_schedules[dev_idx];
+        CMLSchedule* ds            = ms->device_schedules[dev_idx];
         ds->items[ds->num_items++] = item;
 
         for (int s = 0; s < item->num_inputs; ++s) {
             Tensor* inp = item->inputs[s];
-            if (!inp) continue;
+            if (!inp)
+                continue;
             int src_dev = device_for_tensor(inp, device_ids, num_devices);
-            if (src_dev == dev_idx) continue;
+            if (src_dev == dev_idx)
+                continue;
 
             CrossDeviceOp* xfer = &ms->xfer_ops[ms->num_xfer_ops++];
             xfer->direction     = XFER_D2D;
@@ -95,18 +109,18 @@ MultiDeviceSchedule* multi_schedule_build(CMLSchedule* sched,
             xfer->byte_size     = inp->numel * cml_dtype_size(inp->dtype);
             xfer->p2p_possible  = devices_p2p_capable(src_dev, dev_idx);
 
-            ms->steps[ms->num_steps].kind = MULTI_STEP_XFER;
+            ms->steps[ms->num_steps].kind               = MULTI_STEP_XFER;
             ms->steps[ms->num_steps].device_or_xfer_idx = ms->num_xfer_ops - 1;
             ms->num_steps++;
         }
 
-        ms->steps[ms->num_steps].kind = MULTI_STEP_DEVICE;
+        ms->steps[ms->num_steps].kind               = MULTI_STEP_DEVICE;
         ms->steps[ms->num_steps].device_or_xfer_idx = dev_idx;
         ms->num_steps++;
     }
 
     for (int d = 0; d < num_devices; ++d) {
-        CMLSchedule* ds = ms->device_schedules[d];
+        CMLSchedule* ds   = ms->device_schedules[d];
         ds->total_kernels = ds->num_items;
     }
 
@@ -118,7 +132,8 @@ fail:
 }
 
 void multi_schedule_free(MultiDeviceSchedule* ms) {
-    if (!ms) return;
+    if (!ms)
+        return;
     if (ms->device_schedules) {
         for (int d = 0; d < ms->num_devices; ++d) {
             if (ms->device_schedules[d]) {
@@ -135,11 +150,13 @@ void multi_schedule_free(MultiDeviceSchedule* ms) {
 }
 
 int multi_schedule_run(MultiDeviceSchedule* ms) {
-    if (!ms) return -1;
+    if (!ms)
+        return -1;
     for (int s = 0; s < ms->num_steps; ++s) {
         if (ms->steps[s].kind == MULTI_STEP_XFER) {
             CrossDeviceOp* xfer = &ms->xfer_ops[ms->steps[s].device_or_xfer_idx];
-            if (!xfer->tensor || !xfer->tensor->data) continue;
+            if (!xfer->tensor || !xfer->tensor->data)
+                continue;
 
             /* A cross-device relocation needs a destination buffer on the
              * target device. This single-buffer planner has none, so the old
@@ -151,7 +168,7 @@ int multi_schedule_run(MultiDeviceSchedule* ms) {
              * account for it (see multi_schedule_xfer_bytes) rather than
              * corrupt-or-noop silently. */
             if (xfer->src_device_id == xfer->dst_device_id)
-                continue;   /* no relocation needed */
+                continue; /* no relocation needed */
 
             /* dst == src here (one buffer); skip the meaningless self-copy. A
              * true executor would device_copy into the target-device buffer. */
@@ -162,7 +179,8 @@ int multi_schedule_run(MultiDeviceSchedule* ms) {
              * runnable). Left intentionally un-run rather than faking success
              * per kernel. */
             int dev = ms->steps[s].device_or_xfer_idx;
-            if (dev < 0 || dev >= ms->num_devices) return -1;
+            if (dev < 0 || dev >= ms->num_devices)
+                return -1;
             (void)ms->device_schedules;
         }
     }
@@ -170,7 +188,8 @@ int multi_schedule_run(MultiDeviceSchedule* ms) {
 }
 
 size_t multi_schedule_xfer_bytes(const MultiDeviceSchedule* ms) {
-    if (!ms) return 0;
+    if (!ms)
+        return 0;
     size_t total = 0;
     for (int i = 0; i < ms->num_xfer_ops; ++i)
         total += ms->xfer_ops[i].byte_size;
@@ -178,7 +197,8 @@ size_t multi_schedule_xfer_bytes(const MultiDeviceSchedule* ms) {
 }
 
 int multi_schedule_total_kernels(const MultiDeviceSchedule* ms) {
-    if (!ms) return 0;
+    if (!ms)
+        return 0;
     int total = 0;
     for (int d = 0; d < ms->num_devices; ++d)
         if (ms->device_schedules[d])
@@ -187,13 +207,16 @@ int multi_schedule_total_kernels(const MultiDeviceSchedule* ms) {
 }
 
 void multi_schedule_print(const MultiDeviceSchedule* ms) {
-    if (!ms) { fprintf(stderr, "MultiDeviceSchedule(NULL)\n"); return; }
-    fprintf(stderr, "MultiDeviceSchedule: %d devices, %d steps, %zu xfer bytes\n",
-            ms->num_devices, ms->num_steps, multi_schedule_xfer_bytes(ms));
+    if (!ms) {
+        fprintf(stderr, "MultiDeviceSchedule(NULL)\n");
+        return;
+    }
+    fprintf(stderr, "MultiDeviceSchedule: %d devices, %d steps, %zu xfer bytes\n", ms->num_devices,
+            ms->num_steps, multi_schedule_xfer_bytes(ms));
     for (int d = 0; d < ms->num_devices; ++d) {
         CMLSchedule* ds = ms->device_schedules[d];
-        fprintf(stderr, "  device[%d] id=%d: %d kernels\n",
-                d, ms->device_ids[d], ds ? ds->num_items : 0);
+        fprintf(stderr, "  device[%d] id=%d: %d kernels\n", d, ms->device_ids[d],
+                ds ? ds->num_items : 0);
     }
     fprintf(stderr, "  cross-device transfers: %d\n", ms->num_xfer_ops);
 }

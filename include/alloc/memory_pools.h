@@ -11,13 +11,13 @@ extern "C" {
 #endif
 
 typedef struct MemoryPool {
-    void** blocks;       // Array of memory blocks
-    size_t* block_sizes; // Size of each block
-    size_t* used;        // Usage flags
-    int num_blocks;      // Number of blocks
-    int capacity;        // Capacity of pool
-    size_t block_size;   // Size of each block
-    DType dtype;         // Data type for pool
+    void** blocks;        // Array of memory blocks
+    size_t* block_sizes;  // Size of each block
+    size_t* used;         // Usage flags
+    int num_blocks;       // Number of blocks
+    int capacity;         // Capacity of pool
+    size_t block_size;    // Size of each block
+    DType dtype;          // Data type for pool
     pthread_mutex_t lock; // Guards used[] for concurrent alloc/free
 } MemoryPool;
 

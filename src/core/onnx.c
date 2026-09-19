@@ -6,47 +6,59 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-static void copy_pb_string(char *dst, size_t dst_size, const PBField *field)
-{
-    size_t len = 0;
-    const char *src = pb_field_string(field, &len);
+static void copy_pb_string(char* dst, size_t dst_size, const PBField* field) {
+    size_t len      = 0;
+    const char* src = pb_field_string(field, &len);
     if (!src || len == 0) {
         dst[0] = '\0';
         return;
     }
-    if (len >= dst_size) len = dst_size - 1;
+    if (len >= dst_size)
+        len = dst_size - 1;
     memcpy(dst, src, len);
     dst[len] = '\0';
 }
 
-static char *dup_pb_string(const PBField *field)
-{
-    size_t len = 0;
-    const char *src = pb_field_string(field, &len);
-    if (!src || len == 0) return NULL;
+static char* dup_pb_string(const PBField* field) {
+    size_t len      = 0;
+    const char* src = pb_field_string(field, &len);
+    if (!src || len == 0)
+        return NULL;
 
-    char *s = (char *)cml_malloc(len + 1);
-    if (!s) return NULL;
+    char* s = (char*)cml_malloc(len + 1);
+    if (!s)
+        return NULL;
     memcpy(s, src, len);
     s[len] = '\0';
     return s;
 }
 
-static DType onnx_dtype_to_cml(int onnx_dtype)
-{
+static DType onnx_dtype_to_cml(int onnx_dtype) {
     switch (onnx_dtype) {
-    case 1:  return DTYPE_FLOAT32;   /* FLOAT  */
-    case 2:  return DTYPE_UINT8;     /* UINT8  */
-    case 3:  return DTYPE_INT8;      /* INT8   */
-    case 5:  return DTYPE_INT16;     /* INT16  */
-    case 6:  return DTYPE_INT32;     /* INT32  */
-    case 7:  return DTYPE_INT64;     /* INT64  */
-    case 10: return DTYPE_FLOAT16;   /* FLOAT16 */
-    case 11: return DTYPE_FLOAT64;   /* DOUBLE */
-    case 12: return DTYPE_UINT32;    /* UINT32 */
-    case 13: return DTYPE_UINT64;    /* UINT64 */
-    case 16: return DTYPE_BFLOAT16;  /* BFLOAT16 */
-    default: return DTYPE_FLOAT32;
+    case 1:
+        return DTYPE_FLOAT32; /* FLOAT  */
+    case 2:
+        return DTYPE_UINT8; /* UINT8  */
+    case 3:
+        return DTYPE_INT8; /* INT8   */
+    case 5:
+        return DTYPE_INT16; /* INT16  */
+    case 6:
+        return DTYPE_INT32; /* INT32  */
+    case 7:
+        return DTYPE_INT64; /* INT64  */
+    case 10:
+        return DTYPE_FLOAT16; /* FLOAT16 */
+    case 11:
+        return DTYPE_FLOAT64; /* DOUBLE */
+    case 12:
+        return DTYPE_UINT32; /* UINT32 */
+    case 13:
+        return DTYPE_UINT64; /* UINT64 */
+    case 16:
+        return DTYPE_BFLOAT16; /* BFLOAT16 */
+    default:
+        return DTYPE_FLOAT32;
     }
 }
 
@@ -62,8 +74,7 @@ static DType onnx_dtype_to_cml(int onnx_dtype)
  *  20: type           (int32, AttributeType enum)
  */
 
-static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
-{
+static void parse_attribute(PBReader* rd, CMLONNXAttribute* attr) {
     memset(attr, 0, sizeof(*attr));
 
     PBField f;
@@ -82,7 +93,7 @@ static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
 
         case 3: /* i (int64, varint) */
             attr->value.i = (int64_t)f.value.varint;
-            attr->type = CML_ONNX_ATTR_INT;
+            attr->type    = CML_ONNX_ATTR_INT;
             break;
 
         case 4: /* s (string / bytes) */
@@ -92,15 +103,15 @@ static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
                     slen = sizeof(attr->value.s.data) - 1;
                 memcpy(attr->value.s.data, f.value.bytes.data, slen);
                 attr->value.s.data[slen] = '\0';
-                attr->value.s.len = slen;
-                attr->type = CML_ONNX_ATTR_STRING;
+                attr->value.s.len        = slen;
+                attr->type               = CML_ONNX_ATTR_STRING;
             }
             break;
 
         case 7: /* floats (packed repeated float) */
             if (f.wire_type == PB_WIRE_LEN) {
-                int count = (int)(f.value.bytes.length / sizeof(float));
-                attr->value.floats.data = (float *)cml_malloc(sizeof(float) * (size_t)count);
+                int count               = (int)(f.value.bytes.length / sizeof(float));
+                attr->value.floats.data = (float*)cml_malloc(sizeof(float) * (size_t)count);
                 if (attr->value.floats.data) {
                     PBReader sub = pb_reader_sub(&f);
                     for (int i = 0; i < count; i++) {
@@ -118,12 +129,12 @@ static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
                 PBReader sub = pb_reader_sub(&f);
                 /* First pass: count */
                 PBReader counter = sub;
-                int count = 0;
+                int count        = 0;
                 while (pb_reader_has_data(&counter)) {
                     pb_read_varint(&counter);
                     count++;
                 }
-                attr->value.ints.data = (int64_t *)cml_malloc(sizeof(int64_t) * (size_t)count);
+                attr->value.ints.data = (int64_t*)cml_malloc(sizeof(int64_t) * (size_t)count);
                 if (attr->value.ints.data) {
                     for (int i = 0; i < count; i++) {
                         attr->value.ints.data[i] = (int64_t)pb_read_varint(&sub);
@@ -133,12 +144,12 @@ static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
                 attr->type = CML_ONNX_ATTR_INTS;
             } else if (f.wire_type == PB_WIRE_VARINT) {
                 /* Non-packed single int in repeated field -- append */
-                int cur = attr->value.ints.count;
-                int64_t *tmp = (int64_t *)cml_realloc(attr->value.ints.data,
-                                                   sizeof(int64_t) * (size_t)(cur + 1));
+                int cur      = attr->value.ints.count;
+                int64_t* tmp = (int64_t*)cml_realloc(attr->value.ints.data,
+                                                     sizeof(int64_t) * (size_t)(cur + 1));
                 if (tmp) {
-                    tmp[cur] = (int64_t)f.value.varint;
-                    attr->value.ints.data = tmp;
+                    tmp[cur]               = (int64_t)f.value.varint;
+                    attr->value.ints.data  = tmp;
                     attr->value.ints.count = cur + 1;
                 }
                 attr->type = CML_ONNX_ATTR_INTS;
@@ -161,8 +172,7 @@ static void parse_attribute(PBReader *rd, CMLONNXAttribute *attr)
  *   5: attribute (repeated AttributeProto, LEN)
  */
 
-static void parse_node(PBReader *rd, CMLONNXNode *node)
-{
+static void parse_node(PBReader* rd, CMLONNXNode* node) {
     memset(node, 0, sizeof(*node));
 
     PBField f;
@@ -214,17 +224,16 @@ static void parse_node(PBReader *rd, CMLONNXNode *node)
  *   8: name        (string)
  */
 
-static void parse_tensor_proto(PBReader *rd, CMLONNXInitializer *init)
-{
+static void parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
     memset(init, 0, sizeof(*init));
 
     int dims[8];
-    int ndim = 0;
-    int onnx_dtype = 1; /* default FLOAT */
-    const uint8_t *raw_data = NULL;
-    size_t raw_len = 0;
-    float *float_data = NULL;
-    int float_count = 0;
+    int ndim                = 0;
+    int onnx_dtype          = 1; /* default FLOAT */
+    const uint8_t* raw_data = NULL;
+    size_t raw_len          = 0;
+    float* float_data       = NULL;
+    int float_count         = 0;
 
     PBField f;
     while (pb_read_field(rd, &f)) {
@@ -232,7 +241,8 @@ static void parse_tensor_proto(PBReader *rd, CMLONNXInitializer *init)
         case 1: /* dims (repeated int64) */
             if (f.wire_type == PB_WIRE_VARINT) {
                 /* Non-packed */
-                if (ndim < 8) dims[ndim++] = (int)f.value.varint;
+                if (ndim < 8)
+                    dims[ndim++] = (int)f.value.varint;
             } else if (f.wire_type == PB_WIRE_LEN) {
                 /* Packed */
                 PBReader sub = pb_reader_sub(&f);
@@ -249,7 +259,7 @@ static void parse_tensor_proto(PBReader *rd, CMLONNXInitializer *init)
         case 4: /* float_data (packed repeated float) */
             if (f.wire_type == PB_WIRE_LEN) {
                 float_count = (int)(f.value.bytes.length / sizeof(float));
-                float_data = (float *)cml_malloc(sizeof(float) * (size_t)float_count);
+                float_data  = (float*)cml_malloc(sizeof(float) * (size_t)float_count);
                 if (float_data) {
                     PBReader sub = pb_reader_sub(&f);
                     for (int i = 0; i < float_count; i++) {
@@ -272,14 +282,13 @@ static void parse_tensor_proto(PBReader *rd, CMLONNXInitializer *init)
                  * the loader materializes from (matching its float-centric
                  * tensor_from_data path). */
                 PBReader sub = pb_reader_sub(&f);
-                int count = 0;
+                int count    = 0;
                 while (pb_reader_has_data(&sub)) {
                     pb_read_varint(&sub);
                     count++;
                 }
-                sub = pb_reader_sub(&f);
-                float_data = (float *)cml_malloc(sizeof(float) *
-                                                 (size_t)(count > 0 ? count : 1));
+                sub        = pb_reader_sub(&f);
+                float_data = (float*)cml_malloc(sizeof(float) * (size_t)(count > 0 ? count : 1));
                 if (float_data) {
                     for (int i = 0; i < count; i++)
                         float_data[i] = (float)(int64_t)pb_read_varint(&sub);
@@ -300,12 +309,12 @@ static void parse_tensor_proto(PBReader *rd, CMLONNXInitializer *init)
 
     /* Scalar tensors with no dims */
     if (ndim == 0) {
-        ndim = 1;
+        ndim    = 1;
         dims[0] = 1;
     }
 
-    DType dtype = onnx_dtype_to_cml(onnx_dtype);
-    TensorConfig cfg = { .dtype = dtype, .has_dtype = true };
+    DType dtype      = onnx_dtype_to_cml(onnx_dtype);
+    TensorConfig cfg = {.dtype = dtype, .has_dtype = true};
 
     if (raw_data && raw_len > 0) {
         init->tensor = tensor_from_data(raw_data, dims, ndim, &cfg);
@@ -339,8 +348,7 @@ static void parse_tensor_proto(PBReader *rd, CMLONNXInitializer *init)
  *   2: dim_param (string -- symbolic)
  */
 
-static void parse_tensor_shape_dim(PBReader *rd, int *dim_out)
-{
+static void parse_tensor_shape_dim(PBReader* rd, int* dim_out) {
     *dim_out = -1; /* dynamic / unknown */
     PBField f;
     while (pb_read_field(rd, &f)) {
@@ -351,8 +359,7 @@ static void parse_tensor_shape_dim(PBReader *rd, int *dim_out)
     }
 }
 
-static void parse_tensor_shape(PBReader *rd, CMLONNXTensorInfo *info)
-{
+static void parse_tensor_shape(PBReader* rd, CMLONNXTensorInfo* info) {
     PBField f;
     while (pb_read_field(rd, &f)) {
         if (f.field_number == 1 && f.wire_type == PB_WIRE_LEN) { /* dim */
@@ -365,8 +372,7 @@ static void parse_tensor_shape(PBReader *rd, CMLONNXTensorInfo *info)
     }
 }
 
-static void parse_tensor_type(PBReader *rd, CMLONNXTensorInfo *info)
-{
+static void parse_tensor_type(PBReader* rd, CMLONNXTensorInfo* info) {
     PBField f;
     while (pb_read_field(rd, &f)) {
         switch (f.field_number) {
@@ -385,8 +391,7 @@ static void parse_tensor_type(PBReader *rd, CMLONNXTensorInfo *info)
     }
 }
 
-static void parse_type_proto(PBReader *rd, CMLONNXTensorInfo *info)
-{
+static void parse_type_proto(PBReader* rd, CMLONNXTensorInfo* info) {
     PBField f;
     while (pb_read_field(rd, &f)) {
         if (f.field_number == 1 && f.wire_type == PB_WIRE_LEN) { /* tensor_type */
@@ -396,8 +401,7 @@ static void parse_type_proto(PBReader *rd, CMLONNXTensorInfo *info)
     }
 }
 
-static void parse_value_info(PBReader *rd, CMLONNXTensorInfo *info)
-{
+static void parse_value_info(PBReader* rd, CMLONNXTensorInfo* info) {
     memset(info, 0, sizeof(*info));
     info->dtype = DTYPE_FLOAT32;
 
@@ -428,21 +432,22 @@ static void parse_value_info(PBReader *rd, CMLONNXTensorInfo *info)
  *  12: output       (repeated ValueInfoProto, LEN)
  */
 
-static int parse_graph(PBReader *rd, CMLONNXGraph *graph)
-{
+static int parse_graph(PBReader* rd, CMLONNXGraph* graph) {
     memset(graph, 0, sizeof(*graph));
 
-    graph->nodes        = (CMLONNXNode *)cml_calloc(CML_ONNX_MAX_NODES, sizeof(CMLONNXNode));
-    graph->inputs       = (CMLONNXTensorInfo *)cml_calloc(CML_ONNX_MAX_INPUTS, sizeof(CMLONNXTensorInfo));
-    graph->outputs      = (CMLONNXTensorInfo *)cml_calloc(CML_ONNX_MAX_OUTPUTS, sizeof(CMLONNXTensorInfo));
-    graph->initializers = (CMLONNXInitializer *)cml_calloc(CML_ONNX_MAX_NODES, sizeof(CMLONNXInitializer));
+    graph->nodes  = (CMLONNXNode*)cml_calloc(CML_ONNX_MAX_NODES, sizeof(CMLONNXNode));
+    graph->inputs = (CMLONNXTensorInfo*)cml_calloc(CML_ONNX_MAX_INPUTS, sizeof(CMLONNXTensorInfo));
+    graph->outputs =
+        (CMLONNXTensorInfo*)cml_calloc(CML_ONNX_MAX_OUTPUTS, sizeof(CMLONNXTensorInfo));
+    graph->initializers =
+        (CMLONNXInitializer*)cml_calloc(CML_ONNX_MAX_NODES, sizeof(CMLONNXInitializer));
 
     if (!graph->nodes || !graph->inputs || !graph->outputs || !graph->initializers) {
         return -1;
     }
 
     PBField f;
-        while (pb_read_field(rd, &f)) {
+    while (pb_read_field(rd, &f)) {
         switch (f.field_number) {
 
         case 1: /* node */
@@ -496,8 +501,7 @@ static int parse_graph(PBReader *rd, CMLONNXGraph *graph)
  *   2: version  (int64)
  */
 
-static int64_t parse_opset(PBReader *rd)
-{
+static int64_t parse_opset(PBReader* rd) {
     int64_t version = 0;
     PBField f;
     while (pb_read_field(rd, &f)) {
@@ -518,15 +522,15 @@ static int64_t parse_opset(PBReader *rd)
  *   8: opset_import  (repeated OpsetIdProto, LEN)
  */
 
-CMLONNXModel *cml_onnx_load_buffer(const uint8_t *data, size_t length)
-{
+CMLONNXModel* cml_onnx_load_buffer(const uint8_t* data, size_t length) {
     if (!data || length == 0) {
         LOG_ERROR("onnx: NULL or empty buffer");
         return NULL;
     }
 
-    CMLONNXModel *model = (CMLONNXModel *)cml_calloc(1, sizeof(CMLONNXModel));
-    if (!model) return NULL;
+    CMLONNXModel* model = (CMLONNXModel*)cml_calloc(1, sizeof(CMLONNXModel));
+    if (!model)
+        return NULL;
 
     PBReader reader;
     pb_reader_init(&reader, data, length);
@@ -568,7 +572,7 @@ CMLONNXModel *cml_onnx_load_buffer(const uint8_t *data, size_t length)
         case 8: /* opset_import */
             if (f.wire_type == PB_WIRE_LEN) {
                 PBReader sub = pb_reader_sub(&f);
-                int64_t v = parse_opset(&sub);
+                int64_t v    = parse_opset(&sub);
                 if (v > model->opset_version) {
                     model->opset_version = v;
                 }
@@ -585,25 +589,24 @@ CMLONNXModel *cml_onnx_load_buffer(const uint8_t *data, size_t length)
     /* Stopping before the end means pb_read_field hit a malformed tag or an
      * out-of-range length, not a clean end of message. */
     if (reader.pos < reader.length || !saw_model_field) {
-        LOG_ERROR("onnx: buffer is not a ModelProto (parsed %zu of %zu bytes)",
-                  reader.pos, reader.length);
+        LOG_ERROR("onnx: buffer is not a ModelProto (parsed %zu of %zu bytes)", reader.pos,
+                  reader.length);
         cml_onnx_free(model);
         return NULL;
     }
 
     LOG_INFO("onnx: loaded model ir=%lld opset=%lld producer=%s nodes=%d inits=%d",
-             (long long)model->ir_version, (long long)model->opset_version,
-             model->producer_name, model->graph.num_nodes,
-             model->graph.num_initializers);
+             (long long)model->ir_version, (long long)model->opset_version, model->producer_name,
+             model->graph.num_nodes, model->graph.num_initializers);
 
     return model;
 }
 
-CMLONNXModel *cml_onnx_load(const char *filepath)
-{
-    if (!filepath) return NULL;
+CMLONNXModel* cml_onnx_load(const char* filepath) {
+    if (!filepath)
+        return NULL;
 
-    FILE *fp = fopen(filepath, "rb");
+    FILE* fp = fopen(filepath, "rb");
     if (!fp) {
         LOG_ERROR("onnx: cannot open file '%s'", filepath);
         return NULL;
@@ -619,7 +622,7 @@ CMLONNXModel *cml_onnx_load(const char *filepath)
         return NULL;
     }
 
-    uint8_t *buf = (uint8_t *)cml_malloc((size_t)fsize);
+    uint8_t* buf = (uint8_t*)cml_malloc((size_t)fsize);
     if (!buf) {
         fclose(fp);
         return NULL;
@@ -634,20 +637,20 @@ CMLONNXModel *cml_onnx_load(const char *filepath)
         return NULL;
     }
 
-    CMLONNXModel *model = cml_onnx_load_buffer(buf, (size_t)fsize);
+    CMLONNXModel* model = cml_onnx_load_buffer(buf, (size_t)fsize);
     cml_free(buf);
     return model;
 }
 
-void cml_onnx_free(CMLONNXModel *model)
-{
-    if (!model) return;
+void cml_onnx_free(CMLONNXModel* model) {
+    if (!model)
+        return;
 
-    CMLONNXGraph *g = &model->graph;
+    CMLONNXGraph* g = &model->graph;
 
     if (g->nodes) {
         for (int i = 0; i < g->num_nodes; i++) {
-            CMLONNXNode *nd = &g->nodes[i];
+            CMLONNXNode* nd = &g->nodes[i];
             for (int j = 0; j < nd->num_inputs; j++) {
                 cml_free(nd->inputs[j]);
             }
@@ -655,7 +658,7 @@ void cml_onnx_free(CMLONNXModel *model)
                 cml_free(nd->outputs[j]);
             }
             for (int j = 0; j < nd->num_attrs; j++) {
-                CMLONNXAttribute *a = &nd->attrs[j];
+                CMLONNXAttribute* a = &nd->attrs[j];
                 if (a->type == CML_ONNX_ATTR_INTS) {
                     cml_free(a->value.ints.data);
                 } else if (a->type == CML_ONNX_ATTR_FLOATS) {

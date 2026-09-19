@@ -20,23 +20,21 @@ typedef struct {
     struct timespec end;
 } BenchTimer;
 
-static void bench_timer_start(BenchTimer* t) {
-    clock_gettime(CLOCK_MONOTONIC, &t->start);
-}
+static void bench_timer_start(BenchTimer* t) { clock_gettime(CLOCK_MONOTONIC, &t->start); }
 
 static double bench_timer_stop(BenchTimer* t) {
     clock_gettime(CLOCK_MONOTONIC, &t->end);
     double elapsed = (t->end.tv_sec - t->start.tv_sec) * 1000.0;
     elapsed += (t->end.tv_nsec - t->start.tv_nsec) / 1000000.0;
-    return elapsed;  // milliseconds
+    return elapsed; // milliseconds
 }
 
 static void bench_matmul(int size, int iterations) {
-    printf("\nMatrix Multiplication (size=%dx%d, iterations=%d)\n\n",
-           size, size, iterations);
+    printf("\nMatrix Multiplication (size=%dx%d, iterations=%d)\n\n", size, size, iterations);
 
-    int mat_shape[] = {size, size};
-    TensorConfig cpu_cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    int mat_shape[]      = {size, size};
+    TensorConfig cpu_cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* A = tensor_empty(mat_shape, 2, &cpu_cfg);
     Tensor* B = tensor_empty(mat_shape, 2, &cpu_cfg);
 
@@ -63,8 +61,8 @@ static void bench_matmul(int size, int iterations) {
         for (int i = 0; i < iterations; i++) {
             CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
             cml_ir_set_global_context(ir);
-            Tensor* C = tensor_matmul(A, B);
-            Tensor* inputs[] = {A, B};
+            Tensor* C         = tensor_matmul(A, B);
+            Tensor* inputs[]  = {A, B};
             Tensor* outputs[] = {C};
             bench_timer_start(&timer);
             cml_dispatch_execute(ctx, ir, inputs, 2, outputs, 1);
@@ -73,8 +71,8 @@ static void bench_matmul(int size, int iterations) {
             cml_ir_free(ir);
         }
 
-        printf("  CPU Fallback:    %8.2f ms avg (%.2f ms total)\n",
-               total_time / iterations, total_time);
+        printf("  CPU Fallback:    %8.2f ms avg (%.2f ms total)\n", total_time / iterations,
+               total_time);
         cml_dispatch_free(ctx);
     }
 
@@ -91,8 +89,8 @@ static void bench_matmul(int size, int iterations) {
                 total_time += bench_timer_stop(&timer);
             }
 
-            printf("  BLAS (%s): %8.2f ms avg (%.2f ms total)\n",
-                   cml_blas_get_library_name(blas), total_time / iterations, total_time);
+            printf("  BLAS (%s): %8.2f ms avg (%.2f ms total)\n", cml_blas_get_library_name(blas),
+                   total_time / iterations, total_time);
 
             cml_free(C);
             cml_blas_free(blas);
@@ -122,7 +120,7 @@ static void bench_matmul(int size, int iterations) {
                 return;
             }
 
-            Tensor* inputs[] = {A, B};
+            Tensor* inputs[]  = {A, B};
             Tensor* outputs[] = {C};
 
             double total_time = 0;
@@ -135,8 +133,9 @@ static void bench_matmul(int size, int iterations) {
             size_t cache_hits = 0, cache_misses = 0, cache_size = 0;
             cml_dispatch_cache_stats(ctx, &cache_hits, &cache_misses, &cache_size);
 
-            printf("  CPU LLVM JIT:    %8.2f ms avg (%.2f ms total) [cache: %zu hits, %zu misses]\n",
-                   total_time / iterations, total_time, cache_hits, cache_misses);
+            printf(
+                "  CPU LLVM JIT:    %8.2f ms avg (%.2f ms total) [cache: %zu hits, %zu misses]\n",
+                total_time / iterations, total_time, cache_hits, cache_misses);
 
             tensor_free(C);
             cml_ir_free(ir);
@@ -168,7 +167,7 @@ static void bench_matmul(int size, int iterations) {
                 return;
             }
 
-            Tensor* inputs[] = {A, B};
+            Tensor* inputs[]  = {A, B};
             Tensor* outputs[] = {C};
 
             double total_time = 0;
@@ -181,8 +180,9 @@ static void bench_matmul(int size, int iterations) {
             size_t cache_hits = 0, cache_misses = 0, cache_size = 0;
             cml_dispatch_cache_stats(ctx, &cache_hits, &cache_misses, &cache_size);
 
-            printf("  CUDA:            %8.2f ms avg (%.2f ms total) [cache: %zu hits, %zu misses]\n",
-                   total_time / iterations, total_time, cache_hits, cache_misses);
+            printf(
+                "  CUDA:            %8.2f ms avg (%.2f ms total) [cache: %zu hits, %zu misses]\n",
+                total_time / iterations, total_time, cache_hits, cache_misses);
 
             tensor_free(C);
             cml_ir_free(ir);
@@ -219,7 +219,8 @@ static void bench_kernel_cache(int iterations) {
     int hits = 0;
     for (int i = 0; i < iterations; i++) {
         uint64_t hash = (uint64_t)i * 0x1234567890ABCDEFULL;
-        if (cml_kernel_cache_lookup(cache, hash)) hits++;
+        if (cml_kernel_cache_lookup(cache, hash))
+            hits++;
     }
     double hit_time = bench_timer_stop(&timer);
 
@@ -227,26 +228,27 @@ static void bench_kernel_cache(int iterations) {
     int misses = 0;
     for (int i = iterations; i < iterations * 2; i++) {
         uint64_t hash = (uint64_t)i * 0x1234567890ABCDEFULL;
-        if (!cml_kernel_cache_lookup(cache, hash)) misses++;
+        if (!cml_kernel_cache_lookup(cache, hash))
+            misses++;
     }
     double miss_time = bench_timer_stop(&timer);
 
-    printf("  Insert:     %8.2f ms for %d entries (%.2f us/entry)\n",
-           insert_time, iterations, insert_time * 1000.0 / iterations);
-    printf("  Lookup hit: %8.2f ms for %d lookups (%.2f us/lookup) [%d hits]\n",
-           hit_time, iterations, hit_time * 1000.0 / iterations, hits);
-    printf("  Lookup miss:%8.2f ms for %d lookups (%.2f us/lookup) [%d misses]\n",
-           miss_time, iterations, miss_time * 1000.0 / iterations, misses);
+    printf("  Insert:     %8.2f ms for %d entries (%.2f us/entry)\n", insert_time, iterations,
+           insert_time * 1000.0 / iterations);
+    printf("  Lookup hit: %8.2f ms for %d lookups (%.2f us/lookup) [%d hits]\n", hit_time,
+           iterations, hit_time * 1000.0 / iterations, hits);
+    printf("  Lookup miss:%8.2f ms for %d lookups (%.2f us/lookup) [%d misses]\n", miss_time,
+           iterations, miss_time * 1000.0 / iterations, misses);
 
     cml_kernel_cache_free(cache);
 }
 
 static void bench_elementwise(int size, int iterations) {
-    printf("\nElement-wise Operations (size=%d, iterations=%d)\n\n",
-           size, iterations);
+    printf("\nElement-wise Operations (size=%d, iterations=%d)\n\n", size, iterations);
 
-    int shape[] = {size};
-    TensorConfig cpu_cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    int shape[]          = {size};
+    TensorConfig cpu_cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* A = tensor_empty(shape, 1, &cpu_cfg);
     Tensor* B = tensor_empty(shape, 1, &cpu_cfg);
 
@@ -272,8 +274,8 @@ static void bench_elementwise(int size, int iterations) {
         for (int i = 0; i < iterations; i++) {
             CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
             cml_ir_set_global_context(ir);
-            Tensor* C = tensor_add(A, B);
-            Tensor* inputs[] = {A, B};
+            Tensor* C         = tensor_add(A, B);
+            Tensor* inputs[]  = {A, B};
             Tensor* outputs[] = {C};
             bench_timer_start(&timer);
             cml_dispatch_execute(ctx, ir, inputs, 2, outputs, 1);
@@ -294,8 +296,8 @@ static void bench_elementwise(int size, int iterations) {
         for (int i = 0; i < iterations; i++) {
             CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
             cml_ir_set_global_context(ir);
-            Tensor* C = tensor_mul(A, B);
-            Tensor* inputs[] = {A, B};
+            Tensor* C         = tensor_mul(A, B);
+            Tensor* inputs[]  = {A, B};
             Tensor* outputs[] = {C};
             bench_timer_start(&timer);
             cml_dispatch_execute(ctx, ir, inputs, 2, outputs, 1);
@@ -316,8 +318,8 @@ static void bench_elementwise(int size, int iterations) {
         for (int i = 0; i < iterations; i++) {
             CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
             cml_ir_set_global_context(ir);
-            Tensor* C = tensor_exp(A);
-            Tensor* inputs[] = {A};
+            Tensor* C         = tensor_exp(A);
+            Tensor* inputs[]  = {A};
             Tensor* outputs[] = {C};
             bench_timer_start(&timer);
             cml_dispatch_execute(ctx, ir, inputs, 1, outputs, 1);
@@ -362,12 +364,12 @@ static void bench_dispatch_overhead(int iterations) {
     double detect_time = bench_timer_stop(&timer);
     cml_dispatch_free(ctx);
 
-    printf("  Context create/free: %8.2f ms (%.2f us/op)\n",
-           create_time, create_time * 1000.0 / iterations);
-    printf("  Context init:        %8.2f ms (%.2f us/op)\n",
-           init_time - create_time, (init_time - create_time) * 1000.0 / iterations);
-    printf("  Backend detection:   %8.2f ms (%.2f us/op)\n",
-           detect_time, detect_time * 1000.0 / iterations);
+    printf("  Context create/free: %8.2f ms (%.2f us/op)\n", create_time,
+           create_time * 1000.0 / iterations);
+    printf("  Context init:        %8.2f ms (%.2f us/op)\n", init_time - create_time,
+           (init_time - create_time) * 1000.0 / iterations);
+    printf("  Backend detection:   %8.2f ms (%.2f us/op)\n", detect_time,
+           detect_time * 1000.0 / iterations);
 }
 
 static void print_system_info(void) {
@@ -397,8 +399,8 @@ static void print_system_info(void) {
 }
 
 int main(int argc, char* argv[]) {
-    int matmul_size = 256;
-    int iterations = 10;
+    int matmul_size      = 256;
+    int iterations       = 10;
     int cache_iterations = 10000;
     int elementwise_size = 100000;
 

@@ -23,10 +23,10 @@ typedef struct {
 
     Module** enc_blocks;
     Module** enc_pools;
-    Module*  bottleneck;
+    Module* bottleneck;
     Module** dec_upsamples;
     Module** dec_blocks;
-    Module*  final_conv;
+    Module* final_conv;
 
     int depth;
 } CMLUNet3D;

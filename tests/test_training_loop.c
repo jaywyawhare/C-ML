@@ -8,12 +8,12 @@ int main(void) {
     }
     cml_seed(42);
 
-    const int input_size = 8;
+    const int input_size  = 8;
     const int output_size = 1;
     const int num_samples = 100;
 
     DeviceType device = cml_get_default_device();
-    DType dtype = cml_get_default_dtype();
+    DType dtype       = cml_get_default_dtype();
 
     Sequential* model = nn_sequential();
     model = sequential_add_chain(model, (Module*)nn_linear(input_size, 32, dtype, device, true));
@@ -38,20 +38,23 @@ int main(void) {
     }
 
     Dataset* train_dataset = NULL;
-    Dataset* val_dataset = NULL;
-    Dataset* test_dataset = NULL;
-    if (dataset_split_three(full_dataset, 0.7f, 0.15f, &train_dataset, &val_dataset, &test_dataset) != 0) {
+    Dataset* val_dataset   = NULL;
+    Dataset* test_dataset  = NULL;
+    if (dataset_split_three(full_dataset, 0.7f, 0.15f, &train_dataset, &val_dataset,
+                            &test_dataset) != 0) {
         printf("Error: failed to split dataset\n");
         cml_cleanup();
         return 1;
     }
 
     DataLoader* train_loader = dataloader_create(train_dataset, 16, false);
-    DataLoader* val_loader = dataloader_create(val_dataset, 16, false);
+    DataLoader* val_loader   = dataloader_create(val_dataset, 16, false);
     if (!train_loader || !val_loader) {
         printf("Error: failed to create dataloaders\n");
-        if (train_loader) dataloader_free(train_loader);
-        if (val_loader) dataloader_free(val_loader);
+        if (train_loader)
+            dataloader_free(train_loader);
+        if (val_loader)
+            dataloader_free(val_loader);
         dataset_free(train_dataset);
         dataset_free(val_dataset);
         dataset_free(test_dataset);
@@ -61,8 +64,8 @@ int main(void) {
 
     TrainingConfig cfg;
     training_config_default(&cfg);
-    cfg.epochs = 3;
-    cfg.verbose = false;
+    cfg.epochs           = 3;
+    cfg.verbose          = false;
     cfg.use_progress_bar = false;
 
     if (cml_train_with_validation((Module*)model, train_loader, val_loader, optimizer,
@@ -77,7 +80,8 @@ int main(void) {
         return 1;
     }
 
-    if (training_metrics_evaluate_dataset((Module*)model, test_dataset, tensor_mse_loss, false) != 0) {
+    if (training_metrics_evaluate_dataset((Module*)model, test_dataset, tensor_mse_loss, false) !=
+        0) {
         printf("Error: test evaluation failed\n");
         dataloader_free(train_loader);
         dataloader_free(val_loader);

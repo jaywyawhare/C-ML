@@ -38,7 +38,10 @@ int main(void) {
 
     enum { N = 20 };
     float xd[N], yd[N];
-    for (int i = 0; i < N; i++) { xd[i] = (float)i / (N - 1) * 2.0f - 1.0f; yd[i] = 2.0f * xd[i] + 1.0f; }
+    for (int i = 0; i < N; i++) {
+        xd[i] = (float)i / (N - 1) * 2.0f - 1.0f;
+        yd[i] = 2.0f * xd[i] + 1.0f;
+    }
     Tensor* X = cml_tensor_2d(xd, N, 1);
     Tensor* Y = cml_tensor_2d(yd, N, 1);
     tensor_realize(X);
@@ -47,12 +50,12 @@ int main(void) {
     float final_loss = INFINITY;
     for (int e = 0; e < 300; e++) {
         optimizer_zero_grad(opt);
-        Tensor* out  = module_forward(model, X);   /* reused X + params, loss NOT freed */
+        Tensor* out  = module_forward(model, X); /* reused X + params, loss NOT freed */
         Tensor* loss = tensor_mse_loss(out, Y);
         tensor_backward(loss, NULL, false, false);
         optimizer_step(opt);
         final_loss = get_scalar(loss);
-        cml_autograd_step_end(loss);               /* detach loss + reset the step graph */
+        cml_autograd_step_end(loss); /* detach loss + reset the step graph */
     }
 
     optimizer_free(opt);
@@ -60,7 +63,10 @@ int main(void) {
     cml_cleanup();
 
     printf("final loss (no per-step free, with step_end) = %.6f\n", (double)final_loss);
-    if (isfinite(final_loss) && final_loss < 0.05f) { printf("PASS\n"); return 0; }
+    if (isfinite(final_loss) && final_loss < 0.05f) {
+        printf("PASS\n");
+        return 0;
+    }
     printf("FAIL\n");
     return 1;
 }

@@ -23,10 +23,12 @@ static pthread_mutex_t g_device_lock;
 static bool g_device_lock_initialized = false;
 
 static inline void device_lock(void) {
-    if (g_device_lock_initialized) pthread_mutex_lock(&g_device_lock);
+    if (g_device_lock_initialized)
+        pthread_mutex_lock(&g_device_lock);
 }
 static inline void device_unlock(void) {
-    if (g_device_lock_initialized) pthread_mutex_unlock(&g_device_lock);
+    if (g_device_lock_initialized)
+        pthread_mutex_unlock(&g_device_lock);
 }
 
 static DeviceType g_default_device = DEVICE_CPU;
@@ -48,8 +50,8 @@ typedef struct {
 } SimGPUDevice;
 
 static bool g_sim_gpu_enabled = false;
-static int g_sim_gpu_count = 0;
-static int g_sim_gpu_current = 0;
+static int g_sim_gpu_count    = 0;
+static int g_sim_gpu_current  = 0;
 static SimGPUDevice g_sim_gpus[SIM_GPU_MAX_DEVICES];
 
 typedef int (*cudaRuntimeGetVersion_fn)(int*);
@@ -89,7 +91,6 @@ static void* g_rocm_lib                             = NULL;
 #define hipMemcpyHostToDevice 1
 #define hipMemcpyDeviceToHost 2
 #define hipMemcpyDeviceToDevice 3
-
 
 static bool try_load_cuda(void) {
     const char* lib_paths[] = {
@@ -248,9 +249,7 @@ bool device_metal_available(void) { return g_metal_available; }
 
 bool device_rocm_available(void) { return g_rocm_available; }
 
-int device_rocm_get_count(void) {
-    return g_rocm_available ? 1 : 0;
-}
+int device_rocm_get_count(void) { return g_rocm_available ? 1 : 0; }
 
 DeviceType device_get_best_available(void) {
     if (g_cuda_available) {
@@ -384,8 +383,7 @@ void device_print_info(void) {
     printf("  CUDA: %s\n", g_cuda_available ? "Yes" : "No");
     printf("  Metal: %s\n", g_metal_available ? "Yes" : "No");
     printf("  ROCm: %s\n", g_rocm_available ? "Yes" : "No");
-    printf("  OpenCL: %s (via OpenCL IR backend)\n",
-           cml_opencl_ir_available() ? "Yes" : "No");
+    printf("  OpenCL: %s (via OpenCL IR backend)\n", cml_opencl_ir_available() ? "Yes" : "No");
 
     printf("  SimGPU: %s", g_sim_gpu_enabled ? "Yes" : "No");
     if (g_sim_gpu_enabled) {
@@ -404,8 +402,7 @@ void device_print_info(void) {
     if (g_sim_gpu_enabled) {
         printf("\nSimulated GPU devices: %d\n", g_sim_gpu_count);
         for (int i = 0; i < g_sim_gpu_count; i++) {
-            printf("  [%d] %s: %zuMB total, %zuMB used\n", i,
-                   g_sim_gpus[i].name,
+            printf("  [%d] %s: %zuMB total, %zuMB used\n", i, g_sim_gpus[i].name,
                    g_sim_gpus[i].total_memory / (1024 * 1024),
                    g_sim_gpus[i].allocated / (1024 * 1024));
         }
@@ -530,15 +527,15 @@ void* device_alloc(size_t size, DeviceType device) {
         if (g_sim_gpu_enabled && g_sim_gpu_current < g_sim_gpu_count) {
             SimGPUDevice* dev = &g_sim_gpus[g_sim_gpu_current];
             if (dev->allocated + size > dev->total_memory) {
-                LOG_ERROR("SimGPU[%d]: out of memory (alloc %zu, used %zu/%zu)",
-                          g_sim_gpu_current, size, dev->allocated, dev->total_memory);
+                LOG_ERROR("SimGPU[%d]: out of memory (alloc %zu, used %zu/%zu)", g_sim_gpu_current,
+                          size, dev->allocated, dev->total_memory);
                 return NULL;
             }
             ptr = cml_malloc(size);
             if (ptr) {
                 dev->allocated += size;
-                LOG_DEBUG("SimGPU[%d]: allocated %zu bytes (%zu/%zu used)",
-                          g_sim_gpu_current, size, dev->allocated, dev->total_memory);
+                LOG_DEBUG("SimGPU[%d]: allocated %zu bytes (%zu/%zu used)", g_sim_gpu_current, size,
+                          dev->allocated, dev->total_memory);
             }
         } else {
             LOG_WARNING("SimGPU not available, falling back to CPU");
@@ -583,7 +580,7 @@ void device_free(void* ptr, DeviceType device) {
 #ifdef __APPLE__
         if (ptr) {
             cml_free(ptr);
-                }
+        }
 #else
         cml_free(ptr);
 #endif
@@ -605,7 +602,8 @@ void device_free(void* ptr, DeviceType device) {
         /* Nothing is ever allocated through device_alloc for OpenCL (it fails
          * loudly), so a free here means the caller mixed APIs — say so. */
         LOG_WARNING("device_free: DEVICE_OPENCL pointer %p was not allocated "
-                    "by device_alloc; ignoring", ptr);
+                    "by device_alloc; ignoring",
+                    ptr);
         break;
 
     case DEVICE_SIM_GPU:
@@ -644,7 +642,7 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
             int result = hipMemcpy(dst, src, size, hipMemcpyDeviceToDevice);
             return (result == 0) ? 0 : -1;
         } else if (dst_device == DEVICE_METAL) {
-                memcpy(dst, src, size);
+            memcpy(dst, src, size);
             return 0;
         } else if (dst_device == DEVICE_SIM_GPU) {
             memcpy(dst, src, size);
@@ -776,7 +774,8 @@ int device_move_tensor_to_default(Tensor* tensor) {
 
 int device_sim_gpu_enable(int num_devices, size_t memory_per_device) {
     if (num_devices <= 0 || num_devices > SIM_GPU_MAX_DEVICES) {
-        LOG_ERROR("SimGPU: invalid device count %d (must be 1-%d)", num_devices, SIM_GPU_MAX_DEVICES);
+        LOG_ERROR("SimGPU: invalid device count %d (must be 1-%d)", num_devices,
+                  SIM_GPU_MAX_DEVICES);
         return -1;
     }
 
@@ -790,20 +789,18 @@ int device_sim_gpu_enable(int num_devices, size_t memory_per_device) {
     size_t mem = memory_per_device > 0 ? memory_per_device : SIM_GPU_DEFAULT_MEMORY;
 
     for (int i = 0; i < num_devices; i++) {
-        g_sim_gpus[i].active = true;
+        g_sim_gpus[i].active       = true;
         g_sim_gpus[i].total_memory = mem;
-        g_sim_gpus[i].allocated = 0;
-        snprintf(g_sim_gpus[i].name, sizeof(g_sim_gpus[i].name),
-                 "CML Simulated GPU %d", i);
+        g_sim_gpus[i].allocated    = 0;
+        snprintf(g_sim_gpus[i].name, sizeof(g_sim_gpus[i].name), "CML Simulated GPU %d", i);
     }
 
-    g_sim_gpu_count = num_devices;
+    g_sim_gpu_count   = num_devices;
     g_sim_gpu_current = 0;
     g_sim_gpu_enabled = true;
     device_unlock();
 
-    LOG_INFO("SimGPU: enabled %d simulated GPU(s), %zuMB each",
-             num_devices, mem / (1024 * 1024));
+    LOG_INFO("SimGPU: enabled %d simulated GPU(s), %zuMB each", num_devices, mem / (1024 * 1024));
 
     return 0;
 }
@@ -811,10 +808,10 @@ int device_sim_gpu_enable(int num_devices, size_t memory_per_device) {
 void device_sim_gpu_disable(void) {
     device_lock();
     for (int i = 0; i < g_sim_gpu_count; i++) {
-        g_sim_gpus[i].active = false;
+        g_sim_gpus[i].active    = false;
         g_sim_gpus[i].allocated = 0;
     }
-    g_sim_gpu_count = 0;
+    g_sim_gpu_count   = 0;
     g_sim_gpu_current = 0;
     g_sim_gpu_enabled = false;
     device_unlock();
@@ -860,13 +857,13 @@ int device_sim_gpu_get_info(int device_id, DeviceInfo* info) {
         return -1;
     }
 
-    SimGPUDevice* dev = &g_sim_gpus[device_id];
-    info->type = DEVICE_SIM_GPU;
-    info->device_id = device_id;
+    SimGPUDevice* dev  = &g_sim_gpus[device_id];
+    info->type         = DEVICE_SIM_GPU;
+    info->device_id    = device_id;
     info->total_memory = dev->total_memory;
-    info->free_memory = dev->total_memory - dev->allocated;
-    info->name = dev->name;
-    info->available = dev->active;
+    info->free_memory  = dev->total_memory - dev->allocated;
+    info->name         = dev->name;
+    info->available    = dev->active;
 
     return 0;
 }

@@ -247,8 +247,9 @@ int cml_kernel_cache_insert(CMLKernelCache* cache, uint64_t hash, CMLKernelBacke
     return 0;
 }
 
-int cml_kernel_cache_insert_ir(CMLKernelCache* cache, CMLGraph_t ir, Tensor** inputs, int num_inputs,
-                               CMLKernelBackend backend, void* compiled, size_t memory_size) {
+int cml_kernel_cache_insert_ir(CMLKernelCache* cache, CMLGraph_t ir, Tensor** inputs,
+                               int num_inputs, CMLKernelBackend backend, void* compiled,
+                               size_t memory_size) {
     uint64_t hash = cml_kernel_cache_compute_hash(ir, inputs, num_inputs, backend);
 
     int result = cml_kernel_cache_insert(cache, hash, backend, compiled, memory_size);
@@ -260,8 +261,8 @@ int cml_kernel_cache_insert_ir(CMLKernelCache* cache, CMLGraph_t ir, Tensor** in
         CMLKernelEntry* entry = cache->buckets[bucket_idx];
         while (entry) {
             if (entry->hash == hash) {
-                entry->num_ops    = (int)ir->node_count;
-                entry->num_inputs = num_inputs;
+                entry->num_ops      = (int)ir->node_count;
+                entry->num_inputs   = num_inputs;
                 struct IRNode* node = ir->head;
                 while (node && node->next)
                     node = node->next;

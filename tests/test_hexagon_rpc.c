@@ -34,12 +34,14 @@ static bool set_lib_path(void) {
 }
 
 static bool resolve_mock_api(void) {
-    if (!set_lib_path()) return false;
+    if (!set_lib_path())
+        return false;
     /* Attach to (or preload) the mock instance; the backend's own dlopen of
      * the same path then returns this identical handle, so journal state is
      * shared. */
     void* h = dlopen(g_lib_path, RTLD_LAZY);
-    if (!h) return false;
+    if (!h)
+        return false;
     p_mock_journal_len  = (fn_int)dlsym(h, "fastrpc_mock_journal_len");
     p_mock_open_handles = (fn_int)dlsym(h, "fastrpc_mock_open_handles");
     p_mock_reset        = (fn_int)dlsym(h, "fastrpc_mock_reset");
@@ -47,24 +49,27 @@ static bool resolve_mock_api(void) {
 }
 
 static bool test_session_lifecycle(void) {
-    if (!set_lib_path() || !resolve_mock_api()) return false;
+    if (!set_lib_path() || !resolve_mock_api())
+        return false;
     p_mock_reset();
 
     CMLHexagonBackend* b = cml_hexagon_backend_create();
-    if (!b) return false;
+    if (!b)
+        return false;
     if (cml_hexagon_backend_init(b) != 0) {
         cml_hexagon_backend_free(b);
         return false;
     }
 
     /* tiny graph: two ops */
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     int shape[] = {2, 2};
-    Tensor* a = tensor_randn(shape, 2, &cfg);
-    Tensor* s1 = tensor_relu(a);
-    Tensor* s2 = tensor_neg(s1);
-    if (!a || !s1 || !s2) return false;
+    Tensor* a   = tensor_randn(shape, 2, &cfg);
+    Tensor* s1  = tensor_relu(a);
+    Tensor* s2  = tensor_neg(s1);
+    if (!a || !s1 || !s2)
+        return false;
     tensor_ensure_executed(s2);
 
     p_mock_reset();

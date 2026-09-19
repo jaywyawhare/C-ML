@@ -12,16 +12,20 @@
 
 static int test_hash_basic(void) {
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
-    if (!ir) return 0;
+    if (!ir)
+        return 0;
     cml_ir_set_global_context(ir);
 
     float data[] = {1.0f, 2.0f, 3.0f, 4.0f};
-    int shape[] = {2, 2};
-    Tensor* t = tensor_from_data(data, shape, 2, NULL);
-    if (!t) { cml_ir_free(ir); return 0; }
+    int shape[]  = {2, 2};
+    Tensor* t    = tensor_from_data(data, shape, 2, NULL);
+    if (!t) {
+        cml_ir_free(ir);
+        return 0;
+    }
 
     uint64_t h = tensor_hash(t);
-    int ok = (h != 0);
+    int ok     = (h != 0);
 
     tensor_free(t);
     cml_ir_free(ir);
@@ -30,17 +34,20 @@ static int test_hash_basic(void) {
 
 static int test_hash_deterministic(void) {
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
-    if (!ir) return 0;
+    if (!ir)
+        return 0;
     cml_ir_set_global_context(ir);
 
     float data[] = {1.0f, 2.0f, 3.0f};
-    int shape[] = {3};
+    int shape[]  = {3};
 
     Tensor* t1 = tensor_from_data(data, shape, 1, NULL);
     Tensor* t2 = tensor_from_data(data, shape, 1, NULL);
     if (!t1 || !t2) {
-        if (t1) tensor_free(t1);
-        if (t2) tensor_free(t2);
+        if (t1)
+            tensor_free(t1);
+        if (t2)
+            tensor_free(t2);
         cml_ir_free(ir);
         return 0;
     }
@@ -57,18 +64,21 @@ static int test_hash_deterministic(void) {
 
 static int test_hash_different_data(void) {
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
-    if (!ir) return 0;
+    if (!ir)
+        return 0;
     cml_ir_set_global_context(ir);
 
     float data1[] = {1.0f, 2.0f};
     float data2[] = {3.0f, 4.0f};
-    int shape[] = {2};
+    int shape[]   = {2};
 
     Tensor* t1 = tensor_from_data(data1, shape, 1, NULL);
     Tensor* t2 = tensor_from_data(data2, shape, 1, NULL);
     if (!t1 || !t2) {
-        if (t1) tensor_free(t1);
-        if (t2) tensor_free(t2);
+        if (t1)
+            tensor_free(t1);
+        if (t2)
+            tensor_free(t2);
         cml_ir_free(ir);
         return 0;
     }
@@ -83,19 +93,21 @@ static int test_hash_different_data(void) {
     return ok;
 }
 
-static int test_hash_null(void) {
-    return tensor_hash(NULL) == 0;
-}
+static int test_hash_null(void) { return tensor_hash(NULL) == 0; }
 
 static int test_keccak_basic(void) {
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
-    if (!ir) return 0;
+    if (!ir)
+        return 0;
     cml_ir_set_global_context(ir);
 
     float data[] = {1.0f, 2.0f, 3.0f, 4.0f};
-    int shape[] = {4};
-    Tensor* t = tensor_from_data(data, shape, 1, NULL);
-    if (!t) { cml_ir_free(ir); return 0; }
+    int shape[]  = {4};
+    Tensor* t    = tensor_from_data(data, shape, 1, NULL);
+    if (!t) {
+        cml_ir_free(ir);
+        return 0;
+    }
 
     uint8_t hash[32];
     int rc = tensor_keccak(t, hash, 32);
@@ -107,7 +119,10 @@ static int test_keccak_basic(void) {
 
     int all_zero = 1;
     for (int i = 0; i < 32; i++) {
-        if (hash[i] != 0) { all_zero = 0; break; }
+        if (hash[i] != 0) {
+            all_zero = 0;
+            break;
+        }
     }
 
     tensor_free(t);
@@ -117,17 +132,20 @@ static int test_keccak_basic(void) {
 
 static int test_keccak_deterministic(void) {
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
-    if (!ir) return 0;
+    if (!ir)
+        return 0;
     cml_ir_set_global_context(ir);
 
     float data[] = {5.0f, 6.0f, 7.0f};
-    int shape[] = {3};
+    int shape[]  = {3};
 
     Tensor* t1 = tensor_from_data(data, shape, 1, NULL);
     Tensor* t2 = tensor_from_data(data, shape, 1, NULL);
     if (!t1 || !t2) {
-        if (t1) tensor_free(t1);
-        if (t2) tensor_free(t2);
+        if (t1)
+            tensor_free(t1);
+        if (t2)
+            tensor_free(t2);
         cml_ir_free(ir);
         return 0;
     }
@@ -145,18 +163,21 @@ static int test_keccak_deterministic(void) {
 
 static int test_keccak_different_data(void) {
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
-    if (!ir) return 0;
+    if (!ir)
+        return 0;
     cml_ir_set_global_context(ir);
 
     float data1[] = {1.0f};
     float data2[] = {2.0f};
-    int shape[] = {1};
+    int shape[]   = {1};
 
     Tensor* t1 = tensor_from_data(data1, shape, 1, NULL);
     Tensor* t2 = tensor_from_data(data2, shape, 1, NULL);
     if (!t1 || !t2) {
-        if (t1) tensor_free(t1);
-        if (t2) tensor_free(t2);
+        if (t1)
+            tensor_free(t1);
+        if (t2)
+            tensor_free(t2);
         cml_ir_free(ir);
         return 0;
     }
@@ -174,13 +195,17 @@ static int test_keccak_different_data(void) {
 
 static int test_keccak_short_output(void) {
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
-    if (!ir) return 0;
+    if (!ir)
+        return 0;
     cml_ir_set_global_context(ir);
 
     float data[] = {42.0f};
-    int shape[] = {1};
-    Tensor* t = tensor_from_data(data, shape, 1, NULL);
-    if (!t) { cml_ir_free(ir); return 0; }
+    int shape[]  = {1};
+    Tensor* t    = tensor_from_data(data, shape, 1, NULL);
+    if (!t) {
+        cml_ir_free(ir);
+        return 0;
+    }
 
     uint8_t full[32], partial[16];
     tensor_keccak(t, full, 32);
@@ -199,17 +224,22 @@ static int test_keccak_null(void) {
 
 static int test_keccak_large_tensor(void) {
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
-    if (!ir) return 0;
+    if (!ir)
+        return 0;
     cml_ir_set_global_context(ir);
 
-    int n = 1024;
+    int n       = 1024;
     float* data = cml_malloc(n * sizeof(float));
-    for (int i = 0; i < n; i++) data[i] = (float)i;
+    for (int i = 0; i < n; i++)
+        data[i] = (float)i;
     int shape[] = {n};
 
     Tensor* t = tensor_from_data(data, shape, 1, NULL);
     cml_free(data);
-    if (!t) { cml_ir_free(ir); return 0; }
+    if (!t) {
+        cml_ir_free(ir);
+        return 0;
+    }
 
     uint8_t hash[32];
     int rc = tensor_keccak(t, hash, 32);
@@ -221,13 +251,17 @@ static int test_keccak_large_tensor(void) {
 
 static int test_keccak_known_empty(void) {
     CMLGraph_t ir = cml_ir_new(IR_TARGET_C);
-    if (!ir) return 0;
+    if (!ir)
+        return 0;
     cml_ir_set_global_context(ir);
 
     float data[] = {0.0f};
-    int shape[] = {1};
-    Tensor* t = tensor_from_data(data, shape, 1, NULL);
-    if (!t) { cml_ir_free(ir); return 0; }
+    int shape[]  = {1};
+    Tensor* t    = tensor_from_data(data, shape, 1, NULL);
+    if (!t) {
+        cml_ir_free(ir);
+        return 0;
+    }
 
     uint8_t hash[32];
     int rc = tensor_keccak(t, hash, 32);

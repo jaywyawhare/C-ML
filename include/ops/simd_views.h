@@ -30,8 +30,8 @@ void simd_gather_f32(const float* src, const int32_t* indices, float* out, size_
 void simd_scatter_f32(const float* src, const int32_t* indices, float* dst, size_t n);
 void simd_scatter_add_f32(const float* src, const int32_t* indices, float* dst, size_t n);
 
-void simd_strided_copy_f32(const float* src, float* dst, size_t n,
-                           size_t src_stride, size_t dst_stride);
+void simd_strided_copy_f32(const float* src, float* dst, size_t n, size_t src_stride,
+                           size_t dst_stride);
 void simd_copy_f32(const float* src, float* dst, size_t n);
 void simd_fill_f32(float* dst, float value, size_t n);
 
@@ -39,8 +39,8 @@ void simd_fill_f32(float* dst, float value, size_t n);
 void simd_broadcast_copy_f32(const float* src, size_t src_n, float* dst, size_t dst_n);
 
 /* General N-D permute using stride-based copy. */
-void simd_permute_nd_f32(const float* src, float* dst, const int* shape,
-                         const size_t* strides, const int* perm, int ndim, size_t numel);
+void simd_permute_nd_f32(const float* src, float* dst, const int* shape, const size_t* strides,
+                         const int* perm, int ndim, size_t numel);
 
 #ifdef __cplusplus
 }

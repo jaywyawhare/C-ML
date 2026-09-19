@@ -11,12 +11,12 @@ typedef struct Embedding {
     Module base;
     int num_embeddings;
     int embedding_dim;
-    int padding_idx; // -1 if no padding
+    int padding_idx;   // -1 if no padding
     Parameter* weight; // [num_embeddings, embedding_dim]
 } Embedding;
 
-Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx,
-                        DType dtype, DeviceType device);
+Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx, DType dtype,
+                        DeviceType device);
 
 #ifdef __cplusplus
 }

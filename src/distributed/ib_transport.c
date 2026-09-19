@@ -11,22 +11,22 @@
 #include <netdb.h>
 #include "alloc/cml_allocator.h"
 
-#define IBV_QPT_RC          2
-#define IBV_QPS_INIT        1
-#define IBV_QPS_RTR         2
-#define IBV_QPS_RTS         3
-#define IBV_WR_SEND         0
-#define IBV_SEND_SIGNALED   (1 << 1)
-#define IBV_ACCESS_LOCAL_WRITE  (1 << 0)
+#define IBV_QPT_RC 2
+#define IBV_QPS_INIT 1
+#define IBV_QPS_RTR 2
+#define IBV_QPS_RTS 3
+#define IBV_WR_SEND 0
+#define IBV_SEND_SIGNALED (1 << 1)
+#define IBV_ACCESS_LOCAL_WRITE (1 << 0)
 #define IBV_ACCESS_REMOTE_WRITE (1 << 1)
-#define IBV_ACCESS_REMOTE_READ  (1 << 2)
-#define IBV_WC_SUCCESS      0
+#define IBV_ACCESS_REMOTE_READ (1 << 2)
+#define IBV_WC_SUCCESS 0
 
-typedef struct ibv_device      ibv_device;
-typedef struct ibv_context     ibv_context;
-typedef struct ibv_pd          ibv_pd;
-typedef struct ibv_cq          ibv_cq;
-typedef struct ibv_qp          ibv_qp;
+typedef struct ibv_device ibv_device;
+typedef struct ibv_context ibv_context;
+typedef struct ibv_pd ibv_pd;
+typedef struct ibv_cq ibv_cq;
+typedef struct ibv_qp ibv_qp;
 
 /* Public libibverbs ABI layout for struct ibv_mr (stable for years). Defined
  * fully — rather than left opaque — so we can read the driver-assigned lkey/rkey
@@ -35,12 +35,12 @@ typedef struct ibv_qp          ibv_qp;
  * why the previous lkey=0 made every send/recv fail on real hardware. */
 typedef struct ibv_mr {
     ibv_context* context;
-    ibv_pd*      pd;
-    void*        addr;
-    size_t       length;
-    uint32_t     handle;
-    uint32_t     lkey;
-    uint32_t     rkey;
+    ibv_pd* pd;
+    void* addr;
+    size_t length;
+    uint32_t handle;
+    uint32_t lkey;
+    uint32_t rkey;
 } ibv_mr;
 
 typedef struct ibv_qp_init_attr {
@@ -48,7 +48,13 @@ typedef struct ibv_qp_init_attr {
     ibv_cq* send_cq;
     ibv_cq* recv_cq;
     void* srq;
-    struct { uint32_t max_send_wr; uint32_t max_recv_wr; uint32_t max_send_sge; uint32_t max_recv_sge; uint32_t max_inline_data; } cap;
+    struct {
+        uint32_t max_send_wr;
+        uint32_t max_recv_wr;
+        uint32_t max_send_sge;
+        uint32_t max_recv_sge;
+        uint32_t max_inline_data;
+    } cap;
     int qp_type;
     int sq_sig_all;
 } ibv_qp_init_attr;
@@ -66,7 +72,12 @@ typedef struct ibv_send_wr {
     int num_sge;
     int opcode;
     int send_flags;
-    union { struct { uint64_t remote_addr; uint32_t rkey; } rdma; } wr;
+    union {
+        struct {
+            uint64_t remote_addr;
+            uint32_t rkey;
+        } rdma;
+    } wr;
 } ibv_send_wr;
 
 typedef struct ibv_recv_wr {
@@ -113,7 +124,20 @@ typedef struct ibv_qp_attr {
     uint32_t qp_num;
     uint32_t dest_qp_num;
     int qp_access_flags;
-    struct { uint16_t dlid; uint8_t sl; uint8_t src_path_bits; uint8_t static_rate; uint8_t is_global; uint8_t port_num; struct { uint32_t flow_label; uint8_t sgid_index; uint8_t hop_limit; uint8_t traffic_class; } grh; } ah_attr;
+    struct {
+        uint16_t dlid;
+        uint8_t sl;
+        uint8_t src_path_bits;
+        uint8_t static_rate;
+        uint8_t is_global;
+        uint8_t port_num;
+        struct {
+            uint32_t flow_label;
+            uint8_t sgid_index;
+            uint8_t hop_limit;
+            uint8_t traffic_class;
+        } grh;
+    } ah_attr;
     uint8_t pkey_index;
     uint8_t _port_num;
     uint32_t sq_draining;
@@ -128,51 +152,58 @@ typedef struct ibv_qp_attr {
 } ibv_qp_attr;
 
 typedef ibv_device** (*fn_ibv_get_device_list_t)(int* num_devices);
-typedef void         (*fn_ibv_free_device_list_t)(ibv_device** list);
+typedef void (*fn_ibv_free_device_list_t)(ibv_device** list);
 typedef ibv_context* (*fn_ibv_open_device_t)(ibv_device* device);
-typedef int          (*fn_ibv_close_device_t)(ibv_context* context);
-typedef ibv_pd*      (*fn_ibv_alloc_pd_t)(ibv_context* context);
-typedef int          (*fn_ibv_dealloc_pd_t)(ibv_pd* pd);
-typedef ibv_cq*      (*fn_ibv_create_cq_t)(ibv_context* context, int cqe, void* cq_ctx, void* channel, int comp_vector);
-typedef int          (*fn_ibv_destroy_cq_t)(ibv_cq* cq);
-typedef ibv_qp*      (*fn_ibv_create_qp_t)(ibv_pd* pd, ibv_qp_init_attr* qp_init_attr);
-typedef int          (*fn_ibv_destroy_qp_t)(ibv_qp* qp);
-typedef int          (*fn_ibv_modify_qp_t)(ibv_qp* qp, ibv_qp_attr* attr, int attr_mask);
-typedef ibv_mr*      (*fn_ibv_reg_mr_t)(ibv_pd* pd, void* addr, size_t length, int access);
-typedef int          (*fn_ibv_dereg_mr_t)(ibv_mr* mr);
-typedef int          (*fn_ibv_post_send_t)(ibv_qp* qp, ibv_send_wr* wr, ibv_send_wr** bad_wr);
-typedef int          (*fn_ibv_post_recv_t)(ibv_qp* qp, ibv_recv_wr* wr, ibv_recv_wr** bad_wr);
-typedef int          (*fn_ibv_poll_cq_t)(ibv_cq* cq, int num_entries, ibv_wc* wc);
-typedef int          (*fn_ibv_query_port_t)(ibv_context* context, uint8_t port_num, ibv_port_attr* port_attr);
-typedef int          (*fn_ibv_query_qp_t)(ibv_qp* qp, ibv_qp_attr* attr, int attr_mask, ibv_qp_init_attr* init_attr);
+typedef int (*fn_ibv_close_device_t)(ibv_context* context);
+typedef ibv_pd* (*fn_ibv_alloc_pd_t)(ibv_context* context);
+typedef int (*fn_ibv_dealloc_pd_t)(ibv_pd* pd);
+typedef ibv_cq* (*fn_ibv_create_cq_t)(ibv_context* context, int cqe, void* cq_ctx, void* channel,
+                                      int comp_vector);
+typedef int (*fn_ibv_destroy_cq_t)(ibv_cq* cq);
+typedef ibv_qp* (*fn_ibv_create_qp_t)(ibv_pd* pd, ibv_qp_init_attr* qp_init_attr);
+typedef int (*fn_ibv_destroy_qp_t)(ibv_qp* qp);
+typedef int (*fn_ibv_modify_qp_t)(ibv_qp* qp, ibv_qp_attr* attr, int attr_mask);
+typedef ibv_mr* (*fn_ibv_reg_mr_t)(ibv_pd* pd, void* addr, size_t length, int access);
+typedef int (*fn_ibv_dereg_mr_t)(ibv_mr* mr);
+typedef int (*fn_ibv_post_send_t)(ibv_qp* qp, ibv_send_wr* wr, ibv_send_wr** bad_wr);
+typedef int (*fn_ibv_post_recv_t)(ibv_qp* qp, ibv_recv_wr* wr, ibv_recv_wr** bad_wr);
+typedef int (*fn_ibv_poll_cq_t)(ibv_cq* cq, int num_entries, ibv_wc* wc);
+typedef int (*fn_ibv_query_port_t)(ibv_context* context, uint8_t port_num,
+                                   ibv_port_attr* port_attr);
+typedef int (*fn_ibv_query_qp_t)(ibv_qp* qp, ibv_qp_attr* attr, int attr_mask,
+                                 ibv_qp_init_attr* init_attr);
 
 static struct {
     void* lib;
-    fn_ibv_get_device_list_t  get_device_list;
+    fn_ibv_get_device_list_t get_device_list;
     fn_ibv_free_device_list_t free_device_list;
-    fn_ibv_open_device_t      open_device;
-    fn_ibv_close_device_t     close_device;
-    fn_ibv_alloc_pd_t         alloc_pd;
-    fn_ibv_dealloc_pd_t       dealloc_pd;
-    fn_ibv_create_cq_t        create_cq;
-    fn_ibv_destroy_cq_t       destroy_cq;
-    fn_ibv_create_qp_t        create_qp;
-    fn_ibv_destroy_qp_t       destroy_qp;
-    fn_ibv_modify_qp_t        modify_qp;
-    fn_ibv_reg_mr_t            reg_mr;
-    fn_ibv_dereg_mr_t          dereg_mr;
-    fn_ibv_post_send_t         post_send;
-    fn_ibv_post_recv_t         post_recv;
-    fn_ibv_poll_cq_t           poll_cq;
-    fn_ibv_query_port_t        query_port;
-    fn_ibv_query_qp_t          query_qp;
+    fn_ibv_open_device_t open_device;
+    fn_ibv_close_device_t close_device;
+    fn_ibv_alloc_pd_t alloc_pd;
+    fn_ibv_dealloc_pd_t dealloc_pd;
+    fn_ibv_create_cq_t create_cq;
+    fn_ibv_destroy_cq_t destroy_cq;
+    fn_ibv_create_qp_t create_qp;
+    fn_ibv_destroy_qp_t destroy_qp;
+    fn_ibv_modify_qp_t modify_qp;
+    fn_ibv_reg_mr_t reg_mr;
+    fn_ibv_dereg_mr_t dereg_mr;
+    fn_ibv_post_send_t post_send;
+    fn_ibv_post_recv_t post_recv;
+    fn_ibv_poll_cq_t poll_cq;
+    fn_ibv_query_port_t query_port;
+    fn_ibv_query_qp_t query_qp;
 } ib_api = {0};
 
 static bool load_ib_symbols(void* lib) {
-#define LOAD_SYM(name) do { \
-    ib_api.name = (fn_ibv_##name##_t)dlsym(lib, "ibv_" #name); \
-    if (!ib_api.name) { LOG_ERROR("Missing symbol ibv_%s: %s", #name, dlerror()); return false; } \
-} while(0)
+#define LOAD_SYM(name)                                                                             \
+    do {                                                                                           \
+        ib_api.name = (fn_ibv_##name##_t)dlsym(lib, "ibv_" #name);                                 \
+        if (!ib_api.name) {                                                                        \
+            LOG_ERROR("Missing symbol ibv_%s: %s", #name, dlerror());                              \
+            return false;                                                                          \
+        }                                                                                          \
+    } while (0)
 
     LOAD_SYM(get_device_list);
     LOAD_SYM(free_device_list);
@@ -198,19 +229,26 @@ static bool load_ib_symbols(void* lib) {
 
 bool cml_ib_available(void) {
     void* lib = dlopen("libibverbs.so.1", RTLD_LAZY);
-    if (!lib) lib = dlopen("libibverbs.so", RTLD_LAZY);
-    if (!lib) return false;
+    if (!lib)
+        lib = dlopen("libibverbs.so", RTLD_LAZY);
+    if (!lib)
+        return false;
 
     fn_ibv_get_device_list_t gdl = (fn_ibv_get_device_list_t)dlsym(lib, "ibv_get_device_list");
-    if (!gdl) { dlclose(lib); return false; }
+    if (!gdl) {
+        dlclose(lib);
+        return false;
+    }
 
-    int num = 0;
+    int num           = 0;
     ibv_device** devs = gdl(&num);
-    bool found = (devs && num > 0);
+    bool found        = (devs && num > 0);
 
     if (devs) {
-        fn_ibv_free_device_list_t fdl = (fn_ibv_free_device_list_t)dlsym(lib, "ibv_free_device_list");
-        if (fdl) fdl(devs);
+        fn_ibv_free_device_list_t fdl =
+            (fn_ibv_free_device_list_t)dlsym(lib, "ibv_free_device_list");
+        if (fdl)
+            fdl(devs);
     }
 
     dlclose(lib);
@@ -226,108 +264,276 @@ bool cml_ib_available(void) {
  * regresses to 0 (the exact bug this validates). One mock transport per
  * process; enable by setting IB_MOCK=1 before cml_ib_create.
  * ══════════════════════════════════════════════════════════════════════════ */
-static char     MOCK_CTX, MOCK_PD, MOCK_CQ;      /* non-NULL sentinels */
-static int      mock_rank = -1, mock_ws = 0;
-static int*     mock_fds = NULL;                 /* [rank] -> socket, self = -1 */
-static uint32_t mock_next_key = 0x1000;          /* real keys start well above 0 */
+static char MOCK_CTX, MOCK_PD, MOCK_CQ; /* non-NULL sentinels */
+static int mock_rank = -1, mock_ws = 0;
+static int* mock_fds          = NULL;   /* [rank] -> socket, self = -1 */
+static uint32_t mock_next_key = 0x1000; /* real keys start well above 0 */
 #define MOCK_MAX_MR 512
 static uint32_t mock_keys[MOCK_MAX_MR];
-static int      mock_num_keys = 0;
-static int      mock_pending = 0;
+static int mock_num_keys     = 0;
+static int mock_pending      = 0;
 static uint64_t mock_wc_wrid = 0;
-static int      mock_wc_status = 0;
+static int mock_wc_status    = 0;
 
 static int mock_send_all(int fd, const void* b, size_t n) {
     const char* p = b;
-    while (n) { ssize_t k = send(fd, p, n, 0); if (k <= 0) { if (k < 0 && errno == EINTR) continue; return -1; } p += k; n -= (size_t)k; }
+    while (n) {
+        ssize_t k = send(fd, p, n, 0);
+        if (k <= 0) {
+            if (k < 0 && errno == EINTR)
+                continue;
+            return -1;
+        }
+        p += k;
+        n -= (size_t)k;
+    }
     return 0;
 }
 static int mock_recv_all(int fd, void* b, size_t n) {
     char* p = b;
-    while (n) { ssize_t k = recv(fd, p, n, 0); if (k <= 0) { if (k < 0 && errno == EINTR) continue; return -1; } p += k; n -= (size_t)k; }
+    while (n) {
+        ssize_t k = recv(fd, p, n, 0);
+        if (k <= 0) {
+            if (k < 0 && errno == EINTR)
+                continue;
+            return -1;
+        }
+        p += k;
+        n -= (size_t)k;
+    }
     return 0;
 }
 static int mock_key_known(uint32_t lkey) {
-    for (int i = 0; i < mock_num_keys; i++) if (mock_keys[i] == lkey) return 1;
+    for (int i = 0; i < mock_num_keys; i++)
+        if (mock_keys[i] == lkey)
+            return 1;
     return 0;
 }
 
-static ibv_device** mock_get_device_list(int* n) { static ibv_device* d[1]; d[0] = (ibv_device*)&MOCK_CTX; if (n) *n = 1; return d; }
+static ibv_device** mock_get_device_list(int* n) {
+    static ibv_device* d[1];
+    d[0] = (ibv_device*)&MOCK_CTX;
+    if (n)
+        *n = 1;
+    return d;
+}
 static void mock_free_device_list(ibv_device** l) { (void)l; }
-static ibv_context* mock_open_device(ibv_device* d) { (void)d; return (ibv_context*)&MOCK_CTX; }
-static int mock_close_device(ibv_context* c) { (void)c;
-    if (mock_fds) { for (int i = 0; i < mock_ws; i++) if (mock_fds[i] >= 0) close(mock_fds[i]); cml_free(mock_fds); mock_fds = NULL; }
+static ibv_context* mock_open_device(ibv_device* d) {
+    (void)d;
+    return (ibv_context*)&MOCK_CTX;
+}
+static int mock_close_device(ibv_context* c) {
+    (void)c;
+    if (mock_fds) {
+        for (int i = 0; i < mock_ws; i++)
+            if (mock_fds[i] >= 0)
+                close(mock_fds[i]);
+        cml_free(mock_fds);
+        mock_fds = NULL;
+    }
     return 0;
 }
-static ibv_pd* mock_alloc_pd(ibv_context* c) { (void)c; return (ibv_pd*)&MOCK_PD; }
-static int mock_dealloc_pd(ibv_pd* p) { (void)p; return 0; }
-static ibv_cq* mock_create_cq(ibv_context* c, int cqe, void* x, void* ch, int cv) { (void)c; (void)cqe; (void)x; (void)ch; (void)cv; return (ibv_cq*)&MOCK_CQ; }
-static int mock_destroy_cq(ibv_cq* q) { (void)q; return 0; }
-static ibv_qp* mock_create_qp(ibv_pd* p, ibv_qp_init_attr* a) { (void)p; (void)a; static int qpc = 100; int* h = (int*)cml_malloc(sizeof(int)); if (!h) return NULL; *h = qpc++; return (ibv_qp*)h; }
-static int mock_destroy_qp(ibv_qp* q) { cml_free(q); return 0; }
-static int mock_modify_qp(ibv_qp* q, ibv_qp_attr* a, int m) { (void)q; (void)a; (void)m; return 0; }
-static ibv_mr* mock_reg_mr(ibv_pd* p, void* addr, size_t len, int access) { (void)p; (void)access;
-    ibv_mr* mr = (ibv_mr*)cml_calloc(1, sizeof(ibv_mr)); if (!mr) return NULL;
-    mr->addr = addr; mr->length = len; mr->lkey = mock_next_key; mr->rkey = mock_next_key; mock_next_key++;
-    if (mock_num_keys < MOCK_MAX_MR) mock_keys[mock_num_keys++] = mr->lkey;
+static ibv_pd* mock_alloc_pd(ibv_context* c) {
+    (void)c;
+    return (ibv_pd*)&MOCK_PD;
+}
+static int mock_dealloc_pd(ibv_pd* p) {
+    (void)p;
+    return 0;
+}
+static ibv_cq* mock_create_cq(ibv_context* c, int cqe, void* x, void* ch, int cv) {
+    (void)c;
+    (void)cqe;
+    (void)x;
+    (void)ch;
+    (void)cv;
+    return (ibv_cq*)&MOCK_CQ;
+}
+static int mock_destroy_cq(ibv_cq* q) {
+    (void)q;
+    return 0;
+}
+static ibv_qp* mock_create_qp(ibv_pd* p, ibv_qp_init_attr* a) {
+    (void)p;
+    (void)a;
+    static int qpc = 100;
+    int* h         = (int*)cml_malloc(sizeof(int));
+    if (!h)
+        return NULL;
+    *h = qpc++;
+    return (ibv_qp*)h;
+}
+static int mock_destroy_qp(ibv_qp* q) {
+    cml_free(q);
+    return 0;
+}
+static int mock_modify_qp(ibv_qp* q, ibv_qp_attr* a, int m) {
+    (void)q;
+    (void)a;
+    (void)m;
+    return 0;
+}
+static ibv_mr* mock_reg_mr(ibv_pd* p, void* addr, size_t len, int access) {
+    (void)p;
+    (void)access;
+    ibv_mr* mr = (ibv_mr*)cml_calloc(1, sizeof(ibv_mr));
+    if (!mr)
+        return NULL;
+    mr->addr   = addr;
+    mr->length = len;
+    mr->lkey   = mock_next_key;
+    mr->rkey   = mock_next_key;
+    mock_next_key++;
+    if (mock_num_keys < MOCK_MAX_MR)
+        mock_keys[mock_num_keys++] = mr->lkey;
     return mr;
 }
-static int mock_dereg_mr(ibv_mr* mr) { cml_free(mr); return 0; }
-static int mock_post_send(ibv_qp* q, ibv_send_wr* wr, ibv_send_wr** bad) { (void)q; (void)bad;
-    int peer = (int)wr->wr_id; ibv_sge* sge = wr->sg_list;
-    int ok = sge && mock_key_known(sge->lkey) && peer >= 0 && peer < mock_ws && mock_fds && mock_fds[peer] >= 0;
-    if (!ok) LOG_ERROR("MOCK IB post_send: invalid SGE lkey=%u / peer=%d (lkey must be a registered MR key)", sge ? sge->lkey : 0, peer);
-    else if (sge->length > 0) ok = (mock_send_all(mock_fds[peer], (const void*)(uintptr_t)sge->addr, sge->length) == 0);
-    mock_pending = 1; mock_wc_wrid = wr->wr_id; mock_wc_status = ok ? 0 : 1;
+static int mock_dereg_mr(ibv_mr* mr) {
+    cml_free(mr);
     return 0;
 }
-static int mock_post_recv(ibv_qp* q, ibv_recv_wr* wr, ibv_recv_wr** bad) { (void)q; (void)bad;
-    int peer = (int)wr->wr_id; ibv_sge* sge = wr->sg_list;
-    int ok = sge && mock_key_known(sge->lkey) && peer >= 0 && peer < mock_ws && mock_fds && mock_fds[peer] >= 0;
-    if (!ok) LOG_ERROR("MOCK IB post_recv: invalid SGE lkey=%u / peer=%d", sge ? sge->lkey : 0, peer);
-    else if (sge->length > 0) ok = (mock_recv_all(mock_fds[peer], (void*)(uintptr_t)sge->addr, sge->length) == 0);
-    mock_pending = 1; mock_wc_wrid = wr->wr_id; mock_wc_status = ok ? 0 : 1;
+static int mock_post_send(ibv_qp* q, ibv_send_wr* wr, ibv_send_wr** bad) {
+    (void)q;
+    (void)bad;
+    int peer     = (int)wr->wr_id;
+    ibv_sge* sge = wr->sg_list;
+    int ok       = sge && mock_key_known(sge->lkey) && peer >= 0 && peer < mock_ws && mock_fds &&
+             mock_fds[peer] >= 0;
+    if (!ok)
+        LOG_ERROR(
+            "MOCK IB post_send: invalid SGE lkey=%u / peer=%d (lkey must be a registered MR key)",
+            sge ? sge->lkey : 0, peer);
+    else if (sge->length > 0)
+        ok = (mock_send_all(mock_fds[peer], (const void*)(uintptr_t)sge->addr, sge->length) == 0);
+    mock_pending   = 1;
+    mock_wc_wrid   = wr->wr_id;
+    mock_wc_status = ok ? 0 : 1;
     return 0;
 }
-static int mock_poll_cq(ibv_cq* cq, int ne, ibv_wc* wc) { (void)cq; (void)ne;
-    if (mock_pending) { if (wc) { wc->wr_id = mock_wc_wrid; wc->status = mock_wc_status; wc->opcode = 0; wc->byte_len = 0; wc->qp_num = 0; } mock_pending = 0; return 1; }
+static int mock_post_recv(ibv_qp* q, ibv_recv_wr* wr, ibv_recv_wr** bad) {
+    (void)q;
+    (void)bad;
+    int peer     = (int)wr->wr_id;
+    ibv_sge* sge = wr->sg_list;
+    int ok       = sge && mock_key_known(sge->lkey) && peer >= 0 && peer < mock_ws && mock_fds &&
+             mock_fds[peer] >= 0;
+    if (!ok)
+        LOG_ERROR("MOCK IB post_recv: invalid SGE lkey=%u / peer=%d", sge ? sge->lkey : 0, peer);
+    else if (sge->length > 0)
+        ok = (mock_recv_all(mock_fds[peer], (void*)(uintptr_t)sge->addr, sge->length) == 0);
+    mock_pending   = 1;
+    mock_wc_wrid   = wr->wr_id;
+    mock_wc_status = ok ? 0 : 1;
     return 0;
 }
-static int mock_query_port(ibv_context* c, uint8_t port, ibv_port_attr* pa) { (void)c; (void)port; if (pa) { memset(pa, 0, sizeof(*pa)); pa->lid = (uint16_t)(mock_rank + 1); } return 0; }
-static int mock_query_qp(ibv_qp* q, ibv_qp_attr* a, int m, ibv_qp_init_attr* ia) { (void)m; (void)ia; if (a) { memset(a, 0, sizeof(*a)); a->qp_num = (uint32_t)(q ? *(int*)q : 0); } return 0; }
+static int mock_poll_cq(ibv_cq* cq, int ne, ibv_wc* wc) {
+    (void)cq;
+    (void)ne;
+    if (mock_pending) {
+        if (wc) {
+            wc->wr_id    = mock_wc_wrid;
+            wc->status   = mock_wc_status;
+            wc->opcode   = 0;
+            wc->byte_len = 0;
+            wc->qp_num   = 0;
+        }
+        mock_pending = 0;
+        return 1;
+    }
+    return 0;
+}
+static int mock_query_port(ibv_context* c, uint8_t port, ibv_port_attr* pa) {
+    (void)c;
+    (void)port;
+    if (pa) {
+        memset(pa, 0, sizeof(*pa));
+        pa->lid = (uint16_t)(mock_rank + 1);
+    }
+    return 0;
+}
+static int mock_query_qp(ibv_qp* q, ibv_qp_attr* a, int m, ibv_qp_init_attr* ia) {
+    (void)m;
+    (void)ia;
+    if (a) {
+        memset(a, 0, sizeof(*a));
+        a->qp_num = (uint32_t)(q ? *(int*)q : 0);
+    }
+    return 0;
+}
 
 /* Gloo-style mesh: connect to higher ranks, accept from lower ones. */
 static int mock_build_mesh(int rank, int ws) {
     mock_fds = (int*)cml_calloc((size_t)ws, sizeof(int));
-    if (!mock_fds) return -1;
-    for (int i = 0; i < ws; i++) mock_fds[i] = -1;
-    if (ws <= 1) return 0;
+    if (!mock_fds)
+        return -1;
+    for (int i = 0; i < ws; i++)
+        mock_fds[i] = -1;
+    if (ws <= 1)
+        return 0;
 
     const char* pe = getenv("IB_MOCK_PORT");
-    int base = pe ? atoi(pe) : 39590;
-    if (base <= 0) base = 39590;
+    int base       = pe ? atoi(pe) : 39590;
+    if (base <= 0)
+        base = 39590;
 
     int lfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (lfd < 0) return -1;
-    int opt = 1; setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    struct sockaddr_in a; memset(&a, 0, sizeof(a));
-    a.sin_family = AF_INET; a.sin_addr.s_addr = INADDR_ANY; a.sin_port = htons((uint16_t)(base + rank));
-    if (bind(lfd, (struct sockaddr*)&a, sizeof(a)) < 0 || listen(lfd, ws) < 0) { close(lfd); return -1; }
+    if (lfd < 0)
+        return -1;
+    int opt = 1;
+    setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof(a));
+    a.sin_family      = AF_INET;
+    a.sin_addr.s_addr = INADDR_ANY;
+    a.sin_port        = htons((uint16_t)(base + rank));
+    if (bind(lfd, (struct sockaddr*)&a, sizeof(a)) < 0 || listen(lfd, ws) < 0) {
+        close(lfd);
+        return -1;
+    }
 
     for (int peer = rank + 1; peer < ws; peer++) {
-        int s = socket(AF_INET, SOCK_STREAM, 0); if (s < 0) { close(lfd); return -1; }
-        struct sockaddr_in pa; memset(&pa, 0, sizeof(pa));
-        pa.sin_family = AF_INET; pa.sin_port = htons((uint16_t)(base + peer)); inet_pton(AF_INET, "127.0.0.1", &pa.sin_addr);
+        int s = socket(AF_INET, SOCK_STREAM, 0);
+        if (s < 0) {
+            close(lfd);
+            return -1;
+        }
+        struct sockaddr_in pa;
+        memset(&pa, 0, sizeof(pa));
+        pa.sin_family = AF_INET;
+        pa.sin_port   = htons((uint16_t)(base + peer));
+        inet_pton(AF_INET, "127.0.0.1", &pa.sin_addr);
         int conn = 0;
-        for (int r = 0; r < 100; r++) { if (connect(s, (struct sockaddr*)&pa, sizeof(pa)) == 0) { conn = 1; break; } usleep(100000); }
-        if (!conn) { close(s); close(lfd); return -1; }
-        if (mock_send_all(s, &rank, sizeof(rank)) != 0) { close(s); close(lfd); return -1; }
+        for (int r = 0; r < 100; r++) {
+            if (connect(s, (struct sockaddr*)&pa, sizeof(pa)) == 0) {
+                conn = 1;
+                break;
+            }
+            usleep(100000);
+        }
+        if (!conn) {
+            close(s);
+            close(lfd);
+            return -1;
+        }
+        if (mock_send_all(s, &rank, sizeof(rank)) != 0) {
+            close(s);
+            close(lfd);
+            return -1;
+        }
         mock_fds[peer] = s;
     }
     for (int i = 0; i < rank; i++) {
-        int c = accept(lfd, NULL, NULL); if (c < 0) { close(lfd); return -1; }
+        int c = accept(lfd, NULL, NULL);
+        if (c < 0) {
+            close(lfd);
+            return -1;
+        }
         int pr = -1;
-        if (mock_recv_all(c, &pr, sizeof(pr)) != 0 || pr < 0 || pr >= ws) { close(c); close(lfd); return -1; }
+        if (mock_recv_all(c, &pr, sizeof(pr)) != 0 || pr < 0 || pr >= ws) {
+            close(c);
+            close(lfd);
+            return -1;
+        }
         mock_fds[pr] = c;
     }
     close(lfd);
@@ -335,18 +541,33 @@ static int mock_build_mesh(int rank, int ws) {
 }
 
 static int install_mock_ib_api(int rank, int ws) {
-    mock_rank = rank; mock_ws = ws; mock_num_keys = 0; mock_pending = 0; mock_next_key = 0x1000;
-    if (mock_build_mesh(rank, ws) != 0) { LOG_ERROR("MOCK IB: mesh setup failed"); return -1; }
-    ib_api.get_device_list = mock_get_device_list; ib_api.free_device_list = mock_free_device_list;
-    ib_api.open_device = mock_open_device;         ib_api.close_device = mock_close_device;
-    ib_api.alloc_pd = mock_alloc_pd;               ib_api.dealloc_pd = mock_dealloc_pd;
-    ib_api.create_cq = mock_create_cq;             ib_api.destroy_cq = mock_destroy_cq;
-    ib_api.create_qp = mock_create_qp;             ib_api.destroy_qp = mock_destroy_qp;
-    ib_api.modify_qp = mock_modify_qp;
-    ib_api.reg_mr = mock_reg_mr;                   ib_api.dereg_mr = mock_dereg_mr;
-    ib_api.post_send = mock_post_send;             ib_api.post_recv = mock_post_recv;
-    ib_api.poll_cq = mock_poll_cq;
-    ib_api.query_port = mock_query_port;           ib_api.query_qp = mock_query_qp;
+    mock_rank     = rank;
+    mock_ws       = ws;
+    mock_num_keys = 0;
+    mock_pending  = 0;
+    mock_next_key = 0x1000;
+    if (mock_build_mesh(rank, ws) != 0) {
+        LOG_ERROR("MOCK IB: mesh setup failed");
+        return -1;
+    }
+    ib_api.get_device_list  = mock_get_device_list;
+    ib_api.free_device_list = mock_free_device_list;
+    ib_api.open_device      = mock_open_device;
+    ib_api.close_device     = mock_close_device;
+    ib_api.alloc_pd         = mock_alloc_pd;
+    ib_api.dealloc_pd       = mock_dealloc_pd;
+    ib_api.create_cq        = mock_create_cq;
+    ib_api.destroy_cq       = mock_destroy_cq;
+    ib_api.create_qp        = mock_create_qp;
+    ib_api.destroy_qp       = mock_destroy_qp;
+    ib_api.modify_qp        = mock_modify_qp;
+    ib_api.reg_mr           = mock_reg_mr;
+    ib_api.dereg_mr         = mock_dereg_mr;
+    ib_api.post_send        = mock_post_send;
+    ib_api.post_recv        = mock_post_recv;
+    ib_api.poll_cq          = mock_poll_cq;
+    ib_api.query_port       = mock_query_port;
+    ib_api.query_qp         = mock_query_qp;
     return 0;
 }
 
@@ -357,14 +578,15 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
     }
 
     int use_mock = (getenv("IB_MOCK") != NULL);
-    void* lib = NULL;
+    void* lib    = NULL;
 
     if (use_mock) {
         if (install_mock_ib_api(rank, world_size) != 0)
             return NULL;
     } else {
         lib = dlopen("libibverbs.so.1", RTLD_LAZY);
-        if (!lib) lib = dlopen("libibverbs.so", RTLD_LAZY);
+        if (!lib)
+            lib = dlopen("libibverbs.so", RTLD_LAZY);
         if (!lib) {
             LOG_ERROR("Failed to load libibverbs: %s", dlerror());
             return NULL;
@@ -375,7 +597,7 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
         }
     }
 
-    int num_devs = 0;
+    int num_devs          = 0;
     ibv_device** dev_list = ib_api.get_device_list(&num_devs);
     if (!dev_list || num_devs == 0) {
         LOG_ERROR("No InfiniBand devices found");
@@ -400,7 +622,8 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
     }
 
     int cq_size = 256 * (world_size - 1);
-    if (cq_size < 16) cq_size = 16;
+    if (cq_size < 16)
+        cq_size = 16;
     ibv_cq* cq = ib_api.create_cq(ctx, cq_size, NULL, NULL, 0);
     if (!cq) {
         LOG_ERROR("Failed to create completion queue");
@@ -419,14 +642,14 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
         return NULL;
     }
 
-    ib->ib_ctx = ctx;
-    ib->pd = pd;
-    ib->cq = cq;
-    ib->rank = rank;
+    ib->ib_ctx     = ctx;
+    ib->pd         = pd;
+    ib->cq         = cq;
+    ib->rank       = rank;
     ib->world_size = world_size;
-    ib->ib_lib = lib;
-    ib->num_peers = world_size - 1;
-    ib->connected = false;
+    ib->ib_lib     = lib;
+    ib->num_peers  = world_size - 1;
+    ib->connected  = false;
 
     ib->qps = cml_calloc((size_t)world_size, sizeof(void*));
     if (!ib->qps) {
@@ -441,19 +664,20 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
     }
 
     for (int i = 0; i < world_size; i++) {
-        if (i == rank) continue;
+        if (i == rank)
+            continue;
 
         ibv_qp_init_attr qp_attr;
         memset(&qp_attr, 0, sizeof(qp_attr));
-        qp_attr.send_cq = cq;
-        qp_attr.recv_cq = cq;
-        qp_attr.qp_type = IBV_QPT_RC;
-        qp_attr.cap.max_send_wr = 128;
-        qp_attr.cap.max_recv_wr = 128;
-        qp_attr.cap.max_send_sge = 1;
-        qp_attr.cap.max_recv_sge = 1;
+        qp_attr.send_cq             = cq;
+        qp_attr.recv_cq             = cq;
+        qp_attr.qp_type             = IBV_QPT_RC;
+        qp_attr.cap.max_send_wr     = 128;
+        qp_attr.cap.max_recv_wr     = 128;
+        qp_attr.cap.max_send_sge    = 1;
+        qp_attr.cap.max_recv_sge    = 1;
         qp_attr.cap.max_inline_data = 64;
-        qp_attr.sq_sig_all = 0;
+        qp_attr.sq_sig_all          = 0;
 
         ibv_qp* qp = ib_api.create_qp(pd, &qp_attr);
         if (!qp) {
@@ -476,10 +700,11 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
 
     /* The mock's socket mesh is already established, so no real QP handshake is
      * needed — mark connected and skip cml_ib_connect. */
-    if (use_mock) ib->connected = true;
+    if (use_mock)
+        ib->connected = true;
 
-    LOG_INFO("IB transport created%s: rank %d/%d, %d QPs",
-             use_mock ? " (MOCK)" : "", rank, world_size, world_size - 1);
+    LOG_INFO("IB transport created%s: rank %d/%d, %d QPs", use_mock ? " (MOCK)" : "", rank,
+             world_size, world_size - 1);
     return ib;
 }
 
@@ -492,29 +717,30 @@ typedef struct {
 static int transition_qp_init(CMLIBTransport* ib, int peer) {
     ibv_qp_attr attr;
     memset(&attr, 0, sizeof(attr));
-    attr.qp_state = IBV_QPS_INIT;
+    attr.qp_state   = IBV_QPS_INIT;
     attr.pkey_index = 0;
-    attr._port_num = 1;
-    attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ;
+    attr._port_num  = 1;
+    attr.qp_access_flags =
+        IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ;
 
-    int mask = (1 << 0) | (1 << 16) | (1 << 17) | (1 << 20); 
+    int mask = (1 << 0) | (1 << 16) | (1 << 17) | (1 << 20);
     return ib_api.modify_qp(ib->qps[peer], &attr, mask);
 }
 
 static int transition_qp_rtr(CMLIBTransport* ib, int peer, qp_info_t* remote) {
     ibv_qp_attr attr;
     memset(&attr, 0, sizeof(attr));
-    attr.qp_state = IBV_QPS_RTR;
-    attr.path_mtu = 3; 
-    attr.dest_qp_num = remote->qp_num;
-    attr.rq_psn = remote->psn;
-    attr.max_dest_rd_atomic = 4;
-    attr.min_rnr_timer = 12;
-    attr.ah_attr.dlid = remote->lid;
-    attr.ah_attr.sl = 0;
+    attr.qp_state              = IBV_QPS_RTR;
+    attr.path_mtu              = 3;
+    attr.dest_qp_num           = remote->qp_num;
+    attr.rq_psn                = remote->psn;
+    attr.max_dest_rd_atomic    = 4;
+    attr.min_rnr_timer         = 12;
+    attr.ah_attr.dlid          = remote->lid;
+    attr.ah_attr.sl            = 0;
     attr.ah_attr.src_path_bits = 0;
-    attr.ah_attr.port_num = 1;
-    attr.ah_attr.is_global = 0;
+    attr.ah_attr.port_num      = 1;
+    attr.ah_attr.is_global     = 0;
 
     int mask = (1 << 0) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 6) | (1 << 9) | (1 << 12);
     return ib_api.modify_qp(ib->qps[peer], &attr, mask);
@@ -523,21 +749,22 @@ static int transition_qp_rtr(CMLIBTransport* ib, int peer, qp_info_t* remote) {
 static int transition_qp_rts(CMLIBTransport* ib, int peer, uint32_t local_psn) {
     ibv_qp_attr attr;
     memset(&attr, 0, sizeof(attr));
-    attr.qp_state = IBV_QPS_RTS;
-    attr.timeout = 14;
-    attr.retry_cnt = 7;
-    attr.rnr_retry = 7;
-    attr.sq_psn = local_psn;
+    attr.qp_state      = IBV_QPS_RTS;
+    attr.timeout       = 14;
+    attr.retry_cnt     = 7;
+    attr.rnr_retry     = 7;
+    attr.sq_psn        = local_psn;
     attr.max_rd_atomic = 4;
 
     int mask = (1 << 0) | (1 << 5) | (1 << 8) | (1 << 10) | (1 << 11) | (1 << 13);
     return ib_api.modify_qp(ib->qps[peer], &attr, mask);
 }
 
-static int tcp_exchange(const char* addr, int is_server, void* send_data, void* recv_data, size_t size) {
+static int tcp_exchange(const char* addr, int is_server, void* send_data, void* recv_data,
+                        size_t size) {
     struct addrinfo hints, *res;
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
+    hints.ai_family   = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
     char host[256];
@@ -548,7 +775,7 @@ static int tcp_exchange(const char* addr, int is_server, void* send_data, void* 
     char* colon = strrchr(host, ':');
     if (colon) {
         *colon = '\0';
-        port = atoi(colon + 1);
+        port   = atoi(colon + 1);
     }
 
     char port_str[16];
@@ -557,27 +784,38 @@ static int tcp_exchange(const char* addr, int is_server, void* send_data, void* 
     int fd = -1;
     if (is_server) {
         hints.ai_flags = AI_PASSIVE;
-        if (getaddrinfo(NULL, port_str, &hints, &res) != 0) return -1;
+        if (getaddrinfo(NULL, port_str, &hints, &res) != 0)
+            return -1;
 
         fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-        if (fd < 0) { freeaddrinfo(res); return -1; }
+        if (fd < 0) {
+            freeaddrinfo(res);
+            return -1;
+        }
 
         int opt = 1;
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
         if (bind(fd, res->ai_addr, res->ai_addrlen) < 0 || listen(fd, 1) < 0) {
-            close(fd); freeaddrinfo(res); return -1;
+            close(fd);
+            freeaddrinfo(res);
+            return -1;
         }
         freeaddrinfo(res);
 
         int client = accept(fd, NULL, NULL);
         close(fd);
-        if (client < 0) return -1;
+        if (client < 0)
+            return -1;
         fd = client;
     } else {
-        if (getaddrinfo(host, port_str, &hints, &res) != 0) return -1;
+        if (getaddrinfo(host, port_str, &hints, &res) != 0)
+            return -1;
         fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-        if (fd < 0) { freeaddrinfo(res); return -1; }
+        if (fd < 0) {
+            freeaddrinfo(res);
+            return -1;
+        }
 
         int retries = 50;
         while (connect(fd, res->ai_addr, res->ai_addrlen) < 0 && retries > 0) {
@@ -585,16 +823,25 @@ static int tcp_exchange(const char* addr, int is_server, void* send_data, void* 
             retries--;
         }
         freeaddrinfo(res);
-        if (retries <= 0) { close(fd); return -1; }
+        if (retries <= 0) {
+            close(fd);
+            return -1;
+        }
     }
 
     ssize_t n = send(fd, send_data, size, 0);
-    if (n != (ssize_t)size) { close(fd); return -1; }
+    if (n != (ssize_t)size) {
+        close(fd);
+        return -1;
+    }
 
     size_t recvd = 0;
     while (recvd < size) {
         n = recv(fd, (char*)recv_data + recvd, size - recvd, 0);
-        if (n <= 0) { close(fd); return -1; }
+        if (n <= 0) {
+            close(fd);
+            return -1;
+        }
         recvd += (size_t)n;
     }
 
@@ -603,10 +850,13 @@ static int tcp_exchange(const char* addr, int is_server, void* send_data, void* 
 }
 
 int cml_ib_connect(CMLIBTransport* ib, const char** peer_addrs, int num_peers) {
-    if (!ib) return -1;
+    if (!ib)
+        return -1;
     /* Mock transport is already connected via its socket mesh at create time. */
-    if (ib->connected) return 0;
-    if (!peer_addrs || num_peers != ib->world_size - 1) return -1;
+    if (ib->connected)
+        return 0;
+    if (!peer_addrs || num_peers != ib->world_size - 1)
+        return -1;
 
     ibv_port_attr port_attr;
     if (ib_api.query_port(ib->ib_ctx, 1, &port_attr) != 0) {
@@ -618,23 +868,20 @@ int cml_ib_connect(CMLIBTransport* ib, const char** peer_addrs, int num_peers) {
 
     int peer_idx = 0;
     for (int i = 0; i < ib->world_size; i++) {
-        if (i == ib->rank) continue;
+        if (i == ib->rank)
+            continue;
 
         if (transition_qp_init(ib, i) != 0) {
             LOG_ERROR("Failed to transition QP to INIT for peer %d", i);
             return -1;
         }
 
-        qp_info_t local_info = {
-            .qp_num = ib->qp_nums[i],
-            .lid = port_attr.lid,
-            .psn = local_psn
-        };
+        qp_info_t local_info = {.qp_num = ib->qp_nums[i], .lid = port_attr.lid, .psn = local_psn};
 
         qp_info_t remote_info;
         int is_server = (ib->rank < i);
-        if (tcp_exchange(peer_addrs[peer_idx], is_server,
-                         &local_info, &remote_info, sizeof(qp_info_t)) != 0) {
+        if (tcp_exchange(peer_addrs[peer_idx], is_server, &local_info, &remote_info,
+                         sizeof(qp_info_t)) != 0) {
             LOG_ERROR("TCP exchange failed for peer %d", i);
             return -1;
         }
@@ -658,21 +905,27 @@ int cml_ib_connect(CMLIBTransport* ib, const char** peer_addrs, int num_peers) {
 }
 
 void cml_ib_free(CMLIBTransport* ib) {
-    if (!ib) return;
+    if (!ib)
+        return;
 
     if (ib->qps) {
         for (int i = 0; i < ib->world_size; i++) {
-            if (ib->qps[i]) ib_api.destroy_qp(ib->qps[i]);
+            if (ib->qps[i])
+                ib_api.destroy_qp(ib->qps[i]);
         }
         cml_free(ib->qps);
     }
 
     cml_free(ib->qp_nums);
 
-    if (ib->cq) ib_api.destroy_cq(ib->cq);
-    if (ib->pd) ib_api.dealloc_pd(ib->pd);
-    if (ib->ib_ctx) ib_api.close_device(ib->ib_ctx);
-    if (ib->ib_lib) dlclose(ib->ib_lib);
+    if (ib->cq)
+        ib_api.destroy_cq(ib->cq);
+    if (ib->pd)
+        ib_api.dealloc_pd(ib->pd);
+    if (ib->ib_ctx)
+        ib_api.close_device(ib->ib_ctx);
+    if (ib->ib_lib)
+        dlclose(ib->ib_lib);
 
     cml_free(ib);
 }
@@ -704,30 +957,28 @@ int cml_ib_send(CMLIBTransport* ib, int peer, const void* buf, size_t size) {
     if (!ib || !ib->connected || peer < 0 || peer >= ib->world_size || peer == ib->rank)
         return -1;
 
-    ibv_mr* mr = ib_api.reg_mr(ib->pd, (void*)buf, size,
-                                IBV_ACCESS_LOCAL_WRITE);
+    ibv_mr* mr = ib_api.reg_mr(ib->pd, (void*)buf, size, IBV_ACCESS_LOCAL_WRITE);
     if (!mr) {
         LOG_ERROR("Failed to register send buffer");
         return -1;
     }
 
-    
     ibv_sge sge = {
-        .addr = (uint64_t)(uintptr_t)buf,
+        .addr   = (uint64_t)(uintptr_t)buf,
         .length = (uint32_t)size,
-        .lkey = mr->lkey            /* real driver-assigned key */
+        .lkey   = mr->lkey /* real driver-assigned key */
     };
 
     ibv_send_wr wr;
     memset(&wr, 0, sizeof(wr));
-    wr.wr_id = (uint64_t)peer;
-    wr.sg_list = &sge;
-    wr.num_sge = 1;
-    wr.opcode = IBV_WR_SEND;
+    wr.wr_id      = (uint64_t)peer;
+    wr.sg_list    = &sge;
+    wr.num_sge    = 1;
+    wr.opcode     = IBV_WR_SEND;
     wr.send_flags = IBV_SEND_SIGNALED;
 
     ibv_send_wr* bad_wr = NULL;
-    int rc = ib_api.post_send(ib->qps[peer], &wr, &bad_wr);
+    int rc              = ib_api.post_send(ib->qps[peer], &wr, &bad_wr);
     if (rc != 0) {
         LOG_ERROR("post_send failed for peer %d: rc=%d", peer, rc);
         ib_api.dereg_mr(mr);
@@ -743,27 +994,26 @@ int cml_ib_recv(CMLIBTransport* ib, int peer, void* buf, size_t size) {
     if (!ib || !ib->connected || peer < 0 || peer >= ib->world_size || peer == ib->rank)
         return -1;
 
-    ibv_mr* mr = ib_api.reg_mr(ib->pd, buf, size,
-                                IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+    ibv_mr* mr = ib_api.reg_mr(ib->pd, buf, size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
     if (!mr) {
         LOG_ERROR("Failed to register recv buffer");
         return -1;
     }
 
     ibv_sge sge = {
-        .addr = (uint64_t)(uintptr_t)buf,
+        .addr   = (uint64_t)(uintptr_t)buf,
         .length = (uint32_t)size,
-        .lkey = mr->lkey            /* real driver-assigned key */
+        .lkey   = mr->lkey /* real driver-assigned key */
     };
 
     ibv_recv_wr wr;
     memset(&wr, 0, sizeof(wr));
-    wr.wr_id = (uint64_t)peer;
+    wr.wr_id   = (uint64_t)peer;
     wr.sg_list = &sge;
     wr.num_sge = 1;
 
     ibv_recv_wr* bad_wr = NULL;
-    int rc = ib_api.post_recv(ib->qps[peer], &wr, &bad_wr);
+    int rc              = ib_api.post_recv(ib->qps[peer], &wr, &bad_wr);
     if (rc != 0) {
         LOG_ERROR("post_recv failed for peer %d: rc=%d", peer, rc);
         ib_api.dereg_mr(mr);
@@ -785,50 +1035,58 @@ int cml_ib_recv(CMLIBTransport* ib, int peer, void* buf, size_t size) {
 static int ib_ring_sendrecv(CMLIBTransport* ib, int right, const void* sbuf, size_t sbytes,
                             int left, void* rbuf, size_t rbytes, int rank) {
     if ((rank & 1) == 0) {
-        if (sbytes && cml_ib_send(ib, right, sbuf, sbytes) != 0) return -1;
-        if (rbytes && cml_ib_recv(ib, left, rbuf, rbytes) != 0) return -1;
+        if (sbytes && cml_ib_send(ib, right, sbuf, sbytes) != 0)
+            return -1;
+        if (rbytes && cml_ib_recv(ib, left, rbuf, rbytes) != 0)
+            return -1;
     } else {
-        if (rbytes && cml_ib_recv(ib, left, rbuf, rbytes) != 0) return -1;
-        if (sbytes && cml_ib_send(ib, right, sbuf, sbytes) != 0) return -1;
+        if (rbytes && cml_ib_recv(ib, left, rbuf, rbytes) != 0)
+            return -1;
+        if (sbytes && cml_ib_send(ib, right, sbuf, sbytes) != 0)
+            return -1;
     }
     return 0;
 }
 
 int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) {
-    if (!ib || !ib->connected || !buf || size == 0 || elem_size <= 0) return -1;
+    if (!ib || !ib->connected || !buf || size == 0 || elem_size <= 0)
+        return -1;
 
-    int ws = ib->world_size;
+    int ws   = ib->world_size;
     int rank = ib->rank;
 
-    if (ws == 1) return 0;
+    if (ws == 1)
+        return 0;
 
-    size_t count = size / (size_t)elem_size;
-    size_t chunk = (count + (size_t)ws - 1) / (size_t)ws;
+    size_t count       = size / (size_t)elem_size;
+    size_t chunk       = (count + (size_t)ws - 1) / (size_t)ws;
     size_t chunk_bytes = chunk * (size_t)elem_size;
 
     int left  = (rank - 1 + ws) % ws;
     int right = (rank + 1) % ws;
 
     float* recv_buf = cml_malloc(chunk_bytes);
-    if (!recv_buf) return -1;
+    if (!recv_buf)
+        return -1;
 
     float* data = (float*)buf;
 
-    
     for (int step = 0; step < ws - 1; step++) {
         int send_chunk = (rank - step + ws) % ws;
         int recv_chunk = (rank - step - 1 + ws) % ws;
 
         size_t send_off = (size_t)send_chunk * chunk;
         size_t recv_off = (size_t)recv_chunk * chunk;
-        size_t sc = chunk;
-        size_t rc = chunk;
+        size_t sc       = chunk;
+        size_t rc       = chunk;
 
-        if (send_off + sc > count) sc = (send_off < count) ? count - send_off : 0;
-        if (recv_off + rc > count) rc = (recv_off < count) ? count - recv_off : 0;
+        if (send_off + sc > count)
+            sc = (send_off < count) ? count - send_off : 0;
+        if (recv_off + rc > count)
+            rc = (recv_off < count) ? count - recv_off : 0;
 
-        if (ib_ring_sendrecv(ib, right, data + send_off, sc * (size_t)elem_size,
-                             left, recv_buf, rc * (size_t)elem_size, rank) != 0) {
+        if (ib_ring_sendrecv(ib, right, data + send_off, sc * (size_t)elem_size, left, recv_buf,
+                             rc * (size_t)elem_size, rank) != 0) {
             cml_free(recv_buf);
             return -1;
         }
@@ -837,21 +1095,22 @@ int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) 
             data[recv_off + i] += recv_buf[i];
     }
 
-    
     for (int step = 0; step < ws - 1; step++) {
         int send_chunk = (rank - step + 1 + ws) % ws;
         int recv_chunk = (rank - step + ws) % ws;
 
         size_t send_off = (size_t)send_chunk * chunk;
         size_t recv_off = (size_t)recv_chunk * chunk;
-        size_t sc = chunk;
-        size_t rc = chunk;
+        size_t sc       = chunk;
+        size_t rc       = chunk;
 
-        if (send_off + sc > count) sc = (send_off < count) ? count - send_off : 0;
-        if (recv_off + rc > count) rc = (recv_off < count) ? count - recv_off : 0;
+        if (send_off + sc > count)
+            sc = (send_off < count) ? count - send_off : 0;
+        if (recv_off + rc > count)
+            rc = (recv_off < count) ? count - recv_off : 0;
 
-        if (ib_ring_sendrecv(ib, right, data + send_off, sc * (size_t)elem_size,
-                             left, data + recv_off, rc * (size_t)elem_size, rank) != 0) {
+        if (ib_ring_sendrecv(ib, right, data + send_off, sc * (size_t)elem_size, left,
+                             data + recv_off, rc * (size_t)elem_size, rank) != 0) {
             cml_free(recv_buf);
             return -1;
         }
@@ -862,7 +1121,8 @@ int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) 
 }
 
 int cml_ib_barrier(CMLIBTransport* ib) {
-    if (!ib || !ib->connected) return -1;
+    if (!ib || !ib->connected)
+        return -1;
 
     uint8_t sdummy = 0, rdummy = 0;
     int left  = (ib->rank - 1 + ib->world_size) % ib->world_size;
@@ -876,7 +1136,8 @@ int cml_ib_barrier(CMLIBTransport* ib) {
 }
 
 CMLIBMemReg* cml_ib_register_memory(CMLIBTransport* ib, void* addr, size_t size) {
-    if (!ib || !addr || size == 0) return NULL;
+    if (!ib || !addr || size == 0)
+        return NULL;
 
     int access = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ;
     ibv_mr* mr = ib_api.reg_mr(ib->pd, addr, size, access);
@@ -891,7 +1152,7 @@ CMLIBMemReg* cml_ib_register_memory(CMLIBTransport* ib, void* addr, size_t size)
         return NULL;
     }
 
-    reg->mr = mr;
+    reg->mr   = mr;
     reg->addr = addr;
     reg->size = size;
     reg->lkey = mr->lkey;
@@ -902,7 +1163,9 @@ CMLIBMemReg* cml_ib_register_memory(CMLIBTransport* ib, void* addr, size_t size)
 
 void cml_ib_deregister_memory(CMLIBTransport* ib, CMLIBMemReg* reg) {
     (void)ib;
-    if (!reg) return;
-    if (reg->mr) ib_api.dereg_mr(reg->mr);
+    if (!reg)
+        return;
+    if (reg->mr)
+        ib_api.dereg_mr(reg->mr);
     cml_free(reg);
 }

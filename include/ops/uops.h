@@ -57,25 +57,25 @@ typedef enum {
     UOP_SLICE,   // slice tensor (view)
 
     // Additional Unary Ops
-    UOP_SIGN,    // sign(a): -1, 0, or 1
-    UOP_FLOOR,   // floor(a)
-    UOP_CEIL,    // ceil(a)
-    UOP_ROUND,   // round(a)
-    UOP_LOG2,    // log2(a)
-    UOP_EXP2,    // 2^a
-    UOP_ASIN,    // asin(a)
-    UOP_ACOS,    // acos(a)
-    UOP_ATAN,    // atan(a)
-    UOP_SQUARE,  // a * a
-    UOP_RSQRT,   // 1 / sqrt(a)
-    UOP_ERF,     // erf(a)
-    UOP_CLAMP,   // clamp(a, min, max)
+    UOP_SIGN,   // sign(a): -1, 0, or 1
+    UOP_FLOOR,  // floor(a)
+    UOP_CEIL,   // ceil(a)
+    UOP_ROUND,  // round(a)
+    UOP_LOG2,   // log2(a)
+    UOP_EXP2,   // 2^a
+    UOP_ASIN,   // asin(a)
+    UOP_ACOS,   // acos(a)
+    UOP_ATAN,   // atan(a)
+    UOP_SQUARE, // a * a
+    UOP_RSQRT,  // 1 / sqrt(a)
+    UOP_ERF,    // erf(a)
+    UOP_CLAMP,  // clamp(a, min, max)
 
     // Additional Reduction Ops
-    UOP_PROD,       // product along dimension(s)
-    UOP_ARGMAX,     // argmax along dimension
-    UOP_ARGMIN,     // argmin along dimension
-    UOP_CUMSUM,     // cumulative sum along dimension
+    UOP_PROD,   // product along dimension(s)
+    UOP_ARGMAX, // argmax along dimension
+    UOP_ARGMIN, // argmin along dimension
+    UOP_CUMSUM, // cumulative sum along dimension
 
     // Special Ops
     UOP_MATMUL, // matrix multiplication
@@ -88,12 +88,12 @@ typedef enum {
     UOP_PAD,    // pad tensor
 
     // Sorting Ops
-    UOP_SORT,       // sort along dimension
-    UOP_ARGSORT,    // indices that would sort
-    UOP_TOPK,       // top-k elements along dimension
+    UOP_SORT,    // sort along dimension
+    UOP_ARGSORT, // indices that would sort
+    UOP_TOPK,    // top-k elements along dimension
 
     // Cumulative Ops
-    UOP_CUMPROD,    // cumulative product along dimension
+    UOP_CUMPROD, // cumulative product along dimension
 
     // Bitwise Ops
     UOP_BITWISE_AND,
@@ -119,7 +119,7 @@ typedef enum {
     UOP_LOGICAL_NOT, // logical NOT (returns 0 or 1)
 
     // Additional Binary Ops
-    UOP_IDIV,        // integer division: floor(a / b)
+    UOP_IDIV, // integer division: floor(a / b)
     /* NOTE: fmod semantics (sign follows the dividend), pinned by an explicit
      * expectation table in tests/test_numerical_ops.c. This does NOT pair with
      * UOP_IDIV's floor division: a == b*idiv(a,b) + mod(a,b) fails whenever the
@@ -137,115 +137,115 @@ typedef enum {
     UOP_LOGICAL_OR,  // a || b (returns 0 or 1)
 
     // Comparison Ops
-    UOP_CMPEQ,       // a == b (returns 0 or 1)
-    UOP_CMPNE,       // a != b (returns 0 or 1)
-    UOP_CMPLE,       // a <= b (returns 0 or 1)
-    UOP_CMPGT,       // a > b (returns 0 or 1)
-    UOP_CMPGE,       // a >= b (returns 0 or 1)
+    UOP_CMPEQ, // a == b (returns 0 or 1)
+    UOP_CMPNE, // a != b (returns 0 or 1)
+    UOP_CMPLE, // a <= b (returns 0 or 1)
+    UOP_CMPGT, // a > b (returns 0 or 1)
+    UOP_CMPGE, // a >= b (returns 0 or 1)
 
     // Additional Reduction Ops
-    UOP_MIN_REDUCE,  // min along dimension(s)
-    UOP_VAR,         // variance along dimension(s)
-    UOP_STD,         // standard deviation along dimension(s)
-    UOP_ANY,         // logical OR reduce along dimension(s)
-    UOP_ALL,         // logical AND reduce along dimension(s)
-    UOP_LOGSUMEXP,   // log(sum(exp(a))) along dimension(s)
-    UOP_CUMMAX,      // cumulative max along dimension
-    UOP_CUMMIN,      // cumulative min along dimension
+    UOP_MIN_REDUCE, // min along dimension(s)
+    UOP_VAR,        // variance along dimension(s)
+    UOP_STD,        // standard deviation along dimension(s)
+    UOP_ANY,        // logical OR reduce along dimension(s)
+    UOP_ALL,        // logical AND reduce along dimension(s)
+    UOP_LOGSUMEXP,  // log(sum(exp(a))) along dimension(s)
+    UOP_CUMMAX,     // cumulative max along dimension
+    UOP_CUMMIN,     // cumulative min along dimension
 
     // Movement/Shape Ops
-    UOP_CAT,         // concatenate tensors along dimension
-    UOP_STACK,       // stack tensors along new dimension
-    UOP_SCATTER,     // scatter elements by index
-    UOP_ROLL,        // circular shift along dimension
-    UOP_FLATTEN,     // collapse dimensions into one
-    UOP_UNFLATTEN,   // expand a dimension into multiple
-    UOP_DIAG,        // create/extract diagonal
-    UOP_ONE_HOT,     // one-hot encoding
+    UOP_CAT,       // concatenate tensors along dimension
+    UOP_STACK,     // stack tensors along new dimension
+    UOP_SCATTER,   // scatter elements by index
+    UOP_ROLL,      // circular shift along dimension
+    UOP_FLATTEN,   // collapse dimensions into one
+    UOP_UNFLATTEN, // expand a dimension into multiple
+    UOP_DIAG,      // create/extract diagonal
+    UOP_ONE_HOT,   // one-hot encoding
 
     // Additional Unary Ops
-    UOP_ERFC,            // complementary error function erfc(a)
-    UOP_LOGCUMSUMEXP,    // log(cumsum(exp(a))) along dimension
+    UOP_ERFC,         // complementary error function erfc(a)
+    UOP_LOGCUMSUMEXP, // log(cumsum(exp(a))) along dimension
 
     // Additional Binary Ops
-    UOP_LERP,            // linear interpolation: a + t*(b-a)
+    UOP_LERP, // linear interpolation: a + t*(b-a)
 
     // Additional Movement/Shape Ops
-    UOP_TILE,            // repeat tensor along dimensions
+    UOP_TILE,              // repeat tensor along dimensions
     UOP_REPEAT_INTERLEAVE, // repeat elements along dimension
-    UOP_TRACE,           // sum of diagonal elements
-    UOP_SHRINK,          // shrink tensor (slice with start/end per dim)
+    UOP_TRACE,             // sum of diagonal elements
+    UOP_SHRINK,            // shrink tensor (slice with start/end per dim)
 
     // Activation Ops
-    UOP_RELU,            // max(x, 0)
-    UOP_RELU6,           // min(max(x, 0), 6)
-    UOP_HARD_SIGMOID,    // clamp((x + 3) / 6, 0, 1)
-    UOP_HARD_TANH,       // clamp(x, -1, 1)
-    UOP_CELU,            // max(0,x) + min(0, alpha*(exp(x/alpha)-1))
-    UOP_QUICK_GELU,      // x * sigmoid(1.702 * x)
-    UOP_SOFTPLUS,        // log(1 + exp(x))
-    UOP_SOFTSIGN,        // x / (1 + |x|)
-    UOP_LOGSIGMOID,      // log(sigmoid(x))
+    UOP_RELU,         // max(x, 0)
+    UOP_RELU6,        // min(max(x, 0), 6)
+    UOP_HARD_SIGMOID, // clamp((x + 3) / 6, 0, 1)
+    UOP_HARD_TANH,    // clamp(x, -1, 1)
+    UOP_CELU,         // max(0,x) + min(0, alpha*(exp(x/alpha)-1))
+    UOP_QUICK_GELU,   // x * sigmoid(1.702 * x)
+    UOP_SOFTPLUS,     // log(1 + exp(x))
+    UOP_SOFTSIGN,     // x / (1 + |x|)
+    UOP_LOGSIGMOID,   // log(sigmoid(x))
 
     // Additional Ops
-    UOP_UNFOLD,          // sliding window extraction (im2col-like)
+    UOP_UNFOLD, // sliding window extraction (im2col-like)
 
     // Additional Activation Ops
-    UOP_ELU,             // x > 0 ? x : alpha*(exp(x)-1)
-    UOP_SELU,            // scale*(x > 0 ? x : alpha*(exp(x)-1))
-    UOP_GELU,            // x * Phi(x) (Gaussian Error Linear Unit)
-    UOP_LEAKY_RELU,      // x > 0 ? x : alpha*x
-    UOP_MISH,            // x * tanh(softplus(x))
-    UOP_SILU,            // x * sigmoid(x) (swish)
-    UOP_HARDSWISH,       // x > 3 ? x : x < -3 ? 0 : x*(x+3)/6
+    UOP_ELU,        // x > 0 ? x : alpha*(exp(x)-1)
+    UOP_SELU,       // scale*(x > 0 ? x : alpha*(exp(x)-1))
+    UOP_GELU,       // x * Phi(x) (Gaussian Error Linear Unit)
+    UOP_LEAKY_RELU, // x > 0 ? x : alpha*x
+    UOP_MISH,       // x * tanh(softplus(x))
+    UOP_SILU,       // x * sigmoid(x) (swish)
+    UOP_HARDSWISH,  // x > 3 ? x : x < -3 ? 0 : x*(x+3)/6
 
     // Masking/Selection Ops
-    UOP_MASKED_SELECT,   // select elements where mask is true
+    UOP_MASKED_SELECT, // select elements where mask is true
 
     // Movement/Shape Ops
-    UOP_SPLIT,           // split tensor into chunks along dim
-    UOP_CHUNK,           // split tensor into N chunks along dim
-    UOP_MESHGRID,        // create coordinate matrices from vectors
-    UOP_DIAGONAL,        // extract diagonal with offset, dim1, dim2
+    UOP_SPLIT,    // split tensor into chunks along dim
+    UOP_CHUNK,    // split tensor into N chunks along dim
+    UOP_MESHGRID, // create coordinate matrices from vectors
+    UOP_DIAGONAL, // extract diagonal with offset, dim1, dim2
 
     // Fused Ops
-    UOP_LINEAR,          // fused linear: output = input @ weight^T + bias
-    UOP_MAXPOOL2D,       // 2D max pooling
-    UOP_AVGPOOL2D,       // 2D average pooling
-    UOP_CONV3D,          // 3D convolution
-    UOP_CONV_TRANSPOSE2D,// 2D transposed convolution
-    UOP_CONV_TRANSPOSE3D,// 3D transposed convolution
+    UOP_LINEAR,           // fused linear: output = input @ weight^T + bias
+    UOP_MAXPOOL2D,        // 2D max pooling
+    UOP_AVGPOOL2D,        // 2D average pooling
+    UOP_CONV3D,           // 3D convolution
+    UOP_CONV_TRANSPOSE2D, // 2D transposed convolution
+    UOP_CONV_TRANSPOSE3D, // 3D transposed convolution
 
     // Lazy creation ops (zero-input; all computation deferred to realization)
-    UOP_CONST,           // constant tensor from a data array (ConstParams)
-    UOP_RAND_UNIFORM,    // random uniform [0, 1)  (RandParams)
-    UOP_RAND_NORMAL,     // random normal  N(0,1)  (RandParams)
-    UOP_ARANGE_OP,       // range tensor start:step:end  (ArangeParams)
-    UOP_EYE_OP,          // n×n identity matrix  (EyeParams)
-    UOP_RAND_INT,        // random integers [low, high)  (RandIntParams)
+    UOP_CONST,        // constant tensor from a data array (ConstParams)
+    UOP_RAND_UNIFORM, // random uniform [0, 1)  (RandParams)
+    UOP_RAND_NORMAL,  // random normal  N(0,1)  (RandParams)
+    UOP_ARANGE_OP,    // range tensor start:step:end  (ArangeParams)
+    UOP_EYE_OP,       // n×n identity matrix  (EyeParams)
+    UOP_RAND_INT,     // random integers [low, high)  (RandIntParams)
 
     // Lazy allocation op (zero-input; allocates uninitialized buffer at execution)
-    UOP_ALLOC,           // allocate buffer, shape/dtype from params (AllocParams)
+    UOP_ALLOC, // allocate buffer, shape/dtype from params (AllocParams)
 
     // In-graph optimizer steps (inputs: param, grad[, moment states...])
-    UOP_SGD_STEP,        // SGD / SGD-momentum in-place update  (SgdStepParams)
-    UOP_ADAM_STEP,       // Adam in-place update                (AdamStepParams)
+    UOP_SGD_STEP,  // SGD / SGD-momentum in-place update  (SgdStepParams)
+    UOP_ADAM_STEP, // Adam in-place update                (AdamStepParams)
 
-    UOP_FOLD,            // col2im: adjoint of UNFOLD (scatter-add windows) (FoldParams)
-    UOP_SCATTER_ADD,     // index_add: adjoint of GATHER (scatter-ADD rows)  (ScatterAddParams)
+    UOP_FOLD,              // col2im: adjoint of UNFOLD (scatter-add windows) (FoldParams)
+    UOP_SCATTER_ADD,       // index_add: adjoint of GATHER (scatter-ADD rows)  (ScatterAddParams)
     UOP_FUSED_ELEMENTWISE, // one fused kernel for an elementwise chain (FusedElementwiseParams)
 
-    UOP_IM2COL,          // fused 2D im2col: [N,C,H,W] -> [N*OH*OW, C*kh*kw] (Im2colParams)
-    UOP_COL2IM,          // adjoint of IM2COL: scatter-add cols back to [N,C,H,W] (Col2imParams)
+    UOP_IM2COL, // fused 2D im2col: [N,C,H,W] -> [N*OH*OW, C*kh*kw] (Im2colParams)
+    UOP_COL2IM, // adjoint of IM2COL: scatter-add cols back to [N,C,H,W] (Col2imParams)
 
     /* Sparse COO @ dense matmul (built by sparse_matmul). Inputs:
      * {indices [nnz,2] int32, values [nnz], dense B [K,N], rows [nnz] int32,
      *  cols [nnz] int32}. Rows/cols are the split coordinate columns, kept as
      * eager tensors so the VJP can gather/scatter with the primitive uops. */
-    UOP_SPMM,            // C = A_coo @ B  (SpMMParams)
+    UOP_SPMM, // C = A_coo @ B  (SpMMParams)
 
-    UOP_FLIP,            // reverse along dimension (FlipParams) — appended here to
-                         // keep existing UOp enum values stable
+    UOP_FLIP, // reverse along dimension (FlipParams) — appended here to
+              // keep existing UOp enum values stable
 
     UOP_COUNT // Total count
 } UOpType;
@@ -339,7 +339,7 @@ typedef struct {
     int* dilation;
     int groups;
     bool bias;
-    bool use_winograd;  /* set by uop_conv2d when Winograd is applicable */
+    bool use_winograd; /* set by uop_conv2d when Winograd is applicable */
 } Conv2DParams;
 
 typedef struct {
@@ -409,15 +409,15 @@ typedef struct {
 } TriParams;
 
 typedef enum {
-    PAD_CONSTANT = 0,  // Fill with constant value
-    PAD_REFLECT,       // Reflect at boundary (e.g. [a,b,c,d] -> [c,b,a,b,c,d,c,b])
-    PAD_REPLICATE      // Replicate edge values (e.g. [a,b,c,d] -> [a,a,a,b,c,d,d,d])
+    PAD_CONSTANT = 0, // Fill with constant value
+    PAD_REFLECT,      // Reflect at boundary (e.g. [a,b,c,d] -> [c,b,a,b,c,d,c,b])
+    PAD_REPLICATE     // Replicate edge values (e.g. [a,b,c,d] -> [a,a,a,b,c,d,d,d])
 } PadMode;
 
 typedef struct {
     int* pad_widths; // [before_0, after_0, before_1, after_1, ...]
     int num_dims;
-    float value; // Pad value (usually 0)
+    float value;  // Pad value (usually 0)
     PadMode mode; // Padding mode (default: PAD_CONSTANT)
 } PadParams;
 
@@ -438,53 +438,53 @@ typedef struct {
 
 /* Parameters for lazy creation ops */
 typedef struct {
-    void*      data;       // Copied constant data (heap-owned by the node)
-    size_t     data_size;  // Size in bytes
-    DType      dtype;
+    void* data;       // Copied constant data (heap-owned by the node)
+    size_t data_size; // Size in bytes
+    DType dtype;
     DeviceType device;
-    int*       shape;
-    int        ndim;
+    int* shape;
+    int ndim;
 } ConstParams;
 
 typedef struct {
-    DType      dtype;
+    DType dtype;
     DeviceType device;
 } RandParams;
 
 typedef struct {
-    float      start;
-    float      end;
-    float      step;
-    DType      dtype;
+    float start;
+    float end;
+    float step;
+    DType dtype;
     DeviceType device;
 } ArangeParams;
 
 typedef struct {
-    int        n;
-    DType      dtype;
+    int n;
+    DType dtype;
     DeviceType device;
 } EyeParams;
 
 typedef struct {
-    int        low;
-    int        high;
-    DType      dtype;
+    int low;
+    int high;
+    DType dtype;
     DeviceType device;
 } RandIntParams;
 
 typedef struct {
-    int*       shape;
-    int        ndim;
-    DType      dtype;
+    int* shape;
+    int ndim;
+    DType dtype;
     DeviceType device;
 } AllocParams;
 
 typedef struct {
     float lr;
-    float momentum;   /* 0 = plain SGD */
+    float momentum; /* 0 = plain SGD */
     float weight_decay;
     float dampening;
-    bool  nesterov;
+    bool nesterov;
 } SgdStepParams;
 
 typedef struct {
@@ -493,8 +493,8 @@ typedef struct {
     float beta2;
     float eps;
     float weight_decay;
-    int   step;       /* current step count (for bias correction) */
-    bool  amsgrad;
+    int step; /* current step count (for bias correction) */
+    bool amsgrad;
 } AdamStepParams;
 
 /* Lazy - data filled on execution */
@@ -502,8 +502,8 @@ Tensor* uop_fill(int* shape, int ndim, float value);
 /* Like uop_fill but with explicit dtype and device */
 Tensor* uop_fill_ex(int* shape, int ndim, float value, DType dtype, DeviceType device);
 /* Constant tensor from existing data (data is copied) */
-Tensor* uop_const(const void* data, size_t data_size, int* shape, int ndim,
-                  DType dtype, DeviceType device);
+Tensor* uop_const(const void* data, size_t data_size, int* shape, int ndim, DType dtype,
+                  DeviceType device);
 /* Random uniform [0, 1) */
 Tensor* uop_rand_uniform(int* shape, int ndim, DType dtype, DeviceType device);
 /* Random normal N(0, 1) */
@@ -513,21 +513,18 @@ Tensor* uop_arange_op(float start, float end, float step, DType dtype, DeviceTyp
 /* n×n identity matrix */
 Tensor* uop_eye_op(int n, DType dtype, DeviceType device);
 /* Random integers in [low, high) */
-Tensor* uop_rand_int(int low, int high, int* shape, int ndim,
-                     DType dtype, DeviceType device);
+Tensor* uop_rand_int(int low, int high, int* shape, int ndim, DType dtype, DeviceType device);
 
 /* Lazy uninitialized allocation (shape/dtype deferred to execution) */
 Tensor* uop_alloc(int* shape, int ndim, DType dtype, DeviceType device);
 
 /* In-graph SGD update: outputs updated param (inputs: param, grad[, momentum_buf]) */
-Tensor* uop_sgd_step(Tensor* param, Tensor* grad, Tensor* momentum_buf,
-                     SgdStepParams* p);
+Tensor* uop_sgd_step(Tensor* param, Tensor* grad, Tensor* momentum_buf, SgdStepParams* p);
 
 /* In-graph Adam update: outputs updated param (inputs: param, grad, exp_avg,
  * exp_avg_sq[, max_exp_avg_sq for amsgrad]) */
-Tensor* uop_adam_step(Tensor* param, Tensor* grad, Tensor* exp_avg,
-                      Tensor* exp_avg_sq, Tensor* max_exp_avg_sq,
-                      AdamStepParams* p);
+Tensor* uop_adam_step(Tensor* param, Tensor* grad, Tensor* exp_avg, Tensor* exp_avg_sq,
+                      Tensor* max_exp_avg_sq, AdamStepParams* p);
 Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* params);
 Tensor* uop_maxpool2d(Tensor* input, Pool2DParams* params);
 Tensor* uop_avgpool2d(Tensor* input, Pool2DParams* params);
@@ -635,7 +632,7 @@ typedef struct {
 } StackParams;
 
 typedef struct {
-    int dim;   // Dimension to scatter along
+    int dim; // Dimension to scatter along
 } ScatterParams;
 
 typedef struct {
@@ -644,7 +641,7 @@ typedef struct {
 } RollParams;
 
 typedef struct {
-    int dim;   // Dimension to reverse along
+    int dim; // Dimension to reverse along
 } FlipParams;
 
 typedef struct {
@@ -659,9 +656,9 @@ typedef struct {
 } UnflattenParams;
 
 typedef struct {
-    int offset;    // Diagonal offset (0=main, positive=above, negative=below)
-    int dim1;      // First axis of the plane the diagonal is taken from
-    int dim2;      // Second axis; dropped from the output, dim1's slot holds the diagonal
+    int offset; // Diagonal offset (0=main, positive=above, negative=below)
+    int dim1;   // First axis of the plane the diagonal is taken from
+    int dim2;   // Second axis; dropped from the output, dim1's slot holds the diagonal
 } DiagParams;
 
 typedef struct {
@@ -688,18 +685,18 @@ Tensor* uop_scaled_dot_product_attention_bias(Tensor* q, Tensor* k, Tensor* v, T
                                               Tensor* attn_bias);
 
 typedef struct {
-    int* repeats;   // Number of repeats per dimension
-    int num_dims;   // Number of dimensions
+    int* repeats; // Number of repeats per dimension
+    int num_dims; // Number of dimensions
 } TileParams;
 
 typedef struct {
-    int repeats;    // Number of times to repeat each element
-    int dim;        // Dimension along which to repeat
+    int repeats; // Number of times to repeat each element
+    int dim;     // Dimension along which to repeat
 } RepeatInterleaveParams;
 
 typedef struct {
-    int* starts;    // Start index per dimension
-    int* ends;      // End index per dimension
+    int* starts; // Start index per dimension
+    int* ends;   // End index per dimension
     int num_dims;
 } ShrinkParams;
 
@@ -741,14 +738,14 @@ Tensor* uop_softsign(Tensor* x);
 Tensor* uop_logsigmoid(Tensor* x);
 
 typedef struct {
-    int kernel_size;  // Size of the sliding window
-    int stride;       // Stride of the sliding window (default = 1)
+    int kernel_size; // Size of the sliding window
+    int stride;      // Stride of the sliding window (default = 1)
 } UnfoldParams;
 
 typedef struct {
-    int kernel_size;  // window size
-    int stride;       // window stride
-    int output_len;   // length of the reconstructed (folded) last axis
+    int kernel_size; // window size
+    int stride;      // window stride
+    int output_len;  // length of the reconstructed (folded) last axis
 } FoldParams;
 
 /* Sparse COO @ dense matmul: only the dense output extent [M, K] — the
@@ -759,8 +756,8 @@ typedef struct {
 } SpMMParams;
 
 typedef struct {
-    int dim;       // axis to scatter-add along (indices select positions here)
-    int dim_size;  // size of the output along `dim`
+    int dim;      // axis to scatter-add along (indices select positions here)
+    int dim_size; // size of the output along `dim`
 } ScatterAddParams;
 
 /* Fused 2D im2col: input [N,C,H,W] -> [N*OH*OW, C*kh*kw]. Folds padding in via
@@ -768,10 +765,10 @@ typedef struct {
  * PAD op is needed. Column order is (c, kh_i, kw_i) with kw_i fastest, matching
  * the weight reshape [Cout, C*kh*kw]. */
 typedef struct {
-    int kh, kw;   // kernel height, width
-    int sh, sw;   // stride height, width
-    int ph, pw;   // padding height, width
-    int dh, dw;   // dilation height, width
+    int kh, kw; // kernel height, width
+    int sh, sw; // stride height, width
+    int ph, pw; // padding height, width
+    int dh, dw; // dilation height, width
 } Im2colParams;
 
 /* Adjoint of IM2COL (col2im): [N*OH*OW, C*kh*kw] -> [N,C,H,W] by scatter-add of
@@ -789,12 +786,12 @@ typedef struct {
  *               FUSED_UNUSED_REF -> slot not used by this op. */
 #define FUSED_UNUSED_REF (-1000000)
 typedef struct {
-    int      num_steps;
-    UOpType* op;      // op[s]
-    int*     a;       // first operand ref per step
-    int*     b;       // second operand ref (binary), or unused
-    int*     c;       // third operand ref (WHERE=cond,then,else -> a,b,c), or unused
-    float*   konst;   // constant per step (FILL); ignored otherwise
+    int num_steps;
+    UOpType* op;  // op[s]
+    int* a;       // first operand ref per step
+    int* b;       // second operand ref (binary), or unused
+    int* c;       // third operand ref (WHERE=cond,then,else -> a,b,c), or unused
+    float* konst; // constant per step (FILL); ignored otherwise
 } FusedElementwiseParams;
 
 /* Matmul epilogue fusion: a FusedElementwiseParams stored on a UOP_MATMUL node's

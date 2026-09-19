@@ -27,15 +27,17 @@
 
 #include <stdatomic.h>
 
-static _Atomic bool g_torch_eager = false;
-static _Atomic int  g_inference_depth = 0;
+static _Atomic bool g_torch_eager        = false;
+static _Atomic int g_inference_depth     = 0;
 static _Atomic bool g_saved_grad_enabled = true;
 
 void torch_set_eager_mode(bool enabled) {
     atomic_store_explicit(&g_torch_eager, enabled, memory_order_relaxed);
 }
 
-bool torch_is_eager_mode(void) { return atomic_load_explicit(&g_torch_eager, memory_order_relaxed); }
+bool torch_is_eager_mode(void) {
+    return atomic_load_explicit(&g_torch_eager, memory_order_relaxed);
+}
 
 void torch_inference_mode(bool enabled) {
     if (enabled) {
@@ -51,9 +53,9 @@ void torch_inference_mode(bool enabled) {
         do {
             if (expected <= 0)
                 return;
-        } while (!atomic_compare_exchange_weak_explicit(
-            &g_inference_depth, &expected, expected - 1, memory_order_acq_rel,
-            memory_order_acquire));
+        } while (!atomic_compare_exchange_weak_explicit(&g_inference_depth, &expected, expected - 1,
+                                                        memory_order_acq_rel,
+                                                        memory_order_acquire));
         int remaining = expected - 1;
         if (remaining == 0) {
             atomic_store_explicit(&g_torch_eager, false, memory_order_relaxed);
@@ -79,8 +81,7 @@ int torch_realize(Tensor* t) {
 /* ------------------------------------------------------------------ */
 
 static inline bool eager_cpu_f32(const Tensor* t) {
-    return t && t->dtype == DTYPE_FLOAT32 &&
-           (t->device == DEVICE_CPU || t->device == DEVICE_AUTO);
+    return t && t->dtype == DTYPE_FLOAT32 && (t->device == DEVICE_CPU || t->device == DEVICE_AUTO);
 }
 
 /* Skip eager when an input still needs autograd tracking. */
@@ -139,7 +140,7 @@ Tensor* torch_eager_binary(int uop, Tensor* a, Tensor* b) {
         if (rows == 0 || rows > (size_t)INT_MAX)
             return NULL;
 
-        int out_ndim          = a->ndim;
+        int out_ndim = a->ndim;
         int out_shape[TORCH_EAGER_MAX_DIMS];
         for (int i = 0; i < a->ndim - 1; i++)
             out_shape[i] = a->shape[i];
@@ -175,14 +176,22 @@ Tensor* torch_eager_binary(int uop, Tensor* a, Tensor* b) {
     Tensor* out = eager_alloc_like(a);
     if (!out)
         return NULL;
-    float* od    = (float*)out->data;
-    size_t n     = out->numel;
+    float* od = (float*)out->data;
+    size_t n  = out->numel;
 
     switch (uop) {
-    case UOP_ADD: simd_add_f32(ad, bd, od, n); break;
-    case UOP_SUB: simd_sub_f32(ad, bd, od, n); break;
-    case UOP_MUL: simd_mul_f32(ad, bd, od, n); break;
-    case UOP_DIV: simd_div_f32(ad, bd, od, n); break;
+    case UOP_ADD:
+        simd_add_f32(ad, bd, od, n);
+        break;
+    case UOP_SUB:
+        simd_sub_f32(ad, bd, od, n);
+        break;
+    case UOP_MUL:
+        simd_mul_f32(ad, bd, od, n);
+        break;
+    case UOP_DIV:
+        simd_div_f32(ad, bd, od, n);
+        break;
     default:
         tensor_free(out);
         return NULL;
@@ -209,9 +218,16 @@ Tensor* torch_eager_unary(int uop, Tensor* a) {
     size_t n  = out->numel;
 
     switch (uop) {
-    case UOP_RELU: memcpy(od, ad, n * sizeof(float)); relu_inplace(od, n); break;
-    case UOP_SIGMOID: simd_sigmoid_f32(ad, od, n); break;
-    case UOP_TANH: simd_tanh_f32(ad, od, n); break;
+    case UOP_RELU:
+        memcpy(od, ad, n * sizeof(float));
+        relu_inplace(od, n);
+        break;
+    case UOP_SIGMOID:
+        simd_sigmoid_f32(ad, od, n);
+        break;
+    case UOP_TANH:
+        simd_tanh_f32(ad, od, n);
+        break;
     default:
         tensor_free(out);
         return NULL;

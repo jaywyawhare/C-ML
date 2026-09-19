@@ -38,8 +38,8 @@ typedef enum {
  * the single previous token at its position. The callback owns the KV cache.
  * Returns 0 on success, non-zero on failure.
  */
-typedef int (*CMLServingForwardFn)(void* model, const int* tokens, int num_tokens,
-                                   int position, float* logits_out, int vocab_size);
+typedef int (*CMLServingForwardFn)(void* model, const int* tokens, int num_tokens, int position,
+                                   float* logits_out, int vocab_size);
 
 typedef struct CMLSequenceRequest {
     int request_id;
@@ -51,11 +51,11 @@ typedef struct CMLSequenceRequest {
 
     /* State */
     CMLSequenceStatus status;
-    int paged_seq_id;        /* ID in paged KV cache */
+    int paged_seq_id; /* ID in paged KV cache */
     int* generated_tokens;
     int num_generated;
     int gen_capacity;
-    int current_pos;         /* Position in generation */
+    int current_pos; /* Position in generation */
 
     /* Timing */
     double submit_time_ms;
@@ -108,7 +108,7 @@ typedef struct CMLServingContext {
     CMLServingForwardFn forward_fn;
     void* model;
     int vocab_size;
-    int eos_token_id;      /* generation stops when this token is produced (<0 = none) */
+    int eos_token_id; /* generation stops when this token is produced (<0 = none) */
 } CMLServingContext;
 
 CMLServingConfig cml_serving_default_config(void);
@@ -125,13 +125,13 @@ void cml_serving_set_kv_cache(CMLServingContext* ctx, CMLPagedKVCache* cache);
  * `vocab_size` is the logits width the callback produces; `eos_token_id` stops a
  * sequence early when produced (pass a negative value to disable).
  */
-void cml_serving_set_model(CMLServingContext* ctx, CMLServingForwardFn forward_fn,
-                           void* model, int vocab_size, int eos_token_id);
+void cml_serving_set_model(CMLServingContext* ctx, CMLServingForwardFn forward_fn, void* model,
+                           int vocab_size, int eos_token_id);
 
 /* Returns request_id on success, -1 on failure (e.g. queue full).
  * prompt_tokens is copied internally. max_new_tokens 0 = use config default. */
-int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens,
-                       int num_tokens, int max_new_tokens);
+int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens, int num_tokens,
+                       int max_new_tokens);
 
 /* Run one scheduling iteration. Returns number of active sequences. */
 int cml_serving_step(CMLServingContext* ctx);
@@ -139,8 +139,7 @@ int cml_serving_step(CMLServingContext* ctx);
 CMLSequenceStatus cml_serving_get_status(CMLServingContext* ctx, int request_id);
 
 /* Returns pointer to internal token array (do not free), or NULL if not found. */
-const int* cml_serving_get_tokens(CMLServingContext* ctx, int request_id,
-                                  int* out_count);
+const int* cml_serving_get_tokens(CMLServingContext* ctx, int request_id, int* out_count);
 
 int cml_serving_finish_request(CMLServingContext* ctx, int request_id);
 

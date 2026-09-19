@@ -33,9 +33,7 @@ static CMLROCmBackend* rocm_backend_of(CMLHCQQueue* queue) {
 
 /* Public accessor so tests can reach the backend behind a queue (e.g. the
  * HIP mock driver's journal checks). */
-CMLROCmBackend* cml_hcq_rocm_queue_backend(CMLHCQQueue* queue) {
-    return rocm_backend_of(queue);
-}
+CMLROCmBackend* cml_hcq_rocm_queue_backend(CMLHCQQueue* queue) { return rocm_backend_of(queue); }
 
 CMLHCQQueue* cml_hcq_rocm_queue_create(void) {
     CMLROCmBackend* backend = cml_rocm_backend_create();
@@ -55,7 +53,7 @@ CMLHCQQueue* cml_hcq_rocm_queue_create(void) {
         return NULL;
     }
 
-    qd->backend = backend;
+    qd->backend          = backend;
     queue->backend       = CML_HCQ_ROCM;
     queue->native_handle = qd;
     queue->active        = true;
@@ -205,27 +203,52 @@ int cml_hcq_rocm_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
 CMLHCQQueue* cml_hcq_rocm_queue_create(void) { return NULL; }
 void cml_hcq_rocm_queue_destroy(CMLHCQQueue* q) { (void)q; }
 
-int cml_hcq_rocm_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* d)
-    { (void)q; (void)d; return -1; }
+int cml_hcq_rocm_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* d) {
+    (void)q;
+    (void)d;
+    return -1;
+}
 
-int cml_hcq_rocm_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n)
-    { (void)q; (void)d; (void)s; (void)n; return -1; }
+int cml_hcq_rocm_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
+    (void)q;
+    (void)d;
+    (void)s;
+    (void)n;
+    return -1;
+}
 
-int cml_hcq_rocm_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n)
-    { (void)q; (void)d; (void)s; (void)n; return -1; }
+int cml_hcq_rocm_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
+    (void)q;
+    (void)d;
+    (void)s;
+    (void)n;
+    return -1;
+}
 
 CMLHCQSignal* cml_hcq_rocm_signal_create(void) { return NULL; }
-void          cml_hcq_rocm_signal_destroy(CMLHCQSignal* s) { (void)s; }
+void cml_hcq_rocm_signal_destroy(CMLHCQSignal* s) { (void)s; }
 
-int cml_hcq_rocm_signal_record(CMLHCQQueue* q, CMLHCQSignal* s)
-    { (void)q; (void)s; return -1; }
+int cml_hcq_rocm_signal_record(CMLHCQQueue* q, CMLHCQSignal* s) {
+    (void)q;
+    (void)s;
+    return -1;
+}
 
-int cml_hcq_rocm_queue_wait(CMLHCQQueue* q, CMLHCQSignal* s)
-    { (void)q; (void)s; return -1; }
+int cml_hcq_rocm_queue_wait(CMLHCQQueue* q, CMLHCQSignal* s) {
+    (void)q;
+    (void)s;
+    return -1;
+}
 
-int cml_hcq_rocm_signal_wait_cpu(CMLHCQSignal* s, uint64_t t)
-    { (void)s; (void)t; return -1; }
+int cml_hcq_rocm_signal_wait_cpu(CMLHCQSignal* s, uint64_t t) {
+    (void)s;
+    (void)t;
+    return -1;
+}
 
-int cml_hcq_rocm_queue_synchronize(CMLHCQQueue* q) { (void)q; return -1; }
+int cml_hcq_rocm_queue_synchronize(CMLHCQQueue* q) {
+    (void)q;
+    return -1;
+}
 
 #endif /* __linux__ */

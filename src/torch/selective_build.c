@@ -23,11 +23,20 @@ static const struct {
     const char* name;
     UOpType op;
 } g_selective_op_table[] = {
-    {"add", UOP_ADD},           {"sub", UOP_SUB},         {"mul", UOP_MUL},
-    {"div", UOP_DIV},           {"matmul", UOP_MATMUL},   {"relu", UOP_RELU},
-    {"sigmoid", UOP_SIGMOID},   {"tanh", UOP_TANH},       {"sum", UOP_SUM},
-    {"mean", UOP_MEAN},         {"quick_gelu", UOP_QUICK_GELU},
-    {"reshape", UOP_RESHAPE},   {"transpose", UOP_PERMUTE}, {"linear", UOP_LINEAR},
+    {"add", UOP_ADD},
+    {"sub", UOP_SUB},
+    {"mul", UOP_MUL},
+    {"div", UOP_DIV},
+    {"matmul", UOP_MATMUL},
+    {"relu", UOP_RELU},
+    {"sigmoid", UOP_SIGMOID},
+    {"tanh", UOP_TANH},
+    {"sum", UOP_SUM},
+    {"mean", UOP_MEAN},
+    {"quick_gelu", UOP_QUICK_GELU},
+    {"reshape", UOP_RESHAPE},
+    {"transpose", UOP_PERMUTE},
+    {"linear", UOP_LINEAR},
     {NULL, UOP_COUNT},
 };
 
@@ -55,9 +64,8 @@ static void selective_init_defaults(void) {
         char spec_copy[512];
         strncpy(spec_copy, CML_TORCH_SELECTIVE_OPS, sizeof(spec_copy) - 1);
         spec_copy[sizeof(spec_copy) - 1] = '\0';
-        char* save = NULL;
-        for (char* tok = strtok_r(spec_copy, ",", &save); tok;
-             tok = strtok_r(NULL, ",", &save)) {
+        char* save                       = NULL;
+        for (char* tok = strtok_r(spec_copy, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
             while (*tok == ' ')
                 tok++;
             UOpType op = selective_op_from_name(tok);
@@ -72,7 +80,7 @@ static void selective_init_defaults(void) {
 TorchSelectiveBuildConfig torch_selective_build_all(void) {
     selective_init_defaults();
     TorchSelectiveBuildConfig cfg = {0};
-    cfg.all_enabled = true;
+    cfg.all_enabled               = true;
     for (int i = 0; i < UOP_COUNT; i++)
         cfg.enabled[i] = true;
     for (int i = 0; i < CML_TORCH_MAX_SELECTIVE_DTYPES; i++)
@@ -83,7 +91,7 @@ TorchSelectiveBuildConfig torch_selective_build_all(void) {
 TorchSelectiveBuildConfig torch_selective_build_none(void) {
     selective_init_defaults();
     TorchSelectiveBuildConfig cfg = {0};
-    cfg.all_enabled = false;
+    cfg.all_enabled               = false;
     memset(cfg.enabled, 0, sizeof(cfg.enabled));
     for (int i = 0; i < CML_TORCH_MAX_SELECTIVE_DTYPES; i++)
         cfg.dtype_enabled[i] = true;

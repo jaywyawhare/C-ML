@@ -24,12 +24,12 @@ static void test_tensor_options(void) {
     printf("  test_tensor_options...");
 
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    opts = torch_options_device(opts, DEVICE_CPU);
-    opts = torch_options_requires_grad(opts, true);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts                    = torch_options_device(opts, DEVICE_CPU);
+    opts                    = torch_options_requires_grad(opts, true);
 
     int shape[] = {2, 2};
-    Tensor* t = torch_zeros(shape, 2, &opts);
+    Tensor* t   = torch_zeros(shape, 2, &opts);
     REQUIRE(t != NULL);
     REQUIRE(torch_tensor_ndim(t) == 2);
     REQUIRE(torch_tensor_numel(t) == 4);
@@ -51,12 +51,12 @@ static void test_tensor_ops(void) {
     printf("  test_tensor_ops...");
 
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    opts = torch_options_device(opts, DEVICE_CPU);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts                    = torch_options_device(opts, DEVICE_CPU);
 
     int shape[] = {2, 2};
-    Tensor* a = torch_ones(shape, 2, &opts);
-    Tensor* b = torch_ones(shape, 2, &opts);
+    Tensor* a   = torch_ones(shape, 2, &opts);
+    Tensor* b   = torch_ones(shape, 2, &opts);
 
     Tensor* c = torch_add(a, b);
     REQUIRE(c != NULL);
@@ -86,13 +86,13 @@ static void test_autograd(void) {
     printf("  test_autograd...");
 
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    opts = torch_options_device(opts, DEVICE_CPU);
-    opts = torch_options_requires_grad(opts, true);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts                    = torch_options_device(opts, DEVICE_CPU);
+    opts                    = torch_options_requires_grad(opts, true);
 
-    int shape[] = {2};
-    Tensor* x = torch_ones(shape, 1, &opts);
-    Tensor* y = torch_mul(x, x);
+    int shape[]  = {2};
+    Tensor* x    = torch_ones(shape, 1, &opts);
+    Tensor* y    = torch_mul(x, x);
     Tensor* loss = torch_sum(y, -1, false);
 
     torch_backward(loss, NULL, false, false);
@@ -118,11 +118,11 @@ static void test_module_api(void) {
     REQUIRE(torch_module_is_training((Module*)model));
 
     TorchTensorOptions opts = torch_options();
-    opts = torch_options_dtype(opts, DTYPE_FLOAT32);
-    opts = torch_options_device(opts, DEVICE_CPU);
+    opts                    = torch_options_dtype(opts, DTYPE_FLOAT32);
+    opts                    = torch_options_device(opts, DEVICE_CPU);
 
-    int shape[] = {3, 4};
-    Tensor* input = torch_randn(shape, 2, &opts);
+    int shape[]    = {3, 4};
+    Tensor* input  = torch_randn(shape, 2, &opts);
     Tensor* output = torch_module_forward((Module*)model, input);
     REQUIRE(output != NULL);
     REQUIRE(torch_tensor_numel(output) == 3);
@@ -153,8 +153,8 @@ static void test_retain(void) {
     printf("  test_retain...");
 
     TorchTensorOptions opts = torch_options();
-    int shape[] = {1};
-    Tensor* t = torch_ones(shape, 1, &opts);
+    int shape[]             = {1};
+    Tensor* t               = torch_ones(shape, 1, &opts);
     REQUIRE(torch_tensor_ref_count(t) == 1);
     torch_tensor_retain(t);
     REQUIRE(torch_tensor_ref_count(t) == 2);

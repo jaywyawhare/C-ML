@@ -7,7 +7,8 @@
 #include "alloc/cml_allocator.h"
 
 static bool is_eliminated(const CMLFusionGroup* g, int node_idx) {
-    if (!g) return false;
+    if (!g)
+        return false;
     for (int i = 0; i < g->num_eliminated; i++) {
         if (g->eliminated_buffers[i] == node_idx)
             return true;
@@ -17,14 +18,22 @@ static bool is_eliminated(const CMLFusionGroup* g, int node_idx) {
 
 LinearProgram* linear_program_create(void) {
     LinearProgram* prog = cml_calloc(1, sizeof(LinearProgram));
-    if (!prog) return NULL;
+    if (!prog)
+        return NULL;
     prog->capacity = 32;
-    prog->ops = cml_calloc((size_t)prog->capacity, sizeof(LinearOp));
-    if (!prog->ops) { cml_free(prog); return NULL; }
-    prog->next_vreg = 0;
+    prog->ops      = cml_calloc((size_t)prog->capacity, sizeof(LinearOp));
+    if (!prog->ops) {
+        cml_free(prog);
+        return NULL;
+    }
+    prog->next_vreg     = 0;
     prog->axes_capacity = 8;
-    prog->loop_axes = cml_calloc((size_t)prog->axes_capacity, sizeof(int));
-    if (!prog->loop_axes) { cml_free(prog->ops); cml_free(prog); return NULL; }
+    prog->loop_axes     = cml_calloc((size_t)prog->axes_capacity, sizeof(int));
+    if (!prog->loop_axes) {
+        cml_free(prog->ops);
+        cml_free(prog);
+        return NULL;
+    }
     prog->group_dims[0] = 1;
     prog->group_dims[1] = 1;
     prog->group_dims[2] = 1;
@@ -32,19 +41,22 @@ LinearProgram* linear_program_create(void) {
 }
 
 void linear_program_free(LinearProgram* prog) {
-    if (!prog) return;
+    if (!prog)
+        return;
     cml_free(prog->loop_axes);
     cml_free(prog->ops);
     cml_free(prog);
 }
 
 int linear_program_emit(LinearProgram* prog, LinearOp op) {
-    if (!prog) return -1;
+    if (!prog)
+        return -1;
     if (prog->num_ops >= prog->capacity) {
-        int nc = prog->capacity * 2;
+        int nc        = prog->capacity * 2;
         LinearOp* tmp = cml_realloc(prog->ops, (size_t)nc * sizeof(LinearOp));
-        if (!tmp) return -1;
-        prog->ops = tmp;
+        if (!tmp)
+            return -1;
+        prog->ops      = tmp;
         prog->capacity = nc;
     }
     prog->ops[prog->num_ops++] = op;
@@ -52,7 +64,8 @@ int linear_program_emit(LinearProgram* prog, LinearOp op) {
 }
 
 int alloc_vreg(LinearProgram* prog) {
-    if (!prog) return -1;
+    if (!prog)
+        return -1;
     if (prog->next_vreg >= MAX_VIRTUAL_REGS) {
         LOG_WARNING("Virtual register file exhausted (%d regs)", MAX_VIRTUAL_REGS);
         return -1;
@@ -61,32 +74,40 @@ int alloc_vreg(LinearProgram* prog) {
 }
 
 LinearProgram* linearize_group(const CMLFusionGroup* g) {
-    if (!g || g->num_nodes == 0) return NULL;
+    if (!g || g->num_nodes == 0)
+        return NULL;
 
     LinearProgram* prog = linear_program_create();
-    if (!prog) return NULL;
+    if (!prog)
+        return NULL;
 
     int* node_vreg = cml_calloc((size_t)g->num_nodes, sizeof(int));
-    if (!node_vreg) { linear_program_free(prog); return NULL; }
-    for (int i = 0; i < g->num_nodes; i++) node_vreg[i] = -1;
+    if (!node_vreg) {
+        linear_program_free(prog);
+        return NULL;
+    }
+    for (int i = 0; i < g->num_nodes; i++)
+        node_vreg[i] = -1;
 
     Tensor* loaded_tensors[MAX_VIRTUAL_REGS];
-    int     loaded_vregs[MAX_VIRTUAL_REGS];
-    int     num_loaded = 0;
+    int loaded_vregs[MAX_VIRTUAL_REGS];
+    int num_loaded = 0;
 
     for (int i = 0; i < g->num_nodes; i++) {
         struct IRNode* node = g->nodes[i];
-        if (!node) continue;
+        if (!node)
+            continue;
 
         LinearOp compute_op;
         memset(&compute_op, 0, sizeof(compute_op));
-        compute_op.kind = LINOP_COMPUTE;
-        compute_op.uop  = node->type;
+        compute_op.kind     = LINOP_COMPUTE;
+        compute_op.uop      = node->type;
         compute_op.num_srcs = 0;
 
         for (int j = 0; j < node->num_inputs && j < 8; j++) {
             Tensor* inp = (node->inputs) ? node->inputs[j] : NULL;
-            if (!inp) continue;
+            if (!inp)
+                continue;
 
             int src_reg = -1;
 
@@ -108,7 +129,8 @@ LinearProgram* linearize_group(const CMLFusionGroup* g) {
 
             if (src_reg < 0) {
                 src_reg = alloc_vreg(prog);
-                if (src_reg < 0) break;
+                if (src_reg < 0)
+                    break;
 
                 LinearOp load_op;
                 memset(&load_op, 0, sizeof(load_op));
@@ -128,10 +150,11 @@ LinearProgram* linearize_group(const CMLFusionGroup* g) {
         }
 
         int dest = alloc_vreg(prog);
-        if (dest < 0) break;
-        compute_op.dest_reg = dest;
+        if (dest < 0)
+            break;
+        compute_op.dest_reg      = dest;
         compute_op.is_eliminated = is_eliminated(g, i);
-        node_vreg[i] = dest;
+        node_vreg[i]             = dest;
 
         linear_program_emit(prog, compute_op);
 
@@ -151,46 +174,62 @@ LinearProgram* linearize_group(const CMLFusionGroup* g) {
 
 const char* linop_name(LinearOpKind k) {
     switch (k) {
-        case LINOP_LOAD:        return "LOAD";
-        case LINOP_COMPUTE:     return "COMPUTE";
-        case LINOP_STORE:       return "STORE";
-        case LINOP_LOOP:        return "LOOP";
-        case LINOP_ENDLOOP:     return "ENDLOOP";
-        case LINOP_BARRIER:     return "BARRIER";
-        case LINOP_LOCAL_ALLOC: return "LOCAL_ALLOC";
-        case LINOP_LOCAL_LOAD:  return "LOCAL_LOAD";
-        case LINOP_LOCAL_STORE: return "LOCAL_STORE";
-        default:                return "???";
+    case LINOP_LOAD:
+        return "LOAD";
+    case LINOP_COMPUTE:
+        return "COMPUTE";
+    case LINOP_STORE:
+        return "STORE";
+    case LINOP_LOOP:
+        return "LOOP";
+    case LINOP_ENDLOOP:
+        return "ENDLOOP";
+    case LINOP_BARRIER:
+        return "BARRIER";
+    case LINOP_LOCAL_ALLOC:
+        return "LOCAL_ALLOC";
+    case LINOP_LOCAL_LOAD:
+        return "LOCAL_LOAD";
+    case LINOP_LOCAL_STORE:
+        return "LOCAL_STORE";
+    default:
+        return "???";
     }
 }
 
 void linear_program_print(const LinearProgram* prog) {
-    if (!prog) { printf("LinearProgram: (null)\n"); return; }
+    if (!prog) {
+        printf("LinearProgram: (null)\n");
+        return;
+    }
 
-    printf("Linear Program (%d ops, %d vregs)\n",
-           prog->num_ops, prog->next_vreg);
+    printf("Linear Program (%d ops, %d vregs)\n", prog->num_ops, prog->next_vreg);
     for (int i = 0; i < prog->num_ops; i++) {
         const LinearOp* op = &prog->ops[i];
         printf("  [%d] %-12s  dest=v%d", i, linop_name(op->kind), op->dest_reg);
         if (op->kind == LINOP_COMPUTE) {
             printf("  uop=%s  srcs=[", uop_type_to_string(op->uop));
             for (int j = 0; j < op->num_srcs; j++) {
-                if (j > 0) printf(", ");
+                if (j > 0)
+                    printf(", ");
                 printf("v%d", op->src_regs[j]);
             }
             printf("]");
-            if (op->is_eliminated) printf("  [ELIM]");
-            if (op->vec_width > 1) printf("  [VEC%d]", op->vec_width);
+            if (op->is_eliminated)
+                printf("  [ELIM]");
+            if (op->vec_width > 1)
+                printf("  [VEC%d]", op->vec_width);
         }
         if (op->kind == LINOP_LOOP)
-            printf("  axis=%d extent=%d stride=%d",
-                   op->loop_axis, op->loop_extent, op->loop_stride);
+            printf("  axis=%d extent=%d stride=%d", op->loop_axis, op->loop_extent,
+                   op->loop_stride);
         printf("\n");
     }
 }
 
 void cml_linearize_group_print(const CMLFusionGroup* g) {
-    if (!g) return;
+    if (!g)
+        return;
     LinearProgram* prog = linearize_group(g);
     if (prog) {
         linear_program_print(prog);
@@ -199,9 +238,11 @@ void cml_linearize_group_print(const CMLFusionGroup* g) {
 }
 
 int cml_linearize_group_count(const CMLFusionGroup* g) {
-    if (!g) return -1;
+    if (!g)
+        return -1;
     LinearProgram* prog = linearize_group(g);
-    if (!prog) return -1;
+    if (!prog)
+        return -1;
     int count = prog->num_ops;
     linear_program_free(prog);
     return count;

@@ -55,13 +55,13 @@
 #include "alloc/cml_allocator.h"
 
 static CMLCUDABackend* g_cuda_backend = NULL;
-static bool g_cuda_init_attempted = false;
+static bool g_cuda_init_attempted     = false;
 static CMLROCmBackend* g_rocm_backend = NULL;
-static bool g_rocm_init_attempted = false;
+static bool g_rocm_init_attempted     = false;
 
 #ifdef CML_HAS_VULKAN
 static CMLVulkanBackend* g_vulkan_backend = NULL;
-static bool g_vulkan_init_attempted = false;
+static bool g_vulkan_init_attempted       = false;
 #endif
 
 #ifdef CML_HAS_NV_DRIVER
@@ -76,10 +76,10 @@ static bool g_am_init_attempted = false;
 
 #ifdef CML_HAS_OPENCL
 static CMLOpenCLIRBackend* g_opencl_backend = NULL;
-static bool g_opencl_init_attempted = false;
+static bool g_opencl_init_attempted         = false;
 #endif
 
-static CMLDispatchContext* g_dispatch_ctx = NULL;
+static CMLDispatchContext* g_dispatch_ctx           = NULL;
 static CMLHCQQueue* g_hcq_queues[CML_BACKEND_COUNT] = {0};
 
 static CMLHCQBackendType dispatch_backend_to_hcq(CMLBackendType backend) {
@@ -115,17 +115,8 @@ static void dispatch_destroy_hcq_queues(void) {
 }
 
 static const char* backend_names[] = {
-    "CPU (Interpreter)",
-    "CPU (LLVM JIT)",
-    "NV (Userspace)",
-    "CUDA",
-    "AM (Userspace)",
-    "ROCm",
-    "NIR (Mesa)",
-    "Metal",
-    "Vulkan",
-    "WebGPU",
-    "OpenCL",
+    "CPU (Interpreter)", "CPU (LLVM JIT)", "NV (Userspace)", "CUDA",   "AM (Userspace)", "ROCm",
+    "NIR (Mesa)",        "Metal",          "Vulkan",         "WebGPU", "OpenCL",
 };
 
 static const char* backend_descriptions[] = {
@@ -163,18 +154,18 @@ CMLDispatchContext* cml_dispatch_create(void) {
     ctx->backends[CML_BACKEND_CPU_FALLBACK].status       = CML_BACKEND_STATUS_AVAILABLE;
     ctx->backends[CML_BACKEND_CPU_FALLBACK].device_count = 1;
 
-    ctx->fallback_chain[0] = CML_BACKEND_NV;
-    ctx->fallback_chain[1] = CML_BACKEND_CUDA;
-    ctx->fallback_chain[2] = CML_BACKEND_AM;
-    ctx->fallback_chain[3] = CML_BACKEND_ROCM;
-    ctx->fallback_chain[4] = CML_BACKEND_NIR;
-    ctx->fallback_chain[5] = CML_BACKEND_METAL;
-    ctx->fallback_chain[6] = CML_BACKEND_VULKAN;
-    ctx->fallback_chain[7] = CML_BACKEND_OPENCL;
-    ctx->fallback_chain[8] = CML_BACKEND_WEBGPU;
-    ctx->fallback_chain[9] = CML_BACKEND_CPU_LLVM;
+    ctx->fallback_chain[0]  = CML_BACKEND_NV;
+    ctx->fallback_chain[1]  = CML_BACKEND_CUDA;
+    ctx->fallback_chain[2]  = CML_BACKEND_AM;
+    ctx->fallback_chain[3]  = CML_BACKEND_ROCM;
+    ctx->fallback_chain[4]  = CML_BACKEND_NIR;
+    ctx->fallback_chain[5]  = CML_BACKEND_METAL;
+    ctx->fallback_chain[6]  = CML_BACKEND_VULKAN;
+    ctx->fallback_chain[7]  = CML_BACKEND_OPENCL;
+    ctx->fallback_chain[8]  = CML_BACKEND_WEBGPU;
+    ctx->fallback_chain[9]  = CML_BACKEND_CPU_LLVM;
     ctx->fallback_chain[10] = CML_BACKEND_CPU_FALLBACK;
-    ctx->fallback_count    = 11;
+    ctx->fallback_count     = 11;
 
     ctx->preferred   = CML_BACKEND_CPU_LLVM;
     ctx->active      = CML_BACKEND_CPU_FALLBACK;
@@ -189,7 +180,7 @@ int cml_dispatch_init(CMLDispatchContext* ctx) {
 
     cml_dispatch_detect_backends(ctx);
 
-    ctx->active = cml_dispatch_get_best_backend(ctx);
+    ctx->active      = cml_dispatch_get_best_backend(ctx);
     ctx->initialized = true;
 
     cml_dispatch_set_from_env(ctx);
@@ -274,19 +265,19 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
 
 #ifdef CML_HAS_LLVM_BACKEND
     ctx->backends[CML_BACKEND_CPU_LLVM].status       = CML_BACKEND_STATUS_AVAILABLE;
-    ctx->backends[CML_BACKEND_CPU_LLVM].device_count  = 1;
+    ctx->backends[CML_BACKEND_CPU_LLVM].device_count = 1;
     available++;
     LOG_INFO("LLVM JIT backend available");
 #endif
 
     if (!g_cuda_init_attempted && cml_cuda_available()) {
         g_cuda_init_attempted = true;
-        g_cuda_backend = cml_cuda_backend_create();
+        g_cuda_backend        = cml_cuda_backend_create();
         if (g_cuda_backend && cml_cuda_backend_init(g_cuda_backend, 0) == 0) {
-            ctx->backends[CML_BACKEND_CUDA].status       = CML_BACKEND_STATUS_INITIALIZED;
-            ctx->backends[CML_BACKEND_CUDA].device_count  = 1;
+            ctx->backends[CML_BACKEND_CUDA].status         = CML_BACKEND_STATUS_INITIALIZED;
+            ctx->backends[CML_BACKEND_CUDA].device_count   = 1;
             ctx->backends[CML_BACKEND_CUDA].supports_async = true;
-            ctx->backend_contexts[CML_BACKEND_CUDA]       = g_cuda_backend;
+            ctx->backend_contexts[CML_BACKEND_CUDA]        = g_cuda_backend;
             available++;
             LOG_INFO("CUDA backend initialized");
         } else if (g_cuda_backend) {
@@ -294,21 +285,21 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
             g_cuda_backend = NULL;
         }
     } else if (g_cuda_backend) {
-        ctx->backends[CML_BACKEND_CUDA].status       = CML_BACKEND_STATUS_INITIALIZED;
-        ctx->backends[CML_BACKEND_CUDA].device_count  = 1;
+        ctx->backends[CML_BACKEND_CUDA].status         = CML_BACKEND_STATUS_INITIALIZED;
+        ctx->backends[CML_BACKEND_CUDA].device_count   = 1;
         ctx->backends[CML_BACKEND_CUDA].supports_async = true;
-        ctx->backend_contexts[CML_BACKEND_CUDA]       = g_cuda_backend;
+        ctx->backend_contexts[CML_BACKEND_CUDA]        = g_cuda_backend;
         available++;
     }
 
     if (!g_rocm_init_attempted && cml_rocm_available()) {
         g_rocm_init_attempted = true;
-        g_rocm_backend = cml_rocm_backend_create();
+        g_rocm_backend        = cml_rocm_backend_create();
         if (g_rocm_backend && cml_rocm_backend_init(g_rocm_backend, 0) == 0) {
-            ctx->backends[CML_BACKEND_ROCM].status       = CML_BACKEND_STATUS_INITIALIZED;
-            ctx->backends[CML_BACKEND_ROCM].device_count  = 1;
+            ctx->backends[CML_BACKEND_ROCM].status         = CML_BACKEND_STATUS_INITIALIZED;
+            ctx->backends[CML_BACKEND_ROCM].device_count   = 1;
             ctx->backends[CML_BACKEND_ROCM].supports_async = true;
-            ctx->backend_contexts[CML_BACKEND_ROCM]       = g_rocm_backend;
+            ctx->backend_contexts[CML_BACKEND_ROCM]        = g_rocm_backend;
             available++;
             LOG_INFO("ROCm backend initialized");
         } else if (g_rocm_backend) {
@@ -316,19 +307,19 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
             g_rocm_backend = NULL;
         }
     } else if (g_rocm_backend) {
-        ctx->backends[CML_BACKEND_ROCM].status       = CML_BACKEND_STATUS_INITIALIZED;
-        ctx->backends[CML_BACKEND_ROCM].device_count  = 1;
+        ctx->backends[CML_BACKEND_ROCM].status         = CML_BACKEND_STATUS_INITIALIZED;
+        ctx->backends[CML_BACKEND_ROCM].device_count   = 1;
         ctx->backends[CML_BACKEND_ROCM].supports_async = true;
-        ctx->backend_contexts[CML_BACKEND_ROCM]       = g_rocm_backend;
+        ctx->backend_contexts[CML_BACKEND_ROCM]        = g_rocm_backend;
         available++;
     }
 
 #ifdef CML_HAS_VULKAN
     if (!g_vulkan_init_attempted && cml_vulkan_available()) {
         g_vulkan_init_attempted = true;
-        g_vulkan_backend = cml_vulkan_backend_create();
+        g_vulkan_backend        = cml_vulkan_backend_create();
         if (g_vulkan_backend && cml_vulkan_backend_init(g_vulkan_backend) == 0) {
-            ctx->backends[CML_BACKEND_VULKAN].status        = CML_BACKEND_STATUS_INITIALIZED;
+            ctx->backends[CML_BACKEND_VULKAN].status         = CML_BACKEND_STATUS_INITIALIZED;
             ctx->backends[CML_BACKEND_VULKAN].device_count   = 1;
             ctx->backends[CML_BACKEND_VULKAN].supports_async = true;
             ctx->backend_contexts[CML_BACKEND_VULKAN]        = g_vulkan_backend;
@@ -339,7 +330,7 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
             g_vulkan_backend = NULL;
         }
     } else if (g_vulkan_backend) {
-        ctx->backends[CML_BACKEND_VULKAN].status        = CML_BACKEND_STATUS_INITIALIZED;
+        ctx->backends[CML_BACKEND_VULKAN].status         = CML_BACKEND_STATUS_INITIALIZED;
         ctx->backends[CML_BACKEND_VULKAN].device_count   = 1;
         ctx->backends[CML_BACKEND_VULKAN].supports_async = true;
         ctx->backend_contexts[CML_BACKEND_VULKAN]        = g_vulkan_backend;
@@ -350,9 +341,9 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
 #ifdef CML_HAS_OPENCL
     if (!g_opencl_init_attempted && cml_opencl_ir_available()) {
         g_opencl_init_attempted = true;
-        g_opencl_backend = cml_opencl_ir_backend_create();
+        g_opencl_backend        = cml_opencl_ir_backend_create();
         if (g_opencl_backend && cml_opencl_ir_backend_init(g_opencl_backend) == 0) {
-            ctx->backends[CML_BACKEND_OPENCL].status        = CML_BACKEND_STATUS_INITIALIZED;
+            ctx->backends[CML_BACKEND_OPENCL].status         = CML_BACKEND_STATUS_INITIALIZED;
             ctx->backends[CML_BACKEND_OPENCL].device_count   = 1;
             ctx->backends[CML_BACKEND_OPENCL].supports_async = true;
             ctx->backend_contexts[CML_BACKEND_OPENCL]        = g_opencl_backend;
@@ -363,7 +354,7 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
             g_opencl_backend = NULL;
         }
     } else if (g_opencl_backend) {
-        ctx->backends[CML_BACKEND_OPENCL].status        = CML_BACKEND_STATUS_INITIALIZED;
+        ctx->backends[CML_BACKEND_OPENCL].status         = CML_BACKEND_STATUS_INITIALIZED;
         ctx->backends[CML_BACKEND_OPENCL].device_count   = 1;
         ctx->backends[CML_BACKEND_OPENCL].supports_async = true;
         ctx->backend_contexts[CML_BACKEND_OPENCL]        = g_opencl_backend;
@@ -374,9 +365,9 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
 #ifdef CML_HAS_NV_DRIVER
     if (!g_nv_init_attempted && cml_nv_driver_available()) {
         g_nv_init_attempted = true;
-        g_nv_driver = cml_nv_driver_create();
+        g_nv_driver         = cml_nv_driver_create();
         if (g_nv_driver && cml_nv_driver_init(g_nv_driver) == 0) {
-            ctx->backends[CML_BACKEND_NV].status        = CML_BACKEND_STATUS_INITIALIZED;
+            ctx->backends[CML_BACKEND_NV].status         = CML_BACKEND_STATUS_INITIALIZED;
             ctx->backends[CML_BACKEND_NV].device_count   = 1;
             ctx->backends[CML_BACKEND_NV].supports_async = true;
             ctx->backend_contexts[CML_BACKEND_NV]        = g_nv_driver;
@@ -387,8 +378,8 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
             g_nv_driver = NULL;
         }
     } else if (g_nv_driver) {
-        ctx->backends[CML_BACKEND_NV].status        = CML_BACKEND_STATUS_INITIALIZED;
-        ctx->backend_contexts[CML_BACKEND_NV]        = g_nv_driver;
+        ctx->backends[CML_BACKEND_NV].status  = CML_BACKEND_STATUS_INITIALIZED;
+        ctx->backend_contexts[CML_BACKEND_NV] = g_nv_driver;
         available++;
     }
 #endif
@@ -396,9 +387,9 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
 #ifdef CML_HAS_AM_DRIVER
     if (!g_am_init_attempted && cml_am_driver_available()) {
         g_am_init_attempted = true;
-        g_am_driver = cml_am_driver_create();
+        g_am_driver         = cml_am_driver_create();
         if (g_am_driver && cml_am_driver_init(g_am_driver) == 0) {
-            ctx->backends[CML_BACKEND_AM].status        = CML_BACKEND_STATUS_INITIALIZED;
+            ctx->backends[CML_BACKEND_AM].status         = CML_BACKEND_STATUS_INITIALIZED;
             ctx->backends[CML_BACKEND_AM].device_count   = 1;
             ctx->backends[CML_BACKEND_AM].supports_async = true;
             ctx->backend_contexts[CML_BACKEND_AM]        = g_am_driver;
@@ -409,16 +400,16 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
             g_am_driver = NULL;
         }
     } else if (g_am_driver) {
-        ctx->backends[CML_BACKEND_AM].status        = CML_BACKEND_STATUS_INITIALIZED;
-        ctx->backend_contexts[CML_BACKEND_AM]        = g_am_driver;
+        ctx->backends[CML_BACKEND_AM].status  = CML_BACKEND_STATUS_INITIALIZED;
+        ctx->backend_contexts[CML_BACKEND_AM] = g_am_driver;
         available++;
     }
 #endif
 
 #ifdef CML_HAS_NIR
     if (cml_nir_available()) {
-        ctx->backends[CML_BACKEND_NIR].status        = CML_BACKEND_STATUS_AVAILABLE;
-        ctx->backends[CML_BACKEND_NIR].device_count   = 1;
+        ctx->backends[CML_BACKEND_NIR].status       = CML_BACKEND_STATUS_AVAILABLE;
+        ctx->backends[CML_BACKEND_NIR].device_count = 1;
         available++;
         LOG_INFO("NIR/Mesa backend available");
     }
@@ -428,17 +419,18 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
     if (cml_metal_available()) {
         CMLMetalBackend* metal = cml_metal_backend_create();
         if (metal && cml_metal_backend_init(metal) == 0) {
-            ctx->backends[CML_BACKEND_METAL].status          = CML_BACKEND_STATUS_INITIALIZED;
-            ctx->backends[CML_BACKEND_METAL].device_count    = 1;
-            ctx->backends[CML_BACKEND_METAL].supports_async  = true;
+            ctx->backends[CML_BACKEND_METAL].status               = CML_BACKEND_STATUS_INITIALIZED;
+            ctx->backends[CML_BACKEND_METAL].device_count         = 1;
+            ctx->backends[CML_BACKEND_METAL].supports_async       = true;
             ctx->backends[CML_BACKEND_METAL].supports_unified_mem = true;
-            ctx->backend_contexts[CML_BACKEND_METAL]         = metal;
+            ctx->backend_contexts[CML_BACKEND_METAL]              = metal;
             available++;
             LOG_INFO("Metal backend initialized");
         } else {
-            if (metal) cml_metal_backend_free(metal);
-            ctx->backends[CML_BACKEND_METAL].status       = CML_BACKEND_STATUS_AVAILABLE;
-            ctx->backends[CML_BACKEND_METAL].device_count  = 1;
+            if (metal)
+                cml_metal_backend_free(metal);
+            ctx->backends[CML_BACKEND_METAL].status         = CML_BACKEND_STATUS_AVAILABLE;
+            ctx->backends[CML_BACKEND_METAL].device_count   = 1;
             ctx->backends[CML_BACKEND_METAL].supports_async = true;
             available++;
             LOG_INFO("Metal backend available (init deferred)");
@@ -450,16 +442,17 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
     if (cml_webgpu_available()) {
         CMLWebGPUBackend* wgpu = cml_webgpu_backend_create();
         if (wgpu && cml_webgpu_backend_init(wgpu) == 0) {
-            ctx->backends[CML_BACKEND_WEBGPU].status       = CML_BACKEND_STATUS_INITIALIZED;
-            ctx->backends[CML_BACKEND_WEBGPU].device_count  = 1;
+            ctx->backends[CML_BACKEND_WEBGPU].status         = CML_BACKEND_STATUS_INITIALIZED;
+            ctx->backends[CML_BACKEND_WEBGPU].device_count   = 1;
             ctx->backends[CML_BACKEND_WEBGPU].supports_async = true;
-            ctx->backend_contexts[CML_BACKEND_WEBGPU]       = wgpu;
+            ctx->backend_contexts[CML_BACKEND_WEBGPU]        = wgpu;
             available++;
             LOG_INFO("WebGPU backend initialized");
         } else {
-            if (wgpu) cml_webgpu_backend_free(wgpu);
-            ctx->backends[CML_BACKEND_WEBGPU].status       = CML_BACKEND_STATUS_AVAILABLE;
-            ctx->backends[CML_BACKEND_WEBGPU].device_count  = 1;
+            if (wgpu)
+                cml_webgpu_backend_free(wgpu);
+            ctx->backends[CML_BACKEND_WEBGPU].status         = CML_BACKEND_STATUS_AVAILABLE;
+            ctx->backends[CML_BACKEND_WEBGPU].device_count   = 1;
             ctx->backends[CML_BACKEND_WEBGPU].supports_async = true;
             available++;
             LOG_INFO("WebGPU backend available (init deferred)");
@@ -557,12 +550,23 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
     if (ctx->cache) {
         CMLKernelBackend kbackend = CML_KERNEL_CPU_FALLBACK;
         switch (backend) {
-        case CML_BACKEND_CUDA: kbackend = CML_KERNEL_CUDA; break;
-        case CML_BACKEND_ROCM: kbackend = CML_KERNEL_ROCM; break;
-        case CML_BACKEND_METAL: kbackend = CML_KERNEL_METAL; break;
-        case CML_BACKEND_WEBGPU: kbackend = CML_KERNEL_WEBGPU; break;
-        case CML_BACKEND_CPU_LLVM: kbackend = CML_KERNEL_CPU_LLVM; break;
-        default: break;
+        case CML_BACKEND_CUDA:
+            kbackend = CML_KERNEL_CUDA;
+            break;
+        case CML_BACKEND_ROCM:
+            kbackend = CML_KERNEL_ROCM;
+            break;
+        case CML_BACKEND_METAL:
+            kbackend = CML_KERNEL_METAL;
+            break;
+        case CML_BACKEND_WEBGPU:
+            kbackend = CML_KERNEL_WEBGPU;
+            break;
+        case CML_BACKEND_CPU_LLVM:
+            kbackend = CML_KERNEL_CPU_LLVM;
+            break;
+        default:
+            break;
         }
         (void)cml_kernel_cache_lookup_ir((CMLKernelCache*)ctx->cache, ir, inputs, nin, kbackend);
     }
@@ -570,7 +574,8 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
     switch (backend) {
     case CML_BACKEND_CPU_FALLBACK: {
         int r = cml_ir_execute_cpu(ir);
-        if (r == 0) ctx->executions_total++;
+        if (r == 0)
+            ctx->executions_total++;
         return r;
     }
 
@@ -597,11 +602,14 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
         CMLGPUCodegen** cg_ptr = (backend == CML_BACKEND_CUDA) ? &g_gpu_cuda : &g_gpu_rocm;
         if (!*cg_ptr) {
             GPUTarget tgt = (backend == CML_BACKEND_CUDA) ? GPU_TARGET_CUDA : GPU_TARGET_ROCM;
-            *cg_ptr = cml_gpu_codegen_create(tgt, ctx->backend_contexts[backend]);
+            *cg_ptr       = cml_gpu_codegen_create(tgt, ctx->backend_contexts[backend]);
         }
         if (*cg_ptr) {
             int r = cml_gpu_execute(*cg_ptr, ir);
-            if (r == 0) { ctx->executions_total++; return 0; }
+            if (r == 0) {
+                ctx->executions_total++;
+                return 0;
+            }
         }
         /* LLVM GPU codegen failed; fall through to PTX string codegen */
 #endif
@@ -609,13 +617,16 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
         if (backend == CML_BACKEND_CUDA && g_cuda_backend && g_cuda_backend->initialized) {
             static CMLPTXCodegen* g_ptx_cg = NULL;
             if (!g_ptx_cg) {
-                int sm = g_cuda_backend->compute_capability_major * 10
-                       + g_cuda_backend->compute_capability_minor;
+                int sm = g_cuda_backend->compute_capability_major * 10 +
+                         g_cuda_backend->compute_capability_minor;
                 g_ptx_cg = cml_ptx_codegen_create(sm, g_cuda_backend);
             }
             if (g_ptx_cg) {
                 int r = cml_ptx_execute_graph(g_ptx_cg, ir);
-                if (r == 0) { ctx->executions_total++; return 0; }
+                if (r == 0) {
+                    ctx->executions_total++;
+                    return 0;
+                }
             }
             LOG_DEBUG("PTX string codegen: graph execution unavailable");
         }
@@ -626,11 +637,13 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
     case CML_BACKEND_VULKAN:
 #ifdef CML_HAS_VULKAN
     {
-        CMLVulkanBackend* vk =
-            (CMLVulkanBackend*)ctx->backend_contexts[CML_BACKEND_VULKAN];
+        CMLVulkanBackend* vk = (CMLVulkanBackend*)ctx->backend_contexts[CML_BACKEND_VULKAN];
         if (vk) {
             int r = cml_vulkan_execute_graph(vk, ir);
-            if (r == 0) { ctx->executions_total++; return 0; }
+            if (r == 0) {
+                ctx->executions_total++;
+                return 0;
+            }
         }
         LOG_DEBUG("Vulkan backend execution failed");
         return -1;
@@ -646,7 +659,10 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
         CMLNVDriver* nv = (CMLNVDriver*)ctx->backend_contexts[CML_BACKEND_NV];
         if (nv) {
             int r = cml_nv_execute_graph(nv, ir);
-            if (r == 0) { ctx->executions_total++; return 0; }
+            if (r == 0) {
+                ctx->executions_total++;
+                return 0;
+            }
         }
         LOG_DEBUG("NV driver execution failed");
         return -1;
@@ -662,7 +678,10 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
         CMLAMDriver* am = (CMLAMDriver*)ctx->backend_contexts[CML_BACKEND_AM];
         if (am) {
             int r = cml_am_execute_graph(am, ir);
-            if (r == 0) { ctx->executions_total++; return 0; }
+            if (r == 0) {
+                ctx->executions_total++;
+                return 0;
+            }
         }
         LOG_DEBUG("AM driver execution failed");
         return -1;
@@ -680,12 +699,14 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
         if (nir && cml_nir_compile(nir, ir) == 0) {
             /* Execute via Vulkan backend if available */
 #ifdef CML_HAS_VULKAN
-            CMLVulkanBackend* vk =
-                (CMLVulkanBackend*)ctx->backend_contexts[CML_BACKEND_VULKAN];
+            CMLVulkanBackend* vk = (CMLVulkanBackend*)ctx->backend_contexts[CML_BACKEND_VULKAN];
             if (vk) {
                 int r = cml_vulkan_execute_graph(vk, ir);
                 cml_nir_compiler_free(nir);
-                if (r == 0) { ctx->executions_total++; return 0; }
+                if (r == 0) {
+                    ctx->executions_total++;
+                    return 0;
+                }
             }
 #endif
             cml_nir_compiler_free(nir);
@@ -703,11 +724,13 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
     case CML_BACKEND_METAL:
 #ifdef CML_HAS_METAL
     {
-        CMLMetalBackend* metal =
-            (CMLMetalBackend*)ctx->backend_contexts[CML_BACKEND_METAL];
+        CMLMetalBackend* metal = (CMLMetalBackend*)ctx->backend_contexts[CML_BACKEND_METAL];
         if (metal) {
             int r = cml_metal_execute_graph(metal, ir);
-            if (r == 0) { ctx->executions_total++; return 0; }
+            if (r == 0) {
+                ctx->executions_total++;
+                return 0;
+            }
         }
         LOG_DEBUG("Metal backend execution failed");
         return -1;
@@ -720,11 +743,13 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
     case CML_BACKEND_WEBGPU:
 #ifdef CML_HAS_WEBGPU
     {
-        CMLWebGPUBackend* wgpu =
-            (CMLWebGPUBackend*)ctx->backend_contexts[CML_BACKEND_WEBGPU];
+        CMLWebGPUBackend* wgpu = (CMLWebGPUBackend*)ctx->backend_contexts[CML_BACKEND_WEBGPU];
         if (wgpu) {
             int r = cml_webgpu_execute_graph(wgpu, ir);
-            if (r == 0) { ctx->executions_total++; return 0; }
+            if (r == 0) {
+                ctx->executions_total++;
+                return 0;
+            }
         }
         LOG_DEBUG("WebGPU backend execution failed");
         return -1;
@@ -737,11 +762,13 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
     case CML_BACKEND_OPENCL:
 #ifdef CML_HAS_OPENCL
     {
-        CMLOpenCLIRBackend* ocl =
-            (CMLOpenCLIRBackend*)ctx->backend_contexts[CML_BACKEND_OPENCL];
+        CMLOpenCLIRBackend* ocl = (CMLOpenCLIRBackend*)ctx->backend_contexts[CML_BACKEND_OPENCL];
         if (ocl) {
             int r = cml_opencl_execute_graph(ocl, ir);
-            if (r == 0) { ctx->executions_total++; return 0; }
+            if (r == 0) {
+                ctx->executions_total++;
+                return 0;
+            }
         }
         LOG_DEBUG("OpenCL backend execution failed");
         return -1;
@@ -756,9 +783,8 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
     }
 }
 
-int cml_dispatch_execute_async(CMLDispatchContext* ctx, CMLGraph_t ir,
-                               Tensor** inputs, int num_inputs,
-                               Tensor** outputs, int num_outputs) {
+int cml_dispatch_execute_async(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** inputs,
+                               int num_inputs, Tensor** outputs, int num_outputs) {
     /* Graph execution is still synchronous; HCQ queues are used for memcpy,
      * kernel submit, and cml_dispatch_synchronize on GPU backends. */
     return cml_dispatch_execute(ctx, ir, inputs, num_inputs, outputs, num_outputs);
@@ -800,7 +826,7 @@ CMLBackendType cml_dispatch_select_backend(CMLDispatchContext* ctx, CMLGraph_t i
     if (!ctx || !ir)
         return CML_BACKEND_CPU_FALLBACK;
 
-    struct IRNode* node = ir->head;
+    struct IRNode* node   = ir->head;
     bool has_cuda_tensors = false;
     bool has_rocm_tensors = false;
 
@@ -852,9 +878,12 @@ void cml_dispatch_cache_stats(CMLDispatchContext* ctx, size_t* hits, size_t* mis
         size_t count = 0;
         kernel_cache_stats((CMLKernelCache*)ctx->cache, hits, misses, &count, size);
     } else {
-        if (hits) *hits = ctx->cache_hits;
-        if (misses) *misses = ctx->cache_misses;
-        if (size) *size = 0;
+        if (hits)
+            *hits = ctx->cache_hits;
+        if (misses)
+            *misses = ctx->cache_misses;
+        if (size)
+            *size = 0;
     }
 }
 
@@ -873,11 +902,21 @@ void cml_dispatch_print_status(CMLDispatchContext* ctx) {
     for (int i = 0; i < CML_BACKEND_COUNT; i++) {
         const char* status;
         switch (ctx->backends[i].status) {
-        case CML_BACKEND_STATUS_UNAVAILABLE: status = "Unavailable"; break;
-        case CML_BACKEND_STATUS_AVAILABLE:   status = "Available"; break;
-        case CML_BACKEND_STATUS_INITIALIZED: status = "Initialized"; break;
-        case CML_BACKEND_STATUS_ERROR:       status = "Error"; break;
-        default:                             status = "Unknown"; break;
+        case CML_BACKEND_STATUS_UNAVAILABLE:
+            status = "Unavailable";
+            break;
+        case CML_BACKEND_STATUS_AVAILABLE:
+            status = "Available";
+            break;
+        case CML_BACKEND_STATUS_INITIALIZED:
+            status = "Initialized";
+            break;
+        case CML_BACKEND_STATUS_ERROR:
+            status = "Error";
+            break;
+        default:
+            status = "Unknown";
+            break;
         }
         printf("  [%d] %-20s: %s", i, backend_names[i], status);
         if (ctx->backends[i].device_count > 0)
@@ -901,7 +940,8 @@ void cml_dispatch_synchronize(CMLDispatchContext* ctx) {
     if (ctx->backends[CML_BACKEND_ROCM].status == CML_BACKEND_STATUS_INITIALIZED && g_rocm_backend)
         cml_rocm_synchronize(g_rocm_backend);
 #ifdef CML_HAS_VULKAN
-    if (ctx->backends[CML_BACKEND_VULKAN].status == CML_BACKEND_STATUS_INITIALIZED && g_vulkan_backend)
+    if (ctx->backends[CML_BACKEND_VULKAN].status == CML_BACKEND_STATUS_INITIALIZED &&
+        g_vulkan_backend)
         cml_vulkan_synchronize(g_vulkan_backend);
 #endif
 
@@ -916,9 +956,7 @@ void cml_dispatch_synchronize(CMLDispatchContext* ctx) {
     }
 }
 
-struct CMLCUDABackend* cml_dispatch_get_cuda_backend(void) {
-    return g_cuda_backend;
-}
+struct CMLCUDABackend* cml_dispatch_get_cuda_backend(void) { return g_cuda_backend; }
 
 struct CMLVulkanBackend* cml_dispatch_get_vulkan_backend(void) {
 #ifdef CML_HAS_VULKAN
@@ -964,9 +1002,8 @@ CMLHCQQueue* cml_dispatch_get_hcq_queue(CMLBackendType backend) {
     return g_hcq_queues[backend];
 }
 
-int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir,
-                             Tensor** inputs, int num_inputs,
-                             Tensor** outputs, int num_outputs) {
+int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** inputs,
+                             int num_inputs, Tensor** outputs, int num_outputs) {
     /*
      * Route execution through the TinyJit layer.  On the first call for a
      * given graph structure the graph is executed normally and the launch
@@ -975,10 +1012,15 @@ int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir,
      *
      * Falls back to regular dispatch if the TinyJit path is unavailable.
      */
-    (void)inputs; (void)num_inputs; (void)outputs; (void)num_outputs;
+    (void)inputs;
+    (void)num_inputs;
+    (void)outputs;
+    (void)num_outputs;
 
-    if (!ctx) ctx = cml_dispatch_get_global();
-    if (!ctx || !ir) return -1;
+    if (!ctx)
+        ctx = cml_dispatch_get_global();
+    if (!ctx || !ir)
+        return -1;
 
     /* Try traced execution (capture-and-replay) */
     extern int cml_ir_execute_traced(CMLGraph_t ir);

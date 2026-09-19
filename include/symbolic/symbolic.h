@@ -10,22 +10,30 @@ extern "C" {
 #endif
 
 typedef enum {
-    SYM_CONST,  // Constant integer value
-    SYM_VAR,    // Named variable with bounds [vmin, vmax]
-    SYM_ADD,    // left + right
-    SYM_MUL,    // left * right
-    SYM_DIV,    // left / right (integer division)
-    SYM_MOD,    // left % right
-    SYM_MIN,    // min(left, right)
-    SYM_MAX     // max(left, right)
+    SYM_CONST, // Constant integer value
+    SYM_VAR,   // Named variable with bounds [vmin, vmax]
+    SYM_ADD,   // left + right
+    SYM_MUL,   // left * right
+    SYM_DIV,   // left / right (integer division)
+    SYM_MOD,   // left % right
+    SYM_MIN,   // min(left, right)
+    SYM_MAX    // max(left, right)
 } SymExprType;
 
 typedef struct SymExpr {
     SymExprType type;
     union {
         int64_t const_val;
-        struct { char name[32]; int64_t vmin; int64_t vmax; int id; } var;
-        struct { struct SymExpr* left; struct SymExpr* right; } binop;
+        struct {
+            char name[32];
+            int64_t vmin;
+            int64_t vmax;
+            int id;
+        } var;
+        struct {
+            struct SymExpr* left;
+            struct SymExpr* right;
+        } binop;
     };
     int ref_count;
 } SymExpr;

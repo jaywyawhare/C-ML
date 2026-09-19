@@ -55,25 +55,21 @@ void cml_runtime_compiler_free(CMLRuntimeCompiler* rc);
 
 /* Returns compiled kernel (owned by cache), or NULL on failure. */
 const CMLCompiledKernel* cml_runtime_compile_group(CMLRuntimeCompiler* rc,
-                                                     const CMLFusionGroup* group);
-const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
-                                                       const CMLLinearProgram* prog,
-                                                       size_t work_size);
+                                                   const CMLFusionGroup* group);
+const CMLCompiledKernel*
+cml_runtime_compile_program(CMLRuntimeCompiler* rc, const CMLLinearProgram* prog, size_t work_size);
 
 /* CPU fallback: interprets the LinearProgram operations directly. */
-int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel,
-                                  Tensor** inputs, int num_inputs,
-                                  Tensor** outputs, int num_outputs);
+int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel, Tensor** inputs, int num_inputs,
+                                 Tensor** outputs, int num_outputs);
 
 /* fusion schedule -> linearize groups -> fused codegen -> execute */
 int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir);
 
-void cml_runtime_compiler_stats(const CMLRuntimeCompiler* rc,
-                                 size_t* hits, size_t* misses,
-                                 size_t* compilations);
+void cml_runtime_compiler_stats(const CMLRuntimeCompiler* rc, size_t* hits, size_t* misses,
+                                size_t* compilations);
 void cml_runtime_compiler_clear_cache(CMLRuntimeCompiler* rc);
-void cml_runtime_compiler_set_backend(CMLRuntimeCompiler* rc,
-                                       CMLFusedBackend backend);
+void cml_runtime_compiler_set_backend(CMLRuntimeCompiler* rc, CMLFusedBackend backend);
 
 #ifdef __cplusplus
 }

@@ -14,7 +14,7 @@ extern "C" {
 
 typedef struct AutocastContext {
     bool enabled;
-    DType target_dtype;   /* target low-precision dtype (e.g. DTYPE_FLOAT16) */
+    DType target_dtype; /* target low-precision dtype (e.g. DTYPE_FLOAT16) */
 } AutocastContext;
 
 /*
@@ -24,9 +24,9 @@ typedef struct AutocastContext {
  */
 typedef struct GradScaler {
     float scale_factor;
-    float growth_factor;      /* default: 2.0 */
-    float backoff_factor;     /* default: 0.5 */
-    int growth_interval;      /* default: 2000 */
+    float growth_factor;  /* default: 2.0 */
+    float backoff_factor; /* default: 0.5 */
+    int growth_interval;  /* default: 2000 */
     int growth_step;
     bool found_inf;
 } GradScaler;
@@ -45,8 +45,8 @@ DType autocast_get_dtype(void);
 /* Ops like softmax, layer norm, losses should stay in float32 */
 bool autocast_should_keep_float32(OpType op);
 
-GradScaler* grad_scaler_create(float init_scale, float growth_factor,
-                                float backoff_factor, int growth_interval);
+GradScaler* grad_scaler_create(float init_scale, float growth_factor, float backoff_factor,
+                               int growth_interval);
 void grad_scaler_free(GradScaler* scaler);
 Tensor* grad_scaler_scale(GradScaler* scaler, Tensor* loss);
 void grad_scaler_unscale(GradScaler* scaler, Parameter** params, int num_params);

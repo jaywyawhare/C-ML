@@ -350,9 +350,9 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     ir->backward_head = NULL;
     ir->node_count    = 0;
 
-    ir->is_executed                = false;
-    ir->is_optimized               = false;
-    ir->is_decomposed              = false;
+    ir->is_executed   = false;
+    ir->is_optimized  = false;
+    ir->is_decomposed = false;
     /* Allocator blocks are recycled without zeroing (see cml_malloc), so
      * every field must be set explicitly -- a stale has_backward_nodes from
      * a freed context made the next context skip its forward decompose. */
@@ -413,10 +413,11 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_ERF:
     case UOP_COUNT:
         break;
-    case UOP_ELU:            /* ELU/CLAMP both store ClampParams */
+    case UOP_ELU: /* ELU/CLAMP both store ClampParams */
     case UOP_CLAMP: {
         ClampParams* p = (ClampParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_PROD:
@@ -427,26 +428,30 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_MEAN: {
         ReduceParams* p = (ReduceParams*)node->params;
         if (p) {
-            if (p->dims) cml_free(p->dims);
+            if (p->dims)
+                cml_free(p->dims);
             cml_free(p);
         }
         break;
     }
     case UOP_CUMSUM: {
         CumsumParams* p = (CumsumParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_TRIU:
     case UOP_TRIL: {
         TriParams* p = (TriParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_PAD: {
         PadParams* p = (PadParams*)node->params;
         if (p) {
-            if (p->pad_widths) cml_free(p->pad_widths);
+            if (p->pad_widths)
+                cml_free(p->pad_widths);
             cml_free(p);
         }
         break;
@@ -534,24 +539,28 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_SORT:
     case UOP_ARGSORT: {
         SortParams* p = (SortParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_TOPK: {
         TopkParams* p = (TopkParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_CUMPROD:
     case UOP_CUMMAX:
     case UOP_CUMMIN: {
         CumsumParams* p = (CumsumParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_MASKED_FILL: {
         MaskedFillParams* p = (MaskedFillParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_MIN_REDUCE:
@@ -562,120 +571,144 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_LOGSUMEXP: {
         ReduceParams* p = (ReduceParams*)node->params;
         if (p) {
-            if (p->dims) cml_free(p->dims);
+            if (p->dims)
+                cml_free(p->dims);
             cml_free(p);
         }
         break;
     }
     case UOP_CAT: {
         CatParams* p = (CatParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_STACK: {
         StackParams* p = (StackParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_SCATTER: {
         ScatterParams* p = (ScatterParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_ROLL: {
         RollParams* p = (RollParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_FLATTEN: {
         FlattenParams* p = (FlattenParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_UNFLATTEN: {
         UnflattenParams* p = (UnflattenParams*)node->params;
         if (p) {
-            if (p->sizes) cml_free(p->sizes);
+            if (p->sizes)
+                cml_free(p->sizes);
             cml_free(p);
         }
         break;
     }
-    case UOP_DIAGONAL:       /* DIAG/DIAGONAL both store DiagParams */
+    case UOP_DIAGONAL: /* DIAG/DIAGONAL both store DiagParams */
     case UOP_DIAG: {
         DiagParams* p = (DiagParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_ALLOC: {
         AllocParams* p = (AllocParams*)node->params;
         if (p) {
-            if (p->shape) cml_free(p->shape);
+            if (p->shape)
+                cml_free(p->shape);
             cml_free(p);
         }
         break;
     }
     case UOP_ONE_HOT: {
         OneHotParams* p = (OneHotParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_TILE: {
         TileParams* p = (TileParams*)node->params;
         if (p) {
-            if (p->repeats) cml_free(p->repeats);
+            if (p->repeats)
+                cml_free(p->repeats);
             cml_free(p);
         }
         break;
     }
     case UOP_REPEAT_INTERLEAVE: {
         RepeatInterleaveParams* p = (RepeatInterleaveParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_SHRINK: {
         ShrinkParams* p = (ShrinkParams*)node->params;
         if (p) {
-            if (p->starts) cml_free(p->starts);
-            if (p->ends) cml_free(p->ends);
+            if (p->starts)
+                cml_free(p->starts);
+            if (p->ends)
+                cml_free(p->ends);
             cml_free(p);
         }
         break;
     }
     case UOP_UNFOLD: {
         UnfoldParams* p = (UnfoldParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_FOLD: {
         FoldParams* p = (FoldParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_IM2COL: {
         Im2colParams* p = (Im2colParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_COL2IM: {
         Col2imParams* p = (Col2imParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_SCATTER_ADD: {
         ScatterAddParams* p = (ScatterAddParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_SPMM: {
         SpMMParams* p = (SpMMParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_FUSED_ELEMENTWISE: {
         FusedElementwiseParams* p = (FusedElementwiseParams*)node->params;
         if (p) {
-            cml_free(p->op); cml_free(p->a); cml_free(p->b);
-            cml_free(p->c); cml_free(p->konst); cml_free(p);
+            cml_free(p->op);
+            cml_free(p->a);
+            cml_free(p->b);
+            cml_free(p->c);
+            cml_free(p->konst);
+            cml_free(p);
         }
         break;
     }
@@ -684,40 +717,50 @@ void cml_ir_free_node_params(struct IRNode* node) {
          * attaches a FusedElementwiseParams to be freed here. */
         FusedElementwiseParams* p = (FusedElementwiseParams*)node->params;
         if (p) {
-            cml_free(p->op); cml_free(p->a); cml_free(p->b);
-            cml_free(p->c); cml_free(p->konst); cml_free(p);
+            cml_free(p->op);
+            cml_free(p->a);
+            cml_free(p->b);
+            cml_free(p->c);
+            cml_free(p->konst);
+            cml_free(p);
         }
         break;
     }
     case UOP_MAXPOOL2D:
     case UOP_AVGPOOL2D: {
         Pool2DParams* p = (Pool2DParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_CONV3D: {
         Conv3DParams* p = (Conv3DParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_CONV_TRANSPOSE2D: {
         ConvTranspose2DParams* p = (ConvTranspose2DParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_CONV_TRANSPOSE3D: {
         ConvTranspose3DParams* p = (ConvTranspose3DParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_LOGCUMSUMEXP: {
         CumsumParams* p = (CumsumParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_CELU: {
         ClampParams* p = (ClampParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_ERFC:
@@ -766,8 +809,10 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_CONST: {
         ConstParams* p = (ConstParams*)node->params;
         if (p) {
-            if (p->data)  cml_free(p->data);
-            if (p->shape) cml_free(p->shape);
+            if (p->data)
+                cml_free(p->data);
+            if (p->shape)
+                cml_free(p->shape);
             cml_free(p);
         }
         break;
@@ -775,32 +820,38 @@ void cml_ir_free_node_params(struct IRNode* node) {
     case UOP_RAND_UNIFORM:
     case UOP_RAND_NORMAL: {
         RandParams* p = (RandParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_ARANGE_OP: {
         ArangeParams* p = (ArangeParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_EYE_OP: {
         EyeParams* p = (EyeParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_RAND_INT: {
         RandIntParams* p = (RandIntParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_SGD_STEP: {
         SgdStepParams* p = (SgdStepParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     case UOP_ADAM_STEP: {
         AdamStepParams* p = (AdamStepParams*)node->params;
-        if (p) cml_free(p);
+        if (p)
+            cml_free(p);
         break;
     }
     default:
@@ -924,15 +975,22 @@ void cml_ir_release_node_storage(struct IRNode* node) {
  * be recorded while they are still valid. */
 typedef struct {
     Tensor** p;
-    int      n, cap;
+    int n, cap;
 } FreedSet;
 
 static void freed_set_add(FreedSet* fs, Tensor* t) {
-    if (!t || !fs->p) return;
+    if (!t || !fs->p)
+        return;
     if (fs->n == fs->cap) {
-        int cap    = fs->cap ? fs->cap * 2 : 64;
+        int cap     = fs->cap ? fs->cap * 2 : 64;
         Tensor** np = cml_realloc(fs->p, (size_t)cap * sizeof(Tensor*));
-        if (!np) { cml_free(fs->p); fs->p = NULL; fs->n = 0; fs->cap = 0; return; }
+        if (!np) {
+            cml_free(fs->p);
+            fs->p   = NULL;
+            fs->n   = 0;
+            fs->cap = 0;
+            return;
+        }
         fs->p   = np;
         fs->cap = cap;
     }
@@ -946,13 +1004,17 @@ static int freed_set_cmp(const void* a, const void* b) {
 }
 
 static bool freed_set_contains(const FreedSet* fs, Tensor* t) {
-    if (!fs->p || fs->n == 0) return false;
+    if (!fs->p || fs->n == 0)
+        return false;
     int lo = 0, hi = fs->n - 1;
     while (lo <= hi) {
         int mid = lo + (hi - lo) / 2;
-        if (fs->p[mid] == t) return true;
-        if (fs->p[mid] < t) lo = mid + 1;
-        else                hi = mid - 1;
+        if (fs->p[mid] == t)
+            return true;
+        if (fs->p[mid] < t)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
     }
     return false;
 }
@@ -964,8 +1026,8 @@ void cml_ir_free(CMLGraph_t ir) {
     cml_ir_clear_global_if_current(ir);
 
     FreedSet freed = {0};
-    freed.cap = 64;
-    freed.p   = cml_malloc((size_t)freed.cap * sizeof(Tensor*));
+    freed.cap      = 64;
+    freed.p        = cml_malloc((size_t)freed.cap * sizeof(Tensor*));
 
     /* Phase 1: Free forward output tensors.
      * Do not auto-execute pending nodes during teardown: lazy tensors can be
@@ -1143,17 +1205,17 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
             Tensor* raw_inputs_arr[8];
             int lookup_count = num_inputs < 8 ? num_inputs : 8;
             for (int i = 0; i < lookup_count; i++) {
-                input_nodes[i] = (inputs[i] && inputs[i]->ir_node) ? inputs[i]->ir_node : NULL;
+                input_nodes[i]    = (inputs[i] && inputs[i]->ir_node) ? inputs[i]->ir_node : NULL;
                 raw_inputs_arr[i] = inputs[i];
             }
 
-            int dtype = (num_inputs > 0 && inputs[0]) ? (int)inputs[0]->dtype : 0;
-            uint64_t hash = cml_intern_hash_node_ex((int)type, dtype, input_nodes,
-                                                    raw_inputs_arr, lookup_count, params, 0);
+            int dtype     = (num_inputs > 0 && inputs[0]) ? (int)inputs[0]->dtype : 0;
+            uint64_t hash = cml_intern_hash_node_ex((int)type, dtype, input_nodes, raw_inputs_arr,
+                                                    lookup_count, params, 0);
 
-            struct IRNode* existing = cml_intern_lookup_ex(ir->intern_table, hash, (int)type,
-                                                           dtype, input_nodes, raw_inputs_arr,
-                                                           lookup_count, params, 0);
+            struct IRNode* existing =
+                cml_intern_lookup_ex(ir->intern_table, hash, (int)type, dtype, input_nodes,
+                                     raw_inputs_arr, lookup_count, params, 0);
             if (existing && existing->output && !existing->is_executed) {
                 existing->ref_count++;
                 ir->last_result = existing;
@@ -1338,7 +1400,7 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     node->chain_id       = -1;
 
     node->ref_count = 1;
-    node->scope = NULL;
+    node->scope     = NULL;
     {
         const char* sc = cml_ir_scope_current();
         if (sc)
@@ -1356,9 +1418,10 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
         if (cml_stack_is_internal(node->build_stack)) {
             const char* inherited = NULL;
             for (int i = 0; i < num_inputs && !inherited; i++) {
-                struct IRNode* in = (inputs[i] && inputs[i]->ir_node)
-                                        ? (struct IRNode*)inputs[i]->ir_node : NULL;
-                if (in && in->build_stack) inherited = in->build_stack;
+                struct IRNode* in =
+                    (inputs[i] && inputs[i]->ir_node) ? (struct IRNode*)inputs[i]->ir_node : NULL;
+                if (in && in->build_stack)
+                    inherited = in->build_stack;
             }
             if (inherited) {
                 cml_free(node->build_stack);
@@ -1375,8 +1438,8 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
             input_nodes[i] = (inputs[i] && inputs[i]->ir_node) ? inputs[i]->ir_node : NULL;
 
         int dtype = (num_inputs > 0 && inputs[0]) ? (int)inputs[0]->dtype : 0;
-        node->hash = cml_intern_hash_node_ex((int)type, dtype, input_nodes,
-                                             inputs, hash_count, params, 0);
+        node->hash =
+            cml_intern_hash_node_ex((int)type, dtype, input_nodes, inputs, hash_count, params, 0);
     }
 
     if (ir->intern_table)
@@ -1628,7 +1691,7 @@ void cml_ir_insert_before(CMLGraph_t ir, struct IRNode* new_node, struct IRNode*
 
     if (ir->head == before) {
         new_node->next = before;
-        ir->head = new_node;
+        ir->head       = new_node;
         ir->node_count++;
         return;
     }
@@ -1639,10 +1702,10 @@ void cml_ir_insert_before(CMLGraph_t ir, struct IRNode* new_node, struct IRNode*
 
     if (prev) {
         new_node->next = before;
-        prev->next = new_node;
+        prev->next     = new_node;
     } else {
         ir->tail->next = new_node;
-        ir->tail = new_node;
+        ir->tail       = new_node;
     }
     ir->node_count++;
 }
@@ -1650,12 +1713,12 @@ void cml_ir_insert_before(CMLGraph_t ir, struct IRNode* new_node, struct IRNode*
 /* ── Module scope stack (graph view) ─────────────────────────────────────── */
 
 #define IR_SCOPE_MAX_DEPTH 32
-#define IR_SCOPE_MAX_LEN   256
+#define IR_SCOPE_MAX_LEN 256
 
 static _Thread_local char g_scope_path[IR_SCOPE_MAX_LEN];
-static _Thread_local int  g_scope_ends[IR_SCOPE_MAX_DEPTH]; /* path length after each push */
-static _Thread_local int  g_scope_depth = 0;
-static int g_scope_enabled = -1; /* -1 = not yet probed */
+static _Thread_local int g_scope_ends[IR_SCOPE_MAX_DEPTH]; /* path length after each push */
+static _Thread_local int g_scope_depth = 0;
+static int g_scope_enabled             = -1; /* -1 = not yet probed */
 
 bool cml_ir_scope_enabled(void) {
     if (cml_flag_enabled(CML_FLAG_NO_EXPORT))
@@ -1679,15 +1742,15 @@ bool cml_ir_scope_enabled(void) {
  * identical stacks are interned, so the resolve cost is paid once per distinct
  * call path (tens of them), not once per node.
  */
-#define CML_BT_MAX 40      /* deepest stack kept */
-#define CML_BT_SKIP 2      /* this function + cml_ir_add_uop itself */
+#define CML_BT_MAX 40 /* deepest stack kept */
+#define CML_BT_SKIP 2 /* this function + cml_ir_add_uop itself */
 
 /* Interned stacks: a small table keyed on the raw address vector, so the common
  * case (thousands of nodes from a handful of call paths) costs one memcmp. */
 typedef struct {
-    void*  addrs[CML_BT_MAX];
-    int    n;
-    char*  folded;
+    void* addrs[CML_BT_MAX];
+    int n;
+    char* folded;
 } BtEntry;
 static BtEntry g_bt[64];
 static int g_bt_n = 0;
@@ -1699,14 +1762,15 @@ static int g_bt_n = 0;
  * unresolved frame, which reads like a real function and is not one. An empty
  * name drops the frame instead. */
 static void bt_symbol(const char* raw, char* out, size_t cap) {
-    out[0] = '\0';
+    out[0]           = '\0';
     const char* open = strchr(raw, '(');
     const char* plus = open ? strchr(open, '+') : NULL;
     const char* end  = plus ? plus : (open ? strchr(open, ')') : NULL);
     if (!open || !end || end <= open + 1)
-        return;                     /* "/path/bin() [0x..]" -- no symbol */
+        return; /* "/path/bin() [0x..]" -- no symbol */
     size_t n = (size_t)(end - open - 1);
-    if (n >= cap) n = cap - 1;
+    if (n >= cap)
+        n = cap - 1;
     memcpy(out, open + 1, n);
     out[n] = '\0';
 }
@@ -1715,37 +1779,56 @@ static void bt_symbol(const char* raw, char* out, size_t cap) {
  * about which part of the model is being built. */
 static int bt_is_noise(const char* fn) {
     static const char* skip[] = {
-        "cml_ir_add_uop", "cml_ir_create_node", "ir_node_create",
-        "uop_binary_ex", "uop_unary_noparam", "uop_reduce_ex",
-        "finish_source_node", "attach_movement_op",
+        "cml_ir_add_uop",
+        "cml_ir_create_node",
+        "ir_node_create",
+        "uop_binary_ex",
+        "uop_unary_noparam",
+        "uop_reduce_ex",
+        "finish_source_node",
+        "attach_movement_op",
         /* Process entry: true of every stack, so it distinguishes nothing. */
-        "_start", "__libc_start_main", "__libc_start_call_main", NULL,
+        "_start",
+        "__libc_start_main",
+        "__libc_start_call_main",
+        NULL,
     };
     for (int i = 0; skip[i]; i++)
-        if (strcmp(fn, skip[i]) == 0) return 1;
+        if (strcmp(fn, skip[i]) == 0)
+            return 1;
     return 0;
 }
 
 /* True when a stack is rooted in the compiler rather than in model code. */
 static int cml_stack_is_internal(const char* folded) {
-    if (!folded || !*folded) return 1;
+    if (!folded || !*folded)
+        return 1;
     static const char* passes[] = {
-        "cml_ir_decompose", "cml_ir_fuse_elementwise", "cml_ir_fuse_matmul_epilogue",
-        "cml_ir_optimize", "cml_ir_execute", "cpu_execute_ir", "cml_ir_execute_fusion",
-        "cml_ir_reexecute", "cml_ir_execute_up_to", NULL,
+        "cml_ir_decompose",
+        "cml_ir_fuse_elementwise",
+        "cml_ir_fuse_matmul_epilogue",
+        "cml_ir_optimize",
+        "cml_ir_execute",
+        "cpu_execute_ir",
+        "cml_ir_execute_fusion",
+        "cml_ir_reexecute",
+        "cml_ir_execute_up_to",
+        NULL,
     };
     for (int i = 0; passes[i]; i++)
-        if (strstr(folded, passes[i])) return 1;
+        if (strstr(folded, passes[i]))
+            return 1;
     return 0;
 }
 
 static char* cml_capture_build_stack(void) {
 #ifdef _WIN32
-    return NULL;   /* no execinfo/backtrace on Windows; flame graph omits stacks */
+    return NULL; /* no execinfo/backtrace on Windows; flame graph omits stacks */
 #else
     void* addrs[CML_BT_MAX];
     int n = backtrace(addrs, CML_BT_MAX);
-    if (n <= CML_BT_SKIP) return NULL;
+    if (n <= CML_BT_SKIP)
+        return NULL;
 
     for (int i = 0; i < g_bt_n; i++) {
         if (g_bt[i].n == n && memcmp(g_bt[i].addrs, addrs, (size_t)n * sizeof(void*)) == 0)
@@ -1753,7 +1836,8 @@ static char* cml_capture_build_stack(void) {
     }
 
     char** syms = backtrace_symbols(addrs, n);
-    if (!syms) return NULL;
+    if (!syms)
+        return NULL;
 
     /* backtrace() is innermost-first; a flame graph reads root-first. */
     char buf[2048];
@@ -1761,21 +1845,25 @@ static char* cml_capture_build_stack(void) {
     for (int i = n - 1; i >= CML_BT_SKIP; i--) {
         char fn[192];
         bt_symbol(syms[i], fn, sizeof(fn));
-        if (!fn[0] || bt_is_noise(fn)) continue;
+        if (!fn[0] || bt_is_noise(fn))
+            continue;
         size_t need = strlen(fn) + (len ? 1 : 0);
-        if (len + need >= sizeof(buf)) break;
-        if (len) buf[len++] = ';';
+        if (len + need >= sizeof(buf))
+            break;
+        if (len)
+            buf[len++] = ';';
         memcpy(buf + len, fn, strlen(fn));
         len += strlen(fn);
     }
     buf[len] = '\0';
-    free(syms);   /* backtrace_symbols uses malloc, not the pool allocator */
-    if (!len) return NULL;
+    free(syms); /* backtrace_symbols uses malloc, not the pool allocator */
+    if (!len)
+        return NULL;
 
     if (g_bt_n < (int)(sizeof(g_bt) / sizeof(g_bt[0]))) {
         BtEntry* e = &g_bt[g_bt_n++];
         memcpy(e->addrs, addrs, (size_t)n * sizeof(void*));
-        e->n = n;
+        e->n      = n;
         e->folded = cml_strdup(buf);
     }
     return cml_strdup(buf);
@@ -1803,7 +1891,7 @@ void cml_ir_scope_pop(void) {
     if (!cml_ir_scope_enabled() || g_scope_depth <= 0)
         return;
     g_scope_depth--;
-    int keep = g_scope_depth > 0 ? g_scope_ends[g_scope_depth - 1] : 0;
+    int keep           = g_scope_depth > 0 ? g_scope_ends[g_scope_depth - 1] : 0;
     g_scope_path[keep] = '\0';
 }
 

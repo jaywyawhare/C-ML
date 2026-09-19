@@ -18,9 +18,9 @@
 #define TEST_PORT "29713"
 
 static Tensor* make_filled(float value) {
-    int shape[1] = {N};
-    TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .device = DEVICE_CPU,
-                        .has_dtype = true, .has_device = true};
+    int shape[1]     = {N};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
     Tensor* t = tensor_full(shape, 1, &cfg, value);
     tensor_ensure_executed(t);
     return t;
@@ -34,8 +34,8 @@ static int check_all(Tensor* t, float expected, const char* what, int rank) {
     }
     for (int i = 0; i < N; i++) {
         if (fabsf(d[i] - expected) > 1e-5f) {
-            fprintf(stderr, "[rank %d] %s: elem %d = %f, expected %f\n",
-                    rank, what, i, d[i], expected);
+            fprintf(stderr, "[rank %d] %s: elem %d = %f, expected %f\n", rank, what, i, d[i],
+                    expected);
             return 0;
         }
     }
@@ -61,7 +61,8 @@ static int run_rank(int rank, int world) {
         fprintf(stderr, "[rank %d] allreduce SUM failed\n", rank);
         return 1;
     }
-    if (!check_all(t, 3.0f, "allreduce SUM", rank)) return 1;
+    if (!check_all(t, 3.0f, "allreduce SUM", rank))
+        return 1;
 
     /* allreduce AVG: rank r contributes r -> avg = (0+1)/2 = 0.5 */
     Tensor* a = make_filled((float)rank);
@@ -69,7 +70,8 @@ static int run_rank(int rank, int world) {
         fprintf(stderr, "[rank %d] allreduce AVG failed\n", rank);
         return 1;
     }
-    if (!check_all(a, 0.5f, "allreduce AVG", rank)) return 1;
+    if (!check_all(a, 0.5f, "allreduce AVG", rank))
+        return 1;
 
     /* broadcast from rank 0: only rank 0 starts with 42 */
     Tensor* b = make_filled(rank == 0 ? 42.0f : 0.0f);
@@ -77,7 +79,8 @@ static int run_rank(int rank, int world) {
         fprintf(stderr, "[rank %d] broadcast failed\n", rank);
         return 1;
     }
-    if (!check_all(b, 42.0f, "broadcast", rank)) return 1;
+    if (!check_all(b, 42.0f, "broadcast", rank))
+        return 1;
 
     if (cml_dist_barrier() != 0) {
         fprintf(stderr, "[rank %d] barrier failed\n", rank);

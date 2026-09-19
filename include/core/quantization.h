@@ -14,7 +14,7 @@ extern "C" {
 #endif
 
 typedef struct QuantParams {
-    float scale;       // Scale factor
+    float scale;        // Scale factor
     int32_t zero_point; // Zero point offset
 } QuantParams;
 
@@ -39,8 +39,8 @@ Tensor* cml_quantize_weight_int8(Tensor* weight, bool symmetric);
  * y[M,N] = scale * ( x[M,K] @ w[K,N] - zero_point * rowsum(x) )
  * where w is int8 and x/y are float32.  Returns 0 on success, -1 on bad args.
  */
-int cml_qmatmul_affine_int8(const float* x, const int8_t* w, float scale,
-                            int32_t zero_point, float* y, int M, int K, int N);
+int cml_qmatmul_affine_int8(const float* x, const int8_t* w, float scale, int32_t zero_point,
+                            float* y, int M, int K, int N);
 
 /*
  * Weight-only packed 4-bit quantization for matmul (AUDIT #19 follow-up).
@@ -71,8 +71,8 @@ int cml_qmatmul_affine_int4(const float* x, const uint8_t* w_packed, float scale
  * with f32 activations.  num_scales must equal ceil(K*N / block_size).
  * Returns 0 on success, -1 on bad args.
  */
-int cml_qmatmul_nf4(const float* x, const uint8_t* w_packed, const float* scales,
-                    int num_scales, int block_size, float* y, int M, int K, int N);
+int cml_qmatmul_nf4(const float* x, const uint8_t* w_packed, const float* scales, int num_scales,
+                    int block_size, float* y, int M, int K, int N);
 
 /* NF4 (Normal Float 4-bit) lookup table - 16 values optimal for normal distribution */
 extern const float CML_NF4_TABLE[16];
@@ -81,11 +81,10 @@ extern const float CML_NF4_TABLE[16];
  * Each uint8 stores two NF4 values (high nibble + low nibble).
  * Block size determines granularity of scale factors.
  */
-Tensor* cml_quantize_nf4(Tensor* tensor, int block_size,
-                          float** out_scales, int* out_num_scales);
+Tensor* cml_quantize_nf4(Tensor* tensor, int block_size, float** out_scales, int* out_num_scales);
 
-Tensor* cml_dequantize_nf4(Tensor* nf4_tensor, const float* scales,
-                            int num_scales, int block_size, size_t original_numel);
+Tensor* cml_dequantize_nf4(Tensor* nf4_tensor, const float* scales, int num_scales, int block_size,
+                           size_t original_numel);
 
 /* ---- Quantization-aware training (QAT) primitives ---- */
 /*
@@ -110,11 +109,11 @@ typedef enum {
 
 typedef struct QatObserver {
     CmlQatObserverMode mode;
-    float momentum;      // EMA weight of the new batch (MOVING_AVG mode only)
-    float running_min;   // Calibrated range; invalid before first update
+    float momentum;    // EMA weight of the new batch (MOVING_AVG mode only)
+    float running_min; // Calibrated range; invalid before first update
     float running_max;
-    bool initialized;    // False until the first update()
-    size_t num_updates;  // update() calls since create/reset
+    bool initialized;   // False until the first update()
+    size_t num_updates; // update() calls since create/reset
 } QatObserver;
 
 /* momentum is the EMA weight of each new batch, in (0, 1] (ignored for

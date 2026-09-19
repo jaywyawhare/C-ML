@@ -19,7 +19,7 @@ typedef struct InstanceNorm2d {
 } InstanceNorm2d;
 
 InstanceNorm2d* nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
-                                   DeviceType device);
+                                  DeviceType device);
 
 #ifdef __cplusplus
 }

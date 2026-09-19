@@ -10,18 +10,18 @@
 
 typedef void (*ErrorStackNotifyFn)(int code, const char* message, void* context);
 
-static __thread ErrorEntry* g_error_stack             = NULL;
-static __thread size_t g_error_stack_size             = 0;
-static __thread size_t g_error_stack_capacity         = 0;
-static __thread bool g_error_stack_initialized        = false;
+static __thread ErrorEntry* g_error_stack      = NULL;
+static __thread size_t g_error_stack_size      = 0;
+static __thread size_t g_error_stack_capacity  = 0;
+static __thread bool g_error_stack_initialized = false;
 static __thread char g_error_message_buffer[MAX_ERROR_STACK_SIZE][MAX_ERROR_MESSAGE_LEN];
 static __thread char g_error_file_buffer[MAX_ERROR_STACK_SIZE][256];
 static __thread char g_error_function_buffer[MAX_ERROR_STACK_SIZE][128];
-static __thread size_t g_message_buffer_index         = 0;
+static __thread size_t g_message_buffer_index = 0;
 
-static ErrorStackNotifyFn g_error_notify_fn           = NULL;
-static void* g_error_notify_context                   = NULL;
-static pthread_mutex_t g_notify_lock                  = PTHREAD_MUTEX_INITIALIZER;
+static ErrorStackNotifyFn g_error_notify_fn = NULL;
+static void* g_error_notify_context         = NULL;
+static pthread_mutex_t g_notify_lock        = PTHREAD_MUTEX_INITIALIZER;
 
 static void error_stack_ensure_initialized(void) {
     if (g_error_stack_initialized)
@@ -41,20 +41,27 @@ static void error_stack_ensure_initialized(void) {
 
 void error_stack_set_notify(ErrorStackNotifyFn fn, void* context) {
     pthread_mutex_lock(&g_notify_lock);
-    g_error_notify_fn     = fn;
+    g_error_notify_fn      = fn;
     g_error_notify_context = context;
     pthread_mutex_unlock(&g_notify_lock);
 }
 
 const char* cml_error_string(int code) {
     switch (code) {
-    case CM_SUCCESS:                 return "success";
-    case CM_MEMORY_ALLOCATION_ERROR: return "memory allocation error";
-    case CM_INVALID_ARGUMENT:        return "invalid argument";
-    case CM_OPERATION_FAILED:        return "operation failed";
-    case CM_NOT_IMPLEMENTED:         return "not implemented";
-    case CM_INVALID_STATE:           return "invalid state";
-    default:                         return "unknown error";
+    case CM_SUCCESS:
+        return "success";
+    case CM_MEMORY_ALLOCATION_ERROR:
+        return "memory allocation error";
+    case CM_INVALID_ARGUMENT:
+        return "invalid argument";
+    case CM_OPERATION_FAILED:
+        return "operation failed";
+    case CM_NOT_IMPLEMENTED:
+        return "not implemented";
+    case CM_INVALID_STATE:
+        return "invalid state";
+    default:
+        return "unknown error";
     }
 }
 
@@ -133,8 +140,8 @@ void error_stack_push(int code, const char* message, const char* file, int line,
     g_message_buffer_index++;
 
     pthread_mutex_lock(&g_notify_lock);
-    ErrorStackNotifyFn notify_fn  = g_error_notify_fn;
-    void* notify_ctx              = g_error_notify_context;
+    ErrorStackNotifyFn notify_fn = g_error_notify_fn;
+    void* notify_ctx             = g_error_notify_context;
     pthread_mutex_unlock(&g_notify_lock);
     if (notify_fn && entry->message)
         notify_fn(code, entry->message, notify_ctx);
