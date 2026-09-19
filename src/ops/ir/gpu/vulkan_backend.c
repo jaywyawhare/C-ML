@@ -11,13 +11,14 @@
 #include <stdio.h>
 #include "ops/ir/gpu/vk_shaders.h" /* embedded glslc-compiled SPIR-V: binary / unary / matmul */
 
+#include "core/dynlib.h"
 #ifdef __linux__
-#include <dlfcn.h>
 #define VULKAN_LIB_NAME "libvulkan.so.1"
 #elif defined(__APPLE__)
-#include <dlfcn.h>
 #include "alloc/cml_allocator.h"
 #define VULKAN_LIB_NAME "libvulkan.1.dylib"
+#elif defined(_WIN32)
+#define VULKAN_LIB_NAME "vulkan-1.dll"
 #else
 #define VULKAN_LIB_NAME NULL
 #endif
@@ -332,19 +333,19 @@ typedef struct {
 
 static void* vk_load_library(const char* name) {
     if (!name) return NULL;
-    void* lib = dlopen(name, RTLD_LAZY | RTLD_LOCAL);
+    void* lib = CML_DLOPEN(name, RTLD_LAZY | RTLD_LOCAL);
     if (!lib) {
-        LOG_DEBUG("Failed to load %s: %s", name, dlerror());
+        LOG_DEBUG("Failed to load %s: %s", name, CML_DLERROR());
     }
     return lib;
 }
 
 static void* vk_get_symbol(void* lib, const char* name) {
-    return dlsym(lib, name);
+    return CML_DLSYM(lib, name);
 }
 
 static void vk_unload_library(void* lib) {
-    if (lib) dlclose(lib);
+    if (lib) CML_DLCLOSE(lib);
 }
 
 
