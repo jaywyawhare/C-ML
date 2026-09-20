@@ -857,6 +857,45 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_FLIP: {
+        // flip is its own inverse: the gradient is the upstream grad flipped
+        // back along the same axis. Scatter each output-grad element to the
+        // input position with that axis coordinate reversed.
+        if (in1 && in1->requires_grad && out_grad) {
+            Tensor* g1 = ensure_grad(in1);
+            if (g1 && g1->data) {
+                float* g1_data = (float*)g1->data;
+                FlipParams* fp = (FlipParams*)node->params;
+                int nd         = in1->ndim;
+                int dim        = fp ? fp->dim : 0;
+                if (dim < 0)
+                    dim += nd;
+                if (nd >= 1 && nd <= 16 && dim >= 0 && dim < nd && in1->shape && out->shape) {
+                    size_t in_strides[16];
+                    size_t s = 1;
+                    for (int i = nd - 1; i >= 0; i--) {
+                        in_strides[i] = s;
+                        s *= (size_t)in1->shape[i];
+                    }
+                    int coord[16];
+                    for (size_t o = 0; o < out_numel; o++) {
+                        size_t rem = o;
+                        for (int i = nd - 1; i >= 0; i--) {
+                            coord[i] = (int)(rem % (size_t)out->shape[i]);
+                            rem /= (size_t)out->shape[i];
+                        }
+                        coord[dim]    = in1->shape[dim] - 1 - coord[dim];
+                        size_t in_lin = 0;
+                        for (int i = 0; i < nd; i++)
+                            in_lin += (size_t)coord[i] * in_strides[i];
+                        g1_data[in_lin] += out_grad[o];
+                    }
+                }
+            }
+        }
+        break;
+    }
+
     case UOP_EXPAND:
         // d(expand(a))/da = sum along broadcast dimensions.
         // The output index must be mapped to the input index by broadcast rules
