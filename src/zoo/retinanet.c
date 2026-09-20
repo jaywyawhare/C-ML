@@ -183,23 +183,40 @@ static Tensor* retinanet_forward(Module* module, Tensor* input) {
     if (!c5)
         return NULL;
 
-    /* Top-down pathway. The single-tensor Module interface can only carry one
-     * pyramid level forward, so the classification subnet runs on the finest
-     * level P3; per-level heads would need multi-output support. */
-    Tensor* p5 = module_forward(fpn->lateral5, c5);
-    if (!p5)
+    /* Top-down pathway, smoothing every pyramid level (P3, P4, P5). */
+    Tensor* p5m = module_forward(fpn->lateral5, c5);
+    if (!p5m)
         return NULL;
-    Tensor* p4 = zoo_fpn_topdown_add(fpn->lateral4, c4, p5);
-    if (!p4)
+    Tensor* p4m = zoo_fpn_topdown_add(fpn->lateral4, c4, p5m);
+    if (!p4m)
         return NULL;
-    Tensor* p3 = zoo_fpn_topdown_add(fpn->lateral3, c3, p4);
-    if (!p3)
+    Tensor* p3m = zoo_fpn_topdown_add(fpn->lateral3, c3, p4m);
+    if (!p3m)
         return NULL;
-    p3 = module_forward(fpn->smooth3, p3);
-    if (!p3)
-        return NULL;
+    Tensor* levels[3] = {module_forward(fpn->smooth3, p3m), module_forward(fpn->smooth4, p4m),
+                         module_forward(fpn->smooth5, p5m)};
 
-    return module_forward(net->cls_subnet, p3);
+    /* RetinaNet's classification subnet is shared across levels. Run it on each
+     * pyramid level, flatten the spatial dims to [B, A*num_classes, H*W], and
+     * concatenate across levels so every anchor over the whole pyramid is
+     * scored — not just the finest level P3 as before. */
+    Tensor* flat[3];
+    int ns[3][3];
+    for (int l = 0; l < 3; l++) {
+        if (!levels[l])
+            return NULL;
+        Tensor* cls = module_forward(net->cls_subnet, levels[l]);
+        if (!cls || cls->ndim != 4 || !cls->shape)
+            return NULL;
+        ns[l][0]         = cls->shape[0];
+        ns[l][1]         = cls->shape[1];
+        ns[l][2]         = cls->shape[2] * cls->shape[3];
+        ReshapeParams rp = {ns[l], 3};
+        flat[l]          = uop_reshape(cls, &rp);
+        if (!flat[l])
+            return NULL;
+    }
+    return uop_cat(flat, 3, 2);
 }
 
 static void retinanet_free(Module* module) {
