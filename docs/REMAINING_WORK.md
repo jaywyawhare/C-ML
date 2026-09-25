@@ -309,10 +309,19 @@ its 50 cases while the default run was green.
     Now routed through `tensor_get_float`, which dispatches on dtype. (Same class
     of bug as the ONNX operands in §6 — worth grepping for as a pattern.)
 
-  `SPLIT`, `CHUNK`, `MESHGRID` and `MASKED_SELECT` stay ungradiented in both
-  engines: they are differentiable, but need state a single-output backward walk
-  does not carry (the mask, or one gradient per output). The comment now separates
-  those from `IDIV`/`MOD`, which are genuinely non-differentiable.
+  - `MASKED_SELECT` was in the same group, and did not belong there. It compacts
+    the set positions in order, so its VJP hands element k of the output gradient
+    to the k-th set position -- and the mask is `inputs[1]`, already to hand. The
+    graph engine had this rule all along. Implemented, with a value check that
+    runs in whichever engine `GRAD_MODE` selects.
+
+  `IDIV` and `MOD` remain genuinely non-differentiable. `SPLIT`, `CHUNK` and
+  `MESHGRID` also yield no gradient, but the earlier claim here that they "need
+  multi-output backward infrastructure" was wrong in a more basic way: **no
+  builder anywhere creates those nodes.** They are enum values with no producer
+  (ONNX `Split` imports as slices, not `UOP_SPLIT`), so the backward case guards
+  an op that cannot occur -- not a gradient gap. Their VJPs would only be worth
+  writing alongside an op that actually emits them.
 
 - **Module buffers were dropped by BOTH serialization formats**
   (`src/core/serialization.c`, `src/core/safetensors.c`). Neither walked

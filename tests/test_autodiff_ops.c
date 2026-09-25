@@ -416,6 +416,61 @@ static int test_gather_grad_dtype_and_value(void) {
     return ok;
 }
 
+/* masked_select compacts the set positions in order, so its VJP hands element k
+ * of the output gradient to the k-th set position and leaves the rest at zero.
+ * The graph engine always had this rule; the eager one lumped the op in with the
+ * non-differentiable cases and returned nothing, so the same model trained under
+ * one engine and silently did not under the other. Runs in whichever engine
+ * GRAD_MODE selects, so ctest covers both. */
+static int test_masked_select_grad(void) {
+    cml_reset_ir_context();
+
+    int sh[1]    = {6};
+    Tensor* x    = tensor_zeros(sh, 1, &cfg);
+    Tensor* mask = tensor_zeros(sh, 1, &cfg);
+    if (!x || !mask) {
+        cml_reset_ir_context();
+        return 0;
+    }
+
+    float xv[6] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+    float mv[6] = {0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f}; /* select 1, 2, 5 */
+    memcpy(tensor_data_ptr(x), xv, sizeof xv);
+    memcpy(tensor_data_ptr(mask), mv, sizeof mv);
+    x->requires_grad = true;
+
+    Tensor* sel = uop_masked_select(x, mask);
+    if (!sel) {
+        cml_reset_ir_context();
+        return 0;
+    }
+    ReduceParams rp = {0};
+    Tensor* s       = uop_sum(sel, &rp);
+    if (!s) {
+        cml_reset_ir_context();
+        return 0;
+    }
+    tensor_backward(s, NULL, false, false);
+
+    int ok = x->grad != NULL;
+    if (ok) {
+        tensor_ensure_executed(x->grad);
+        const float* g = (const float*)tensor_data_ptr(x->grad);
+        ok             = g != NULL;
+        /* d(sum of selected)/dx is 1 exactly where the mask is set. */
+        for (int i = 0; i < 6 && ok; i++) {
+            float want = mv[i];
+            if (fabsf(g[i] - want) > 1e-5f) {
+                printf("(grad[%d]=%g want %g) ", i, (double)g[i], (double)want);
+                ok = 0;
+            }
+        }
+    }
+
+    cml_reset_ir_context();
+    return ok;
+}
+
 int main(void) {
     cml_init();
     printf("=== per-op autodiff ===\n");
@@ -474,6 +529,7 @@ int main(void) {
     TEST(reduce_multi_axis);
     TEST(topk_values_and_indices);
     TEST(gather_grad_dtype_and_value);
+    TEST(masked_select_grad);
 
     cml_cleanup();
     return TEST_SUMMARY();

@@ -2525,19 +2525,47 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
+    /* masked_select compacts the elements where the mask is set, in order, so its
+     * VJP walks the same traversal and hands element k of the output gradient
+     * back to the k-th set position. The mask is inputs[1], so no extra state is
+     * needed -- this one was only grouped with the unimplemented ops below
+     * because it looked like it needed the mask saved somewhere. */
+    case UOP_MASKED_SELECT: {
+        Tensor* mask = (node->num_inputs >= 2) ? node->inputs[1] : NULL;
+        if (!in1 || !in1->requires_grad || !mask)
+            break;
+        if (tensor_ensure_executed(mask) != 0 || !tensor_data_ptr(mask))
+            break;
+
+        Tensor* g1 = ensure_grad(in1);
+        if (!g1 || !g1->data)
+            break;
+
+        float* g1d = (float*)g1->data;
+        size_t k   = 0;
+        for (size_t i = 0; i < in1->numel && i < mask->numel; i++) {
+            if (tensor_get_float(mask, i) == 0.0f)
+                continue;
+            if (k >= out_numel)
+                break;
+            g1d[i] += out_grad[k++];
+        }
+        break;
+    }
+
     case UOP_IDIV:
     case UOP_MOD:
-    case UOP_MASKED_SELECT:
     case UOP_SPLIT:
     case UOP_CHUNK:
     case UOP_MESHGRID:
         /* Two different reasons, deliberately grouped because both yield no
          * gradient here:
          *   - IDIV and MOD are genuinely non-differentiable.
-         *   - MASKED_SELECT, SPLIT, CHUNK and MESHGRID *are* differentiable, but
-         *     each needs state this single-output backward walk does not carry:
-         *     the mask, or one gradient per output. The graph engine has no rule
-         *     for them either, so the two engines agree.
+         *   - SPLIT, CHUNK and MESHGRID *are* differentiable, but each produces
+         *     several outputs and this walk carries one output gradient, so
+         *     there is nothing to concatenate from. That needs multi-output
+         *     backward support, not a rule. The graph engine has no rule for
+         *     them either, so the two engines agree.
          * Either way CML_STRICT_GRAD=1 turns the silent zero into a loud error;
          * see the policy note in autodiff.c. */
         break;
