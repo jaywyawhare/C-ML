@@ -491,6 +491,32 @@ fallback:
   node-pointer version was reverted rather than shipped, because a latent
   use-after-free to satisfy a checkbox is worse than an inert feature.
 
+  Two things found while doing this that matter more than the feature:
+
+  **The empty-trace guard is load-bearing on the DEFAULT path.** TinyJit is on
+  unless `TINYJIT=0` (`cml_ir_execute_cpu` dispatches to it), so *every* graph
+  execution goes through `cml_tinyjit_execute`. It is harmless today only because
+  the CPU trace is always empty and it falls through to real execution. Naively
+  "fixing" recording — caching the trace and replaying it — would make every
+  repeated graph return its first run's values: silently wrong training, on the
+  default path, everywhere. `tests/test_tiny_jit.c` now pins that guard.
+
+  **The codebase already knew.** `cml_ir_reexecute()` — the zero-rebuild
+  static-graph step — deliberately calls `cpu_execute_ir` instead of
+  `cml_ir_execute`, and says why: *"whose TinyJit replay would return the values
+  recorded on the first run instead of recomputing from the updated buffers."* So
+  the stale-replay hazard was understood and routed around, not overlooked.
+
+  **Why node pointers can never be the answer**, stated precisely: the trace cache
+  lives in a static `g_tinyjit` that outlives any single graph, and it is keyed on a
+  *structural* hash — matching structurally identical but **distinct** graph
+  instances is the entire point, since that is what makes "build once, replay every
+  step" pay off. Holding `IRNode*` into one graph's nodes is fundamentally
+  incompatible with that: a freed graph's nodes get replayed as soon as a later
+  graph hashes the same. Tying the trace's lifetime to one graph would fix the
+  safety and remove the benefit in the same stroke. Hence: record ops plus buffers
+  with an executor of their own, which is the second replay-shaped engine.
+
   Kept from the attempt, since both are real: a `truncated` flag on `CMLTrace`, and
   `cml_trace_end` no longer marking a truncated trace complete. **That was a live
   bug on the GPU path**, not a hypothetical — a trace that hit
