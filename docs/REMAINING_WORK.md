@@ -471,9 +471,44 @@ fallback:
   targets *compiled* kernels (`cml_kernel_fn_t(args, n, grid, block)`); CPU
   execution has no compiled kernel to record, so faithful recording would mean a
   second, replay-shaped CPU engine. Current behavior re-executes correctly.
-- **HEVC intra-frame decode** (`src/core/hevc.c`) — NAL parsing only; a conformant
-  intra decoder (CABAC, 4×4–32×32 transforms, 35 prediction modes, deblocking,
-  SAO) is decoder-scale work, out of scope for this library's focus.
+- **HEVC intra-frame decode** (`src/core/hevc.c`) — NAL and SPS parsing only.
+  Previously dismissed here as "out of scope", which was the wrong reason. It needs
+  no special hardware, and a verification path does exist on a normal machine:
+
+  ```bash
+  ffmpeg -f lavfi -i testsrc2=size=64x64:rate=1:duration=1 -pix_fmt yuv420p \
+         -frames:v 1 src.yuv -y
+  x265 --input src.yuv --input-res 64x64 --fps 1 --frames 1 --output t.265 \
+       --no-deblock --no-sao --keyint 1 --qp 30        # in-loop filters off
+  ffmpeg -i t.265 -pix_fmt yuv420p ref.yuv -y          # ground truth
+  ```
+
+  What actually blocks it is **reference data, not effort**. A decoder needs the
+  spec's exact integer tables — the DCT-II 4/8/16/32 and DST-VII matrices, ~200
+  CABAC context-init values, `intraPredAngle`, the scan orders — and a single wrong
+  entry produces a decoder that compiles, self-consistently round-trips, and
+  decodes real streams wrongly. That is the exact silent-failure mode the rest of
+  this document is about removing.
+
+  Reconstructing those tables from memory is demonstrably not safe. The 8-, 16- and
+  32-point matrices *can* be derived (`round(64·√2·cos(π·i·(2j+1)/64))` reproduces
+  their spec rows exactly), but the 4-point matrix is a hand-adjusted special case:
+  the formula yields `[84, 35, -35, -84]` where the spec requires
+  `[83, 36, -36, -83]`. One checkable row already disagrees, so the ~200 CABAC
+  values — which have no generating formula and no cheap self-check — cannot be
+  trusted from recall either.
+
+  Nothing local supplies them: no spec document, no libde265 or HM source, and
+  libavcodec ships headers only (the tables live in `.c` files that are not
+  installed). So this is open pending the reference tables, at which point the
+  verification harness above makes it a tractable, testable project. The honest
+  `CM_NOT_IMPLEMENTED` stays until then.
+
+  Fixed along the way, since it blocked any future decoder: `cml_hevc_next_nal()`
+  never emitted the **trailing** NAL — a NAL is delimited by the start code that
+  follows it, so for a whole-file feed the slice (the only NAL a decoder consumes)
+  was permanently unreachable. `cml_hevc_parser_end_of_stream()` is how the caller
+  now says no more bytes are coming.
 - **The CUDA/ROCm *driver* path** — NVRTC compilation, module load and kernel
   launch still need real hardware. The driver mocks (`test_nv_mock`,
   `test_am_mock`, `test_hip_mock`) cover the transport around it — h2d/d2h,
