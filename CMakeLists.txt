@@ -731,13 +731,12 @@ if(BUILD_TESTS)
     # backstop for any plain assert() added later.
     add_compile_options($<$<COMPILE_LANGUAGE:C>:-UNDEBUG>)
     file(GLOB TEST_SOURCES "tests/*.c")
-    # NOT gated yet: re-running the gradient suites under GRAD_MODE=eager would
-    # be the natural way to keep the two autodiff engines honest about each other,
-    # and it is how the eager-only VJP gaps (DIAGONAL, SORT, TOPK, the
-    # zero-gradient ops, GATHER's index dtype) were found. It cannot be a gate
-    # while the eager engine is still nondeterministic -- see the eager-mode entry
-    # in docs/REMAINING_WORK.md. Run it by hand:
-    #   GRAD_MODE=eager ./build/bin/test_autodiff_ops
+    # The gradient suites run twice: once on the default (graph) autodiff engine
+    # and once forced onto the eager one. Only the default was ever exercised, and
+    # that is how the eager-only VJP gaps (DIAGONAL, SORT, TOPK, the
+    # zero-gradient ops, GATHER's index dtype) went unnoticed -- every one of them
+    # was silently wrong under eager while the suite was green.
+    set(CML_EAGER_GRAD_SUITES test_autodiff_ops test_autograd)
 
     # Mock-driver suites need special definitions/libraries; added below.
     list(FILTER TEST_SOURCES EXCLUDE REGEX "tests/test_nv_driver.c$")
@@ -750,6 +749,11 @@ if(BUILD_TESTS)
         target_link_libraries(${test_name} cml_static)
         cml_link_all(${test_name})
         add_test(NAME ${test_name} COMMAND ${test_name})
+        if(${test_name} IN_LIST CML_EAGER_GRAD_SUITES)
+            add_test(NAME ${test_name}_eager COMMAND ${test_name})
+            set_tests_properties(${test_name}_eager PROPERTIES
+                ENVIRONMENT "GRAD_MODE=eager")
+        endif()
     endforeach()
 
     # The mock-driver suites simulate Linux kernel GPU/DSP driver interfaces

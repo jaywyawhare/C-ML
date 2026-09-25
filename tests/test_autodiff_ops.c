@@ -24,13 +24,35 @@ typedef Tensor* (*OpFn)(Tensor*);
 static int g_rows = 1, g_cols = 6;
 static float g_lo = 0.35f, g_hi = 0.95f;
 
+/* The test input, shaped [g_rows, g_cols] or [g_cols] when g_rows == 1.
+ *
+ * This used to be `tensor_zeros({g_rows, g_cols}, g_rows > 1 ? 2 : 1, ...)`,
+ * which in the 1-D case passed ndim=1 against a {1, 6} shape array and so built a
+ * tensor of shape {1} -- ONE element -- while the callers went on to write and
+ * read g_rows*g_cols = 6 of them. Every elementwise case therefore validated
+ * element 0 only, and the five out-of-range comparisons passed because the
+ * numeric derivative of an absent element is 0 and the over-read usually landed
+ * on zeroed heap. Under the eager engine it sometimes landed on dirty heap
+ * instead, which is what made this suite flaky rather than merely weak. */
+static Tensor* make_test_input(const float* xs, int n) {
+    int sh2[2] = {g_rows, g_cols};
+    int sh1[1] = {g_cols};
+    Tensor* x  = (g_rows > 1) ? tensor_zeros(sh2, 2, &cfg) : tensor_zeros(sh1, 1, &cfg);
+    if (!x)
+        return NULL;
+    if ((int)x->numel != n) {
+        printf("(input numel %zu != %d) ", x->numel, n);
+        return NULL;
+    }
+    memcpy(tensor_data_ptr(x), xs, sizeof(float) * (size_t)n);
+    return x;
+}
+
 static float forward_sum(OpFn op, const float* xs, int n) {
     cml_reset_ir_context();
-    int sh[2] = {g_rows, g_cols};
-    Tensor* x = tensor_zeros(sh, g_rows > 1 ? 2 : 1, &cfg);
+    Tensor* x = make_test_input(xs, n);
     if (!x)
         return NAN;
-    memcpy(tensor_data_ptr(x), xs, sizeof(float) * (size_t)n);
     Tensor* y = op(x);
     if (!y) {
         cml_reset_ir_context();
@@ -56,11 +78,11 @@ static int grad_matches(OpFn op) {
         xs[i] = g_lo + (g_hi - g_lo) * (i + 0.5f) / n;
 
     cml_reset_ir_context();
-    int sh[2] = {g_rows, g_cols};
-    Tensor* x = tensor_zeros(sh, g_rows > 1 ? 2 : 1, &cfg);
-    if (!x)
+    Tensor* x = make_test_input(xs, n);
+    if (!x) {
+        cml_reset_ir_context();
         return 0;
-    memcpy(tensor_data_ptr(x), xs, sizeof(float) * (size_t)n);
+    }
     x->requires_grad = true;
 
     Tensor* y = op(x);

@@ -362,39 +362,43 @@ its 50 cases while the default run was green.
   any schedule name other than `"step"`/`"exponential"` — it now raises and points
   at the richer C-backed schedulers in `cml.optim`.
 
-### Open: the eager autodiff engine is nondeterministic
+### The "eager nondeterminism" was a test bug, not an engine bug
 
-Found while fixing the above, and **not** caused by it. Under
-`GRAD_MODE=eager`, `test_autodiff_ops` returns a different score run to run:
+Worth recording because the first diagnosis was wrong. Forcing
+`GRAD_MODE=eager` on `test_autodiff_ops` gave a different score every run
+(37/50, 50/50, 37/50 ...) while graph mode was a stable 50/50, and the failing
+set was always the same 13 composite unary ops at element `i == 2`. ASAN and LSAN
+were clean, which pointed at an uninitialised read somewhere in the eager engine.
 
+It was in the test. `grad_matches`/`forward_sum` built their input with
+
+```c
+int sh[2] = {g_rows, g_cols};
+Tensor* x = tensor_zeros(sh, g_rows > 1 ? 2 : 1, &cfg);
 ```
-graph (default):  50/50  50/50  50/50  50/50  50/50
-eager:            37/50  50/50  50/50  50/50  37/50  37/50 ...
-```
 
-It predates this pass (41/50 and 28/50 alternating before the VJP fixes above —
-those fixes raised the ceiling to 50/50 but did not touch the instability). What
-is known:
+For the elementwise cases `g_rows == 1`, so ndim came out 1 against a `{1, 6}`
+shape array — a tensor of shape `{1}`, **one element** — while the callers then
+wrote and read `g_rows * g_cols == 6`. Consequences:
 
-- The failing set is always the same contiguous block of 13 composite unary ops
-  (`acos`, `atan`, `asinh`, `acosh`, `atanh`, `erf`, `sinh`, `cosh`, `log2`,
-  `log10`, `exp2`, `hard_sigmoid`, `hard_tanh`, `relu6`), always at element
-  `i == 2`.
-- Both halves of the check go wrong together: the finite difference comes back
-  `0.0000` and the analytic gradient is astronomically large and *different every
-  run* — the signature of reading uninitialized heap.
-- Each op is correct in isolation: a standalone eager `atan` gradient matches
-  `1/(1+x²)` exactly, every time. So it is cross-test state, not the rule.
-- **ASAN and LSAN are clean**, which rules out an out-of-bounds or use-after-free
-  and points at an uninitialized-but-owned buffer (MSAN territory).
-- `CACHELEVEL=0` does not change it, so the on-disk kernel cache is not involved.
+- Every `ELEMENTWISE` case validated **element 0 only**. The other five
+  comparisons passed vacuously: the numeric derivative of an element the tensor
+  does not contain is 0, and the over-read of `x->grad` usually landed on zeroed
+  heap, so both sides read 0 and "matched".
+- Under the eager engine the over-read sometimes landed on dirty heap instead,
+  which is what turned a permanently weak suite into a flaky one. The engine was
+  never at fault.
 
-Because of this the gradient suites are **not** gated under `GRAD_MODE=eager` in
-CMakeLists — a flaky gate is worse than none. Reproduce with:
+`make_test_input()` now builds `{g_cols}` for the 1-D case and asserts the
+tensor's numel equals the element count the caller is about to use, so this
+cannot silently come back. Valgrind reported 35 uninitialised-value errors before
+and **0** after; eager is 50/50 across 12 consecutive runs, so the gradient
+suites are now gated under `GRAD_MODE=eager` in CMakeLists as well.
 
-```bash
-for i in $(seq 8); do GRAD_MODE=eager ./build/bin/test_autodiff_ops | tail -1; done
-```
+Two lessons this one is worth keeping for: a passing gradient check can be
+vacuous (compare the tensor's real numel against what the test thinks it has),
+and ASAN silence is not evidence of memory correctness — valgrind found in one
+run what ASAN could not see at all.
 
 ## 9. Deliberately still open (engine-scale or hardware-gated)
 
@@ -425,7 +429,8 @@ fallback:
 cmake -S . -B build && make -C build -j$(nproc) && (cd build && ctest --output-on-failure)
 ```
 
-All 199 ctest suites pass (174 unit suites + 25 example smoke tests), plus
+All 201 ctest suites pass (174 unit suites + 25 example smoke tests + 2
+eager-engine gradient re-runs), plus
 78 Python tests.
 
 The Python bindings are a separate build (CI runs both):
