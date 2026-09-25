@@ -409,7 +409,58 @@ vacuous (compare the tensor's real numel against what the test thinks it has),
 and ASAN silence is not evidence of memory correctness — valgrind found in one
 run what ASAN could not see at all.
 
-## 9. Deliberately still open (engine-scale or hardware-gated)
+## 9. GPU codegen is now numerically validated without a GPU
+
+This was listed for several passes as "codegen exists but numeric validation needs
+NVIDIA/AMD hardware (none in CI)". That framing was wrong: it needed *an
+execution engine*, and the host can be one.
+
+`test_ptx_codegen.c` asserts the emitted PTX **text** contains the instructions it
+should. That catches a missing op but not a wrong one — a kernel that reads the
+wrong register, swaps two operands, or picks the wrong rounding mode emits
+perfectly plausible text. So the codegen's arithmetic was unverified.
+
+`tests/ptx_interp.h` is a ~500-line interpreter for exactly the PTX subset this
+codegen emits, and `tests/test_ptx_numeric.c` runs every generated kernel through
+it and compares against the same reference the CPU path computes: **28 unary and
+12 binary ops, 43 assertions, no GPU.**
+
+Why it is tractable: the emitted elementwise kernels are straight-line scalar f32
+— a thread-index preamble, one predicated `@%pN ret;` bounds guard, computed
+`ld.global.f32`/`st.global.f32`, and arithmetic in between. No loops, no shared
+memory, no real branching. About 30 distinct opcodes.
+
+Deliberate properties:
+
+- **Addresses are synthetic.** A u64 holds `(buffer_index << 40) | byte_offset`,
+  so the pointer arithmetic the kernel does on a param base decodes back to a real
+  host array with no flat address space, and an out-of-range access is a reported
+  error rather than a host segfault.
+- **Unknown instructions fail loudly.** A quiet skip would rebuild exactly the
+  false confidence this replaces, so anything outside the supported subset is an
+  error — a codegen change that starts emitting new instructions makes the suite
+  fail rather than silently stop checking. There is a test asserting this.
+- **The bounds guard is tested for real.** `N = 37` with `BLOCK = 8` means 40
+  threads for 37 elements, and the buffers are declared oversized so a missing or
+  inverted `setp.ge.u32` shows up as a modified tail element — a class of bug that
+  is a memory fault on a real GPU and invisible to text inspection.
+- **Outputs are poisoned before the run** (`-12345.0f`), so a kernel that writes
+  nothing fails instead of passing on leftover zeros.
+
+Verified to be capable of failing, which is the point: injecting a realistic
+defect into the codegen (`UOP_SUB` emitting `add.f32`) turns the suite red with a
+precise diagnosis —
+
+```
+sub    (i=0 a=-1.94595 b=-1.94595 got=-3.89189 want=0)   [FAIL]
+Results: 42/43 passed
+```
+
+— and reverting restores 43/43. The interpreter is test-only and is not part of
+the shipped library. The remaining GPU item is the *driver* path (NVRTC, module
+load, launch), which is a genuinely different claim; see §10.
+
+## 10. Deliberately still open (engine-scale or platform-gated)
 
 These are honest, loudly-failing stubs / fallbacks rather than silent fakes.
 Each is a cross-cutting engine change with real correctness risk, or needs
@@ -423,14 +474,14 @@ fallback:
 - **HEVC intra-frame decode** (`src/core/hevc.c`) — NAL parsing only; a conformant
   intra decoder (CABAC, 4×4–32×32 transforms, 35 prediction modes, deblocking,
   SAO) is decoder-scale work, out of scope for this library's focus.
-- **Real CUDA/NVRTC and ROCm execution** — the codegen exists and its *emitted
-  text* is validated portably (`test_ptx_codegen.c`), but nothing checks the
-  numbers a GPU would produce. The driver mocks (`test_nv_mock`, `test_am_mock`,
-  `test_hip_mock`) validate the *transport* only — h2d/d2h, kernel submission and
-  ordering, with a deliberately fake kernel that performs no arithmetic — so they
-  cannot close this. Doing it without hardware would mean writing a PTX/GCN
-  interpreter, which is decoder-scale work of its own. The CPU fallback covers
-  correctness meanwhile.
+- **The CUDA/ROCm *driver* path** — NVRTC compilation, module load and kernel
+  launch still need real hardware. The driver mocks (`test_nv_mock`,
+  `test_am_mock`, `test_hip_mock`) cover the transport around it — h2d/d2h,
+  submission, ordering — but with a deliberately fake kernel that performs no
+  arithmetic, so they say nothing about what a kernel computes.
+
+  The *numeric* half of this item is now closed, and it did not need hardware
+  after all. See §9.
 - **Non-blocking CI legs** — the macOS matrix leg (`ci.yml`) and the Windows
   wheel build (`wheels.yml`) are `continue-on-error: true`. Promoting either needs
   a green run on that platform first, and this checkout cannot produce one: not
@@ -457,7 +508,7 @@ matching hardware or toolchain can pick them up directly.
 cmake -S . -B build && make -C build -j$(nproc) && (cd build && ctest --output-on-failure)
 ```
 
-All 201 ctest suites pass (174 unit suites + 25 example smoke tests + 2
+All 202 ctest suites pass (175 unit suites + 25 example smoke tests + 2
 eager-engine gradient re-runs), plus
 78 Python tests.
 
