@@ -18,10 +18,24 @@ typedef struct PipelineStage {
 typedef struct {
     int num_micro_batches; /* Number of micro-batches (default: 4) */
     int num_stages;        /* Number of pipeline stages */
-    bool interleaved;      /* NOT YET HONORED: the schedule is always the
-                            * GPipe all-forwards-then-all-backwards order;
-                            * setting this has no effect yet. */
+    /* Honored: selects the execution order (see cml_pipeline_build_schedule).
+     * false => GPipe (all forwards, then all backwards); true => 1F1B, which
+     * runs each stage's backwards as early as dependencies allow so a
+     * micro-batch's cached activations can be released mid-backward. Weight
+     * gradients accumulate over micro-batches, so both orders produce the same
+     * numbers; 1F1B holds fewer activations at once. */
+    bool interleaved;
 } PipelineConfig;
+
+/* One unit of pipeline work: the forward or backward of micro-batch
+ * `micro_batch` on stage `stage`. */
+typedef enum { PIPE_UNIT_FORWARD = 0, PIPE_UNIT_BACKWARD = 1 } PipeUnitKind;
+
+typedef struct {
+    int stage;
+    int micro_batch;
+    PipeUnitKind kind;
+} PipeUnit;
 
 typedef struct CMLPipelineParallel {
     PipelineStage* stages;   /* Array of stages */
@@ -44,8 +58,33 @@ typedef struct CMLPipelineParallel {
 CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
                                          const PipelineConfig* config);
 
+/* Build the execution order for `num_stages` x `num_micro_batches` units.
+ *
+ * Both orders are valid topological orders of the pipeline dependency graph:
+ * F(s,m) after F(s-1,m), B(s,m) after F(s,m) and after B(s+1,m). They differ in
+ * when backwards run:
+ *
+ *   GPipe (interleaved=false): every forward, then every backward. All M
+ *   micro-batches' activations are live at once at every stage.
+ *
+ *   1F1B (interleaved=true): stage s runs (num_stages-1-s) warmup forwards, then
+ *   alternates one forward with one backward, then drains its remaining
+ *   backwards. Each stage holds at most (num_stages-s) micro-batches of
+ *   activations, so peak activation memory is bounded by the depth rather than
+ *   the micro-batch count.
+ *
+ * Returns a malloc'd array of 2*num_stages*num_micro_batches units (free with
+ * cml_free) and writes its length to *out_num_units. NULL on invalid input. */
+PipeUnit* cml_pipeline_build_schedule(int num_stages, int num_micro_batches, bool interleaved,
+                                      int* out_num_units);
+
 Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input);
 
+/* Back-propagates every (stage, micro-batch) unit in the configured schedule
+ * order. Under `interleaved`, a micro-batch's cached stage outputs are released
+ * as soon as its backward reaches stage 0 -- that early release is the point of
+ * 1F1B -- so an interleaved backward consumes the forward's cache and cannot be
+ * run twice against the same forward. */
 int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output);
 
 /* True cross-rank pipeline parallelism: world_size == num_stages and this rank

@@ -14,10 +14,20 @@ typedef struct {
     bool broadcast_buffers;      /* Honored: buffers broadcast from rank 0 at forward */
     bool find_unused_parameters; /* Honored: unused params reserve a zero-filled
                                   * bucket slot so every rank's layout matches */
-    /* Accepted for API familiarity but NOT yet honored: gradients are always
-     * copied into buckets rather than aliased into them. Inert (not silently
-     * wrong) until implemented. */
-    int gradient_as_bucket_view; /* NOT YET HONORED */
+    /* Honored: alias each gradient's storage onto its slot in the flat bucket
+     * instead of copying in and out around the all-reduce. The gradient tensors
+     * stop owning their data (the bucket does), so the pack/unpack memcpys and
+     * the separate per-gradient allocations both go away.
+     *
+     * Implies the reserved bucket layout that find_unused_parameters requests:
+     * every parameter keeps a fixed slot whether or not it has a gradient, since
+     * an alias cannot survive offsets that shift between steps. A gradient that
+     * cannot be aliased (device memory, non-float32) falls back to copying.
+     *
+     * cml_ddp_free() copies every aliased gradient back into its own allocation
+     * before releasing the buckets, so gradients stay valid after the DDP
+     * wrapper is destroyed. */
+    int gradient_as_bucket_view;
 } DDPConfig;
 
 typedef struct CMLDataParallel {
@@ -34,6 +44,11 @@ typedef struct CMLDataParallel {
     Parameter** all_params; /* All parameters */
     int num_params;         /* Number of parameters */
     int* param_to_bucket;   /* Map param index -> bucket index */
+
+    /* gradient_as_bucket_view bookkeeping: whether param i's gradient currently
+     * aliases its bucket slot (NULL when the option is off). Params that could
+     * not be aliased stay false and are copied as usual. */
+    bool* grad_is_view;
 
     bool initialized;
 } CMLDataParallel;

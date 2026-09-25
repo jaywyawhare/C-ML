@@ -171,8 +171,17 @@ CML_API Tensor* torch_contiguous(Tensor* a);
 /* Autograd                                                            */
 /* ------------------------------------------------------------------ */
 
-/* Backward pass. retain_graph and create_graph are accepted for API compatibility
- * but are not yet implemented (graph is always freed after backward). */
+/* Backward pass, forwarded to tensor_backward().
+ *
+ * create_graph is honored under the graph autodiff engine: the backward pass is
+ * emitted as differentiable graph nodes, so the result can be differentiated
+ * again (see tests/test_double_backward.c). Under the eager engine it warns and
+ * is ignored -- eager gradients are plain data with nothing to differentiate.
+ *
+ * retain_graph is inert because retaining is already the behavior: backward does
+ * not free the IR graph, so it can be re-run. Non-leaf gradients are still
+ * released after the pass unless the tensor asked to keep them
+ * (tensor_retain_grad). */
 CML_API void torch_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph);
 CML_API void torch_zero_grad(Tensor* tensor);
 CML_API void torch_no_grad(void);

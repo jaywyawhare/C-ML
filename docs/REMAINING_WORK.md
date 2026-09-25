@@ -64,7 +64,52 @@ cannot support it — gradients are plain data with nothing to differentiate —
 it says so loudly (`autograd.c:319`); that is a fundamental engine property, not a
 gap.
 
-## 5. Deliberately still open (engine-scale or hardware-gated)
+## 5. Closed in this pass
+
+- **`gradient_as_bucket_view`** (`src/distributed/data_parallel.c`) — honored.
+  Each gradient's storage is repointed at its slot in the flat bucket
+  (`ddp_alias_grad_to_slot`), so the pack/unpack memcpys around the all-reduce
+  and the separate per-gradient allocations both go away. The ownership hazard
+  the option carries is handled explicitly rather than avoided:
+  - `tensor_realize()` runs first, which both materialises a lazy gradient and
+    detaches it from the IR graph — a still-attached gradient could be
+    re-executed into a fresh buffer later and silently drop the alias.
+  - The aliased tensor gets `owns_data = false`, so `tensor_free` leaves the
+    bucket's memory alone (no double free).
+  - The option implies the reserved bucket layout that `find_unused_parameters`
+    requests: an alias cannot survive offsets that shift between steps.
+  - `cml_ddp_free()` copies every aliased gradient back into its own allocation
+    before releasing the buckets, so gradients stay valid after the wrapper dies
+    (no use-after-free). It only un-aliases pointers that really fall inside its
+    own buckets, so a gradient replaced since the last sync is left alone.
+  - A gradient that cannot be aliased (device memory, non-float32, size
+    mismatch) falls back to copying, tracked per parameter in `grad_is_view`.
+
+  Contrary to the previous note here, this **is** validatable without MPI: the
+  alias is a storage layout, not a collective, so `world_size == 1` exercises all
+  of it. `tests/test_ddp_bucket_view.c` checks that each gradient's data pointer
+  *is* its bucket slot, that values are bit-identical to the copying path, that
+  re-syncing is stable, and that gradients survive `cml_ddp_free`. Run under
+  `-DENABLE_SANITIZERS=ON` for the double-free half.
+
+- **Pipeline `interleaved` schedule** (`src/distributed/pipeline_parallel.c`) —
+  honored. `cml_pipeline_build_schedule()` emits the execution order as data and
+  both `cml_pipeline_forward` and `cml_pipeline_backward` now run their units in
+  it. GPipe is every forward then every backward; `interleaved` is 1F1B, built by
+  replaying each stage's warmup/steady/drain program and emitting whichever
+  stage's next unit has its dependencies met (backwards preferred, deepest stage
+  first). Under 1F1B a micro-batch's cached activations are released the moment
+  its backward reaches stage 0, which bounds live activations by the pipeline
+  depth instead of the micro-batch count — so an interleaved backward consumes
+  the forward's cache and cannot be re-run against it.
+
+  Weight gradients accumulate over micro-batches, so the order cannot change the
+  sum: `tests/test_pipeline_schedule.c` checks both schedules are valid
+  topological orders across a range of (stages, micro-batches), that 1F1B's peak
+  live-activation count is strictly lower and bounded by the depth, and that
+  training through the two lands on **bitwise identical** gradients.
+
+## 6. Deliberately still open (engine-scale or hardware-gated)
 
 These are honest, loudly-failing stubs / fallbacks rather than silent fakes.
 Each is a cross-cutting engine change with real correctness risk, or needs
@@ -75,16 +120,15 @@ fallback:
   targets *compiled* kernels (`cml_kernel_fn_t(args, n, grid, block)`); CPU
   execution has no compiled kernel to record, so faithful recording would mean a
   second, replay-shaped CPU engine. Current behavior re-executes correctly.
-- **`gradient_as_bucket_view`** (DDP) — aliasing grads into the bucket changes
-  tensor data ownership (double-free risk) and is only exercised with
-  world_size>1 (MPI); not validatable in CI. Grads are copied into buckets.
 - **HEVC intra-frame decode** (`src/core/hevc.c`) — NAL parsing only; a conformant
   intra decoder (CABAC, 4×4–32×32 transforms, 35 prediction modes, deblocking,
   SAO) is decoder-scale work, out of scope for this library's focus.
-- **Pipeline `interleaved` schedule** (`src/distributed/pipeline_parallel.c`) —
-  no numerical effect in the synchronous single-process implementation.
 - **Real CUDA/NVRTC and ROCm execution** — codegen exists but numeric validation
   needs NVIDIA/AMD hardware (none in CI); the CPU fallback covers correctness.
+- **Non-blocking CI legs** — the macOS matrix leg (`ci.yml`) and the Windows
+  wheel build (`wheels.yml`) are `continue-on-error: true`. Promoting either to a
+  hard gate needs a run on that platform to confirm it is actually green first,
+  so it cannot be done from a Linux checkout.
 
 ---
 
@@ -94,4 +138,4 @@ fallback:
 cd build && cmake .. && make -j$(nproc) && ctest --output-on-failure
 ```
 
-All 167 ctest suites pass.
+All 171 ctest suites pass.

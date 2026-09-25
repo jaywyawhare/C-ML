@@ -1,6 +1,8 @@
 #include "distributed/data_parallel.h"
 #include "distributed/distributed.h"
 #include "core/logging.h"
+#include "ops/ir/execution.h"
+#include "tensor/realize.h"
 #include <stdlib.h>
 #include <string.h>
 #include "alloc/cml_allocator.h"
@@ -66,8 +68,11 @@ CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
     ddp->buckets         = cml_calloc(ddp->num_buckets, sizeof(float*));
     ddp->bucket_sizes    = cml_calloc(ddp->num_buckets, sizeof(size_t));
     ddp->param_to_bucket = cml_calloc(ddp->num_params, sizeof(int));
+    if (ddp->config.gradient_as_bucket_view)
+        ddp->grad_is_view = cml_calloc(ddp->num_params, sizeof(bool));
 
-    if (!ddp->buckets || !ddp->bucket_sizes || !ddp->param_to_bucket) {
+    if (!ddp->buckets || !ddp->bucket_sizes || !ddp->param_to_bucket ||
+        (ddp->config.gradient_as_bucket_view && !ddp->grad_is_view)) {
         cml_ddp_free(ddp);
         return NULL;
     }
@@ -192,15 +197,122 @@ Tensor* cml_ddp_shard_input(CMLDataParallel* ddp, Tensor* full_batch) {
     return shard;
 }
 
+/* Repoint `g` at `slot`, which is owned by a gradient bucket, carrying its
+ * current values over. Returns false when the tensor cannot be aliased -- device
+ * memory, a non-float32 dtype, or a size that doesn't match the slot -- and the
+ * caller then falls back to copying.
+ *
+ * tensor_realize() is the first step because it both materialises a lazy
+ * gradient and detaches it from the IR graph: a gradient still wired to a graph
+ * node could be re-executed into a fresh buffer later, silently dropping the
+ * alias. After the swap the tensor no longer owns its data, so tensor_free()
+ * leaves the bucket's memory alone (see the owns_data branch in tensor_free). */
+static bool ddp_alias_grad_to_slot(Tensor* g, float* slot, size_t numel) {
+    if (!g || !slot || g->numel != numel || numel == 0)
+        return false;
+    if (g->dtype != DTYPE_FLOAT32)
+        return false;
+    if (g->buffer_handle)
+        return false; /* backend-owned device buffer */
+    if (g->device != DEVICE_CPU && g->device != DEVICE_AUTO)
+        return false;
+
+    if (tensor_realize(g) != 0 || !g->data)
+        return false;
+    if ((float*)g->data == slot)
+        return true; /* already aliased from a previous step */
+
+    memcpy(slot, g->data, numel * sizeof(float));
+
+    if (g->owns_data) {
+        if (g->storage) {
+            tensor_storage_release(g); /* shared block: drop our hold */
+        } else if (g->from_buffer_cache) {
+            cml_buffer_cache_free(g->data, numel * sizeof(float));
+        } else {
+            cml_free(g->data);
+        }
+    } else if (g->storage) {
+        tensor_storage_release(g);
+    }
+
+    g->data              = slot;
+    g->owns_data         = false; /* the bucket owns this memory now */
+    g->from_buffer_cache = false;
+    g->storage           = NULL;
+    g->storage_offset    = 0;
+    g->is_executed       = true;
+    return true;
+}
+
+static bool ddp_ptr_in_buckets(const CMLDataParallel* ddp, const void* p) {
+    if (!ddp->buckets || !ddp->bucket_sizes)
+        return false;
+    for (int b = 0; b < ddp->num_buckets; b++) {
+        if (!ddp->buckets[b])
+            continue;
+        const float* lo = ddp->buckets[b];
+        const float* hi = lo + ddp->bucket_sizes[b];
+        if ((const float*)p >= lo && (const float*)p < hi)
+            return true;
+    }
+    return false;
+}
+
+/* Give each aliased gradient its own allocation again, copying the current
+ * values out of the bucket. Called before the buckets are released so the
+ * module's gradients stay readable after the DDP wrapper is gone. */
+static void ddp_unbind_views(CMLDataParallel* ddp) {
+    if (!ddp->grad_is_view || !ddp->all_params)
+        return;
+
+    for (int i = 0; i < ddp->num_params; i++) {
+        if (!ddp->grad_is_view[i])
+            continue;
+        ddp->grad_is_view[i] = false;
+
+        Parameter* p = ddp->all_params[i];
+        Tensor* g    = (p && p->tensor) ? p->tensor->grad : NULL;
+        if (!g || !g->data || g->owns_data)
+            continue;
+        /* Only un-alias a gradient that really points into our buckets. A
+         * gradient replaced since the last sync can be a borrowed view of
+         * something else entirely, and handing it owns_data would hand it a
+         * double free. */
+        if (!ddp_ptr_in_buckets(ddp, g->data))
+            continue;
+
+        size_t nbytes = g->numel * sizeof(float);
+        void* owned   = cml_malloc(nbytes);
+        if (!owned) {
+            /* Better a gradient-less parameter than one pointing into freed
+             * bucket memory. */
+            LOG_ERROR("DDP: could not un-alias gradient for param %d", i);
+            g->data        = NULL;
+            g->is_executed = false;
+            continue;
+        }
+        memcpy(owned, g->data, nbytes);
+        g->data      = owned;
+        g->owns_data = true;
+    }
+}
+
 /* Copy bucket `b`'s gradients between the parameter tensors and the flat bucket
  * buffer: `pack` gathers into the bucket, otherwise it scatters back. Gradients
  * may still be lazy (graph autodiff), so each is materialised before its data
- * pointer is touched -- otherwise the sync silently skips it. */
+ * pointer is touched -- otherwise the sync silently skips it.
+ *
+ * Under gradient_as_bucket_view the pack pass instead aliases each gradient onto
+ * its slot, so both passes become no-ops for every gradient that could be
+ * aliased. */
 static size_t ddp_bucket_copy(CMLDataParallel* ddp, int b, bool pack) {
+    bool view = ddp->config.gradient_as_bucket_view != 0 && ddp->grad_is_view != NULL;
     /* find_unused_parameters keeps a zero-filled slot for a gradient-less param
      * so every rank's bucket layout matches; otherwise the all-reduce would sum
-     * mismatched elements. */
-    bool reserve  = ddp->config.find_unused_parameters;
+     * mismatched elements. Aliasing needs that same fixed layout: an offset that
+     * shifts between steps would leave gradients pointing at the wrong slot. */
+    bool reserve  = ddp->config.find_unused_parameters || view;
     size_t offset = 0;
     for (int i = 0; i < ddp->num_params; i++) {
         if (ddp->param_to_bucket[i] != b)
@@ -221,15 +333,25 @@ static size_t ddp_bucket_copy(CMLDataParallel* ddp, int b, bool pack) {
                     memset(ddp->buckets[b] + offset, 0, numel * sizeof(float));
                 offset += numel;
             }
+            if (view)
+                ddp->grad_is_view[i] = false;
             continue;
         }
 
-        float* grad_data = (float*)p->tensor->grad->data;
         if (ddp->buckets[b]) {
-            if (pack)
-                memcpy(ddp->buckets[b] + offset, grad_data, numel * sizeof(float));
-            else
-                memcpy(grad_data, ddp->buckets[b] + offset, numel * sizeof(float));
+            float* slot = ddp->buckets[b] + offset;
+            if (view && pack)
+                ddp->grad_is_view[i] = ddp_alias_grad_to_slot(p->tensor->grad, slot, numel);
+
+            /* An aliased gradient already *is* the slot; only the copy-fallback
+             * params still need moving in either direction. */
+            if (!view || !ddp->grad_is_view[i]) {
+                float* grad_data = (float*)p->tensor->grad->data;
+                if (pack)
+                    memcpy(slot, grad_data, numel * sizeof(float));
+                else
+                    memcpy(grad_data, slot, numel * sizeof(float));
+            }
         }
         offset += numel;
     }
@@ -243,10 +365,13 @@ int cml_ddp_sync_gradients(CMLDataParallel* ddp) {
     }
 
     int world_size = ddp->group->world_size;
-    if (world_size <= 1) {
-        /* No need to sync in single-process mode */
+    bool view      = ddp->config.gradient_as_bucket_view != 0 && ddp->grad_is_view != NULL;
+
+    /* There is nothing to reduce against a single rank, but bucket-view aliasing
+     * is a storage layout rather than a collective: binding it here keeps
+     * single- and multi-process runs on one code path. */
+    if (world_size <= 1 && !view)
         return 0;
-    }
 
     LOG_DEBUG("DDP: syncing gradients across %d processes", world_size);
 
@@ -255,10 +380,12 @@ int cml_ddp_sync_gradients(CMLDataParallel* ddp) {
         if (ddp->bucket_sizes[b] == 0)
             continue;
 
+        /* Gathers into the bucket, or (bucket-view) aliases the gradients onto
+         * it so this pass copies nothing. */
         size_t offset = ddp_bucket_copy(ddp, b, true);
 
         /* All-reduce the bucket */
-        if (ddp->buckets[b] && offset > 0) {
+        if (world_size > 1 && ddp->buckets[b] && offset > 0) {
             /* Create a temporary tensor for the bucket */
             int shape[1]         = {(int)offset};
             Tensor bucket_tensor = {.data      = ddp->buckets[b],
@@ -277,7 +404,10 @@ int cml_ddp_sync_gradients(CMLDataParallel* ddp) {
                 ddp->buckets[b][j] *= scale;
         }
 
-        ddp_bucket_copy(ddp, b, false);
+        /* Scatter the reduced values back. Aliased gradients already read
+         * straight out of the bucket, and at world_size 1 nothing changed. */
+        if (world_size > 1)
+            ddp_bucket_copy(ddp, b, false);
     }
 
     LOG_DEBUG("DDP: gradient sync complete");
@@ -287,6 +417,11 @@ int cml_ddp_sync_gradients(CMLDataParallel* ddp) {
 void cml_ddp_free(CMLDataParallel* ddp) {
     if (!ddp)
         return;
+
+    /* Aliased gradients point into the buckets about to be freed; give them
+     * their own storage back first. */
+    ddp_unbind_views(ddp);
+    cml_free(ddp->grad_is_view);
 
     if (ddp->buckets) {
         for (int b = 0; b < ddp->num_buckets; b++)

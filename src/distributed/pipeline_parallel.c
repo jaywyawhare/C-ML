@@ -2,6 +2,7 @@
 #include "distributed/distributed.h"
 #include "autograd/autograd.h"
 #include "core/logging.h"
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include "alloc/cml_allocator.h"
@@ -66,6 +67,133 @@ CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
     LOG_INFO("Pipeline created: %d stages, %d micro-batches", num_stages,
              pipeline->num_micro_batches);
     return pipeline;
+}
+
+/* 1F1B per-stage program: (P-1-s) warmup forwards, then one forward paired with
+ * one backward, then the remaining backwards. Deeper stages warm up less, so by
+ * the time stage 0 finishes its warmup the last stage is already retiring
+ * backwards -- that is what caps the number of simultaneously live
+ * activations. */
+static void pipe_fill_stage_program(PipeUnit* out, int stage, int P, int M) {
+    int k    = 0;
+    int warm = P - 1 - stage;
+    if (warm > M)
+        warm = M;
+
+    for (int m = 0; m < warm; m++)
+        out[k++] = (PipeUnit){.stage = stage, .micro_batch = m, .kind = PIPE_UNIT_FORWARD};
+    for (int i = 0; i < M - warm; i++) {
+        out[k++] = (PipeUnit){.stage = stage, .micro_batch = warm + i, .kind = PIPE_UNIT_FORWARD};
+        out[k++] = (PipeUnit){.stage = stage, .micro_batch = i, .kind = PIPE_UNIT_BACKWARD};
+    }
+    for (int m = M - warm; m < M; m++)
+        out[k++] = (PipeUnit){.stage = stage, .micro_batch = m, .kind = PIPE_UNIT_BACKWARD};
+}
+
+PipeUnit* cml_pipeline_build_schedule(int num_stages, int num_micro_batches, bool interleaved,
+                                      int* out_num_units) {
+    int P = num_stages, M = num_micro_batches;
+    if (P <= 0 || M <= 0 || !out_num_units)
+        return NULL;
+    if ((long long)2 * P * M > INT_MAX)
+        return NULL;
+
+    int total     = 2 * P * M;
+    PipeUnit* out = cml_malloc((size_t)total * sizeof(PipeUnit));
+    if (!out)
+        return NULL;
+
+    int n = 0;
+    if (!interleaved) {
+        /* GPipe: every forward stage-major, then every backward in reverse
+         * stage order. */
+        for (int s = 0; s < P; s++)
+            for (int m = 0; m < M; m++)
+                out[n++] = (PipeUnit){.stage = s, .micro_batch = m, .kind = PIPE_UNIT_FORWARD};
+        for (int s = P - 1; s >= 0; s--)
+            for (int m = 0; m < M; m++)
+                out[n++] = (PipeUnit){.stage = s, .micro_batch = m, .kind = PIPE_UNIT_BACKWARD};
+        *out_num_units = n;
+        return out;
+    }
+
+    /* Interleave by replaying each stage's 1F1B program, emitting whichever
+     * stage's next unit has its dependencies met. Backwards are preferred
+     * (deepest stage first) so activations retire as early as the dependency
+     * graph allows; forwards fill in otherwise. */
+    PipeUnit* prog = cml_malloc((size_t)P * (size_t)(2 * M) * sizeof(PipeUnit));
+    bool* f_done   = cml_calloc((size_t)P * (size_t)M, sizeof(bool));
+    bool* b_done   = cml_calloc((size_t)P * (size_t)M, sizeof(bool));
+    int* pc        = cml_calloc((size_t)P, sizeof(int));
+    if (!prog || !f_done || !b_done || !pc) {
+        cml_free(prog);
+        cml_free(f_done);
+        cml_free(b_done);
+        cml_free(pc);
+        cml_free(out);
+        return NULL;
+    }
+
+    for (int s = 0; s < P; s++)
+        pipe_fill_stage_program(prog + (size_t)s * (size_t)(2 * M), s, P, M);
+
+#define PIPE_NEXT(s) (prog[(size_t)(s) * (size_t)(2 * M) + (size_t)pc[s]])
+#define PIPE_READY(u)                                                                              \
+    ((u).kind == PIPE_UNIT_FORWARD                                                                 \
+         ? ((u).stage == 0 ||                                                                      \
+            f_done[(size_t)((u).stage - 1) * (size_t)M + (size_t)(u).micro_batch])                 \
+         : (f_done[(size_t)(u).stage * (size_t)M + (size_t)(u).micro_batch] &&                     \
+            ((u).stage == P - 1 ||                                                                 \
+             b_done[(size_t)((u).stage + 1) * (size_t)M + (size_t)(u).micro_batch])))
+
+    while (n < total) {
+        bool progress = false;
+
+        for (int s = P - 1; s >= 0 && !progress; s--) {
+            if (pc[s] >= 2 * M)
+                continue;
+            PipeUnit u = PIPE_NEXT(s);
+            if (u.kind != PIPE_UNIT_BACKWARD || !PIPE_READY(u))
+                continue;
+            b_done[(size_t)s * (size_t)M + (size_t)u.micro_batch] = true;
+            out[n++]                                              = u;
+            pc[s]++;
+            progress = true;
+        }
+        for (int s = 0; s < P && !progress; s++) {
+            if (pc[s] >= 2 * M)
+                continue;
+            PipeUnit u = PIPE_NEXT(s);
+            if (u.kind != PIPE_UNIT_FORWARD || !PIPE_READY(u))
+                continue;
+            f_done[(size_t)s * (size_t)M + (size_t)u.micro_batch] = true;
+            out[n++]                                              = u;
+            pc[s]++;
+            progress = true;
+        }
+
+        /* Bounds the loop: every iteration must retire a unit. */
+        if (!progress) {
+            LOG_ERROR("pipeline: 1F1B schedule stalled at %d/%d units (P=%d, M=%d)", n, total, P,
+                      M);
+            cml_free(prog);
+            cml_free(f_done);
+            cml_free(b_done);
+            cml_free(pc);
+            cml_free(out);
+            return NULL;
+        }
+    }
+
+#undef PIPE_NEXT
+#undef PIPE_READY
+
+    cml_free(prog);
+    cml_free(f_done);
+    cml_free(b_done);
+    cml_free(pc);
+    *out_num_units = n;
+    return out;
 }
 
 static Tensor* slice_batch_dim(Tensor* input, int start, int end) {
@@ -205,40 +333,43 @@ Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input) {
         }
     }
 
-    /* GPipe schedule: process all micro-batches through stage 0, then stage 1, etc. */
-    for (int stage = 0; stage < num_stages; stage++) {
-        Module* mod = pipeline->stages[stage].module;
-
-        for (int mb = 0; mb < num_mb; mb++) {
-            Tensor* mb_input;
-
-            if (stage == 0) {
-                mb_input = input_slices[mb];
-            } else {
-                mb_input = pipeline->micro_batch_outputs[stage - 1][mb];
-            }
-
-            if (!mb_input) {
-                LOG_ERROR("Pipeline forward: NULL input at stage %d, micro-batch %d", stage, mb);
-                for (int j = 0; j < num_mb; j++)
-                    tensor_free(input_slices[j]);
-                cml_free(input_slices);
-                return NULL;
-            }
-
-            Tensor* mb_output = module_forward(mod, mb_input);
-            if (!mb_output) {
-                LOG_ERROR("Pipeline forward: module_forward failed at stage %d, micro-batch %d",
-                          stage, mb);
-                for (int j = 0; j < num_mb; j++)
-                    tensor_free(input_slices[j]);
-                cml_free(input_slices);
-                return NULL;
-            }
-
-            pipeline->micro_batch_outputs[stage][mb] = mb_output;
-        }
+    /* Run the forward units in the configured schedule order (GPipe or 1F1B).
+     * The schedule guarantees F(s-1,mb) precedes F(s,mb), so each unit's input
+     * is already cached by the time it runs. */
+    int num_units = 0;
+    PipeUnit* sched =
+        cml_pipeline_build_schedule(num_stages, num_mb, pipeline->config.interleaved, &num_units);
+    if (!sched) {
+        for (int j = 0; j < num_mb; j++)
+            tensor_free(input_slices[j]);
+        cml_free(input_slices);
+        return NULL;
     }
+
+    for (int u = 0; u < num_units; u++) {
+        if (sched[u].kind != PIPE_UNIT_FORWARD)
+            continue;
+
+        int stage = sched[u].stage;
+        int mb    = sched[u].micro_batch;
+        Tensor* mb_input =
+            (stage == 0) ? input_slices[mb] : pipeline->micro_batch_outputs[stage - 1][mb];
+
+        if (!mb_input) {
+            LOG_ERROR("Pipeline forward: NULL input at stage %d, micro-batch %d", stage, mb);
+            goto fwd_fail;
+        }
+
+        Tensor* mb_output = module_forward(pipeline->stages[stage].module, mb_input);
+        if (!mb_output) {
+            LOG_ERROR("Pipeline forward: module_forward failed at stage %d, micro-batch %d", stage,
+                      mb);
+            goto fwd_fail;
+        }
+
+        pipeline->micro_batch_outputs[stage][mb] = mb_output;
+    }
+    cml_free(sched);
 
     /* Free input slices (not needed after stage 0) */
     for (int mb = 0; mb < num_mb; mb++)
@@ -253,6 +384,13 @@ Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input) {
     }
 
     return final_output;
+
+fwd_fail:
+    cml_free(sched);
+    for (int j = 0; j < num_mb; j++)
+        tensor_free(input_slices[j]);
+    cml_free(input_slices);
+    return NULL;
 }
 
 int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
@@ -291,32 +429,58 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
         }
     }
 
-    /*
-     * GPipe backward: reverse stage order, process each micro-batch.
-     * For each micro-batch at each stage, set the gradient on the cached
-     * output tensor and call tensor_backward to propagate through autograd.
-     */
-    for (int stage = num_stages - 1; stage >= 0; stage--) {
-        for (int mb = 0; mb < num_mb; mb++) {
-            Tensor* mb_output = pipeline->micro_batch_outputs[stage][mb];
-            if (!mb_output) {
-                LOG_ERROR("Pipeline backward: NULL cached output at stage %d, micro-batch %d",
-                          stage, mb);
-                continue;
+    /* Run the backward units in the configured schedule order. Both orders keep
+     * B(s+1,mb) before B(s,mb), so a stage's gradient has always arrived from
+     * downstream before it runs; they differ only in how early each backward is
+     * retired relative to the forwards. */
+    bool interleaved = pipeline->config.interleaved;
+    int num_units    = 0;
+    PipeUnit* sched  = cml_pipeline_build_schedule(num_stages, num_mb, interleaved, &num_units);
+    if (!sched) {
+        for (int mb = 0; mb < num_mb; mb++)
+            tensor_free(grad_slices[mb]);
+        cml_free(grad_slices);
+        return -1;
+    }
+
+    for (int u = 0; u < num_units; u++) {
+        if (sched[u].kind != PIPE_UNIT_BACKWARD)
+            continue;
+
+        int stage         = sched[u].stage;
+        int mb            = sched[u].micro_batch;
+        Tensor* mb_output = pipeline->micro_batch_outputs[stage][mb];
+        if (!mb_output) {
+            LOG_ERROR("Pipeline backward: NULL cached output at stage %d, micro-batch %d", stage,
+                      mb);
+            continue;
+        }
+
+        /* Last stage is seeded with the sliced loss gradient (passed as the
+         * backward seed, which tensor_backward CLONES — so we retain
+         * ownership of the slice and free it below; the previous code raw-
+         * assigned it into mb_output->grad, leaving ownership unmanaged).
+         * Intermediate stages get NULL: their gradient already arrived via
+         * the autograd graph from the downstream stage. */
+        Tensor* seed = (stage == num_stages - 1) ? grad_slices[mb] : NULL;
+        tensor_backward(mb_output, seed, false, false);
+
+        LOG_DEBUG("Pipeline backward: completed stage %d, micro-batch %d", stage, mb);
+
+        /* 1F1B retires a micro-batch the moment its backward reaches stage 0:
+         * every stage is done with it, so its cached activations are released
+         * here instead of being held until the next forward. That early release
+         * is the whole point of the schedule -- it also means an interleaved
+         * backward consumes the forward's cache (documented in the header). */
+        if (interleaved && stage == 0) {
+            for (int s = 0; s < num_stages; s++) {
+                if (pipeline->micro_batch_outputs[s][mb])
+                    tensor_free(pipeline->micro_batch_outputs[s][mb]);
+                pipeline->micro_batch_outputs[s][mb] = NULL;
             }
-
-            /* Last stage is seeded with the sliced loss gradient (passed as the
-             * backward seed, which tensor_backward CLONES — so we retain
-             * ownership of the slice and free it below; the previous code raw-
-             * assigned it into mb_output->grad, leaving ownership unmanaged).
-             * Intermediate stages get NULL: their gradient already arrived via
-             * the autograd graph from the downstream stage. */
-            Tensor* seed = (stage == num_stages - 1) ? grad_slices[mb] : NULL;
-            tensor_backward(mb_output, seed, false, false);
-
-            LOG_DEBUG("Pipeline backward: completed stage %d, micro-batch %d", stage, mb);
         }
     }
+    cml_free(sched);
 
     /* We own the grad slices end-to-end (backward cloned them). */
     for (int mb = 0; mb < num_mb; mb++)
