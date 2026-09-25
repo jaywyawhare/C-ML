@@ -423,12 +423,31 @@ fallback:
 - **HEVC intra-frame decode** (`src/core/hevc.c`) — NAL parsing only; a conformant
   intra decoder (CABAC, 4×4–32×32 transforms, 35 prediction modes, deblocking,
   SAO) is decoder-scale work, out of scope for this library's focus.
-- **Real CUDA/NVRTC and ROCm execution** — codegen exists but numeric validation
-  needs NVIDIA/AMD hardware (none in CI); the CPU fallback covers correctness.
+- **Real CUDA/NVRTC and ROCm execution** — the codegen exists and its *emitted
+  text* is validated portably (`test_ptx_codegen.c`), but nothing checks the
+  numbers a GPU would produce. The driver mocks (`test_nv_mock`, `test_am_mock`,
+  `test_hip_mock`) validate the *transport* only — h2d/d2h, kernel submission and
+  ordering, with a deliberately fake kernel that performs no arithmetic — so they
+  cannot close this. Doing it without hardware would mean writing a PTX/GCN
+  interpreter, which is decoder-scale work of its own. The CPU fallback covers
+  correctness meanwhile.
 - **Non-blocking CI legs** — the macOS matrix leg (`ci.yml`) and the Windows
-  wheel build (`wheels.yml`) are `continue-on-error: true`. Promoting either to a
-  hard gate needs a run on that platform to confirm it is actually green first,
-  so it cannot be done from a Linux checkout.
+  wheel build (`wheels.yml`) are `continue-on-error: true`. Promoting either needs
+  a green run on that platform first, and this checkout cannot produce one: not
+  even a compile check is possible.
+
+Checked rather than assumed, on the machine this work was done on:
+
+| Resource | State |
+| --- | --- |
+| `/dev/nvidia*`, `/dev/kfd` | absent |
+| `libcuda.so[.1]`, `libamdhip64.so`, `libhsa-runtime64.so` | absent |
+| `x86_64-w64-mingw32-gcc`, `i686-w64-mingw32-gcc` | absent |
+| `clang-cl` | present, but `#include <windows.h>` fails — no Windows SDK |
+| osxcross / `o64-clang` | absent |
+
+So each item above is blocked on a resource, not on effort. Anyone with the
+matching hardware or toolchain can pick them up directly.
 
 ---
 
