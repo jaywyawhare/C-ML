@@ -53,6 +53,7 @@ typedef struct {
 
     bool is_recording;
     bool is_complete;
+    bool truncated;      /* hit CML_TRACE_MAX_ENTRIES: describes only part of the graph */
     uint64_t graph_hash; /* hash of the IR graph that produced this trace */
 } CMLTrace;
 

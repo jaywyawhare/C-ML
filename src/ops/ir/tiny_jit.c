@@ -71,12 +71,15 @@ int cml_tinyjit_execute(CMLTinyJit* jit, CMLGraph_t ir) {
                 break;
             }
 
-            /* Only replay a trace that actually captured kernel launches.
-             * Kernel recording is not yet wired into the CPU/JIT execution path,
-             * so traces are currently empty; replaying an empty trace is a no-op
-             * that leaves the output buffers at their first-run (STALE) values.
-             * Requiring num_entries>0 makes replay faithful, and falling through
-             * re-executes for real (correct) until recording is implemented. */
+            /* Only replay a trace that actually captured work. An empty trace
+             * would "replay" as a no-op and leave the outputs at their first-run
+             * values, so num_entries>0 is what keeps replay faithful; a graph that
+             * recorded nothing falls through and re-executes for real.
+             *
+             * The CPU executor records its node order (CML_TRACE_CPU_NODE), so
+             * replay skips the graph walk, DCE, fusion decisions and scheduling and
+             * re-runs just those nodes. A truncated trace is never marked complete,
+             * so it cannot be replayed in part. */
             if (entry->trace && entry->trace->is_complete && entry->trace->num_entries > 0) {
                 void* tensor_ptrs[CML_TRACE_MAX_ENTRIES];
                 int n = cml_ir_output_slots(ir, tensor_ptrs, CML_TRACE_MAX_ENTRIES);
@@ -113,10 +116,10 @@ int cml_tinyjit_execute(CMLTinyJit* jit, CMLGraph_t ir) {
 
     trace->num_slots = cml_ir_output_slots(ir, trace->tensor_slots, CML_TRACE_MAX_ENTRIES);
 
-    /* Don't cache an empty trace (no kernels were recorded): a cached empty
-     * trace would be "replayed" as a no-op on the next same-hash call, returning
+    /* Don't cache an empty or truncated trace: an empty one would "replay" as a
+     * no-op and a truncated one would skip the graph's tail, either way returning
      * stale outputs. Leaving it uncached means the next call re-executes for real. */
-    if (trace->num_entries == 0) {
+    if (trace->num_entries == 0 || !trace->is_complete) {
         cml_trace_free(trace);
         return rc;
     }

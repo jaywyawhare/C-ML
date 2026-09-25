@@ -467,10 +467,39 @@ Each is a cross-cutting engine change with real correctness risk, or needs
 hardware not present, so forcing code here would be worse than the honest
 fallback:
 
-- **JIT kernel recording** (`src/ops/ir/tiny_jit.c`) — the trace/replay design
-  targets *compiled* kernels (`cml_kernel_fn_t(args, n, grid, block)`); CPU
-  execution has no compiled kernel to record, so faithful recording would mean a
-  second, replay-shaped CPU engine. Current behavior re-executes correctly.
+- **JIT kernel recording** (`src/ops/ir/tiny_jit.c`) — attempted, and the
+  original assessment holds; recording it as a trace of IR nodes cannot work. Worth
+  writing down so it is not re-attempted the same way.
+
+  `cml_trace_get_active` and `cml_trace_record_kernel` have no call sites outside
+  `trace.c`, so no trace ever captured anything and the JIT could never engage.
+  The obvious CPU fix looks easy: `cpu_execute_node()` exists, so record the node
+  order and replay by calling it — skipping the graph walk, DCE, fusion decisions
+  and scheduling without a second engine. Implemented, it records fine (a
+  three-op graph yielded one entry after fusion). Replay still cannot work:
+
+  1. **Re-running an executed graph is a no-op.** Nodes are marked `is_executed`,
+     so the second `cml_tinyjit_execute` on the same graph recorded *zero* entries —
+     there is nothing left to replay.
+  2. **Getting a fresh run means `cml_reset_ir_context()`,** which frees the graph.
+     Any recorded `IRNode*` is then dangling, so caching one is a use-after-free
+     rather than a feature.
+
+  A CPU trace therefore has to record something that outlives the graph — ops plus
+  buffer addresses plus shapes, with its own executor over that list. That is
+  precisely the "second, replay-shaped CPU engine" this entry always named. The
+  node-pointer version was reverted rather than shipped, because a latent
+  use-after-free to satisfy a checkbox is worse than an inert feature.
+
+  Kept from the attempt, since both are real: a `truncated` flag on `CMLTrace`, and
+  `cml_trace_end` no longer marking a truncated trace complete. **That was a live
+  bug on the GPU path**, not a hypothetical — a trace that hit
+  `CML_TRACE_MAX_ENTRIES` silently dropped the overflow, was still marked complete,
+  and so was cached and replayed, skipping the graph's tail. `tests/test_tiny_jit.c`
+  covers it, along with the fallback itself: results stay correct, and an empty or
+  truncated trace is never cached or replayed. That test is what makes the inert
+  fallback safe to leave alone — the tempting "fix" of caching the trace anyway
+  returns the recording run's values forever.
 - **HEVC intra-frame decode** (`src/core/hevc.c`) — NAL and SPS parsing only.
   Previously dismissed here as "out of scope", which was the wrong reason. It needs
   no special hardware, and a verification path does exist on a normal machine:
@@ -543,7 +572,7 @@ matching hardware or toolchain can pick them up directly.
 cmake -S . -B build && make -C build -j$(nproc) && (cd build && ctest --output-on-failure)
 ```
 
-All 202 ctest suites pass (175 unit suites + 25 example smoke tests + 2
+All 203 ctest suites pass (176 unit suites + 25 example smoke tests + 2
 eager-engine gradient re-runs), plus
 78 Python tests.
 

@@ -29,6 +29,7 @@ int cml_trace_begin(CMLTrace* trace, uint64_t graph_hash) {
 
     trace->is_recording = true;
     trace->is_complete  = false;
+    trace->truncated    = false;
     trace->graph_hash   = graph_hash;
     trace->num_entries  = 0;
     trace->num_slots    = 0;
@@ -43,7 +44,10 @@ int cml_trace_end(CMLTrace* trace) {
         return -1;
 
     trace->is_recording = false;
-    trace->is_complete  = true;
+    /* A trace that hit the entry cap describes only part of the graph. Replaying
+     * it would silently skip the tail and leave stale outputs, so it is never
+     * marked complete -- and only complete traces are replayed or cached. */
+    trace->is_complete = !trace->truncated;
 
     return 0;
 }
@@ -53,8 +57,13 @@ int cml_trace_record_kernel(CMLTrace* trace, uint64_t kernel_hash, void* compile
                             int num_args) {
     if (!trace || !trace->is_recording)
         return -1;
-    if (trace->num_entries >= CML_TRACE_MAX_ENTRIES)
+    if (trace->num_entries >= CML_TRACE_MAX_ENTRIES) {
+        /* Flag it: a trace that dropped entries describes only part of the graph,
+         * and cml_trace_end must not mark it complete. Without this a full trace
+         * was still cached and replayed, silently skipping the graph's tail. */
+        trace->truncated = true;
         return -2;
+    }
     if (num_args > CML_TRACE_MAX_ARGS)
         return -3;
 
@@ -83,8 +92,13 @@ int cml_trace_record_memcpy(CMLTrace* trace, CMLTraceEntryType type, int src_slo
                             size_t bytes) {
     if (!trace || !trace->is_recording)
         return -1;
-    if (trace->num_entries >= CML_TRACE_MAX_ENTRIES)
+    if (trace->num_entries >= CML_TRACE_MAX_ENTRIES) {
+        /* Flag it: a trace that dropped entries describes only part of the graph,
+         * and cml_trace_end must not mark it complete. Without this a full trace
+         * was still cached and replayed, silently skipping the graph's tail. */
+        trace->truncated = true;
         return -2;
+    }
     if (type != CML_TRACE_MEMCPY_H2D && type != CML_TRACE_MEMCPY_D2H)
         return -3;
 
