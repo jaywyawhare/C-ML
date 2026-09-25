@@ -41,6 +41,15 @@ CMLHEVCParser* cml_hevc_parser_create(void);
 void cml_hevc_parser_free(CMLHEVCParser* parser);
 
 int cml_hevc_parser_feed(CMLHEVCParser* parser, const uint8_t* data, size_t size);
+
+/* Signal that no further bytes will be fed.
+ *
+ * A NAL unit is delimited by the start code that FOLLOWS it, so until the stream
+ * ends the trailing NAL may still be incomplete and cannot be emitted. Call this
+ * after the final cml_hevc_parser_feed() -- otherwise cml_hevc_next_nal() stops
+ * one NAL early and the slice data is never returned. */
+void cml_hevc_parser_end_of_stream(CMLHEVCParser* parser);
+
 CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser);
 void cml_hevc_nal_free(CMLHEVCNalUnit* nal);
 

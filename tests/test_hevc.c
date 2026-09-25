@@ -240,6 +240,86 @@ static int test_nal_free_null(void) {
     return 1;
 }
 
+/* A NAL unit is delimited by the start code that FOLLOWS it, so the trailing NAL
+ * in a buffer could never be emitted -- cml_hevc_next_nal returned NULL as soon as
+ * there was no second start code. For a whole-file feed that silently dropped the
+ * last NAL, which is the slice: the only NAL a decoder actually consumes was
+ * unreachable. cml_hevc_parser_end_of_stream() is how the caller says no more
+ * bytes are coming. */
+static int test_final_nal_needs_end_of_stream(void) {
+    /* Two NALs: VPS (type 32) then an IDR_N_LP (type 20). */
+    const uint8_t stream[] = {
+        0x00, 0x00, 0x00, 0x01, 0x40, 0x01, 0xAA, 0xBB,       /* VPS  */
+        0x00, 0x00, 0x00, 0x01, 0x28, 0x01, 0xCC, 0xDD, 0xEE, /* IDR */
+    };
+
+    /* Without EOS: only the first NAL is available. */
+    CMLHEVCParser* p = cml_hevc_parser_create();
+    if (!p)
+        return 0;
+    if (cml_hevc_parser_feed(p, stream, sizeof(stream)) != 0) {
+        cml_hevc_parser_free(p);
+        return 0;
+    }
+
+    int ok                = 1;
+    CMLHEVCNalUnit* first = cml_hevc_next_nal(p);
+    if (!first || first->type != 32) {
+        printf("(first NAL wrong) ");
+        ok = 0;
+    }
+    if (first)
+        cml_hevc_nal_free(first);
+
+    if (ok && cml_hevc_next_nal(p) != NULL) {
+        printf("(emitted trailing NAL before EOS) ");
+        ok = 0;
+    }
+
+    /* After EOS the trailing NAL appears, payload intact. */
+    cml_hevc_parser_end_of_stream(p);
+    CMLHEVCNalUnit* last = cml_hevc_next_nal(p);
+    if (ok) {
+        if (!last) {
+            printf("(trailing NAL still missing after EOS) ");
+            ok = 0;
+        } else if (last->type != 20) {
+            printf("(trailing type %d, want 20) ", last->type);
+            ok = 0;
+        } else if (last->size != 5) {
+            printf("(trailing size %zu, want 5) ", last->size);
+            ok = 0;
+        }
+    }
+    if (last)
+        cml_hevc_nal_free(last);
+
+    cml_hevc_parser_free(p);
+    return ok;
+}
+
+/* Trailing zero bytes are start-code padding / cabac_zero_words, not payload. */
+static int test_final_nal_strips_trailing_zeros(void) {
+    const uint8_t stream[] = {
+        0x00, 0x00, 0x00, 0x01, 0x28, 0x01, 0x42, 0x00, 0x00, 0x00,
+    };
+
+    CMLHEVCParser* p = cml_hevc_parser_create();
+    if (!p)
+        return 0;
+    cml_hevc_parser_feed(p, stream, sizeof(stream));
+    cml_hevc_parser_end_of_stream(p);
+
+    CMLHEVCNalUnit* nal = cml_hevc_next_nal(p);
+    int ok              = nal != NULL && nal->type == 20 && nal->size == 3;
+    if (!ok && nal)
+        printf("(type %d size %zu, want 20/3) ", nal->type, nal->size);
+    if (nal)
+        cml_hevc_nal_free(nal);
+    cml_hevc_parser_free(p);
+    return ok;
+}
+
 int main(void) {
     printf("HEVC Parser Tests\n");
 
@@ -255,6 +335,8 @@ int main(void) {
     RUN_TEST(test_non_idr_decode_returns_null);
     RUN_TEST(test_multiple_nal_sequence);
     RUN_TEST(test_nal_free_null);
+    RUN_TEST(test_final_nal_needs_end_of_stream);
+    RUN_TEST(test_final_nal_strips_trailing_zeros);
 
     return TEST_SUMMARY();
 }

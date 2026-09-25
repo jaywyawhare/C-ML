@@ -15,6 +15,12 @@ struct CMLHEVCParser {
     size_t ring_len;
     size_t scan_pos;
     int64_t frame_count;
+    /* Set by cml_hevc_parser_end_of_stream(). A NAL is delimited by the *next*
+     * start code, so while more bytes may still arrive the trailing one cannot be
+     * emitted -- it might not be complete yet. Without this flag the last NAL in a
+     * buffer was simply never returned, which for a whole-file feed meant the
+     * slice data (the only NAL you actually decode) was unreachable. */
+    bool eos;
 };
 
 typedef struct {
@@ -145,6 +151,11 @@ int cml_hevc_parser_feed(CMLHEVCParser* parser, const uint8_t* data, size_t size
     return 0;
 }
 
+void cml_hevc_parser_end_of_stream(CMLHEVCParser* parser) {
+    if (parser)
+        parser->eos = true;
+}
+
 CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser) {
     if (!parser || parser->ring_len < 4)
         return NULL;
@@ -158,10 +169,19 @@ CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser) {
     size_t nal_start = first_pos + first_len;
 
     if (!find_start_code(parser->ring, parser->ring_len, nal_start, &second_pos, &second_len)) {
-        return NULL;
+        /* No following start code: this NAL runs to the end of what we have. Only
+         * safe to emit once the caller has said no more bytes are coming. */
+        if (!parser->eos)
+            return NULL;
+        second_pos = parser->ring_len;
+        second_len = 0;
     }
 
     size_t nal_size = second_pos - nal_start;
+    /* Trailing zero bytes belong to the start-code prefix of nothing, or to
+     * cabac_zero_words; they are not part of the NAL payload. */
+    while (nal_size > 0 && parser->ring[nal_start + nal_size - 1] == 0x00)
+        nal_size--;
     if (nal_size < 2) {
         parser->scan_pos = second_pos;
         return NULL;
