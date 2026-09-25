@@ -30,12 +30,8 @@ static const ThunderOpMapping op_table[] = {
     {"torch.sum", UOP_SUM},
     {"torch.max", UOP_MAX_REDUCE},
     {"torch.mean", UOP_MEAN},
-    {"torch.reshape", UOP_RESHAPE},
-    {"torch.permute", UOP_PERMUTE},
     {"torch.where", UOP_WHERE},
     {"torch.pow", UOP_POW},
-    {"torch.conv2d", UOP_CONV2D},
-    {"torch.gather", UOP_GATHER},
     {"torch.sign", UOP_SIGN},
     {"torch.floor", UOP_FLOOR},
     {"torch.ceil", UOP_CEIL},
@@ -48,7 +44,16 @@ static const ThunderOpMapping op_table[] = {
     {"torch.relu6", UOP_RELU6},
     /* torch.gelu and torch.leaky_relu decompose into other uops and have no
      * dedicated UOpType, so they are intentionally absent from this table
-     * (thunder_lookup_op returns "unsupported" for unknown names). */
+     * (thunder_lookup_op returns "unsupported" for unknown names).
+     *
+     * torch.reshape, torch.permute, torch.conv2d and torch.gather are absent for
+     * a different reason: their uops need attributes (target shape, permutation,
+     * stride/padding, gather dim) that a CMLThunderOp carries no field for, and
+     * they are not derivable from the input tensors. They used to sit in this
+     * table, which made thunder_lookup_op resolve them and then fail in the
+     * dispatch switch with a confusing "not implemented" -- a table entry is a
+     * claim the op is dispatchable. Re-add them together with an attribute field
+     * on CMLThunderOp, not before. */
     {"torch.silu", UOP_SILU},
     {"torch.mish", UOP_MISH},
     {"torch.hardswish", UOP_HARDSWISH},
@@ -248,6 +253,45 @@ int cml_thunder_execute(CMLThunderExecutor* exec, CMLThunderOp* ops, int num_ops
             if (op->num_inputs >= 1)
                 result = uop_exp2(inputs[0]);
             break;
+        case UOP_SIGN:
+            if (op->num_inputs >= 1)
+                result = uop_sign(inputs[0]);
+            break;
+        case UOP_FLOOR:
+            if (op->num_inputs >= 1)
+                result = uop_floor(inputs[0]);
+            break;
+        case UOP_CEIL:
+            if (op->num_inputs >= 1)
+                result = uop_ceil(inputs[0]);
+            break;
+        case UOP_ROUND:
+            if (op->num_inputs >= 1)
+                result = uop_round(inputs[0]);
+            break;
+        case UOP_ERF:
+            if (op->num_inputs >= 1)
+                result = uop_erf(inputs[0]);
+            break;
+        case UOP_POW:
+            if (op->num_inputs >= 2)
+                result = uop_pow(inputs[0], inputs[1]);
+            break;
+        case UOP_MAX_REDUCE:
+            /* NULL ReduceParams reduces every axis, matching how SUM and MEAN
+             * are dispatched above. */
+            if (op->num_inputs >= 1)
+                result = uop_max_reduce(inputs[0], NULL);
+            break;
+        case UOP_WHERE: {
+            /* uop_where takes its three operands in a params struct rather than
+             * as positional arguments. */
+            if (op->num_inputs >= 3) {
+                WhereParams wp = {.cond = inputs[0], .a = inputs[1], .b = inputs[2]};
+                result         = uop_where(&wp);
+            }
+            break;
+        }
         default:
             LOG_ERROR("[thunder] Op dispatch not implemented: %s", op->op_name);
             return -1;

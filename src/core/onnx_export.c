@@ -529,6 +529,17 @@ static const char* map_uop(struct IRNode* n) {
     }
 }
 
+/* Rank of node input `i`. Prefers the `input_ndims` snapshot: the `inputs`
+ * Tensor* array can be cleared once the graph is realized, and reading ndim
+ * straight off it then yields 0. Returns 0 when neither is available. */
+static int input_rank(struct IRNode* n, int i) {
+    if (i < 0 || i >= n->num_inputs)
+        return 0;
+    if (n->input_ndims)
+        return n->input_ndims[i];
+    return (n->inputs && n->inputs[i]) ? n->inputs[i]->ndim : 0;
+}
+
 /* Attributes for ops carrying parameters. Returns false on error. */
 static bool build_attrs(ExportCtx* c, struct IRNode* n, AttrList* attrs) {
     switch (n->type) {
@@ -549,13 +560,13 @@ static bool build_attrs(ExportCtx* c, struct IRNode* n, AttrList* attrs) {
                attr_float_attr(attrs, "max", p ? p->max_val : 3.4e38f);
     }
     case UOP_FLATTEN: {
+        /* Only the flatten-to-the-end case reaches here; export_special has
+         * already lowered a partial range to Reshape. `axis` indexes the input's
+         * dims, so it normalizes against the input rank. */
         FlattenParams* p = (FlattenParams*)n->params;
         int axis         = p ? p->start_dim : 1;
-        if (p && p->end_dim != n->output_ndim - 1) {
-            ctx_error(c, "Flatten over partial dim range not supported");
-            return false;
-        }
-        return attr_int(attrs, "axis", norm_axis(axis, n->output_ndim + 1));
+        int in_rank      = input_rank(n, 0);
+        return attr_int(attrs, "axis", norm_axis(axis, in_rank > 0 ? in_rank : n->output_ndim + 1));
     }
     case UOP_CAT: {
         CatParams* p = (CatParams*)n->params;
@@ -651,9 +662,14 @@ static const char* emit_shape_initializer(ExportCtx* c, const int* shape, int nd
     int64_t sv[8];
     for (int i = 0; i < ndim && i < 8; i++)
         sv[i] = shape[i];
+    /* A shape operand is a 1-D int64 tensor holding `ndim` values, so TensorProto
+     * dims is [ndim] -- not the shape values themselves. Passing `sv` here
+     * declared a tensor of prod(sv) int64s while supplying only ndim of them, so
+     * the importer computed the wrong element count and Reshape failed. */
+    int64_t dims[1] = {ndim};
     PBBuf tp;
     pb_init(&tp);
-    bool ok = pb_field_packed_int64(&tp, 1, sv, ndim) && pb_field_varint(&tp, 2, ONNX_INT64) &&
+    bool ok = pb_field_packed_int64(&tp, 1, dims, 1) && pb_field_varint(&tp, 2, ONNX_INT64) &&
               pb_field_str(&tp, 8, name) &&
               pb_field_len(&tp, 9, sv, (size_t)ndim * sizeof(int64_t)) &&
               pb_field_buf(&c->initializers, 5, &tp);
@@ -692,6 +708,35 @@ static int export_special(ExportCtx* c, struct IRNode* n, const char* const* in_
     case UOP_SQUARE: {
         const char* ins[2] = {in_names[0], in_names[0]};
         return emit_node_full(c, "Mul", ins, 2, out_name, NULL) ? 0 : -1;
+    }
+    case UOP_FLATTEN: {
+        /* ONNX Flatten always collapses everything from `axis` to the end, so a
+         * flatten that stops short of the last dim has no single-op equivalent.
+         * The node's output shape is already known, though, so an explicit
+         * Reshape expresses it exactly. The full-tail case falls through to the
+         * generic path, which emits a plain Flatten with an `axis` attribute.
+         *
+         * end_dim indexes the INPUT's dims, so it must be compared against the
+         * input rank. The previous check compared it against the output rank,
+         * which only coincides when exactly two dims are being collapsed. */
+        FlattenParams* p = (FlattenParams*)n->params;
+        if (!p)
+            return 1;
+        int in_rank = input_rank(n, 0);
+        int end     = p->end_dim < 0 ? p->end_dim + in_rank : p->end_dim;
+        if (in_rank > 0 && end == in_rank - 1)
+            return 1; /* flattens to the end: a plain Flatten says it */
+        if (n->output_ndim <= 0 || !n->output_shape) {
+            ctx_error(c, "Flatten missing output shape for Reshape lowering");
+            return -1;
+        }
+        char buf[80];
+        snprintf(buf, sizeof(buf), "%s_shape", out_name);
+        const char* shp = emit_shape_initializer(c, n->output_shape, n->output_ndim, buf);
+        if (!shp)
+            return -1;
+        const char* ins[2] = {in_names[0], shp};
+        return emit_node_full(c, "Reshape", ins, 2, out_name, NULL) ? 0 : -1;
     }
     case UOP_RESHAPE:
     case UOP_EXPAND: {

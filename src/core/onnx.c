@@ -234,6 +234,8 @@ static void parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
     size_t raw_len          = 0;
     float* float_data       = NULL;
     int float_count         = 0;
+    int64_t* i64_data       = NULL;
+    int i64_count           = 0;
 
     PBField f;
     while (pb_read_field(rd, &f)) {
@@ -278,21 +280,24 @@ static void parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
 
         case 7: /* int64_data (packed repeated int64) */
             if (f.wire_type == PB_WIRE_LEN) {
-                /* Integer payloads decode element-wise into the float buffer
-                 * the loader materializes from (matching its float-centric
-                 * tensor_from_data path). */
+                /* Decode into real int64 values, not floats. The tensor is built
+                 * with the declared dtype (INT64 here), so a float payload would
+                 * make the tensor lie about its own representation -- and every
+                 * consumer that reads a shape/axes/indices operand through its
+                 * dtype would then see garbage. The raw_data path below already
+                 * stores genuine int64 bytes; these two must agree. */
                 PBReader sub = pb_reader_sub(&f);
                 int count    = 0;
                 while (pb_reader_has_data(&sub)) {
                     pb_read_varint(&sub);
                     count++;
                 }
-                sub        = pb_reader_sub(&f);
-                float_data = (float*)cml_malloc(sizeof(float) * (size_t)(count > 0 ? count : 1));
-                if (float_data) {
+                sub      = pb_reader_sub(&f);
+                i64_data = (int64_t*)cml_malloc(sizeof(int64_t) * (size_t)(count > 0 ? count : 1));
+                if (i64_data) {
                     for (int i = 0; i < count; i++)
-                        float_data[i] = (float)(int64_t)pb_read_varint(&sub);
-                    float_count = count;
+                        i64_data[i] = (int64_t)pb_read_varint(&sub);
+                    i64_count = count;
                 }
             }
             break;
@@ -318,6 +323,8 @@ static void parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
 
     if (raw_data && raw_len > 0) {
         init->tensor = tensor_from_data(raw_data, dims, ndim, &cfg);
+    } else if (i64_data && i64_count > 0) {
+        init->tensor = tensor_from_data(i64_data, dims, ndim, &cfg);
     } else if (float_data && float_count > 0) {
         init->tensor = tensor_from_data(float_data, dims, ndim, &cfg);
     } else {
@@ -326,6 +333,7 @@ static void parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
     }
 
     cml_free(float_data);
+    cml_free(i64_data);
 }
 
 /*

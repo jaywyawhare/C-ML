@@ -862,6 +862,57 @@ ffi.cdef(
     int cml_dist_barrier(void);
 
 
+    // distributed/data_parallel.h — bucketed DDP
+    typedef struct {
+        size_t bucket_size_bytes;
+        bool broadcast_buffers;
+        bool find_unused_parameters;
+        int gradient_as_bucket_view;
+    } DDPConfig;
+
+    typedef struct CMLDataParallel CMLDataParallel;
+
+    DDPConfig cml_ddp_default_config(void);
+    CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config);
+    Tensor* cml_ddp_forward(CMLDataParallel* ddp, Tensor* input);
+    Tensor* cml_ddp_shard_input(CMLDataParallel* ddp, Tensor* full_batch);
+    int cml_ddp_sync_gradients(CMLDataParallel* ddp);
+    void cml_ddp_free(CMLDataParallel* ddp);
+
+
+    // distributed/pipeline_parallel.h — GPipe / 1F1B pipeline
+    typedef struct PipelineStage {
+        Module* module;
+        int device_id;
+        DeviceType device;
+        int stage_id;
+    } PipelineStage;
+
+    typedef struct {
+        int num_micro_batches;
+        int num_stages;
+        bool interleaved;
+    } PipelineConfig;
+
+    typedef struct CMLPipelineParallel CMLPipelineParallel;
+
+    typedef enum { PIPE_UNIT_FORWARD = 0, PIPE_UNIT_BACKWARD = 1 } PipeUnitKind;
+
+    typedef struct {
+        int stage;
+        int micro_batch;
+        PipeUnitKind kind;
+    } PipeUnit;
+
+    CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
+                                             const PipelineConfig* config);
+    PipeUnit* cml_pipeline_build_schedule(int num_stages, int num_micro_batches, bool interleaved,
+                                          int* out_num_units);
+    Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input);
+    int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output);
+    void cml_pipeline_free(CMLPipelineParallel* pipeline);
+
+
     // torch/torch_c.h — PyTorch-like C API
     typedef struct TorchTensorOptions {
         DType dtype;
@@ -1035,6 +1086,8 @@ ffi.set_source(
     #include "tensor/realize.h"
     #include "torch/torch_c.h"
     #include "distributed/distributed.h"
+    #include "distributed/data_parallel.h"
+    #include "distributed/pipeline_parallel.h"
     #include "core/onnx.h"
     """,
     include_dirs=[_INCLUDE_DIR],

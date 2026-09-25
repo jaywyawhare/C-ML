@@ -64,6 +64,11 @@ int autograd_checkpoint(Tensor* tensor) {
         }
         for (int i = 0; i < checkpoint->num_inputs; i++) {
             checkpoint->saved_inputs[i] = tensor->ir_node->inputs[i];
+            /* Hold a reference: the recompute below dereferences these long after
+             * the forward pass, and an input freed in between would be a
+             * use-after-free. Released in autograd_checkpointing_cleanup. */
+            if (checkpoint->saved_inputs[i])
+                tensor_pin(checkpoint->saved_inputs[i]);
         }
     } else {
         checkpoint->num_inputs   = 0;
@@ -72,6 +77,29 @@ int autograd_checkpoint(Tensor* tensor) {
 
     tensor->ir_node    = NULL;
     tensor->ir_context = NULL;
+
+    /* Release the activation. Checkpointing trades compute for memory, so
+     * keeping the buffer alive here would make the whole mechanism a no-op: the
+     * saved IR linkage above is what autograd_recompute rebuilds the values
+     * from. A backend-owned device buffer is left alone -- freeing it needs the
+     * backend, and the CPU path is what this feature targets. */
+    if (tensor->data && !tensor->buffer_handle) {
+        if (tensor->owns_data) {
+            if (tensor->storage) {
+                tensor_storage_release(tensor);
+            } else if (tensor->from_buffer_cache) {
+                cml_buffer_cache_free(tensor->data, tensor->numel * cml_dtype_size(tensor->dtype));
+            } else {
+                cml_free(tensor->data);
+            }
+        } else if (tensor->storage) {
+            tensor_storage_release(tensor);
+        }
+        tensor->data              = NULL;
+        tensor->owns_data         = false;
+        tensor->from_buffer_cache = false;
+        tensor->is_executed       = false;
+    }
 
     checkpointed_tensors[num_checkpointed] = checkpoint;
     num_checkpointed++;
@@ -277,12 +305,25 @@ Tensor* autograd_recompute(Tensor* tensor) {
 
         if (recomputed) {
             if (tensor->numel == recomputed->numel && tensor->dtype == recomputed->dtype) {
-                void* tensor_data     = tensor_data_ptr(tensor);
                 void* recomputed_data = tensor_data_ptr(recomputed);
-                if (tensor_data && recomputed_data) {
-                    size_t data_size = tensor->numel * cml_dtype_size(tensor->dtype);
-                    memcpy(tensor_data, recomputed_data, data_size);
+                size_t data_size      = tensor->numel * cml_dtype_size(tensor->dtype);
+
+                /* autograd_checkpoint freed this activation, so there is usually
+                 * no buffer to copy into any more -- allocate one. (A tensor
+                 * whose buffer survived, e.g. device memory, is filled in
+                 * place.) */
+                if (!tensor->data && !tensor->buffer_handle && data_size > 0) {
+                    tensor->data = cml_malloc(data_size);
+                    if (tensor->data) {
+                        tensor->owns_data         = true;
+                        tensor->from_buffer_cache = false;
+                        tensor->is_executed       = true;
+                    }
                 }
+
+                void* tensor_data = tensor_data_ptr(tensor);
+                if (tensor_data && recomputed_data)
+                    memcpy(tensor_data, recomputed_data, data_size);
             }
 
             tensor->ir_node    = checkpoint->saved_ir_node;
@@ -336,6 +377,10 @@ void autograd_checkpointing_cleanup(void) {
         for (int i = 0; i < num_checkpointed; i++) {
             if (checkpointed_tensors[i]) {
                 if (checkpointed_tensors[i]->saved_inputs) {
+                    /* Drop the references taken in autograd_checkpoint. */
+                    for (int j = 0; j < checkpointed_tensors[i]->num_inputs; j++)
+                        if (checkpointed_tensors[i]->saved_inputs[j])
+                            tensor_release(checkpointed_tensors[i]->saved_inputs[j]);
                     cml_free(checkpointed_tensors[i]->saved_inputs);
                 }
                 cml_free(checkpointed_tensors[i]);

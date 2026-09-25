@@ -109,7 +109,101 @@ gap.
   live-activation count is strictly lower and bounded by the depth, and that
   training through the two lands on **bitwise identical** gradients.
 
-## 6. Deliberately still open (engine-scale or hardware-gated)
+## 6. Closed in the follow-up pass
+
+Five gaps that were **not** tracked in this document, found by auditing the
+"not implemented"/stub markers rather than the list above.
+
+- **ONNX importer read every integer operand as float32**
+  (`src/core/onnx_ops.c`). ONNX passes shapes, axes, indices, pads and slice
+  bounds as INT64 tensors. Reading those bytes through a `float*` is not a
+  rounding problem: the low four bytes of a small little-endian int64 are a
+  float32 denormal, so `2` came back as `2.8e-45` — zero. `Reshape` therefore
+  computed a target shape of all-zeros, which its "0 means keep the input's dim"
+  rule quietly turned into the *input* shape, and the op failed on a numel
+  mismatch. `Expand`, `Tile`, `Slice`, `Squeeze`, `Unsqueeze`, `Pad`, `CumSum`,
+  `Split`, `ScatterND`, `Resize` and the reduce family all read operands the same
+  way. Added `operand_int`/`operand_int_list`, which dispatch on the tensor's own
+  dtype, and converted every integer-operand site. Any model from a real exporter
+  (PyTorch included) hits this path, so it was not a corner case.
+
+- **Two initializer paths disagreed about their own dtype**
+  (`src/core/onnx.c`). `int64_data` decoded into a *float* buffer while building
+  the tensor with the declared dtype (INT64), so the tensor lied about its
+  representation; `raw_data` stored genuine int64 bytes. Consumers reading by
+  dtype therefore saw garbage from one path and correct values from the other.
+  `int64_data` now decodes to real `int64_t`.
+
+- **`emit_shape_initializer` wrote the wrong `dims`** (`src/core/onnx_export.c`).
+  A shape operand is a 1-D int64 tensor of `ndim` values, but the exporter passed
+  the shape values *as* `dims` — declaring a tensor of `prod(shape)` int64s while
+  supplying only `ndim` of them. Every exported `Reshape`/`Expand` was unloadable.
+  Now emits `dims = [ndim]`. With the two fixes above, `Reshape` round-trips
+  export → import → run for the first time (`test_onnx_export.c`).
+
+- **Partial-range `Flatten` export** (`src/core/onnx_export.c`) — ONNX `Flatten`
+  always runs to the last dim, so a partial range has no single-op equivalent and
+  the exporter failed outright. It now lowers to an explicit `Reshape` using the
+  node's known output shape. The full-tail case still emits the cheaper plain
+  `Flatten`. The old partial/full test was also simply wrong: it compared
+  `end_dim` (an *input* dim index) against the *output* rank, which only coincide
+  when exactly two dims collapse, so valid flatten-to-end nodes were
+  misclassified. Rank now comes from `input_ndims`, the snapshot that survives
+  realization (the `inputs` Tensor* array can be cleared).
+
+- **Thunder executor advertised twelve ops it could not dispatch**
+  (`src/backend/thunder_executor.c`). `op_table` rows resolved by name and then
+  fell through the switch to a confusing "dispatch not implemented". Eight are now
+  implemented — `SIGN FLOOR CEIL ROUND ERF POW`, plus `MAX_REDUCE` (NULL
+  `ReduceParams` reduces every axis, as `SUM`/`MEAN` already did here) and `WHERE`
+  (its operands come from a params struct, not positionally). The remaining four —
+  `RESHAPE PERMUTE CONV2D GATHER` — need attributes (`target shape`,
+  permutation, stride/padding, gather dim) that `CMLThunderOp` has no field for
+  and that are not derivable from the inputs, so they were **removed from the
+  table**: a row is a claim the op is dispatchable, and the clear "Unsupported op"
+  path now fires instead. This follows the convention the file already used for
+  `torch.gelu`/`torch.leaky_relu`. First tests for the executor
+  (`test_thunder_executor.c`), including one that walks every advertised name.
+
+- **Gradient checkpointing reclaimed no memory**
+  (`src/autograd/checkpointing.c`). `autograd_checkpoint` saved the IR linkage and
+  detached the node but never released `tensor->data` — so the feature paid the
+  recompute cost and saved nothing, which is the one thing it exists to do. It now
+  frees the activation (honouring `storage` / buffer-cache ownership, leaving
+  backend-owned device buffers alone), and `autograd_recompute` allocates a fresh
+  buffer before restoring, since there is no longer one to copy into. Saved input
+  pointers are also pinned now and released in cleanup; they were raw `Tensor*`
+  dereferenced long after the forward pass. First tests for the file
+  (`test_checkpointing.c`).
+
+- **Python DDP and pipeline never called the C engine**
+  (`python/cml/distributed.py`). `DistributedDataParallel.__init__` stored
+  `bucket_size_mb` and never called `cml_ddp_create` — no rank-0 broadcast, no
+  bucketing, and neither `find_unused_parameters` nor the `gradient_as_bucket_view`
+  from §5 was reachable; `sync_gradients` hand-rolled an unbucketed per-parameter
+  all-reduce and then discarded the in-place result. `PipelineParallel.__call__`
+  just chained the modules, so `num_micro_batches` was inert and `interleaved`
+  unreachable. Both now wrap the real handles, with `build_pipeline_schedule()`
+  exposing the schedule as data. The cffi `cdef` gained the DDP/pipeline
+  declarations. Also removed the `_setup_distributed_bindings` ctypes scaffolding:
+  `_get_lib()` returns the **cffi** lib, so every `.argtypes` assignment there
+  raised `AttributeError` into a bare `except` — the whole block was a no-op.
+  24 tests in `python/tests/test_distributed_py.py`.
+
+- **`multi_schedule_run` reported success for work it never did**
+  (`src/ops/ir/schedule_multi.c`). `CMLSchedule` has no executor, so device-compute
+  steps cannot run, yet the function returned 0. It now returns -2 when the
+  schedule contains compute steps, with the contract documented on the header.
+  The partitioning and cost figures (`multi_schedule_build`,
+  `xfer_bytes`, `total_kernels`) are computed for real and now have tests
+  (`test_schedule_multi.c`); the API previously had none and no callers.
+
+Note on test counts: a hardware-gated skip is reported as a pass, so the suite
+total overstates coverage on a machine without a GPU — `test_gpu_codegen` prints
+8/8 with every case skipped. `test_opencl_ir` does run for real where an OpenCL
+device is present.
+
+## 7. Deliberately still open (engine-scale or hardware-gated)
 
 These are honest, loudly-failing stubs / fallbacks rather than silent fakes.
 Each is a cross-cutting engine change with real correctness risk, or needs
@@ -135,7 +229,16 @@ fallback:
 ## Build & Test
 
 ```bash
-cd build && cmake .. && make -j$(nproc) && ctest --output-on-failure
+cmake -S . -B build && make -C build -j$(nproc) && (cd build && ctest --output-on-failure)
 ```
 
-All 171 ctest suites pass.
+All 174 ctest suites pass.
+
+The Python bindings are a separate build (CI runs both):
+
+```bash
+cd python && python cml/build_cffi.py && python -m pytest tests/ -q
+```
+
+Changing the cffi `cdef` in `python/cml/_cml_cffi.py` requires re-running
+`build_cffi.py` — the extension is compiled, not interpreted.

@@ -152,6 +152,7 @@ void multi_schedule_free(MultiDeviceSchedule* ms) {
 int multi_schedule_run(MultiDeviceSchedule* ms) {
     if (!ms)
         return -1;
+    int compute_steps = 0;
     for (int s = 0; s < ms->num_steps; ++s) {
         if (ms->steps[s].kind == MULTI_STEP_XFER) {
             CrossDeviceOp* xfer = &ms->xfer_ops[ms->steps[s].device_or_xfer_idx];
@@ -175,14 +176,21 @@ int multi_schedule_run(MultiDeviceSchedule* ms) {
             continue;
         } else {
             /* Device-compute steps require a schedule executor, which does not
-             * exist yet (CMLSchedule is an analysis/cost structure, not
-             * runnable). Left intentionally un-run rather than faking success
-             * per kernel. */
+             * exist (CMLSchedule is an analysis/cost structure, not runnable).
+             * Validate the step, then report that the schedule could not be run
+             * -- returning 0 here would claim these kernels executed. */
             int dev = ms->steps[s].device_or_xfer_idx;
             if (dev < 0 || dev >= ms->num_devices)
                 return -1;
             (void)ms->device_schedules;
+            compute_steps++;
         }
+    }
+
+    if (compute_steps > 0) {
+        LOG_DEBUG("[multi] %d device-compute step(s) not executed: no schedule executor",
+                  compute_steps);
+        return -2;
     }
     return 0;
 }

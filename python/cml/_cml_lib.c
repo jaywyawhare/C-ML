@@ -576,48 +576,50 @@ static void (*_cffi_call_python_org)(struct _cffi_externpy_s *, char *);
     #include "tensor/realize.h"
     #include "torch/torch_c.h"
     #include "distributed/distributed.h"
+    #include "distributed/data_parallel.h"
+    #include "distributed/pipeline_parallel.h"
     #include "core/onnx.h"
     
 
 /************************************************************/
 
 static void *_cffi_types[] = {
-/*  0 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1069), // AdaptiveAvgPool1d *()(int)
+/*  0 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1107), // AdaptiveAvgPool1d *()(int)
 /*  1 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7), // int
 /*  2 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  3 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1071), // AdaptiveAvgPool2d *()(int, int)
+/*  3 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1109), // AdaptiveAvgPool2d *()(int, int)
 /*  4 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /*  5 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /*  6 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/*  7 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1073), // AdaptiveMaxPool1d *()(int)
+/*  7 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1111), // AdaptiveMaxPool1d *()(int)
 /*  8 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /*  9 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 10 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1075), // AdaptiveMaxPool2d *()(int, int)
+/* 10 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1113), // AdaptiveMaxPool2d *()(int, int)
 /* 11 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 12 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 13 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 14 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1077), // AvgPool1d *()(int, int, int, _Bool, _Bool)
+/* 14 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1115), // AvgPool1d *()(int, int, int, _Bool, _Bool)
 /* 15 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 16 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 17 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 18 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1), // _Bool
 /* 19 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 20 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 21 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1079), // AvgPool2d *()(int, int, int, _Bool, _Bool)
+/* 21 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1117), // AvgPool2d *()(int, int, int, _Bool, _Bool)
 /* 22 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 23 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 24 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 25 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 26 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 27 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 28 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1081), // AvgPool3d *()(int, int, int, _Bool, _Bool)
+/* 28 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1119), // AvgPool3d *()(int, int, int, _Bool, _Bool)
 /* 29 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 30 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 31 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 32 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 33 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 34 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 35 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1083), // BatchNorm1d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
+/* 35 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1121), // BatchNorm1d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
 /* 36 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 37 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13), // float
 /* 38 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
@@ -626,7 +628,7 @@ static void *_cffi_types[] = {
 /* 41 */ _CFFI_OP(_CFFI_OP_ENUM, 0), // DType
 /* 42 */ _CFFI_OP(_CFFI_OP_ENUM, 1), // DeviceType
 /* 43 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 44 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1085), // BatchNorm2d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
+/* 44 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1123), // BatchNorm2d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
 /* 45 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 46 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 47 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
@@ -635,7 +637,7 @@ static void *_cffi_types[] = {
 /* 50 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 51 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 52 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 53 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1087), // BatchNorm3d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
+/* 53 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1125), // BatchNorm3d *()(int, float, float, _Bool, _Bool, DType, DeviceType)
 /* 54 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 55 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 56 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
@@ -644,1143 +646,1201 @@ static void *_cffi_types[] = {
 /* 59 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 60 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 61 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 62 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1090), // Conv1d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
-/* 63 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 64 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 65 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 66 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 67 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 62 */ _CFFI_OP(_CFFI_OP_FUNCTION, 465), // CMLDataParallel *()(Module *, DDPConfig const *)
+/* 63 */ _CFFI_OP(_CFFI_OP_POINTER, 1181), // Module *
+/* 64 */ _CFFI_OP(_CFFI_OP_POINTER, 1142), // DDPConfig const *
+/* 65 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 66 */ _CFFI_OP(_CFFI_OP_FUNCTION, 469), // CMLPipelineParallel *()(PipelineStage *, int, PipelineConfig const *)
+/* 67 */ _CFFI_OP(_CFFI_OP_POINTER, 1195), // PipelineStage *
 /* 68 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 69 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 70 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 71 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 72 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 73 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1092), // Conv2d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 69 */ _CFFI_OP(_CFFI_OP_POINTER, 1194), // PipelineConfig const *
+/* 70 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 71 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1130), // Conv1d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 72 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 73 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 74 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 75 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 76 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 77 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 78 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 79 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 80 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 81 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 82 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 83 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 84 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1094), // Conv3d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 78 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 79 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 80 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 81 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 82 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1132), // Conv2d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 83 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 84 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 85 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 86 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 87 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 88 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 89 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 90 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 91 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 92 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 93 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 94 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 95 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1096), // ConvTranspose1d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 89 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 90 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 91 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 92 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 93 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1134), // Conv3d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 94 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 95 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 96 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 97 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 98 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 99 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 100 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 101 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 102 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 103 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 104 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 105 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 106 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1098), // ConvTranspose2d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 100 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 101 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 102 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 103 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 104 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1136), // ConvTranspose1d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 105 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 106 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 107 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 108 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 109 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 110 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 111 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 112 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 113 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 114 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 115 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 116 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 117 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1100), // ConvTranspose3d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 111 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 112 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 113 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 114 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 115 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1138), // ConvTranspose2d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 116 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 117 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 118 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 119 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 120 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 121 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 122 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 123 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 124 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 125 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 126 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 127 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 128 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // DType()(Tensor const *)
-/* 129 */ _CFFI_OP(_CFFI_OP_POINTER, 1171), // Tensor const *
-/* 130 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 131 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // DType()(void)
-/* 132 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 133 */ _CFFI_OP(_CFFI_OP_FUNCTION, 836), // Dataset *()(char const *)
-/* 134 */ _CFFI_OP(_CFFI_OP_POINTER, 1188), // char const *
-/* 135 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 136 */ _CFFI_OP(_CFFI_OP_FUNCTION, 42), // DeviceType()(Tensor const *)
-/* 137 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
+/* 122 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 123 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 124 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 125 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 126 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1140), // ConvTranspose3d *()(int, int, int, int, int, int, _Bool, DType, DeviceType)
+/* 127 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 128 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 129 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 130 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 131 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 132 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 133 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 134 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 135 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 136 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 137 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1142), // DDPConfig()(void)
 /* 138 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 139 */ _CFFI_OP(_CFFI_OP_FUNCTION, 42), // DeviceType()(void)
-/* 140 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 141 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1103), // Dropout *()(float, _Bool)
-/* 142 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 143 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 144 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 145 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1105), // Embedding *()(int, int, int, DType, DeviceType)
-/* 146 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 147 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 148 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 149 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 150 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 139 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // DType()(Tensor const *)
+/* 140 */ _CFFI_OP(_CFFI_OP_POINTER, 1217), // Tensor const *
+/* 141 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 142 */ _CFFI_OP(_CFFI_OP_FUNCTION, 41), // DType()(void)
+/* 143 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 144 */ _CFFI_OP(_CFFI_OP_FUNCTION, 868), // Dataset *()(char const *)
+/* 145 */ _CFFI_OP(_CFFI_OP_POINTER, 1234), // char const *
+/* 146 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 147 */ _CFFI_OP(_CFFI_OP_FUNCTION, 42), // DeviceType()(Tensor const *)
+/* 148 */ _CFFI_OP(_CFFI_OP_NOOP, 140),
+/* 149 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 150 */ _CFFI_OP(_CFFI_OP_FUNCTION, 42), // DeviceType()(void)
 /* 151 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 152 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1107), // Flatten *()(int, int)
-/* 153 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 154 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 152 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1144), // Dropout *()(float, _Bool)
+/* 153 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 154 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 155 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 156 */ _CFFI_OP(_CFFI_OP_FUNCTION, 448), // GGUFContext *()(char const *)
-/* 157 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 158 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 159 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1110), // GRU *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
-/* 160 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 161 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 162 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 163 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 164 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 165 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 166 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 167 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 168 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 156 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1146), // Embedding *()(int, int, int, DType, DeviceType)
+/* 157 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 158 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 159 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 160 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 161 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 162 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 163 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1148), // Flatten *()(int, int)
+/* 164 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 165 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 166 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 167 */ _CFFI_OP(_CFFI_OP_FUNCTION, 473), // GGUFContext *()(char const *)
+/* 168 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
 /* 169 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 170 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1112), // GRUCell *()(int, int, _Bool, DType, DeviceType)
+/* 170 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1151), // GRU *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
 /* 171 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 172 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 173 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 174 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 175 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 176 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 177 */ _CFFI_OP(_CFFI_OP_FUNCTION, 452), // GradScaler *()(float, float, float, int)
-/* 178 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 179 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 180 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 181 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 182 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 183 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1115), // GroupNorm *()(int, int, float, _Bool, DType, DeviceType)
-/* 184 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 185 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 186 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 187 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 188 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 189 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 190 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 191 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1117), // Identity *()(void)
-/* 192 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 193 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1119), // InstanceNorm2d *()(int, float, _Bool, DType, DeviceType)
-/* 194 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 195 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 196 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 197 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 198 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 199 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 200 */ _CFFI_OP(_CFFI_OP_FUNCTION, 201), // LRScheduler *()(LRScheduler *, int, float)
-/* 201 */ _CFFI_OP(_CFFI_OP_POINTER, 1121), // LRScheduler *
-/* 202 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 203 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 204 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 205 */ _CFFI_OP(_CFFI_OP_FUNCTION, 201), // LRScheduler *()(Optimizer *, float)
-/* 206 */ _CFFI_OP(_CFFI_OP_POINTER, 1145), // Optimizer *
-/* 207 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 208 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 209 */ _CFFI_OP(_CFFI_OP_FUNCTION, 201), // LRScheduler *()(Optimizer *, float, int, float)
-/* 210 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 211 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 212 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 213 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 214 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 215 */ _CFFI_OP(_CFFI_OP_FUNCTION, 201), // LRScheduler *()(Optimizer *, float, int, float, float, float)
-/* 216 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 217 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 218 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 219 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 220 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 221 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 222 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 223 */ _CFFI_OP(_CFFI_OP_FUNCTION, 201), // LRScheduler *()(Optimizer *, int *, int, float)
-/* 224 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 225 */ _CFFI_OP(_CFFI_OP_POINTER, 1), // int *
-/* 226 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 227 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 228 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 229 */ _CFFI_OP(_CFFI_OP_FUNCTION, 201), // LRScheduler *()(Optimizer *, int, float)
-/* 230 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 231 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 173 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 174 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 175 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 176 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 177 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 178 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 179 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 180 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 181 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1153), // GRUCell *()(int, int, _Bool, DType, DeviceType)
+/* 182 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 183 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 184 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 185 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 186 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 187 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 188 */ _CFFI_OP(_CFFI_OP_FUNCTION, 477), // GradScaler *()(float, float, float, int)
+/* 189 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 190 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 191 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 192 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 193 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 194 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1156), // GroupNorm *()(int, int, float, _Bool, DType, DeviceType)
+/* 195 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 196 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 197 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 198 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 199 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 200 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 201 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 202 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1158), // Identity *()(void)
+/* 203 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 204 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1160), // InstanceNorm2d *()(int, float, _Bool, DType, DeviceType)
+/* 205 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 206 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 207 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 208 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 209 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 210 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 211 */ _CFFI_OP(_CFFI_OP_FUNCTION, 212), // LRScheduler *()(LRScheduler *, int, float)
+/* 212 */ _CFFI_OP(_CFFI_OP_POINTER, 1162), // LRScheduler *
+/* 213 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 214 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 215 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 216 */ _CFFI_OP(_CFFI_OP_FUNCTION, 212), // LRScheduler *()(Optimizer *, float)
+/* 217 */ _CFFI_OP(_CFFI_OP_POINTER, 1186), // Optimizer *
+/* 218 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 219 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 220 */ _CFFI_OP(_CFFI_OP_FUNCTION, 212), // LRScheduler *()(Optimizer *, float, int, float)
+/* 221 */ _CFFI_OP(_CFFI_OP_NOOP, 217),
+/* 222 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 223 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 224 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 225 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 226 */ _CFFI_OP(_CFFI_OP_FUNCTION, 212), // LRScheduler *()(Optimizer *, float, int, float, float, float)
+/* 227 */ _CFFI_OP(_CFFI_OP_NOOP, 217),
+/* 228 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 229 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 230 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 231 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 232 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 233 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 234 */ _CFFI_OP(_CFFI_OP_FUNCTION, 201), // LRScheduler *()(Optimizer *, int, float, float)
-/* 235 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 236 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 237 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 234 */ _CFFI_OP(_CFFI_OP_FUNCTION, 212), // LRScheduler *()(Optimizer *, int *, int, float)
+/* 235 */ _CFFI_OP(_CFFI_OP_NOOP, 217),
+/* 236 */ _CFFI_OP(_CFFI_OP_POINTER, 1), // int *
+/* 237 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 238 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 239 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 240 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1122), // LSTM *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
-/* 241 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 240 */ _CFFI_OP(_CFFI_OP_FUNCTION, 212), // LRScheduler *()(Optimizer *, int, float)
+/* 241 */ _CFFI_OP(_CFFI_OP_NOOP, 217),
 /* 242 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 243 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 244 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 245 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 246 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 247 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 248 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 249 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 243 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 244 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 245 */ _CFFI_OP(_CFFI_OP_FUNCTION, 212), // LRScheduler *()(Optimizer *, int, float, float)
+/* 246 */ _CFFI_OP(_CFFI_OP_NOOP, 217),
+/* 247 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 248 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 249 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 250 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 251 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1124), // LSTMCell *()(int, int, _Bool, DType, DeviceType)
+/* 251 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1163), // LSTM *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
 /* 252 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 253 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 254 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 255 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 256 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 257 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 258 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1126), // LayerNorm *()(int, float, _Bool, DType, DeviceType)
-/* 259 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 260 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 261 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 262 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 263 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 264 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 265 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1127), // LayerNorm2d *()(int, float, _Bool, DType, DeviceType)
-/* 266 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 267 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 268 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 269 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 270 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 271 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 272 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1130), // LeakyReLU *()(float, _Bool)
-/* 273 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 274 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 254 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 255 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 256 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 257 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 258 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 259 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 260 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 261 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 262 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1165), // LSTMCell *()(int, int, _Bool, DType, DeviceType)
+/* 263 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 264 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 265 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 266 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 267 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 268 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 269 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1167), // LayerNorm *()(int, float, _Bool, DType, DeviceType)
+/* 270 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 271 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 272 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 273 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 274 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 275 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 276 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1132), // Linear *()(int, int, DType, DeviceType, _Bool)
+/* 276 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1168), // LayerNorm2d *()(int, float, _Bool, DType, DeviceType)
 /* 277 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 278 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 279 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 280 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 281 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 278 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 279 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 280 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 281 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 282 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 283 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1132), // Linear *()(int, int, _Bool)
-/* 284 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 285 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 286 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 287 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 288 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1134), // MaxPool1d *()(int, int, int, int, _Bool)
+/* 283 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1171), // LeakyReLU *()(float, _Bool)
+/* 284 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 285 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 286 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 287 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1173), // Linear *()(int, int, DType, DeviceType, _Bool)
+/* 288 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 289 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 290 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 291 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 292 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 293 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 294 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 295 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1136), // MaxPool2d *()(int, int, int, int, _Bool)
+/* 290 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 291 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 292 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 293 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 294 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1173), // Linear *()(int, int, _Bool)
+/* 295 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 296 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 297 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 298 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 299 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 300 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 301 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 302 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1138), // MaxPool3d *()(int, int, int, int, _Bool)
+/* 297 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 298 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 299 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1175), // MaxPool1d *()(int, int, int, int, _Bool)
+/* 300 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 301 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 302 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 303 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 304 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 305 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 306 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 307 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 308 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 309 */ _CFFI_OP(_CFFI_OP_FUNCTION, 871), // ModuleDict *()(void)
-/* 310 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 311 */ _CFFI_OP(_CFFI_OP_FUNCTION, 879), // ModuleList *()(void)
+/* 304 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 305 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 306 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1177), // MaxPool2d *()(int, int, int, int, _Bool)
+/* 307 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 308 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 309 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 310 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 311 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 312 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 313 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1143), // MultiHeadAttention *()(int, int, float, DType, DeviceType)
+/* 313 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1179), // MaxPool3d *()(int, int, int, int, _Bool)
 /* 314 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 315 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 316 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 317 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 318 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 316 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 317 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 318 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 319 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 320 */ _CFFI_OP(_CFFI_OP_FUNCTION, 206), // Optimizer *()(Module *, float, float, float)
-/* 321 */ _CFFI_OP(_CFFI_OP_POINTER, 1140), // Module *
-/* 322 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 323 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 324 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 325 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 326 */ _CFFI_OP(_CFFI_OP_FUNCTION, 206), // Optimizer *()(Module *, float, float, float, float, float)
-/* 327 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 328 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 329 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 330 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 331 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 332 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 333 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 334 */ _CFFI_OP(_CFFI_OP_FUNCTION, 206), // Optimizer *()(Parameter * *, int, float, float, float)
-/* 335 */ _CFFI_OP(_CFFI_OP_POINTER, 1148), // Parameter * *
-/* 336 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 337 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 338 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 320 */ _CFFI_OP(_CFFI_OP_FUNCTION, 903), // ModuleDict *()(void)
+/* 321 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 322 */ _CFFI_OP(_CFFI_OP_FUNCTION, 911), // ModuleList *()(void)
+/* 323 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 324 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1184), // MultiHeadAttention *()(int, int, float, DType, DeviceType)
+/* 325 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 326 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 327 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 328 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 329 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 330 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 331 */ _CFFI_OP(_CFFI_OP_FUNCTION, 217), // Optimizer *()(Module *, float, float, float)
+/* 332 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 333 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 334 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 335 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 336 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 337 */ _CFFI_OP(_CFFI_OP_FUNCTION, 217), // Optimizer *()(Module *, float, float, float, float, float)
+/* 338 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
 /* 339 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 340 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 341 */ _CFFI_OP(_CFFI_OP_FUNCTION, 206), // Optimizer *()(Parameter * *, int, float, float, float, _Bool)
-/* 342 */ _CFFI_OP(_CFFI_OP_NOOP, 335),
-/* 343 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 344 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 345 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 346 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 347 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 348 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 349 */ _CFFI_OP(_CFFI_OP_FUNCTION, 206), // Optimizer *()(Parameter * *, int, float, float, float, float)
-/* 350 */ _CFFI_OP(_CFFI_OP_NOOP, 335),
-/* 351 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 352 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 353 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 354 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 340 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 341 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 342 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 343 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 344 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 345 */ _CFFI_OP(_CFFI_OP_FUNCTION, 217), // Optimizer *()(Parameter * *, int, float, float, float)
+/* 346 */ _CFFI_OP(_CFFI_OP_POINTER, 1189), // Parameter * *
+/* 347 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 348 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 349 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 350 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 351 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 352 */ _CFFI_OP(_CFFI_OP_FUNCTION, 217), // Optimizer *()(Parameter * *, int, float, float, float, _Bool)
+/* 353 */ _CFFI_OP(_CFFI_OP_NOOP, 346),
+/* 354 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 355 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 356 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 357 */ _CFFI_OP(_CFFI_OP_FUNCTION, 206), // Optimizer *()(Parameter * *, int, float, float, float, float, float)
-/* 358 */ _CFFI_OP(_CFFI_OP_NOOP, 335),
-/* 359 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 360 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 361 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 362 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 356 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 357 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 358 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 359 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 360 */ _CFFI_OP(_CFFI_OP_FUNCTION, 217), // Optimizer *()(Parameter * *, int, float, float, float, float)
+/* 361 */ _CFFI_OP(_CFFI_OP_NOOP, 346),
+/* 362 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 363 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 364 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 365 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 366 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1146), // PReLU *()(int, float, DType, DeviceType)
-/* 367 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 368 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 369 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 370 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 371 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 372 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1150), // PixelShuffle *()(int)
-/* 373 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 374 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 375 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1152), // PixelUnshuffle *()(int)
-/* 376 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 377 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 378 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1154), // QRResult()(Tensor *)
-/* 379 */ _CFFI_OP(_CFFI_OP_POINTER, 1171), // Tensor *
-/* 380 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 381 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1155), // RNN *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
-/* 382 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 383 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 365 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 366 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 367 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 368 */ _CFFI_OP(_CFFI_OP_FUNCTION, 217), // Optimizer *()(Parameter * *, int, float, float, float, float, float)
+/* 369 */ _CFFI_OP(_CFFI_OP_NOOP, 346),
+/* 370 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 371 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 372 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 373 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 374 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 375 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 376 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 377 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1187), // PReLU *()(int, float, DType, DeviceType)
+/* 378 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 379 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 380 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 381 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 382 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 383 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1191), // PipeUnit *()(int, int, _Bool, int *)
 /* 384 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 385 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 385 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 386 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 387 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 388 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 389 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 390 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 387 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 388 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 389 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1196), // PixelShuffle *()(int)
+/* 390 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 391 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 392 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1157), // RNNCell *()(int, int, _Bool, DType, DeviceType)
+/* 392 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1198), // PixelUnshuffle *()(int)
 /* 393 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 394 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 395 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 396 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 397 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 398 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 399 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1159), // ReLU *()(_Bool)
-/* 400 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 401 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 402 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1159), // ReLU *()(void)
-/* 403 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 404 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1161), // SVDResult()(Tensor *)
-/* 405 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 406 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 407 */ _CFFI_OP(_CFFI_OP_FUNCTION, 456), // SafeTensorsContext *()(char const *)
-/* 408 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 409 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 410 */ _CFFI_OP(_CFFI_OP_FUNCTION, 411), // Sequential *()(Sequential *, Module *)
-/* 411 */ _CFFI_OP(_CFFI_OP_POINTER, 1163), // Sequential *
-/* 412 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 413 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 414 */ _CFFI_OP(_CFFI_OP_FUNCTION, 411), // Sequential *()(void)
+/* 394 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 395 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1200), // QRResult()(Tensor *)
+/* 396 */ _CFFI_OP(_CFFI_OP_POINTER, 1217), // Tensor *
+/* 397 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 398 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1201), // RNN *()(int, int, int, _Bool, _Bool, float, _Bool, DType, DeviceType)
+/* 399 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 400 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 401 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 402 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 403 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 404 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 405 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 406 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 407 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 408 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 409 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1203), // RNNCell *()(int, int, _Bool, DType, DeviceType)
+/* 410 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 411 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 412 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 413 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 414 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 415 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 416 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1164), // Sigmoid *()(void)
-/* 417 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 418 */ _CFFI_OP(_CFFI_OP_FUNCTION, 419), // SparseCOOData *()(SparseCOOData *)
-/* 419 */ _CFFI_OP(_CFFI_OP_POINTER, 1166), // SparseCOOData *
+/* 416 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1205), // ReLU *()(_Bool)
+/* 417 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 418 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 419 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1205), // ReLU *()(void)
 /* 420 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 421 */ _CFFI_OP(_CFFI_OP_FUNCTION, 419), // SparseCOOData *()(Tensor *)
-/* 422 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 421 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1207), // SVDResult()(Tensor *)
+/* 422 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
 /* 423 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 424 */ _CFFI_OP(_CFFI_OP_FUNCTION, 419), // SparseCOOData *()(Tensor *, Tensor *, int const *, int)
-/* 425 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 426 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 427 */ _CFFI_OP(_CFFI_OP_POINTER, 1), // int const *
-/* 428 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 429 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 430 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1003), // StateDict *()(Module *, char const *)
-/* 431 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 432 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 433 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 434 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1168), // Tanh *()(void)
-/* 435 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 436 */ _CFFI_OP(_CFFI_OP_FUNCTION, 437), // Tensor * *()(Tensor * *, int, int *)
-/* 437 */ _CFFI_OP(_CFFI_OP_POINTER, 379), // Tensor * *
-/* 438 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 439 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 424 */ _CFFI_OP(_CFFI_OP_FUNCTION, 481), // SafeTensorsContext *()(char const *)
+/* 425 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 426 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 427 */ _CFFI_OP(_CFFI_OP_FUNCTION, 428), // Sequential *()(Sequential *, Module *)
+/* 428 */ _CFFI_OP(_CFFI_OP_POINTER, 1209), // Sequential *
+/* 429 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 430 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 431 */ _CFFI_OP(_CFFI_OP_FUNCTION, 428), // Sequential *()(void)
+/* 432 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 433 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1210), // Sigmoid *()(void)
+/* 434 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 435 */ _CFFI_OP(_CFFI_OP_FUNCTION, 436), // SparseCOOData *()(SparseCOOData *)
+/* 436 */ _CFFI_OP(_CFFI_OP_POINTER, 1212), // SparseCOOData *
+/* 437 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 438 */ _CFFI_OP(_CFFI_OP_FUNCTION, 436), // SparseCOOData *()(Tensor *)
+/* 439 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
 /* 440 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 441 */ _CFFI_OP(_CFFI_OP_FUNCTION, 437), // Tensor * *()(Tensor *, int, int, int *)
-/* 442 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 443 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 444 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 445 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 441 */ _CFFI_OP(_CFFI_OP_FUNCTION, 436), // SparseCOOData *()(Tensor *, Tensor *, int const *, int)
+/* 442 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 443 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 444 */ _CFFI_OP(_CFFI_OP_POINTER, 1), // int const *
+/* 445 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 446 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 447 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(GGUFContext *, char const *)
-/* 448 */ _CFFI_OP(_CFFI_OP_POINTER, 1109), // GGUFContext *
-/* 449 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 447 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1041), // StateDict *()(Module *, char const *)
+/* 448 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 449 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
 /* 450 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 451 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(GradScaler *, Tensor *)
-/* 452 */ _CFFI_OP(_CFFI_OP_POINTER, 1114), // GradScaler *
-/* 453 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 454 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 455 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(SafeTensorsContext *, char const *)
-/* 456 */ _CFFI_OP(_CFFI_OP_POINTER, 1162), // SafeTensorsContext *
-/* 457 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 458 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 459 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Sequential *, Tensor *)
-/* 460 */ _CFFI_OP(_CFFI_OP_NOOP, 411),
-/* 461 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 462 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 463 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(SparseCOOData *, Tensor *)
-/* 464 */ _CFFI_OP(_CFFI_OP_NOOP, 419),
-/* 465 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 466 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 467 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(SparseCOOData *, TensorConfig const *)
-/* 468 */ _CFFI_OP(_CFFI_OP_NOOP, 419),
-/* 469 */ _CFFI_OP(_CFFI_OP_POINTER, 1172), // TensorConfig const *
-/* 470 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 471 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(StateDict const *, char const *)
-/* 472 */ _CFFI_OP(_CFFI_OP_POINTER, 1167), // StateDict const *
-/* 473 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 474 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 475 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor * *, int, int)
-/* 476 */ _CFFI_OP(_CFFI_OP_NOOP, 437),
-/* 477 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 478 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 451 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1214), // Tanh *()(void)
+/* 452 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 453 */ _CFFI_OP(_CFFI_OP_FUNCTION, 454), // Tensor * *()(Tensor * *, int, int *)
+/* 454 */ _CFFI_OP(_CFFI_OP_POINTER, 396), // Tensor * *
+/* 455 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 456 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 457 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 458 */ _CFFI_OP(_CFFI_OP_FUNCTION, 454), // Tensor * *()(Tensor *, int, int, int *)
+/* 459 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 460 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 461 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 462 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 463 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 464 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(CMLDataParallel *, Tensor *)
+/* 465 */ _CFFI_OP(_CFFI_OP_POINTER, 1127), // CMLDataParallel *
+/* 466 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 467 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 468 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(CMLPipelineParallel *, Tensor *)
+/* 469 */ _CFFI_OP(_CFFI_OP_POINTER, 1128), // CMLPipelineParallel *
+/* 470 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 471 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 472 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(GGUFContext *, char const *)
+/* 473 */ _CFFI_OP(_CFFI_OP_POINTER, 1150), // GGUFContext *
+/* 474 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 475 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 476 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(GradScaler *, Tensor *)
+/* 477 */ _CFFI_OP(_CFFI_OP_POINTER, 1155), // GradScaler *
+/* 478 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
 /* 479 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 480 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *)
-/* 481 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 482 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 483 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, DType)
-/* 484 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 485 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 486 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 487 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, Tensor *)
-/* 488 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 489 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 490 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 491 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, Tensor *, Tensor *)
-/* 492 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 493 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 494 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 480 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(SafeTensorsContext *, char const *)
+/* 481 */ _CFFI_OP(_CFFI_OP_POINTER, 1208), // SafeTensorsContext *
+/* 482 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 483 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 484 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Sequential *, Tensor *)
+/* 485 */ _CFFI_OP(_CFFI_OP_NOOP, 428),
+/* 486 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 487 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 488 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(SparseCOOData *, Tensor *)
+/* 489 */ _CFFI_OP(_CFFI_OP_NOOP, 436),
+/* 490 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 491 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 492 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(SparseCOOData *, TensorConfig const *)
+/* 493 */ _CFFI_OP(_CFFI_OP_NOOP, 436),
+/* 494 */ _CFFI_OP(_CFFI_OP_POINTER, 1218), // TensorConfig const *
 /* 495 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 496 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, Tensor *, Tensor *, float)
-/* 497 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 498 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 499 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 500 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 501 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 502 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, Tensor *, float)
-/* 503 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 504 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 505 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 506 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 507 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, Tensor *, int)
-/* 508 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 509 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 510 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 496 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(StateDict const *, char const *)
+/* 497 */ _CFFI_OP(_CFFI_OP_POINTER, 1213), // StateDict const *
+/* 498 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 499 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 500 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor * *, int, int)
+/* 501 */ _CFFI_OP(_CFFI_OP_NOOP, 454),
+/* 502 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 503 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 504 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 505 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *)
+/* 506 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 507 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 508 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, DType)
+/* 509 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 510 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 511 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 512 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, float)
-/* 513 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 514 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 512 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, Tensor *)
+/* 513 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 514 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
 /* 515 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 516 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, float, float)
-/* 517 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 518 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 519 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 516 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, Tensor *, Tensor *)
+/* 517 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 518 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 519 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
 /* 520 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 521 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int *, int *, int)
-/* 522 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 523 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 524 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 525 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 521 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, Tensor *, Tensor *, float)
+/* 522 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 523 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 524 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 525 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 526 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 527 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int *, int)
-/* 528 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 529 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 530 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 527 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, Tensor *, float)
+/* 528 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 529 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 530 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 531 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 532 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int *, int, InterpMode)
-/* 533 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 534 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 532 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, Tensor *, int)
+/* 533 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 534 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
 /* 535 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 536 */ _CFFI_OP(_CFFI_OP_ENUM, 4), // InterpMode
-/* 537 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 538 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int *, int, UpsampleMode, _Bool)
-/* 539 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 540 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 541 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 542 */ _CFFI_OP(_CFFI_OP_ENUM, 8), // UpsampleMode
-/* 543 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 544 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 545 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int *, int, float)
-/* 546 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 547 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 548 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 549 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 550 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 551 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int)
-/* 552 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 553 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 554 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 555 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, Tensor *, Tensor *, ScatterReduceMode)
-/* 556 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 557 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 558 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 559 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 560 */ _CFFI_OP(_CFFI_OP_ENUM, 6), // ScatterReduceMode
-/* 561 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 562 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, _Bool)
-/* 563 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 564 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 565 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 566 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 567 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, _Bool, _Bool)
-/* 568 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 569 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 570 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 571 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 572 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 573 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, int)
-/* 574 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 575 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 576 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 577 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 578 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, int, _Bool, Tensor * *)
-/* 579 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 580 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 581 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 582 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 583 */ _CFFI_OP(_CFFI_OP_NOOP, 437),
-/* 584 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 585 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, int, _Bool, _Bool)
-/* 586 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 587 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 588 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 589 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 536 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 537 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, float)
+/* 538 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 539 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 540 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 541 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, float, float)
+/* 542 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 543 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 544 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 545 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 546 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int *, int *, int)
+/* 547 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 548 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 549 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 550 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 551 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 552 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int *, int)
+/* 553 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 554 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 555 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 556 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 557 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int *, int, InterpMode)
+/* 558 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 559 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 560 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 561 */ _CFFI_OP(_CFFI_OP_ENUM, 4), // InterpMode
+/* 562 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 563 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int *, int, UpsampleMode, _Bool)
+/* 564 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 565 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 566 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 567 */ _CFFI_OP(_CFFI_OP_ENUM, 9), // UpsampleMode
+/* 568 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 569 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 570 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int *, int, float)
+/* 571 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 572 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 573 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 574 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 575 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 576 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int)
+/* 577 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 578 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 579 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 580 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int, Tensor *, Tensor *, ScatterReduceMode)
+/* 581 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 582 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 583 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 584 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 585 */ _CFFI_OP(_CFFI_OP_ENUM, 7), // ScatterReduceMode
+/* 586 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 587 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int, _Bool)
+/* 588 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 589 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 590 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 591 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 592 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(Tensor *, int, int, int)
-/* 593 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 592 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int, _Bool, _Bool)
+/* 593 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
 /* 594 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 595 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 596 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 595 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 596 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 597 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 598 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(TorchRuntimeModule *, Tensor *)
-/* 599 */ _CFFI_OP(_CFFI_OP_POINTER, 1176), // TorchRuntimeModule *
-/* 600 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 601 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 602 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(char const *)
-/* 603 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 604 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 605 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(char const *, Tensor * *, int)
-/* 606 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 607 */ _CFFI_OP(_CFFI_OP_NOOP, 437),
-/* 608 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 598 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int, int)
+/* 599 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 600 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 601 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 602 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 603 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int, int, _Bool, Tensor * *)
+/* 604 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 605 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 606 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 607 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 608 */ _CFFI_OP(_CFFI_OP_NOOP, 454),
 /* 609 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 610 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float const *, int)
-/* 611 */ _CFFI_OP(_CFFI_OP_POINTER, 37), // float const *
+/* 610 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int, int, _Bool, _Bool)
+/* 611 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
 /* 612 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 613 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 614 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float const *, int, int)
-/* 615 */ _CFFI_OP(_CFFI_OP_NOOP, 611),
-/* 616 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 617 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 618 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 619 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, float, TensorConfig const *)
-/* 620 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 621 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 622 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 623 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 624 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 625 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, float, TorchTensorOptions const *)
-/* 626 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 627 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 628 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 629 */ _CFFI_OP(_CFFI_OP_POINTER, 739), // TorchTensorOptions const *
-/* 630 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 631 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, int, TensorConfig const *)
-/* 632 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 633 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 634 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 635 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 636 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 637 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(float, float, int, TorchTensorOptions const *)
-/* 638 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 639 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 640 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 641 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
-/* 642 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 643 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TensorConfig const *)
-/* 644 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 645 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 646 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 647 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 648 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TensorConfig const *, float)
-/* 649 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 650 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 651 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 613 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 614 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 615 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 616 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 617 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(Tensor *, int, int, int)
+/* 618 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 619 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 620 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 621 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 622 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 623 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(TorchRuntimeModule *, Tensor *)
+/* 624 */ _CFFI_OP(_CFFI_OP_POINTER, 1222), // TorchRuntimeModule *
+/* 625 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 626 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 627 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(char const *)
+/* 628 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 629 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 630 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(char const *, Tensor * *, int)
+/* 631 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 632 */ _CFFI_OP(_CFFI_OP_NOOP, 454),
+/* 633 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 634 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 635 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(float const *, int)
+/* 636 */ _CFFI_OP(_CFFI_OP_POINTER, 37), // float const *
+/* 637 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 638 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 639 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(float const *, int, int)
+/* 640 */ _CFFI_OP(_CFFI_OP_NOOP, 636),
+/* 641 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 642 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 643 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 644 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(float, float, float, TensorConfig const *)
+/* 645 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 646 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 647 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 648 */ _CFFI_OP(_CFFI_OP_NOOP, 494),
+/* 649 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 650 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(float, float, float, TorchTensorOptions const *)
+/* 651 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 652 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 653 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 654 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TorchTensorOptions const *)
-/* 655 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 656 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 657 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
-/* 658 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 659 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, TorchTensorOptions const *, float)
-/* 660 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 661 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 662 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
+/* 653 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 654 */ _CFFI_OP(_CFFI_OP_POINTER, 764), // TorchTensorOptions const *
+/* 655 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 656 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(float, float, int, TensorConfig const *)
+/* 657 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 658 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 659 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 660 */ _CFFI_OP(_CFFI_OP_NOOP, 494),
+/* 661 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 662 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(float, float, int, TorchTensorOptions const *)
 /* 663 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 664 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 665 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, int, TensorConfig const *)
-/* 666 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 667 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 668 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 669 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 670 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 671 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int *, int, int, int, TensorConfig const *)
-/* 672 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 673 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 674 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 664 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 665 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 666 */ _CFFI_OP(_CFFI_OP_NOOP, 654),
+/* 667 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 668 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(int *, int, TensorConfig const *)
+/* 669 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 670 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 671 */ _CFFI_OP(_CFFI_OP_NOOP, 494),
+/* 672 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 673 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(int *, int, TensorConfig const *, float)
+/* 674 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
 /* 675 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 676 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 677 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 678 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int)
-/* 679 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 680 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 681 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, TensorConfig const *)
-/* 682 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 683 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 684 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 685 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, TorchTensorOptions const *)
+/* 676 */ _CFFI_OP(_CFFI_OP_NOOP, 494),
+/* 677 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 678 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 679 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(int *, int, TorchTensorOptions const *)
+/* 680 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 681 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 682 */ _CFFI_OP(_CFFI_OP_NOOP, 654),
+/* 683 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 684 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(int *, int, TorchTensorOptions const *, float)
+/* 685 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
 /* 686 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 687 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
-/* 688 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 689 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, int)
-/* 690 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 691 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 692 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 693 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(int, int, int *, int, TensorConfig const *)
-/* 694 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 695 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 696 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 697 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 698 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 699 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 700 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(struct Module *, Tensor *)
-/* 701 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 702 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 703 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 704 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(void *, int *, int, TensorConfig const *)
-/* 705 */ _CFFI_OP(_CFFI_OP_POINTER, 1197), // void *
-/* 706 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 687 */ _CFFI_OP(_CFFI_OP_NOOP, 654),
+/* 688 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 689 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 690 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(int *, int, int, TensorConfig const *)
+/* 691 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 692 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 693 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 694 */ _CFFI_OP(_CFFI_OP_NOOP, 494),
+/* 695 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 696 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(int *, int, int, int, TensorConfig const *)
+/* 697 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 698 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 699 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 700 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 701 */ _CFFI_OP(_CFFI_OP_NOOP, 494),
+/* 702 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 703 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(int)
+/* 704 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 705 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 706 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(int, TensorConfig const *)
 /* 707 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 708 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 708 */ _CFFI_OP(_CFFI_OP_NOOP, 494),
 /* 709 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 710 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(void *, int *, int, TorchTensorOptions const *)
-/* 711 */ _CFFI_OP(_CFFI_OP_NOOP, 705),
-/* 712 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 713 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 714 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
-/* 715 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 716 */ _CFFI_OP(_CFFI_OP_FUNCTION, 379), // Tensor *()(void const *, int *, int, TensorConfig const *)
-/* 717 */ _CFFI_OP(_CFFI_OP_POINTER, 1197), // void const *
-/* 718 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
+/* 710 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(int, TorchTensorOptions const *)
+/* 711 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 712 */ _CFFI_OP(_CFFI_OP_NOOP, 654),
+/* 713 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 714 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(int, int)
+/* 715 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 716 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 717 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 718 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(int, int, int *, int, TensorConfig const *)
 /* 719 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 720 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
-/* 721 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 722 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1172), // TensorConfig()(TorchTensorOptions const *)
-/* 723 */ _CFFI_OP(_CFFI_OP_NOOP, 629),
+/* 720 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 721 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 722 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 723 */ _CFFI_OP(_CFFI_OP_NOOP, 494),
 /* 724 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 725 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1028), // TorchMemoryManager *()(size_t)
-/* 726 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28), // size_t
-/* 727 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 728 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1028), // TorchMemoryManager *()(void *, size_t)
-/* 729 */ _CFFI_OP(_CFFI_OP_NOOP, 705),
-/* 730 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
-/* 731 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 732 */ _CFFI_OP(_CFFI_OP_FUNCTION, 599), // TorchRuntimeModule *()(Module *)
-/* 733 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 725 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(struct Module *, Tensor *)
+/* 726 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 727 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 728 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 729 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(void *, int *, int, TensorConfig const *)
+/* 730 */ _CFFI_OP(_CFFI_OP_POINTER, 1243), // void *
+/* 731 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 732 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 733 */ _CFFI_OP(_CFFI_OP_NOOP, 494),
 /* 734 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 735 */ _CFFI_OP(_CFFI_OP_FUNCTION, 599), // TorchRuntimeModule *()(char const *)
-/* 736 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 737 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 738 */ _CFFI_OP(_CFFI_OP_FUNCTION, 739), // TorchTensorOptions()(TorchTensorOptions, DType)
-/* 739 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 66), // TorchTensorOptions
-/* 740 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 741 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 742 */ _CFFI_OP(_CFFI_OP_FUNCTION, 739), // TorchTensorOptions()(TorchTensorOptions, DeviceType)
-/* 743 */ _CFFI_OP(_CFFI_OP_NOOP, 739),
-/* 744 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 745 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 746 */ _CFFI_OP(_CFFI_OP_FUNCTION, 739), // TorchTensorOptions()(TorchTensorOptions, _Bool)
-/* 747 */ _CFFI_OP(_CFFI_OP_NOOP, 739),
-/* 748 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 735 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(void *, int *, int, TorchTensorOptions const *)
+/* 736 */ _CFFI_OP(_CFFI_OP_NOOP, 730),
+/* 737 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 738 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 739 */ _CFFI_OP(_CFFI_OP_NOOP, 654),
+/* 740 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 741 */ _CFFI_OP(_CFFI_OP_FUNCTION, 396), // Tensor *()(void const *, int *, int, TensorConfig const *)
+/* 742 */ _CFFI_OP(_CFFI_OP_POINTER, 1243), // void const *
+/* 743 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 744 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 745 */ _CFFI_OP(_CFFI_OP_NOOP, 494),
+/* 746 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 747 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1218), // TensorConfig()(TorchTensorOptions const *)
+/* 748 */ _CFFI_OP(_CFFI_OP_NOOP, 654),
 /* 749 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 750 */ _CFFI_OP(_CFFI_OP_FUNCTION, 739), // TorchTensorOptions()(void)
-/* 751 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 752 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1177), // TransformerDecoder *()(int, int, int, float, int, DType, DeviceType)
-/* 753 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 754 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 755 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 756 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 757 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 758 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 759 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 760 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 761 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1179), // TransformerDecoderLayer *()(int, int, int, float, DType, DeviceType)
-/* 762 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 763 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 764 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 765 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 766 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 767 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 768 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 769 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1181), // TransformerEncoder *()(int, int, int, float, int, DType, DeviceType)
-/* 770 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 771 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 772 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 773 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 774 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 775 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 776 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
-/* 777 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 778 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1183), // TransformerEncoderLayer *()(int, int, int, float, DType, DeviceType)
+/* 750 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1066), // TorchMemoryManager *()(size_t)
+/* 751 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28), // size_t
+/* 752 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 753 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1066), // TorchMemoryManager *()(void *, size_t)
+/* 754 */ _CFFI_OP(_CFFI_OP_NOOP, 730),
+/* 755 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
+/* 756 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 757 */ _CFFI_OP(_CFFI_OP_FUNCTION, 624), // TorchRuntimeModule *()(Module *)
+/* 758 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 759 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 760 */ _CFFI_OP(_CFFI_OP_FUNCTION, 624), // TorchRuntimeModule *()(char const *)
+/* 761 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 762 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 763 */ _CFFI_OP(_CFFI_OP_FUNCTION, 764), // TorchTensorOptions()(TorchTensorOptions, DType)
+/* 764 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 72), // TorchTensorOptions
+/* 765 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 766 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 767 */ _CFFI_OP(_CFFI_OP_FUNCTION, 764), // TorchTensorOptions()(TorchTensorOptions, DeviceType)
+/* 768 */ _CFFI_OP(_CFFI_OP_NOOP, 764),
+/* 769 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 770 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 771 */ _CFFI_OP(_CFFI_OP_FUNCTION, 764), // TorchTensorOptions()(TorchTensorOptions, _Bool)
+/* 772 */ _CFFI_OP(_CFFI_OP_NOOP, 764),
+/* 773 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 774 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 775 */ _CFFI_OP(_CFFI_OP_FUNCTION, 764), // TorchTensorOptions()(void)
+/* 776 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 777 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1223), // TransformerDecoder *()(int, int, int, float, int, DType, DeviceType)
+/* 778 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 779 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 780 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 781 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 782 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 781 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 782 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 783 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 784 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 785 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 786 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1185), // Upsample *()(float, int const *, int, UpsampleMode, _Bool)
-/* 787 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 788 */ _CFFI_OP(_CFFI_OP_NOOP, 427),
+/* 786 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1225), // TransformerDecoderLayer *()(int, int, int, float, DType, DeviceType)
+/* 787 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 788 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 789 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 790 */ _CFFI_OP(_CFFI_OP_NOOP, 542),
-/* 791 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 792 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 793 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Module *)
-/* 794 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 795 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 796 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Tensor *)
-/* 797 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 798 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 799 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Tensor const *)
-/* 800 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
-/* 801 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 802 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(void)
-/* 803 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 804 */ _CFFI_OP(_CFFI_OP_FUNCTION, 134), // char const *()(Optimizer *)
-/* 805 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 806 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 807 */ _CFFI_OP(_CFFI_OP_FUNCTION, 134), // char const *()(void)
-/* 808 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 809 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1189), // double()(void)
+/* 790 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 791 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 792 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 793 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 794 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1227), // TransformerEncoder *()(int, int, int, float, int, DType, DeviceType)
+/* 795 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 796 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 797 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 798 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 799 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 800 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 801 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 802 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 803 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1229), // TransformerEncoderLayer *()(int, int, int, float, DType, DeviceType)
+/* 804 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 805 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 806 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 807 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 808 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 809 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
 /* 810 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 811 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1190), // float *()(Tensor *)
-/* 812 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 813 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 814 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(LRScheduler *)
-/* 815 */ _CFFI_OP(_CFFI_OP_NOOP, 201),
-/* 816 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 817 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(LRScheduler *, float)
-/* 818 */ _CFFI_OP(_CFFI_OP_NOOP, 201),
-/* 819 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 811 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1231), // Upsample *()(float, int const *, int, UpsampleMode, _Bool)
+/* 812 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 813 */ _CFFI_OP(_CFFI_OP_NOOP, 444),
+/* 814 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 815 */ _CFFI_OP(_CFFI_OP_NOOP, 567),
+/* 816 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 817 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 818 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Module *)
+/* 819 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
 /* 820 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 821 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Optimizer *, int)
-/* 822 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 823 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 824 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 825 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Tensor *)
-/* 826 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 827 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 828 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Tensor *, size_t)
-/* 829 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 830 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
+/* 821 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Tensor *)
+/* 822 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 823 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 824 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(Tensor const *)
+/* 825 */ _CFFI_OP(_CFFI_OP_NOOP, 140),
+/* 826 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 827 */ _CFFI_OP(_CFFI_OP_FUNCTION, 18), // _Bool()(void)
+/* 828 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 829 */ _CFFI_OP(_CFFI_OP_FUNCTION, 145), // char const *()(Optimizer *)
+/* 830 */ _CFFI_OP(_CFFI_OP_NOOP, 217),
 /* 831 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 832 */ _CFFI_OP(_CFFI_OP_FUNCTION, 427), // int const *()(Tensor const *)
-/* 833 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
-/* 834 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 835 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Dataset *, char const *)
-/* 836 */ _CFFI_OP(_CFFI_OP_POINTER, 1102), // Dataset *
-/* 837 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 832 */ _CFFI_OP(_CFFI_OP_FUNCTION, 145), // char const *()(void)
+/* 833 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 834 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1235), // double()(void)
+/* 835 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 836 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1236), // float *()(Tensor *)
+/* 837 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
 /* 838 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 839 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(DistBackendType, int, int)
-/* 840 */ _CFFI_OP(_CFFI_OP_ENUM, 2), // DistBackendType
-/* 841 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 842 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 843 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 844 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(GGUFContext *, char const *, Tensor *)
-/* 845 */ _CFFI_OP(_CFFI_OP_NOOP, 448),
-/* 846 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 847 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 848 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 849 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, Parameter * * *, int *, _Bool)
-/* 850 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 851 */ _CFFI_OP(_CFFI_OP_POINTER, 335), // Parameter * * *
-/* 852 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 853 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 854 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 855 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, StateDict const *, _Bool)
-/* 856 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 857 */ _CFFI_OP(_CFFI_OP_NOOP, 472),
-/* 858 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 839 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(LRScheduler *)
+/* 840 */ _CFFI_OP(_CFFI_OP_NOOP, 212),
+/* 841 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 842 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(LRScheduler *, float)
+/* 843 */ _CFFI_OP(_CFFI_OP_NOOP, 212),
+/* 844 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 845 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 846 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Optimizer *, int)
+/* 847 */ _CFFI_OP(_CFFI_OP_NOOP, 217),
+/* 848 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 849 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 850 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Tensor *)
+/* 851 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 852 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 853 */ _CFFI_OP(_CFFI_OP_FUNCTION, 37), // float()(Tensor *, size_t)
+/* 854 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 855 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
+/* 856 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 857 */ _CFFI_OP(_CFFI_OP_FUNCTION, 444), // int const *()(Tensor const *)
+/* 858 */ _CFFI_OP(_CFFI_OP_NOOP, 140),
 /* 859 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 860 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, Tensor *, char const *, TorchPTEExportOptions const *)
-/* 861 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 862 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 863 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 864 */ _CFFI_OP(_CFFI_OP_POINTER, 1174), // TorchPTEExportOptions const *
-/* 865 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 866 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, char const *)
-/* 867 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 868 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 869 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 870 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleDict *)
-/* 871 */ _CFFI_OP(_CFFI_OP_POINTER, 1141), // ModuleDict *
-/* 872 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 873 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleDict *, char const *, Module *)
-/* 874 */ _CFFI_OP(_CFFI_OP_NOOP, 871),
-/* 875 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 876 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 877 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 878 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *)
-/* 879 */ _CFFI_OP(_CFFI_OP_POINTER, 1142), // ModuleList *
+/* 860 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(CMLDataParallel *)
+/* 861 */ _CFFI_OP(_CFFI_OP_NOOP, 465),
+/* 862 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 863 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(CMLPipelineParallel *, Tensor *)
+/* 864 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
+/* 865 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 866 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 867 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Dataset *, char const *)
+/* 868 */ _CFFI_OP(_CFFI_OP_POINTER, 1143), // Dataset *
+/* 869 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 870 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 871 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(DistBackendType, int, int)
+/* 872 */ _CFFI_OP(_CFFI_OP_ENUM, 2), // DistBackendType
+/* 873 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 874 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 875 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 876 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(GGUFContext *, char const *, Tensor *)
+/* 877 */ _CFFI_OP(_CFFI_OP_NOOP, 473),
+/* 878 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 879 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
 /* 880 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 881 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *, Module *)
-/* 882 */ _CFFI_OP(_CFFI_OP_NOOP, 879),
-/* 883 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 884 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 885 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *, int, Module *)
-/* 886 */ _CFFI_OP(_CFFI_OP_NOOP, 879),
-/* 887 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 888 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 889 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 890 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(SafeTensorsContext *, char const *, Tensor *)
-/* 891 */ _CFFI_OP(_CFFI_OP_NOOP, 456),
-/* 892 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 893 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 894 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 895 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor *)
-/* 896 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
+/* 881 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, Parameter * * *, int *, _Bool)
+/* 882 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 883 */ _CFFI_OP(_CFFI_OP_POINTER, 346), // Parameter * * *
+/* 884 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 885 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 886 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 887 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, StateDict const *, _Bool)
+/* 888 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 889 */ _CFFI_OP(_CFFI_OP_NOOP, 497),
+/* 890 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 891 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 892 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, Tensor *, char const *, TorchPTEExportOptions const *)
+/* 893 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 894 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 895 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 896 */ _CFFI_OP(_CFFI_OP_POINTER, 1220), // TorchPTEExportOptions const *
 /* 897 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 898 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor *, DistReduceOp)
-/* 899 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 900 */ _CFFI_OP(_CFFI_OP_ENUM, 3), // DistReduceOp
+/* 898 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Module *, char const *)
+/* 899 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 900 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
 /* 901 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 902 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor const *)
-/* 903 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
+/* 902 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleDict *)
+/* 903 */ _CFFI_OP(_CFFI_OP_POINTER, 1182), // ModuleDict *
 /* 904 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 905 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(struct CMLGraph *, Tensor * *, int, Tensor * *, int, char const *)
-/* 906 */ _CFFI_OP(_CFFI_OP_POINTER, 1193), // struct CMLGraph *
-/* 907 */ _CFFI_OP(_CFFI_OP_NOOP, 437),
-/* 908 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 909 */ _CFFI_OP(_CFFI_OP_NOOP, 437),
-/* 910 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 911 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
+/* 905 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleDict *, char const *, Module *)
+/* 906 */ _CFFI_OP(_CFFI_OP_NOOP, 903),
+/* 907 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 908 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 909 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 910 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *)
+/* 911 */ _CFFI_OP(_CFFI_OP_POINTER, 1183), // ModuleList *
 /* 912 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 913 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(void)
-/* 914 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 915 */ _CFFI_OP(_CFFI_OP_FUNCTION, 726), // size_t()(DType)
-/* 916 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 917 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 918 */ _CFFI_OP(_CFFI_OP_FUNCTION, 726), // size_t()(Tensor const *)
-/* 919 */ _CFFI_OP(_CFFI_OP_NOOP, 129),
-/* 920 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 921 */ _CFFI_OP(_CFFI_OP_FUNCTION, 726), // size_t()(TorchMemoryManager const *)
-/* 922 */ _CFFI_OP(_CFFI_OP_POINTER, 1173), // TorchMemoryManager const *
-/* 923 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 924 */ _CFFI_OP(_CFFI_OP_FUNCTION, 726), // size_t()(int *, int)
-/* 925 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 926 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 927 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 928 */ _CFFI_OP(_CFFI_OP_FUNCTION, 705), // void *()(Tensor *)
-/* 929 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 930 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 931 */ _CFFI_OP(_CFFI_OP_FUNCTION, 705), // void *()(int, char const *, void *)
-/* 932 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 933 */ _CFFI_OP(_CFFI_OP_NOOP, 134),
-/* 934 */ _CFFI_OP(_CFFI_OP_NOOP, 705),
-/* 935 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 936 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1062), // void *(*()(void))(int, char const *, void *)
-/* 937 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 938 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(CleanupContext *)
-/* 939 */ _CFFI_OP(_CFFI_OP_POINTER, 1089), // CleanupContext *
-/* 940 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 941 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(DType)
-/* 942 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
-/* 943 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 944 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Dataset *)
-/* 945 */ _CFFI_OP(_CFFI_OP_NOOP, 836),
+/* 913 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *, Module *)
+/* 914 */ _CFFI_OP(_CFFI_OP_NOOP, 911),
+/* 915 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 916 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 917 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(ModuleList *, int, Module *)
+/* 918 */ _CFFI_OP(_CFFI_OP_NOOP, 911),
+/* 919 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 920 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 921 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 922 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(SafeTensorsContext *, char const *, Tensor *)
+/* 923 */ _CFFI_OP(_CFFI_OP_NOOP, 481),
+/* 924 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 925 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 926 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 927 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor *)
+/* 928 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 929 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 930 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor *, DistReduceOp)
+/* 931 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 932 */ _CFFI_OP(_CFFI_OP_ENUM, 3), // DistReduceOp
+/* 933 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 934 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(Tensor const *)
+/* 935 */ _CFFI_OP(_CFFI_OP_NOOP, 140),
+/* 936 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 937 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(struct CMLGraph *, Tensor * *, int, Tensor * *, int, char const *)
+/* 938 */ _CFFI_OP(_CFFI_OP_POINTER, 1239), // struct CMLGraph *
+/* 939 */ _CFFI_OP(_CFFI_OP_NOOP, 454),
+/* 940 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 941 */ _CFFI_OP(_CFFI_OP_NOOP, 454),
+/* 942 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 943 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 944 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 945 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1), // int()(void)
 /* 946 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 947 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(DeviceType)
-/* 948 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 947 */ _CFFI_OP(_CFFI_OP_FUNCTION, 751), // size_t()(DType)
+/* 948 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
 /* 949 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 950 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(GGUFContext *)
-/* 951 */ _CFFI_OP(_CFFI_OP_NOOP, 448),
+/* 950 */ _CFFI_OP(_CFFI_OP_FUNCTION, 751), // size_t()(Tensor const *)
+/* 951 */ _CFFI_OP(_CFFI_OP_NOOP, 140),
 /* 952 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 953 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(GradScaler *)
-/* 954 */ _CFFI_OP(_CFFI_OP_NOOP, 452),
+/* 953 */ _CFFI_OP(_CFFI_OP_FUNCTION, 751), // size_t()(TorchMemoryManager const *)
+/* 954 */ _CFFI_OP(_CFFI_OP_POINTER, 1219), // TorchMemoryManager const *
 /* 955 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 956 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(GradScaler *, Parameter * *, int)
-/* 957 */ _CFFI_OP(_CFFI_OP_NOOP, 452),
-/* 958 */ _CFFI_OP(_CFFI_OP_NOOP, 335),
-/* 959 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 960 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 961 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(GradScaler *, void(*)(void *), void *)
-/* 962 */ _CFFI_OP(_CFFI_OP_NOOP, 452),
-/* 963 */ _CFFI_OP(_CFFI_OP_POINTER, 1064), // void(*)(void *)
-/* 964 */ _CFFI_OP(_CFFI_OP_NOOP, 705),
-/* 965 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 966 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(LRScheduler *)
-/* 967 */ _CFFI_OP(_CFFI_OP_NOOP, 201),
-/* 968 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 969 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(LogLevel)
-/* 970 */ _CFFI_OP(_CFFI_OP_ENUM, 5), // LogLevel
-/* 971 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 972 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Module *, _Bool)
-/* 973 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 974 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 956 */ _CFFI_OP(_CFFI_OP_FUNCTION, 751), // size_t()(int *, int)
+/* 957 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 958 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 959 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 960 */ _CFFI_OP(_CFFI_OP_FUNCTION, 730), // void *()(Tensor *)
+/* 961 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 962 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 963 */ _CFFI_OP(_CFFI_OP_FUNCTION, 730), // void *()(int, char const *, void *)
+/* 964 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 965 */ _CFFI_OP(_CFFI_OP_NOOP, 145),
+/* 966 */ _CFFI_OP(_CFFI_OP_NOOP, 730),
+/* 967 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 968 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1100), // void *(*()(void))(int, char const *, void *)
+/* 969 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 970 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(CMLDataParallel *)
+/* 971 */ _CFFI_OP(_CFFI_OP_NOOP, 465),
+/* 972 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 973 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(CMLPipelineParallel *)
+/* 974 */ _CFFI_OP(_CFFI_OP_NOOP, 469),
 /* 975 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 976 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Optimizer *)
-/* 977 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
+/* 976 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(CleanupContext *)
+/* 977 */ _CFFI_OP(_CFFI_OP_POINTER, 1129), // CleanupContext *
 /* 978 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 979 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Optimizer *, _Bool)
-/* 980 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 981 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 982 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 983 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Optimizer *, float)
-/* 984 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 985 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 986 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 987 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Optimizer *, int, float)
-/* 988 */ _CFFI_OP(_CFFI_OP_NOOP, 206),
-/* 989 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 990 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 991 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 992 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(SafeTensorsContext *)
-/* 993 */ _CFFI_OP(_CFFI_OP_NOOP, 456),
-/* 994 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 995 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Sequential *, Module *)
-/* 996 */ _CFFI_OP(_CFFI_OP_NOOP, 411),
-/* 997 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
+/* 979 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(DType)
+/* 980 */ _CFFI_OP(_CFFI_OP_NOOP, 41),
+/* 981 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 982 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Dataset *)
+/* 983 */ _CFFI_OP(_CFFI_OP_NOOP, 868),
+/* 984 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 985 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(DeviceType)
+/* 986 */ _CFFI_OP(_CFFI_OP_NOOP, 42),
+/* 987 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 988 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(GGUFContext *)
+/* 989 */ _CFFI_OP(_CFFI_OP_NOOP, 473),
+/* 990 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 991 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(GradScaler *)
+/* 992 */ _CFFI_OP(_CFFI_OP_NOOP, 477),
+/* 993 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 994 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(GradScaler *, Parameter * *, int)
+/* 995 */ _CFFI_OP(_CFFI_OP_NOOP, 477),
+/* 996 */ _CFFI_OP(_CFFI_OP_NOOP, 346),
+/* 997 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
 /* 998 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 999 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(SparseCOOData *)
-/* 1000 */ _CFFI_OP(_CFFI_OP_NOOP, 419),
-/* 1001 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1002 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(StateDict *)
-/* 1003 */ _CFFI_OP(_CFFI_OP_POINTER, 1167), // StateDict *
-/* 1004 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1005 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Tensor *)
-/* 1006 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 1007 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1008 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Tensor *, Tensor *, _Bool, _Bool)
-/* 1009 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 1010 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 1011 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 999 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(GradScaler *, void(*)(void *), void *)
+/* 1000 */ _CFFI_OP(_CFFI_OP_NOOP, 477),
+/* 1001 */ _CFFI_OP(_CFFI_OP_POINTER, 1102), // void(*)(void *)
+/* 1002 */ _CFFI_OP(_CFFI_OP_NOOP, 730),
+/* 1003 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1004 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(LRScheduler *)
+/* 1005 */ _CFFI_OP(_CFFI_OP_NOOP, 212),
+/* 1006 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1007 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(LogLevel)
+/* 1008 */ _CFFI_OP(_CFFI_OP_ENUM, 5), // LogLevel
+/* 1009 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1010 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Module *, _Bool)
+/* 1011 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
 /* 1012 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
 /* 1013 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1014 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Tensor *, _Bool)
-/* 1015 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 1016 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
-/* 1017 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1018 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Tensor *, float)
-/* 1019 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 1020 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 1021 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1022 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(Tensor *, size_t, float)
-/* 1023 */ _CFFI_OP(_CFFI_OP_NOOP, 379),
-/* 1024 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
-/* 1025 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
-/* 1026 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1027 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(TorchMemoryManager *)
-/* 1028 */ _CFFI_OP(_CFFI_OP_POINTER, 1173), // TorchMemoryManager *
+/* 1014 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Optimizer *)
+/* 1015 */ _CFFI_OP(_CFFI_OP_NOOP, 217),
+/* 1016 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1017 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Optimizer *, _Bool)
+/* 1018 */ _CFFI_OP(_CFFI_OP_NOOP, 217),
+/* 1019 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 1020 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1021 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Optimizer *, float)
+/* 1022 */ _CFFI_OP(_CFFI_OP_NOOP, 217),
+/* 1023 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 1024 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1025 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Optimizer *, int, float)
+/* 1026 */ _CFFI_OP(_CFFI_OP_NOOP, 217),
+/* 1027 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 1028 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
 /* 1029 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1030 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(TorchRuntimeModule *)
-/* 1031 */ _CFFI_OP(_CFFI_OP_NOOP, 599),
+/* 1030 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(SafeTensorsContext *)
+/* 1031 */ _CFFI_OP(_CFFI_OP_NOOP, 481),
 /* 1032 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1033 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(TorchRuntimeModule *, TorchMemoryManager *)
-/* 1034 */ _CFFI_OP(_CFFI_OP_NOOP, 599),
-/* 1035 */ _CFFI_OP(_CFFI_OP_NOOP, 1028),
+/* 1033 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Sequential *, Module *)
+/* 1034 */ _CFFI_OP(_CFFI_OP_NOOP, 428),
+/* 1035 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
 /* 1036 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1037 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(_Bool)
-/* 1038 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 1037 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(SparseCOOData *)
+/* 1038 */ _CFFI_OP(_CFFI_OP_NOOP, 436),
 /* 1039 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1040 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(int *, int *, int *, char const * *)
-/* 1041 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 1042 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 1043 */ _CFFI_OP(_CFFI_OP_NOOP, 225),
-/* 1044 */ _CFFI_OP(_CFFI_OP_POINTER, 134), // char const * *
+/* 1040 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(StateDict *)
+/* 1041 */ _CFFI_OP(_CFFI_OP_POINTER, 1213), // StateDict *
+/* 1042 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1043 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Tensor *)
+/* 1044 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
 /* 1045 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1046 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(int)
-/* 1047 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
-/* 1048 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1049 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(size_t *, size_t *, size_t *, size_t *)
-/* 1050 */ _CFFI_OP(_CFFI_OP_POINTER, 726), // size_t *
-/* 1051 */ _CFFI_OP(_CFFI_OP_NOOP, 1050),
-/* 1052 */ _CFFI_OP(_CFFI_OP_NOOP, 1050),
-/* 1053 */ _CFFI_OP(_CFFI_OP_NOOP, 1050),
-/* 1054 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1055 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(struct Module *)
-/* 1056 */ _CFFI_OP(_CFFI_OP_NOOP, 321),
-/* 1057 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1058 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(uint64_t)
-/* 1059 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 24), // uint64_t
-/* 1060 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1061 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(void *(*)(int, char const *, void *))
-/* 1062 */ _CFFI_OP(_CFFI_OP_POINTER, 931), // void *(*)(int, char const *, void *)
-/* 1063 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1064 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(void *)
-/* 1065 */ _CFFI_OP(_CFFI_OP_NOOP, 705),
-/* 1066 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1067 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1197), // void()(void)
-/* 1068 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
-/* 1069 */ _CFFI_OP(_CFFI_OP_POINTER, 1070), // AdaptiveAvgPool1d *
-/* 1070 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 2), // AdaptiveAvgPool1d
-/* 1071 */ _CFFI_OP(_CFFI_OP_POINTER, 1072), // AdaptiveAvgPool2d *
-/* 1072 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 3), // AdaptiveAvgPool2d
-/* 1073 */ _CFFI_OP(_CFFI_OP_POINTER, 1074), // AdaptiveMaxPool1d *
-/* 1074 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 4), // AdaptiveMaxPool1d
-/* 1075 */ _CFFI_OP(_CFFI_OP_POINTER, 1076), // AdaptiveMaxPool2d *
-/* 1076 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 5), // AdaptiveMaxPool2d
-/* 1077 */ _CFFI_OP(_CFFI_OP_POINTER, 1078), // AvgPool1d *
-/* 1078 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 6), // AvgPool1d
-/* 1079 */ _CFFI_OP(_CFFI_OP_POINTER, 1080), // AvgPool2d *
-/* 1080 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 7), // AvgPool2d
-/* 1081 */ _CFFI_OP(_CFFI_OP_POINTER, 1082), // AvgPool3d *
-/* 1082 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 8), // AvgPool3d
-/* 1083 */ _CFFI_OP(_CFFI_OP_POINTER, 1084), // BatchNorm1d *
-/* 1084 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 9), // BatchNorm1d
-/* 1085 */ _CFFI_OP(_CFFI_OP_POINTER, 1086), // BatchNorm2d *
-/* 1086 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 10), // BatchNorm2d
-/* 1087 */ _CFFI_OP(_CFFI_OP_POINTER, 1088), // BatchNorm3d *
-/* 1088 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 11), // BatchNorm3d
-/* 1089 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 14), // CleanupContext
-/* 1090 */ _CFFI_OP(_CFFI_OP_POINTER, 1091), // Conv1d *
-/* 1091 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 15), // Conv1d
-/* 1092 */ _CFFI_OP(_CFFI_OP_POINTER, 1093), // Conv2d *
-/* 1093 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 16), // Conv2d
-/* 1094 */ _CFFI_OP(_CFFI_OP_POINTER, 1095), // Conv3d *
-/* 1095 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 17), // Conv3d
-/* 1096 */ _CFFI_OP(_CFFI_OP_POINTER, 1097), // ConvTranspose1d *
-/* 1097 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 18), // ConvTranspose1d
-/* 1098 */ _CFFI_OP(_CFFI_OP_POINTER, 1099), // ConvTranspose2d *
-/* 1099 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 19), // ConvTranspose2d
-/* 1100 */ _CFFI_OP(_CFFI_OP_POINTER, 1101), // ConvTranspose3d *
-/* 1101 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 20), // ConvTranspose3d
-/* 1102 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 21), // Dataset
-/* 1103 */ _CFFI_OP(_CFFI_OP_POINTER, 1104), // Dropout *
-/* 1104 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 22), // Dropout
-/* 1105 */ _CFFI_OP(_CFFI_OP_POINTER, 1106), // Embedding *
-/* 1106 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 23), // Embedding
-/* 1107 */ _CFFI_OP(_CFFI_OP_POINTER, 1108), // Flatten *
-/* 1108 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 24), // Flatten
-/* 1109 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 25), // GGUFContext
-/* 1110 */ _CFFI_OP(_CFFI_OP_POINTER, 1111), // GRU *
-/* 1111 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 26), // GRU
-/* 1112 */ _CFFI_OP(_CFFI_OP_POINTER, 1113), // GRUCell *
-/* 1113 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 27), // GRUCell
-/* 1114 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 28), // GradScaler
-/* 1115 */ _CFFI_OP(_CFFI_OP_POINTER, 1116), // GroupNorm *
-/* 1116 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 29), // GroupNorm
-/* 1117 */ _CFFI_OP(_CFFI_OP_POINTER, 1118), // Identity *
-/* 1118 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 31), // Identity
-/* 1119 */ _CFFI_OP(_CFFI_OP_POINTER, 1120), // InstanceNorm2d *
-/* 1120 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 32), // InstanceNorm2d
-/* 1121 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 33), // LRScheduler
-/* 1122 */ _CFFI_OP(_CFFI_OP_POINTER, 1123), // LSTM *
-/* 1123 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 34), // LSTM
-/* 1124 */ _CFFI_OP(_CFFI_OP_POINTER, 1125), // LSTMCell *
-/* 1125 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 35), // LSTMCell
-/* 1126 */ _CFFI_OP(_CFFI_OP_POINTER, 1129), // LayerNorm *
-/* 1127 */ _CFFI_OP(_CFFI_OP_POINTER, 1128), // LayerNorm2d *
-/* 1128 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 37), // LayerNorm2d
-/* 1129 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 36), // LayerNorm
-/* 1130 */ _CFFI_OP(_CFFI_OP_POINTER, 1131), // LeakyReLU *
-/* 1131 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 38), // LeakyReLU
-/* 1132 */ _CFFI_OP(_CFFI_OP_POINTER, 1133), // Linear *
-/* 1133 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 39), // Linear
-/* 1134 */ _CFFI_OP(_CFFI_OP_POINTER, 1135), // MaxPool1d *
-/* 1135 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 40), // MaxPool1d
-/* 1136 */ _CFFI_OP(_CFFI_OP_POINTER, 1137), // MaxPool2d *
-/* 1137 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 41), // MaxPool2d
-/* 1138 */ _CFFI_OP(_CFFI_OP_POINTER, 1139), // MaxPool3d *
-/* 1139 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 42), // MaxPool3d
-/* 1140 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 43), // Module
-/* 1141 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 44), // ModuleDict
-/* 1142 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 45), // ModuleList
-/* 1143 */ _CFFI_OP(_CFFI_OP_POINTER, 1144), // MultiHeadAttention *
-/* 1144 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 46), // MultiHeadAttention
-/* 1145 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 47), // Optimizer
-/* 1146 */ _CFFI_OP(_CFFI_OP_POINTER, 1147), // PReLU *
-/* 1147 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 48), // PReLU
-/* 1148 */ _CFFI_OP(_CFFI_OP_POINTER, 1149), // Parameter *
-/* 1149 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 49), // Parameter
-/* 1150 */ _CFFI_OP(_CFFI_OP_POINTER, 1151), // PixelShuffle *
-/* 1151 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 50), // PixelShuffle
-/* 1152 */ _CFFI_OP(_CFFI_OP_POINTER, 1153), // PixelUnshuffle *
-/* 1153 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 51), // PixelUnshuffle
-/* 1154 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 0), // QRResult
-/* 1155 */ _CFFI_OP(_CFFI_OP_POINTER, 1156), // RNN *
-/* 1156 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 52), // RNN
-/* 1157 */ _CFFI_OP(_CFFI_OP_POINTER, 1158), // RNNCell *
-/* 1158 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 53), // RNNCell
-/* 1159 */ _CFFI_OP(_CFFI_OP_POINTER, 1160), // ReLU *
-/* 1160 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 54), // ReLU
-/* 1161 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 1), // SVDResult
-/* 1162 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 55), // SafeTensorsContext
-/* 1163 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 56), // Sequential
-/* 1164 */ _CFFI_OP(_CFFI_OP_POINTER, 1165), // Sigmoid *
-/* 1165 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 57), // Sigmoid
-/* 1166 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 58), // SparseCOOData
-/* 1167 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 59), // StateDict
-/* 1168 */ _CFFI_OP(_CFFI_OP_POINTER, 1169), // Tanh *
-/* 1169 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 60), // Tanh
-/* 1170 */ _CFFI_OP(_CFFI_OP_POINTER, 700), // Tensor *(*)(struct Module *, Tensor *)
-/* 1171 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 61), // Tensor
-/* 1172 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 62), // TensorConfig
-/* 1173 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 63), // TorchMemoryManager
-/* 1174 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 64), // TorchPTEExportOptions
-/* 1175 */ _CFFI_OP(_CFFI_OP_ENUM, 7), // TorchRuntimeKind
-/* 1176 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 65), // TorchRuntimeModule
-/* 1177 */ _CFFI_OP(_CFFI_OP_POINTER, 1178), // TransformerDecoder *
-/* 1178 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 67), // TransformerDecoder
-/* 1179 */ _CFFI_OP(_CFFI_OP_POINTER, 1180), // TransformerDecoderLayer *
-/* 1180 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 68), // TransformerDecoderLayer
-/* 1181 */ _CFFI_OP(_CFFI_OP_POINTER, 1182), // TransformerEncoder *
-/* 1182 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 69), // TransformerEncoder
-/* 1183 */ _CFFI_OP(_CFFI_OP_POINTER, 1184), // TransformerEncoderLayer *
-/* 1184 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 70), // TransformerEncoderLayer
-/* 1185 */ _CFFI_OP(_CFFI_OP_POINTER, 1186), // Upsample *
-/* 1186 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 71), // Upsample
-/* 1187 */ _CFFI_OP(_CFFI_OP_POINTER, 1188), // char *
-/* 1188 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
-/* 1189 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 14), // double
-/* 1190 */ _CFFI_OP(_CFFI_OP_POINTER, 37), // float *
-/* 1191 */ _CFFI_OP(_CFFI_OP_POINTER, 1192), // struct CMLBackendBuffer *
-/* 1192 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 12), // struct CMLBackendBuffer
-/* 1193 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 13), // struct CMLGraph
-/* 1194 */ _CFFI_OP(_CFFI_OP_POINTER, 1195), // struct IRNode *
-/* 1195 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 30), // struct IRNode
-/* 1196 */ _CFFI_OP(_CFFI_OP_POINTER, 1055), // void(*)(struct Module *)
-/* 1197 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
+/* 1046 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Tensor *, Tensor *, _Bool, _Bool)
+/* 1047 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 1048 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 1049 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 1050 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 1051 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1052 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Tensor *, _Bool)
+/* 1053 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 1054 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 1055 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1056 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Tensor *, float)
+/* 1057 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 1058 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 1059 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1060 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(Tensor *, size_t, float)
+/* 1061 */ _CFFI_OP(_CFFI_OP_NOOP, 396),
+/* 1062 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 28),
+/* 1063 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 13),
+/* 1064 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1065 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(TorchMemoryManager *)
+/* 1066 */ _CFFI_OP(_CFFI_OP_POINTER, 1219), // TorchMemoryManager *
+/* 1067 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1068 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(TorchRuntimeModule *)
+/* 1069 */ _CFFI_OP(_CFFI_OP_NOOP, 624),
+/* 1070 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1071 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(TorchRuntimeModule *, TorchMemoryManager *)
+/* 1072 */ _CFFI_OP(_CFFI_OP_NOOP, 624),
+/* 1073 */ _CFFI_OP(_CFFI_OP_NOOP, 1066),
+/* 1074 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1075 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(_Bool)
+/* 1076 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 1),
+/* 1077 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1078 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(int *, int *, int *, char const * *)
+/* 1079 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 1080 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 1081 */ _CFFI_OP(_CFFI_OP_NOOP, 236),
+/* 1082 */ _CFFI_OP(_CFFI_OP_POINTER, 145), // char const * *
+/* 1083 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1084 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(int)
+/* 1085 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 7),
+/* 1086 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1087 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(size_t *, size_t *, size_t *, size_t *)
+/* 1088 */ _CFFI_OP(_CFFI_OP_POINTER, 751), // size_t *
+/* 1089 */ _CFFI_OP(_CFFI_OP_NOOP, 1088),
+/* 1090 */ _CFFI_OP(_CFFI_OP_NOOP, 1088),
+/* 1091 */ _CFFI_OP(_CFFI_OP_NOOP, 1088),
+/* 1092 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1093 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(struct Module *)
+/* 1094 */ _CFFI_OP(_CFFI_OP_NOOP, 63),
+/* 1095 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1096 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(uint64_t)
+/* 1097 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 24), // uint64_t
+/* 1098 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1099 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(void *(*)(int, char const *, void *))
+/* 1100 */ _CFFI_OP(_CFFI_OP_POINTER, 963), // void *(*)(int, char const *, void *)
+/* 1101 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1102 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(void *)
+/* 1103 */ _CFFI_OP(_CFFI_OP_NOOP, 730),
+/* 1104 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1105 */ _CFFI_OP(_CFFI_OP_FUNCTION, 1243), // void()(void)
+/* 1106 */ _CFFI_OP(_CFFI_OP_FUNCTION_END, 0),
+/* 1107 */ _CFFI_OP(_CFFI_OP_POINTER, 1108), // AdaptiveAvgPool1d *
+/* 1108 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 5), // AdaptiveAvgPool1d
+/* 1109 */ _CFFI_OP(_CFFI_OP_POINTER, 1110), // AdaptiveAvgPool2d *
+/* 1110 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 6), // AdaptiveAvgPool2d
+/* 1111 */ _CFFI_OP(_CFFI_OP_POINTER, 1112), // AdaptiveMaxPool1d *
+/* 1112 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 7), // AdaptiveMaxPool1d
+/* 1113 */ _CFFI_OP(_CFFI_OP_POINTER, 1114), // AdaptiveMaxPool2d *
+/* 1114 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 8), // AdaptiveMaxPool2d
+/* 1115 */ _CFFI_OP(_CFFI_OP_POINTER, 1116), // AvgPool1d *
+/* 1116 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 9), // AvgPool1d
+/* 1117 */ _CFFI_OP(_CFFI_OP_POINTER, 1118), // AvgPool2d *
+/* 1118 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 10), // AvgPool2d
+/* 1119 */ _CFFI_OP(_CFFI_OP_POINTER, 1120), // AvgPool3d *
+/* 1120 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 11), // AvgPool3d
+/* 1121 */ _CFFI_OP(_CFFI_OP_POINTER, 1122), // BatchNorm1d *
+/* 1122 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 12), // BatchNorm1d
+/* 1123 */ _CFFI_OP(_CFFI_OP_POINTER, 1124), // BatchNorm2d *
+/* 1124 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 13), // BatchNorm2d
+/* 1125 */ _CFFI_OP(_CFFI_OP_POINTER, 1126), // BatchNorm3d *
+/* 1126 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 14), // BatchNorm3d
+/* 1127 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 16), // CMLDataParallel
+/* 1128 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 18), // CMLPipelineParallel
+/* 1129 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 19), // CleanupContext
+/* 1130 */ _CFFI_OP(_CFFI_OP_POINTER, 1131), // Conv1d *
+/* 1131 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 20), // Conv1d
+/* 1132 */ _CFFI_OP(_CFFI_OP_POINTER, 1133), // Conv2d *
+/* 1133 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 21), // Conv2d
+/* 1134 */ _CFFI_OP(_CFFI_OP_POINTER, 1135), // Conv3d *
+/* 1135 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 22), // Conv3d
+/* 1136 */ _CFFI_OP(_CFFI_OP_POINTER, 1137), // ConvTranspose1d *
+/* 1137 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 23), // ConvTranspose1d
+/* 1138 */ _CFFI_OP(_CFFI_OP_POINTER, 1139), // ConvTranspose2d *
+/* 1139 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 24), // ConvTranspose2d
+/* 1140 */ _CFFI_OP(_CFFI_OP_POINTER, 1141), // ConvTranspose3d *
+/* 1141 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 25), // ConvTranspose3d
+/* 1142 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 0), // DDPConfig
+/* 1143 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 26), // Dataset
+/* 1144 */ _CFFI_OP(_CFFI_OP_POINTER, 1145), // Dropout *
+/* 1145 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 27), // Dropout
+/* 1146 */ _CFFI_OP(_CFFI_OP_POINTER, 1147), // Embedding *
+/* 1147 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 28), // Embedding
+/* 1148 */ _CFFI_OP(_CFFI_OP_POINTER, 1149), // Flatten *
+/* 1149 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 29), // Flatten
+/* 1150 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 30), // GGUFContext
+/* 1151 */ _CFFI_OP(_CFFI_OP_POINTER, 1152), // GRU *
+/* 1152 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 31), // GRU
+/* 1153 */ _CFFI_OP(_CFFI_OP_POINTER, 1154), // GRUCell *
+/* 1154 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 32), // GRUCell
+/* 1155 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 33), // GradScaler
+/* 1156 */ _CFFI_OP(_CFFI_OP_POINTER, 1157), // GroupNorm *
+/* 1157 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 34), // GroupNorm
+/* 1158 */ _CFFI_OP(_CFFI_OP_POINTER, 1159), // Identity *
+/* 1159 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 36), // Identity
+/* 1160 */ _CFFI_OP(_CFFI_OP_POINTER, 1161), // InstanceNorm2d *
+/* 1161 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 37), // InstanceNorm2d
+/* 1162 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 38), // LRScheduler
+/* 1163 */ _CFFI_OP(_CFFI_OP_POINTER, 1164), // LSTM *
+/* 1164 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 39), // LSTM
+/* 1165 */ _CFFI_OP(_CFFI_OP_POINTER, 1166), // LSTMCell *
+/* 1166 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 40), // LSTMCell
+/* 1167 */ _CFFI_OP(_CFFI_OP_POINTER, 1170), // LayerNorm *
+/* 1168 */ _CFFI_OP(_CFFI_OP_POINTER, 1169), // LayerNorm2d *
+/* 1169 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 42), // LayerNorm2d
+/* 1170 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 41), // LayerNorm
+/* 1171 */ _CFFI_OP(_CFFI_OP_POINTER, 1172), // LeakyReLU *
+/* 1172 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 43), // LeakyReLU
+/* 1173 */ _CFFI_OP(_CFFI_OP_POINTER, 1174), // Linear *
+/* 1174 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 44), // Linear
+/* 1175 */ _CFFI_OP(_CFFI_OP_POINTER, 1176), // MaxPool1d *
+/* 1176 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 45), // MaxPool1d
+/* 1177 */ _CFFI_OP(_CFFI_OP_POINTER, 1178), // MaxPool2d *
+/* 1178 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 46), // MaxPool2d
+/* 1179 */ _CFFI_OP(_CFFI_OP_POINTER, 1180), // MaxPool3d *
+/* 1180 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 47), // MaxPool3d
+/* 1181 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 48), // Module
+/* 1182 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 49), // ModuleDict
+/* 1183 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 50), // ModuleList
+/* 1184 */ _CFFI_OP(_CFFI_OP_POINTER, 1185), // MultiHeadAttention *
+/* 1185 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 51), // MultiHeadAttention
+/* 1186 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 52), // Optimizer
+/* 1187 */ _CFFI_OP(_CFFI_OP_POINTER, 1188), // PReLU *
+/* 1188 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 53), // PReLU
+/* 1189 */ _CFFI_OP(_CFFI_OP_POINTER, 1190), // Parameter *
+/* 1190 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 54), // Parameter
+/* 1191 */ _CFFI_OP(_CFFI_OP_POINTER, 1192), // PipeUnit *
+/* 1192 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 1), // PipeUnit
+/* 1193 */ _CFFI_OP(_CFFI_OP_ENUM, 6), // PipeUnitKind
+/* 1194 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 2), // PipelineConfig
+/* 1195 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 55), // PipelineStage
+/* 1196 */ _CFFI_OP(_CFFI_OP_POINTER, 1197), // PixelShuffle *
+/* 1197 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 56), // PixelShuffle
+/* 1198 */ _CFFI_OP(_CFFI_OP_POINTER, 1199), // PixelUnshuffle *
+/* 1199 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 57), // PixelUnshuffle
+/* 1200 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 3), // QRResult
+/* 1201 */ _CFFI_OP(_CFFI_OP_POINTER, 1202), // RNN *
+/* 1202 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 58), // RNN
+/* 1203 */ _CFFI_OP(_CFFI_OP_POINTER, 1204), // RNNCell *
+/* 1204 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 59), // RNNCell
+/* 1205 */ _CFFI_OP(_CFFI_OP_POINTER, 1206), // ReLU *
+/* 1206 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 60), // ReLU
+/* 1207 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 4), // SVDResult
+/* 1208 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 61), // SafeTensorsContext
+/* 1209 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 62), // Sequential
+/* 1210 */ _CFFI_OP(_CFFI_OP_POINTER, 1211), // Sigmoid *
+/* 1211 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 63), // Sigmoid
+/* 1212 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 64), // SparseCOOData
+/* 1213 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 65), // StateDict
+/* 1214 */ _CFFI_OP(_CFFI_OP_POINTER, 1215), // Tanh *
+/* 1215 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 66), // Tanh
+/* 1216 */ _CFFI_OP(_CFFI_OP_POINTER, 725), // Tensor *(*)(struct Module *, Tensor *)
+/* 1217 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 67), // Tensor
+/* 1218 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 68), // TensorConfig
+/* 1219 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 69), // TorchMemoryManager
+/* 1220 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 70), // TorchPTEExportOptions
+/* 1221 */ _CFFI_OP(_CFFI_OP_ENUM, 8), // TorchRuntimeKind
+/* 1222 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 71), // TorchRuntimeModule
+/* 1223 */ _CFFI_OP(_CFFI_OP_POINTER, 1224), // TransformerDecoder *
+/* 1224 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 73), // TransformerDecoder
+/* 1225 */ _CFFI_OP(_CFFI_OP_POINTER, 1226), // TransformerDecoderLayer *
+/* 1226 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 74), // TransformerDecoderLayer
+/* 1227 */ _CFFI_OP(_CFFI_OP_POINTER, 1228), // TransformerEncoder *
+/* 1228 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 75), // TransformerEncoder
+/* 1229 */ _CFFI_OP(_CFFI_OP_POINTER, 1230), // TransformerEncoderLayer *
+/* 1230 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 76), // TransformerEncoderLayer
+/* 1231 */ _CFFI_OP(_CFFI_OP_POINTER, 1232), // Upsample *
+/* 1232 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 77), // Upsample
+/* 1233 */ _CFFI_OP(_CFFI_OP_POINTER, 1234), // char *
+/* 1234 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 2), // char
+/* 1235 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 14), // double
+/* 1236 */ _CFFI_OP(_CFFI_OP_POINTER, 37), // float *
+/* 1237 */ _CFFI_OP(_CFFI_OP_POINTER, 1238), // struct CMLBackendBuffer *
+/* 1238 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 15), // struct CMLBackendBuffer
+/* 1239 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 17), // struct CMLGraph
+/* 1240 */ _CFFI_OP(_CFFI_OP_POINTER, 1241), // struct IRNode *
+/* 1241 */ _CFFI_OP(_CFFI_OP_STRUCT_UNION, 35), // struct IRNode
+/* 1242 */ _CFFI_OP(_CFFI_OP_POINTER, 1093), // void(*)(struct Module *)
+/* 1243 */ _CFFI_OP(_CFFI_OP_PRIMITIVE, 0), // void
 };
+
+_CFFI_UNUSED_FN
+static void _cffi_checkfld_typedef_DDPConfig(DDPConfig *p)
+{
+  /* only to generate compile-time warnings or errors */
+  (void)p;
+  (void)((p->bucket_size_bytes) | 0);  /* check that 'DDPConfig.bucket_size_bytes' is an integer */
+  (void)((p->broadcast_buffers) | 0);  /* check that 'DDPConfig.broadcast_buffers' is an integer */
+  (void)((p->find_unused_parameters) | 0);  /* check that 'DDPConfig.find_unused_parameters' is an integer */
+  (void)((p->gradient_as_bucket_view) | 0);  /* check that 'DDPConfig.gradient_as_bucket_view' is an integer */
+}
+struct _cffi_align_typedef_DDPConfig { char x; DDPConfig y; };
 
 static int _cffi_const_DTYPE_FLOAT32(unsigned long long *o)
 {
@@ -2035,6 +2095,42 @@ static int _cffi_const_LOG_LEVEL_ERROR(unsigned long long *o)
 }
 
 _CFFI_UNUSED_FN
+static void _cffi_checkfld_typedef_PipeUnit(PipeUnit *p)
+{
+  /* only to generate compile-time warnings or errors */
+  (void)p;
+  (void)((p->stage) | 0);  /* check that 'PipeUnit.stage' is an integer */
+  (void)((p->micro_batch) | 0);  /* check that 'PipeUnit.micro_batch' is an integer */
+  { PipeUnitKind *tmp = &p->kind; (void)tmp; }
+}
+struct _cffi_align_typedef_PipeUnit { char x; PipeUnit y; };
+
+static int _cffi_const_PIPE_UNIT_FORWARD(unsigned long long *o)
+{
+  int n = (PIPE_UNIT_FORWARD) <= 0;
+  *o = (unsigned long long)((PIPE_UNIT_FORWARD) | 0);  /* check that PIPE_UNIT_FORWARD is an integer */
+  return n;
+}
+
+static int _cffi_const_PIPE_UNIT_BACKWARD(unsigned long long *o)
+{
+  int n = (PIPE_UNIT_BACKWARD) <= 0;
+  *o = (unsigned long long)((PIPE_UNIT_BACKWARD) | 0);  /* check that PIPE_UNIT_BACKWARD is an integer */
+  return n;
+}
+
+_CFFI_UNUSED_FN
+static void _cffi_checkfld_typedef_PipelineConfig(PipelineConfig *p)
+{
+  /* only to generate compile-time warnings or errors */
+  (void)p;
+  (void)((p->num_micro_batches) | 0);  /* check that 'PipelineConfig.num_micro_batches' is an integer */
+  (void)((p->num_stages) | 0);  /* check that 'PipelineConfig.num_stages' is an integer */
+  (void)((p->interleaved) | 0);  /* check that 'PipelineConfig.interleaved' is an integer */
+}
+struct _cffi_align_typedef_PipelineConfig { char x; PipelineConfig y; };
+
+_CFFI_UNUSED_FN
 static void _cffi_checkfld_typedef_QRResult(QRResult *p)
 {
   /* only to generate compile-time warnings or errors */
@@ -2221,10 +2317,10 @@ _cffi_f_cml_acos(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2236,7 +2332,7 @@ _cffi_f_cml_acos(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -2265,19 +2361,19 @@ _cffi_f_cml_add(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2289,7 +2385,7 @@ _cffi_f_cml_add(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -2334,10 +2430,10 @@ _cffi_f_cml_arange(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg3, (char **)&x3);
+      _cffi_type(494), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2349,7 +2445,7 @@ _cffi_f_cml_arange(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -2378,10 +2474,10 @@ _cffi_f_cml_argmax(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2397,7 +2493,7 @@ _cffi_f_cml_argmax(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -2426,10 +2522,10 @@ _cffi_f_cml_argmin(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2445,7 +2541,7 @@ _cffi_f_cml_argmin(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -2476,10 +2572,10 @@ _cffi_f_cml_argsort(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2499,7 +2595,7 @@ _cffi_f_cml_argsort(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -2522,10 +2618,10 @@ _cffi_f_cml_asin(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2537,7 +2633,7 @@ _cffi_f_cml_asin(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -2560,10 +2656,10 @@ _cffi_f_cml_atan(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2575,12 +2671,38 @@ _cffi_f_cml_atan(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
 #else
 #  define _cffi_f_cml_atan _cffi_d_cml_atan
+#endif
+
+static DType _cffi_d_cml_autocast_default_dtype(void)
+{
+  return cml_autocast_default_dtype();
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_autocast_default_dtype(PyObject *self, PyObject *noarg)
+{
+  DType result;
+  PyObject *pyresult;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_autocast_default_dtype(); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  (void)noarg; /* unused */
+  pyresult = _cffi_from_c_deref((char *)&result, _cffi_type(41));
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_autocast_default_dtype _cffi_d_cml_autocast_default_dtype
 #endif
 
 static void _cffi_d_cml_autocast_enter(DType x0)
@@ -2634,6 +2756,32 @@ _cffi_f_cml_autocast_exit(PyObject *self, PyObject *noarg)
 #  define _cffi_f_cml_autocast_exit _cffi_d_cml_autocast_exit
 #endif
 
+static DType _cffi_d_cml_autocast_get_dtype(void)
+{
+  return cml_autocast_get_dtype();
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_autocast_get_dtype(PyObject *self, PyObject *noarg)
+{
+  DType result;
+  PyObject *pyresult;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_autocast_get_dtype(); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  (void)noarg; /* unused */
+  pyresult = _cffi_from_c_deref((char *)&result, _cffi_type(41));
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_autocast_get_dtype _cffi_d_cml_autocast_get_dtype
+#endif
+
 static _Bool _cffi_d_cml_autocast_is_enabled(void)
 {
   return cml_autocast_is_enabled();
@@ -2658,6 +2806,33 @@ _cffi_f_cml_autocast_is_enabled(PyObject *self, PyObject *noarg)
 }
 #else
 #  define _cffi_f_cml_autocast_is_enabled _cffi_d_cml_autocast_is_enabled
+#endif
+
+static void _cffi_d_cml_autocast_set_dtype(DType x0)
+{
+  cml_autocast_set_dtype(x0);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_autocast_set_dtype(PyObject *self, PyObject *arg0)
+{
+  DType x0;
+
+  if (_cffi_to_c((char *)&x0, _cffi_type(41), arg0) < 0)
+    return NULL;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { cml_autocast_set_dtype(x0); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+#else
+#  define _cffi_f_cml_autocast_set_dtype _cffi_d_cml_autocast_set_dtype
 #endif
 
 static void _cffi_d_cml_autograd_reset_after_step(void)
@@ -2697,10 +2872,10 @@ _cffi_f_cml_autograd_step_end(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2743,19 +2918,19 @@ _cffi_f_cml_backward(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2798,10 +2973,10 @@ _cffi_f_cml_bfloat16(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2813,7 +2988,7 @@ _cffi_f_cml_bfloat16(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -2842,10 +3017,10 @@ _cffi_f_cml_bitcast(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2860,7 +3035,7 @@ _cffi_f_cml_bitcast(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -2883,10 +3058,10 @@ _cffi_f_cml_bool_(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2898,7 +3073,7 @@ _cffi_f_cml_bool_(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -2927,10 +3102,10 @@ _cffi_f_cml_cast(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2945,7 +3120,7 @@ _cffi_f_cml_cast(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -2968,10 +3143,10 @@ _cffi_f_cml_ceil(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -2983,7 +3158,7 @@ _cffi_f_cml_ceil(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3016,10 +3191,10 @@ _cffi_f_cml_chunk(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3033,10 +3208,10 @@ _cffi_f_cml_chunk(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg3, (char **)&x3);
+      _cffi_type(236), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3048,7 +3223,7 @@ _cffi_f_cml_chunk(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(437));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(454));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3079,10 +3254,10 @@ _cffi_f_cml_clamp(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3102,7 +3277,7 @@ _cffi_f_cml_clamp(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3175,10 +3350,10 @@ _cffi_f_cml_clone(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3190,7 +3365,7 @@ _cffi_f_cml_clone(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3221,10 +3396,10 @@ _cffi_f_cml_concat(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(437), arg0, (char **)&x0);
+      _cffi_type(454), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(437), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(454), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3244,7 +3419,7 @@ _cffi_f_cml_concat(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3267,10 +3442,10 @@ _cffi_f_cml_contiguous(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3282,7 +3457,7 @@ _cffi_f_cml_contiguous(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3311,19 +3486,19 @@ _cffi_f_cml_copysign(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3335,7 +3510,7 @@ _cffi_f_cml_copysign(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3358,10 +3533,10 @@ _cffi_f_cml_cos(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3373,7 +3548,7 @@ _cffi_f_cml_cos(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3402,10 +3577,10 @@ _cffi_f_cml_cumprod(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3421,7 +3596,7 @@ _cffi_f_cml_cumprod(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3450,10 +3625,10 @@ _cffi_f_cml_cumsum(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3469,7 +3644,7 @@ _cffi_f_cml_cumsum(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3492,10 +3667,10 @@ _cffi_f_cml_dataset_load(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg0, (char **)&x0);
+      _cffi_type(145), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3507,12 +3682,274 @@ _cffi_f_cml_dataset_load(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(836));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(868));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
 #else
 #  define _cffi_f_cml_dataset_load _cffi_d_cml_dataset_load
+#endif
+
+static CMLDataParallel * _cffi_d_cml_ddp_create(Module * x0, DDPConfig const * x1)
+{
+  return cml_ddp_create(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_ddp_create(PyObject *self, PyObject *args)
+{
+  Module * x0;
+  DDPConfig const * x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  CMLDataParallel * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "cml_ddp_create", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(63), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(64), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (DDPConfig const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(64), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_ddp_create(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(465));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_ddp_create _cffi_d_cml_ddp_create
+#endif
+
+static DDPConfig _cffi_d_cml_ddp_default_config(void)
+{
+  return cml_ddp_default_config();
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_ddp_default_config(PyObject *self, PyObject *noarg)
+{
+  DDPConfig result;
+  PyObject *pyresult;
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_ddp_default_config(); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  (void)noarg; /* unused */
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1142));
+  return pyresult;
+}
+#else
+static void _cffi_f_cml_ddp_default_config(DDPConfig *result)
+{
+  { *result = cml_ddp_default_config(); }
+}
+#endif
+
+static Tensor * _cffi_d_cml_ddp_forward(CMLDataParallel * x0, Tensor * x1)
+{
+  return cml_ddp_forward(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_ddp_forward(PyObject *self, PyObject *args)
+{
+  CMLDataParallel * x0;
+  Tensor * x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "cml_ddp_forward", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(465), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (CMLDataParallel *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(465), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(396), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_ddp_forward(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_ddp_forward _cffi_d_cml_ddp_forward
+#endif
+
+static void _cffi_d_cml_ddp_free(CMLDataParallel * x0)
+{
+  cml_ddp_free(x0);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_ddp_free(PyObject *self, PyObject *arg0)
+{
+  CMLDataParallel * x0;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(465), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (CMLDataParallel *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(465), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { cml_ddp_free(x0); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+#else
+#  define _cffi_f_cml_ddp_free _cffi_d_cml_ddp_free
+#endif
+
+static Tensor * _cffi_d_cml_ddp_shard_input(CMLDataParallel * x0, Tensor * x1)
+{
+  return cml_ddp_shard_input(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_ddp_shard_input(PyObject *self, PyObject *args)
+{
+  CMLDataParallel * x0;
+  Tensor * x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "cml_ddp_shard_input", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(465), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (CMLDataParallel *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(465), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(396), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_ddp_shard_input(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_ddp_shard_input _cffi_d_cml_ddp_shard_input
+#endif
+
+static int _cffi_d_cml_ddp_sync_gradients(CMLDataParallel * x0)
+{
+  return cml_ddp_sync_gradients(x0);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_ddp_sync_gradients(PyObject *self, PyObject *arg0)
+{
+  CMLDataParallel * x0;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  int result;
+  PyObject *pyresult;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(465), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (CMLDataParallel *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(465), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_ddp_sync_gradients(x0); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_int(result, int);
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_ddp_sync_gradients _cffi_d_cml_ddp_sync_gradients
 #endif
 
 static Tensor * _cffi_d_cml_detach(Tensor * x0)
@@ -3530,10 +3967,10 @@ _cffi_f_cml_detach(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3545,7 +3982,7 @@ _cffi_f_cml_detach(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3578,10 +4015,10 @@ _cffi_f_cml_diagonal(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3605,7 +4042,7 @@ _cffi_f_cml_diagonal(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3634,15 +4071,15 @@ _cffi_f_cml_dist_allreduce(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
-  if (_cffi_to_c((char *)&x1, _cffi_type(900), arg1) < 0)
+  if (_cffi_to_c((char *)&x1, _cffi_type(932), arg1) < 0)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
@@ -3782,7 +4219,7 @@ _cffi_f_cml_dist_init(PyObject *self, PyObject *args)
   if (!PyArg_UnpackTuple(args, "cml_dist_init", 3, 3, &arg0, &arg1, &arg2))
     return NULL;
 
-  if (_cffi_to_c((char *)&x0, _cffi_type(840), arg0) < 0)
+  if (_cffi_to_c((char *)&x0, _cffi_type(872), arg0) < 0)
     return NULL;
 
   x1 = _cffi_to_c_int(arg1, int);
@@ -3854,19 +4291,19 @@ _cffi_f_cml_div(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3878,7 +4315,7 @@ _cffi_f_cml_div(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3907,19 +4344,19 @@ _cffi_f_cml_dot(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3931,7 +4368,7 @@ _cffi_f_cml_dot(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -3954,10 +4391,10 @@ _cffi_f_cml_double(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -3969,7 +4406,7 @@ _cffi_f_cml_double(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4029,19 +4466,19 @@ _cffi_f_cml_einsum(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg0, (char **)&x0);
+      _cffi_type(145), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(437), arg1, (char **)&x1);
+      _cffi_type(454), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(437), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(454), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4057,7 +4494,7 @@ _cffi_f_cml_einsum(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4086,10 +4523,10 @@ _cffi_f_cml_elu(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4105,7 +4542,7 @@ _cffi_f_cml_elu(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4136,10 +4573,10 @@ _cffi_f_cml_empty(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4149,10 +4586,10 @@ _cffi_f_cml_empty(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg2, (char **)&x2);
+      _cffi_type(494), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4164,7 +4601,7 @@ _cffi_f_cml_empty(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4195,7 +4632,7 @@ _cffi_f_cml_empty_1d(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   return pyresult;
 }
 #else
@@ -4235,7 +4672,7 @@ _cffi_f_cml_empty_2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   return pyresult;
 }
 #else
@@ -4281,10 +4718,10 @@ _cffi_f_cml_erf(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4296,7 +4733,7 @@ _cffi_f_cml_erf(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4319,10 +4756,10 @@ _cffi_f_cml_exp(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4334,7 +4771,7 @@ _cffi_f_cml_exp(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4357,10 +4794,10 @@ _cffi_f_cml_exp2(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4372,7 +4809,7 @@ _cffi_f_cml_exp2(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4405,10 +4842,10 @@ _cffi_f_cml_eye(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg1, (char **)&x1);
+      _cffi_type(494), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4420,7 +4857,7 @@ _cffi_f_cml_eye(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4455,19 +4892,19 @@ _cffi_f_cml_f_interpolate(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4476,7 +4913,7 @@ _cffi_f_cml_f_interpolate(PyObject *self, PyObject *args)
   if (x2 == (int)-1 && PyErr_Occurred())
     return NULL;
 
-  if (_cffi_to_c((char *)&x3, _cffi_type(542), arg3) < 0)
+  if (_cffi_to_c((char *)&x3, _cffi_type(567), arg3) < 0)
     return NULL;
 
   x4 = (_Bool)_cffi_to_c__Bool(arg4);
@@ -4490,7 +4927,7 @@ _cffi_f_cml_f_interpolate(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4519,10 +4956,10 @@ _cffi_f_cml_f_pixel_shuffle(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4538,7 +4975,7 @@ _cffi_f_cml_f_pixel_shuffle(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4567,10 +5004,10 @@ _cffi_f_cml_f_pixel_unshuffle(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4586,7 +5023,7 @@ _cffi_f_cml_f_pixel_unshuffle(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4615,10 +5052,10 @@ _cffi_f_cml_flip(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4634,7 +5071,7 @@ _cffi_f_cml_flip(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4657,10 +5094,10 @@ _cffi_f_cml_floor(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4672,7 +5109,7 @@ _cffi_f_cml_floor(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4719,10 +5156,10 @@ _cffi_f_cml_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(705), arg0, (char **)&x0);
+      _cffi_type(730), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(705), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(730), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4767,19 +5204,19 @@ _cffi_f_cml_from_blob(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(705), arg0, (char **)&x0);
+      _cffi_type(730), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(705), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(730), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4789,10 +5226,10 @@ _cffi_f_cml_from_blob(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg3, (char **)&x3);
+      _cffi_type(494), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4804,7 +5241,7 @@ _cffi_f_cml_from_blob(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4827,10 +5264,10 @@ _cffi_f_cml_from_url(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg0, (char **)&x0);
+      _cffi_type(145), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4842,7 +5279,7 @@ _cffi_f_cml_from_url(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4875,10 +5312,10 @@ _cffi_f_cml_full(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4888,10 +5325,10 @@ _cffi_f_cml_full(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg2, (char **)&x2);
+      _cffi_type(494), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4907,7 +5344,7 @@ _cffi_f_cml_full(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4936,10 +5373,10 @@ _cffi_f_cml_full_like(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -4955,7 +5392,7 @@ _cffi_f_cml_full_like(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -4982,7 +5419,7 @@ _cffi_f_cml_get_build_info(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(134));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(145));
   return pyresult;
 }
 #else
@@ -5060,7 +5497,7 @@ _cffi_f_cml_get_error_handler(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1062));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1100));
   return pyresult;
 }
 #else
@@ -5116,37 +5553,37 @@ _cffi_f_cml_get_version(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg2, (char **)&x2);
+      _cffi_type(236), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1044), arg3, (char **)&x3);
+      _cffi_type(1082), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (char const * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1044), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(1082), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5179,10 +5616,10 @@ _cffi_f_cml_gguf_close(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(448), arg0, (char **)&x0);
+      _cffi_type(473), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (GGUFContext *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(448), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(473), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5217,10 +5654,10 @@ _cffi_f_cml_gguf_open_read(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg0, (char **)&x0);
+      _cffi_type(145), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5232,7 +5669,7 @@ _cffi_f_cml_gguf_open_read(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(448));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(473));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -5255,10 +5692,10 @@ _cffi_f_cml_gguf_open_write(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg0, (char **)&x0);
+      _cffi_type(145), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5270,7 +5707,7 @@ _cffi_f_cml_gguf_open_write(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(448));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(473));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -5299,19 +5736,19 @@ _cffi_f_cml_gguf_read_tensor(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(448), arg0, (char **)&x0);
+      _cffi_type(473), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (GGUFContext *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(448), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(473), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5323,7 +5760,7 @@ _cffi_f_cml_gguf_read_tensor(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -5354,28 +5791,28 @@ _cffi_f_cml_gguf_write_tensor(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(448), arg0, (char **)&x0);
+      _cffi_type(473), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (GGUFContext *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(448), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(473), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg2, (char **)&x2);
+      _cffi_type(396), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5422,10 +5859,10 @@ _cffi_f_cml_glorot_uniform(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5443,10 +5880,10 @@ _cffi_f_cml_glorot_uniform(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg4, (char **)&x4);
+      _cffi_type(494), arg4, (char **)&x4);
   if (datasize != 0) {
     x4 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg4, (char **)&x4,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg4, (char **)&x4,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5458,7 +5895,7 @@ _cffi_f_cml_glorot_uniform(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -5511,7 +5948,7 @@ _cffi_f_cml_grad_scaler_create(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(452));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(477));
   return pyresult;
 }
 #else
@@ -5531,10 +5968,10 @@ _cffi_f_cml_grad_scaler_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(452), arg0, (char **)&x0);
+      _cffi_type(477), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (GradScaler *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(452), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(477), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5575,19 +6012,19 @@ _cffi_f_cml_grad_scaler_scale(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(452), arg0, (char **)&x0);
+      _cffi_type(477), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (GradScaler *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(452), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(477), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5599,7 +6036,7 @@ _cffi_f_cml_grad_scaler_scale(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -5628,23 +6065,23 @@ _cffi_f_cml_grad_scaler_step(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(452), arg0, (char **)&x0);
+      _cffi_type(477), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (GradScaler *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(452), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(477), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
-  x1 = (void(*)(void *))_cffi_to_c_pointer(arg1, _cffi_type(963));
+  x1 = (void(*)(void *))_cffi_to_c_pointer(arg1, _cffi_type(1001));
   if (x1 == (void(*)(void *))NULL && PyErr_Occurred())
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(705), arg2, (char **)&x2);
+      _cffi_type(730), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(705), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(730), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5685,19 +6122,19 @@ _cffi_f_cml_grad_scaler_unscale(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(452), arg0, (char **)&x0);
+      _cffi_type(477), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (GradScaler *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(452), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(477), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg1, (char **)&x1);
+      _cffi_type(346), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5734,10 +6171,10 @@ _cffi_f_cml_grad_scaler_update(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(452), arg0, (char **)&x0);
+      _cffi_type(477), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (GradScaler *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(452), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(477), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5772,10 +6209,10 @@ _cffi_f_cml_half(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5787,7 +6224,7 @@ _cffi_f_cml_half(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -5810,10 +6247,10 @@ _cffi_f_cml_hardswish(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5825,7 +6262,7 @@ _cffi_f_cml_hardswish(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -5854,19 +6291,19 @@ _cffi_f_cml_idiv(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5878,7 +6315,7 @@ _cffi_f_cml_idiv(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -5927,10 +6364,10 @@ _cffi_f_cml_int_(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5942,7 +6379,7 @@ _cffi_f_cml_int_(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -5975,19 +6412,19 @@ _cffi_f_cml_interpolate(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -5996,7 +6433,7 @@ _cffi_f_cml_interpolate(PyObject *self, PyObject *args)
   if (x2 == (int)-1 && PyErr_Occurred())
     return NULL;
 
-  if (_cffi_to_c((char *)&x3, _cffi_type(536), arg3) < 0)
+  if (_cffi_to_c((char *)&x3, _cffi_type(561), arg3) < 0)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
@@ -6006,7 +6443,7 @@ _cffi_f_cml_interpolate(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6081,10 +6518,10 @@ _cffi_f_cml_is_leaf(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6129,10 +6566,10 @@ _cffi_f_cml_kaiming_normal(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6146,10 +6583,10 @@ _cffi_f_cml_kaiming_normal(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg3, (char **)&x3);
+      _cffi_type(494), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6161,7 +6598,7 @@ _cffi_f_cml_kaiming_normal(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6194,10 +6631,10 @@ _cffi_f_cml_kaiming_uniform(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6211,10 +6648,10 @@ _cffi_f_cml_kaiming_uniform(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg3, (char **)&x3);
+      _cffi_type(494), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6226,7 +6663,7 @@ _cffi_f_cml_kaiming_uniform(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6331,37 +6768,37 @@ _cffi_f_cml_kernel_cache_stats(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1050), arg0, (char **)&x0);
+      _cffi_type(1088), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (size_t *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1050), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(1088), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1050), arg1, (char **)&x1);
+      _cffi_type(1088), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (size_t *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1050), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(1088), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1050), arg2, (char **)&x2);
+      _cffi_type(1088), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (size_t *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1050), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(1088), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1050), arg3, (char **)&x3);
+      _cffi_type(1088), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (size_t *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1050), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(1088), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6402,10 +6839,10 @@ _cffi_f_cml_leaky_relu(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6421,7 +6858,7 @@ _cffi_f_cml_leaky_relu(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6452,19 +6889,19 @@ _cffi_f_cml_lerp(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6480,7 +6917,7 @@ _cffi_f_cml_lerp(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6525,10 +6962,10 @@ _cffi_f_cml_linspace(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg3, (char **)&x3);
+      _cffi_type(494), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6540,7 +6977,7 @@ _cffi_f_cml_linspace(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6563,10 +7000,10 @@ _cffi_f_cml_log(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6578,7 +7015,7 @@ _cffi_f_cml_log(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6601,10 +7038,10 @@ _cffi_f_cml_log2(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6616,7 +7053,7 @@ _cffi_f_cml_log2(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6645,19 +7082,19 @@ _cffi_f_cml_logaddexp(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6669,7 +7106,7 @@ _cffi_f_cml_logaddexp(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6698,10 +7135,10 @@ _cffi_f_cml_logcumsumexp(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6717,7 +7154,7 @@ _cffi_f_cml_logcumsumexp(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6740,10 +7177,10 @@ _cffi_f_cml_long(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6755,7 +7192,7 @@ _cffi_f_cml_long(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6786,10 +7223,10 @@ _cffi_f_cml_lr_scheduler_cosine(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6809,7 +7246,7 @@ _cffi_f_cml_lr_scheduler_cosine(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(201));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(212));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6838,10 +7275,10 @@ _cffi_f_cml_lr_scheduler_exponential(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6857,7 +7294,7 @@ _cffi_f_cml_lr_scheduler_exponential(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(201));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(212));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -6878,10 +7315,10 @@ _cffi_f_cml_lr_scheduler_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(201), arg0, (char **)&x0);
+      _cffi_type(212), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (LRScheduler *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(201), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(212), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6916,10 +7353,10 @@ _cffi_f_cml_lr_scheduler_get_lr(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(201), arg0, (char **)&x0);
+      _cffi_type(212), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (LRScheduler *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(201), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(212), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6964,19 +7401,19 @@ _cffi_f_cml_lr_scheduler_multi_step(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -6996,7 +7433,7 @@ _cffi_f_cml_lr_scheduler_multi_step(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(201));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(212));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7033,10 +7470,10 @@ _cffi_f_cml_lr_scheduler_one_cycle(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7068,7 +7505,7 @@ _cffi_f_cml_lr_scheduler_one_cycle(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(201));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(212));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7101,10 +7538,10 @@ _cffi_f_cml_lr_scheduler_polynomial(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7128,7 +7565,7 @@ _cffi_f_cml_lr_scheduler_polynomial(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(201));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(212));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7161,10 +7598,10 @@ _cffi_f_cml_lr_scheduler_reduce_on_plateau(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7188,7 +7625,7 @@ _cffi_f_cml_lr_scheduler_reduce_on_plateau(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(201));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(212));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7219,10 +7656,10 @@ _cffi_f_cml_lr_scheduler_step(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7242,7 +7679,7 @@ _cffi_f_cml_lr_scheduler_step(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(201));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(212));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7271,10 +7708,10 @@ _cffi_f_cml_lr_scheduler_update(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(201), arg0, (char **)&x0);
+      _cffi_type(212), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (LRScheduler *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(201), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(212), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7321,10 +7758,10 @@ _cffi_f_cml_lr_scheduler_warmup(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(201), arg0, (char **)&x0);
+      _cffi_type(212), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (LRScheduler *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(201), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(212), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7344,7 +7781,7 @@ _cffi_f_cml_lr_scheduler_warmup(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(201));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(212));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7401,19 +7838,19 @@ _cffi_f_cml_masked_select(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7425,7 +7862,7 @@ _cffi_f_cml_masked_select(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7454,19 +7891,19 @@ _cffi_f_cml_matmul(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7478,7 +7915,7 @@ _cffi_f_cml_matmul(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7509,10 +7946,10 @@ _cffi_f_cml_max(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7532,7 +7969,7 @@ _cffi_f_cml_max(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7563,10 +8000,10 @@ _cffi_f_cml_mean(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7586,7 +8023,7 @@ _cffi_f_cml_mean(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7617,10 +8054,10 @@ _cffi_f_cml_meshgrid(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(437), arg0, (char **)&x0);
+      _cffi_type(454), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(437), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(454), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7630,10 +8067,10 @@ _cffi_f_cml_meshgrid(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg2, (char **)&x2);
+      _cffi_type(236), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7645,7 +8082,7 @@ _cffi_f_cml_meshgrid(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(437));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(454));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7676,10 +8113,10 @@ _cffi_f_cml_min(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7699,7 +8136,7 @@ _cffi_f_cml_min(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7722,10 +8159,10 @@ _cffi_f_cml_mish(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7737,7 +8174,7 @@ _cffi_f_cml_mish(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7766,19 +8203,19 @@ _cffi_f_cml_mod(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7790,7 +8227,7 @@ _cffi_f_cml_mod(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -7819,19 +8256,19 @@ _cffi_f_cml_module_load_gguf(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7872,19 +8309,19 @@ _cffi_f_cml_module_load_safetensors(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7925,19 +8362,19 @@ _cffi_f_cml_module_save_gguf(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -7978,19 +8415,19 @@ _cffi_f_cml_module_save_safetensors(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -8031,19 +8468,19 @@ _cffi_f_cml_mul(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -8055,7 +8492,7 @@ _cffi_f_cml_mul(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -8086,7 +8523,7 @@ _cffi_f_cml_nn_adaptive_avgpool1d(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1069));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1107));
   return pyresult;
 }
 #else
@@ -8126,7 +8563,7 @@ _cffi_f_cml_nn_adaptive_avgpool2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1071));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1109));
   return pyresult;
 }
 #else
@@ -8156,7 +8593,7 @@ _cffi_f_cml_nn_adaptive_maxpool1d(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1073));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1111));
   return pyresult;
 }
 #else
@@ -8196,7 +8633,7 @@ _cffi_f_cml_nn_adaptive_maxpool2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1075));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1113));
   return pyresult;
 }
 #else
@@ -8254,7 +8691,7 @@ _cffi_f_cml_nn_avgpool1d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1077));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1115));
   return pyresult;
 }
 #else
@@ -8312,7 +8749,7 @@ _cffi_f_cml_nn_avgpool2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1079));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1117));
   return pyresult;
 }
 #else
@@ -8370,7 +8807,7 @@ _cffi_f_cml_nn_avgpool3d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1081));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1119));
   return pyresult;
 }
 #else
@@ -8438,7 +8875,7 @@ _cffi_f_cml_nn_batchnorm1d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1083));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1121));
   return pyresult;
 }
 #else
@@ -8506,7 +8943,7 @@ _cffi_f_cml_nn_batchnorm2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1085));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1123));
   return pyresult;
 }
 #else
@@ -8574,7 +9011,7 @@ _cffi_f_cml_nn_batchnorm3d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1087));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1125));
   return pyresult;
 }
 #else
@@ -8602,19 +9039,19 @@ _cffi_f_cml_nn_bce_loss(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -8626,7 +9063,7 @@ _cffi_f_cml_nn_bce_loss(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -8707,7 +9144,7 @@ _cffi_f_cml_nn_conv1d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1090));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1130));
   return pyresult;
 }
 #else
@@ -8787,7 +9224,7 @@ _cffi_f_cml_nn_conv2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1092));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1132));
   return pyresult;
 }
 #else
@@ -8867,7 +9304,7 @@ _cffi_f_cml_nn_conv3d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1094));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1134));
   return pyresult;
 }
 #else
@@ -8947,7 +9384,7 @@ _cffi_f_cml_nn_conv_transpose1d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1096));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1136));
   return pyresult;
 }
 #else
@@ -9027,7 +9464,7 @@ _cffi_f_cml_nn_conv_transpose2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1098));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1138));
   return pyresult;
 }
 #else
@@ -9107,7 +9544,7 @@ _cffi_f_cml_nn_conv_transpose3d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1100));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1140));
   return pyresult;
 }
 #else
@@ -9139,28 +9576,28 @@ _cffi_f_cml_nn_cosine_embedding_loss(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg2, (char **)&x2);
+      _cffi_type(396), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -9176,7 +9613,7 @@ _cffi_f_cml_nn_cosine_embedding_loss(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -9205,19 +9642,19 @@ _cffi_f_cml_nn_cross_entropy_loss(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -9229,7 +9666,7 @@ _cffi_f_cml_nn_cross_entropy_loss(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -9270,7 +9707,7 @@ _cffi_f_cml_nn_dropout(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1103));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1144));
   return pyresult;
 }
 #else
@@ -9326,7 +9763,7 @@ _cffi_f_cml_nn_embedding(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1105));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1146));
   return pyresult;
 }
 #else
@@ -9366,7 +9803,7 @@ _cffi_f_cml_nn_flatten(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1107));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1148));
   return pyresult;
 }
 #else
@@ -9428,7 +9865,7 @@ _cffi_f_cml_nn_groupnorm(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1115));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1156));
   return pyresult;
 }
 #else
@@ -9508,7 +9945,7 @@ _cffi_f_cml_nn_gru(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1110));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1151));
   return pyresult;
 }
 #else
@@ -9564,7 +10001,7 @@ _cffi_f_cml_nn_gru_cell(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1112));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1153));
   return pyresult;
 }
 #else
@@ -9594,19 +10031,19 @@ _cffi_f_cml_nn_huber_loss(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -9622,7 +10059,7 @@ _cffi_f_cml_nn_huber_loss(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -9649,7 +10086,7 @@ _cffi_f_cml_nn_identity(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1117));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1158));
   return pyresult;
 }
 #else
@@ -9705,7 +10142,7 @@ _cffi_f_cml_nn_instancenorm2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1119));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1160));
   return pyresult;
 }
 #else
@@ -9733,19 +10170,19 @@ _cffi_f_cml_nn_kl_div_loss(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -9757,7 +10194,7 @@ _cffi_f_cml_nn_kl_div_loss(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -9814,7 +10251,7 @@ _cffi_f_cml_nn_layernorm(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1126));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1167));
   return pyresult;
 }
 #else
@@ -9870,7 +10307,7 @@ _cffi_f_cml_nn_layernorm2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1127));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1168));
   return pyresult;
 }
 #else
@@ -9910,7 +10347,7 @@ _cffi_f_cml_nn_leaky_relu(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1130));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1171));
   return pyresult;
 }
 #else
@@ -9966,7 +10403,7 @@ _cffi_f_cml_nn_linear(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1132));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1173));
   return pyresult;
 }
 #else
@@ -10046,7 +10483,7 @@ _cffi_f_cml_nn_lstm(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1122));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1163));
   return pyresult;
 }
 #else
@@ -10102,7 +10539,7 @@ _cffi_f_cml_nn_lstm_cell(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1124));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1165));
   return pyresult;
 }
 #else
@@ -10130,19 +10567,19 @@ _cffi_f_cml_nn_mae_loss(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -10154,7 +10591,7 @@ _cffi_f_cml_nn_mae_loss(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -10213,7 +10650,7 @@ _cffi_f_cml_nn_maxpool1d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1134));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1175));
   return pyresult;
 }
 #else
@@ -10271,7 +10708,7 @@ _cffi_f_cml_nn_maxpool2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1136));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1177));
   return pyresult;
 }
 #else
@@ -10329,7 +10766,7 @@ _cffi_f_cml_nn_maxpool3d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1138));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1179));
   return pyresult;
 }
 #else
@@ -10355,7 +10792,7 @@ _cffi_f_cml_nn_module_dict(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(871));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(903));
   return pyresult;
 }
 #else
@@ -10375,10 +10812,10 @@ _cffi_f_cml_nn_module_eval(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -10419,19 +10856,19 @@ _cffi_f_cml_nn_module_forward(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -10443,7 +10880,7 @@ _cffi_f_cml_nn_module_forward(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -10466,10 +10903,10 @@ _cffi_f_cml_nn_module_is_training(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -10508,7 +10945,7 @@ _cffi_f_cml_nn_module_list(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(879));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(911));
   return pyresult;
 }
 #else
@@ -10534,10 +10971,10 @@ _cffi_f_cml_nn_module_set_training(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -10574,10 +11011,10 @@ _cffi_f_cml_nn_module_train(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -10618,19 +11055,19 @@ _cffi_f_cml_nn_mse_loss(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -10642,7 +11079,7 @@ _cffi_f_cml_nn_mse_loss(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -10699,7 +11136,7 @@ _cffi_f_cml_nn_multihead_attention(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1143));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1184));
   return pyresult;
 }
 #else
@@ -10727,19 +11164,19 @@ _cffi_f_cml_nn_nll_loss(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -10751,7 +11188,7 @@ _cffi_f_cml_nn_nll_loss(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -10782,7 +11219,7 @@ _cffi_f_cml_nn_pixel_shuffle(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1150));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1196));
   return pyresult;
 }
 #else
@@ -10812,7 +11249,7 @@ _cffi_f_cml_nn_pixel_unshuffle(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1152));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1198));
   return pyresult;
 }
 #else
@@ -10862,7 +11299,7 @@ _cffi_f_cml_nn_prelu(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1146));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1187));
   return pyresult;
 }
 #else
@@ -10892,7 +11329,7 @@ _cffi_f_cml_nn_relu(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1159));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1205));
   return pyresult;
 }
 #else
@@ -10972,7 +11409,7 @@ _cffi_f_cml_nn_rnn(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1155));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1201));
   return pyresult;
 }
 #else
@@ -11028,7 +11465,7 @@ _cffi_f_cml_nn_rnn_cell(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1157));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1203));
   return pyresult;
 }
 #else
@@ -11054,7 +11491,7 @@ _cffi_f_cml_nn_sequential(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(411));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(428));
   return pyresult;
 }
 #else
@@ -11082,19 +11519,19 @@ _cffi_f_cml_nn_sequential_add(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(411), arg0, (char **)&x0);
+      _cffi_type(428), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Sequential *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(411), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(428), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg1, (char **)&x1);
+      _cffi_type(63), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -11106,7 +11543,7 @@ _cffi_f_cml_nn_sequential_add(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(411));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(428));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -11135,19 +11572,19 @@ _cffi_f_cml_nn_sequential_forward(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(411), arg0, (char **)&x0);
+      _cffi_type(428), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Sequential *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(411), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(428), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -11159,7 +11596,7 @@ _cffi_f_cml_nn_sequential_forward(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -11186,7 +11623,7 @@ _cffi_f_cml_nn_sigmoid(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1164));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1210));
   return pyresult;
 }
 #else
@@ -11214,19 +11651,19 @@ _cffi_f_cml_nn_sparse_cross_entropy_loss(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -11238,7 +11675,7 @@ _cffi_f_cml_nn_sparse_cross_entropy_loss(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -11265,7 +11702,7 @@ _cffi_f_cml_nn_tanh(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1168));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1214));
   return pyresult;
 }
 #else
@@ -11333,7 +11770,7 @@ _cffi_f_cml_nn_transformer_decoder(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1177));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1223));
   return pyresult;
 }
 #else
@@ -11395,7 +11832,7 @@ _cffi_f_cml_nn_transformer_decoder_layer(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1179));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1225));
   return pyresult;
 }
 #else
@@ -11463,7 +11900,7 @@ _cffi_f_cml_nn_transformer_encoder(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1181));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1227));
   return pyresult;
 }
 #else
@@ -11525,7 +11962,7 @@ _cffi_f_cml_nn_transformer_encoder_layer(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1183));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1229));
   return pyresult;
 }
 #else
@@ -11557,28 +11994,28 @@ _cffi_f_cml_nn_triplet_margin_loss(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg2, (char **)&x2);
+      _cffi_type(396), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -11594,7 +12031,7 @@ _cffi_f_cml_nn_triplet_margin_loss(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -11633,10 +12070,10 @@ _cffi_f_cml_nn_upsample(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(427), arg1, (char **)&x1);
+      _cffi_type(444), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(427), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(444), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -11645,7 +12082,7 @@ _cffi_f_cml_nn_upsample(PyObject *self, PyObject *args)
   if (x2 == (int)-1 && PyErr_Occurred())
     return NULL;
 
-  if (_cffi_to_c((char *)&x3, _cffi_type(542), arg3) < 0)
+  if (_cffi_to_c((char *)&x3, _cffi_type(567), arg3) < 0)
     return NULL;
 
   x4 = (_Bool)_cffi_to_c__Bool(arg4);
@@ -11659,7 +12096,7 @@ _cffi_f_cml_nn_upsample(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1185));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1231));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -11712,10 +12149,10 @@ _cffi_f_cml_one_hot(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -11731,7 +12168,7 @@ _cffi_f_cml_one_hot(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -11762,10 +12199,10 @@ _cffi_f_cml_ones(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -11775,10 +12212,10 @@ _cffi_f_cml_ones(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg2, (char **)&x2);
+      _cffi_type(494), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -11790,7 +12227,7 @@ _cffi_f_cml_ones(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -11821,7 +12258,7 @@ _cffi_f_cml_ones_1d(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   return pyresult;
 }
 #else
@@ -11861,7 +12298,7 @@ _cffi_f_cml_ones_2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   return pyresult;
 }
 #else
@@ -11883,10 +12320,10 @@ _cffi_f_cml_ones_like(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -11898,7 +12335,7 @@ _cffi_f_cml_ones_like(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -11935,19 +12372,19 @@ _cffi_f_cml_onnx_export_graph(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(906), arg0, (char **)&x0);
+      _cffi_type(938), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (struct CMLGraph *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(906), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(938), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(437), arg1, (char **)&x1);
+      _cffi_type(454), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(437), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(454), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -11957,10 +12394,10 @@ _cffi_f_cml_onnx_export_graph(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(437), arg3, (char **)&x3);
+      _cffi_type(454), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(437), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(454), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -11970,10 +12407,10 @@ _cffi_f_cml_onnx_export_graph(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg5, (char **)&x5);
+      _cffi_type(145), arg5, (char **)&x5);
   if (datasize != 0) {
     x5 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg5, (char **)&x5,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg5, (char **)&x5,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12020,10 +12457,10 @@ _cffi_f_cml_optim_adadelta(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg0, (char **)&x0);
+      _cffi_type(346), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12051,7 +12488,7 @@ _cffi_f_cml_optim_adadelta(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12086,10 +12523,10 @@ _cffi_f_cml_optim_adagrad(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg0, (char **)&x0);
+      _cffi_type(346), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12117,7 +12554,7 @@ _cffi_f_cml_optim_adagrad(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12156,10 +12593,10 @@ _cffi_f_cml_optim_adam(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg0, (char **)&x0);
+      _cffi_type(346), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12195,7 +12632,7 @@ _cffi_f_cml_optim_adam(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12232,10 +12669,10 @@ _cffi_f_cml_optim_adam_for_model(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12267,7 +12704,7 @@ _cffi_f_cml_optim_adam_for_model(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12306,10 +12743,10 @@ _cffi_f_cml_optim_adamax(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg0, (char **)&x0);
+      _cffi_type(346), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12345,7 +12782,7 @@ _cffi_f_cml_optim_adamax(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12384,10 +12821,10 @@ _cffi_f_cml_optim_adamw(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg0, (char **)&x0);
+      _cffi_type(346), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12423,7 +12860,7 @@ _cffi_f_cml_optim_adamw(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12462,10 +12899,10 @@ _cffi_f_cml_optim_lamb(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg0, (char **)&x0);
+      _cffi_type(346), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12501,7 +12938,7 @@ _cffi_f_cml_optim_lamb(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12538,10 +12975,10 @@ _cffi_f_cml_optim_lars(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg0, (char **)&x0);
+      _cffi_type(346), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12573,7 +13010,7 @@ _cffi_f_cml_optim_lars(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12610,10 +13047,10 @@ _cffi_f_cml_optim_muon(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg0, (char **)&x0);
+      _cffi_type(346), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12645,7 +13082,7 @@ _cffi_f_cml_optim_muon(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12684,10 +13121,10 @@ _cffi_f_cml_optim_nadam(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg0, (char **)&x0);
+      _cffi_type(346), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12723,7 +13160,7 @@ _cffi_f_cml_optim_nadam(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12744,10 +13181,10 @@ _cffi_f_cml_optim_realize_params(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12796,10 +13233,10 @@ _cffi_f_cml_optim_rmsprop(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg0, (char **)&x0);
+      _cffi_type(346), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12831,7 +13268,7 @@ _cffi_f_cml_optim_rmsprop(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12866,10 +13303,10 @@ _cffi_f_cml_optim_sgd(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(335), arg0, (char **)&x0);
+      _cffi_type(346), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Parameter * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(335), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(346), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12897,7 +13334,7 @@ _cffi_f_cml_optim_sgd(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12930,10 +13367,10 @@ _cffi_f_cml_optim_sgd_for_model(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -12957,7 +13394,7 @@ _cffi_f_cml_optim_sgd_for_model(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -12978,10 +13415,10 @@ _cffi_f_cml_optim_step(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13014,10 +13451,10 @@ _cffi_f_cml_optim_zero_grad(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13062,19 +13499,19 @@ _cffi_f_cml_pad(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13094,7 +13531,7 @@ _cffi_f_cml_pad(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13125,19 +13562,19 @@ _cffi_f_cml_pad_reflect(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13153,7 +13590,7 @@ _cffi_f_cml_pad_reflect(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13184,19 +13621,19 @@ _cffi_f_cml_pad_replicate(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13212,12 +13649,273 @@ _cffi_f_cml_pad_replicate(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
 #else
 #  define _cffi_f_cml_pad_replicate _cffi_d_cml_pad_replicate
+#endif
+
+static int _cffi_d_cml_pipeline_backward(CMLPipelineParallel * x0, Tensor * x1)
+{
+  return cml_pipeline_backward(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_pipeline_backward(PyObject *self, PyObject *args)
+{
+  CMLPipelineParallel * x0;
+  Tensor * x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  int result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "cml_pipeline_backward", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(469), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (CMLPipelineParallel *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(469), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(396), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_pipeline_backward(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_int(result, int);
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_pipeline_backward _cffi_d_cml_pipeline_backward
+#endif
+
+static PipeUnit * _cffi_d_cml_pipeline_build_schedule(int x0, int x1, _Bool x2, int * x3)
+{
+  return cml_pipeline_build_schedule(x0, x1, x2, x3);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_pipeline_build_schedule(PyObject *self, PyObject *args)
+{
+  int x0;
+  int x1;
+  _Bool x2;
+  int * x3;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  PipeUnit * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+  PyObject *arg3;
+
+  if (!PyArg_UnpackTuple(args, "cml_pipeline_build_schedule", 4, 4, &arg0, &arg1, &arg2, &arg3))
+    return NULL;
+
+  x0 = _cffi_to_c_int(arg0, int);
+  if (x0 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  x1 = _cffi_to_c_int(arg1, int);
+  if (x1 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  x2 = (_Bool)_cffi_to_c__Bool(arg2);
+  if (x2 == (_Bool)-1 && PyErr_Occurred())
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(236), arg3, (char **)&x3);
+  if (datasize != 0) {
+    x3 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(236), arg3, (char **)&x3,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_pipeline_build_schedule(x0, x1, x2, x3); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1191));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_pipeline_build_schedule _cffi_d_cml_pipeline_build_schedule
+#endif
+
+static CMLPipelineParallel * _cffi_d_cml_pipeline_create(PipelineStage * x0, int x1, PipelineConfig const * x2)
+{
+  return cml_pipeline_create(x0, x1, x2);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_pipeline_create(PyObject *self, PyObject *args)
+{
+  PipelineStage * x0;
+  int x1;
+  PipelineConfig const * x2;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  CMLPipelineParallel * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+  PyObject *arg2;
+
+  if (!PyArg_UnpackTuple(args, "cml_pipeline_create", 3, 3, &arg0, &arg1, &arg2))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(67), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (PipelineStage *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(67), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  x1 = _cffi_to_c_int(arg1, int);
+  if (x1 == (int)-1 && PyErr_Occurred())
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(69), arg2, (char **)&x2);
+  if (datasize != 0) {
+    x2 = ((size_t)datasize) <= 640 ? (PipelineConfig const *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(69), arg2, (char **)&x2,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_pipeline_create(x0, x1, x2); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(469));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_pipeline_create _cffi_d_cml_pipeline_create
+#endif
+
+static Tensor * _cffi_d_cml_pipeline_forward(CMLPipelineParallel * x0, Tensor * x1)
+{
+  return cml_pipeline_forward(x0, x1);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_pipeline_forward(PyObject *self, PyObject *args)
+{
+  CMLPipelineParallel * x0;
+  Tensor * x1;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+  Tensor * result;
+  PyObject *pyresult;
+  PyObject *arg0;
+  PyObject *arg1;
+
+  if (!PyArg_UnpackTuple(args, "cml_pipeline_forward", 2, 2, &arg0, &arg1))
+    return NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(469), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (CMLPipelineParallel *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(469), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(396), arg1, (char **)&x1);
+  if (datasize != 0) {
+    x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { result = cml_pipeline_forward(x0, x1); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  return pyresult;
+}
+#else
+#  define _cffi_f_cml_pipeline_forward _cffi_d_cml_pipeline_forward
+#endif
+
+static void _cffi_d_cml_pipeline_free(CMLPipelineParallel * x0)
+{
+  cml_pipeline_free(x0);
+}
+#ifndef PYPY_VERSION
+static PyObject *
+_cffi_f_cml_pipeline_free(PyObject *self, PyObject *arg0)
+{
+  CMLPipelineParallel * x0;
+  Py_ssize_t datasize;
+  struct _cffi_freeme_s *large_args_free = NULL;
+
+  datasize = _cffi_prepare_pointer_call_argument(
+      _cffi_type(469), arg0, (char **)&x0);
+  if (datasize != 0) {
+    x0 = ((size_t)datasize) <= 640 ? (CMLPipelineParallel *)alloca((size_t)datasize) : NULL;
+    if (_cffi_convert_array_argument(_cffi_type(469), arg0, (char **)&x0,
+            datasize, &large_args_free) < 0)
+      return NULL;
+  }
+
+  Py_BEGIN_ALLOW_THREADS
+  _cffi_restore_errno();
+  { cml_pipeline_free(x0); }
+  _cffi_save_errno();
+  Py_END_ALLOW_THREADS
+
+  (void)self; /* unused */
+  if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+#else
+#  define _cffi_f_cml_pipeline_free _cffi_d_cml_pipeline_free
 #endif
 
 static Tensor * _cffi_d_cml_pow(Tensor * x0, Tensor * x1)
@@ -13241,19 +13939,19 @@ _cffi_f_cml_pow(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13265,7 +13963,7 @@ _cffi_f_cml_pow(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13296,10 +13994,10 @@ _cffi_f_cml_prod(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13319,7 +14017,7 @@ _cffi_f_cml_prod(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13342,10 +14040,10 @@ _cffi_f_cml_qr(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13357,7 +14055,7 @@ _cffi_f_cml_qr(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1154));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1200));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13391,10 +14089,10 @@ _cffi_f_cml_rand(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13404,10 +14102,10 @@ _cffi_f_cml_rand(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg2, (char **)&x2);
+      _cffi_type(494), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13419,7 +14117,7 @@ _cffi_f_cml_rand(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13442,10 +14140,10 @@ _cffi_f_cml_rand_like(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13457,7 +14155,7 @@ _cffi_f_cml_rand_like(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13500,10 +14198,10 @@ _cffi_f_cml_randint(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg2, (char **)&x2);
+      _cffi_type(236), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13513,10 +14211,10 @@ _cffi_f_cml_randint(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg4, (char **)&x4);
+      _cffi_type(494), arg4, (char **)&x4);
   if (datasize != 0) {
     x4 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg4, (char **)&x4,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg4, (char **)&x4,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13528,7 +14226,7 @@ _cffi_f_cml_randint(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13559,10 +14257,10 @@ _cffi_f_cml_randn(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13572,10 +14270,10 @@ _cffi_f_cml_randn(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg2, (char **)&x2);
+      _cffi_type(494), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13587,7 +14285,7 @@ _cffi_f_cml_randn(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13610,10 +14308,10 @@ _cffi_f_cml_randn_like(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13625,7 +14323,7 @@ _cffi_f_cml_randn_like(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13658,10 +14356,10 @@ _cffi_f_cml_randperm(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg1, (char **)&x1);
+      _cffi_type(494), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13673,7 +14371,7 @@ _cffi_f_cml_randperm(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13694,10 +14392,10 @@ _cffi_f_cml_register_cleanup_context(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(939), arg0, (char **)&x0);
+      _cffi_type(977), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (CleanupContext *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(939), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(977), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13732,10 +14430,10 @@ _cffi_f_cml_relu(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13747,7 +14445,7 @@ _cffi_f_cml_relu(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13778,19 +14476,19 @@ _cffi_f_cml_repeat(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13806,7 +14504,7 @@ _cffi_f_cml_repeat(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13829,10 +14527,10 @@ _cffi_f_cml_requires_grad(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13923,19 +14621,19 @@ _cffi_f_cml_reshape(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -13951,7 +14649,7 @@ _cffi_f_cml_reshape(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -13982,10 +14680,10 @@ _cffi_f_cml_roll(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14005,7 +14703,7 @@ _cffi_f_cml_roll(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14028,10 +14726,10 @@ _cffi_f_cml_round(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14043,7 +14741,7 @@ _cffi_f_cml_round(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14066,10 +14764,10 @@ _cffi_f_cml_rsqrt(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14081,7 +14779,7 @@ _cffi_f_cml_rsqrt(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14102,10 +14800,10 @@ _cffi_f_cml_safetensors_close(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(456), arg0, (char **)&x0);
+      _cffi_type(481), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (SafeTensorsContext *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(456), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(481), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14140,10 +14838,10 @@ _cffi_f_cml_safetensors_open_read(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg0, (char **)&x0);
+      _cffi_type(145), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14155,7 +14853,7 @@ _cffi_f_cml_safetensors_open_read(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(456));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(481));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14178,10 +14876,10 @@ _cffi_f_cml_safetensors_open_write(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg0, (char **)&x0);
+      _cffi_type(145), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14193,7 +14891,7 @@ _cffi_f_cml_safetensors_open_write(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(456));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(481));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14222,19 +14920,19 @@ _cffi_f_cml_safetensors_read_tensor(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(456), arg0, (char **)&x0);
+      _cffi_type(481), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (SafeTensorsContext *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(456), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(481), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14246,7 +14944,7 @@ _cffi_f_cml_safetensors_read_tensor(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14277,28 +14975,28 @@ _cffi_f_cml_safetensors_write_tensor(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(456), arg0, (char **)&x0);
+      _cffi_type(481), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (SafeTensorsContext *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(456), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(481), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg2, (char **)&x2);
+      _cffi_type(396), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14345,10 +15043,10 @@ _cffi_f_cml_scatter_reduce(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14358,24 +15056,24 @@ _cffi_f_cml_scatter_reduce(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg2, (char **)&x2);
+      _cffi_type(396), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg3, (char **)&x3);
+      _cffi_type(396), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
-  if (_cffi_to_c((char *)&x4, _cffi_type(560), arg4) < 0)
+  if (_cffi_to_c((char *)&x4, _cffi_type(585), arg4) < 0)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
@@ -14385,7 +15083,7 @@ _cffi_f_cml_scatter_reduce(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14436,10 +15134,10 @@ _cffi_f_cml_selu(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14451,7 +15149,7 @@ _cffi_f_cml_selu(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14523,7 +15221,7 @@ _cffi_f_cml_set_error_handler(PyObject *self, PyObject *arg0)
 {
   void *(* x0)(int, char const *, void *);
 
-  x0 = (void *(*)(int, char const *, void *))_cffi_to_c_pointer(arg0, _cffi_type(1062));
+  x0 = (void *(*)(int, char const *, void *))_cffi_to_c_pointer(arg0, _cffi_type(1100));
   if (x0 == (void *(*)(int, char const *, void *))NULL && PyErr_Occurred())
     return NULL;
 
@@ -14551,7 +15249,7 @@ _cffi_f_cml_set_log_level(PyObject *self, PyObject *arg0)
 {
   LogLevel x0;
 
-  if (_cffi_to_c((char *)&x0, _cffi_type(970), arg0) < 0)
+  if (_cffi_to_c((char *)&x0, _cffi_type(1008), arg0) < 0)
     return NULL;
 
   Py_BEGIN_ALLOW_THREADS
@@ -14587,10 +15285,10 @@ _cffi_f_cml_set_requires_grad(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14629,10 +15327,10 @@ _cffi_f_cml_short(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14644,7 +15342,7 @@ _cffi_f_cml_short(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14667,10 +15365,10 @@ _cffi_f_cml_sigmoid(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14682,7 +15380,7 @@ _cffi_f_cml_sigmoid(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14705,10 +15403,10 @@ _cffi_f_cml_sign(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14720,7 +15418,7 @@ _cffi_f_cml_sign(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14743,10 +15441,10 @@ _cffi_f_cml_silu(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14758,7 +15456,7 @@ _cffi_f_cml_silu(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14781,10 +15479,10 @@ _cffi_f_cml_sin(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14796,7 +15494,7 @@ _cffi_f_cml_sin(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14825,10 +15523,10 @@ _cffi_f_cml_softmax(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14844,7 +15542,7 @@ _cffi_f_cml_softmax(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14875,10 +15573,10 @@ _cffi_f_cml_sort(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14898,7 +15596,7 @@ _cffi_f_cml_sort(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14921,10 +15619,10 @@ _cffi_f_cml_sparse_coalesce(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(419), arg0, (char **)&x0);
+      _cffi_type(436), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (SparseCOOData *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(419), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(436), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -14936,7 +15634,7 @@ _cffi_f_cml_sparse_coalesce(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(419));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(436));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -14969,28 +15667,28 @@ _cffi_f_cml_sparse_coo_tensor(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(427), arg2, (char **)&x2);
+      _cffi_type(444), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (int const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(427), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(444), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15006,7 +15704,7 @@ _cffi_f_cml_sparse_coo_tensor(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(419));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(436));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15027,10 +15725,10 @@ _cffi_f_cml_sparse_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(419), arg0, (char **)&x0);
+      _cffi_type(436), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (SparseCOOData *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(419), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(436), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15065,10 +15763,10 @@ _cffi_f_cml_sparse_from_dense(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15080,7 +15778,7 @@ _cffi_f_cml_sparse_from_dense(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(419));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(436));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15109,19 +15807,19 @@ _cffi_f_cml_sparse_matmul(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(419), arg0, (char **)&x0);
+      _cffi_type(436), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (SparseCOOData *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(419), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(436), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15133,7 +15831,7 @@ _cffi_f_cml_sparse_matmul(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15162,19 +15860,19 @@ _cffi_f_cml_sparse_to_dense(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(419), arg0, (char **)&x0);
+      _cffi_type(436), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (SparseCOOData *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(419), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(436), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg1, (char **)&x1);
+      _cffi_type(494), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15186,7 +15884,7 @@ _cffi_f_cml_sparse_to_dense(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15219,10 +15917,10 @@ _cffi_f_cml_split(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15236,10 +15934,10 @@ _cffi_f_cml_split(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg3, (char **)&x3);
+      _cffi_type(236), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15251,7 +15949,7 @@ _cffi_f_cml_split(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(437));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(454));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15274,10 +15972,10 @@ _cffi_f_cml_sqrt(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15289,7 +15987,7 @@ _cffi_f_cml_sqrt(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15312,10 +16010,10 @@ _cffi_f_cml_square(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15327,7 +16025,7 @@ _cffi_f_cml_square(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15356,10 +16054,10 @@ _cffi_f_cml_squeeze(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15375,7 +16073,7 @@ _cffi_f_cml_squeeze(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15406,10 +16104,10 @@ _cffi_f_cml_stack(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(437), arg0, (char **)&x0);
+      _cffi_type(454), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(437), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(454), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15429,7 +16127,7 @@ _cffi_f_cml_stack(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15462,10 +16160,10 @@ _cffi_f_cml_std(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15489,7 +16187,7 @@ _cffi_f_cml_std(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15518,19 +16216,19 @@ _cffi_f_cml_sub(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15542,7 +16240,7 @@ _cffi_f_cml_sub(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15573,10 +16271,10 @@ _cffi_f_cml_sum(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15596,7 +16294,7 @@ _cffi_f_cml_sum(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15617,10 +16315,10 @@ _cffi_f_cml_summary(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15655,10 +16353,10 @@ _cffi_f_cml_svd(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15670,7 +16368,7 @@ _cffi_f_cml_svd(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1161));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1207));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15696,10 +16394,10 @@ _cffi_f_cml_tan(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15711,7 +16409,7 @@ _cffi_f_cml_tan(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15734,10 +16432,10 @@ _cffi_f_cml_tanh(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15749,7 +16447,7 @@ _cffi_f_cml_tanh(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15782,19 +16480,19 @@ _cffi_f_cml_tensor(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(705), arg0, (char **)&x0);
+      _cffi_type(730), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(705), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(730), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15804,10 +16502,10 @@ _cffi_f_cml_tensor(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg3, (char **)&x3);
+      _cffi_type(494), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15819,7 +16517,7 @@ _cffi_f_cml_tensor(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15848,10 +16546,10 @@ _cffi_f_cml_tensor_1d(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(611), arg0, (char **)&x0);
+      _cffi_type(636), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (float const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(611), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(636), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15867,7 +16565,7 @@ _cffi_f_cml_tensor_1d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15898,10 +16596,10 @@ _cffi_f_cml_tensor_2d(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(611), arg0, (char **)&x0);
+      _cffi_type(636), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (float const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(611), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(636), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15921,7 +16619,7 @@ _cffi_f_cml_tensor_2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -15956,10 +16654,10 @@ _cffi_f_cml_topk(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -15987,7 +16685,7 @@ _cffi_f_cml_topk(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16022,10 +16720,10 @@ _cffi_f_cml_topk_with_indices(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16043,10 +16741,10 @@ _cffi_f_cml_topk_with_indices(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(437), arg4, (char **)&x4);
+      _cffi_type(454), arg4, (char **)&x4);
   if (datasize != 0) {
     x4 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(437), arg4, (char **)&x4,
+    if (_cffi_convert_array_argument(_cffi_type(454), arg4, (char **)&x4,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16058,7 +16756,7 @@ _cffi_f_cml_topk_with_indices(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16079,10 +16777,10 @@ _cffi_f_cml_track_dataset(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(836), arg0, (char **)&x0);
+      _cffi_type(868), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Dataset *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(836), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(868), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16115,10 +16813,10 @@ _cffi_f_cml_track_module(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16151,10 +16849,10 @@ _cffi_f_cml_track_optimizer(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16197,10 +16895,10 @@ _cffi_f_cml_transpose(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16220,7 +16918,7 @@ _cffi_f_cml_transpose(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16249,10 +16947,10 @@ _cffi_f_cml_tril(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16268,7 +16966,7 @@ _cffi_f_cml_tril(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16297,10 +16995,10 @@ _cffi_f_cml_triu(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16316,7 +17014,7 @@ _cffi_f_cml_triu(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16347,10 +17045,10 @@ _cffi_f_cml_unfold(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16370,7 +17068,7 @@ _cffi_f_cml_unfold(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16399,10 +17097,10 @@ _cffi_f_cml_unsqueeze(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16418,7 +17116,7 @@ _cffi_f_cml_unsqueeze(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16439,10 +17137,10 @@ _cffi_f_cml_untrack_module(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16487,10 +17185,10 @@ _cffi_f_cml_var(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16514,7 +17212,7 @@ _cffi_f_cml_var(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16545,28 +17243,28 @@ _cffi_f_cml_where(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg2, (char **)&x2);
+      _cffi_type(396), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16578,7 +17276,7 @@ _cffi_f_cml_where(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16613,10 +17311,10 @@ _cffi_f_cml_xavier_normal(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16634,10 +17332,10 @@ _cffi_f_cml_xavier_normal(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg4, (char **)&x4);
+      _cffi_type(494), arg4, (char **)&x4);
   if (datasize != 0) {
     x4 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg4, (char **)&x4,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg4, (char **)&x4,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16649,7 +17347,7 @@ _cffi_f_cml_xavier_normal(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16670,10 +17368,10 @@ _cffi_f_cml_zero_grad(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16716,10 +17414,10 @@ _cffi_f_cml_zeros(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16729,10 +17427,10 @@ _cffi_f_cml_zeros(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg2, (char **)&x2);
+      _cffi_type(494), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16744,7 +17442,7 @@ _cffi_f_cml_zeros(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16775,7 +17473,7 @@ _cffi_f_cml_zeros_1d(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   return pyresult;
 }
 #else
@@ -16815,7 +17513,7 @@ _cffi_f_cml_zeros_2d(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   return pyresult;
 }
 #else
@@ -16837,10 +17535,10 @@ _cffi_f_cml_zeros_like(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -16852,7 +17550,7 @@ _cffi_f_cml_zeros_like(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -16881,19 +17579,19 @@ _cffi_f_dataset_normalize(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(836), arg0, (char **)&x0);
+      _cffi_type(868), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Dataset *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(836), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(868), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17084,7 +17782,7 @@ _cffi_f_error_stack_get_last_message(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(134));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(145));
   return pyresult;
 }
 #else
@@ -17162,19 +17860,19 @@ _cffi_f_model_load(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17219,28 +17917,28 @@ _cffi_f_module_collect_parameters(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(851), arg1, (char **)&x1);
+      _cffi_type(883), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Parameter * * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(851), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(883), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg2, (char **)&x2);
+      _cffi_type(236), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17287,28 +17985,28 @@ _cffi_f_module_dict_add(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(871), arg0, (char **)&x0);
+      _cffi_type(903), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (ModuleDict *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(871), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(903), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg2, (char **)&x2);
+      _cffi_type(63), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17343,10 +18041,10 @@ _cffi_f_module_dict_size(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(871), arg0, (char **)&x0);
+      _cffi_type(903), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (ModuleDict *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(871), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(903), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17387,19 +18085,19 @@ _cffi_f_module_forward(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17411,7 +18109,7 @@ _cffi_f_module_forward(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -17432,10 +18130,10 @@ _cffi_f_module_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17470,10 +18168,10 @@ _cffi_f_module_is_training(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17514,19 +18212,19 @@ _cffi_f_module_list_append(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(879), arg0, (char **)&x0);
+      _cffi_type(911), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (ModuleList *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(879), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(911), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg1, (char **)&x1);
+      _cffi_type(63), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17569,10 +18267,10 @@ _cffi_f_module_list_insert(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(879), arg0, (char **)&x0);
+      _cffi_type(911), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (ModuleList *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(879), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(911), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17582,10 +18280,10 @@ _cffi_f_module_list_insert(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg2, (char **)&x2);
+      _cffi_type(63), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17620,10 +18318,10 @@ _cffi_f_module_list_length(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(879), arg0, (char **)&x0);
+      _cffi_type(911), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (ModuleList *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(879), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(911), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17662,10 +18360,10 @@ _cffi_f_module_set_training(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17702,10 +18400,10 @@ _cffi_f_optimizer_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17746,10 +18444,10 @@ _cffi_f_optimizer_get_group_lr(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17788,10 +18486,10 @@ _cffi_f_optimizer_get_name(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17803,7 +18501,7 @@ _cffi_f_optimizer_get_name(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(134));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(145));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -17830,10 +18528,10 @@ _cffi_f_optimizer_set_amsgrad(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17876,10 +18574,10 @@ _cffi_f_optimizer_set_grad_clip_norm(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17924,10 +18622,10 @@ _cffi_f_optimizer_set_group_lr(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -17974,10 +18672,10 @@ _cffi_f_optimizer_set_lr(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18016,10 +18714,10 @@ _cffi_f_tensor_clone(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18031,7 +18729,7 @@ _cffi_f_tensor_clone(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -18054,10 +18752,10 @@ _cffi_f_tensor_data_ptr(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18069,7 +18767,7 @@ _cffi_f_tensor_data_ptr(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(705));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(730));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -18092,10 +18790,10 @@ _cffi_f_tensor_ensure_executed(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18128,10 +18826,10 @@ _cffi_f_tensor_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18176,19 +18874,19 @@ _cffi_f_tensor_from_data(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(717), arg0, (char **)&x0);
+      _cffi_type(742), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(717), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(742), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18198,10 +18896,10 @@ _cffi_f_tensor_from_data(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(469), arg3, (char **)&x3);
+      _cffi_type(494), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TensorConfig const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(469), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(494), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18213,7 +18911,7 @@ _cffi_f_tensor_from_data(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -18242,10 +18940,10 @@ _cffi_f_tensor_get_float(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18284,10 +18982,10 @@ _cffi_f_tensor_is_contiguous(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18322,10 +19020,10 @@ _cffi_f_tensor_is_scalar(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18366,10 +19064,10 @@ _cffi_f_tensor_numel(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18406,10 +19104,10 @@ _cffi_f_tensor_pin(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18444,10 +19142,10 @@ _cffi_f_tensor_realize(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18480,10 +19178,10 @@ _cffi_f_tensor_release(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18518,10 +19216,10 @@ _cffi_f_tensor_requires_grad(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18562,10 +19260,10 @@ _cffi_f_tensor_set_float(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18612,10 +19310,10 @@ _cffi_f_tensor_set_requires_grad(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18660,19 +19358,19 @@ _cffi_f_torch_add(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18684,7 +19382,7 @@ _cffi_f_torch_add(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -18729,10 +19427,10 @@ _cffi_f_torch_arange(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(629), arg3, (char **)&x3);
+      _cffi_type(654), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(629), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(654), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18744,7 +19442,7 @@ _cffi_f_torch_arange(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -18775,19 +19473,19 @@ _cffi_f_torch_backward(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18838,10 +19536,10 @@ _cffi_f_torch_cat(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(437), arg0, (char **)&x0);
+      _cffi_type(454), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(437), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(454), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18861,7 +19559,7 @@ _cffi_f_torch_cat(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -18934,10 +19632,10 @@ _cffi_f_torch_clone(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18949,7 +19647,7 @@ _cffi_f_torch_clone(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -18972,10 +19670,10 @@ _cffi_f_torch_contiguous(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -18987,7 +19685,7 @@ _cffi_f_torch_contiguous(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19062,10 +19760,10 @@ _cffi_f_torch_detach(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19077,7 +19775,7 @@ _cffi_f_torch_detach(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19106,19 +19804,19 @@ _cffi_f_torch_div(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19130,7 +19828,7 @@ _cffi_f_torch_div(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19161,10 +19859,10 @@ _cffi_f_torch_empty(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19174,10 +19872,10 @@ _cffi_f_torch_empty(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(629), arg2, (char **)&x2);
+      _cffi_type(654), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(654), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19189,7 +19887,7 @@ _cffi_f_torch_empty(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19246,10 +19944,10 @@ _cffi_f_torch_eye(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(629), arg1, (char **)&x1);
+      _cffi_type(654), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(629), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(654), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19261,7 +19959,7 @@ _cffi_f_torch_eye(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19294,19 +19992,19 @@ _cffi_f_torch_from_blob(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(705), arg0, (char **)&x0);
+      _cffi_type(730), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(705), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(730), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19316,10 +20014,10 @@ _cffi_f_torch_from_blob(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(629), arg3, (char **)&x3);
+      _cffi_type(654), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(629), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(654), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19331,7 +20029,7 @@ _cffi_f_torch_from_blob(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19364,10 +20062,10 @@ _cffi_f_torch_full(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19377,10 +20075,10 @@ _cffi_f_torch_full(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(629), arg2, (char **)&x2);
+      _cffi_type(654), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(654), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19396,7 +20094,7 @@ _cffi_f_torch_full(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19419,10 +20117,10 @@ _cffi_f_torch_gelu(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19434,7 +20132,7 @@ _cffi_f_torch_gelu(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19509,10 +20207,10 @@ _cffi_f_torch_get_grad(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19524,7 +20222,7 @@ _cffi_f_torch_get_grad(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19551,7 +20249,7 @@ _cffi_f_torch_get_last_error(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(134));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(145));
   return pyresult;
 }
 #else
@@ -19633,37 +20331,37 @@ _cffi_f_torch_get_version(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg2, (char **)&x2);
+      _cffi_type(236), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1044), arg3, (char **)&x3);
+      _cffi_type(1082), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (char const * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1044), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(1082), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19838,28 +20536,28 @@ _cffi_f_torch_linear(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg2, (char **)&x2);
+      _cffi_type(396), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19871,7 +20569,7 @@ _cffi_f_torch_linear(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19902,28 +20600,28 @@ _cffi_f_torch_linear_relu(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg2, (char **)&x2);
+      _cffi_type(396), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19935,7 +20633,7 @@ _cffi_f_torch_linear_relu(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -19980,10 +20678,10 @@ _cffi_f_torch_linspace(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(629), arg3, (char **)&x3);
+      _cffi_type(654), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(629), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(654), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -19995,7 +20693,7 @@ _cffi_f_torch_linspace(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -20052,19 +20750,19 @@ _cffi_f_torch_matmul(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20076,7 +20774,7 @@ _cffi_f_torch_matmul(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -20107,10 +20805,10 @@ _cffi_f_torch_max(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20130,7 +20828,7 @@ _cffi_f_torch_max(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -20161,10 +20859,10 @@ _cffi_f_torch_mean(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20184,7 +20882,7 @@ _cffi_f_torch_mean(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -20215,7 +20913,7 @@ _cffi_f_torch_memory_create(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1028));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1066));
   return pyresult;
 }
 #else
@@ -20235,10 +20933,10 @@ _cffi_f_torch_memory_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1028), arg0, (char **)&x0);
+      _cffi_type(1066), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchMemoryManager *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1028), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(1066), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20279,10 +20977,10 @@ _cffi_f_torch_memory_from_buffer(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(705), arg0, (char **)&x0);
+      _cffi_type(730), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (void *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(705), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(730), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20298,7 +20996,7 @@ _cffi_f_torch_memory_from_buffer(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1028));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1066));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -20321,10 +21019,10 @@ _cffi_f_torch_memory_peak(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(922), arg0, (char **)&x0);
+      _cffi_type(954), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchMemoryManager const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(922), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(954), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20359,10 +21057,10 @@ _cffi_f_torch_memory_used(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(922), arg0, (char **)&x0);
+      _cffi_type(954), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchMemoryManager const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(922), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(954), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20405,10 +21103,10 @@ _cffi_f_torch_min(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20428,7 +21126,7 @@ _cffi_f_torch_min(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -20449,10 +21147,10 @@ _cffi_f_torch_module_eval(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20493,19 +21191,19 @@ _cffi_f_torch_module_forward(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20517,7 +21215,7 @@ _cffi_f_torch_module_forward(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -20540,10 +21238,10 @@ _cffi_f_torch_module_is_training(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20586,19 +21284,19 @@ _cffi_f_torch_module_load_state_dict(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(472), arg1, (char **)&x1);
+      _cffi_type(497), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (StateDict const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(472), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(497), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20643,19 +21341,19 @@ _cffi_f_torch_module_state_dict(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20667,7 +21365,7 @@ _cffi_f_torch_module_state_dict(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1003));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1041));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -20688,10 +21386,10 @@ _cffi_f_torch_module_train(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20724,10 +21422,10 @@ _cffi_f_torch_module_zero_grad(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20768,19 +21466,19 @@ _cffi_f_torch_mul(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20792,7 +21490,7 @@ _cffi_f_torch_mul(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -20839,7 +21537,7 @@ _cffi_f_torch_nn_linear(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1132));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1173));
   return pyresult;
 }
 #else
@@ -20867,19 +21565,19 @@ _cffi_f_torch_nn_mse_loss(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -20891,7 +21589,7 @@ _cffi_f_torch_nn_mse_loss(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -20918,7 +21616,7 @@ _cffi_f_torch_nn_relu(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1159));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1205));
   return pyresult;
 }
 #else
@@ -20944,7 +21642,7 @@ _cffi_f_torch_nn_sequential(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(411));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(428));
   return pyresult;
 }
 #else
@@ -20970,19 +21668,19 @@ _cffi_f_torch_nn_sequential_add(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(411), arg0, (char **)&x0);
+      _cffi_type(428), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Sequential *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(411), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(428), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg1, (char **)&x1);
+      _cffi_type(63), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21023,19 +21721,19 @@ _cffi_f_torch_nn_sequential_forward(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(411), arg0, (char **)&x0);
+      _cffi_type(428), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Sequential *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(411), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(428), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21047,7 +21745,7 @@ _cffi_f_torch_nn_sequential_forward(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21102,10 +21800,10 @@ _cffi_f_torch_ones(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21115,10 +21813,10 @@ _cffi_f_torch_ones(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(629), arg2, (char **)&x2);
+      _cffi_type(654), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(654), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21130,7 +21828,7 @@ _cffi_f_torch_ones(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21153,10 +21851,10 @@ _cffi_f_torch_ones_like(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21168,7 +21866,7 @@ _cffi_f_torch_ones_like(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21205,10 +21903,10 @@ _cffi_f_torch_optim_adam(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21240,7 +21938,7 @@ _cffi_f_torch_optim_adam(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21261,10 +21959,10 @@ _cffi_f_torch_optim_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21309,10 +22007,10 @@ _cffi_f_torch_optim_sgd(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21336,7 +22034,7 @@ _cffi_f_torch_optim_sgd(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(206));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(217));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21357,10 +22055,10 @@ _cffi_f_torch_optim_step(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21393,10 +22091,10 @@ _cffi_f_torch_optim_zero_grad(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(206), arg0, (char **)&x0);
+      _cffi_type(217), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Optimizer *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(206), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(217), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21435,7 +22133,7 @@ _cffi_f_torch_options(PyObject *self, PyObject *noarg)
 
   (void)self; /* unused */
   (void)noarg; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(739));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(764));
   return pyresult;
 }
 #else
@@ -21463,7 +22161,7 @@ _cffi_f_torch_options_device(PyObject *self, PyObject *args)
   if (!PyArg_UnpackTuple(args, "torch_options_device", 2, 2, &arg0, &arg1))
     return NULL;
 
-  if (_cffi_to_c((char *)&x0, _cffi_type(739), arg0) < 0)
+  if (_cffi_to_c((char *)&x0, _cffi_type(764), arg0) < 0)
     return NULL;
 
   if (_cffi_to_c((char *)&x1, _cffi_type(42), arg1) < 0)
@@ -21476,7 +22174,7 @@ _cffi_f_torch_options_device(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(739));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(764));
   return pyresult;
 }
 #else
@@ -21504,7 +22202,7 @@ _cffi_f_torch_options_dtype(PyObject *self, PyObject *args)
   if (!PyArg_UnpackTuple(args, "torch_options_dtype", 2, 2, &arg0, &arg1))
     return NULL;
 
-  if (_cffi_to_c((char *)&x0, _cffi_type(739), arg0) < 0)
+  if (_cffi_to_c((char *)&x0, _cffi_type(764), arg0) < 0)
     return NULL;
 
   if (_cffi_to_c((char *)&x1, _cffi_type(41), arg1) < 0)
@@ -21517,7 +22215,7 @@ _cffi_f_torch_options_dtype(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(739));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(764));
   return pyresult;
 }
 #else
@@ -21545,7 +22243,7 @@ _cffi_f_torch_options_requires_grad(PyObject *self, PyObject *args)
   if (!PyArg_UnpackTuple(args, "torch_options_requires_grad", 2, 2, &arg0, &arg1))
     return NULL;
 
-  if (_cffi_to_c((char *)&x0, _cffi_type(739), arg0) < 0)
+  if (_cffi_to_c((char *)&x0, _cffi_type(764), arg0) < 0)
     return NULL;
 
   x1 = (_Bool)_cffi_to_c__Bool(arg1);
@@ -21559,7 +22257,7 @@ _cffi_f_torch_options_requires_grad(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(739));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(764));
   return pyresult;
 }
 #else
@@ -21584,10 +22282,10 @@ _cffi_f_torch_options_to_config(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(629), arg0, (char **)&x0);
+      _cffi_type(654), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(629), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(654), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21599,7 +22297,7 @@ _cffi_f_torch_options_to_config(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1172));
+  pyresult = _cffi_from_c_struct((char *)&result, _cffi_type(1218));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21631,19 +22329,19 @@ _cffi_f_torch_pow(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21655,7 +22353,7 @@ _cffi_f_torch_pow(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21686,10 +22384,10 @@ _cffi_f_torch_rand(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21699,10 +22397,10 @@ _cffi_f_torch_rand(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(629), arg2, (char **)&x2);
+      _cffi_type(654), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(654), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21714,7 +22412,7 @@ _cffi_f_torch_rand(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21745,10 +22443,10 @@ _cffi_f_torch_randn(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21758,10 +22456,10 @@ _cffi_f_torch_randn(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(629), arg2, (char **)&x2);
+      _cffi_type(654), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(654), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21773,7 +22471,7 @@ _cffi_f_torch_randn(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21796,10 +22494,10 @@ _cffi_f_torch_randn_like(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21811,7 +22509,7 @@ _cffi_f_torch_randn_like(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21834,10 +22532,10 @@ _cffi_f_torch_realize(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21872,10 +22570,10 @@ _cffi_f_torch_relu(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21887,7 +22585,7 @@ _cffi_f_torch_relu(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -21966,19 +22664,19 @@ _cffi_f_torch_reshape(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -21994,7 +22692,7 @@ _cffi_f_torch_reshape(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22027,37 +22725,37 @@ _cffi_f_torch_runtime_export_pte(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg2, (char **)&x2);
+      _cffi_type(145), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(864), arg3, (char **)&x3);
+      _cffi_type(896), arg3, (char **)&x3);
   if (datasize != 0) {
     x3 = ((size_t)datasize) <= 640 ? (TorchPTEExportOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(864), arg3, (char **)&x3,
+    if (_cffi_convert_array_argument(_cffi_type(896), arg3, (char **)&x3,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22098,19 +22796,19 @@ _cffi_f_torch_runtime_forward(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(599), arg0, (char **)&x0);
+      _cffi_type(624), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchRuntimeModule *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(599), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(624), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22122,7 +22820,7 @@ _cffi_f_torch_runtime_forward(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22143,10 +22841,10 @@ _cffi_f_torch_runtime_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(599), arg0, (char **)&x0);
+      _cffi_type(624), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchRuntimeModule *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(599), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(624), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22181,10 +22879,10 @@ _cffi_f_torch_runtime_from_module(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(321), arg0, (char **)&x0);
+      _cffi_type(63), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Module *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(321), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(63), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22196,7 +22894,7 @@ _cffi_f_torch_runtime_from_module(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(599));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(624));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22219,10 +22917,10 @@ _cffi_f_torch_runtime_load_aot(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg0, (char **)&x0);
+      _cffi_type(145), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22234,7 +22932,7 @@ _cffi_f_torch_runtime_load_aot(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(599));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(624));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22257,10 +22955,10 @@ _cffi_f_torch_runtime_load_pte(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg0, (char **)&x0);
+      _cffi_type(145), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22272,7 +22970,7 @@ _cffi_f_torch_runtime_load_pte(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(599));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(624));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22299,19 +22997,19 @@ _cffi_f_torch_runtime_set_memory(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(599), arg0, (char **)&x0);
+      _cffi_type(624), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (TorchRuntimeModule *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(599), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(624), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1028), arg1, (char **)&x1);
+      _cffi_type(1066), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (TorchMemoryManager *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1028), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(1066), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22456,10 +23154,10 @@ _cffi_f_torch_sigmoid(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22471,7 +23169,7 @@ _cffi_f_torch_sigmoid(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22500,10 +23198,10 @@ _cffi_f_torch_softmax(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22519,7 +23217,7 @@ _cffi_f_torch_softmax(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22548,10 +23246,10 @@ _cffi_f_torch_squeeze(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22567,7 +23265,7 @@ _cffi_f_torch_squeeze(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22598,10 +23296,10 @@ _cffi_f_torch_stack(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(437), arg0, (char **)&x0);
+      _cffi_type(454), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor * *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(437), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(454), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22621,7 +23319,7 @@ _cffi_f_torch_stack(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22642,10 +23340,10 @@ _cffi_f_torch_state_dict_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(1003), arg0, (char **)&x0);
+      _cffi_type(1041), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (StateDict *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(1003), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(1041), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22686,19 +23384,19 @@ _cffi_f_torch_state_dict_get(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(472), arg0, (char **)&x0);
+      _cffi_type(497), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (StateDict const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(472), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(497), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(134), arg1, (char **)&x1);
+      _cffi_type(145), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (char const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(134), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(145), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22710,7 +23408,7 @@ _cffi_f_torch_state_dict_get(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22739,19 +23437,19 @@ _cffi_f_torch_sub(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22763,7 +23461,7 @@ _cffi_f_torch_sub(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22794,10 +23492,10 @@ _cffi_f_torch_sum(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22817,7 +23515,7 @@ _cffi_f_torch_sum(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22840,10 +23538,10 @@ _cffi_f_torch_tanh(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22855,7 +23553,7 @@ _cffi_f_torch_tanh(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22878,10 +23576,10 @@ _cffi_f_torch_tensor_data_ptr(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22893,7 +23591,7 @@ _cffi_f_torch_tensor_data_ptr(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(705));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(730));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22916,10 +23614,10 @@ _cffi_f_torch_tensor_data_ptr_f32(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22931,7 +23629,7 @@ _cffi_f_torch_tensor_data_ptr_f32(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1190));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(1236));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -22954,10 +23652,10 @@ _cffi_f_torch_tensor_device(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(129), arg0, (char **)&x0);
+      _cffi_type(140), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(129), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(140), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -22992,10 +23690,10 @@ _cffi_f_torch_tensor_dtype(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(129), arg0, (char **)&x0);
+      _cffi_type(140), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(129), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(140), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23028,10 +23726,10 @@ _cffi_f_torch_tensor_free(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23066,10 +23764,10 @@ _cffi_f_torch_tensor_has_lazy_ir(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(129), arg0, (char **)&x0);
+      _cffi_type(140), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(129), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(140), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23104,10 +23802,10 @@ _cffi_f_torch_tensor_is_contiguous(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(129), arg0, (char **)&x0);
+      _cffi_type(140), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(129), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(140), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23142,10 +23840,10 @@ _cffi_f_torch_tensor_is_materialized(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(129), arg0, (char **)&x0);
+      _cffi_type(140), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(129), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(140), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23180,10 +23878,10 @@ _cffi_f_torch_tensor_item_float(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23218,10 +23916,10 @@ _cffi_f_torch_tensor_ndim(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(129), arg0, (char **)&x0);
+      _cffi_type(140), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(129), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(140), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23256,10 +23954,10 @@ _cffi_f_torch_tensor_numel(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(129), arg0, (char **)&x0);
+      _cffi_type(140), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(129), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(140), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23294,10 +23992,10 @@ _cffi_f_torch_tensor_ref_count(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(129), arg0, (char **)&x0);
+      _cffi_type(140), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(129), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(140), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23332,10 +24030,10 @@ _cffi_f_torch_tensor_requires_grad(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(129), arg0, (char **)&x0);
+      _cffi_type(140), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(129), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(140), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23368,10 +24066,10 @@ _cffi_f_torch_tensor_retain(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23410,10 +24108,10 @@ _cffi_f_torch_tensor_set_item_float(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23456,10 +24154,10 @@ _cffi_f_torch_tensor_set_requires_grad(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23498,10 +24196,10 @@ _cffi_f_torch_tensor_sizes(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(129), arg0, (char **)&x0);
+      _cffi_type(140), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(129), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(140), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23513,7 +24211,7 @@ _cffi_f_torch_tensor_sizes(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(427));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(444));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -23544,10 +24242,10 @@ _cffi_f_torch_transpose(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23567,7 +24265,7 @@ _cffi_f_torch_transpose(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -23596,10 +24294,10 @@ _cffi_f_torch_unsqueeze(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23615,7 +24313,7 @@ _cffi_f_torch_unsqueeze(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -23636,10 +24334,10 @@ _cffi_f_torch_zero_grad(PyObject *self, PyObject *arg0)
   struct _cffi_freeme_s *large_args_free = NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23682,10 +24380,10 @@ _cffi_f_torch_zeros(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg0, (char **)&x0);
+      _cffi_type(236), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23695,10 +24393,10 @@ _cffi_f_torch_zeros(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(629), arg2, (char **)&x2);
+      _cffi_type(654), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (TorchTensorOptions const *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(629), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(654), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23710,7 +24408,7 @@ _cffi_f_torch_zeros(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -23733,10 +24431,10 @@ _cffi_f_torch_zeros_like(PyObject *self, PyObject *arg0)
   PyObject *pyresult;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23748,7 +24446,7 @@ _cffi_f_torch_zeros_like(PyObject *self, PyObject *arg0)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -23779,19 +24477,19 @@ _cffi_f_uop_gather(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg1, (char **)&x1);
+      _cffi_type(396), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23807,7 +24505,7 @@ _cffi_f_uop_gather(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -23840,28 +24538,28 @@ _cffi_f_uop_shrink(PyObject *self, PyObject *args)
     return NULL;
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(379), arg0, (char **)&x0);
+      _cffi_type(396), arg0, (char **)&x0);
   if (datasize != 0) {
     x0 = ((size_t)datasize) <= 640 ? (Tensor *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(379), arg0, (char **)&x0,
+    if (_cffi_convert_array_argument(_cffi_type(396), arg0, (char **)&x0,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg1, (char **)&x1);
+      _cffi_type(236), arg1, (char **)&x1);
   if (datasize != 0) {
     x1 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg1, (char **)&x1,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg1, (char **)&x1,
             datasize, &large_args_free) < 0)
       return NULL;
   }
 
   datasize = _cffi_prepare_pointer_call_argument(
-      _cffi_type(225), arg2, (char **)&x2);
+      _cffi_type(236), arg2, (char **)&x2);
   if (datasize != 0) {
     x2 = ((size_t)datasize) <= 640 ? (int *)alloca((size_t)datasize) : NULL;
-    if (_cffi_convert_array_argument(_cffi_type(225), arg2, (char **)&x2,
+    if (_cffi_convert_array_argument(_cffi_type(236), arg2, (char **)&x2,
             datasize, &large_args_free) < 0)
       return NULL;
   }
@@ -23877,7 +24575,7 @@ _cffi_f_uop_shrink(PyObject *self, PyObject *args)
   Py_END_ALLOW_THREADS
 
   (void)self; /* unused */
-  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(379));
+  pyresult = _cffi_from_c_pointer((char *)result, _cffi_type(396));
   if (large_args_free != NULL) _cffi_free_array_arguments(large_args_free);
   return pyresult;
 }
@@ -24228,6 +24926,18 @@ static void _cffi_checkfld__Parameter(Parameter *p)
 struct _cffi_align__Parameter { char x; Parameter y; };
 
 _CFFI_UNUSED_FN
+static void _cffi_checkfld__PipelineStage(PipelineStage *p)
+{
+  /* only to generate compile-time warnings or errors */
+  (void)p;
+  { Module * *tmp = &p->module; (void)tmp; }
+  (void)((p->device_id) | 0);  /* check that 'PipelineStage.device_id' is an integer */
+  { DeviceType *tmp = &p->device; (void)tmp; }
+  (void)((p->stage_id) | 0);  /* check that 'PipelineStage.stage_id' is an integer */
+}
+struct _cffi_align__PipelineStage { char x; PipelineStage y; };
+
+_CFFI_UNUSED_FN
 static void _cffi_checkfld__PixelShuffle(PixelShuffle *p)
 {
   /* only to generate compile-time warnings or errors */
@@ -24448,6 +25158,8 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "LOG_LEVEL_ERROR", (void *)_cffi_const_LOG_LEVEL_ERROR, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
   { "LOG_LEVEL_INFO", (void *)_cffi_const_LOG_LEVEL_INFO, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
   { "LOG_LEVEL_WARNING", (void *)_cffi_const_LOG_LEVEL_WARNING, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
+  { "PIPE_UNIT_BACKWARD", (void *)_cffi_const_PIPE_UNIT_BACKWARD, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
+  { "PIPE_UNIT_FORWARD", (void *)_cffi_const_PIPE_UNIT_FORWARD, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
   { "SCATTER_REDUCE_AMAX", (void *)_cffi_const_SCATTER_REDUCE_AMAX, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
   { "SCATTER_REDUCE_AMIN", (void *)_cffi_const_SCATTER_REDUCE_AMIN, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
   { "SCATTER_REDUCE_MEAN", (void *)_cffi_const_SCATTER_REDUCE_MEAN, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
@@ -24459,140 +25171,149 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "UPSAMPLE_BICUBIC", (void *)_cffi_const_UPSAMPLE_BICUBIC, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
   { "UPSAMPLE_BILINEAR", (void *)_cffi_const_UPSAMPLE_BILINEAR, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
   { "UPSAMPLE_NEAREST", (void *)_cffi_const_UPSAMPLE_NEAREST, _CFFI_OP(_CFFI_OP_ENUM, -1), (void *)0 },
-  { "autograd_is_grad_enabled", (void *)_cffi_f_autograd_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_autograd_is_grad_enabled },
-  { "autograd_no_grad_enter", (void *)_cffi_f_autograd_no_grad_enter, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_autograd_no_grad_enter },
-  { "autograd_no_grad_exit", (void *)_cffi_f_autograd_no_grad_exit, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_autograd_no_grad_exit },
-  { "cml_acos", (void *)_cffi_f_cml_acos, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_acos },
-  { "cml_add", (void *)_cffi_f_cml_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_add },
-  { "cml_arange", (void *)_cffi_f_cml_arange, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 619), (void *)_cffi_d_cml_arange },
-  { "cml_argmax", (void *)_cffi_f_cml_argmax, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_argmax },
-  { "cml_argmin", (void *)_cffi_f_cml_argmin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_argmin },
-  { "cml_argsort", (void *)_cffi_f_cml_argsort, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_argsort },
-  { "cml_asin", (void *)_cffi_f_cml_asin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_asin },
-  { "cml_atan", (void *)_cffi_f_cml_atan, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_atan },
-  { "cml_autocast_enter", (void *)_cffi_f_cml_autocast_enter, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 941), (void *)_cffi_d_cml_autocast_enter },
-  { "cml_autocast_exit", (void *)_cffi_f_cml_autocast_exit, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_autocast_exit },
-  { "cml_autocast_is_enabled", (void *)_cffi_f_cml_autocast_is_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_cml_autocast_is_enabled },
-  { "cml_autograd_reset_after_step", (void *)_cffi_f_cml_autograd_reset_after_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_autograd_reset_after_step },
-  { "cml_autograd_step_end", (void *)_cffi_f_cml_autograd_step_end, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_cml_autograd_step_end },
-  { "cml_backward", (void *)_cffi_f_cml_backward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1008), (void *)_cffi_d_cml_backward },
-  { "cml_bfloat16", (void *)_cffi_f_cml_bfloat16, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_bfloat16 },
-  { "cml_bitcast", (void *)_cffi_f_cml_bitcast, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 483), (void *)_cffi_d_cml_bitcast },
-  { "cml_bool_", (void *)_cffi_f_cml_bool_, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_bool_ },
-  { "cml_cast", (void *)_cffi_f_cml_cast, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 483), (void *)_cffi_d_cml_cast },
-  { "cml_ceil", (void *)_cffi_f_cml_ceil, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_ceil },
-  { "cml_chunk", (void *)_cffi_f_cml_chunk, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 441), (void *)_cffi_d_cml_chunk },
-  { "cml_clamp", (void *)_cffi_f_cml_clamp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 516), (void *)_cffi_d_cml_clamp },
-  { "cml_cleanup", (void *)_cffi_f_cml_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_cleanup },
-  { "cml_clear_last_error", (void *)_cffi_f_cml_clear_last_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_clear_last_error },
-  { "cml_clone", (void *)_cffi_f_cml_clone, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_clone },
-  { "cml_concat", (void *)_cffi_f_cml_concat, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 475), (void *)_cffi_d_cml_concat },
-  { "cml_contiguous", (void *)_cffi_f_cml_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_contiguous },
-  { "cml_copysign", (void *)_cffi_f_cml_copysign, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_copysign },
-  { "cml_cos", (void *)_cffi_f_cml_cos, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_cos },
-  { "cml_cumprod", (void *)_cffi_f_cml_cumprod, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_cumprod },
-  { "cml_cumsum", (void *)_cffi_f_cml_cumsum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_cumsum },
-  { "cml_dataset_load", (void *)_cffi_f_cml_dataset_load, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 133), (void *)_cffi_d_cml_dataset_load },
-  { "cml_detach", (void *)_cffi_f_cml_detach, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_detach },
-  { "cml_diagonal", (void *)_cffi_f_cml_diagonal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 592), (void *)_cffi_d_cml_diagonal },
-  { "cml_dist_allreduce", (void *)_cffi_f_cml_dist_allreduce, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 898), (void *)_cffi_d_cml_dist_allreduce },
-  { "cml_dist_barrier", (void *)_cffi_f_cml_dist_barrier, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_dist_barrier },
-  { "cml_dist_destroy", (void *)_cffi_f_cml_dist_destroy, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_dist_destroy },
-  { "cml_dist_get_rank", (void *)_cffi_f_cml_dist_get_rank, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_dist_get_rank },
-  { "cml_dist_get_world_size", (void *)_cffi_f_cml_dist_get_world_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_dist_get_world_size },
-  { "cml_dist_init", (void *)_cffi_f_cml_dist_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 839), (void *)_cffi_d_cml_dist_init },
-  { "cml_dist_is_initialized", (void *)_cffi_f_cml_dist_is_initialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_cml_dist_is_initialized },
-  { "cml_div", (void *)_cffi_f_cml_div, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_div },
-  { "cml_dot", (void *)_cffi_f_cml_dot, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_dot },
-  { "cml_double", (void *)_cffi_f_cml_double, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_double },
-  { "cml_dtype_size", (void *)_cffi_f_cml_dtype_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 915), (void *)_cffi_d_cml_dtype_size },
-  { "cml_einsum", (void *)_cffi_f_cml_einsum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 605), (void *)_cffi_d_cml_einsum },
-  { "cml_elu", (void *)_cffi_f_cml_elu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_elu },
-  { "cml_empty", (void *)_cffi_f_cml_empty, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 643), (void *)_cffi_d_cml_empty },
-  { "cml_empty_1d", (void *)_cffi_f_cml_empty_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 678), (void *)_cffi_d_cml_empty_1d },
-  { "cml_empty_2d", (void *)_cffi_f_cml_empty_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 689), (void *)_cffi_d_cml_empty_2d },
-  { "cml_enable_grad", (void *)_cffi_f_cml_enable_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_enable_grad },
-  { "cml_erf", (void *)_cffi_f_cml_erf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_erf },
-  { "cml_exp", (void *)_cffi_f_cml_exp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_exp },
-  { "cml_exp2", (void *)_cffi_f_cml_exp2, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_exp2 },
-  { "cml_eye", (void *)_cffi_f_cml_eye, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 681), (void *)_cffi_d_cml_eye },
-  { "cml_f_interpolate", (void *)_cffi_f_cml_f_interpolate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 538), (void *)_cffi_d_cml_f_interpolate },
-  { "cml_f_pixel_shuffle", (void *)_cffi_f_cml_f_pixel_shuffle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_f_pixel_shuffle },
-  { "cml_f_pixel_unshuffle", (void *)_cffi_f_cml_f_pixel_unshuffle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_f_pixel_unshuffle },
-  { "cml_flip", (void *)_cffi_f_cml_flip, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_flip },
-  { "cml_floor", (void *)_cffi_f_cml_floor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_floor },
-  { "cml_force_cleanup", (void *)_cffi_f_cml_force_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_force_cleanup },
-  { "cml_free", (void *)_cffi_f_cml_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1064), (void *)_cffi_d_cml_free },
-  { "cml_from_blob", (void *)_cffi_f_cml_from_blob, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 704), (void *)_cffi_d_cml_from_blob },
-  { "cml_from_url", (void *)_cffi_f_cml_from_url, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 602), (void *)_cffi_d_cml_from_url },
-  { "cml_full", (void *)_cffi_f_cml_full, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 648), (void *)_cffi_d_cml_full },
-  { "cml_full_like", (void *)_cffi_f_cml_full_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_full_like },
-  { "cml_get_build_info", (void *)_cffi_f_cml_get_build_info, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 807), (void *)_cffi_d_cml_get_build_info },
-  { "cml_get_default_device", (void *)_cffi_f_cml_get_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 139), (void *)_cffi_d_cml_get_default_device },
-  { "cml_get_default_dtype", (void *)_cffi_f_cml_get_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 131), (void *)_cffi_d_cml_get_default_dtype },
-  { "cml_get_error_handler", (void *)_cffi_f_cml_get_error_handler, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 936), (void *)_cffi_d_cml_get_error_handler },
-  { "cml_get_init_count", (void *)_cffi_f_cml_get_init_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_get_init_count },
-  { "cml_get_version", (void *)_cffi_f_cml_get_version, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1040), (void *)_cffi_d_cml_get_version },
-  { "cml_gguf_close", (void *)_cffi_f_cml_gguf_close, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 950), (void *)_cffi_d_cml_gguf_close },
-  { "cml_gguf_open_read", (void *)_cffi_f_cml_gguf_open_read, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 156), (void *)_cffi_d_cml_gguf_open_read },
-  { "cml_gguf_open_write", (void *)_cffi_f_cml_gguf_open_write, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 156), (void *)_cffi_d_cml_gguf_open_write },
-  { "cml_gguf_read_tensor", (void *)_cffi_f_cml_gguf_read_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 447), (void *)_cffi_d_cml_gguf_read_tensor },
-  { "cml_gguf_write_tensor", (void *)_cffi_f_cml_gguf_write_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 844), (void *)_cffi_d_cml_gguf_write_tensor },
-  { "cml_glorot_uniform", (void *)_cffi_f_cml_glorot_uniform, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 671), (void *)_cffi_d_cml_glorot_uniform },
-  { "cml_grad_scaler_create", (void *)_cffi_f_cml_grad_scaler_create, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 177), (void *)_cffi_d_cml_grad_scaler_create },
-  { "cml_grad_scaler_free", (void *)_cffi_f_cml_grad_scaler_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 953), (void *)_cffi_d_cml_grad_scaler_free },
-  { "cml_grad_scaler_scale", (void *)_cffi_f_cml_grad_scaler_scale, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 451), (void *)_cffi_d_cml_grad_scaler_scale },
-  { "cml_grad_scaler_step", (void *)_cffi_f_cml_grad_scaler_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 961), (void *)_cffi_d_cml_grad_scaler_step },
-  { "cml_grad_scaler_unscale", (void *)_cffi_f_cml_grad_scaler_unscale, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 956), (void *)_cffi_d_cml_grad_scaler_unscale },
-  { "cml_grad_scaler_update", (void *)_cffi_f_cml_grad_scaler_update, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 953), (void *)_cffi_d_cml_grad_scaler_update },
-  { "cml_half", (void *)_cffi_f_cml_half, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_half },
-  { "cml_hardswish", (void *)_cffi_f_cml_hardswish, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_hardswish },
-  { "cml_idiv", (void *)_cffi_f_cml_idiv, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_idiv },
-  { "cml_init", (void *)_cffi_f_cml_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_cml_init },
-  { "cml_int_", (void *)_cffi_f_cml_int_, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_int_ },
-  { "cml_interpolate", (void *)_cffi_f_cml_interpolate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 532), (void *)_cffi_d_cml_interpolate },
-  { "cml_is_grad_enabled", (void *)_cffi_f_cml_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_cml_is_grad_enabled },
-  { "cml_is_initialized", (void *)_cffi_f_cml_is_initialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_cml_is_initialized },
-  { "cml_is_leaf", (void *)_cffi_f_cml_is_leaf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 796), (void *)_cffi_d_cml_is_leaf },
-  { "cml_kaiming_normal", (void *)_cffi_f_cml_kaiming_normal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 665), (void *)_cffi_d_cml_kaiming_normal },
-  { "cml_kaiming_uniform", (void *)_cffi_f_cml_kaiming_uniform, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 665), (void *)_cffi_d_cml_kaiming_uniform },
-  { "cml_kernel_cache_clear", (void *)_cffi_f_cml_kernel_cache_clear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_kernel_cache_clear },
-  { "cml_kernel_cache_hit_rate", (void *)_cffi_f_cml_kernel_cache_hit_rate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 809), (void *)_cffi_d_cml_kernel_cache_hit_rate },
-  { "cml_kernel_cache_print_stats", (void *)_cffi_f_cml_kernel_cache_print_stats, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_kernel_cache_print_stats },
-  { "cml_kernel_cache_stats", (void *)_cffi_f_cml_kernel_cache_stats, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1049), (void *)_cffi_d_cml_kernel_cache_stats },
-  { "cml_leaky_relu", (void *)_cffi_f_cml_leaky_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_leaky_relu },
-  { "cml_lerp", (void *)_cffi_f_cml_lerp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 502), (void *)_cffi_d_cml_lerp },
-  { "cml_linspace", (void *)_cffi_f_cml_linspace, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 631), (void *)_cffi_d_cml_linspace },
-  { "cml_log", (void *)_cffi_f_cml_log, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_log },
-  { "cml_log2", (void *)_cffi_f_cml_log2, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_log2 },
-  { "cml_logaddexp", (void *)_cffi_f_cml_logaddexp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_logaddexp },
-  { "cml_logcumsumexp", (void *)_cffi_f_cml_logcumsumexp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_logcumsumexp },
-  { "cml_long", (void *)_cffi_f_cml_long, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_long },
-  { "cml_lr_scheduler_cosine", (void *)_cffi_f_cml_lr_scheduler_cosine, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 229), (void *)_cffi_d_cml_lr_scheduler_cosine },
-  { "cml_lr_scheduler_exponential", (void *)_cffi_f_cml_lr_scheduler_exponential, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 205), (void *)_cffi_d_cml_lr_scheduler_exponential },
-  { "cml_lr_scheduler_free", (void *)_cffi_f_cml_lr_scheduler_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 966), (void *)_cffi_d_cml_lr_scheduler_free },
-  { "cml_lr_scheduler_get_lr", (void *)_cffi_f_cml_lr_scheduler_get_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 814), (void *)_cffi_d_cml_lr_scheduler_get_lr },
-  { "cml_lr_scheduler_multi_step", (void *)_cffi_f_cml_lr_scheduler_multi_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 223), (void *)_cffi_d_cml_lr_scheduler_multi_step },
-  { "cml_lr_scheduler_one_cycle", (void *)_cffi_f_cml_lr_scheduler_one_cycle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 215), (void *)_cffi_d_cml_lr_scheduler_one_cycle },
-  { "cml_lr_scheduler_polynomial", (void *)_cffi_f_cml_lr_scheduler_polynomial, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 234), (void *)_cffi_d_cml_lr_scheduler_polynomial },
-  { "cml_lr_scheduler_reduce_on_plateau", (void *)_cffi_f_cml_lr_scheduler_reduce_on_plateau, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 209), (void *)_cffi_d_cml_lr_scheduler_reduce_on_plateau },
-  { "cml_lr_scheduler_step", (void *)_cffi_f_cml_lr_scheduler_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 229), (void *)_cffi_d_cml_lr_scheduler_step },
-  { "cml_lr_scheduler_update", (void *)_cffi_f_cml_lr_scheduler_update, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 817), (void *)_cffi_d_cml_lr_scheduler_update },
-  { "cml_lr_scheduler_warmup", (void *)_cffi_f_cml_lr_scheduler_warmup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 200), (void *)_cffi_d_cml_lr_scheduler_warmup },
-  { "cml_manual_seed", (void *)_cffi_f_cml_manual_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1058), (void *)_cffi_d_cml_manual_seed },
-  { "cml_masked_select", (void *)_cffi_f_cml_masked_select, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_masked_select },
-  { "cml_matmul", (void *)_cffi_f_cml_matmul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_matmul },
-  { "cml_max", (void *)_cffi_f_cml_max, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_max },
-  { "cml_mean", (void *)_cffi_f_cml_mean, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_mean },
-  { "cml_meshgrid", (void *)_cffi_f_cml_meshgrid, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 436), (void *)_cffi_d_cml_meshgrid },
-  { "cml_min", (void *)_cffi_f_cml_min, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_min },
-  { "cml_mish", (void *)_cffi_f_cml_mish, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_mish },
-  { "cml_mod", (void *)_cffi_f_cml_mod, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_mod },
-  { "cml_module_load_gguf", (void *)_cffi_f_cml_module_load_gguf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 866), (void *)_cffi_d_cml_module_load_gguf },
-  { "cml_module_load_safetensors", (void *)_cffi_f_cml_module_load_safetensors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 866), (void *)_cffi_d_cml_module_load_safetensors },
-  { "cml_module_save_gguf", (void *)_cffi_f_cml_module_save_gguf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 866), (void *)_cffi_d_cml_module_save_gguf },
-  { "cml_module_save_safetensors", (void *)_cffi_f_cml_module_save_safetensors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 866), (void *)_cffi_d_cml_module_save_safetensors },
-  { "cml_mul", (void *)_cffi_f_cml_mul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_mul },
+  { "autograd_is_grad_enabled", (void *)_cffi_f_autograd_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_autograd_is_grad_enabled },
+  { "autograd_no_grad_enter", (void *)_cffi_f_autograd_no_grad_enter, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_autograd_no_grad_enter },
+  { "autograd_no_grad_exit", (void *)_cffi_f_autograd_no_grad_exit, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_autograd_no_grad_exit },
+  { "cml_acos", (void *)_cffi_f_cml_acos, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_acos },
+  { "cml_add", (void *)_cffi_f_cml_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_add },
+  { "cml_arange", (void *)_cffi_f_cml_arange, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 644), (void *)_cffi_d_cml_arange },
+  { "cml_argmax", (void *)_cffi_f_cml_argmax, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_argmax },
+  { "cml_argmin", (void *)_cffi_f_cml_argmin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_argmin },
+  { "cml_argsort", (void *)_cffi_f_cml_argsort, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 587), (void *)_cffi_d_cml_argsort },
+  { "cml_asin", (void *)_cffi_f_cml_asin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_asin },
+  { "cml_atan", (void *)_cffi_f_cml_atan, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_atan },
+  { "cml_autocast_default_dtype", (void *)_cffi_f_cml_autocast_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 142), (void *)_cffi_d_cml_autocast_default_dtype },
+  { "cml_autocast_enter", (void *)_cffi_f_cml_autocast_enter, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 979), (void *)_cffi_d_cml_autocast_enter },
+  { "cml_autocast_exit", (void *)_cffi_f_cml_autocast_exit, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_cml_autocast_exit },
+  { "cml_autocast_get_dtype", (void *)_cffi_f_cml_autocast_get_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 142), (void *)_cffi_d_cml_autocast_get_dtype },
+  { "cml_autocast_is_enabled", (void *)_cffi_f_cml_autocast_is_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_cml_autocast_is_enabled },
+  { "cml_autocast_set_dtype", (void *)_cffi_f_cml_autocast_set_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 979), (void *)_cffi_d_cml_autocast_set_dtype },
+  { "cml_autograd_reset_after_step", (void *)_cffi_f_cml_autograd_reset_after_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_cml_autograd_reset_after_step },
+  { "cml_autograd_step_end", (void *)_cffi_f_cml_autograd_step_end, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1043), (void *)_cffi_d_cml_autograd_step_end },
+  { "cml_backward", (void *)_cffi_f_cml_backward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1046), (void *)_cffi_d_cml_backward },
+  { "cml_bfloat16", (void *)_cffi_f_cml_bfloat16, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_bfloat16 },
+  { "cml_bitcast", (void *)_cffi_f_cml_bitcast, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 508), (void *)_cffi_d_cml_bitcast },
+  { "cml_bool_", (void *)_cffi_f_cml_bool_, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_bool_ },
+  { "cml_cast", (void *)_cffi_f_cml_cast, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 508), (void *)_cffi_d_cml_cast },
+  { "cml_ceil", (void *)_cffi_f_cml_ceil, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_ceil },
+  { "cml_chunk", (void *)_cffi_f_cml_chunk, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 458), (void *)_cffi_d_cml_chunk },
+  { "cml_clamp", (void *)_cffi_f_cml_clamp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 541), (void *)_cffi_d_cml_clamp },
+  { "cml_cleanup", (void *)_cffi_f_cml_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_cml_cleanup },
+  { "cml_clear_last_error", (void *)_cffi_f_cml_clear_last_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_cml_clear_last_error },
+  { "cml_clone", (void *)_cffi_f_cml_clone, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_clone },
+  { "cml_concat", (void *)_cffi_f_cml_concat, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 500), (void *)_cffi_d_cml_concat },
+  { "cml_contiguous", (void *)_cffi_f_cml_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_contiguous },
+  { "cml_copysign", (void *)_cffi_f_cml_copysign, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_copysign },
+  { "cml_cos", (void *)_cffi_f_cml_cos, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_cos },
+  { "cml_cumprod", (void *)_cffi_f_cml_cumprod, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_cumprod },
+  { "cml_cumsum", (void *)_cffi_f_cml_cumsum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_cumsum },
+  { "cml_dataset_load", (void *)_cffi_f_cml_dataset_load, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 144), (void *)_cffi_d_cml_dataset_load },
+  { "cml_ddp_create", (void *)_cffi_f_cml_ddp_create, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 62), (void *)_cffi_d_cml_ddp_create },
+  { "cml_ddp_default_config", (void *)_cffi_f_cml_ddp_default_config, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 137), (void *)_cffi_d_cml_ddp_default_config },
+  { "cml_ddp_forward", (void *)_cffi_f_cml_ddp_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 464), (void *)_cffi_d_cml_ddp_forward },
+  { "cml_ddp_free", (void *)_cffi_f_cml_ddp_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 970), (void *)_cffi_d_cml_ddp_free },
+  { "cml_ddp_shard_input", (void *)_cffi_f_cml_ddp_shard_input, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 464), (void *)_cffi_d_cml_ddp_shard_input },
+  { "cml_ddp_sync_gradients", (void *)_cffi_f_cml_ddp_sync_gradients, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 860), (void *)_cffi_d_cml_ddp_sync_gradients },
+  { "cml_detach", (void *)_cffi_f_cml_detach, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_detach },
+  { "cml_diagonal", (void *)_cffi_f_cml_diagonal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 617), (void *)_cffi_d_cml_diagonal },
+  { "cml_dist_allreduce", (void *)_cffi_f_cml_dist_allreduce, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 930), (void *)_cffi_d_cml_dist_allreduce },
+  { "cml_dist_barrier", (void *)_cffi_f_cml_dist_barrier, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_cml_dist_barrier },
+  { "cml_dist_destroy", (void *)_cffi_f_cml_dist_destroy, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_cml_dist_destroy },
+  { "cml_dist_get_rank", (void *)_cffi_f_cml_dist_get_rank, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_cml_dist_get_rank },
+  { "cml_dist_get_world_size", (void *)_cffi_f_cml_dist_get_world_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_cml_dist_get_world_size },
+  { "cml_dist_init", (void *)_cffi_f_cml_dist_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 871), (void *)_cffi_d_cml_dist_init },
+  { "cml_dist_is_initialized", (void *)_cffi_f_cml_dist_is_initialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_cml_dist_is_initialized },
+  { "cml_div", (void *)_cffi_f_cml_div, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_div },
+  { "cml_dot", (void *)_cffi_f_cml_dot, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_dot },
+  { "cml_double", (void *)_cffi_f_cml_double, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_double },
+  { "cml_dtype_size", (void *)_cffi_f_cml_dtype_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 947), (void *)_cffi_d_cml_dtype_size },
+  { "cml_einsum", (void *)_cffi_f_cml_einsum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 630), (void *)_cffi_d_cml_einsum },
+  { "cml_elu", (void *)_cffi_f_cml_elu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 537), (void *)_cffi_d_cml_elu },
+  { "cml_empty", (void *)_cffi_f_cml_empty, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 668), (void *)_cffi_d_cml_empty },
+  { "cml_empty_1d", (void *)_cffi_f_cml_empty_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 703), (void *)_cffi_d_cml_empty_1d },
+  { "cml_empty_2d", (void *)_cffi_f_cml_empty_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 714), (void *)_cffi_d_cml_empty_2d },
+  { "cml_enable_grad", (void *)_cffi_f_cml_enable_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_cml_enable_grad },
+  { "cml_erf", (void *)_cffi_f_cml_erf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_erf },
+  { "cml_exp", (void *)_cffi_f_cml_exp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_exp },
+  { "cml_exp2", (void *)_cffi_f_cml_exp2, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_exp2 },
+  { "cml_eye", (void *)_cffi_f_cml_eye, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 706), (void *)_cffi_d_cml_eye },
+  { "cml_f_interpolate", (void *)_cffi_f_cml_f_interpolate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 563), (void *)_cffi_d_cml_f_interpolate },
+  { "cml_f_pixel_shuffle", (void *)_cffi_f_cml_f_pixel_shuffle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_f_pixel_shuffle },
+  { "cml_f_pixel_unshuffle", (void *)_cffi_f_cml_f_pixel_unshuffle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_f_pixel_unshuffle },
+  { "cml_flip", (void *)_cffi_f_cml_flip, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_flip },
+  { "cml_floor", (void *)_cffi_f_cml_floor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_floor },
+  { "cml_force_cleanup", (void *)_cffi_f_cml_force_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_cml_force_cleanup },
+  { "cml_free", (void *)_cffi_f_cml_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1102), (void *)_cffi_d_cml_free },
+  { "cml_from_blob", (void *)_cffi_f_cml_from_blob, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 729), (void *)_cffi_d_cml_from_blob },
+  { "cml_from_url", (void *)_cffi_f_cml_from_url, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 627), (void *)_cffi_d_cml_from_url },
+  { "cml_full", (void *)_cffi_f_cml_full, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 673), (void *)_cffi_d_cml_full },
+  { "cml_full_like", (void *)_cffi_f_cml_full_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 537), (void *)_cffi_d_cml_full_like },
+  { "cml_get_build_info", (void *)_cffi_f_cml_get_build_info, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 832), (void *)_cffi_d_cml_get_build_info },
+  { "cml_get_default_device", (void *)_cffi_f_cml_get_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 150), (void *)_cffi_d_cml_get_default_device },
+  { "cml_get_default_dtype", (void *)_cffi_f_cml_get_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 142), (void *)_cffi_d_cml_get_default_dtype },
+  { "cml_get_error_handler", (void *)_cffi_f_cml_get_error_handler, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 968), (void *)_cffi_d_cml_get_error_handler },
+  { "cml_get_init_count", (void *)_cffi_f_cml_get_init_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_cml_get_init_count },
+  { "cml_get_version", (void *)_cffi_f_cml_get_version, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1078), (void *)_cffi_d_cml_get_version },
+  { "cml_gguf_close", (void *)_cffi_f_cml_gguf_close, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 988), (void *)_cffi_d_cml_gguf_close },
+  { "cml_gguf_open_read", (void *)_cffi_f_cml_gguf_open_read, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 167), (void *)_cffi_d_cml_gguf_open_read },
+  { "cml_gguf_open_write", (void *)_cffi_f_cml_gguf_open_write, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 167), (void *)_cffi_d_cml_gguf_open_write },
+  { "cml_gguf_read_tensor", (void *)_cffi_f_cml_gguf_read_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 472), (void *)_cffi_d_cml_gguf_read_tensor },
+  { "cml_gguf_write_tensor", (void *)_cffi_f_cml_gguf_write_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 876), (void *)_cffi_d_cml_gguf_write_tensor },
+  { "cml_glorot_uniform", (void *)_cffi_f_cml_glorot_uniform, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 696), (void *)_cffi_d_cml_glorot_uniform },
+  { "cml_grad_scaler_create", (void *)_cffi_f_cml_grad_scaler_create, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 188), (void *)_cffi_d_cml_grad_scaler_create },
+  { "cml_grad_scaler_free", (void *)_cffi_f_cml_grad_scaler_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 991), (void *)_cffi_d_cml_grad_scaler_free },
+  { "cml_grad_scaler_scale", (void *)_cffi_f_cml_grad_scaler_scale, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 476), (void *)_cffi_d_cml_grad_scaler_scale },
+  { "cml_grad_scaler_step", (void *)_cffi_f_cml_grad_scaler_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 999), (void *)_cffi_d_cml_grad_scaler_step },
+  { "cml_grad_scaler_unscale", (void *)_cffi_f_cml_grad_scaler_unscale, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 994), (void *)_cffi_d_cml_grad_scaler_unscale },
+  { "cml_grad_scaler_update", (void *)_cffi_f_cml_grad_scaler_update, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 991), (void *)_cffi_d_cml_grad_scaler_update },
+  { "cml_half", (void *)_cffi_f_cml_half, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_half },
+  { "cml_hardswish", (void *)_cffi_f_cml_hardswish, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_hardswish },
+  { "cml_idiv", (void *)_cffi_f_cml_idiv, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_idiv },
+  { "cml_init", (void *)_cffi_f_cml_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_cml_init },
+  { "cml_int_", (void *)_cffi_f_cml_int_, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_int_ },
+  { "cml_interpolate", (void *)_cffi_f_cml_interpolate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 557), (void *)_cffi_d_cml_interpolate },
+  { "cml_is_grad_enabled", (void *)_cffi_f_cml_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_cml_is_grad_enabled },
+  { "cml_is_initialized", (void *)_cffi_f_cml_is_initialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_cml_is_initialized },
+  { "cml_is_leaf", (void *)_cffi_f_cml_is_leaf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 821), (void *)_cffi_d_cml_is_leaf },
+  { "cml_kaiming_normal", (void *)_cffi_f_cml_kaiming_normal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 690), (void *)_cffi_d_cml_kaiming_normal },
+  { "cml_kaiming_uniform", (void *)_cffi_f_cml_kaiming_uniform, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 690), (void *)_cffi_d_cml_kaiming_uniform },
+  { "cml_kernel_cache_clear", (void *)_cffi_f_cml_kernel_cache_clear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_cml_kernel_cache_clear },
+  { "cml_kernel_cache_hit_rate", (void *)_cffi_f_cml_kernel_cache_hit_rate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 834), (void *)_cffi_d_cml_kernel_cache_hit_rate },
+  { "cml_kernel_cache_print_stats", (void *)_cffi_f_cml_kernel_cache_print_stats, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_cml_kernel_cache_print_stats },
+  { "cml_kernel_cache_stats", (void *)_cffi_f_cml_kernel_cache_stats, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1087), (void *)_cffi_d_cml_kernel_cache_stats },
+  { "cml_leaky_relu", (void *)_cffi_f_cml_leaky_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 537), (void *)_cffi_d_cml_leaky_relu },
+  { "cml_lerp", (void *)_cffi_f_cml_lerp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_cml_lerp },
+  { "cml_linspace", (void *)_cffi_f_cml_linspace, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 656), (void *)_cffi_d_cml_linspace },
+  { "cml_log", (void *)_cffi_f_cml_log, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_log },
+  { "cml_log2", (void *)_cffi_f_cml_log2, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_log2 },
+  { "cml_logaddexp", (void *)_cffi_f_cml_logaddexp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_logaddexp },
+  { "cml_logcumsumexp", (void *)_cffi_f_cml_logcumsumexp, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_logcumsumexp },
+  { "cml_long", (void *)_cffi_f_cml_long, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_long },
+  { "cml_lr_scheduler_cosine", (void *)_cffi_f_cml_lr_scheduler_cosine, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 240), (void *)_cffi_d_cml_lr_scheduler_cosine },
+  { "cml_lr_scheduler_exponential", (void *)_cffi_f_cml_lr_scheduler_exponential, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 216), (void *)_cffi_d_cml_lr_scheduler_exponential },
+  { "cml_lr_scheduler_free", (void *)_cffi_f_cml_lr_scheduler_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1004), (void *)_cffi_d_cml_lr_scheduler_free },
+  { "cml_lr_scheduler_get_lr", (void *)_cffi_f_cml_lr_scheduler_get_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 839), (void *)_cffi_d_cml_lr_scheduler_get_lr },
+  { "cml_lr_scheduler_multi_step", (void *)_cffi_f_cml_lr_scheduler_multi_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 234), (void *)_cffi_d_cml_lr_scheduler_multi_step },
+  { "cml_lr_scheduler_one_cycle", (void *)_cffi_f_cml_lr_scheduler_one_cycle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 226), (void *)_cffi_d_cml_lr_scheduler_one_cycle },
+  { "cml_lr_scheduler_polynomial", (void *)_cffi_f_cml_lr_scheduler_polynomial, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 245), (void *)_cffi_d_cml_lr_scheduler_polynomial },
+  { "cml_lr_scheduler_reduce_on_plateau", (void *)_cffi_f_cml_lr_scheduler_reduce_on_plateau, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 220), (void *)_cffi_d_cml_lr_scheduler_reduce_on_plateau },
+  { "cml_lr_scheduler_step", (void *)_cffi_f_cml_lr_scheduler_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 240), (void *)_cffi_d_cml_lr_scheduler_step },
+  { "cml_lr_scheduler_update", (void *)_cffi_f_cml_lr_scheduler_update, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 842), (void *)_cffi_d_cml_lr_scheduler_update },
+  { "cml_lr_scheduler_warmup", (void *)_cffi_f_cml_lr_scheduler_warmup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 211), (void *)_cffi_d_cml_lr_scheduler_warmup },
+  { "cml_manual_seed", (void *)_cffi_f_cml_manual_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1096), (void *)_cffi_d_cml_manual_seed },
+  { "cml_masked_select", (void *)_cffi_f_cml_masked_select, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_masked_select },
+  { "cml_matmul", (void *)_cffi_f_cml_matmul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_matmul },
+  { "cml_max", (void *)_cffi_f_cml_max, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 587), (void *)_cffi_d_cml_max },
+  { "cml_mean", (void *)_cffi_f_cml_mean, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 587), (void *)_cffi_d_cml_mean },
+  { "cml_meshgrid", (void *)_cffi_f_cml_meshgrid, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 453), (void *)_cffi_d_cml_meshgrid },
+  { "cml_min", (void *)_cffi_f_cml_min, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 587), (void *)_cffi_d_cml_min },
+  { "cml_mish", (void *)_cffi_f_cml_mish, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_mish },
+  { "cml_mod", (void *)_cffi_f_cml_mod, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_mod },
+  { "cml_module_load_gguf", (void *)_cffi_f_cml_module_load_gguf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 898), (void *)_cffi_d_cml_module_load_gguf },
+  { "cml_module_load_safetensors", (void *)_cffi_f_cml_module_load_safetensors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 898), (void *)_cffi_d_cml_module_load_safetensors },
+  { "cml_module_save_gguf", (void *)_cffi_f_cml_module_save_gguf, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 898), (void *)_cffi_d_cml_module_save_gguf },
+  { "cml_module_save_safetensors", (void *)_cffi_f_cml_module_save_safetensors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 898), (void *)_cffi_d_cml_module_save_safetensors },
+  { "cml_mul", (void *)_cffi_f_cml_mul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_mul },
   { "cml_nn_adaptive_avgpool1d", (void *)_cffi_f_cml_nn_adaptive_avgpool1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 0), (void *)_cffi_d_cml_nn_adaptive_avgpool1d },
   { "cml_nn_adaptive_avgpool2d", (void *)_cffi_f_cml_nn_adaptive_avgpool2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 3), (void *)_cffi_d_cml_nn_adaptive_avgpool2d },
   { "cml_nn_adaptive_maxpool1d", (void *)_cffi_f_cml_nn_adaptive_maxpool1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 7), (void *)_cffi_d_cml_nn_adaptive_maxpool1d },
@@ -24603,364 +25324,399 @@ static const struct _cffi_global_s _cffi_globals[] = {
   { "cml_nn_batchnorm1d", (void *)_cffi_f_cml_nn_batchnorm1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 35), (void *)_cffi_d_cml_nn_batchnorm1d },
   { "cml_nn_batchnorm2d", (void *)_cffi_f_cml_nn_batchnorm2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 44), (void *)_cffi_d_cml_nn_batchnorm2d },
   { "cml_nn_batchnorm3d", (void *)_cffi_f_cml_nn_batchnorm3d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 53), (void *)_cffi_d_cml_nn_batchnorm3d },
-  { "cml_nn_bce_loss", (void *)_cffi_f_cml_nn_bce_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_nn_bce_loss },
-  { "cml_nn_conv1d", (void *)_cffi_f_cml_nn_conv1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 62), (void *)_cffi_d_cml_nn_conv1d },
-  { "cml_nn_conv2d", (void *)_cffi_f_cml_nn_conv2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 73), (void *)_cffi_d_cml_nn_conv2d },
-  { "cml_nn_conv3d", (void *)_cffi_f_cml_nn_conv3d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 84), (void *)_cffi_d_cml_nn_conv3d },
-  { "cml_nn_conv_transpose1d", (void *)_cffi_f_cml_nn_conv_transpose1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 95), (void *)_cffi_d_cml_nn_conv_transpose1d },
-  { "cml_nn_conv_transpose2d", (void *)_cffi_f_cml_nn_conv_transpose2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 106), (void *)_cffi_d_cml_nn_conv_transpose2d },
-  { "cml_nn_conv_transpose3d", (void *)_cffi_f_cml_nn_conv_transpose3d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 117), (void *)_cffi_d_cml_nn_conv_transpose3d },
-  { "cml_nn_cosine_embedding_loss", (void *)_cffi_f_cml_nn_cosine_embedding_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 496), (void *)_cffi_d_cml_nn_cosine_embedding_loss },
-  { "cml_nn_cross_entropy_loss", (void *)_cffi_f_cml_nn_cross_entropy_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_nn_cross_entropy_loss },
-  { "cml_nn_dropout", (void *)_cffi_f_cml_nn_dropout, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 141), (void *)_cffi_d_cml_nn_dropout },
-  { "cml_nn_embedding", (void *)_cffi_f_cml_nn_embedding, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 145), (void *)_cffi_d_cml_nn_embedding },
-  { "cml_nn_flatten", (void *)_cffi_f_cml_nn_flatten, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 152), (void *)_cffi_d_cml_nn_flatten },
-  { "cml_nn_groupnorm", (void *)_cffi_f_cml_nn_groupnorm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 183), (void *)_cffi_d_cml_nn_groupnorm },
-  { "cml_nn_gru", (void *)_cffi_f_cml_nn_gru, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 159), (void *)_cffi_d_cml_nn_gru },
-  { "cml_nn_gru_cell", (void *)_cffi_f_cml_nn_gru_cell, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 170), (void *)_cffi_d_cml_nn_gru_cell },
-  { "cml_nn_huber_loss", (void *)_cffi_f_cml_nn_huber_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 502), (void *)_cffi_d_cml_nn_huber_loss },
-  { "cml_nn_identity", (void *)_cffi_f_cml_nn_identity, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 191), (void *)_cffi_d_cml_nn_identity },
-  { "cml_nn_instancenorm2d", (void *)_cffi_f_cml_nn_instancenorm2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 193), (void *)_cffi_d_cml_nn_instancenorm2d },
-  { "cml_nn_kl_div_loss", (void *)_cffi_f_cml_nn_kl_div_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_nn_kl_div_loss },
-  { "cml_nn_layernorm", (void *)_cffi_f_cml_nn_layernorm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 258), (void *)_cffi_d_cml_nn_layernorm },
-  { "cml_nn_layernorm2d", (void *)_cffi_f_cml_nn_layernorm2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 265), (void *)_cffi_d_cml_nn_layernorm2d },
-  { "cml_nn_leaky_relu", (void *)_cffi_f_cml_nn_leaky_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 272), (void *)_cffi_d_cml_nn_leaky_relu },
-  { "cml_nn_linear", (void *)_cffi_f_cml_nn_linear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 276), (void *)_cffi_d_cml_nn_linear },
-  { "cml_nn_lstm", (void *)_cffi_f_cml_nn_lstm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 240), (void *)_cffi_d_cml_nn_lstm },
-  { "cml_nn_lstm_cell", (void *)_cffi_f_cml_nn_lstm_cell, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 251), (void *)_cffi_d_cml_nn_lstm_cell },
-  { "cml_nn_mae_loss", (void *)_cffi_f_cml_nn_mae_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_nn_mae_loss },
-  { "cml_nn_maxpool1d", (void *)_cffi_f_cml_nn_maxpool1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 288), (void *)_cffi_d_cml_nn_maxpool1d },
-  { "cml_nn_maxpool2d", (void *)_cffi_f_cml_nn_maxpool2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 295), (void *)_cffi_d_cml_nn_maxpool2d },
-  { "cml_nn_maxpool3d", (void *)_cffi_f_cml_nn_maxpool3d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 302), (void *)_cffi_d_cml_nn_maxpool3d },
-  { "cml_nn_module_dict", (void *)_cffi_f_cml_nn_module_dict, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 309), (void *)_cffi_d_cml_nn_module_dict },
-  { "cml_nn_module_eval", (void *)_cffi_f_cml_nn_module_eval, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_cml_nn_module_eval },
-  { "cml_nn_module_forward", (void *)_cffi_f_cml_nn_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 700), (void *)_cffi_d_cml_nn_module_forward },
-  { "cml_nn_module_is_training", (void *)_cffi_f_cml_nn_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 793), (void *)_cffi_d_cml_nn_module_is_training },
-  { "cml_nn_module_list", (void *)_cffi_f_cml_nn_module_list, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 311), (void *)_cffi_d_cml_nn_module_list },
-  { "cml_nn_module_set_training", (void *)_cffi_f_cml_nn_module_set_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 972), (void *)_cffi_d_cml_nn_module_set_training },
-  { "cml_nn_module_train", (void *)_cffi_f_cml_nn_module_train, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_cml_nn_module_train },
-  { "cml_nn_mse_loss", (void *)_cffi_f_cml_nn_mse_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_nn_mse_loss },
-  { "cml_nn_multihead_attention", (void *)_cffi_f_cml_nn_multihead_attention, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 313), (void *)_cffi_d_cml_nn_multihead_attention },
-  { "cml_nn_nll_loss", (void *)_cffi_f_cml_nn_nll_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_nn_nll_loss },
-  { "cml_nn_pixel_shuffle", (void *)_cffi_f_cml_nn_pixel_shuffle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 372), (void *)_cffi_d_cml_nn_pixel_shuffle },
-  { "cml_nn_pixel_unshuffle", (void *)_cffi_f_cml_nn_pixel_unshuffle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 375), (void *)_cffi_d_cml_nn_pixel_unshuffle },
-  { "cml_nn_prelu", (void *)_cffi_f_cml_nn_prelu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 366), (void *)_cffi_d_cml_nn_prelu },
-  { "cml_nn_relu", (void *)_cffi_f_cml_nn_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 399), (void *)_cffi_d_cml_nn_relu },
-  { "cml_nn_rnn", (void *)_cffi_f_cml_nn_rnn, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 381), (void *)_cffi_d_cml_nn_rnn },
-  { "cml_nn_rnn_cell", (void *)_cffi_f_cml_nn_rnn_cell, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 392), (void *)_cffi_d_cml_nn_rnn_cell },
-  { "cml_nn_sequential", (void *)_cffi_f_cml_nn_sequential, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 414), (void *)_cffi_d_cml_nn_sequential },
-  { "cml_nn_sequential_add", (void *)_cffi_f_cml_nn_sequential_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 410), (void *)_cffi_d_cml_nn_sequential_add },
-  { "cml_nn_sequential_forward", (void *)_cffi_f_cml_nn_sequential_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 459), (void *)_cffi_d_cml_nn_sequential_forward },
-  { "cml_nn_sigmoid", (void *)_cffi_f_cml_nn_sigmoid, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 416), (void *)_cffi_d_cml_nn_sigmoid },
-  { "cml_nn_sparse_cross_entropy_loss", (void *)_cffi_f_cml_nn_sparse_cross_entropy_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_nn_sparse_cross_entropy_loss },
-  { "cml_nn_tanh", (void *)_cffi_f_cml_nn_tanh, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 434), (void *)_cffi_d_cml_nn_tanh },
-  { "cml_nn_transformer_decoder", (void *)_cffi_f_cml_nn_transformer_decoder, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 752), (void *)_cffi_d_cml_nn_transformer_decoder },
-  { "cml_nn_transformer_decoder_layer", (void *)_cffi_f_cml_nn_transformer_decoder_layer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 761), (void *)_cffi_d_cml_nn_transformer_decoder_layer },
-  { "cml_nn_transformer_encoder", (void *)_cffi_f_cml_nn_transformer_encoder, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 769), (void *)_cffi_d_cml_nn_transformer_encoder },
-  { "cml_nn_transformer_encoder_layer", (void *)_cffi_f_cml_nn_transformer_encoder_layer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 778), (void *)_cffi_d_cml_nn_transformer_encoder_layer },
-  { "cml_nn_triplet_margin_loss", (void *)_cffi_f_cml_nn_triplet_margin_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 496), (void *)_cffi_d_cml_nn_triplet_margin_loss },
-  { "cml_nn_upsample", (void *)_cffi_f_cml_nn_upsample, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 786), (void *)_cffi_d_cml_nn_upsample },
-  { "cml_no_grad", (void *)_cffi_f_cml_no_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_no_grad },
-  { "cml_one_hot", (void *)_cffi_f_cml_one_hot, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_one_hot },
-  { "cml_ones", (void *)_cffi_f_cml_ones, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 643), (void *)_cffi_d_cml_ones },
-  { "cml_ones_1d", (void *)_cffi_f_cml_ones_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 678), (void *)_cffi_d_cml_ones_1d },
-  { "cml_ones_2d", (void *)_cffi_f_cml_ones_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 689), (void *)_cffi_d_cml_ones_2d },
-  { "cml_ones_like", (void *)_cffi_f_cml_ones_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_ones_like },
-  { "cml_onnx_export_graph", (void *)_cffi_f_cml_onnx_export_graph, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 905), (void *)_cffi_d_cml_onnx_export_graph },
-  { "cml_optim_adadelta", (void *)_cffi_f_cml_optim_adadelta, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 334), (void *)_cffi_d_cml_optim_adadelta },
-  { "cml_optim_adagrad", (void *)_cffi_f_cml_optim_adagrad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 334), (void *)_cffi_d_cml_optim_adagrad },
-  { "cml_optim_adam", (void *)_cffi_f_cml_optim_adam, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 357), (void *)_cffi_d_cml_optim_adam },
-  { "cml_optim_adam_for_model", (void *)_cffi_f_cml_optim_adam_for_model, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 326), (void *)_cffi_d_cml_optim_adam_for_model },
-  { "cml_optim_adamax", (void *)_cffi_f_cml_optim_adamax, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 357), (void *)_cffi_d_cml_optim_adamax },
-  { "cml_optim_adamw", (void *)_cffi_f_cml_optim_adamw, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 357), (void *)_cffi_d_cml_optim_adamw },
-  { "cml_optim_lamb", (void *)_cffi_f_cml_optim_lamb, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 357), (void *)_cffi_d_cml_optim_lamb },
-  { "cml_optim_lars", (void *)_cffi_f_cml_optim_lars, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 349), (void *)_cffi_d_cml_optim_lars },
-  { "cml_optim_muon", (void *)_cffi_f_cml_optim_muon, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 341), (void *)_cffi_d_cml_optim_muon },
-  { "cml_optim_nadam", (void *)_cffi_f_cml_optim_nadam, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 357), (void *)_cffi_d_cml_optim_nadam },
-  { "cml_optim_realize_params", (void *)_cffi_f_cml_optim_realize_params, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_cml_optim_realize_params },
-  { "cml_optim_rmsprop", (void *)_cffi_f_cml_optim_rmsprop, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 349), (void *)_cffi_d_cml_optim_rmsprop },
-  { "cml_optim_sgd", (void *)_cffi_f_cml_optim_sgd, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 334), (void *)_cffi_d_cml_optim_sgd },
-  { "cml_optim_sgd_for_model", (void *)_cffi_f_cml_optim_sgd_for_model, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 320), (void *)_cffi_d_cml_optim_sgd_for_model },
-  { "cml_optim_step", (void *)_cffi_f_cml_optim_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_cml_optim_step },
-  { "cml_optim_zero_grad", (void *)_cffi_f_cml_optim_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_cml_optim_zero_grad },
-  { "cml_pad", (void *)_cffi_f_cml_pad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 545), (void *)_cffi_d_cml_pad },
-  { "cml_pad_reflect", (void *)_cffi_f_cml_pad_reflect, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_cml_pad_reflect },
-  { "cml_pad_replicate", (void *)_cffi_f_cml_pad_replicate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_cml_pad_replicate },
-  { "cml_pow", (void *)_cffi_f_cml_pow, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_pow },
-  { "cml_prod", (void *)_cffi_f_cml_prod, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_prod },
-  { "cml_qr", (void *)_cffi_f_cml_qr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 378), (void *)_cffi_d_cml_qr },
-  { "cml_rand", (void *)_cffi_f_cml_rand, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 643), (void *)_cffi_d_cml_rand },
-  { "cml_rand_like", (void *)_cffi_f_cml_rand_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_rand_like },
-  { "cml_randint", (void *)_cffi_f_cml_randint, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 693), (void *)_cffi_d_cml_randint },
-  { "cml_randn", (void *)_cffi_f_cml_randn, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 643), (void *)_cffi_d_cml_randn },
-  { "cml_randn_like", (void *)_cffi_f_cml_randn_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_randn_like },
-  { "cml_randperm", (void *)_cffi_f_cml_randperm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 681), (void *)_cffi_d_cml_randperm },
-  { "cml_register_cleanup_context", (void *)_cffi_f_cml_register_cleanup_context, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 938), (void *)_cffi_d_cml_register_cleanup_context },
-  { "cml_relu", (void *)_cffi_f_cml_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_relu },
-  { "cml_repeat", (void *)_cffi_f_cml_repeat, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_cml_repeat },
-  { "cml_requires_grad", (void *)_cffi_f_cml_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 796), (void *)_cffi_d_cml_requires_grad },
-  { "cml_reset_ir_context", (void *)_cffi_f_cml_reset_ir_context, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_reset_ir_context },
-  { "cml_reset_ir_graph_only", (void *)_cffi_f_cml_reset_ir_graph_only, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_cml_reset_ir_graph_only },
-  { "cml_reshape", (void *)_cffi_f_cml_reshape, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_cml_reshape },
-  { "cml_roll", (void *)_cffi_f_cml_roll, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 573), (void *)_cffi_d_cml_roll },
-  { "cml_round", (void *)_cffi_f_cml_round, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_round },
-  { "cml_rsqrt", (void *)_cffi_f_cml_rsqrt, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_rsqrt },
-  { "cml_safetensors_close", (void *)_cffi_f_cml_safetensors_close, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 992), (void *)_cffi_d_cml_safetensors_close },
-  { "cml_safetensors_open_read", (void *)_cffi_f_cml_safetensors_open_read, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 407), (void *)_cffi_d_cml_safetensors_open_read },
-  { "cml_safetensors_open_write", (void *)_cffi_f_cml_safetensors_open_write, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 407), (void *)_cffi_d_cml_safetensors_open_write },
-  { "cml_safetensors_read_tensor", (void *)_cffi_f_cml_safetensors_read_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 455), (void *)_cffi_d_cml_safetensors_read_tensor },
-  { "cml_safetensors_write_tensor", (void *)_cffi_f_cml_safetensors_write_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 890), (void *)_cffi_d_cml_safetensors_write_tensor },
-  { "cml_scatter_reduce", (void *)_cffi_f_cml_scatter_reduce, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 555), (void *)_cffi_d_cml_scatter_reduce },
-  { "cml_seed", (void *)_cffi_f_cml_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1058), (void *)_cffi_d_cml_seed },
-  { "cml_selu", (void *)_cffi_f_cml_selu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_selu },
-  { "cml_set_default_device", (void *)_cffi_f_cml_set_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 947), (void *)_cffi_d_cml_set_default_device },
-  { "cml_set_default_dtype", (void *)_cffi_f_cml_set_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 941), (void *)_cffi_d_cml_set_default_dtype },
-  { "cml_set_error_handler", (void *)_cffi_f_cml_set_error_handler, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1061), (void *)_cffi_d_cml_set_error_handler },
-  { "cml_set_log_level", (void *)_cffi_f_cml_set_log_level, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 969), (void *)_cffi_d_cml_set_log_level },
-  { "cml_set_requires_grad", (void *)_cffi_f_cml_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1014), (void *)_cffi_d_cml_set_requires_grad },
-  { "cml_short", (void *)_cffi_f_cml_short, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_short },
-  { "cml_sigmoid", (void *)_cffi_f_cml_sigmoid, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_sigmoid },
-  { "cml_sign", (void *)_cffi_f_cml_sign, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_sign },
-  { "cml_silu", (void *)_cffi_f_cml_silu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_silu },
-  { "cml_sin", (void *)_cffi_f_cml_sin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_sin },
-  { "cml_softmax", (void *)_cffi_f_cml_softmax, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_softmax },
-  { "cml_sort", (void *)_cffi_f_cml_sort, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_sort },
-  { "cml_sparse_coalesce", (void *)_cffi_f_cml_sparse_coalesce, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 418), (void *)_cffi_d_cml_sparse_coalesce },
-  { "cml_sparse_coo_tensor", (void *)_cffi_f_cml_sparse_coo_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 424), (void *)_cffi_d_cml_sparse_coo_tensor },
-  { "cml_sparse_free", (void *)_cffi_f_cml_sparse_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 999), (void *)_cffi_d_cml_sparse_free },
-  { "cml_sparse_from_dense", (void *)_cffi_f_cml_sparse_from_dense, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 421), (void *)_cffi_d_cml_sparse_from_dense },
-  { "cml_sparse_matmul", (void *)_cffi_f_cml_sparse_matmul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 463), (void *)_cffi_d_cml_sparse_matmul },
-  { "cml_sparse_to_dense", (void *)_cffi_f_cml_sparse_to_dense, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 467), (void *)_cffi_d_cml_sparse_to_dense },
-  { "cml_split", (void *)_cffi_f_cml_split, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 441), (void *)_cffi_d_cml_split },
-  { "cml_sqrt", (void *)_cffi_f_cml_sqrt, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_sqrt },
-  { "cml_square", (void *)_cffi_f_cml_square, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_square },
-  { "cml_squeeze", (void *)_cffi_f_cml_squeeze, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_squeeze },
-  { "cml_stack", (void *)_cffi_f_cml_stack, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 475), (void *)_cffi_d_cml_stack },
-  { "cml_std", (void *)_cffi_f_cml_std, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 567), (void *)_cffi_d_cml_std },
-  { "cml_sub", (void *)_cffi_f_cml_sub, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_cml_sub },
-  { "cml_sum", (void *)_cffi_f_cml_sum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_cml_sum },
-  { "cml_summary", (void *)_cffi_f_cml_summary, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_cml_summary },
-  { "cml_svd", (void *)_cffi_f_cml_svd, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 404), (void *)_cffi_d_cml_svd },
-  { "cml_tan", (void *)_cffi_f_cml_tan, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_tan },
-  { "cml_tanh", (void *)_cffi_f_cml_tanh, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_tanh },
-  { "cml_tensor", (void *)_cffi_f_cml_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 704), (void *)_cffi_d_cml_tensor },
-  { "cml_tensor_1d", (void *)_cffi_f_cml_tensor_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 610), (void *)_cffi_d_cml_tensor_1d },
-  { "cml_tensor_2d", (void *)_cffi_f_cml_tensor_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 614), (void *)_cffi_d_cml_tensor_2d },
-  { "cml_topk", (void *)_cffi_f_cml_topk, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 585), (void *)_cffi_d_cml_topk },
-  { "cml_topk_with_indices", (void *)_cffi_f_cml_topk_with_indices, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 578), (void *)_cffi_d_cml_topk_with_indices },
-  { "cml_track_dataset", (void *)_cffi_f_cml_track_dataset, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 944), (void *)_cffi_d_cml_track_dataset },
-  { "cml_track_module", (void *)_cffi_f_cml_track_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_cml_track_module },
-  { "cml_track_optimizer", (void *)_cffi_f_cml_track_optimizer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_cml_track_optimizer },
-  { "cml_transpose", (void *)_cffi_f_cml_transpose, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 573), (void *)_cffi_d_cml_transpose },
-  { "cml_tril", (void *)_cffi_f_cml_tril, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_tril },
-  { "cml_triu", (void *)_cffi_f_cml_triu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_triu },
-  { "cml_unfold", (void *)_cffi_f_cml_unfold, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 573), (void *)_cffi_d_cml_unfold },
-  { "cml_unsqueeze", (void *)_cffi_f_cml_unsqueeze, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_cml_unsqueeze },
-  { "cml_untrack_module", (void *)_cffi_f_cml_untrack_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_cml_untrack_module },
-  { "cml_var", (void *)_cffi_f_cml_var, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 567), (void *)_cffi_d_cml_var },
-  { "cml_where", (void *)_cffi_f_cml_where, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 491), (void *)_cffi_d_cml_where },
-  { "cml_xavier_normal", (void *)_cffi_f_cml_xavier_normal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 671), (void *)_cffi_d_cml_xavier_normal },
-  { "cml_zero_grad", (void *)_cffi_f_cml_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_cml_zero_grad },
-  { "cml_zeros", (void *)_cffi_f_cml_zeros, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 643), (void *)_cffi_d_cml_zeros },
-  { "cml_zeros_1d", (void *)_cffi_f_cml_zeros_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 678), (void *)_cffi_d_cml_zeros_1d },
-  { "cml_zeros_2d", (void *)_cffi_f_cml_zeros_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 689), (void *)_cffi_d_cml_zeros_2d },
-  { "cml_zeros_like", (void *)_cffi_f_cml_zeros_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_cml_zeros_like },
-  { "dataset_normalize", (void *)_cffi_f_dataset_normalize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 835), (void *)_cffi_d_dataset_normalize },
-  { "device_cuda_available", (void *)_cffi_f_device_cuda_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_device_cuda_available },
-  { "device_metal_available", (void *)_cffi_f_device_metal_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_device_metal_available },
-  { "device_rocm_available", (void *)_cffi_f_device_rocm_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_device_rocm_available },
-  { "error_stack_cleanup", (void *)_cffi_f_error_stack_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_error_stack_cleanup },
-  { "error_stack_clear", (void *)_cffi_f_error_stack_clear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_error_stack_clear },
-  { "error_stack_get_last_code", (void *)_cffi_f_error_stack_get_last_code, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_error_stack_get_last_code },
-  { "error_stack_get_last_message", (void *)_cffi_f_error_stack_get_last_message, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 807), (void *)_cffi_d_error_stack_get_last_message },
-  { "error_stack_has_errors", (void *)_cffi_f_error_stack_has_errors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_error_stack_has_errors },
-  { "error_stack_init", (void *)_cffi_f_error_stack_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_error_stack_init },
-  { "model_load", (void *)_cffi_f_model_load, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 866), (void *)_cffi_d_model_load },
-  { "module_collect_parameters", (void *)_cffi_f_module_collect_parameters, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 849), (void *)_cffi_d_module_collect_parameters },
-  { "module_dict_add", (void *)_cffi_f_module_dict_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 873), (void *)_cffi_d_module_dict_add },
-  { "module_dict_size", (void *)_cffi_f_module_dict_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 870), (void *)_cffi_d_module_dict_size },
-  { "module_forward", (void *)_cffi_f_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 700), (void *)_cffi_d_module_forward },
-  { "module_free", (void *)_cffi_f_module_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_module_free },
-  { "module_is_training", (void *)_cffi_f_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 793), (void *)_cffi_d_module_is_training },
-  { "module_list_append", (void *)_cffi_f_module_list_append, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 881), (void *)_cffi_d_module_list_append },
-  { "module_list_insert", (void *)_cffi_f_module_list_insert, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 885), (void *)_cffi_d_module_list_insert },
-  { "module_list_length", (void *)_cffi_f_module_list_length, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 878), (void *)_cffi_d_module_list_length },
-  { "module_set_training", (void *)_cffi_f_module_set_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 972), (void *)_cffi_d_module_set_training },
-  { "optimizer_free", (void *)_cffi_f_optimizer_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_optimizer_free },
-  { "optimizer_get_group_lr", (void *)_cffi_f_optimizer_get_group_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 821), (void *)_cffi_d_optimizer_get_group_lr },
-  { "optimizer_get_name", (void *)_cffi_f_optimizer_get_name, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 804), (void *)_cffi_d_optimizer_get_name },
-  { "optimizer_set_amsgrad", (void *)_cffi_f_optimizer_set_amsgrad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 979), (void *)_cffi_d_optimizer_set_amsgrad },
-  { "optimizer_set_grad_clip_norm", (void *)_cffi_f_optimizer_set_grad_clip_norm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 983), (void *)_cffi_d_optimizer_set_grad_clip_norm },
-  { "optimizer_set_group_lr", (void *)_cffi_f_optimizer_set_group_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 987), (void *)_cffi_d_optimizer_set_group_lr },
-  { "optimizer_set_lr", (void *)_cffi_f_optimizer_set_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 983), (void *)_cffi_d_optimizer_set_lr },
-  { "tensor_clone", (void *)_cffi_f_tensor_clone, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_tensor_clone },
-  { "tensor_data_ptr", (void *)_cffi_f_tensor_data_ptr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 928), (void *)_cffi_d_tensor_data_ptr },
-  { "tensor_ensure_executed", (void *)_cffi_f_tensor_ensure_executed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 895), (void *)_cffi_d_tensor_ensure_executed },
-  { "tensor_free", (void *)_cffi_f_tensor_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_tensor_free },
-  { "tensor_from_data", (void *)_cffi_f_tensor_from_data, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 716), (void *)_cffi_d_tensor_from_data },
-  { "tensor_get_float", (void *)_cffi_f_tensor_get_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 828), (void *)_cffi_d_tensor_get_float },
-  { "tensor_is_contiguous", (void *)_cffi_f_tensor_is_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 796), (void *)_cffi_d_tensor_is_contiguous },
-  { "tensor_is_scalar", (void *)_cffi_f_tensor_is_scalar, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 796), (void *)_cffi_d_tensor_is_scalar },
-  { "tensor_numel", (void *)_cffi_f_tensor_numel, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 924), (void *)_cffi_d_tensor_numel },
-  { "tensor_pin", (void *)_cffi_f_tensor_pin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_tensor_pin },
-  { "tensor_realize", (void *)_cffi_f_tensor_realize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 895), (void *)_cffi_d_tensor_realize },
-  { "tensor_release", (void *)_cffi_f_tensor_release, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_tensor_release },
-  { "tensor_requires_grad", (void *)_cffi_f_tensor_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 796), (void *)_cffi_d_tensor_requires_grad },
-  { "tensor_set_float", (void *)_cffi_f_tensor_set_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1022), (void *)_cffi_d_tensor_set_float },
-  { "tensor_set_requires_grad", (void *)_cffi_f_tensor_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1014), (void *)_cffi_d_tensor_set_requires_grad },
-  { "torch_add", (void *)_cffi_f_torch_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_add },
-  { "torch_arange", (void *)_cffi_f_torch_arange, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 625), (void *)_cffi_d_torch_arange },
-  { "torch_backward", (void *)_cffi_f_torch_backward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1008), (void *)_cffi_d_torch_backward },
-  { "torch_cat", (void *)_cffi_f_torch_cat, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 475), (void *)_cffi_d_torch_cat },
-  { "torch_cleanup", (void *)_cffi_f_torch_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_torch_cleanup },
-  { "torch_clear_error", (void *)_cffi_f_torch_clear_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_torch_clear_error },
-  { "torch_clone", (void *)_cffi_f_torch_clone, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_clone },
-  { "torch_contiguous", (void *)_cffi_f_torch_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_contiguous },
-  { "torch_cuda_device_count", (void *)_cffi_f_torch_cuda_device_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_torch_cuda_device_count },
-  { "torch_cuda_is_available", (void *)_cffi_f_torch_cuda_is_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_torch_cuda_is_available },
-  { "torch_detach", (void *)_cffi_f_torch_detach, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_detach },
-  { "torch_div", (void *)_cffi_f_torch_div, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_div },
-  { "torch_empty", (void *)_cffi_f_torch_empty, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 654), (void *)_cffi_d_torch_empty },
-  { "torch_enable_grad", (void *)_cffi_f_torch_enable_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_torch_enable_grad },
-  { "torch_eye", (void *)_cffi_f_torch_eye, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 685), (void *)_cffi_d_torch_eye },
-  { "torch_from_blob", (void *)_cffi_f_torch_from_blob, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 710), (void *)_cffi_d_torch_from_blob },
-  { "torch_full", (void *)_cffi_f_torch_full, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 659), (void *)_cffi_d_torch_full },
-  { "torch_gelu", (void *)_cffi_f_torch_gelu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_gelu },
-  { "torch_get_default_device", (void *)_cffi_f_torch_get_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 139), (void *)_cffi_d_torch_get_default_device },
-  { "torch_get_default_dtype", (void *)_cffi_f_torch_get_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 131), (void *)_cffi_d_torch_get_default_dtype },
-  { "torch_get_grad", (void *)_cffi_f_torch_get_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_get_grad },
-  { "torch_get_last_error", (void *)_cffi_f_torch_get_last_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 807), (void *)_cffi_d_torch_get_last_error },
-  { "torch_get_last_error_code", (void *)_cffi_f_torch_get_last_error_code, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_torch_get_last_error_code },
-  { "torch_get_num_threads", (void *)_cffi_f_torch_get_num_threads, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_torch_get_num_threads },
-  { "torch_get_version", (void *)_cffi_f_torch_get_version, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1040), (void *)_cffi_d_torch_get_version },
-  { "torch_has_error", (void *)_cffi_f_torch_has_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_torch_has_error },
-  { "torch_inference_mode", (void *)_cffi_f_torch_inference_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1037), (void *)_cffi_d_torch_inference_mode },
-  { "torch_init", (void *)_cffi_f_torch_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 913), (void *)_cffi_d_torch_init },
-  { "torch_is_eager_mode", (void *)_cffi_f_torch_is_eager_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_torch_is_eager_mode },
-  { "torch_is_grad_enabled", (void *)_cffi_f_torch_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 802), (void *)_cffi_d_torch_is_grad_enabled },
-  { "torch_linear", (void *)_cffi_f_torch_linear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 491), (void *)_cffi_d_torch_linear },
-  { "torch_linear_relu", (void *)_cffi_f_torch_linear_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 491), (void *)_cffi_d_torch_linear_relu },
-  { "torch_linspace", (void *)_cffi_f_torch_linspace, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 637), (void *)_cffi_d_torch_linspace },
-  { "torch_manual_seed", (void *)_cffi_f_torch_manual_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1058), (void *)_cffi_d_torch_manual_seed },
-  { "torch_matmul", (void *)_cffi_f_torch_matmul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_matmul },
-  { "torch_max", (void *)_cffi_f_torch_max, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_torch_max },
-  { "torch_mean", (void *)_cffi_f_torch_mean, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_torch_mean },
-  { "torch_memory_create", (void *)_cffi_f_torch_memory_create, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 725), (void *)_cffi_d_torch_memory_create },
-  { "torch_memory_free", (void *)_cffi_f_torch_memory_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1027), (void *)_cffi_d_torch_memory_free },
-  { "torch_memory_from_buffer", (void *)_cffi_f_torch_memory_from_buffer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 728), (void *)_cffi_d_torch_memory_from_buffer },
-  { "torch_memory_peak", (void *)_cffi_f_torch_memory_peak, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 921), (void *)_cffi_d_torch_memory_peak },
-  { "torch_memory_used", (void *)_cffi_f_torch_memory_used, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 921), (void *)_cffi_d_torch_memory_used },
-  { "torch_min", (void *)_cffi_f_torch_min, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_torch_min },
-  { "torch_module_eval", (void *)_cffi_f_torch_module_eval, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_torch_module_eval },
-  { "torch_module_forward", (void *)_cffi_f_torch_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 700), (void *)_cffi_d_torch_module_forward },
-  { "torch_module_is_training", (void *)_cffi_f_torch_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 793), (void *)_cffi_d_torch_module_is_training },
-  { "torch_module_load_state_dict", (void *)_cffi_f_torch_module_load_state_dict, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 855), (void *)_cffi_d_torch_module_load_state_dict },
-  { "torch_module_state_dict", (void *)_cffi_f_torch_module_state_dict, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 430), (void *)_cffi_d_torch_module_state_dict },
-  { "torch_module_train", (void *)_cffi_f_torch_module_train, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_torch_module_train },
-  { "torch_module_zero_grad", (void *)_cffi_f_torch_module_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1055), (void *)_cffi_d_torch_module_zero_grad },
-  { "torch_mul", (void *)_cffi_f_torch_mul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_mul },
-  { "torch_nn_linear", (void *)_cffi_f_torch_nn_linear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 283), (void *)_cffi_d_torch_nn_linear },
-  { "torch_nn_mse_loss", (void *)_cffi_f_torch_nn_mse_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_nn_mse_loss },
-  { "torch_nn_relu", (void *)_cffi_f_torch_nn_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 402), (void *)_cffi_d_torch_nn_relu },
-  { "torch_nn_sequential", (void *)_cffi_f_torch_nn_sequential, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 414), (void *)_cffi_d_torch_nn_sequential },
-  { "torch_nn_sequential_add", (void *)_cffi_f_torch_nn_sequential_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 995), (void *)_cffi_d_torch_nn_sequential_add },
-  { "torch_nn_sequential_forward", (void *)_cffi_f_torch_nn_sequential_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 459), (void *)_cffi_d_torch_nn_sequential_forward },
-  { "torch_no_grad", (void *)_cffi_f_torch_no_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_torch_no_grad },
-  { "torch_ones", (void *)_cffi_f_torch_ones, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 654), (void *)_cffi_d_torch_ones },
-  { "torch_ones_like", (void *)_cffi_f_torch_ones_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_ones_like },
-  { "torch_optim_adam", (void *)_cffi_f_torch_optim_adam, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 326), (void *)_cffi_d_torch_optim_adam },
-  { "torch_optim_free", (void *)_cffi_f_torch_optim_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_torch_optim_free },
-  { "torch_optim_sgd", (void *)_cffi_f_torch_optim_sgd, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 320), (void *)_cffi_d_torch_optim_sgd },
-  { "torch_optim_step", (void *)_cffi_f_torch_optim_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_torch_optim_step },
-  { "torch_optim_zero_grad", (void *)_cffi_f_torch_optim_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_torch_optim_zero_grad },
-  { "torch_options", (void *)_cffi_f_torch_options, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 750), (void *)_cffi_d_torch_options },
-  { "torch_options_device", (void *)_cffi_f_torch_options_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 742), (void *)_cffi_d_torch_options_device },
-  { "torch_options_dtype", (void *)_cffi_f_torch_options_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 738), (void *)_cffi_d_torch_options_dtype },
-  { "torch_options_requires_grad", (void *)_cffi_f_torch_options_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 746), (void *)_cffi_d_torch_options_requires_grad },
-  { "torch_options_to_config", (void *)_cffi_f_torch_options_to_config, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 722), (void *)_cffi_d_torch_options_to_config },
-  { "torch_pow", (void *)_cffi_f_torch_pow, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_pow },
-  { "torch_rand", (void *)_cffi_f_torch_rand, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 654), (void *)_cffi_d_torch_rand },
-  { "torch_randn", (void *)_cffi_f_torch_randn, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 654), (void *)_cffi_d_torch_randn },
-  { "torch_randn_like", (void *)_cffi_f_torch_randn_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_randn_like },
-  { "torch_realize", (void *)_cffi_f_torch_realize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 895), (void *)_cffi_d_torch_realize },
-  { "torch_relu", (void *)_cffi_f_torch_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_relu },
-  { "torch_reset_ir", (void *)_cffi_f_torch_reset_ir, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_torch_reset_ir },
-  { "torch_reset_ir_soft", (void *)_cffi_f_torch_reset_ir_soft, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1067), (void *)_cffi_d_torch_reset_ir_soft },
-  { "torch_reshape", (void *)_cffi_f_torch_reshape, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_torch_reshape },
-  { "torch_runtime_export_pte", (void *)_cffi_f_torch_runtime_export_pte, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 860), (void *)_cffi_d_torch_runtime_export_pte },
-  { "torch_runtime_forward", (void *)_cffi_f_torch_runtime_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 598), (void *)_cffi_d_torch_runtime_forward },
-  { "torch_runtime_free", (void *)_cffi_f_torch_runtime_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1030), (void *)_cffi_d_torch_runtime_free },
-  { "torch_runtime_from_module", (void *)_cffi_f_torch_runtime_from_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 732), (void *)_cffi_d_torch_runtime_from_module },
-  { "torch_runtime_load_aot", (void *)_cffi_f_torch_runtime_load_aot, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 735), (void *)_cffi_d_torch_runtime_load_aot },
-  { "torch_runtime_load_pte", (void *)_cffi_f_torch_runtime_load_pte, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 735), (void *)_cffi_d_torch_runtime_load_pte },
-  { "torch_runtime_set_memory", (void *)_cffi_f_torch_runtime_set_memory, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1033), (void *)_cffi_d_torch_runtime_set_memory },
-  { "torch_set_default_device", (void *)_cffi_f_torch_set_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 947), (void *)_cffi_d_torch_set_default_device },
-  { "torch_set_default_dtype", (void *)_cffi_f_torch_set_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 941), (void *)_cffi_d_torch_set_default_dtype },
-  { "torch_set_eager_mode", (void *)_cffi_f_torch_set_eager_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1037), (void *)_cffi_d_torch_set_eager_mode },
-  { "torch_set_num_threads", (void *)_cffi_f_torch_set_num_threads, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1046), (void *)_cffi_d_torch_set_num_threads },
-  { "torch_sigmoid", (void *)_cffi_f_torch_sigmoid, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_sigmoid },
-  { "torch_softmax", (void *)_cffi_f_torch_softmax, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_torch_softmax },
-  { "torch_squeeze", (void *)_cffi_f_torch_squeeze, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_torch_squeeze },
-  { "torch_stack", (void *)_cffi_f_torch_stack, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 475), (void *)_cffi_d_torch_stack },
-  { "torch_state_dict_free", (void *)_cffi_f_torch_state_dict_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1002), (void *)_cffi_d_torch_state_dict_free },
-  { "torch_state_dict_get", (void *)_cffi_f_torch_state_dict_get, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 471), (void *)_cffi_d_torch_state_dict_get },
-  { "torch_sub", (void *)_cffi_f_torch_sub, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 487), (void *)_cffi_d_torch_sub },
-  { "torch_sum", (void *)_cffi_f_torch_sum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 562), (void *)_cffi_d_torch_sum },
-  { "torch_tanh", (void *)_cffi_f_torch_tanh, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_tanh },
-  { "torch_tensor_data_ptr", (void *)_cffi_f_torch_tensor_data_ptr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 928), (void *)_cffi_d_torch_tensor_data_ptr },
-  { "torch_tensor_data_ptr_f32", (void *)_cffi_f_torch_tensor_data_ptr_f32, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 811), (void *)_cffi_d_torch_tensor_data_ptr_f32 },
-  { "torch_tensor_device", (void *)_cffi_f_torch_tensor_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 136), (void *)_cffi_d_torch_tensor_device },
-  { "torch_tensor_dtype", (void *)_cffi_f_torch_tensor_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 128), (void *)_cffi_d_torch_tensor_dtype },
-  { "torch_tensor_free", (void *)_cffi_f_torch_tensor_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_torch_tensor_free },
-  { "torch_tensor_has_lazy_ir", (void *)_cffi_f_torch_tensor_has_lazy_ir, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 799), (void *)_cffi_d_torch_tensor_has_lazy_ir },
-  { "torch_tensor_is_contiguous", (void *)_cffi_f_torch_tensor_is_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 799), (void *)_cffi_d_torch_tensor_is_contiguous },
-  { "torch_tensor_is_materialized", (void *)_cffi_f_torch_tensor_is_materialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 799), (void *)_cffi_d_torch_tensor_is_materialized },
-  { "torch_tensor_item_float", (void *)_cffi_f_torch_tensor_item_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 825), (void *)_cffi_d_torch_tensor_item_float },
-  { "torch_tensor_ndim", (void *)_cffi_f_torch_tensor_ndim, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 902), (void *)_cffi_d_torch_tensor_ndim },
-  { "torch_tensor_numel", (void *)_cffi_f_torch_tensor_numel, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 918), (void *)_cffi_d_torch_tensor_numel },
-  { "torch_tensor_ref_count", (void *)_cffi_f_torch_tensor_ref_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 902), (void *)_cffi_d_torch_tensor_ref_count },
-  { "torch_tensor_requires_grad", (void *)_cffi_f_torch_tensor_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 799), (void *)_cffi_d_torch_tensor_requires_grad },
-  { "torch_tensor_retain", (void *)_cffi_f_torch_tensor_retain, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_torch_tensor_retain },
-  { "torch_tensor_set_item_float", (void *)_cffi_f_torch_tensor_set_item_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1018), (void *)_cffi_d_torch_tensor_set_item_float },
-  { "torch_tensor_set_requires_grad", (void *)_cffi_f_torch_tensor_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1014), (void *)_cffi_d_torch_tensor_set_requires_grad },
-  { "torch_tensor_sizes", (void *)_cffi_f_torch_tensor_sizes, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 832), (void *)_cffi_d_torch_tensor_sizes },
-  { "torch_transpose", (void *)_cffi_f_torch_transpose, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 573), (void *)_cffi_d_torch_transpose },
-  { "torch_unsqueeze", (void *)_cffi_f_torch_unsqueeze, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 551), (void *)_cffi_d_torch_unsqueeze },
-  { "torch_zero_grad", (void *)_cffi_f_torch_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1005), (void *)_cffi_d_torch_zero_grad },
-  { "torch_zeros", (void *)_cffi_f_torch_zeros, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 654), (void *)_cffi_d_torch_zeros },
-  { "torch_zeros_like", (void *)_cffi_f_torch_zeros_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 480), (void *)_cffi_d_torch_zeros_like },
-  { "uop_gather", (void *)_cffi_f_uop_gather, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 507), (void *)_cffi_d_uop_gather },
-  { "uop_shrink", (void *)_cffi_f_uop_shrink, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 521), (void *)_cffi_d_uop_shrink },
+  { "cml_nn_bce_loss", (void *)_cffi_f_cml_nn_bce_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_nn_bce_loss },
+  { "cml_nn_conv1d", (void *)_cffi_f_cml_nn_conv1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 71), (void *)_cffi_d_cml_nn_conv1d },
+  { "cml_nn_conv2d", (void *)_cffi_f_cml_nn_conv2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 82), (void *)_cffi_d_cml_nn_conv2d },
+  { "cml_nn_conv3d", (void *)_cffi_f_cml_nn_conv3d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 93), (void *)_cffi_d_cml_nn_conv3d },
+  { "cml_nn_conv_transpose1d", (void *)_cffi_f_cml_nn_conv_transpose1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 104), (void *)_cffi_d_cml_nn_conv_transpose1d },
+  { "cml_nn_conv_transpose2d", (void *)_cffi_f_cml_nn_conv_transpose2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 115), (void *)_cffi_d_cml_nn_conv_transpose2d },
+  { "cml_nn_conv_transpose3d", (void *)_cffi_f_cml_nn_conv_transpose3d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 126), (void *)_cffi_d_cml_nn_conv_transpose3d },
+  { "cml_nn_cosine_embedding_loss", (void *)_cffi_f_cml_nn_cosine_embedding_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 521), (void *)_cffi_d_cml_nn_cosine_embedding_loss },
+  { "cml_nn_cross_entropy_loss", (void *)_cffi_f_cml_nn_cross_entropy_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_nn_cross_entropy_loss },
+  { "cml_nn_dropout", (void *)_cffi_f_cml_nn_dropout, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 152), (void *)_cffi_d_cml_nn_dropout },
+  { "cml_nn_embedding", (void *)_cffi_f_cml_nn_embedding, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 156), (void *)_cffi_d_cml_nn_embedding },
+  { "cml_nn_flatten", (void *)_cffi_f_cml_nn_flatten, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 163), (void *)_cffi_d_cml_nn_flatten },
+  { "cml_nn_groupnorm", (void *)_cffi_f_cml_nn_groupnorm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 194), (void *)_cffi_d_cml_nn_groupnorm },
+  { "cml_nn_gru", (void *)_cffi_f_cml_nn_gru, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 170), (void *)_cffi_d_cml_nn_gru },
+  { "cml_nn_gru_cell", (void *)_cffi_f_cml_nn_gru_cell, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 181), (void *)_cffi_d_cml_nn_gru_cell },
+  { "cml_nn_huber_loss", (void *)_cffi_f_cml_nn_huber_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 527), (void *)_cffi_d_cml_nn_huber_loss },
+  { "cml_nn_identity", (void *)_cffi_f_cml_nn_identity, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 202), (void *)_cffi_d_cml_nn_identity },
+  { "cml_nn_instancenorm2d", (void *)_cffi_f_cml_nn_instancenorm2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 204), (void *)_cffi_d_cml_nn_instancenorm2d },
+  { "cml_nn_kl_div_loss", (void *)_cffi_f_cml_nn_kl_div_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_nn_kl_div_loss },
+  { "cml_nn_layernorm", (void *)_cffi_f_cml_nn_layernorm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 269), (void *)_cffi_d_cml_nn_layernorm },
+  { "cml_nn_layernorm2d", (void *)_cffi_f_cml_nn_layernorm2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 276), (void *)_cffi_d_cml_nn_layernorm2d },
+  { "cml_nn_leaky_relu", (void *)_cffi_f_cml_nn_leaky_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 283), (void *)_cffi_d_cml_nn_leaky_relu },
+  { "cml_nn_linear", (void *)_cffi_f_cml_nn_linear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 287), (void *)_cffi_d_cml_nn_linear },
+  { "cml_nn_lstm", (void *)_cffi_f_cml_nn_lstm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 251), (void *)_cffi_d_cml_nn_lstm },
+  { "cml_nn_lstm_cell", (void *)_cffi_f_cml_nn_lstm_cell, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 262), (void *)_cffi_d_cml_nn_lstm_cell },
+  { "cml_nn_mae_loss", (void *)_cffi_f_cml_nn_mae_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_nn_mae_loss },
+  { "cml_nn_maxpool1d", (void *)_cffi_f_cml_nn_maxpool1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 299), (void *)_cffi_d_cml_nn_maxpool1d },
+  { "cml_nn_maxpool2d", (void *)_cffi_f_cml_nn_maxpool2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 306), (void *)_cffi_d_cml_nn_maxpool2d },
+  { "cml_nn_maxpool3d", (void *)_cffi_f_cml_nn_maxpool3d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 313), (void *)_cffi_d_cml_nn_maxpool3d },
+  { "cml_nn_module_dict", (void *)_cffi_f_cml_nn_module_dict, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 320), (void *)_cffi_d_cml_nn_module_dict },
+  { "cml_nn_module_eval", (void *)_cffi_f_cml_nn_module_eval, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1093), (void *)_cffi_d_cml_nn_module_eval },
+  { "cml_nn_module_forward", (void *)_cffi_f_cml_nn_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 725), (void *)_cffi_d_cml_nn_module_forward },
+  { "cml_nn_module_is_training", (void *)_cffi_f_cml_nn_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 818), (void *)_cffi_d_cml_nn_module_is_training },
+  { "cml_nn_module_list", (void *)_cffi_f_cml_nn_module_list, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 322), (void *)_cffi_d_cml_nn_module_list },
+  { "cml_nn_module_set_training", (void *)_cffi_f_cml_nn_module_set_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1010), (void *)_cffi_d_cml_nn_module_set_training },
+  { "cml_nn_module_train", (void *)_cffi_f_cml_nn_module_train, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1093), (void *)_cffi_d_cml_nn_module_train },
+  { "cml_nn_mse_loss", (void *)_cffi_f_cml_nn_mse_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_nn_mse_loss },
+  { "cml_nn_multihead_attention", (void *)_cffi_f_cml_nn_multihead_attention, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 324), (void *)_cffi_d_cml_nn_multihead_attention },
+  { "cml_nn_nll_loss", (void *)_cffi_f_cml_nn_nll_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_nn_nll_loss },
+  { "cml_nn_pixel_shuffle", (void *)_cffi_f_cml_nn_pixel_shuffle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 389), (void *)_cffi_d_cml_nn_pixel_shuffle },
+  { "cml_nn_pixel_unshuffle", (void *)_cffi_f_cml_nn_pixel_unshuffle, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 392), (void *)_cffi_d_cml_nn_pixel_unshuffle },
+  { "cml_nn_prelu", (void *)_cffi_f_cml_nn_prelu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 377), (void *)_cffi_d_cml_nn_prelu },
+  { "cml_nn_relu", (void *)_cffi_f_cml_nn_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 416), (void *)_cffi_d_cml_nn_relu },
+  { "cml_nn_rnn", (void *)_cffi_f_cml_nn_rnn, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 398), (void *)_cffi_d_cml_nn_rnn },
+  { "cml_nn_rnn_cell", (void *)_cffi_f_cml_nn_rnn_cell, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 409), (void *)_cffi_d_cml_nn_rnn_cell },
+  { "cml_nn_sequential", (void *)_cffi_f_cml_nn_sequential, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 431), (void *)_cffi_d_cml_nn_sequential },
+  { "cml_nn_sequential_add", (void *)_cffi_f_cml_nn_sequential_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 427), (void *)_cffi_d_cml_nn_sequential_add },
+  { "cml_nn_sequential_forward", (void *)_cffi_f_cml_nn_sequential_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 484), (void *)_cffi_d_cml_nn_sequential_forward },
+  { "cml_nn_sigmoid", (void *)_cffi_f_cml_nn_sigmoid, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 433), (void *)_cffi_d_cml_nn_sigmoid },
+  { "cml_nn_sparse_cross_entropy_loss", (void *)_cffi_f_cml_nn_sparse_cross_entropy_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_nn_sparse_cross_entropy_loss },
+  { "cml_nn_tanh", (void *)_cffi_f_cml_nn_tanh, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 451), (void *)_cffi_d_cml_nn_tanh },
+  { "cml_nn_transformer_decoder", (void *)_cffi_f_cml_nn_transformer_decoder, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 777), (void *)_cffi_d_cml_nn_transformer_decoder },
+  { "cml_nn_transformer_decoder_layer", (void *)_cffi_f_cml_nn_transformer_decoder_layer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 786), (void *)_cffi_d_cml_nn_transformer_decoder_layer },
+  { "cml_nn_transformer_encoder", (void *)_cffi_f_cml_nn_transformer_encoder, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 794), (void *)_cffi_d_cml_nn_transformer_encoder },
+  { "cml_nn_transformer_encoder_layer", (void *)_cffi_f_cml_nn_transformer_encoder_layer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 803), (void *)_cffi_d_cml_nn_transformer_encoder_layer },
+  { "cml_nn_triplet_margin_loss", (void *)_cffi_f_cml_nn_triplet_margin_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 521), (void *)_cffi_d_cml_nn_triplet_margin_loss },
+  { "cml_nn_upsample", (void *)_cffi_f_cml_nn_upsample, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 811), (void *)_cffi_d_cml_nn_upsample },
+  { "cml_no_grad", (void *)_cffi_f_cml_no_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_cml_no_grad },
+  { "cml_one_hot", (void *)_cffi_f_cml_one_hot, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_one_hot },
+  { "cml_ones", (void *)_cffi_f_cml_ones, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 668), (void *)_cffi_d_cml_ones },
+  { "cml_ones_1d", (void *)_cffi_f_cml_ones_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 703), (void *)_cffi_d_cml_ones_1d },
+  { "cml_ones_2d", (void *)_cffi_f_cml_ones_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 714), (void *)_cffi_d_cml_ones_2d },
+  { "cml_ones_like", (void *)_cffi_f_cml_ones_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_ones_like },
+  { "cml_onnx_export_graph", (void *)_cffi_f_cml_onnx_export_graph, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 937), (void *)_cffi_d_cml_onnx_export_graph },
+  { "cml_optim_adadelta", (void *)_cffi_f_cml_optim_adadelta, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 345), (void *)_cffi_d_cml_optim_adadelta },
+  { "cml_optim_adagrad", (void *)_cffi_f_cml_optim_adagrad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 345), (void *)_cffi_d_cml_optim_adagrad },
+  { "cml_optim_adam", (void *)_cffi_f_cml_optim_adam, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 368), (void *)_cffi_d_cml_optim_adam },
+  { "cml_optim_adam_for_model", (void *)_cffi_f_cml_optim_adam_for_model, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 337), (void *)_cffi_d_cml_optim_adam_for_model },
+  { "cml_optim_adamax", (void *)_cffi_f_cml_optim_adamax, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 368), (void *)_cffi_d_cml_optim_adamax },
+  { "cml_optim_adamw", (void *)_cffi_f_cml_optim_adamw, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 368), (void *)_cffi_d_cml_optim_adamw },
+  { "cml_optim_lamb", (void *)_cffi_f_cml_optim_lamb, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 368), (void *)_cffi_d_cml_optim_lamb },
+  { "cml_optim_lars", (void *)_cffi_f_cml_optim_lars, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 360), (void *)_cffi_d_cml_optim_lars },
+  { "cml_optim_muon", (void *)_cffi_f_cml_optim_muon, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 352), (void *)_cffi_d_cml_optim_muon },
+  { "cml_optim_nadam", (void *)_cffi_f_cml_optim_nadam, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 368), (void *)_cffi_d_cml_optim_nadam },
+  { "cml_optim_realize_params", (void *)_cffi_f_cml_optim_realize_params, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1014), (void *)_cffi_d_cml_optim_realize_params },
+  { "cml_optim_rmsprop", (void *)_cffi_f_cml_optim_rmsprop, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 360), (void *)_cffi_d_cml_optim_rmsprop },
+  { "cml_optim_sgd", (void *)_cffi_f_cml_optim_sgd, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 345), (void *)_cffi_d_cml_optim_sgd },
+  { "cml_optim_sgd_for_model", (void *)_cffi_f_cml_optim_sgd_for_model, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 331), (void *)_cffi_d_cml_optim_sgd_for_model },
+  { "cml_optim_step", (void *)_cffi_f_cml_optim_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1014), (void *)_cffi_d_cml_optim_step },
+  { "cml_optim_zero_grad", (void *)_cffi_f_cml_optim_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1014), (void *)_cffi_d_cml_optim_zero_grad },
+  { "cml_pad", (void *)_cffi_f_cml_pad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 570), (void *)_cffi_d_cml_pad },
+  { "cml_pad_reflect", (void *)_cffi_f_cml_pad_reflect, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 552), (void *)_cffi_d_cml_pad_reflect },
+  { "cml_pad_replicate", (void *)_cffi_f_cml_pad_replicate, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 552), (void *)_cffi_d_cml_pad_replicate },
+  { "cml_pipeline_backward", (void *)_cffi_f_cml_pipeline_backward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 863), (void *)_cffi_d_cml_pipeline_backward },
+  { "cml_pipeline_build_schedule", (void *)_cffi_f_cml_pipeline_build_schedule, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 383), (void *)_cffi_d_cml_pipeline_build_schedule },
+  { "cml_pipeline_create", (void *)_cffi_f_cml_pipeline_create, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 66), (void *)_cffi_d_cml_pipeline_create },
+  { "cml_pipeline_forward", (void *)_cffi_f_cml_pipeline_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 468), (void *)_cffi_d_cml_pipeline_forward },
+  { "cml_pipeline_free", (void *)_cffi_f_cml_pipeline_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 973), (void *)_cffi_d_cml_pipeline_free },
+  { "cml_pow", (void *)_cffi_f_cml_pow, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_pow },
+  { "cml_prod", (void *)_cffi_f_cml_prod, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 587), (void *)_cffi_d_cml_prod },
+  { "cml_qr", (void *)_cffi_f_cml_qr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 395), (void *)_cffi_d_cml_qr },
+  { "cml_rand", (void *)_cffi_f_cml_rand, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 668), (void *)_cffi_d_cml_rand },
+  { "cml_rand_like", (void *)_cffi_f_cml_rand_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_rand_like },
+  { "cml_randint", (void *)_cffi_f_cml_randint, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 718), (void *)_cffi_d_cml_randint },
+  { "cml_randn", (void *)_cffi_f_cml_randn, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 668), (void *)_cffi_d_cml_randn },
+  { "cml_randn_like", (void *)_cffi_f_cml_randn_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_randn_like },
+  { "cml_randperm", (void *)_cffi_f_cml_randperm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 706), (void *)_cffi_d_cml_randperm },
+  { "cml_register_cleanup_context", (void *)_cffi_f_cml_register_cleanup_context, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 976), (void *)_cffi_d_cml_register_cleanup_context },
+  { "cml_relu", (void *)_cffi_f_cml_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_relu },
+  { "cml_repeat", (void *)_cffi_f_cml_repeat, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 552), (void *)_cffi_d_cml_repeat },
+  { "cml_requires_grad", (void *)_cffi_f_cml_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 821), (void *)_cffi_d_cml_requires_grad },
+  { "cml_reset_ir_context", (void *)_cffi_f_cml_reset_ir_context, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_cml_reset_ir_context },
+  { "cml_reset_ir_graph_only", (void *)_cffi_f_cml_reset_ir_graph_only, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_cml_reset_ir_graph_only },
+  { "cml_reshape", (void *)_cffi_f_cml_reshape, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 552), (void *)_cffi_d_cml_reshape },
+  { "cml_roll", (void *)_cffi_f_cml_roll, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 598), (void *)_cffi_d_cml_roll },
+  { "cml_round", (void *)_cffi_f_cml_round, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_round },
+  { "cml_rsqrt", (void *)_cffi_f_cml_rsqrt, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_rsqrt },
+  { "cml_safetensors_close", (void *)_cffi_f_cml_safetensors_close, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1030), (void *)_cffi_d_cml_safetensors_close },
+  { "cml_safetensors_open_read", (void *)_cffi_f_cml_safetensors_open_read, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 424), (void *)_cffi_d_cml_safetensors_open_read },
+  { "cml_safetensors_open_write", (void *)_cffi_f_cml_safetensors_open_write, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 424), (void *)_cffi_d_cml_safetensors_open_write },
+  { "cml_safetensors_read_tensor", (void *)_cffi_f_cml_safetensors_read_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 480), (void *)_cffi_d_cml_safetensors_read_tensor },
+  { "cml_safetensors_write_tensor", (void *)_cffi_f_cml_safetensors_write_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 922), (void *)_cffi_d_cml_safetensors_write_tensor },
+  { "cml_scatter_reduce", (void *)_cffi_f_cml_scatter_reduce, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 580), (void *)_cffi_d_cml_scatter_reduce },
+  { "cml_seed", (void *)_cffi_f_cml_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1096), (void *)_cffi_d_cml_seed },
+  { "cml_selu", (void *)_cffi_f_cml_selu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_selu },
+  { "cml_set_default_device", (void *)_cffi_f_cml_set_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 985), (void *)_cffi_d_cml_set_default_device },
+  { "cml_set_default_dtype", (void *)_cffi_f_cml_set_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 979), (void *)_cffi_d_cml_set_default_dtype },
+  { "cml_set_error_handler", (void *)_cffi_f_cml_set_error_handler, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1099), (void *)_cffi_d_cml_set_error_handler },
+  { "cml_set_log_level", (void *)_cffi_f_cml_set_log_level, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1007), (void *)_cffi_d_cml_set_log_level },
+  { "cml_set_requires_grad", (void *)_cffi_f_cml_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1052), (void *)_cffi_d_cml_set_requires_grad },
+  { "cml_short", (void *)_cffi_f_cml_short, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_short },
+  { "cml_sigmoid", (void *)_cffi_f_cml_sigmoid, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_sigmoid },
+  { "cml_sign", (void *)_cffi_f_cml_sign, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_sign },
+  { "cml_silu", (void *)_cffi_f_cml_silu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_silu },
+  { "cml_sin", (void *)_cffi_f_cml_sin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_sin },
+  { "cml_softmax", (void *)_cffi_f_cml_softmax, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_softmax },
+  { "cml_sort", (void *)_cffi_f_cml_sort, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 587), (void *)_cffi_d_cml_sort },
+  { "cml_sparse_coalesce", (void *)_cffi_f_cml_sparse_coalesce, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 435), (void *)_cffi_d_cml_sparse_coalesce },
+  { "cml_sparse_coo_tensor", (void *)_cffi_f_cml_sparse_coo_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 441), (void *)_cffi_d_cml_sparse_coo_tensor },
+  { "cml_sparse_free", (void *)_cffi_f_cml_sparse_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1037), (void *)_cffi_d_cml_sparse_free },
+  { "cml_sparse_from_dense", (void *)_cffi_f_cml_sparse_from_dense, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 438), (void *)_cffi_d_cml_sparse_from_dense },
+  { "cml_sparse_matmul", (void *)_cffi_f_cml_sparse_matmul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 488), (void *)_cffi_d_cml_sparse_matmul },
+  { "cml_sparse_to_dense", (void *)_cffi_f_cml_sparse_to_dense, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 492), (void *)_cffi_d_cml_sparse_to_dense },
+  { "cml_split", (void *)_cffi_f_cml_split, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 458), (void *)_cffi_d_cml_split },
+  { "cml_sqrt", (void *)_cffi_f_cml_sqrt, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_sqrt },
+  { "cml_square", (void *)_cffi_f_cml_square, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_square },
+  { "cml_squeeze", (void *)_cffi_f_cml_squeeze, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_squeeze },
+  { "cml_stack", (void *)_cffi_f_cml_stack, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 500), (void *)_cffi_d_cml_stack },
+  { "cml_std", (void *)_cffi_f_cml_std, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 592), (void *)_cffi_d_cml_std },
+  { "cml_sub", (void *)_cffi_f_cml_sub, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_cml_sub },
+  { "cml_sum", (void *)_cffi_f_cml_sum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 587), (void *)_cffi_d_cml_sum },
+  { "cml_summary", (void *)_cffi_f_cml_summary, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1093), (void *)_cffi_d_cml_summary },
+  { "cml_svd", (void *)_cffi_f_cml_svd, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 421), (void *)_cffi_d_cml_svd },
+  { "cml_tan", (void *)_cffi_f_cml_tan, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_tan },
+  { "cml_tanh", (void *)_cffi_f_cml_tanh, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_tanh },
+  { "cml_tensor", (void *)_cffi_f_cml_tensor, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 729), (void *)_cffi_d_cml_tensor },
+  { "cml_tensor_1d", (void *)_cffi_f_cml_tensor_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 635), (void *)_cffi_d_cml_tensor_1d },
+  { "cml_tensor_2d", (void *)_cffi_f_cml_tensor_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 639), (void *)_cffi_d_cml_tensor_2d },
+  { "cml_topk", (void *)_cffi_f_cml_topk, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 610), (void *)_cffi_d_cml_topk },
+  { "cml_topk_with_indices", (void *)_cffi_f_cml_topk_with_indices, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 603), (void *)_cffi_d_cml_topk_with_indices },
+  { "cml_track_dataset", (void *)_cffi_f_cml_track_dataset, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 982), (void *)_cffi_d_cml_track_dataset },
+  { "cml_track_module", (void *)_cffi_f_cml_track_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1093), (void *)_cffi_d_cml_track_module },
+  { "cml_track_optimizer", (void *)_cffi_f_cml_track_optimizer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1014), (void *)_cffi_d_cml_track_optimizer },
+  { "cml_transpose", (void *)_cffi_f_cml_transpose, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 598), (void *)_cffi_d_cml_transpose },
+  { "cml_tril", (void *)_cffi_f_cml_tril, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_tril },
+  { "cml_triu", (void *)_cffi_f_cml_triu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_triu },
+  { "cml_unfold", (void *)_cffi_f_cml_unfold, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 598), (void *)_cffi_d_cml_unfold },
+  { "cml_unsqueeze", (void *)_cffi_f_cml_unsqueeze, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_cml_unsqueeze },
+  { "cml_untrack_module", (void *)_cffi_f_cml_untrack_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1093), (void *)_cffi_d_cml_untrack_module },
+  { "cml_var", (void *)_cffi_f_cml_var, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 592), (void *)_cffi_d_cml_var },
+  { "cml_where", (void *)_cffi_f_cml_where, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 516), (void *)_cffi_d_cml_where },
+  { "cml_xavier_normal", (void *)_cffi_f_cml_xavier_normal, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 696), (void *)_cffi_d_cml_xavier_normal },
+  { "cml_zero_grad", (void *)_cffi_f_cml_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1043), (void *)_cffi_d_cml_zero_grad },
+  { "cml_zeros", (void *)_cffi_f_cml_zeros, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 668), (void *)_cffi_d_cml_zeros },
+  { "cml_zeros_1d", (void *)_cffi_f_cml_zeros_1d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 703), (void *)_cffi_d_cml_zeros_1d },
+  { "cml_zeros_2d", (void *)_cffi_f_cml_zeros_2d, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 714), (void *)_cffi_d_cml_zeros_2d },
+  { "cml_zeros_like", (void *)_cffi_f_cml_zeros_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_cml_zeros_like },
+  { "dataset_normalize", (void *)_cffi_f_dataset_normalize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 867), (void *)_cffi_d_dataset_normalize },
+  { "device_cuda_available", (void *)_cffi_f_device_cuda_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_device_cuda_available },
+  { "device_metal_available", (void *)_cffi_f_device_metal_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_device_metal_available },
+  { "device_rocm_available", (void *)_cffi_f_device_rocm_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_device_rocm_available },
+  { "error_stack_cleanup", (void *)_cffi_f_error_stack_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_error_stack_cleanup },
+  { "error_stack_clear", (void *)_cffi_f_error_stack_clear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_error_stack_clear },
+  { "error_stack_get_last_code", (void *)_cffi_f_error_stack_get_last_code, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_error_stack_get_last_code },
+  { "error_stack_get_last_message", (void *)_cffi_f_error_stack_get_last_message, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 832), (void *)_cffi_d_error_stack_get_last_message },
+  { "error_stack_has_errors", (void *)_cffi_f_error_stack_has_errors, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_error_stack_has_errors },
+  { "error_stack_init", (void *)_cffi_f_error_stack_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_error_stack_init },
+  { "model_load", (void *)_cffi_f_model_load, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 898), (void *)_cffi_d_model_load },
+  { "module_collect_parameters", (void *)_cffi_f_module_collect_parameters, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 881), (void *)_cffi_d_module_collect_parameters },
+  { "module_dict_add", (void *)_cffi_f_module_dict_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 905), (void *)_cffi_d_module_dict_add },
+  { "module_dict_size", (void *)_cffi_f_module_dict_size, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 902), (void *)_cffi_d_module_dict_size },
+  { "module_forward", (void *)_cffi_f_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 725), (void *)_cffi_d_module_forward },
+  { "module_free", (void *)_cffi_f_module_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1093), (void *)_cffi_d_module_free },
+  { "module_is_training", (void *)_cffi_f_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 818), (void *)_cffi_d_module_is_training },
+  { "module_list_append", (void *)_cffi_f_module_list_append, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 913), (void *)_cffi_d_module_list_append },
+  { "module_list_insert", (void *)_cffi_f_module_list_insert, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 917), (void *)_cffi_d_module_list_insert },
+  { "module_list_length", (void *)_cffi_f_module_list_length, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 910), (void *)_cffi_d_module_list_length },
+  { "module_set_training", (void *)_cffi_f_module_set_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1010), (void *)_cffi_d_module_set_training },
+  { "optimizer_free", (void *)_cffi_f_optimizer_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1014), (void *)_cffi_d_optimizer_free },
+  { "optimizer_get_group_lr", (void *)_cffi_f_optimizer_get_group_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 846), (void *)_cffi_d_optimizer_get_group_lr },
+  { "optimizer_get_name", (void *)_cffi_f_optimizer_get_name, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 829), (void *)_cffi_d_optimizer_get_name },
+  { "optimizer_set_amsgrad", (void *)_cffi_f_optimizer_set_amsgrad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1017), (void *)_cffi_d_optimizer_set_amsgrad },
+  { "optimizer_set_grad_clip_norm", (void *)_cffi_f_optimizer_set_grad_clip_norm, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1021), (void *)_cffi_d_optimizer_set_grad_clip_norm },
+  { "optimizer_set_group_lr", (void *)_cffi_f_optimizer_set_group_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1025), (void *)_cffi_d_optimizer_set_group_lr },
+  { "optimizer_set_lr", (void *)_cffi_f_optimizer_set_lr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1021), (void *)_cffi_d_optimizer_set_lr },
+  { "tensor_clone", (void *)_cffi_f_tensor_clone, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_tensor_clone },
+  { "tensor_data_ptr", (void *)_cffi_f_tensor_data_ptr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 960), (void *)_cffi_d_tensor_data_ptr },
+  { "tensor_ensure_executed", (void *)_cffi_f_tensor_ensure_executed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 927), (void *)_cffi_d_tensor_ensure_executed },
+  { "tensor_free", (void *)_cffi_f_tensor_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1043), (void *)_cffi_d_tensor_free },
+  { "tensor_from_data", (void *)_cffi_f_tensor_from_data, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 741), (void *)_cffi_d_tensor_from_data },
+  { "tensor_get_float", (void *)_cffi_f_tensor_get_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 853), (void *)_cffi_d_tensor_get_float },
+  { "tensor_is_contiguous", (void *)_cffi_f_tensor_is_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 821), (void *)_cffi_d_tensor_is_contiguous },
+  { "tensor_is_scalar", (void *)_cffi_f_tensor_is_scalar, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 821), (void *)_cffi_d_tensor_is_scalar },
+  { "tensor_numel", (void *)_cffi_f_tensor_numel, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 956), (void *)_cffi_d_tensor_numel },
+  { "tensor_pin", (void *)_cffi_f_tensor_pin, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1043), (void *)_cffi_d_tensor_pin },
+  { "tensor_realize", (void *)_cffi_f_tensor_realize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 927), (void *)_cffi_d_tensor_realize },
+  { "tensor_release", (void *)_cffi_f_tensor_release, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1043), (void *)_cffi_d_tensor_release },
+  { "tensor_requires_grad", (void *)_cffi_f_tensor_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 821), (void *)_cffi_d_tensor_requires_grad },
+  { "tensor_set_float", (void *)_cffi_f_tensor_set_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1060), (void *)_cffi_d_tensor_set_float },
+  { "tensor_set_requires_grad", (void *)_cffi_f_tensor_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1052), (void *)_cffi_d_tensor_set_requires_grad },
+  { "torch_add", (void *)_cffi_f_torch_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_torch_add },
+  { "torch_arange", (void *)_cffi_f_torch_arange, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 650), (void *)_cffi_d_torch_arange },
+  { "torch_backward", (void *)_cffi_f_torch_backward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1046), (void *)_cffi_d_torch_backward },
+  { "torch_cat", (void *)_cffi_f_torch_cat, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 500), (void *)_cffi_d_torch_cat },
+  { "torch_cleanup", (void *)_cffi_f_torch_cleanup, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_torch_cleanup },
+  { "torch_clear_error", (void *)_cffi_f_torch_clear_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_torch_clear_error },
+  { "torch_clone", (void *)_cffi_f_torch_clone, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_torch_clone },
+  { "torch_contiguous", (void *)_cffi_f_torch_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_torch_contiguous },
+  { "torch_cuda_device_count", (void *)_cffi_f_torch_cuda_device_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_torch_cuda_device_count },
+  { "torch_cuda_is_available", (void *)_cffi_f_torch_cuda_is_available, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_torch_cuda_is_available },
+  { "torch_detach", (void *)_cffi_f_torch_detach, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_torch_detach },
+  { "torch_div", (void *)_cffi_f_torch_div, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_torch_div },
+  { "torch_empty", (void *)_cffi_f_torch_empty, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 679), (void *)_cffi_d_torch_empty },
+  { "torch_enable_grad", (void *)_cffi_f_torch_enable_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_torch_enable_grad },
+  { "torch_eye", (void *)_cffi_f_torch_eye, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 710), (void *)_cffi_d_torch_eye },
+  { "torch_from_blob", (void *)_cffi_f_torch_from_blob, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 735), (void *)_cffi_d_torch_from_blob },
+  { "torch_full", (void *)_cffi_f_torch_full, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 684), (void *)_cffi_d_torch_full },
+  { "torch_gelu", (void *)_cffi_f_torch_gelu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_torch_gelu },
+  { "torch_get_default_device", (void *)_cffi_f_torch_get_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 150), (void *)_cffi_d_torch_get_default_device },
+  { "torch_get_default_dtype", (void *)_cffi_f_torch_get_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 142), (void *)_cffi_d_torch_get_default_dtype },
+  { "torch_get_grad", (void *)_cffi_f_torch_get_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_torch_get_grad },
+  { "torch_get_last_error", (void *)_cffi_f_torch_get_last_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 832), (void *)_cffi_d_torch_get_last_error },
+  { "torch_get_last_error_code", (void *)_cffi_f_torch_get_last_error_code, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_torch_get_last_error_code },
+  { "torch_get_num_threads", (void *)_cffi_f_torch_get_num_threads, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_torch_get_num_threads },
+  { "torch_get_version", (void *)_cffi_f_torch_get_version, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1078), (void *)_cffi_d_torch_get_version },
+  { "torch_has_error", (void *)_cffi_f_torch_has_error, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_torch_has_error },
+  { "torch_inference_mode", (void *)_cffi_f_torch_inference_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1075), (void *)_cffi_d_torch_inference_mode },
+  { "torch_init", (void *)_cffi_f_torch_init, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 945), (void *)_cffi_d_torch_init },
+  { "torch_is_eager_mode", (void *)_cffi_f_torch_is_eager_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_torch_is_eager_mode },
+  { "torch_is_grad_enabled", (void *)_cffi_f_torch_is_grad_enabled, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 827), (void *)_cffi_d_torch_is_grad_enabled },
+  { "torch_linear", (void *)_cffi_f_torch_linear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 516), (void *)_cffi_d_torch_linear },
+  { "torch_linear_relu", (void *)_cffi_f_torch_linear_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 516), (void *)_cffi_d_torch_linear_relu },
+  { "torch_linspace", (void *)_cffi_f_torch_linspace, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 662), (void *)_cffi_d_torch_linspace },
+  { "torch_manual_seed", (void *)_cffi_f_torch_manual_seed, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1096), (void *)_cffi_d_torch_manual_seed },
+  { "torch_matmul", (void *)_cffi_f_torch_matmul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_torch_matmul },
+  { "torch_max", (void *)_cffi_f_torch_max, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 587), (void *)_cffi_d_torch_max },
+  { "torch_mean", (void *)_cffi_f_torch_mean, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 587), (void *)_cffi_d_torch_mean },
+  { "torch_memory_create", (void *)_cffi_f_torch_memory_create, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 750), (void *)_cffi_d_torch_memory_create },
+  { "torch_memory_free", (void *)_cffi_f_torch_memory_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1065), (void *)_cffi_d_torch_memory_free },
+  { "torch_memory_from_buffer", (void *)_cffi_f_torch_memory_from_buffer, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 753), (void *)_cffi_d_torch_memory_from_buffer },
+  { "torch_memory_peak", (void *)_cffi_f_torch_memory_peak, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 953), (void *)_cffi_d_torch_memory_peak },
+  { "torch_memory_used", (void *)_cffi_f_torch_memory_used, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 953), (void *)_cffi_d_torch_memory_used },
+  { "torch_min", (void *)_cffi_f_torch_min, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 587), (void *)_cffi_d_torch_min },
+  { "torch_module_eval", (void *)_cffi_f_torch_module_eval, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1093), (void *)_cffi_d_torch_module_eval },
+  { "torch_module_forward", (void *)_cffi_f_torch_module_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 725), (void *)_cffi_d_torch_module_forward },
+  { "torch_module_is_training", (void *)_cffi_f_torch_module_is_training, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 818), (void *)_cffi_d_torch_module_is_training },
+  { "torch_module_load_state_dict", (void *)_cffi_f_torch_module_load_state_dict, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 887), (void *)_cffi_d_torch_module_load_state_dict },
+  { "torch_module_state_dict", (void *)_cffi_f_torch_module_state_dict, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 447), (void *)_cffi_d_torch_module_state_dict },
+  { "torch_module_train", (void *)_cffi_f_torch_module_train, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1093), (void *)_cffi_d_torch_module_train },
+  { "torch_module_zero_grad", (void *)_cffi_f_torch_module_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1093), (void *)_cffi_d_torch_module_zero_grad },
+  { "torch_mul", (void *)_cffi_f_torch_mul, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_torch_mul },
+  { "torch_nn_linear", (void *)_cffi_f_torch_nn_linear, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 294), (void *)_cffi_d_torch_nn_linear },
+  { "torch_nn_mse_loss", (void *)_cffi_f_torch_nn_mse_loss, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_torch_nn_mse_loss },
+  { "torch_nn_relu", (void *)_cffi_f_torch_nn_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 419), (void *)_cffi_d_torch_nn_relu },
+  { "torch_nn_sequential", (void *)_cffi_f_torch_nn_sequential, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 431), (void *)_cffi_d_torch_nn_sequential },
+  { "torch_nn_sequential_add", (void *)_cffi_f_torch_nn_sequential_add, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1033), (void *)_cffi_d_torch_nn_sequential_add },
+  { "torch_nn_sequential_forward", (void *)_cffi_f_torch_nn_sequential_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 484), (void *)_cffi_d_torch_nn_sequential_forward },
+  { "torch_no_grad", (void *)_cffi_f_torch_no_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_torch_no_grad },
+  { "torch_ones", (void *)_cffi_f_torch_ones, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 679), (void *)_cffi_d_torch_ones },
+  { "torch_ones_like", (void *)_cffi_f_torch_ones_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_torch_ones_like },
+  { "torch_optim_adam", (void *)_cffi_f_torch_optim_adam, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 337), (void *)_cffi_d_torch_optim_adam },
+  { "torch_optim_free", (void *)_cffi_f_torch_optim_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1014), (void *)_cffi_d_torch_optim_free },
+  { "torch_optim_sgd", (void *)_cffi_f_torch_optim_sgd, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 331), (void *)_cffi_d_torch_optim_sgd },
+  { "torch_optim_step", (void *)_cffi_f_torch_optim_step, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1014), (void *)_cffi_d_torch_optim_step },
+  { "torch_optim_zero_grad", (void *)_cffi_f_torch_optim_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1014), (void *)_cffi_d_torch_optim_zero_grad },
+  { "torch_options", (void *)_cffi_f_torch_options, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 775), (void *)_cffi_d_torch_options },
+  { "torch_options_device", (void *)_cffi_f_torch_options_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 767), (void *)_cffi_d_torch_options_device },
+  { "torch_options_dtype", (void *)_cffi_f_torch_options_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 763), (void *)_cffi_d_torch_options_dtype },
+  { "torch_options_requires_grad", (void *)_cffi_f_torch_options_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 771), (void *)_cffi_d_torch_options_requires_grad },
+  { "torch_options_to_config", (void *)_cffi_f_torch_options_to_config, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 747), (void *)_cffi_d_torch_options_to_config },
+  { "torch_pow", (void *)_cffi_f_torch_pow, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_torch_pow },
+  { "torch_rand", (void *)_cffi_f_torch_rand, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 679), (void *)_cffi_d_torch_rand },
+  { "torch_randn", (void *)_cffi_f_torch_randn, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 679), (void *)_cffi_d_torch_randn },
+  { "torch_randn_like", (void *)_cffi_f_torch_randn_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_torch_randn_like },
+  { "torch_realize", (void *)_cffi_f_torch_realize, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 927), (void *)_cffi_d_torch_realize },
+  { "torch_relu", (void *)_cffi_f_torch_relu, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_torch_relu },
+  { "torch_reset_ir", (void *)_cffi_f_torch_reset_ir, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_torch_reset_ir },
+  { "torch_reset_ir_soft", (void *)_cffi_f_torch_reset_ir_soft, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_N, 1105), (void *)_cffi_d_torch_reset_ir_soft },
+  { "torch_reshape", (void *)_cffi_f_torch_reshape, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 552), (void *)_cffi_d_torch_reshape },
+  { "torch_runtime_export_pte", (void *)_cffi_f_torch_runtime_export_pte, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 892), (void *)_cffi_d_torch_runtime_export_pte },
+  { "torch_runtime_forward", (void *)_cffi_f_torch_runtime_forward, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 623), (void *)_cffi_d_torch_runtime_forward },
+  { "torch_runtime_free", (void *)_cffi_f_torch_runtime_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1068), (void *)_cffi_d_torch_runtime_free },
+  { "torch_runtime_from_module", (void *)_cffi_f_torch_runtime_from_module, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 757), (void *)_cffi_d_torch_runtime_from_module },
+  { "torch_runtime_load_aot", (void *)_cffi_f_torch_runtime_load_aot, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 760), (void *)_cffi_d_torch_runtime_load_aot },
+  { "torch_runtime_load_pte", (void *)_cffi_f_torch_runtime_load_pte, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 760), (void *)_cffi_d_torch_runtime_load_pte },
+  { "torch_runtime_set_memory", (void *)_cffi_f_torch_runtime_set_memory, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1071), (void *)_cffi_d_torch_runtime_set_memory },
+  { "torch_set_default_device", (void *)_cffi_f_torch_set_default_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 985), (void *)_cffi_d_torch_set_default_device },
+  { "torch_set_default_dtype", (void *)_cffi_f_torch_set_default_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 979), (void *)_cffi_d_torch_set_default_dtype },
+  { "torch_set_eager_mode", (void *)_cffi_f_torch_set_eager_mode, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1075), (void *)_cffi_d_torch_set_eager_mode },
+  { "torch_set_num_threads", (void *)_cffi_f_torch_set_num_threads, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1084), (void *)_cffi_d_torch_set_num_threads },
+  { "torch_sigmoid", (void *)_cffi_f_torch_sigmoid, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_torch_sigmoid },
+  { "torch_softmax", (void *)_cffi_f_torch_softmax, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_torch_softmax },
+  { "torch_squeeze", (void *)_cffi_f_torch_squeeze, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_torch_squeeze },
+  { "torch_stack", (void *)_cffi_f_torch_stack, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 500), (void *)_cffi_d_torch_stack },
+  { "torch_state_dict_free", (void *)_cffi_f_torch_state_dict_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1040), (void *)_cffi_d_torch_state_dict_free },
+  { "torch_state_dict_get", (void *)_cffi_f_torch_state_dict_get, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 496), (void *)_cffi_d_torch_state_dict_get },
+  { "torch_sub", (void *)_cffi_f_torch_sub, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 512), (void *)_cffi_d_torch_sub },
+  { "torch_sum", (void *)_cffi_f_torch_sum, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 587), (void *)_cffi_d_torch_sum },
+  { "torch_tanh", (void *)_cffi_f_torch_tanh, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_torch_tanh },
+  { "torch_tensor_data_ptr", (void *)_cffi_f_torch_tensor_data_ptr, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 960), (void *)_cffi_d_torch_tensor_data_ptr },
+  { "torch_tensor_data_ptr_f32", (void *)_cffi_f_torch_tensor_data_ptr_f32, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 836), (void *)_cffi_d_torch_tensor_data_ptr_f32 },
+  { "torch_tensor_device", (void *)_cffi_f_torch_tensor_device, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 147), (void *)_cffi_d_torch_tensor_device },
+  { "torch_tensor_dtype", (void *)_cffi_f_torch_tensor_dtype, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 139), (void *)_cffi_d_torch_tensor_dtype },
+  { "torch_tensor_free", (void *)_cffi_f_torch_tensor_free, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1043), (void *)_cffi_d_torch_tensor_free },
+  { "torch_tensor_has_lazy_ir", (void *)_cffi_f_torch_tensor_has_lazy_ir, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 824), (void *)_cffi_d_torch_tensor_has_lazy_ir },
+  { "torch_tensor_is_contiguous", (void *)_cffi_f_torch_tensor_is_contiguous, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 824), (void *)_cffi_d_torch_tensor_is_contiguous },
+  { "torch_tensor_is_materialized", (void *)_cffi_f_torch_tensor_is_materialized, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 824), (void *)_cffi_d_torch_tensor_is_materialized },
+  { "torch_tensor_item_float", (void *)_cffi_f_torch_tensor_item_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 850), (void *)_cffi_d_torch_tensor_item_float },
+  { "torch_tensor_ndim", (void *)_cffi_f_torch_tensor_ndim, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 934), (void *)_cffi_d_torch_tensor_ndim },
+  { "torch_tensor_numel", (void *)_cffi_f_torch_tensor_numel, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 950), (void *)_cffi_d_torch_tensor_numel },
+  { "torch_tensor_ref_count", (void *)_cffi_f_torch_tensor_ref_count, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 934), (void *)_cffi_d_torch_tensor_ref_count },
+  { "torch_tensor_requires_grad", (void *)_cffi_f_torch_tensor_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 824), (void *)_cffi_d_torch_tensor_requires_grad },
+  { "torch_tensor_retain", (void *)_cffi_f_torch_tensor_retain, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1043), (void *)_cffi_d_torch_tensor_retain },
+  { "torch_tensor_set_item_float", (void *)_cffi_f_torch_tensor_set_item_float, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1056), (void *)_cffi_d_torch_tensor_set_item_float },
+  { "torch_tensor_set_requires_grad", (void *)_cffi_f_torch_tensor_set_requires_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 1052), (void *)_cffi_d_torch_tensor_set_requires_grad },
+  { "torch_tensor_sizes", (void *)_cffi_f_torch_tensor_sizes, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 857), (void *)_cffi_d_torch_tensor_sizes },
+  { "torch_transpose", (void *)_cffi_f_torch_transpose, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 598), (void *)_cffi_d_torch_transpose },
+  { "torch_unsqueeze", (void *)_cffi_f_torch_unsqueeze, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 576), (void *)_cffi_d_torch_unsqueeze },
+  { "torch_zero_grad", (void *)_cffi_f_torch_zero_grad, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 1043), (void *)_cffi_d_torch_zero_grad },
+  { "torch_zeros", (void *)_cffi_f_torch_zeros, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 679), (void *)_cffi_d_torch_zeros },
+  { "torch_zeros_like", (void *)_cffi_f_torch_zeros_like, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_O, 505), (void *)_cffi_d_torch_zeros_like },
+  { "uop_gather", (void *)_cffi_f_uop_gather, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 532), (void *)_cffi_d_uop_gather },
+  { "uop_shrink", (void *)_cffi_f_uop_shrink, _CFFI_OP(_CFFI_OP_CPYTHON_BLTN_V, 546), (void *)_cffi_d_uop_shrink },
 };
 
 static const struct _cffi_field_s _cffi_fields[] = {
+  { "bucket_size_bytes", offsetof(DDPConfig, bucket_size_bytes),
+                         sizeof(((DDPConfig *)0)->bucket_size_bytes),
+                         _CFFI_OP(_CFFI_OP_NOOP, 751) },
+  { "broadcast_buffers", offsetof(DDPConfig, broadcast_buffers),
+                         sizeof(((DDPConfig *)0)->broadcast_buffers),
+                         _CFFI_OP(_CFFI_OP_NOOP, 18) },
+  { "find_unused_parameters", offsetof(DDPConfig, find_unused_parameters),
+                              sizeof(((DDPConfig *)0)->find_unused_parameters),
+                              _CFFI_OP(_CFFI_OP_NOOP, 18) },
+  { "gradient_as_bucket_view", offsetof(DDPConfig, gradient_as_bucket_view),
+                               sizeof(((DDPConfig *)0)->gradient_as_bucket_view),
+                               _CFFI_OP(_CFFI_OP_NOOP, 1) },
+  { "stage", offsetof(PipeUnit, stage),
+             sizeof(((PipeUnit *)0)->stage),
+             _CFFI_OP(_CFFI_OP_NOOP, 1) },
+  { "micro_batch", offsetof(PipeUnit, micro_batch),
+                   sizeof(((PipeUnit *)0)->micro_batch),
+                   _CFFI_OP(_CFFI_OP_NOOP, 1) },
+  { "kind", offsetof(PipeUnit, kind),
+            sizeof(((PipeUnit *)0)->kind),
+            _CFFI_OP(_CFFI_OP_NOOP, 1193) },
+  { "num_micro_batches", offsetof(PipelineConfig, num_micro_batches),
+                         sizeof(((PipelineConfig *)0)->num_micro_batches),
+                         _CFFI_OP(_CFFI_OP_NOOP, 1) },
+  { "num_stages", offsetof(PipelineConfig, num_stages),
+                  sizeof(((PipelineConfig *)0)->num_stages),
+                  _CFFI_OP(_CFFI_OP_NOOP, 1) },
+  { "interleaved", offsetof(PipelineConfig, interleaved),
+                   sizeof(((PipelineConfig *)0)->interleaved),
+                   _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "Q", offsetof(QRResult, Q),
          sizeof(((QRResult *)0)->Q),
-         _CFFI_OP(_CFFI_OP_NOOP, 379) },
+         _CFFI_OP(_CFFI_OP_NOOP, 396) },
   { "R", offsetof(QRResult, R),
          sizeof(((QRResult *)0)->R),
-         _CFFI_OP(_CFFI_OP_NOOP, 379) },
+         _CFFI_OP(_CFFI_OP_NOOP, 396) },
   { "U", offsetof(SVDResult, U),
          sizeof(((SVDResult *)0)->U),
-         _CFFI_OP(_CFFI_OP_NOOP, 379) },
+         _CFFI_OP(_CFFI_OP_NOOP, 396) },
   { "S", offsetof(SVDResult, S),
          sizeof(((SVDResult *)0)->S),
-         _CFFI_OP(_CFFI_OP_NOOP, 379) },
+         _CFFI_OP(_CFFI_OP_NOOP, 396) },
   { "Vt", offsetof(SVDResult, Vt),
           sizeof(((SVDResult *)0)->Vt),
-          _CFFI_OP(_CFFI_OP_NOOP, 379) },
+          _CFFI_OP(_CFFI_OP_NOOP, 396) },
   { "name", offsetof(Module, name),
             sizeof(((Module *)0)->name),
-            _CFFI_OP(_CFFI_OP_NOOP, 1187) },
+            _CFFI_OP(_CFFI_OP_NOOP, 1233) },
   { "forward", offsetof(Module, forward),
                sizeof(((Module *)0)->forward),
-               _CFFI_OP(_CFFI_OP_NOOP, 1170) },
+               _CFFI_OP(_CFFI_OP_NOOP, 1216) },
   { "free", offsetof(Module, free),
             sizeof(((Module *)0)->free),
-            _CFFI_OP(_CFFI_OP_NOOP, 1196) },
+            _CFFI_OP(_CFFI_OP_NOOP, 1242) },
   { "parameters", offsetof(Module, parameters),
                   sizeof(((Module *)0)->parameters),
-                  _CFFI_OP(_CFFI_OP_NOOP, 335) },
+                  _CFFI_OP(_CFFI_OP_NOOP, 346) },
   { "num_parameters", offsetof(Module, num_parameters),
                       sizeof(((Module *)0)->num_parameters),
                       _CFFI_OP(_CFFI_OP_NOOP, 1) },
@@ -24969,37 +25725,49 @@ static const struct _cffi_field_s _cffi_fields[] = {
                            _CFFI_OP(_CFFI_OP_NOOP, 1) },
   { "next", offsetof(Module, next),
             sizeof(((Module *)0)->next),
-            _CFFI_OP(_CFFI_OP_NOOP, 321) },
+            _CFFI_OP(_CFFI_OP_NOOP, 63) },
   { "training", offsetof(Module, training),
                 sizeof(((Module *)0)->training),
                 _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "user_data", offsetof(Module, user_data),
                  sizeof(((Module *)0)->user_data),
-                 _CFFI_OP(_CFFI_OP_NOOP, 705) },
+                 _CFFI_OP(_CFFI_OP_NOOP, 730) },
   { "version", offsetof(Module, version),
                sizeof(((Module *)0)->version),
-               _CFFI_OP(_CFFI_OP_NOOP, 134) },
+               _CFFI_OP(_CFFI_OP_NOOP, 145) },
   { "description", offsetof(Module, description),
                    sizeof(((Module *)0)->description),
-                   _CFFI_OP(_CFFI_OP_NOOP, 134) },
+                   _CFFI_OP(_CFFI_OP_NOOP, 145) },
   { "tensor", offsetof(Parameter, tensor),
               sizeof(((Parameter *)0)->tensor),
-              _CFFI_OP(_CFFI_OP_NOOP, 379) },
+              _CFFI_OP(_CFFI_OP_NOOP, 396) },
   { "requires_grad", offsetof(Parameter, requires_grad),
                      sizeof(((Parameter *)0)->requires_grad),
                      _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "name", offsetof(Parameter, name),
             sizeof(((Parameter *)0)->name),
-            _CFFI_OP(_CFFI_OP_NOOP, 1187) },
+            _CFFI_OP(_CFFI_OP_NOOP, 1233) },
+  { "module", offsetof(PipelineStage, module),
+              sizeof(((PipelineStage *)0)->module),
+              _CFFI_OP(_CFFI_OP_NOOP, 63) },
+  { "device_id", offsetof(PipelineStage, device_id),
+                 sizeof(((PipelineStage *)0)->device_id),
+                 _CFFI_OP(_CFFI_OP_NOOP, 1) },
+  { "device", offsetof(PipelineStage, device),
+              sizeof(((PipelineStage *)0)->device),
+              _CFFI_OP(_CFFI_OP_NOOP, 42) },
+  { "stage_id", offsetof(PipelineStage, stage_id),
+                sizeof(((PipelineStage *)0)->stage_id),
+                _CFFI_OP(_CFFI_OP_NOOP, 1) },
   { "indices", offsetof(SparseCOOData, indices),
                sizeof(((SparseCOOData *)0)->indices),
-               _CFFI_OP(_CFFI_OP_NOOP, 379) },
+               _CFFI_OP(_CFFI_OP_NOOP, 396) },
   { "values", offsetof(SparseCOOData, values),
               sizeof(((SparseCOOData *)0)->values),
-              _CFFI_OP(_CFFI_OP_NOOP, 379) },
+              _CFFI_OP(_CFFI_OP_NOOP, 396) },
   { "dense_shape", offsetof(SparseCOOData, dense_shape),
                    sizeof(((SparseCOOData *)0)->dense_shape),
-                   _CFFI_OP(_CFFI_OP_NOOP, 225) },
+                   _CFFI_OP(_CFFI_OP_NOOP, 236) },
   { "dense_ndim", offsetof(SparseCOOData, dense_ndim),
                   sizeof(((SparseCOOData *)0)->dense_ndim),
                   _CFFI_OP(_CFFI_OP_NOOP, 1) },
@@ -25008,13 +25776,13 @@ static const struct _cffi_field_s _cffi_fields[] = {
            _CFFI_OP(_CFFI_OP_NOOP, 1) },
   { "shape", offsetof(Tensor, shape),
              sizeof(((Tensor *)0)->shape),
-             _CFFI_OP(_CFFI_OP_NOOP, 225) },
+             _CFFI_OP(_CFFI_OP_NOOP, 236) },
   { "ndim", offsetof(Tensor, ndim),
             sizeof(((Tensor *)0)->ndim),
             _CFFI_OP(_CFFI_OP_NOOP, 1) },
   { "numel", offsetof(Tensor, numel),
              sizeof(((Tensor *)0)->numel),
-             _CFFI_OP(_CFFI_OP_NOOP, 726) },
+             _CFFI_OP(_CFFI_OP_NOOP, 751) },
   { "dtype", offsetof(Tensor, dtype),
              sizeof(((Tensor *)0)->dtype),
              _CFFI_OP(_CFFI_OP_NOOP, 41) },
@@ -25023,16 +25791,16 @@ static const struct _cffi_field_s _cffi_fields[] = {
               _CFFI_OP(_CFFI_OP_NOOP, 42) },
   { "ir_node", offsetof(Tensor, ir_node),
                sizeof(((Tensor *)0)->ir_node),
-               _CFFI_OP(_CFFI_OP_NOOP, 1194) },
+               _CFFI_OP(_CFFI_OP_NOOP, 1240) },
   { "ir_context", offsetof(Tensor, ir_context),
                   sizeof(((Tensor *)0)->ir_context),
-                  _CFFI_OP(_CFFI_OP_NOOP, 906) },
+                  _CFFI_OP(_CFFI_OP_NOOP, 938) },
   { "is_executed", offsetof(Tensor, is_executed),
                    sizeof(((Tensor *)0)->is_executed),
                    _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "data", offsetof(Tensor, data),
             sizeof(((Tensor *)0)->data),
-            _CFFI_OP(_CFFI_OP_NOOP, 705) },
+            _CFFI_OP(_CFFI_OP_NOOP, 730) },
   { "owns_data", offsetof(Tensor, owns_data),
                  sizeof(((Tensor *)0)->owns_data),
                  _CFFI_OP(_CFFI_OP_NOOP, 18) },
@@ -25044,28 +25812,28 @@ static const struct _cffi_field_s _cffi_fields[] = {
                      _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "grad", offsetof(Tensor, grad),
             sizeof(((Tensor *)0)->grad),
-            _CFFI_OP(_CFFI_OP_NOOP, 379) },
+            _CFFI_OP(_CFFI_OP_NOOP, 396) },
   { "ref_count", offsetof(Tensor, ref_count),
                  sizeof(((Tensor *)0)->ref_count),
                  _CFFI_OP(_CFFI_OP_NOOP, 1) },
   { "base", offsetof(Tensor, base),
             sizeof(((Tensor *)0)->base),
-            _CFFI_OP(_CFFI_OP_NOOP, 379) },
+            _CFFI_OP(_CFFI_OP_NOOP, 396) },
   { "strides", offsetof(Tensor, strides),
                sizeof(((Tensor *)0)->strides),
-               _CFFI_OP(_CFFI_OP_NOOP, 1050) },
+               _CFFI_OP(_CFFI_OP_NOOP, 1088) },
   { "storage_offset", offsetof(Tensor, storage_offset),
                       sizeof(((Tensor *)0)->storage_offset),
-                      _CFFI_OP(_CFFI_OP_NOOP, 726) },
+                      _CFFI_OP(_CFFI_OP_NOOP, 751) },
   { "is_contiguous", offsetof(Tensor, is_contiguous),
                      sizeof(((Tensor *)0)->is_contiguous),
                      _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "buffer_handle", offsetof(Tensor, buffer_handle),
                      sizeof(((Tensor *)0)->buffer_handle),
-                     _CFFI_OP(_CFFI_OP_NOOP, 1191) },
+                     _CFFI_OP(_CFFI_OP_NOOP, 1237) },
   { "user_data", offsetof(Tensor, user_data),
                  sizeof(((Tensor *)0)->user_data),
-                 _CFFI_OP(_CFFI_OP_NOOP, 705) },
+                 _CFFI_OP(_CFFI_OP_NOOP, 730) },
   { "dtype", offsetof(TensorConfig, dtype),
              sizeof(((TensorConfig *)0)->dtype),
              _CFFI_OP(_CFFI_OP_NOOP, 41) },
@@ -25080,7 +25848,7 @@ static const struct _cffi_field_s _cffi_fields[] = {
                   _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "method_name", offsetof(TorchPTEExportOptions, method_name),
                    sizeof(((TorchPTEExportOptions *)0)->method_name),
-                   _CFFI_OP(_CFFI_OP_NOOP, 134) },
+                   _CFFI_OP(_CFFI_OP_NOOP, 145) },
   { "backend", offsetof(TorchPTEExportOptions, backend),
                sizeof(((TorchPTEExportOptions *)0)->backend),
                _CFFI_OP(_CFFI_OP_NOOP, 1) },
@@ -25092,7 +25860,7 @@ static const struct _cffi_field_s _cffi_fields[] = {
                            _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "aot_output_path", offsetof(TorchPTEExportOptions, aot_output_path),
                        sizeof(((TorchPTEExportOptions *)0)->aot_output_path),
-                       _CFFI_OP(_CFFI_OP_NOOP, 134) },
+                       _CFFI_OP(_CFFI_OP_NOOP, 145) },
   { "dtype", offsetof(TorchTensorOptions, dtype),
              sizeof(((TorchTensorOptions *)0)->dtype),
              _CFFI_OP(_CFFI_OP_NOOP, 41) },
@@ -25110,154 +25878,166 @@ static const struct _cffi_field_s _cffi_fields[] = {
                   _CFFI_OP(_CFFI_OP_NOOP, 18) },
   { "config", offsetof(TorchTensorOptions, config),
               sizeof(((TorchTensorOptions *)0)->config),
-              _CFFI_OP(_CFFI_OP_NOOP, 1172) },
+              _CFFI_OP(_CFFI_OP_NOOP, 1218) },
 };
 
 static const struct _cffi_struct_union_s _cffi_struct_unions[] = {
-  { "$QRResult", 1154, _CFFI_F_CHECK_FIELDS,
-    sizeof(QRResult), offsetof(struct _cffi_align_typedef_QRResult, y), 0, 2 },
-  { "$SVDResult", 1161, _CFFI_F_CHECK_FIELDS,
-    sizeof(SVDResult), offsetof(struct _cffi_align_typedef_SVDResult, y), 2, 3 },
-  { "AdaptiveAvgPool1d", 1070, 0,
-    sizeof(AdaptiveAvgPool1d), offsetof(struct _cffi_align__AdaptiveAvgPool1d, y), 5, 0 },
-  { "AdaptiveAvgPool2d", 1072, 0,
-    sizeof(AdaptiveAvgPool2d), offsetof(struct _cffi_align__AdaptiveAvgPool2d, y), 5, 0 },
-  { "AdaptiveMaxPool1d", 1074, 0,
-    sizeof(AdaptiveMaxPool1d), offsetof(struct _cffi_align__AdaptiveMaxPool1d, y), 5, 0 },
-  { "AdaptiveMaxPool2d", 1076, 0,
-    sizeof(AdaptiveMaxPool2d), offsetof(struct _cffi_align__AdaptiveMaxPool2d, y), 5, 0 },
-  { "AvgPool1d", 1078, 0,
-    sizeof(AvgPool1d), offsetof(struct _cffi_align__AvgPool1d, y), 5, 0 },
-  { "AvgPool2d", 1080, 0,
-    sizeof(AvgPool2d), offsetof(struct _cffi_align__AvgPool2d, y), 5, 0 },
-  { "AvgPool3d", 1082, 0,
-    sizeof(AvgPool3d), offsetof(struct _cffi_align__AvgPool3d, y), 5, 0 },
-  { "BatchNorm1d", 1084, 0,
-    sizeof(BatchNorm1d), offsetof(struct _cffi_align__BatchNorm1d, y), 5, 0 },
-  { "BatchNorm2d", 1086, 0,
-    sizeof(BatchNorm2d), offsetof(struct _cffi_align__BatchNorm2d, y), 5, 0 },
-  { "BatchNorm3d", 1088, 0,
-    sizeof(BatchNorm3d), offsetof(struct _cffi_align__BatchNorm3d, y), 5, 0 },
-  { "CMLBackendBuffer", 1192, _CFFI_F_OPAQUE,
+  { "$DDPConfig", 1142, _CFFI_F_CHECK_FIELDS,
+    sizeof(DDPConfig), offsetof(struct _cffi_align_typedef_DDPConfig, y), 0, 4 },
+  { "$PipeUnit", 1192, _CFFI_F_CHECK_FIELDS,
+    sizeof(PipeUnit), offsetof(struct _cffi_align_typedef_PipeUnit, y), 4, 3 },
+  { "$PipelineConfig", 1194, _CFFI_F_CHECK_FIELDS,
+    sizeof(PipelineConfig), offsetof(struct _cffi_align_typedef_PipelineConfig, y), 7, 3 },
+  { "$QRResult", 1200, _CFFI_F_CHECK_FIELDS,
+    sizeof(QRResult), offsetof(struct _cffi_align_typedef_QRResult, y), 10, 2 },
+  { "$SVDResult", 1207, _CFFI_F_CHECK_FIELDS,
+    sizeof(SVDResult), offsetof(struct _cffi_align_typedef_SVDResult, y), 12, 3 },
+  { "AdaptiveAvgPool1d", 1108, 0,
+    sizeof(AdaptiveAvgPool1d), offsetof(struct _cffi_align__AdaptiveAvgPool1d, y), 15, 0 },
+  { "AdaptiveAvgPool2d", 1110, 0,
+    sizeof(AdaptiveAvgPool2d), offsetof(struct _cffi_align__AdaptiveAvgPool2d, y), 15, 0 },
+  { "AdaptiveMaxPool1d", 1112, 0,
+    sizeof(AdaptiveMaxPool1d), offsetof(struct _cffi_align__AdaptiveMaxPool1d, y), 15, 0 },
+  { "AdaptiveMaxPool2d", 1114, 0,
+    sizeof(AdaptiveMaxPool2d), offsetof(struct _cffi_align__AdaptiveMaxPool2d, y), 15, 0 },
+  { "AvgPool1d", 1116, 0,
+    sizeof(AvgPool1d), offsetof(struct _cffi_align__AvgPool1d, y), 15, 0 },
+  { "AvgPool2d", 1118, 0,
+    sizeof(AvgPool2d), offsetof(struct _cffi_align__AvgPool2d, y), 15, 0 },
+  { "AvgPool3d", 1120, 0,
+    sizeof(AvgPool3d), offsetof(struct _cffi_align__AvgPool3d, y), 15, 0 },
+  { "BatchNorm1d", 1122, 0,
+    sizeof(BatchNorm1d), offsetof(struct _cffi_align__BatchNorm1d, y), 15, 0 },
+  { "BatchNorm2d", 1124, 0,
+    sizeof(BatchNorm2d), offsetof(struct _cffi_align__BatchNorm2d, y), 15, 0 },
+  { "BatchNorm3d", 1126, 0,
+    sizeof(BatchNorm3d), offsetof(struct _cffi_align__BatchNorm3d, y), 15, 0 },
+  { "CMLBackendBuffer", 1238, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "CMLGraph", 1193, _CFFI_F_OPAQUE,
+  { "CMLDataParallel", 1127, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "CleanupContext", 1089, _CFFI_F_OPAQUE,
+  { "CMLGraph", 1239, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "Conv1d", 1091, 0,
-    sizeof(Conv1d), offsetof(struct _cffi_align__Conv1d, y), 5, 0 },
-  { "Conv2d", 1093, 0,
-    sizeof(Conv2d), offsetof(struct _cffi_align__Conv2d, y), 5, 0 },
-  { "Conv3d", 1095, 0,
-    sizeof(Conv3d), offsetof(struct _cffi_align__Conv3d, y), 5, 0 },
-  { "ConvTranspose1d", 1097, 0,
-    sizeof(ConvTranspose1d), offsetof(struct _cffi_align__ConvTranspose1d, y), 5, 0 },
-  { "ConvTranspose2d", 1099, 0,
-    sizeof(ConvTranspose2d), offsetof(struct _cffi_align__ConvTranspose2d, y), 5, 0 },
-  { "ConvTranspose3d", 1101, 0,
-    sizeof(ConvTranspose3d), offsetof(struct _cffi_align__ConvTranspose3d, y), 5, 0 },
-  { "Dataset", 1102, 0,
-    sizeof(Dataset), offsetof(struct _cffi_align__Dataset, y), 5, 0 },
-  { "Dropout", 1104, 0,
-    sizeof(Dropout), offsetof(struct _cffi_align__Dropout, y), 5, 0 },
-  { "Embedding", 1106, 0,
-    sizeof(Embedding), offsetof(struct _cffi_align__Embedding, y), 5, 0 },
-  { "Flatten", 1108, 0,
-    sizeof(Flatten), offsetof(struct _cffi_align__Flatten, y), 5, 0 },
-  { "GGUFContext", 1109, _CFFI_F_OPAQUE,
+  { "CMLPipelineParallel", 1128, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "GRU", 1111, 0,
-    sizeof(GRU), offsetof(struct _cffi_align__GRU, y), 5, 0 },
-  { "GRUCell", 1113, 0,
-    sizeof(GRUCell), offsetof(struct _cffi_align__GRUCell, y), 5, 0 },
-  { "GradScaler", 1114, _CFFI_F_OPAQUE,
+  { "CleanupContext", 1129, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "GroupNorm", 1116, 0,
-    sizeof(GroupNorm), offsetof(struct _cffi_align__GroupNorm, y), 5, 0 },
-  { "IRNode", 1195, _CFFI_F_OPAQUE,
+  { "Conv1d", 1131, 0,
+    sizeof(Conv1d), offsetof(struct _cffi_align__Conv1d, y), 15, 0 },
+  { "Conv2d", 1133, 0,
+    sizeof(Conv2d), offsetof(struct _cffi_align__Conv2d, y), 15, 0 },
+  { "Conv3d", 1135, 0,
+    sizeof(Conv3d), offsetof(struct _cffi_align__Conv3d, y), 15, 0 },
+  { "ConvTranspose1d", 1137, 0,
+    sizeof(ConvTranspose1d), offsetof(struct _cffi_align__ConvTranspose1d, y), 15, 0 },
+  { "ConvTranspose2d", 1139, 0,
+    sizeof(ConvTranspose2d), offsetof(struct _cffi_align__ConvTranspose2d, y), 15, 0 },
+  { "ConvTranspose3d", 1141, 0,
+    sizeof(ConvTranspose3d), offsetof(struct _cffi_align__ConvTranspose3d, y), 15, 0 },
+  { "Dataset", 1143, 0,
+    sizeof(Dataset), offsetof(struct _cffi_align__Dataset, y), 15, 0 },
+  { "Dropout", 1145, 0,
+    sizeof(Dropout), offsetof(struct _cffi_align__Dropout, y), 15, 0 },
+  { "Embedding", 1147, 0,
+    sizeof(Embedding), offsetof(struct _cffi_align__Embedding, y), 15, 0 },
+  { "Flatten", 1149, 0,
+    sizeof(Flatten), offsetof(struct _cffi_align__Flatten, y), 15, 0 },
+  { "GGUFContext", 1150, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "Identity", 1118, 0,
-    sizeof(Identity), offsetof(struct _cffi_align__Identity, y), 5, 0 },
-  { "InstanceNorm2d", 1120, 0,
-    sizeof(InstanceNorm2d), offsetof(struct _cffi_align__InstanceNorm2d, y), 5, 0 },
-  { "LRScheduler", 1121, _CFFI_F_OPAQUE,
+  { "GRU", 1152, 0,
+    sizeof(GRU), offsetof(struct _cffi_align__GRU, y), 15, 0 },
+  { "GRUCell", 1154, 0,
+    sizeof(GRUCell), offsetof(struct _cffi_align__GRUCell, y), 15, 0 },
+  { "GradScaler", 1155, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "LSTM", 1123, 0,
-    sizeof(LSTM), offsetof(struct _cffi_align__LSTM, y), 5, 0 },
-  { "LSTMCell", 1125, 0,
-    sizeof(LSTMCell), offsetof(struct _cffi_align__LSTMCell, y), 5, 0 },
-  { "LayerNorm", 1129, 0,
-    sizeof(LayerNorm), offsetof(struct _cffi_align__LayerNorm, y), 5, 0 },
-  { "LayerNorm2d", 1128, 0,
-    sizeof(LayerNorm2d), offsetof(struct _cffi_align__LayerNorm2d, y), 5, 0 },
-  { "LeakyReLU", 1131, 0,
-    sizeof(LeakyReLU), offsetof(struct _cffi_align__LeakyReLU, y), 5, 0 },
-  { "Linear", 1133, 0,
-    sizeof(Linear), offsetof(struct _cffi_align__Linear, y), 5, 0 },
-  { "MaxPool1d", 1135, 0,
-    sizeof(MaxPool1d), offsetof(struct _cffi_align__MaxPool1d, y), 5, 0 },
-  { "MaxPool2d", 1137, 0,
-    sizeof(MaxPool2d), offsetof(struct _cffi_align__MaxPool2d, y), 5, 0 },
-  { "MaxPool3d", 1139, 0,
-    sizeof(MaxPool3d), offsetof(struct _cffi_align__MaxPool3d, y), 5, 0 },
-  { "Module", 1140, _CFFI_F_CHECK_FIELDS,
-    sizeof(Module), offsetof(struct _cffi_align__Module, y), 5, 11 },
-  { "ModuleDict", 1141, 0,
-    sizeof(ModuleDict), offsetof(struct _cffi_align__ModuleDict, y), 16, 0 },
-  { "ModuleList", 1142, 0,
-    sizeof(ModuleList), offsetof(struct _cffi_align__ModuleList, y), 16, 0 },
-  { "MultiHeadAttention", 1144, 0,
-    sizeof(MultiHeadAttention), offsetof(struct _cffi_align__MultiHeadAttention, y), 16, 0 },
-  { "Optimizer", 1145, 0,
-    sizeof(Optimizer), offsetof(struct _cffi_align__Optimizer, y), 16, 0 },
-  { "PReLU", 1147, 0,
-    sizeof(PReLU), offsetof(struct _cffi_align__PReLU, y), 16, 0 },
-  { "Parameter", 1149, _CFFI_F_CHECK_FIELDS,
-    sizeof(Parameter), offsetof(struct _cffi_align__Parameter, y), 16, 3 },
-  { "PixelShuffle", 1151, 0,
-    sizeof(PixelShuffle), offsetof(struct _cffi_align__PixelShuffle, y), 19, 0 },
-  { "PixelUnshuffle", 1153, 0,
-    sizeof(PixelUnshuffle), offsetof(struct _cffi_align__PixelUnshuffle, y), 19, 0 },
-  { "RNN", 1156, 0,
-    sizeof(RNN), offsetof(struct _cffi_align__RNN, y), 19, 0 },
-  { "RNNCell", 1158, 0,
-    sizeof(RNNCell), offsetof(struct _cffi_align__RNNCell, y), 19, 0 },
-  { "ReLU", 1160, 0,
-    sizeof(ReLU), offsetof(struct _cffi_align__ReLU, y), 19, 0 },
-  { "SafeTensorsContext", 1162, _CFFI_F_OPAQUE,
+  { "GroupNorm", 1157, 0,
+    sizeof(GroupNorm), offsetof(struct _cffi_align__GroupNorm, y), 15, 0 },
+  { "IRNode", 1241, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "Sequential", 1163, 0,
-    sizeof(Sequential), offsetof(struct _cffi_align__Sequential, y), 19, 0 },
-  { "Sigmoid", 1165, 0,
-    sizeof(Sigmoid), offsetof(struct _cffi_align__Sigmoid, y), 19, 0 },
-  { "SparseCOOData", 1166, _CFFI_F_CHECK_FIELDS,
-    sizeof(SparseCOOData), offsetof(struct _cffi_align__SparseCOOData, y), 19, 5 },
-  { "StateDict", 1167, _CFFI_F_OPAQUE,
+  { "Identity", 1159, 0,
+    sizeof(Identity), offsetof(struct _cffi_align__Identity, y), 15, 0 },
+  { "InstanceNorm2d", 1161, 0,
+    sizeof(InstanceNorm2d), offsetof(struct _cffi_align__InstanceNorm2d, y), 15, 0 },
+  { "LRScheduler", 1162, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "Tanh", 1169, 0,
-    sizeof(Tanh), offsetof(struct _cffi_align__Tanh, y), 24, 0 },
-  { "Tensor", 1171, 0,
-    sizeof(Tensor), offsetof(struct _cffi_align__Tensor, y), 24, 20 },
-  { "TensorConfig", 1172, _CFFI_F_CHECK_FIELDS,
-    sizeof(TensorConfig), offsetof(struct _cffi_align__TensorConfig, y), 44, 4 },
-  { "TorchMemoryManager", 1173, _CFFI_F_OPAQUE,
+  { "LSTM", 1164, 0,
+    sizeof(LSTM), offsetof(struct _cffi_align__LSTM, y), 15, 0 },
+  { "LSTMCell", 1166, 0,
+    sizeof(LSTMCell), offsetof(struct _cffi_align__LSTMCell, y), 15, 0 },
+  { "LayerNorm", 1170, 0,
+    sizeof(LayerNorm), offsetof(struct _cffi_align__LayerNorm, y), 15, 0 },
+  { "LayerNorm2d", 1169, 0,
+    sizeof(LayerNorm2d), offsetof(struct _cffi_align__LayerNorm2d, y), 15, 0 },
+  { "LeakyReLU", 1172, 0,
+    sizeof(LeakyReLU), offsetof(struct _cffi_align__LeakyReLU, y), 15, 0 },
+  { "Linear", 1174, 0,
+    sizeof(Linear), offsetof(struct _cffi_align__Linear, y), 15, 0 },
+  { "MaxPool1d", 1176, 0,
+    sizeof(MaxPool1d), offsetof(struct _cffi_align__MaxPool1d, y), 15, 0 },
+  { "MaxPool2d", 1178, 0,
+    sizeof(MaxPool2d), offsetof(struct _cffi_align__MaxPool2d, y), 15, 0 },
+  { "MaxPool3d", 1180, 0,
+    sizeof(MaxPool3d), offsetof(struct _cffi_align__MaxPool3d, y), 15, 0 },
+  { "Module", 1181, _CFFI_F_CHECK_FIELDS,
+    sizeof(Module), offsetof(struct _cffi_align__Module, y), 15, 11 },
+  { "ModuleDict", 1182, 0,
+    sizeof(ModuleDict), offsetof(struct _cffi_align__ModuleDict, y), 26, 0 },
+  { "ModuleList", 1183, 0,
+    sizeof(ModuleList), offsetof(struct _cffi_align__ModuleList, y), 26, 0 },
+  { "MultiHeadAttention", 1185, 0,
+    sizeof(MultiHeadAttention), offsetof(struct _cffi_align__MultiHeadAttention, y), 26, 0 },
+  { "Optimizer", 1186, 0,
+    sizeof(Optimizer), offsetof(struct _cffi_align__Optimizer, y), 26, 0 },
+  { "PReLU", 1188, 0,
+    sizeof(PReLU), offsetof(struct _cffi_align__PReLU, y), 26, 0 },
+  { "Parameter", 1190, _CFFI_F_CHECK_FIELDS,
+    sizeof(Parameter), offsetof(struct _cffi_align__Parameter, y), 26, 3 },
+  { "PipelineStage", 1195, _CFFI_F_CHECK_FIELDS,
+    sizeof(PipelineStage), offsetof(struct _cffi_align__PipelineStage, y), 29, 4 },
+  { "PixelShuffle", 1197, 0,
+    sizeof(PixelShuffle), offsetof(struct _cffi_align__PixelShuffle, y), 33, 0 },
+  { "PixelUnshuffle", 1199, 0,
+    sizeof(PixelUnshuffle), offsetof(struct _cffi_align__PixelUnshuffle, y), 33, 0 },
+  { "RNN", 1202, 0,
+    sizeof(RNN), offsetof(struct _cffi_align__RNN, y), 33, 0 },
+  { "RNNCell", 1204, 0,
+    sizeof(RNNCell), offsetof(struct _cffi_align__RNNCell, y), 33, 0 },
+  { "ReLU", 1206, 0,
+    sizeof(ReLU), offsetof(struct _cffi_align__ReLU, y), 33, 0 },
+  { "SafeTensorsContext", 1208, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "TorchPTEExportOptions", 1174, _CFFI_F_CHECK_FIELDS,
-    sizeof(TorchPTEExportOptions), offsetof(struct _cffi_align__TorchPTEExportOptions, y), 48, 5 },
-  { "TorchRuntimeModule", 1176, _CFFI_F_OPAQUE,
+  { "Sequential", 1209, 0,
+    sizeof(Sequential), offsetof(struct _cffi_align__Sequential, y), 33, 0 },
+  { "Sigmoid", 1211, 0,
+    sizeof(Sigmoid), offsetof(struct _cffi_align__Sigmoid, y), 33, 0 },
+  { "SparseCOOData", 1212, _CFFI_F_CHECK_FIELDS,
+    sizeof(SparseCOOData), offsetof(struct _cffi_align__SparseCOOData, y), 33, 5 },
+  { "StateDict", 1213, _CFFI_F_OPAQUE,
     (size_t)-1, -1, -1, 0 /* opaque */ },
-  { "TorchTensorOptions", 739, _CFFI_F_CHECK_FIELDS,
-    sizeof(TorchTensorOptions), offsetof(struct _cffi_align__TorchTensorOptions, y), 53, 6 },
-  { "TransformerDecoder", 1178, 0,
-    sizeof(TransformerDecoder), offsetof(struct _cffi_align__TransformerDecoder, y), 59, 0 },
-  { "TransformerDecoderLayer", 1180, 0,
-    sizeof(TransformerDecoderLayer), offsetof(struct _cffi_align__TransformerDecoderLayer, y), 59, 0 },
-  { "TransformerEncoder", 1182, 0,
-    sizeof(TransformerEncoder), offsetof(struct _cffi_align__TransformerEncoder, y), 59, 0 },
-  { "TransformerEncoderLayer", 1184, 0,
-    sizeof(TransformerEncoderLayer), offsetof(struct _cffi_align__TransformerEncoderLayer, y), 59, 0 },
-  { "Upsample", 1186, 0,
-    sizeof(Upsample), offsetof(struct _cffi_align__Upsample, y), 59, 0 },
+  { "Tanh", 1215, 0,
+    sizeof(Tanh), offsetof(struct _cffi_align__Tanh, y), 38, 0 },
+  { "Tensor", 1217, 0,
+    sizeof(Tensor), offsetof(struct _cffi_align__Tensor, y), 38, 20 },
+  { "TensorConfig", 1218, _CFFI_F_CHECK_FIELDS,
+    sizeof(TensorConfig), offsetof(struct _cffi_align__TensorConfig, y), 58, 4 },
+  { "TorchMemoryManager", 1219, _CFFI_F_OPAQUE,
+    (size_t)-1, -1, -1, 0 /* opaque */ },
+  { "TorchPTEExportOptions", 1220, _CFFI_F_CHECK_FIELDS,
+    sizeof(TorchPTEExportOptions), offsetof(struct _cffi_align__TorchPTEExportOptions, y), 62, 5 },
+  { "TorchRuntimeModule", 1222, _CFFI_F_OPAQUE,
+    (size_t)-1, -1, -1, 0 /* opaque */ },
+  { "TorchTensorOptions", 764, _CFFI_F_CHECK_FIELDS,
+    sizeof(TorchTensorOptions), offsetof(struct _cffi_align__TorchTensorOptions, y), 67, 6 },
+  { "TransformerDecoder", 1224, 0,
+    sizeof(TransformerDecoder), offsetof(struct _cffi_align__TransformerDecoder, y), 73, 0 },
+  { "TransformerDecoderLayer", 1226, 0,
+    sizeof(TransformerDecoderLayer), offsetof(struct _cffi_align__TransformerDecoderLayer, y), 73, 0 },
+  { "TransformerEncoder", 1228, 0,
+    sizeof(TransformerEncoder), offsetof(struct _cffi_align__TransformerEncoder, y), 73, 0 },
+  { "TransformerEncoderLayer", 1230, 0,
+    sizeof(TransformerEncoderLayer), offsetof(struct _cffi_align__TransformerEncoderLayer, y), 73, 0 },
+  { "Upsample", 1232, 0,
+    sizeof(Upsample), offsetof(struct _cffi_align__Upsample, y), 73, 0 },
 };
 
 static const struct _cffi_enum_s _cffi_enums[] = {
@@ -25265,106 +26045,115 @@ static const struct _cffi_enum_s _cffi_enums[] = {
     "DTYPE_FLOAT32,DTYPE_FLOAT64,DTYPE_INT32,DTYPE_INT64,DTYPE_BOOL,DTYPE_FLOAT16,DTYPE_BFLOAT16,DTYPE_INT8,DTYPE_UINT8,DTYPE_INT16,DTYPE_UINT16,DTYPE_UINT32,DTYPE_UINT64,DTYPE_FLOAT8_E4M3,DTYPE_FLOAT8_E5M2" },
   { "$DeviceType", 42, _cffi_prim_int(sizeof(DeviceType), ((DeviceType)-1) <= 0),
     "DEVICE_CPU,DEVICE_CUDA,DEVICE_METAL,DEVICE_ROCM,DEVICE_SIM_GPU,DEVICE_AUTO" },
-  { "$DistBackendType", 840, _cffi_prim_int(sizeof(DistBackendType), ((DistBackendType)-1) <= 0),
+  { "$DistBackendType", 872, _cffi_prim_int(sizeof(DistBackendType), ((DistBackendType)-1) <= 0),
     "DIST_BACKEND_NCCL,DIST_BACKEND_MPI,DIST_BACKEND_GLOO,DIST_BACKEND_COUNT" },
-  { "$DistReduceOp", 900, _cffi_prim_int(sizeof(DistReduceOp), ((DistReduceOp)-1) <= 0),
+  { "$DistReduceOp", 932, _cffi_prim_int(sizeof(DistReduceOp), ((DistReduceOp)-1) <= 0),
     "DIST_REDUCE_SUM,DIST_REDUCE_PRODUCT,DIST_REDUCE_MAX,DIST_REDUCE_MIN,DIST_REDUCE_AVG" },
-  { "$InterpMode", 536, _cffi_prim_int(sizeof(InterpMode), ((InterpMode)-1) <= 0),
+  { "$InterpMode", 561, _cffi_prim_int(sizeof(InterpMode), ((InterpMode)-1) <= 0),
     "INTERP_NEAREST,INTERP_BILINEAR" },
-  { "$LogLevel", 970, _cffi_prim_int(sizeof(LogLevel), ((LogLevel)-1) <= 0),
+  { "$LogLevel", 1008, _cffi_prim_int(sizeof(LogLevel), ((LogLevel)-1) <= 0),
     "LOG_LEVEL_DEBUG,LOG_LEVEL_INFO,LOG_LEVEL_WARNING,LOG_LEVEL_ERROR" },
-  { "$ScatterReduceMode", 560, _cffi_prim_int(sizeof(ScatterReduceMode), ((ScatterReduceMode)-1) <= 0),
+  { "$PipeUnitKind", 1193, _cffi_prim_int(sizeof(PipeUnitKind), ((PipeUnitKind)-1) <= 0),
+    "PIPE_UNIT_FORWARD,PIPE_UNIT_BACKWARD" },
+  { "$ScatterReduceMode", 585, _cffi_prim_int(sizeof(ScatterReduceMode), ((ScatterReduceMode)-1) <= 0),
     "SCATTER_REDUCE_SUM,SCATTER_REDUCE_PROD,SCATTER_REDUCE_MEAN,SCATTER_REDUCE_AMAX,SCATTER_REDUCE_AMIN" },
-  { "$TorchRuntimeKind", 1175, _cffi_prim_int(sizeof(TorchRuntimeKind), ((TorchRuntimeKind)-1) <= 0),
+  { "$TorchRuntimeKind", 1221, _cffi_prim_int(sizeof(TorchRuntimeKind), ((TorchRuntimeKind)-1) <= 0),
     "TORCH_RUNTIME_EAGER,TORCH_RUNTIME_AOT,TORCH_RUNTIME_PTE" },
-  { "$UpsampleMode", 542, _cffi_prim_int(sizeof(UpsampleMode), ((UpsampleMode)-1) <= 0),
+  { "$UpsampleMode", 567, _cffi_prim_int(sizeof(UpsampleMode), ((UpsampleMode)-1) <= 0),
     "UPSAMPLE_NEAREST,UPSAMPLE_BILINEAR,UPSAMPLE_BICUBIC" },
 };
 
 static const struct _cffi_typename_s _cffi_typenames[] = {
-  { "AdaptiveAvgPool1d", 1070 },
-  { "AdaptiveAvgPool2d", 1072 },
-  { "AdaptiveMaxPool1d", 1074 },
-  { "AdaptiveMaxPool2d", 1076 },
-  { "AvgPool1d", 1078 },
-  { "AvgPool2d", 1080 },
-  { "AvgPool3d", 1082 },
-  { "BatchNorm1d", 1084 },
-  { "BatchNorm2d", 1086 },
-  { "BatchNorm3d", 1088 },
-  { "CMLBackendBuffer_t", 1191 },
-  { "CMLGlobalErrorHandler", 1062 },
-  { "CMLGraph_t", 906 },
-  { "CleanupContext", 1089 },
-  { "Conv1d", 1091 },
-  { "Conv2d", 1093 },
-  { "Conv3d", 1095 },
-  { "ConvTranspose1d", 1097 },
-  { "ConvTranspose2d", 1099 },
-  { "ConvTranspose3d", 1101 },
+  { "AdaptiveAvgPool1d", 1108 },
+  { "AdaptiveAvgPool2d", 1110 },
+  { "AdaptiveMaxPool1d", 1112 },
+  { "AdaptiveMaxPool2d", 1114 },
+  { "AvgPool1d", 1116 },
+  { "AvgPool2d", 1118 },
+  { "AvgPool3d", 1120 },
+  { "BatchNorm1d", 1122 },
+  { "BatchNorm2d", 1124 },
+  { "BatchNorm3d", 1126 },
+  { "CMLBackendBuffer_t", 1237 },
+  { "CMLDataParallel", 1127 },
+  { "CMLGlobalErrorHandler", 1100 },
+  { "CMLGraph_t", 938 },
+  { "CMLPipelineParallel", 1128 },
+  { "CleanupContext", 1129 },
+  { "Conv1d", 1131 },
+  { "Conv2d", 1133 },
+  { "Conv3d", 1135 },
+  { "ConvTranspose1d", 1137 },
+  { "ConvTranspose2d", 1139 },
+  { "ConvTranspose3d", 1141 },
+  { "DDPConfig", 1142 },
   { "DType", 41 },
-  { "Dataset", 1102 },
+  { "Dataset", 1143 },
   { "DeviceType", 42 },
-  { "DistBackendType", 840 },
-  { "DistReduceOp", 900 },
-  { "Dropout", 1104 },
-  { "Embedding", 1106 },
-  { "Flatten", 1108 },
-  { "ForwardFn", 1170 },
-  { "FreeFn", 1196 },
-  { "GGUFContext", 1109 },
-  { "GRU", 1111 },
-  { "GRUCell", 1113 },
-  { "GradScaler", 1114 },
-  { "GroupNorm", 1116 },
-  { "Identity", 1118 },
-  { "InstanceNorm2d", 1120 },
-  { "InterpMode", 536 },
-  { "LRScheduler", 1121 },
-  { "LSTM", 1123 },
-  { "LSTMCell", 1125 },
-  { "LayerNorm", 1129 },
-  { "LayerNorm2d", 1128 },
-  { "LeakyReLU", 1131 },
-  { "Linear", 1133 },
-  { "LogLevel", 970 },
-  { "MaxPool1d", 1135 },
-  { "MaxPool2d", 1137 },
-  { "MaxPool3d", 1139 },
-  { "Module", 1140 },
-  { "ModuleDict", 1141 },
-  { "ModuleList", 1142 },
-  { "MultiHeadAttention", 1144 },
-  { "Optimizer", 1145 },
-  { "PReLU", 1147 },
-  { "Parameter", 1149 },
-  { "PixelShuffle", 1151 },
-  { "PixelUnshuffle", 1153 },
-  { "QRResult", 1154 },
-  { "RNN", 1156 },
-  { "RNNCell", 1158 },
-  { "ReLU", 1160 },
-  { "SVDResult", 1161 },
-  { "SafeTensorsContext", 1162 },
-  { "ScatterReduceMode", 560 },
-  { "Sequential", 1163 },
-  { "Sigmoid", 1165 },
-  { "SparseCOOData", 1166 },
-  { "StateDict", 1167 },
-  { "Tanh", 1169 },
-  { "Tensor", 1171 },
-  { "TensorConfig", 1172 },
-  { "TorchMemoryManager", 1173 },
-  { "TorchPTEExportOptions", 1174 },
-  { "TorchRuntimeKind", 1175 },
-  { "TorchRuntimeModule", 1176 },
-  { "TorchTensorOptions", 739 },
-  { "TransformerDecoder", 1178 },
-  { "TransformerDecoderLayer", 1180 },
-  { "TransformerEncoder", 1182 },
-  { "TransformerEncoderLayer", 1184 },
-  { "Upsample", 1186 },
-  { "UpsampleMode", 542 },
+  { "DistBackendType", 872 },
+  { "DistReduceOp", 932 },
+  { "Dropout", 1145 },
+  { "Embedding", 1147 },
+  { "Flatten", 1149 },
+  { "ForwardFn", 1216 },
+  { "FreeFn", 1242 },
+  { "GGUFContext", 1150 },
+  { "GRU", 1152 },
+  { "GRUCell", 1154 },
+  { "GradScaler", 1155 },
+  { "GroupNorm", 1157 },
+  { "Identity", 1159 },
+  { "InstanceNorm2d", 1161 },
+  { "InterpMode", 561 },
+  { "LRScheduler", 1162 },
+  { "LSTM", 1164 },
+  { "LSTMCell", 1166 },
+  { "LayerNorm", 1170 },
+  { "LayerNorm2d", 1169 },
+  { "LeakyReLU", 1172 },
+  { "Linear", 1174 },
+  { "LogLevel", 1008 },
+  { "MaxPool1d", 1176 },
+  { "MaxPool2d", 1178 },
+  { "MaxPool3d", 1180 },
+  { "Module", 1181 },
+  { "ModuleDict", 1182 },
+  { "ModuleList", 1183 },
+  { "MultiHeadAttention", 1185 },
+  { "Optimizer", 1186 },
+  { "PReLU", 1188 },
+  { "Parameter", 1190 },
+  { "PipeUnit", 1192 },
+  { "PipeUnitKind", 1193 },
+  { "PipelineConfig", 1194 },
+  { "PipelineStage", 1195 },
+  { "PixelShuffle", 1197 },
+  { "PixelUnshuffle", 1199 },
+  { "QRResult", 1200 },
+  { "RNN", 1202 },
+  { "RNNCell", 1204 },
+  { "ReLU", 1206 },
+  { "SVDResult", 1207 },
+  { "SafeTensorsContext", 1208 },
+  { "ScatterReduceMode", 585 },
+  { "Sequential", 1209 },
+  { "Sigmoid", 1211 },
+  { "SparseCOOData", 1212 },
+  { "StateDict", 1213 },
+  { "Tanh", 1215 },
+  { "Tensor", 1217 },
+  { "TensorConfig", 1218 },
+  { "TorchMemoryManager", 1219 },
+  { "TorchPTEExportOptions", 1220 },
+  { "TorchRuntimeKind", 1221 },
+  { "TorchRuntimeModule", 1222 },
+  { "TorchTensorOptions", 764 },
+  { "TransformerDecoder", 1224 },
+  { "TransformerDecoderLayer", 1226 },
+  { "TransformerEncoder", 1228 },
+  { "TransformerEncoderLayer", 1230 },
+  { "Upsample", 1232 },
+  { "UpsampleMode", 567 },
 };
 
 static const struct _cffi_type_context_s _cffi_type_context = {
@@ -25374,12 +26163,12 @@ static const struct _cffi_type_context_s _cffi_type_context = {
   _cffi_struct_unions,
   _cffi_enums,
   _cffi_typenames,
-  519,  /* num_globals */
-  72,  /* num_struct_unions */
-  9,  /* num_enums */
-  83,  /* num_typenames */
+  535,  /* num_globals */
+  78,  /* num_struct_unions */
+  10,  /* num_enums */
+  90,  /* num_typenames */
   NULL,  /* no includes */
-  1198,  /* num_types */
+  1244,  /* num_types */
   0,  /* flags */
 };
 

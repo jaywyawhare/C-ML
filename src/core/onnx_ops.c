@@ -130,6 +130,83 @@ static const float* tensor_floats(Tensor* t, int* count) {
     return (const float*)tensor_data_ptr(t);
 }
 
+/* Read element `i` of an integer-valued operand.
+ *
+ * ONNX passes shapes, axes, indices, pads and slice bounds as INT64 tensors.
+ * Reading those bytes through a float* does not merely lose precision -- the low
+ * four bytes of a small little-endian int64 are a float32 denormal, so 2 reads
+ * back as 2.8e-45, i.e. zero. Every integer operand must go through its own
+ * dtype, which is what this does. */
+static long long operand_int(const Tensor* t, int i) {
+    const void* p = tensor_data_ptr((Tensor*)t);
+    if (!p || i < 0 || (size_t)i >= t->numel)
+        return 0;
+    switch (t->dtype) {
+    case DTYPE_INT64:
+        return (long long)((const int64_t*)p)[i];
+    case DTYPE_UINT64:
+        return (long long)((const uint64_t*)p)[i];
+    case DTYPE_INT32:
+        return (long long)((const int32_t*)p)[i];
+    case DTYPE_UINT32:
+        return (long long)((const uint32_t*)p)[i];
+    case DTYPE_INT16:
+        return (long long)((const int16_t*)p)[i];
+    case DTYPE_UINT16:
+        return (long long)((const uint16_t*)p)[i];
+    case DTYPE_INT8:
+        return (long long)((const int8_t*)p)[i];
+    case DTYPE_UINT8:
+    case DTYPE_BOOL:
+        return (long long)((const uint8_t*)p)[i];
+    case DTYPE_FLOAT64:
+        return (long long)((const double*)p)[i];
+    default:
+        return (long long)((const float*)p)[i];
+    }
+}
+
+/* Realize an integer operand and report its length. NULL-safe: returns false and
+ * leaves *count at 0 when the operand is absent. */
+static bool operand_ints_ready(Tensor* t, int* count) {
+    if (!t)
+        return false;
+    tensor_ensure_executed(t);
+    if (!tensor_data_ptr(t))
+        return false;
+    if (count)
+        *count = (int)t->numel;
+    return true;
+}
+
+/* Numeric value of element `i`, whatever the operand's dtype. Range's
+ * start/limit/delta are float in some models and INT64 in others, so they need
+ * the dtype-aware read too -- read as float, an INT64 delta comes back as a
+ * denormal and the op bails out as if the step were zero. */
+static double operand_num(const Tensor* t, int i) {
+    const void* p = tensor_data_ptr((Tensor*)t);
+    if (!p || i < 0 || (size_t)i >= t->numel)
+        return 0.0;
+    if (t->dtype == DTYPE_FLOAT32)
+        return (double)((const float*)p)[i];
+    if (t->dtype == DTYPE_FLOAT64)
+        return ((const double*)p)[i];
+    return (double)operand_int(t, i);
+}
+
+/* Copy up to `max` elements of an integer operand into `out`, honouring its
+ * dtype. Returns the number written, or -1 when the operand is absent. */
+static int operand_int_list(Tensor* t, int* out, int max) {
+    int n = 0;
+    if (!operand_ints_ready(t, &n))
+        return -1;
+    if (n > max)
+        n = max;
+    for (int i = 0; i < n; i++)
+        out[i] = (int)operand_int(t, i);
+    return n;
+}
+
 static Tensor* op_add(const CMLONNXNode* n, TensorMap* m) {
     return uop_add(inp(n, m, 0), inp(n, m, 1));
 }
@@ -177,17 +254,15 @@ static Tensor* op_reshape(const CMLONNXNode* n, TensorMap* m) {
     if (!x || !shape)
         return NULL;
 
-    tensor_ensure_executed(shape);
-    float* sdata = (float*)tensor_data_ptr(shape);
-    if (!sdata)
+    int new_ndim = 0;
+    if (!operand_ints_ready(shape, &new_ndim))
         return NULL;
 
-    int new_ndim = (int)shape->numel;
     int new_shape[8];
     int inferred_idx = -1;
 
     for (int i = 0; i < new_ndim && i < 8; i++) {
-        new_shape[i] = (int)sdata[i];
+        new_shape[i] = (int)operand_int(shape, i);
         if (new_shape[i] == 0) {
             new_shape[i] = (i < x->ndim) ? x->shape[i] : 1;
         } else if (new_shape[i] == -1) {
@@ -478,13 +553,14 @@ static Tensor* op_squeeze(const CMLONNXNode* n, TensorMap* m) {
     } else {
         Tensor* axes_tensor = inp(n, m, 1);
         if (axes_tensor) {
-            tensor_ensure_executed(axes_tensor);
-            float* ad = (float*)tensor_data_ptr(axes_tensor);
-            int ac    = (int)axes_tensor->numel;
+            int axbuf[8];
+            int ac = operand_int_list(axes_tensor, axbuf, 8);
+            if (ac < 0)
+                ac = 0;
             for (int i = 0; i < x->ndim && new_ndim < 8; i++) {
                 bool squeeze = false;
                 for (int j = 0; j < ac; j++) {
-                    int ax = (int)ad[j];
+                    int ax = axbuf[j];
                     if (ax < 0)
                         ax += x->ndim;
                     if (ax == i && x->shape[i] == 1) {
@@ -526,13 +602,9 @@ static Tensor* op_unsqueeze(const CMLONNXNode* n, TensorMap* m) {
     if (!axes || acount == 0) {
         Tensor* axes_tensor = inp(n, m, 1);
         if (axes_tensor) {
-            tensor_ensure_executed(axes_tensor);
-            float* ad = (float*)tensor_data_ptr(axes_tensor);
-            acount    = (int)axes_tensor->numel;
-            if (acount > 8)
-                acount = 8;
-            for (int i = 0; i < acount; i++)
-                axes_buf[i] = (int)ad[i];
+            acount = operand_int_list(axes_tensor, axes_buf, 8);
+            if (acount < 0)
+                acount = 0;
         }
     } else {
         if (acount > 8)
@@ -635,9 +707,7 @@ static Tensor* op_pad(const CMLONNXNode* n, TensorMap* m) {
     if (!pads_t)
         return x;
 
-    tensor_ensure_executed(pads_t);
-    float* pd = (float*)tensor_data_ptr(pads_t);
-    if (!pd)
+    if (!operand_ints_ready(pads_t, NULL))
         return x;
 
     /* ONNX pads format: [x1_begin, x2_begin, ..., x1_end, x2_end, ...] */
@@ -647,8 +717,8 @@ static Tensor* op_pad(const CMLONNXNode* n, TensorMap* m) {
 
     int pad_widths[16]; /* [before_0, after_0, before_1, after_1, ...] */
     for (int i = 0; i < pad_ndim; i++) {
-        pad_widths[2 * i]     = (int)pd[i];            /* begin */
-        pad_widths[2 * i + 1] = (int)pd[pad_ndim + i]; /* end */
+        pad_widths[2 * i]     = (int)operand_int(pads_t, i);            /* begin */
+        pad_widths[2 * i + 1] = (int)operand_int(pads_t, pad_ndim + i); /* end */
     }
 
     return uop_pad(x, pad_widths, pad_ndim, constant_value);
@@ -667,11 +737,7 @@ static Tensor* op_slice(const CMLONNXNode* n, TensorMap* m) {
     if (!starts_t || !ends_t)
         return x;
 
-    tensor_ensure_executed(starts_t);
-    tensor_ensure_executed(ends_t);
-    float* starts_d = (float*)tensor_data_ptr(starts_t);
-    float* ends_d   = (float*)tensor_data_ptr(ends_t);
-    if (!starts_d || !ends_d)
+    if (!operand_ints_ready(starts_t, NULL) || !operand_ints_ready(ends_t, NULL))
         return x;
 
     int num_slices = (int)starts_t->numel;
@@ -683,27 +749,19 @@ static Tensor* op_slice(const CMLONNXNode* n, TensorMap* m) {
         step[i]  = 1;
     }
 
-    float* axes_d  = NULL;
-    float* steps_d = NULL;
-    if (axes_t) {
-        tensor_ensure_executed(axes_t);
-        axes_d = (float*)tensor_data_ptr(axes_t);
-    }
-    if (steps_t) {
-        tensor_ensure_executed(steps_t);
-        steps_d = (float*)tensor_data_ptr(steps_t);
-    }
+    bool have_axes  = operand_ints_ready(axes_t, NULL);
+    bool have_steps = operand_ints_ready(steps_t, NULL);
 
     for (int i = 0; i < num_slices; i++) {
-        int axis = axes_d ? (int)axes_d[i] : i;
+        int axis = have_axes ? (int)operand_int(axes_t, i) : i;
         if (axis < 0)
             axis += x->ndim;
         if (axis < 0 || axis >= x->ndim)
             continue;
 
-        int s      = (int)starts_d[i];
-        int e      = (int)ends_d[i];
-        int st_val = steps_d ? (int)steps_d[i] : 1;
+        int s      = (int)operand_int(starts_t, i);
+        int e      = (int)operand_int(ends_t, i);
+        int st_val = have_steps ? (int)operand_int(steps_t, i) : 1;
 
         if (s < 0)
             s += x->shape[axis];
@@ -844,9 +902,8 @@ static Tensor* op_expand(const CMLONNXNode* n, TensorMap* m) {
     if (!x || !shape_t)
         return NULL;
 
-    int count       = 0;
-    const float* sd = tensor_floats(shape_t, &count);
-    if (!sd || count < 1 || count > 8)
+    int count = 0;
+    if (!operand_ints_ready(shape_t, &count) || count < 1 || count > 8)
         return NULL;
 
     /* Unidirectional (right-aligned) broadcast: lift the input to the output
@@ -865,7 +922,7 @@ static Tensor* op_expand(const CMLONNXNode* n, TensorMap* m) {
 
     int shape[8];
     for (int i = 0; i < count; i++) {
-        int d = (int)sd[i];
+        int d = (int)operand_int(shape_t, i);
         if (d <= 0)
             d = x->shape[i];
         shape[i] = d > 0 ? d : 1;
@@ -879,15 +936,15 @@ static Tensor* op_tile(const CMLONNXNode* n, TensorMap* m) {
     if (!x || x->ndim > 8)
         return NULL;
 
-    int rcount      = 0;
-    const float* rd = tensor_floats(inp(n, m, 1), &rcount);
-    if (!rd || rcount != x->ndim)
+    int rcount        = 0;
+    Tensor* repeats_t = inp(n, m, 1);
+    if (!operand_ints_ready(repeats_t, &rcount) || rcount != x->ndim)
         return NULL;
 
     int out_shape[8];
     size_t x_strides[8], out_numel = 1;
     for (int i = 0; i < x->ndim; i++) {
-        out_shape[i] = x->shape[i] * (int)rd[i];
+        out_shape[i] = x->shape[i] * (int)operand_int(repeats_t, i);
         out_numel *= (size_t)out_shape[i];
     }
     x_strides[x->ndim - 1] = 1;
@@ -922,13 +979,20 @@ static Tensor* op_tile(const CMLONNXNode* n, TensorMap* m) {
 
 static Tensor* op_range(const CMLONNXNode* n, TensorMap* m) {
     int scount = 0, lcount = 0, dcount = 0;
-    const float* s = tensor_floats(inp(n, m, 0), &scount);
-    const float* l = tensor_floats(inp(n, m, 1), &lcount);
-    const float* d = tensor_floats(inp(n, m, 2), &dcount);
-    if (!s || !l || !d || dcount == 0 || d[0] == 0.0f)
+    Tensor* start_t = inp(n, m, 0);
+    Tensor* limit_t = inp(n, m, 1);
+    Tensor* delta_t = inp(n, m, 2);
+    if (!operand_ints_ready(start_t, &scount) || !operand_ints_ready(limit_t, &lcount) ||
+        !operand_ints_ready(delta_t, &dcount) || scount == 0 || lcount == 0 || dcount == 0)
         return NULL;
 
-    int count = (int)ceilf((l[0] - s[0]) / d[0]);
+    double s0 = operand_num(start_t, 0);
+    double l0 = operand_num(limit_t, 0);
+    double d0 = operand_num(delta_t, 0);
+    if (d0 == 0.0)
+        return NULL;
+
+    int count = (int)ceil((l0 - s0) / d0);
     if (count < 0)
         count = 0;
 
@@ -940,7 +1004,7 @@ static Tensor* op_range(const CMLONNXNode* n, TensorMap* m) {
 
     float* od = (float*)tensor_data_ptr(out);
     for (int i = 0; i < count; i++)
-        od[i] = s[0] + d[0] * (float)i;
+        od[i] = (float)(s0 + d0 * (double)i);
     return out;
 }
 
@@ -952,11 +1016,11 @@ static Tensor* op_cumsum(const CMLONNXNode* n, TensorMap* m) {
     int exclusive = attr_int(n, "exclusive", 0);
     int reverse   = attr_int(n, "reverse", 0);
 
-    int acount      = 0;
-    const float* ad = tensor_floats(inp(n, m, 1), &acount);
-    if (!ad || acount < 1)
+    int acount     = 0;
+    Tensor* axis_t = inp(n, m, 1);
+    if (!operand_ints_ready(axis_t, &acount) || acount < 1)
         return NULL;
-    int axis = (int)ad[0];
+    int axis = (int)operand_int(axis_t, 0);
 
     /* Compose the exclusive/reverse variants from the inclusive scan:
      *   reverse   -> flip, scan, flip back
@@ -1004,8 +1068,9 @@ static Tensor* op_scatter_nd(const CMLONNXNode* n, TensorMap* m) {
     }
 
     const float* dd = (const float*)tensor_data_ptr(data);
-    const float* id = (const float*)tensor_data_ptr(idx);
     const float* ud = (const float*)tensor_data_ptr(upd);
+    if (!dd || !ud || !operand_ints_ready(idx, NULL))
+        return NULL;
 
     float* out = (float*)cml_malloc(sizeof(float) * numel);
     if (!out)
@@ -1015,7 +1080,7 @@ static Tensor* op_scatter_nd(const CMLONNXNode* n, TensorMap* m) {
     for (size_t e = 0; e < outer; e++) {
         size_t base = 0;
         for (int t = 0; t < q; t++) {
-            int ix = (int)id[e * (size_t)q + (size_t)t];
+            int ix = (int)operand_int(idx, (int)(e * (size_t)q + (size_t)t));
             if (ix < 0)
                 ix += data->shape[t]; /* negative indices wrap */
             base += (size_t)ix * d_strides[t];
@@ -1124,15 +1189,16 @@ static Tensor* op_resize(const CMLONNXNode* n, TensorMap* m) {
     }
 
     int zcount = 0, scount = 0;
-    const float* sizes  = tensor_floats(inp(n, m, 3), &zcount);
+    Tensor* sizes_t     = inp(n, m, 3);
+    bool have_sizes     = operand_ints_ready(sizes_t, &zcount);
     const float* scales = tensor_floats(inp(n, m, 2), &scount);
 
     int out_shape[8];
     size_t out_numel = 1;
     for (int i = 0; i < x->ndim; i++) {
         int od;
-        if (sizes && zcount == x->ndim) {
-            od = (int)sizes[i];
+        if (have_sizes && zcount == x->ndim) {
+            od = (int)operand_int(sizes_t, i);
         } else if (scales && scount == x->ndim) {
             od = (int)floorf((float)x->shape[i] * scales[i]);
         } else {
@@ -1210,12 +1276,11 @@ static int reduce_axes(const CMLONNXNode* n, TensorMap* m, int ndim, int* axes) 
     int count      = 0;
     Tensor* axes_t = inp(n, m, 1);
     if (axes_t) {
-        int acount      = 0;
-        const float* ad = tensor_floats(axes_t, &acount);
-        if (!ad)
+        int acount = 0;
+        if (!operand_ints_ready(axes_t, &acount))
             return -1;
         for (int i = 0; i < acount && count < 8; i++)
-            axes[count++] = (int)ad[i];
+            axes[count++] = (int)operand_int(axes_t, i);
     } else {
         int acount        = 0;
         const int64_t* av = attr_ints(n, "axes", &acount);
@@ -1396,11 +1461,11 @@ static Tensor* op_split(const CMLONNXNode* n, TensorMap* m) {
     int num_out                     = n->num_outputs;
     int sizes[CML_ONNX_MAX_OUTPUTS] = {0};
 
-    int scount      = 0;
-    const float* sd = tensor_floats(inp(n, m, 1), &scount);
-    if (sd && scount == num_out) {
+    int scount       = 0;
+    Tensor* splits_t = inp(n, m, 1);
+    if (operand_ints_ready(splits_t, &scount) && scount == num_out) {
         for (int i = 0; i < num_out; i++)
-            sizes[i] = (int)sd[i];
+            sizes[i] = (int)operand_int(splits_t, i);
     } else {
         int chunk     = (x->shape[axis] + num_out - 1) / num_out; /* ceil split */
         int remaining = x->shape[axis];

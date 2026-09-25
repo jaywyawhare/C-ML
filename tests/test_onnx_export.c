@@ -160,11 +160,111 @@ static void test_roundtrip_linear(void) {
     cml_reset_ir_context();
 }
 
+/* Flatten over a partial dim range has no single-op ONNX equivalent (ONNX
+ * Flatten always runs to the last dim), so the exporter lowers it to an explicit
+ * Reshape. It used to fail the export outright. */
+static void test_partial_flatten_lowers_to_reshape(void) {
+    printf("Test: partial-range Flatten exports as Reshape\n");
+
+    const char* path = "/tmp/cml_onnx_flat.onnx";
+
+    /* [2,3,4,5]; flatten dims 1..2 -> [2,12,5], which stops short of the last
+     * dim and so cannot be a plain ONNX Flatten. */
+    int xshape[]     = {2, 3, 4, 5};
+    TensorConfig cfg = {0};
+    static float xd[120];
+    for (int i = 0; i < 120; i++)
+        xd[i] = (float)i * 0.5f;
+    Tensor* X = tensor_from_data(xd, xshape, 4, &cfg);
+    Tensor* F = uop_flatten(X, 1, 2);
+    CHECK("partial flatten built", F != NULL);
+    CHECK("flatten output rank is 3", F && F->ndim == 3);
+    if (F)
+        CHECK("flatten output shape is [2,12,5]",
+              F->shape[0] == 2 && F->shape[1] == 12 && F->shape[2] == 5);
+
+    int rc = cml_onnx_export_graph(F->ir_context, (Tensor*[]){X}, 1, (Tensor*[]){F}, 1, path);
+    CHECK("partial flatten export succeeded", rc == 0);
+
+    size_t flen = 0;
+    char* bytes = read_file(path, &flen);
+    CHECK("model file readable", bytes != NULL);
+    CMLONNXModel* m = bytes ? cml_onnx_load_buffer((const uint8_t*)bytes, flen) : NULL;
+    CHECK("reimport succeeded", m != NULL);
+
+    if (m) {
+        int last = m->graph.num_nodes - 1;
+        CHECK("final op is Reshape",
+              last >= 0 && strcmp(m->graph.nodes[last].op_type, "Reshape") == 0);
+        /* Reshape takes its target shape as a second operand, so the lowering
+         * must have emitted a shape initializer alongside it. */
+        CHECK("shape initializer emitted", m->graph.num_initializers >= 1);
+        CHECK("Reshape has two inputs", last >= 0 && m->graph.nodes[last].num_inputs == 2);
+
+        Tensor* in_t  = tensor_from_data(xd, xshape, 4, &cfg);
+        Tensor* out_t = NULL;
+        int rrc       = cml_onnx_run(m, (Tensor*[]){in_t}, 1, &out_t, 1);
+        CHECK("onnx run succeeded", rrc == 0);
+        if (rrc == 0 && out_t) {
+            CHECK("reshaped shape is [2,12,5]", out_t->ndim == 3 && out_t->shape[0] == 2 &&
+                                                    out_t->shape[1] == 12 && out_t->shape[2] == 5);
+            tensor_ensure_executed(out_t);
+            float* od = (float*)out_t->data;
+            int ok    = od != NULL && out_t->numel == 120;
+            /* A reshape is a relabelling: the values come back in input order. */
+            for (size_t i = 0; ok && i < out_t->numel; i++)
+                ok = APPROX(od[i], xd[i]);
+            CHECK("values preserved through the reshape", ok);
+        }
+    }
+
+    free(bytes);
+    remove(path);
+    cml_reset_ir_context();
+}
+
+/* A flatten that does run to the last dim keeps the cheaper plain Flatten. */
+static void test_full_flatten_stays_flatten(void) {
+    printf("Test: flatten-to-end still exports as Flatten\n");
+
+    const char* path = "/tmp/cml_onnx_flat_full.onnx";
+    int xshape[]     = {2, 3, 4};
+    TensorConfig cfg = {0};
+    static float xd2[24];
+    for (int i = 0; i < 24; i++)
+        xd2[i] = (float)i;
+    /* A materialized leaf, not a fill: exporting a zero-input creation op forces
+     * its execution, and that runs the decompose pass which rewrites FLATTEN to
+     * RESHAPE before the exporter ever sees it. */
+    Tensor* X = tensor_from_data(xd2, xshape, 3, &cfg);
+    Tensor* F = uop_flatten(X, 1, 2); /* -> [2,12]; end_dim IS the last dim */
+    CHECK("full flatten built", F != NULL && F->ndim == 2);
+
+    int rc = cml_onnx_export_graph(F->ir_context, (Tensor*[]){X}, 1, (Tensor*[]){F}, 1, path);
+    CHECK("full flatten export succeeded", rc == 0);
+
+    size_t flen     = 0;
+    char* bytes     = read_file(path, &flen);
+    CMLONNXModel* m = bytes ? cml_onnx_load_buffer((const uint8_t*)bytes, flen) : NULL;
+    CHECK("reimport succeeded", m != NULL);
+    if (m) {
+        int last = m->graph.num_nodes - 1;
+        CHECK("final op is Flatten",
+              last >= 0 && strcmp(m->graph.nodes[last].op_type, "Flatten") == 0);
+    }
+
+    free(bytes);
+    remove(path);
+    cml_reset_ir_context();
+}
+
 int main(void) {
     printf("=== ONNX Export Tests ===\n\n");
 
     test_roundtrip_matmul_add_relu();
     test_roundtrip_linear();
+    test_partial_flatten_lowers_to_reshape();
+    test_full_flatten_stays_flatten();
 
     return TEST_SUMMARY();
 }
