@@ -94,15 +94,122 @@ void module_named_parameters_free(NamedParameter* named_params, int num_params) 
 
 // Binary format for model serialization:
 // - Magic number (4 bytes): "CMLM"
-// - Version (1 byte): 1
+// - Version (1 byte): 2
 // - Number of parameters (4 bytes): int
 // - For each parameter:
 //   - Name length (4 bytes): int
 //   - Name (name_length bytes): char array
 //   - Tensor data (using tensor serialization format)
+// - Number of buffers (4 bytes): int          [version 2+]
+// - For each buffer: same {name_len, name, tensor} layout
+//
+// Version 2 added the buffer section. Buffers are the non-trainable state a
+// layer keeps -- BatchNorm's running_mean/running_var above all -- and v1 saved
+// only parameters, so a trained model reloaded with fresh running stats and
+// eval-mode inference normalized against mean 0 / var 1. Silently wrong
+// predictions from a save/load that reported success. v1 files still load; they
+// simply carry no buffer section.
 
 #define MODEL_MAGIC "CMLM"
-#define MODEL_VERSION 1
+#define MODEL_VERSION 2
+#define MODEL_VERSION_MIN 1
+
+/* Walk the module chain the way DDP's buffer broadcast does (containers flatten
+ * their children through ->next) and name each buffer "<module index>.<name>"
+ * so two layers' running_mean do not collide. */
+int module_named_buffers(Module* module, NamedBuffer** out, int* count) {
+    *out   = NULL;
+    *count = 0;
+
+    int total = 0;
+    for (Module* m = module; m; m = m->next)
+        total += m->num_buffers;
+    if (total == 0)
+        return 0;
+
+    NamedBuffer* nb = cml_calloc((size_t)total, sizeof(NamedBuffer));
+    if (!nb)
+        return -1;
+
+    char name_buf[256];
+    int idx = 0, mi = 0;
+    for (Module* m = module; m; m = m->next, mi++) {
+        for (int i = 0; i < m->num_buffers && idx < total; i++) {
+            if (!m->buffers[i])
+                continue;
+            const char* bn = (m->buffer_names && m->buffer_names[i]) ? m->buffer_names[i] : "buf";
+            snprintf(name_buf, sizeof(name_buf), "%d.%s", mi, bn);
+            nb[idx].name   = cml_strdup(name_buf);
+            nb[idx].tensor = m->buffers[i];
+            idx++;
+        }
+    }
+
+    *out   = nb;
+    *count = idx;
+    return 0;
+}
+
+void module_named_buffers_free(NamedBuffer* nb, int count) {
+    if (!nb)
+        return;
+    for (int i = 0; i < count; i++)
+        cml_free(nb[i].name);
+    cml_free(nb);
+}
+
+/* Write {name_len, name, tensor}; the record layout parameters already use. */
+static int write_named_tensor(FILE* file, const char* name, Tensor* t) {
+    int name_len         = name ? (int)strlen(name) : 0;
+    int32_t name_len_int = (int32_t)name_len;
+    if (fwrite(&name_len_int, sizeof(int32_t), 1, file) != 1)
+        return -1;
+    if (name_len > 0 && fwrite(name, 1, (size_t)name_len, file) != (size_t)name_len)
+        return -1;
+    return tensor_write_stream(t, file);
+}
+
+/* Copy `src` into `dst` in place when shape and dtype agree, crossing devices if
+ * needed. Returns false (having warned) on a mismatch. */
+static bool copy_into_tensor(Tensor* dst, Tensor* src, const char* what) {
+    if (!dst || !src)
+        return false;
+    /* The destination may still be lazy, in which case ->data is NULL and there
+     * is nothing to copy into yet. */
+    tensor_ensure_executed(dst);
+    if (!dst->data)
+        return false;
+    if (dst->ndim != src->ndim || dst->dtype != src->dtype) {
+        LOG_WARNING("Shape or dtype mismatch for %s, skipping", what ? what : "tensor");
+        return false;
+    }
+    for (int d = 0; d < dst->ndim; d++) {
+        if (dst->shape[d] != src->shape[d]) {
+            LOG_WARNING("Shape mismatch for %s, skipping", what ? what : "tensor");
+            return false;
+        }
+    }
+
+    size_t nbytes = dst->numel * cml_dtype_size(dst->dtype);
+    if (src->device == DEVICE_CPU && dst->device == DEVICE_CPU) {
+        memcpy(dst->data, src->data, nbytes);
+        return true;
+    }
+
+    void* cpu = cml_malloc(nbytes);
+    if (!cpu)
+        return false;
+    if (src->device == DEVICE_CPU)
+        memcpy(cpu, src->data, nbytes);
+    else
+        device_copy_from_device(cpu, src->data, nbytes, src->device);
+    if (dst->device == DEVICE_CPU)
+        memcpy(dst->data, cpu, nbytes);
+    else
+        device_copy_to_device(dst->data, cpu, nbytes, dst->device);
+    cml_free(cpu);
+    return true;
+}
 
 int module_save_stream(Module* module, FILE* file) {
     if (!module || !file) {
@@ -172,6 +279,29 @@ int module_save_stream(Module* module, FILE* file) {
     }
 
     module_named_parameters_free(named_params, num_params);
+
+    /* Buffer section (version 2+). */
+    NamedBuffer* buffers = NULL;
+    int num_buffers      = 0;
+    if (module_named_buffers(module, &buffers, &num_buffers) != 0) {
+        LOG_ERROR("Failed to collect module buffers");
+        return -1;
+    }
+
+    int32_t num_buffers_int = (int32_t)num_buffers;
+    if (fwrite(&num_buffers_int, sizeof(int32_t), 1, file) != 1) {
+        LOG_ERROR("Failed to write number of buffers");
+        module_named_buffers_free(buffers, num_buffers);
+        return -1;
+    }
+    for (int i = 0; i < num_buffers; i++) {
+        if (write_named_tensor(file, buffers[i].name, buffers[i].tensor) != 0) {
+            LOG_ERROR("Failed to write buffer %d", i);
+            module_named_buffers_free(buffers, num_buffers);
+            return -1;
+        }
+    }
+    module_named_buffers_free(buffers, num_buffers);
     return 0;
 }
 
@@ -217,8 +347,9 @@ int module_load_stream(Module* module, FILE* file) {
         return -1;
     }
 
-    if (version != MODEL_VERSION) {
-        LOG_ERROR("Unsupported version: %d (expected %d)", version, MODEL_VERSION);
+    if (version < MODEL_VERSION_MIN || version > MODEL_VERSION) {
+        LOG_ERROR("Unsupported version: %d (supported %d..%d)", version, MODEL_VERSION_MIN,
+                  MODEL_VERSION);
         return -1;
     }
     int32_t num_params_int;
@@ -331,7 +462,75 @@ int module_load_stream(Module* module, FILE* file) {
     }
 
     module_named_parameters_free(module_params, module_num_params);
-    return 0;
+
+    /* Buffer section: absent in version 1 files, which simply carry none. */
+    if (version < 2)
+        return 0;
+
+    int32_t num_buffers_int = 0;
+    if (fread(&num_buffers_int, sizeof(int32_t), 1, file) != 1) {
+        LOG_ERROR("Failed to read number of buffers");
+        return -1;
+    }
+
+    NamedBuffer* module_buffers = NULL;
+    int module_num_buffers      = 0;
+    if (module_named_buffers(module, &module_buffers, &module_num_buffers) != 0)
+        return -1;
+
+    int rc = 0;
+    for (int i = 0; i < (int)num_buffers_int; i++) {
+        int32_t name_len_int = 0;
+        if (fread(&name_len_int, sizeof(int32_t), 1, file) != 1) {
+            LOG_ERROR("Failed to read name length for buffer %d", i);
+            rc = -1;
+            break;
+        }
+        char* name   = NULL;
+        int name_len = (int)name_len_int;
+        if (name_len > 0) {
+            name = cml_malloc((size_t)name_len + 1);
+            if (!name) {
+                rc = -1;
+                break;
+            }
+            if (fread(name, 1, (size_t)name_len, file) != (size_t)name_len) {
+                LOG_ERROR("Failed to read name for buffer %d", i);
+                cml_free(name);
+                rc = -1;
+                break;
+            }
+            name[name_len] = '\0';
+        }
+
+        Tensor* loaded = tensor_read_stream(file);
+        if (!loaded) {
+            LOG_ERROR("Failed to read tensor for buffer %d", i);
+            cml_free(name);
+            rc = -1;
+            break;
+        }
+
+        Tensor* target = NULL;
+        if (name) {
+            for (int j = 0; j < module_num_buffers; j++)
+                if (module_buffers[j].name && strcmp(module_buffers[j].name, name) == 0) {
+                    target = module_buffers[j].tensor;
+                    break;
+                }
+        } else if (i < module_num_buffers) {
+            target = module_buffers[i].tensor;
+        }
+
+        if (target)
+            copy_into_tensor(target, loaded, name);
+
+        cml_free(name);
+        tensor_free(loaded);
+    }
+
+    module_named_buffers_free(module_buffers, module_num_buffers);
+    return rc;
 }
 
 int module_load(Module* module, const char* filepath) {

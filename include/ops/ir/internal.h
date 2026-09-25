@@ -173,6 +173,17 @@ void cml_ir_scope_pop(void);
 const char* cml_ir_scope_current(void);
 bool cml_ir_scope_enabled(void);
 
+/* Axis-wise lane decomposition: element (o,j,i) of `t` around `dim` lives at
+ * (o*count + j)*inner + i. */
+void cml_lanes_of(const Tensor* t, int dim, size_t* outer, size_t* count, size_t* inner);
+
+/* The permutation the SORT/TOPK forward uses for one lane: `ord[0..k)` holds the
+ * source positions in output order. Exposed so the backward scatters through the
+ * *same* ordering the forward produced rather than a second implementation of
+ * it (tie-breaking included). */
+void cml_lane_order(const void* src, DType dt, size_t base, size_t inner, size_t cnt, size_t k,
+                    bool desc, size_t* ord);
+
 const char* uop_type_to_string(UOpType type);
 void free_fused_kernel(FusedKernel* kernel);
 int cpu_execute_node(struct IRNode* node);

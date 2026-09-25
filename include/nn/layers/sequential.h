@@ -44,8 +44,7 @@ typedef struct CachedModelGraph {
     /* Reusable output tensor — avoids malloc per forward pass */
     Tensor* reuse_output; // Allocated once, data overwritten each pass
 
-    bool valid;             // Is cache valid?
-    bool buffers_populated; // Have plan buffers been filled at least once?
+    bool valid; // Is cache valid?
 } CachedModelGraph;
 
 struct SequentialFastPath;

@@ -280,7 +280,123 @@ re-investigated:
   one byte per element. Reading that payload as `float32` yields denormals, not
   0/1 — the same trap as the INT64 operands in §6.
 
-## 8. Deliberately still open (engine-scale or hardware-gated)
+## 8. Closed in the fourth pass
+
+The theme this round: the *eager* autodiff engine had gradient rules the graph
+engine already had, and nothing ran the gradient suites under it, so the gaps were
+invisible. Forcing `GRAD_MODE=eager` on `tests/test_autodiff_ops.c` failed 8 of
+its 50 cases while the default run was green.
+
+- **Eager VJPs that graph mode already had** (`src/ops/ir/backward.c`):
+  - `DIAGONAL` was grouped with the non-differentiable ops. Its VJP just scatters
+    the output gradient back onto the diagonal, and `autodiff.c` had that rule —
+    so the same model trained under graph mode and silently didn't under eager.
+  - `FLOOR` had no case at all (it fell through to `default`), and `CEIL`,
+    `ROUND`, `SIGN`, `TRUNC`, the comparisons and the boolean reducers returned
+    *nothing* where the rule is to return a *zero*. Leaving the input's grad NULL
+    breaks the chain, so every parameter upstream of a `floor()` stopped training.
+    They now call `ensure_grad`, which terminates the chain with zeros.
+  - `SORT` and `TOPK` are permutations (TOPK also drops), so their VJP sends each
+    output gradient back where it came from. The node stores only
+    (dim, descending), but sorting is deterministic: the backward now recomputes
+    the ordering with the forward's own helper, so ties resolve identically.
+    `lanes_of`/`lane_order` were made non-static (`cml_lanes_of`/`cml_lane_order`)
+    for exactly that reason — a second implementation of the comparator would be
+    free to disagree with the first.
+  - `GATHER` read its index operand through a `float*`. Indices are usually
+    INT32/INT64, and a small int read as float32 is a denormal ≈ 0, so every
+    gather collapsed onto row 0 and embedding gradients landed on the wrong rows.
+    Now routed through `tensor_get_float`, which dispatches on dtype. (Same class
+    of bug as the ONNX operands in §6 — worth grepping for as a pattern.)
+
+  `SPLIT`, `CHUNK`, `MESHGRID` and `MASKED_SELECT` stay ungradiented in both
+  engines: they are differentiable, but need state a single-output backward walk
+  does not carry (the mask, or one gradient per output). The comment now separates
+  those from `IDIV`/`MOD`, which are genuinely non-differentiable.
+
+- **Module buffers were dropped by BOTH serialization formats**
+  (`src/core/serialization.c`, `src/core/safetensors.c`). Neither walked
+  `num_buffers`, so a trained BatchNorm saved and reloaded came back with
+  running_mean 0 / running_var 1 and eval-mode inference normalized against the
+  *fresh* module's statistics — wrong predictions from a save/load that reported
+  success. The native format gained a version-2 buffer section (version 1 files
+  still load, they simply carry none); safetensors writes them as extra named
+  tensors under a `buffers.` prefix, so older files just lack the keys.
+  `copy_into_tensor` also now realizes the destination first — a lazy target has
+  `data == NULL`, which silently skipped the copy. Tests for both formats in
+  `test_serialization.c`.
+
+- **BatchNorm `momentum` was inverted** (`src/nn/layers/norm.c`). The update put
+  the weight on the *old* value, so the documented "typical: 0.1" behaved like
+  PyTorch's 0.9 and the running stats tracked little more than the last batch.
+  Now `running = (1 - momentum) * running + momentum * batch`, matching the docs
+  and every framework a model would be ported from.
+
+- **Negative reduction axes silently reduced everything**
+  (`src/autograd/forward_ops.c`). The guard `dim < a->ndim ? dim : -1` tested only
+  the upper bound, so any negative axis fell through to `-1`, which downstream is
+  the sentinel for reduce-all: `sum(x, -2)` on a `[2,3]` tensor returned a scalar
+  instead of reducing axis 0. Negative axes now count from the end. `-1` itself
+  stays reduce-all — `zoo/clip.c` and `torch/pte.c` use it that way — and the
+  header now says so, because it differs from PyTorch and the surprise should at
+  least be written down.
+
+- **`cml_quantize_uint8` silently clamped half its range**
+  (`src/core/quantization.c`). `cml_quantize_compute_params(t, false)` bakes in the
+  *int8* convention (zero-point offset by -128), and passing that to the uint8
+  quantizer — the natural pairing of two public functions — pushed the bottom half
+  of the range to 0. Added `cml_quantize_compute_params_uint8()` as the correct
+  constructor, and `cml_quantize_uint8` now rejects a zero-point outside [0,255]
+  instead of producing quietly wrong output.
+
+- **ConvTranspose could not round-trip** (`src/core/onnx_export.c`,
+  `src/core/onnx_ops.c`). The exporter mapped it to an ONNX op name but emitted
+  **no attributes at all**, so a loader fell back to defaults and computed
+  something else; the importer had no handler either. Both sides now carry
+  kernel_shape/strides/dilations/pads/output_padding, and grouped or
+  asymmetrically-padded variants are refused rather than approximated.
+
+- **Two more dead knobs removed**: `Module.buffers_populated`
+  (`include/nn/layers/sequential.h`) was declared and referenced nowhere; and
+  `python/cml/functional.py`'s `LearningRateScheduler` silently did nothing for
+  any schedule name other than `"step"`/`"exponential"` — it now raises and points
+  at the richer C-backed schedulers in `cml.optim`.
+
+### Open: the eager autodiff engine is nondeterministic
+
+Found while fixing the above, and **not** caused by it. Under
+`GRAD_MODE=eager`, `test_autodiff_ops` returns a different score run to run:
+
+```
+graph (default):  50/50  50/50  50/50  50/50  50/50
+eager:            37/50  50/50  50/50  50/50  37/50  37/50 ...
+```
+
+It predates this pass (41/50 and 28/50 alternating before the VJP fixes above —
+those fixes raised the ceiling to 50/50 but did not touch the instability). What
+is known:
+
+- The failing set is always the same contiguous block of 13 composite unary ops
+  (`acos`, `atan`, `asinh`, `acosh`, `atanh`, `erf`, `sinh`, `cosh`, `log2`,
+  `log10`, `exp2`, `hard_sigmoid`, `hard_tanh`, `relu6`), always at element
+  `i == 2`.
+- Both halves of the check go wrong together: the finite difference comes back
+  `0.0000` and the analytic gradient is astronomically large and *different every
+  run* — the signature of reading uninitialized heap.
+- Each op is correct in isolation: a standalone eager `atan` gradient matches
+  `1/(1+x²)` exactly, every time. So it is cross-test state, not the rule.
+- **ASAN and LSAN are clean**, which rules out an out-of-bounds or use-after-free
+  and points at an uninitialized-but-owned buffer (MSAN territory).
+- `CACHELEVEL=0` does not change it, so the on-disk kernel cache is not involved.
+
+Because of this the gradient suites are **not** gated under `GRAD_MODE=eager` in
+CMakeLists — a flaky gate is worse than none. Reproduce with:
+
+```bash
+for i in $(seq 8); do GRAD_MODE=eager ./build/bin/test_autodiff_ops | tail -1; done
+```
+
+## 9. Deliberately still open (engine-scale or hardware-gated)
 
 These are honest, loudly-failing stubs / fallbacks rather than silent fakes.
 Each is a cross-cutting engine change with real correctness risk, or needs
@@ -309,7 +425,8 @@ fallback:
 cmake -S . -B build && make -C build -j$(nproc) && (cd build && ctest --output-on-failure)
 ```
 
-All 199 ctest suites pass (174 unit suites + 25 example smoke tests).
+All 199 ctest suites pass (174 unit suites + 25 example smoke tests), plus
+78 Python tests.
 
 The Python bindings are a separate build (CI runs both):
 

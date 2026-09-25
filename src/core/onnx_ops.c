@@ -585,6 +585,80 @@ static bool pool_params_from_node(const CMLONNXNode* n, const Tensor* x, Pool2DP
     return true;
 }
 
+/* ConvTranspose: the exporter emits it, so the importer has to read it back.
+ * ConvTranspose2DParams carries one pad per axis, so asymmetric `pads` and the
+ * odd-split SAME cases are refused rather than approximated -- same rule as Conv
+ * and the pooling ops. */
+static Tensor* op_conv_transpose(const CMLONNXNode* n, TensorMap* m) {
+    Tensor* x = inp(n, m, 0);
+    Tensor* w = inp(n, m, 1);
+    Tensor* b = inp(n, m, 2); /* optional */
+    if (!x || !w)
+        return NULL;
+    if (x->ndim != 4 || w->ndim != 4) {
+        LOG_ERROR("onnx_ops: ConvTranspose expects 4-D input and weight");
+        return NULL;
+    }
+
+    ConvTranspose2DParams p;
+    memset(&p, 0, sizeof(p));
+    /* Weight layout is [IC, OC/groups, kH, kW]. */
+    p.kernel_size[0] = w->shape[2];
+    p.kernel_size[1] = w->shape[3];
+    p.stride[0] = p.stride[1] = 1;
+    p.dilation[0] = p.dilation[1] = 1;
+    p.use_bias                    = (b != NULL);
+
+    int kc = 0, sc = 0, dc = 0, pc = 0, oc = 0;
+    const int64_t* kernel_shape = attr_ints(n, "kernel_shape", &kc);
+    const int64_t* strides      = attr_ints(n, "strides", &sc);
+    const int64_t* dilations    = attr_ints(n, "dilations", &dc);
+    const int64_t* pads         = attr_ints(n, "pads", &pc);
+    const int64_t* out_pads     = attr_ints(n, "output_padding", &oc);
+
+    if (kernel_shape && kc >= 2) {
+        p.kernel_size[0] = (int)kernel_shape[0];
+        p.kernel_size[1] = (int)kernel_shape[1];
+    }
+    if (strides && sc >= 2) {
+        p.stride[0] = (int)strides[0];
+        p.stride[1] = (int)strides[1];
+    }
+    if (dilations && dc >= 2) {
+        p.dilation[0] = (int)dilations[0];
+        p.dilation[1] = (int)dilations[1];
+    }
+    if (out_pads && oc >= 2) {
+        p.output_padding[0] = (int)out_pads[0];
+        p.output_padding[1] = (int)out_pads[1];
+    }
+
+    char auto_pad[32] = {0};
+    if (attr_string(n, "auto_pad", auto_pad, sizeof(auto_pad)) && strcmp(auto_pad, "NOTSET") != 0 &&
+        strcmp(auto_pad, "VALID") != 0) {
+        LOG_ERROR("onnx_ops: ConvTranspose auto_pad '%s' not supported by importer", auto_pad);
+        return NULL;
+    }
+    if (pads && pc >= 4) {
+        if (pads[0] != pads[2] || pads[1] != pads[3]) {
+            LOG_ERROR("onnx_ops: ConvTranspose asymmetric pads cannot be expressed");
+            return NULL;
+        }
+        p.padding[0] = (int)pads[0];
+        p.padding[1] = (int)pads[1];
+    } else if (pads && pc >= 2) {
+        p.padding[0] = (int)pads[0];
+        p.padding[1] = (int)pads[1];
+    }
+
+    if (attr_int(n, "group", 1) != 1) {
+        LOG_ERROR("onnx_ops: grouped ConvTranspose not supported by importer");
+        return NULL;
+    }
+
+    return uop_conv_transpose2d(x, w, b, &p);
+}
+
 static Tensor* op_sin(const CMLONNXNode* n, TensorMap* m) { return uop_sin(inp(n, m, 0)); }
 
 static Tensor* op_cos(const CMLONNXNode* n, TensorMap* m) { return uop_cos(inp(n, m, 0)); }
@@ -1782,6 +1856,7 @@ static const OnnxOpEntry g_op_table[] = {
     {"LessOrEqual", op_less_equal},
     {"GreaterOrEqual", op_greater_equal},
     {"HardSigmoid", op_hard_sigmoid},
+    {"ConvTranspose", op_conv_transpose},
 };
 
 #define NUM_SUPPORTED_OPS ((int)(sizeof(g_op_table) / sizeof(g_op_table[0])))

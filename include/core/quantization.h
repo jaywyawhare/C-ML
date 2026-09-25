@@ -18,7 +18,19 @@ typedef struct QuantParams {
     int32_t zero_point; // Zero point offset
 } QuantParams;
 
+/* Scale/zero-point for the SIGNED int8 grid: asymmetric zero-points land in
+ * [-128, 127]. Pair it with cml_quantize_int8.
+ *
+ * Do NOT feed the asymmetric result to cml_quantize_uint8 -- that function's
+ * grid is [0, 255], and an int8 zero-point shifts the whole range down by 128,
+ * clamping the bottom half to 0. Use cml_quantize_compute_params_uint8 for that
+ * path; cml_quantize_uint8 now rejects a negative zero-point rather than
+ * silently clamping. */
 QuantParams cml_quantize_compute_params(Tensor* tensor, bool symmetric);
+
+/* Scale/zero-point for the UNSIGNED uint8 grid: zero-point in [0, 255]. This is
+ * what cml_quantize_uint8 computes internally when passed NULL params. */
+QuantParams cml_quantize_compute_params_uint8(Tensor* tensor);
 Tensor* cml_quantize_int8(Tensor* tensor, const QuantParams* params, QuantParams* out_params);
 Tensor* cml_dequantize_int8(Tensor* tensor, const QuantParams* params);
 Tensor* cml_quantize_uint8(Tensor* tensor, const QuantParams* params, QuantParams* out_params);

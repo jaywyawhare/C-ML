@@ -146,6 +146,74 @@ static int test_checkpoint_save_load(void) {
     return ok;
 }
 
+/* Non-trainable module state has to survive a save/load, and neither format used
+ * to carry it: both walked parameters only, so a trained BatchNorm reloaded with
+ * running_mean 0 / running_var 1 and eval-mode inference silently normalized
+ * against the fresh module's stats. Both calls reported success.
+ *
+ * `safetensors` selects the format so the two paths share one body. */
+static int buffers_round_trip(bool safetensors) {
+    const char* path   = safetensors ? "/tmp/cml_test_buffers.st" : "/tmp/cml_test_buffers.bin";
+    const float marker = 7.0f;
+
+    BatchNorm1d* src = cml_nn_batchnorm1d(4, 1e-5f, 0.1f, true, true, DTYPE_FLOAT32, DEVICE_CPU);
+    if (!src)
+        return 0;
+    Module* sm = (Module*)src;
+    if (sm->num_buffers < 2) {
+        printf("(expected >=2 buffers, got %d) ", sm->num_buffers);
+        module_free(sm);
+        return 0;
+    }
+
+    /* Stamp every buffer with a value neither default init produces. */
+    for (int i = 0; i < sm->num_buffers; i++) {
+        if (tensor_ensure_executed(sm->buffers[i]) != 0) {
+            module_free(sm);
+            return 0;
+        }
+        float* d = (float*)tensor_data_ptr(sm->buffers[i]);
+        for (size_t j = 0; j < sm->buffers[i]->numel; j++)
+            d[j] = marker;
+    }
+
+    int saved = safetensors ? module_save_safetensors(sm, path) : module_save(sm, path);
+
+    BatchNorm1d* dst = cml_nn_batchnorm1d(4, 1e-5f, 0.1f, true, true, DTYPE_FLOAT32, DEVICE_CPU);
+    if (!dst) {
+        module_free(sm);
+        return 0;
+    }
+    Module* dm = (Module*)dst;
+    int loaded = safetensors ? module_load_safetensors(dm, path) : module_load(dm, path);
+
+    int ok = (saved == 0 && loaded == 0 && dm->num_buffers == sm->num_buffers);
+    for (int i = 0; i < dm->num_buffers && ok; i++) {
+        if (tensor_ensure_executed(dm->buffers[i]) != 0) {
+            ok = 0;
+            break;
+        }
+        const float* d = (const float*)tensor_data_ptr(dm->buffers[i]);
+        if (!d) {
+            ok = 0;
+            break;
+        }
+        for (size_t j = 0; j < dm->buffers[i]->numel && ok; j++)
+            if (!APPROX_EQ(d[j], marker)) {
+                printf("(buffer %d elem %zu: %g, want %g) ", i, j, (double)d[j], (double)marker);
+                ok = 0;
+            }
+    }
+
+    module_free(sm);
+    module_free(dm);
+    unlink(path);
+    return ok;
+}
+
+static int test_buffers_survive_native_round_trip(void) { return buffers_round_trip(false); }
+static int test_buffers_survive_safetensors_round_trip(void) { return buffers_round_trip(true); }
+
 static int test_save_null(void) {
     int ret = model_save(NULL, "/tmp/test.bin");
     return (ret != 0);
@@ -177,6 +245,8 @@ int main(void) {
     printf("Model I/O:\n");
     TEST(model_save_load);
     TEST(checkpoint_save_load);
+    TEST(buffers_survive_native_round_trip);
+    TEST(buffers_survive_safetensors_round_trip);
 
     printf("\nError Handling:\n");
     TEST(save_null);

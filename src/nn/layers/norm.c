@@ -100,11 +100,20 @@ static int batchnorm_update_stats(BatchNormState* bn, Tensor* input, int batch, 
         float* running_mean = (float*)tensor_data_ptr(bn->running_mean);
         float* running_var  = (float*)tensor_data_ptr(bn->running_var);
         if (running_mean && running_var) {
+            /* momentum weights the NEW batch statistic, the convention the
+             * documented "typical: 0.1" comes from (and the one PyTorch uses):
+             *
+             *     running = (1 - momentum) * running + momentum * batch
+             *
+             * The weights used to be the other way round, so momentum=0.1 put
+             * 0.9 on the incoming batch and the running stats tracked little
+             * more than the last batch seen -- the opposite of the intended
+             * smoothing, and wrong for any model ported from PyTorch. */
             for (int c = 0; c < channels; c++) {
                 running_mean[c] =
-                    bn->momentum * running_mean[c] + (1.0f - bn->momentum) * current_mean_data[c];
+                    (1.0f - bn->momentum) * running_mean[c] + bn->momentum * current_mean_data[c];
                 running_var[c] =
-                    bn->momentum * running_var[c] + (1.0f - bn->momentum) * current_var_data[c];
+                    (1.0f - bn->momentum) * running_var[c] + bn->momentum * current_var_data[c];
             }
         }
     }

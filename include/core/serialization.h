@@ -33,6 +33,17 @@ typedef struct NamedParameter {
 int module_named_parameters(Module* module, NamedParameter** named_params, int* num_params);
 void module_named_parameters_free(NamedParameter* named_params, int num_params);
 
+/* Non-trainable module state (BatchNorm running stats and friends), named
+ * "<module index>.<buffer name>". Saving only parameters silently reset these on
+ * load, so eval-mode inference normalized against a freshly-initialized module. */
+typedef struct NamedBuffer {
+    char* name;
+    Tensor* tensor;
+} NamedBuffer;
+
+int module_named_buffers(Module* module, NamedBuffer** out, int* count);
+void module_named_buffers_free(NamedBuffer* nb, int count);
+
 #ifdef __cplusplus
 }
 #endif

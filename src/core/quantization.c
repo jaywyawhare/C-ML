@@ -424,6 +424,30 @@ int cml_qmatmul_nf4(const float* x, const uint8_t* w_packed, const float* scales
     return 0;
 }
 
+QuantParams cml_quantize_compute_params_uint8(Tensor* tensor) {
+    QuantParams qp = {.scale = 1.0f, .zero_point = 0};
+    if (!tensor)
+        return qp;
+    tensor_ensure_executed(tensor);
+    if (!tensor->data)
+        return qp;
+
+    float min_val = FLT_MAX, max_val = -FLT_MAX;
+    for (size_t i = 0; i < tensor->numel; i++) {
+        float v = tensor_get_float(tensor, i);
+        if (v < min_val)
+            min_val = v;
+        if (v > max_val)
+            max_val = v;
+    }
+
+    qp.scale = (max_val - min_val) / 255.0f;
+    if (qp.scale < 1e-10f)
+        qp.scale = 1e-10f;
+    qp.zero_point = (int32_t)roundf(-min_val / qp.scale);
+    return qp;
+}
+
 Tensor* cml_quantize_uint8(Tensor* tensor, const QuantParams* params, QuantParams* out_params) {
     if (!tensor) {
         LOG_ERROR("cml_quantize_uint8: NULL tensor");
@@ -439,21 +463,19 @@ Tensor* cml_quantize_uint8(Tensor* tensor, const QuantParams* params, QuantParam
     QuantParams qp;
     if (params) {
         qp = *params;
-    } else {
-        qp            = cml_quantize_compute_params(tensor, false);
-        float min_val = FLT_MAX;
-        float max_val = -FLT_MAX;
-        for (size_t i = 0; i < tensor->numel; i++) {
-            float v = tensor_get_float(tensor, i);
-            if (v < min_val)
-                min_val = v;
-            if (v > max_val)
-                max_val = v;
+        /* A uint8 grid is [0, 255], so its zero-point cannot be negative. The
+         * natural-looking pairing of cml_quantize_compute_params(t, false) with
+         * this function used to land here with an int8 zero-point (offset by
+         * -128) and silently clamp the bottom half of the range to 0. Fail
+         * instead, and point at the right constructor. */
+        if (qp.zero_point < 0 || qp.zero_point > 255) {
+            LOG_ERROR("cml_quantize_uint8: zero_point %d is outside the uint8 grid [0,255]; "
+                      "these look like int8 params -- use cml_quantize_compute_params_uint8()",
+                      qp.zero_point);
+            return NULL;
         }
-        qp.scale = (max_val - min_val) / 255.0f;
-        if (qp.scale < 1e-10f)
-            qp.scale = 1e-10f;
-        qp.zero_point = (int32_t)roundf(-min_val / qp.scale);
+    } else {
+        qp = cml_quantize_compute_params_uint8(tensor);
     }
 
     if (out_params)

@@ -1503,8 +1503,12 @@ static int cpu_backward_node(struct IRNode* node) {
                 indices_t->data) {
                 Tensor* g1 = ensure_grad(input_t);
                 if (g1 && g1->data) {
-                    float* g1_data       = (float*)g1->data;
-                    float* idx_data      = (float*)indices_t->data;
+                    float* g1_data = (float*)g1->data;
+                    /* Indices are commonly INT32/INT64. Reading that payload
+                     * through a float* makes a small int a denormal (~0), so
+                     * every gathered row collapsed to 0 and the embedding
+                     * gradient went to the wrong rows. tensor_get_float
+                     * dispatches on the operand's own dtype. */
                     GatherParams* params = (GatherParams*)node->params;
                     int dim              = params ? params->dim : -1;
                     if (dim < 0)
@@ -1514,7 +1518,7 @@ static int cpu_backward_node(struct IRNode* node) {
                         size_t n_cols = (size_t)input_t->shape[1];
                         size_t n_rows = (size_t)indices_t->numel;
                         for (size_t i = 0; i < n_rows && i < out_numel; i++) {
-                            int idx = (int)idx_data[i];
+                            int idx = (int)tensor_get_float(indices_t, i);
                             if (idx >= 0 && idx < (int)n_cols) {
                                 g1_data[i * n_cols + (size_t)idx] += out_grad[i];
                             }
@@ -1525,7 +1529,7 @@ static int cpu_backward_node(struct IRNode* node) {
                         size_t D = (size_t)input_t->shape[1];
                         size_t N = (size_t)indices_t->numel;
                         for (size_t i = 0; i < N; i++) {
-                            int row = (int)idx_data[i];
+                            int row = (int)tensor_get_float(indices_t, i);
                             if (row >= 0 && row < (int)V) {
                                 for (size_t d = 0; d < D; d++) {
                                     g1_data[row * D + d] += out_grad[i * D + d];
@@ -1558,7 +1562,7 @@ static int cpu_backward_node(struct IRNode* node) {
                                     for (size_t iv = 0; iv < inner; iv++, flat++) {
                                         if (flat >= idx_numel)
                                             goto gather_ndim_done;
-                                        int idx_val = (int)idx_data[flat];
+                                        int idx_val = (int)tensor_get_float(indices_t, flat);
                                         if (idx_val < 0 || idx_val >= input_t->shape[dim])
                                             continue;
                                         size_t in_flat =
@@ -2431,16 +2435,111 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
+    /* DIAGONAL reads a diagonal out of a plane, so its VJP just scatters the
+     * output gradient back onto those positions. The graph engine already had
+     * this rule (autodiff.c), so without it here the same model produced
+     * gradients under GRAD_MODE=graph and silently none under eager. Limited to
+     * the 2-D plane, matching the graph rule; an n-D DIAGONAL (dim1/dim2 other
+     * than 0/1) still falls through below. */
+    case UOP_DIAGONAL: {
+        DiagParams* dp = (DiagParams*)node->params;
+        int off        = dp ? dp->offset : 0;
+        int d1         = dp ? dp->dim1 : 0;
+        int d2         = dp ? dp->dim2 : 1;
+        if (!in1 || !in1->requires_grad || in1->ndim != 2 || d1 != 0 || d2 != 1)
+            break;
+
+        Tensor* g1 = ensure_grad(in1);
+        if (!g1 || !g1->data)
+            break;
+
+        float* g1d = (float*)g1->data;
+        int rows = in1->shape[0], cols = in1->shape[1];
+        /* Element i of the output is x[r0 + i][c0 + i]. */
+        int r0 = off < 0 ? -off : 0;
+        int c0 = off > 0 ? off : 0;
+        for (size_t i = 0; i < out->numel; i++) {
+            int r = r0 + (int)i, c = c0 + (int)i;
+            if (r >= rows || c >= cols)
+                break;
+            g1d[(size_t)r * (size_t)cols + (size_t)c] += out_grad[i];
+        }
+        break;
+    }
+
+    /* SORT and TOPK only permute (and TOPK drops) values, so the VJP sends each
+     * output gradient back to the position it came from. The node stores just
+     * (dim, descending/largest), not the permutation -- but sorting is
+     * deterministic, so recomputing it with the forward's own helper reproduces
+     * exactly the ordering the forward used, ties included. The graph engine
+     * does the same thing via uop_argsort + uop_scatter_add. */
+    case UOP_SORT:
+    case UOP_TOPK: {
+        if (!in1 || !in1->requires_grad || !in1->data || in1->ndim < 1)
+            break;
+
+        int dim   = 0;
+        bool desc = false;
+        size_t k  = 0;
+        if (node->type == UOP_SORT) {
+            SortParams* sp = (SortParams*)node->params;
+            dim            = sp ? sp->dim : in1->ndim - 1;
+            desc           = sp ? sp->descending : false;
+        } else {
+            TopkParams* tp = (TopkParams*)node->params;
+            dim            = tp ? tp->dim : in1->ndim - 1;
+            desc           = tp ? tp->largest : true;
+            k              = tp ? (size_t)tp->k : 0;
+        }
+        if (dim < 0)
+            dim += in1->ndim;
+        if (dim < 0 || dim >= in1->ndim)
+            break;
+
+        Tensor* g1 = ensure_grad(in1);
+        if (!g1 || !g1->data)
+            break;
+
+        size_t outer, cnt, inner;
+        cml_lanes_of(in1, dim, &outer, &cnt, &inner);
+        if (node->type == UOP_SORT || k == 0 || k > cnt)
+            k = cnt;
+
+        size_t* ord = (size_t*)cml_malloc(cnt * sizeof(size_t));
+        if (!ord)
+            break;
+
+        float* g1d = (float*)g1->data;
+        for (size_t o = 0; o < outer; o++)
+            for (size_t m = 0; m < inner; m++) {
+                size_t base = o * cnt * inner + m;
+                cml_lane_order(in1->data, in1->dtype, base, inner, cnt, k, desc, ord);
+                for (size_t i = 0; i < k; i++) {
+                    size_t oi = (o * k + i) * inner + m;
+                    if (oi >= out_numel)
+                        continue;
+                    g1d[base + ord[i] * inner] += out_grad[oi];
+                }
+            }
+        cml_free(ord);
+        break;
+    }
+
     case UOP_IDIV:
     case UOP_MOD:
-    case UOP_SORT:
-    case UOP_TOPK:
     case UOP_MASKED_SELECT:
     case UOP_SPLIT:
     case UOP_CHUNK:
     case UOP_MESHGRID:
-    case UOP_DIAGONAL:
-        // Non-differentiable or complex-gradient ops - no gradient
+        /* Two different reasons, deliberately grouped because both yield no
+         * gradient here:
+         *   - IDIV and MOD are genuinely non-differentiable.
+         *   - MASKED_SELECT, SPLIT, CHUNK and MESHGRID *are* differentiable, but
+         *     each needs state this single-output backward walk does not carry:
+         *     the mask, or one gradient per output. The graph engine has no rule
+         *     for them either, so the two engines agree.
+         * Either way CML_STRICT_GRAD=1 turns the silent zero into a loud error;
+         * see the policy note in autodiff.c. */
         break;
 
         /* ── AVGPOOL2D: distribute grad uniformly over window ───── */
@@ -3241,7 +3340,13 @@ static int cpu_backward_node(struct IRNode* node) {
     }
 
     case UOP_SIGN:
-        // sign(x) is piecewise constant — gradient is 0 everywhere (STE: pass zero)
+        /* sign(x) is piecewise constant, so the derivative is 0 almost
+         * everywhere. Materialise that zero rather than returning nothing:
+         * leaving in1->grad NULL breaks the chain, and every parameter upstream
+         * of a sign() then silently stops training. The graph engine emits an
+         * explicit zero here for the same reason (autodiff.c). */
+        if (in1 && in1->requires_grad)
+            ensure_grad(in1);
         break;
 
     case UOP_COPYSIGN:
@@ -3424,8 +3529,12 @@ static int cpu_backward_node(struct IRNode* node) {
     }
 
     /* zero gradient: piecewise-constant and boolean-producing ops. The
-     * derivative is 0 almost everywhere, so an explicit no-op is the correct
-     * rule (matching what FLOOR/CEIL/ROUND already do above). */
+     * derivative is 0 almost everywhere, so the rule is to write a zero -- not
+     * to write nothing. Leaving the input's grad NULL breaks the chain, and
+     * every parameter upstream of, say, a floor() then silently stops training;
+     * ensure_grad allocates it zero-filled, which terminates the chain instead.
+     * The graph engine emits an explicit zero for the same reason. */
+    case UOP_FLOOR:
     case UOP_CEIL:
     case UOP_ROUND:
     case UOP_TRUNC:
@@ -3442,6 +3551,10 @@ static int cpu_backward_node(struct IRNode* node) {
     case UOP_LOGICAL_NOT:
     case UOP_ALL:
     case UOP_ANY:
+        if (in1 && in1->requires_grad)
+            ensure_grad(in1);
+        if (in2 && in2->requires_grad)
+            ensure_grad(in2);
         break;
 
     /* no gradient: constants / creation ops */

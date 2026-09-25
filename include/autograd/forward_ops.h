@@ -33,6 +33,9 @@ Tensor* tensor_tan(Tensor* a);
 Tensor* tensor_softmax(Tensor* a, int dim);
 
 /* dim=-1 reduces all dimensions */
+/* Reductions. `dim == -1` reduces EVERY axis (this API's sentinel, unlike
+ * PyTorch where -1 is the last axis); other negative axes count from the end,
+ * and an out-of-range axis also reduces everything. */
 Tensor* tensor_sum(Tensor* a, int dim, bool keepdim);
 Tensor* tensor_mean(Tensor* a, int dim, bool keepdim);
 Tensor* tensor_max(Tensor* a, int dim, bool keepdim);

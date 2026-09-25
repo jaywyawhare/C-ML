@@ -156,7 +156,25 @@ class EarlyStopping:
 
 
 class LearningRateScheduler:
+    """Step and exponential decay, driven from Python.
+
+    ``cml.optim`` wraps the C ``LRScheduler`` and covers far more policies
+    (StepLR, ExponentialLR, CosineAnnealingLR, ReduceOnPlateau, OneCycleLR,
+    MultiStepLR, PolynomialLR, WarmupLR); prefer those. This stays for the two
+    simple cases and for optimizers driven entirely from Python.
+    """
+
+    _SCHEDULES = ("step", "exponential")
+
     def __init__(self, optimizer, schedule: str = "step", **kwargs):
+        if schedule not in self._SCHEDULES:
+            # Anything else used to fall through step() silently, leaving the
+            # learning rate untouched for the whole run.
+            raise ValueError(
+                f"unknown schedule {schedule!r}; this class supports "
+                f"{self._SCHEDULES}. For cosine/plateau/warmup and friends use "
+                f"the C-backed schedulers in cml.optim."
+            )
         self.optimizer = optimizer
         self.schedule = schedule
         self.initial_lr = kwargs.get("lr", 0.001)

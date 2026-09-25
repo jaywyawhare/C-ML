@@ -608,6 +608,25 @@ static bool build_attrs(ExportCtx* c, struct IRNode* n, AttrList* attrs) {
                          4) &&
                attr_int(attrs, "group", p->groups);
     }
+    /* ConvTranspose was mapped to an ONNX op name but emitted with no attributes
+     * at all, so a loader fell back to defaults (kernel inferred, stride 1, no
+     * padding) and computed something else entirely. */
+    case UOP_CONV_TRANSPOSE2D: {
+        ConvTranspose2DParams* p = (ConvTranspose2DParams*)n->params;
+        if (!p) {
+            ctx_error(c, "ConvTranspose2D missing params");
+            return false;
+        }
+        return attr_ints(attrs, "kernel_shape", (int64_t[]){p->kernel_size[0], p->kernel_size[1]},
+                         2) &&
+               attr_ints(attrs, "strides", (int64_t[]){p->stride[0], p->stride[1]}, 2) &&
+               attr_ints(attrs, "dilations", (int64_t[]){p->dilation[0], p->dilation[1]}, 2) &&
+               attr_ints(attrs, "pads",
+                         (int64_t[]){p->padding[0], p->padding[1], p->padding[0], p->padding[1]},
+                         4) &&
+               attr_ints(attrs, "output_padding",
+                         (int64_t[]){p->output_padding[0], p->output_padding[1]}, 2);
+    }
     case UOP_MAXPOOL2D:
     case UOP_AVGPOOL2D: {
         Pool2DParams* p = (Pool2DParams*)n->params;

@@ -731,6 +731,14 @@ if(BUILD_TESTS)
     # backstop for any plain assert() added later.
     add_compile_options($<$<COMPILE_LANGUAGE:C>:-UNDEBUG>)
     file(GLOB TEST_SOURCES "tests/*.c")
+    # NOT gated yet: re-running the gradient suites under GRAD_MODE=eager would
+    # be the natural way to keep the two autodiff engines honest about each other,
+    # and it is how the eager-only VJP gaps (DIAGONAL, SORT, TOPK, the
+    # zero-gradient ops, GATHER's index dtype) were found. It cannot be a gate
+    # while the eager engine is still nondeterministic -- see the eager-mode entry
+    # in docs/REMAINING_WORK.md. Run it by hand:
+    #   GRAD_MODE=eager ./build/bin/test_autodiff_ops
+
     # Mock-driver suites need special definitions/libraries; added below.
     list(FILTER TEST_SOURCES EXCLUDE REGEX "tests/test_nv_driver.c$")
     list(FILTER TEST_SOURCES EXCLUDE REGEX "tests/test_am_driver.c$")

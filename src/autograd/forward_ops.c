@@ -144,22 +144,42 @@ Tensor* tensor_softmax(Tensor* a, int dim) {
     return uop_softmax(a, normalized_dim);
 }
 
+/* Resolve a reduction axis for the uop_*_dim family.
+ *
+ * -1 is this API's long-standing sentinel for "reduce every axis" -- NOT "the
+ * last axis" as in PyTorch. Callers depend on it (zoo/clip.c reduces a loss to a
+ * scalar with dim=-1, as does torch/pte.c), so it is preserved.
+ *
+ * What was wrong: the old guard `dim < a->ndim ? dim : -1` tested only the upper
+ * bound, so every other negative axis fell through unchanged and hit the same
+ * reduce-all sentinel downstream. `sum(x, -2)` on a [2,3] tensor silently
+ * returned a scalar instead of reducing axis 0. Those now count from the end,
+ * and a genuinely out-of-range axis still falls back to reduce-all rather than
+ * indexing past the shape. */
+static int resolve_reduce_dim(const Tensor* a, int dim) {
+    if (dim == -1)
+        return -1; /* documented reduce-all sentinel */
+    if (dim < 0)
+        dim += a->ndim;
+    return (dim >= 0 && dim < a->ndim) ? dim : -1;
+}
+
 Tensor* tensor_sum(Tensor* a, int dim, bool keepdim) {
     if (!a)
         return NULL;
-    return uop_sum_dim(a, dim < a->ndim ? dim : -1, keepdim);
+    return uop_sum_dim(a, resolve_reduce_dim(a, dim), keepdim);
 }
 
 Tensor* tensor_mean(Tensor* a, int dim, bool keepdim) {
     if (!a)
         return NULL;
-    return uop_mean_dim(a, dim < a->ndim ? dim : -1, keepdim);
+    return uop_mean_dim(a, resolve_reduce_dim(a, dim), keepdim);
 }
 
 Tensor* tensor_max(Tensor* a, int dim, bool keepdim) {
     if (!a)
         return NULL;
-    return uop_max_reduce_dim(a, dim < a->ndim ? dim : -1, keepdim);
+    return uop_max_reduce_dim(a, resolve_reduce_dim(a, dim), keepdim);
 }
 
 Tensor* tensor_min(Tensor* a, int dim, bool keepdim) {

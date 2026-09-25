@@ -488,6 +488,24 @@ int module_save_safetensors(Module* module, const char* filepath) {
         }
     }
 
+    /* Buffers (BatchNorm running stats and the like) go in as ordinary named
+     * tensors under a "buffers." prefix, so they cannot collide with a parameter
+     * name. Saving only parameters left these at their freshly-initialized values
+     * on load, which silently changes eval-mode inference. Older files simply
+     * lack the keys and are skipped on load. */
+    NamedBuffer* buffers = NULL;
+    int num_buffers      = 0;
+    if (module_named_buffers(module, &buffers, &num_buffers) == 0) {
+        char key[320];
+        for (int i = 0; i < num_buffers; i++) {
+            if (!buffers[i].tensor)
+                continue;
+            snprintf(key, sizeof(key), "buffers.%s", buffers[i].name);
+            safetensors_write_tensor(ctx, key, buffers[i].tensor);
+        }
+        module_named_buffers_free(buffers, num_buffers);
+    }
+
     safetensors_close(ctx);
     module_named_parameters_free(named_params, num_params);
     return 0;
@@ -518,6 +536,26 @@ int module_load_safetensors(Module* module, const char* filepath) {
             }
             tensor_free(loaded);
         }
+    }
+
+    NamedBuffer* buffers = NULL;
+    int num_buffers      = 0;
+    if (module_named_buffers(module, &buffers, &num_buffers) == 0) {
+        char key[320];
+        for (int i = 0; i < num_buffers; i++) {
+            if (!buffers[i].tensor)
+                continue;
+            snprintf(key, sizeof(key), "buffers.%s", buffers[i].name);
+            Tensor* loaded = safetensors_read_tensor(ctx, key);
+            if (!loaded)
+                continue; /* file predates buffer support */
+            Tensor* target = buffers[i].tensor;
+            tensor_ensure_executed(target);
+            if (target->data && loaded->data && target->numel == loaded->numel)
+                memcpy(target->data, loaded->data, target->numel * cml_dtype_size(target->dtype));
+            tensor_free(loaded);
+        }
+        module_named_buffers_free(buffers, num_buffers);
     }
 
     safetensors_close(ctx);

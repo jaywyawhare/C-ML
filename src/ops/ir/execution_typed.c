@@ -55,7 +55,7 @@ static int axis_of(int dim, int ndim) {
 
 /* Split a tensor into (outer, count, inner) around `dim`: element (o,j,i) lives
  * at (o*count + j)*inner + i. Every axis-wise kernel below uses this. */
-static void lanes_of(const Tensor* t, int dim, size_t* outer, size_t* count, size_t* inner) {
+void cml_lanes_of(const Tensor* t, int dim, size_t* outer, size_t* count, size_t* inner) {
     size_t o = 1, n = 1;
     for (int d = 0; d < dim; d++)
         o *= (size_t)t->shape[d];
@@ -961,7 +961,7 @@ static int layout_kernel(struct IRNode* node, Tensor* out, void* od) {
         if (dim < 0)
             return -1;
         size_t outer, cnt, inner;
-        lanes_of(a, dim, &outer, &cnt, &inner);
+        cml_lanes_of(a, dim, &outer, &cnt, &inner);
         int s = (int)(((p->shift % (int)cnt) + (int)cnt) % (int)cnt);
         for (size_t o = 0; o < outer; o++)
             for (size_t j = 0; j < cnt; j++)
@@ -979,7 +979,7 @@ static int layout_kernel(struct IRNode* node, Tensor* out, void* od) {
         if (dim < 0)
             return -1;
         size_t outer, cnt, inner;
-        lanes_of(a, dim, &outer, &cnt, &inner);
+        cml_lanes_of(a, dim, &outer, &cnt, &inner);
         for (size_t o = 0; o < outer; o++)
             for (size_t j = 0; j < cnt; j++)
                 for (size_t m = 0; m < inner; m++)
@@ -1013,7 +1013,7 @@ static int layout_kernel(struct IRNode* node, Tensor* out, void* od) {
         if (dim < 0)
             return -1;
         size_t outer, cnt, inner;
-        lanes_of(a, dim, &outer, &cnt, &inner);
+        cml_lanes_of(a, dim, &outer, &cnt, &inner);
         size_t reps = (size_t)p->repeats;
         for (size_t o = 0; o < outer; o++)
             for (size_t j = 0; j < cnt; j++)
@@ -1216,7 +1216,7 @@ static int exec_reduce_like(struct IRNode* node, Tensor* out) {
     int dim      = reduce_dim_of(node, a);
     size_t outer = 1, cnt = a->numel, inner = 1;
     if (dim >= 0)
-        lanes_of(a, dim, &outer, &cnt, &inner);
+        cml_lanes_of(a, dim, &outer, &cnt, &inner);
     if (cnt == 0)
         return -1;
 
@@ -1318,7 +1318,7 @@ static int exec_cumulative(struct IRNode* node, Tensor* out) {
         return -1;
 
     size_t outer, cnt, inner;
-    lanes_of(a, dim, &outer, &cnt, &inner);
+    cml_lanes_of(a, dim, &outer, &cnt, &inner);
     for (size_t o = 0; o < outer; o++)
         for (size_t m = 0; m < inner; m++) {
             size_t base = o * cnt * inner + m;
@@ -1360,8 +1360,8 @@ static int exec_cumulative(struct IRNode* node, Tensor* out) {
 /* Selection sort over one lane -- k passes for topk, full for sort. Matches the
  * f32 kernels' tie-breaking (first occurrence wins, since comparisons are
  * strict). */
-static void lane_order(const void* src, DType dt, size_t base, size_t inner, size_t cnt, size_t k,
-                       bool desc, size_t* ord) {
+void cml_lane_order(const void* src, DType dt, size_t base, size_t inner, size_t cnt, size_t k,
+                    bool desc, size_t* ord) {
     for (size_t j = 0; j < cnt; j++)
         ord[j] = j;
     for (size_t i = 0; i < k && i < cnt; i++) {
@@ -1408,7 +1408,7 @@ static int exec_order(struct IRNode* node, Tensor* out) {
         return -1;
 
     size_t outer, cnt, inner;
-    lanes_of(a, dim, &outer, &cnt, &inner);
+    cml_lanes_of(a, dim, &outer, &cnt, &inner);
     if (k > cnt)
         k = cnt;
     size_t* ord = (size_t*)cml_malloc(cnt * sizeof(size_t));
@@ -1418,7 +1418,7 @@ static int exec_order(struct IRNode* node, Tensor* out) {
     for (size_t o = 0; o < outer; o++)
         for (size_t m = 0; m < inner; m++) {
             size_t base = o * cnt * inner + m;
-            lane_order(a->data, a->dtype, base, inner, cnt, k, desc, ord);
+            cml_lane_order(a->data, a->dtype, base, inner, cnt, k, desc, ord);
             for (size_t i = 0; i < k; i++) {
                 size_t oi = (o * k + i) * inner + m;
                 if (oi >= out->numel)
