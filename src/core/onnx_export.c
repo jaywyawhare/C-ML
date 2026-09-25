@@ -1,7 +1,7 @@
 /*
  * ONNX model export.
  *
- * Serializes a CML IR graph to the ONNX protobuf format (opset 11), reusing
+ * Serializes a CML IR graph to the ONNX protobuf format (opset 12), reusing
  * the CMLONNXModel-era conventions the importer (onnx_ops.c) parses. The
  * exporter and importer are independent implementations, so a model is
  * validated by exporting it, parsing it back with cml_onnx_load_buffer, and
@@ -946,8 +946,12 @@ int cml_onnx_export_graph(struct CMLGraph* ir_handle, Tensor** graph_inputs, int
                   pb_put(&graph, c.vi_inputs.data, c.vi_inputs.len) &&       /* input */
                   pb_put(&graph, c.vi_outputs.data, c.vi_outputs.len);       /* output */
 
-        /* OperatorSetIdProto{domain=1 "", version=2} */
-        ok = ok && pb_field_str(&opset, 1, "") && pb_field_varint(&opset, 2, 11);
+        /* OperatorSetIdProto{domain=1 "", version=2}
+         *
+         * Opset 12, not 11: the exporter emits LessOrEqual and GreaterOrEqual
+         * (from UOP_CMPLE/UOP_CMPGE), which were introduced in 12. Declaring 11
+         * while using them makes strict external loaders reject the model. */
+        ok = ok && pb_field_str(&opset, 1, "") && pb_field_varint(&opset, 2, 12);
 
         ok = ok && pb_field_varint(&model, 1, 8) && /* ir_version */
              pb_field_str(&model, 2, "cml") &&      /* producer_name */

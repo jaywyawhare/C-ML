@@ -831,6 +831,21 @@ function(cml_add_example target_name source_file)
     endif()
 endfunction()
 
+# Run an example as a smoke test: it must exit 0.
+#
+# Examples were built but never executed, so a tutorial could crash or stop
+# compiling against its own API and nothing would notice -- and the tutorials are
+# the user-facing surface people copy from. Only the fast, self-contained ones
+# are gated; anything needing a downloaded dataset (mnist_example) or taking
+# minutes (gru_classifier, ~110s) is deliberately left out so the suite stays
+# quick.
+function(cml_add_example_smoke_test target_name)
+    if(BUILD_TESTS)
+        add_test(NAME example_${target_name} COMMAND ${target_name})
+        set_tests_properties(example_${target_name} PROPERTIES TIMEOUT 120)
+    endif()
+endfunction()
+
 if(BUILD_EXAMPLES)
     cml_add_example(experiment_demo examples/experiment_demo.c)
     cml_add_example(sweep_runner examples/sweep_runner.c)
@@ -890,6 +905,21 @@ if(BUILD_EXAMPLES)
     cml_add_example(unet3d examples/demos/unet3d.c)
     cml_add_example(rnnt examples/demos/rnnt.c)
     cml_add_example(mlperf_resnet50 examples/mlperf/mlperf_resnet50.c)
+
+    # Tutorials and self-contained demos, run as smoke tests. Excluded on
+    # purpose: mnist_example (needs a downloaded dataset), gru_classifier (~110s),
+    # the benchmark/profile targets (timing harnesses, not assertions), and the
+    # zoo demos (already covered by test_zoo_models).
+    foreach(ex
+        hello_cml simple_xor tensor_ops linear_regression logistic_regression
+        mlp_classifier autoencoder conv_net rnn_sequence lstm_timeseries
+        embedding gan multi_task transformer lr_scheduler activations
+        torch_c_example
+        autograd_example auto_capture_example comprehensive_fusion_example
+        dead_code_example export_graph print_kernels training_loop_example
+        early_stopping_lr_scheduler)
+        cml_add_example_smoke_test(${ex})
+    endforeach()
 endif()
 
 install(TARGETS cml cml_static

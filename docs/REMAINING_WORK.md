@@ -203,7 +203,84 @@ total overstates coverage on a machine without a GPU — `test_gpu_codegen` prin
 8/8 with every case skipped. `test_opencl_ir` does run for real where an OpenCL
 device is present.
 
-## 7. Deliberately still open (engine-scale or hardware-gated)
+## 7. Closed in the third pass
+
+Found by diffing the ONNX exporter's op map against the importer's, and by
+auditing every public options struct for fields nothing reads.
+
+- **`MaxPool` / `AveragePool` imported as GLOBAL pools** (`src/core/onnx_ops.c`).
+  Both handlers reduced over the entire spatial extent, which is
+  `GlobalMaxPool`, not a window: `MaxPool(kernel=2, stride=2)` on `[1,1,4,4]`
+  returned `[1,1,1,1]` instead of `[1,1,2,2]`, and every downstream layer then
+  saw the wrong shape. `op_avgpool` never even read `kernel_shape`, and
+  `op_maxpool` returned the input *unchanged* when the input wasn't 4-D or the
+  attribute was missing — a silent identity. Both now build `Pool2DParams` from
+  `kernel_shape`/`strides`/`pads`/`dilations`/`ceil_mode`/`count_include_pad` and
+  call the real `uop_maxpool2d`/`uop_avgpool2d`, refusing (loudly) the cases
+  `Pool2DParams` cannot express rather than pooling something else.
+
+- **Nine ops the exporter emits could not be imported** (`src/core/onnx_ops.c`).
+  The file header names export→import→run round-tripping as the validation
+  strategy, but `Sin`, `Cos`, `Less`, `Greater`, `Equal`, `LessOrEqual`,
+  `GreaterOrEqual` and `HardSigmoid` had no importer handler, so a CML-exported
+  model failed to load back with "unsupported op". All are now wired to their
+  existing uops. `HardSigmoid` refuses non-default `alpha`/`beta` because
+  `uop_hard_sigmoid` hardcodes ONNX's 0.2/0.5.
+
+- **`Conv` ignored `auto_pad`** (`src/core/onnx_ops.c`). Models exported from
+  TensorFlow carry `auto_pad="SAME_UPPER"` and omit `pads`, so padding silently
+  became 0 and the output shape was wrong. `auto_pad` is now honoured
+  (`VALID` and the `SAME_*` pair), and both `Conv` and the pooling ops now reject
+  asymmetric padding instead of silently keeping only the begin pads — the params
+  structs carry one pad per axis and cannot represent it.
+
+- **Declared opset was 11 but the exporter emits opset-12 ops**
+  (`src/core/onnx_export.c`). `LessOrEqual`/`GreaterOrEqual` arrived in 12, so
+  strict external loaders would reject the models. Now declares 12.
+
+- **`optimizer_set_lr_scheduler()` was a no-op** (`src/optim.c`). It stored
+  `step_size`/`gamma` and nothing ever read them, while
+  `optimizer_supports_lr_scheduling()` returned true — so the caller was told the
+  schedule was active as the learning rate sat still. `optimizer_step()` now
+  applies the StepLR decay. (The separate `LRScheduler` subsystem, with its eight
+  policies, was always real; this was a vestigial duplicate.)
+
+- **Three dead config knobs removed.** `Optimizer.use_amp` (plus
+  `optimizer_set_amp()`), `Optimizer.lr_scheduler_factor`, and
+  `CMLScheduleOptions.topological_sort` were written and never read — the same
+  shape of bug as §5's `gradient_as_bucket_view`. Mixed precision is the separate
+  autocast subsystem; a knob that silently does nothing is worse than no knob.
+  The one test touching `topological_sort` only asserted its default was set,
+  which verified nothing about behaviour.
+
+- **The 58 example programs were built but never run.** `cml_add_example` only
+  created an executable, so a tutorial could crash, or stop compiling against its
+  own API, and CI would stay green — and the tutorials are the surface users copy
+  from. The fast, self-contained ones now run as `example_*` smoke tests (~31s).
+  Deliberately excluded: `mnist_example` (needs a downloaded dataset, and fails
+  with a clear message), `gru_classifier` (correct but ~110s), the
+  benchmark/profile targets (timing harnesses, not assertions), and the zoo demos
+  (already covered by `test_zoo_models`). All 58 were verified to run before
+  choosing the subset.
+
+Coverage added: pooling, comparison and round-trip-op cases in
+`test_onnx_import_ops.c`; a MaxPool export round-trip in `test_onnx_export.c`;
+built-in StepLR cases in `test_optim.c`; 25 example smoke tests.
+
+Two things that looked like gaps and were not, recorded so they are not
+re-investigated:
+
+- The exporter's `MaxPool`/`AveragePool` rows are **not** dead code. Exporting a
+  pooling graph works and carries every attribute. Export fails only if the graph
+  has already been *executed*, because the decompose pass rewrites `MAXPOOL2D`
+  into `UNFOLD` + a reduce and `UNFOLD` has no ONNX equivalent. Export the graph
+  you built, not the lowered one — the same reason a partial `Flatten` survives to
+  the exporter in one graph and arrives pre-lowered in another.
+- Comparison ops return **BOOL** tensors (`uop_binary_ex(..., BINARY_DTYPE_BOOL)`),
+  one byte per element. Reading that payload as `float32` yields denormals, not
+  0/1 — the same trap as the INT64 operands in §6.
+
+## 8. Deliberately still open (engine-scale or hardware-gated)
 
 These are honest, loudly-failing stubs / fallbacks rather than silent fakes.
 Each is a cross-cutting engine change with real correctness risk, or needs
@@ -232,7 +309,7 @@ fallback:
 cmake -S . -B build && make -C build -j$(nproc) && (cd build && ctest --output-on-failure)
 ```
 
-All 174 ctest suites pass.
+All 199 ctest suites pass (174 unit suites + 25 example smoke tests).
 
 The Python bindings are a separate build (CI runs both):
 

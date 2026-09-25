@@ -40,13 +40,11 @@ typedef struct Optimizer {
     int num_param_groups;         // Number of parameter groups
     int param_groups_capacity;    // Capacity of param_groups array
 
-    bool use_amp;         // Automatic mixed precision
     float grad_clip_norm; // Gradient clipping norm
     bool amsgrad;         // AMSGrad variant (for Adam)
 
-    float lr_scheduler_factor;  // Learning rate multiplier
-    int lr_scheduler_step_size; // Step size for LR scheduling
-    float lr_scheduler_gamma;   // LR decay factor
+    int lr_scheduler_step_size; // StepLR period, 0 = no decay
+    float lr_scheduler_gamma;   // StepLR decay factor
 
     const char* version;     // Optimizer version
     const char* description; // Optimizer description
@@ -94,9 +92,13 @@ void optimizer_set_group_lr(Optimizer* optimizer, int group_index, float lr);
 
 float optimizer_get_group_lr(Optimizer* optimizer, int group_index);
 
+/* Built-in StepLR decay: every `step_size` steps, each param group's lr is
+ * multiplied by `gamma`. step_size <= 0 disables it. Applied by
+ * optimizer_step() after the parameter update.
+ *
+ * For anything beyond step decay (cosine, plateau, warmup, ...) use the
+ * LRScheduler subsystem instead -- it carries the full policy set. */
 void optimizer_set_lr_scheduler(Optimizer* optimizer, int step_size, float gamma);
-
-void optimizer_set_amp(Optimizer* optimizer, bool use_amp);
 
 void optimizer_set_grad_clip_norm(Optimizer* optimizer, float norm);
 

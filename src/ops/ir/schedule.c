@@ -182,7 +182,6 @@ CMLScheduleOptions cml_schedule_default_options(void) {
     opts.enable_movement_fold     = true;
     opts.max_fused_ops            = CML_SCHEDULE_MAX_FUSED_OPS;
     opts.estimate_costs           = true;
-    opts.topological_sort         = true;
     opts.allow_reduce_elem_fusion = true;
     opts.schedule_order           = CML_SCHEDULE_ORDER_TOPO;
     return opts;

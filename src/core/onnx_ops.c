@@ -413,14 +413,59 @@ static Tensor* op_conv(const CMLONNXNode* n, TensorMap* m) {
         st[0] = (int)strides_v[0];
         st[1] = (int)strides_v[1];
     }
-    if (pads && pcount >= 2) {
-        /* ONNX pads: [top, left, bottom, right] -- we take top/left */
-        pd[0] = (int)pads[0];
-        pd[1] = (int)pads[1];
-    }
+    /* Parsed before the padding block below, which needs the effective kernel
+     * size to size SAME padding. */
     if (dilations && dcount >= 2) {
         dl[0] = (int)dilations[0];
         dl[1] = (int)dilations[1];
+    }
+    /* auto_pad takes precedence over `pads` and is what TF-exported models
+     * carry; ignoring it left padding at 0 and silently produced the wrong
+     * output shape. Conv2DParams holds one pad per axis, so a SAME split that
+     * comes out odd -- or an explicitly asymmetric `pads` -- cannot be
+     * represented and is refused rather than approximated. */
+    char auto_pad[32] = {0};
+    bool has_auto     = attr_string(n, "auto_pad", auto_pad, sizeof(auto_pad));
+    if (has_auto && strcmp(auto_pad, "NOTSET") != 0) {
+        if (strcmp(auto_pad, "VALID") == 0) {
+            pd[0] = pd[1] = 0;
+        } else if (strcmp(auto_pad, "SAME_UPPER") == 0 || strcmp(auto_pad, "SAME_LOWER") == 0) {
+            if (x->ndim != 4) {
+                LOG_ERROR("onnx_ops: Conv auto_pad=%s needs a 4-D input", auto_pad);
+                return NULL;
+            }
+            for (int i = 0; i < 2; i++) {
+                int in     = x->shape[2 + i];
+                int eff_k  = (ks[i] - 1) * dl[i] + 1;
+                int out    = (in + st[i] - 1) / st[i];
+                int needed = (out - 1) * st[i] + eff_k - in;
+                if (needed < 0)
+                    needed = 0;
+                if (needed % 2 != 0) {
+                    LOG_ERROR("onnx_ops: Conv auto_pad=%s needs asymmetric padding on axis %d, "
+                              "which this conv op cannot express",
+                              auto_pad, i);
+                    return NULL;
+                }
+                pd[i] = needed / 2;
+            }
+        } else {
+            LOG_ERROR("onnx_ops: Conv auto_pad '%s' not supported by importer", auto_pad);
+            return NULL;
+        }
+    } else if (pads && pcount >= 4) {
+        /* ONNX pads: [x1_begin, x2_begin, x1_end, x2_end]. */
+        if (pads[0] != pads[2] || pads[1] != pads[3]) {
+            LOG_ERROR("onnx_ops: Conv asymmetric pads [%lld,%lld,%lld,%lld] cannot be expressed",
+                      (long long)pads[0], (long long)pads[1], (long long)pads[2],
+                      (long long)pads[3]);
+            return NULL;
+        }
+        pd[0] = (int)pads[0];
+        pd[1] = (int)pads[1];
+    } else if (pads && pcount >= 2) {
+        pd[0] = (int)pads[0];
+        pd[1] = (int)pads[1];
     }
 
     Conv2DParams params = {
@@ -455,44 +500,157 @@ static Tensor* op_batchnorm(const CMLONNXNode* n, TensorMap* m) {
     return uop_add(scaled, bias);
 }
 
+/* Fill Pool2DParams from a MaxPool/AveragePool node.
+ *
+ * Both importers used to reduce over the whole spatial extent, which is
+ * GlobalMaxPool/GlobalAveragePool, not a windowed pool: MaxPool(kernel=2,
+ * stride=2) over [1,1,4,4] returned [1,1,1,1] instead of [1,1,2,2], and every
+ * downstream layer then saw the wrong shape. kernel_shape, strides, pads,
+ * dilations and ceil_mode are all honoured now.
+ *
+ * Returns false (having logged) when the node cannot be represented, rather than
+ * pooling something other than what the model asked for. */
+static bool pool_params_from_node(const CMLONNXNode* n, const Tensor* x, Pool2DParams* p,
+                                  const char* who) {
+    int kcount                  = 0;
+    const int64_t* kernel_shape = attr_ints(n, "kernel_shape", &kcount);
+    if (!kernel_shape || kcount < 2) {
+        LOG_ERROR("onnx_ops: %s requires a 2-D kernel_shape", who);
+        return false;
+    }
+
+    memset(p, 0, sizeof(*p));
+    p->kernel_size[0] = (int)kernel_shape[0];
+    p->kernel_size[1] = (int)kernel_shape[1];
+    /* ONNX defaults: strides and dilations 1, pads 0. */
+    p->stride[0] = p->stride[1] = 1;
+    p->dilation[0] = p->dilation[1] = 1;
+
+    int scount = 0, dcount = 0, pcount = 0;
+    const int64_t* strides   = attr_ints(n, "strides", &scount);
+    const int64_t* dilations = attr_ints(n, "dilations", &dcount);
+    const int64_t* pads      = attr_ints(n, "pads", &pcount);
+
+    if (strides && scount >= 2) {
+        p->stride[0] = (int)strides[0];
+        p->stride[1] = (int)strides[1];
+    }
+    if (dilations && dcount >= 2) {
+        p->dilation[0] = (int)dilations[0];
+        p->dilation[1] = (int)dilations[1];
+    }
+
+    char auto_pad[32] = {0};
+    bool has_auto     = attr_string(n, "auto_pad", auto_pad, sizeof(auto_pad));
+    if (has_auto && strcmp(auto_pad, "NOTSET") != 0) {
+        if (strcmp(auto_pad, "VALID") == 0) {
+            p->padding[0] = p->padding[1] = 0;
+        } else if (strcmp(auto_pad, "SAME_UPPER") == 0 || strcmp(auto_pad, "SAME_LOWER") == 0) {
+            /* SAME keeps ceil(in/stride) outputs. Pool2DParams carries one pad
+             * per axis, so an odd total (which SAME splits unevenly) cannot be
+             * expressed. */
+            for (int i = 0; i < 2; i++) {
+                int in     = x->shape[2 + i];
+                int eff_k  = (p->kernel_size[i] - 1) * p->dilation[i] + 1;
+                int out    = (in + p->stride[i] - 1) / p->stride[i];
+                int needed = (out - 1) * p->stride[i] + eff_k - in;
+                if (needed < 0)
+                    needed = 0;
+                if (needed % 2 != 0) {
+                    LOG_ERROR("onnx_ops: %s auto_pad=%s needs asymmetric padding on axis %d, "
+                              "which this pooling op cannot express",
+                              who, auto_pad, i);
+                    return false;
+                }
+                p->padding[i] = needed / 2;
+            }
+        } else {
+            LOG_ERROR("onnx_ops: %s auto_pad '%s' not supported by importer", who, auto_pad);
+            return false;
+        }
+    } else if (pads && pcount >= 4) {
+        /* ONNX pads: [x1_begin, x2_begin, x1_end, x2_end]. */
+        if (pads[0] != pads[2] || pads[1] != pads[3]) {
+            LOG_ERROR("onnx_ops: %s asymmetric pads [%lld,%lld,%lld,%lld] cannot be expressed", who,
+                      (long long)pads[0], (long long)pads[1], (long long)pads[2],
+                      (long long)pads[3]);
+            return false;
+        }
+        p->padding[0] = (int)pads[0];
+        p->padding[1] = (int)pads[1];
+    }
+
+    p->ceil_mode         = attr_int(n, "ceil_mode", 0) != 0;
+    p->count_include_pad = attr_int(n, "count_include_pad", 0) != 0;
+    return true;
+}
+
+static Tensor* op_sin(const CMLONNXNode* n, TensorMap* m) { return uop_sin(inp(n, m, 0)); }
+
+static Tensor* op_cos(const CMLONNXNode* n, TensorMap* m) { return uop_cos(inp(n, m, 0)); }
+
+static Tensor* op_less(const CMLONNXNode* n, TensorMap* m) {
+    return uop_cmplt(inp(n, m, 0), inp(n, m, 1));
+}
+
+static Tensor* op_greater(const CMLONNXNode* n, TensorMap* m) {
+    return uop_cmpgt(inp(n, m, 0), inp(n, m, 1));
+}
+
+static Tensor* op_equal(const CMLONNXNode* n, TensorMap* m) {
+    return uop_cmpeq(inp(n, m, 0), inp(n, m, 1));
+}
+
+static Tensor* op_less_equal(const CMLONNXNode* n, TensorMap* m) {
+    return uop_cmple(inp(n, m, 0), inp(n, m, 1));
+}
+
+static Tensor* op_greater_equal(const CMLONNXNode* n, TensorMap* m) {
+    return uop_cmpge(inp(n, m, 0), inp(n, m, 1));
+}
+
+static Tensor* op_hard_sigmoid(const CMLONNXNode* n, TensorMap* m) {
+    /* uop_hard_sigmoid hardcodes ONNX's default alpha=0.2, beta=0.5; a model
+     * carrying other values would be silently mis-evaluated. */
+    float alpha = attr_float(n, "alpha", 0.2f);
+    float beta  = attr_float(n, "beta", 0.5f);
+    if (fabsf(alpha - 0.2f) > 1e-6f || fabsf(beta - 0.5f) > 1e-6f) {
+        LOG_ERROR("onnx_ops: HardSigmoid alpha=%g beta=%g not supported (only the 0.2/0.5 "
+                  "defaults)",
+                  (double)alpha, (double)beta);
+        return NULL;
+    }
+    return uop_hard_sigmoid(inp(n, m, 0));
+}
+
 static Tensor* op_maxpool(const CMLONNXNode* n, TensorMap* m) {
     Tensor* x = inp(n, m, 0);
     if (!x)
         return NULL;
-
-    int kcount                  = 0;
-    const int64_t* kernel_shape = attr_ints(n, "kernel_shape", &kcount);
-
-    if (x->ndim == 4 && kernel_shape && kcount >= 2) {
-        int reduce_dims[2] = {2, 3};
-        ReduceParams rp    = {
-               .dims     = reduce_dims,
-               .num_dims = 2,
-               .keepdim  = true,
-        };
-
-        Tensor* pooled = uop_max_reduce(x, &rp);
-        return pooled;
+    if (x->ndim != 4) {
+        LOG_ERROR("onnx_ops: MaxPool expects a 4-D NCHW input, got %d dims", x->ndim);
+        return NULL;
     }
 
-    return x;
+    Pool2DParams p;
+    if (!pool_params_from_node(n, x, &p, "MaxPool"))
+        return NULL;
+    return uop_maxpool2d(x, &p);
 }
 
 static Tensor* op_avgpool(const CMLONNXNode* n, TensorMap* m) {
     Tensor* x = inp(n, m, 0);
     if (!x)
         return NULL;
-
-    if (x->ndim == 4) {
-        int reduce_dims[2] = {2, 3};
-        ReduceParams rp    = {
-               .dims     = reduce_dims,
-               .num_dims = 2,
-               .keepdim  = true,
-        };
-        return uop_mean(x, &rp);
+    if (x->ndim != 4) {
+        LOG_ERROR("onnx_ops: AveragePool expects a 4-D NCHW input, got %d dims", x->ndim);
+        return NULL;
     }
-    return x;
+
+    Pool2DParams p;
+    if (!pool_params_from_node(n, x, &p, "AveragePool"))
+        return NULL;
+    return uop_avgpool2d(x, &p);
 }
 
 static Tensor* op_global_avg_pool(const CMLONNXNode* n, TensorMap* m) {
@@ -1613,6 +1771,17 @@ static const OnnxOpEntry g_op_table[] = {
     {"Max", op_elw_max},
     {"Sum", op_sum_all},
     {"Mean", op_elw_mean},
+    /* These close a round-trip hole: the exporter emits all of them (see the
+     * UOp->ONNX map in onnx_export.c), but the importer could not parse them, so
+     * a CML-exported model failed to re-import with "unsupported op". */
+    {"Sin", op_sin},
+    {"Cos", op_cos},
+    {"Less", op_less},
+    {"Greater", op_greater},
+    {"Equal", op_equal},
+    {"LessOrEqual", op_less_equal},
+    {"GreaterOrEqual", op_greater_equal},
+    {"HardSigmoid", op_hard_sigmoid},
 };
 
 #define NUM_SUPPORTED_OPS ((int)(sizeof(g_op_table) / sizeof(g_op_table[0])))

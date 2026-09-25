@@ -225,6 +225,27 @@ static bool out_matches(Tensor* t, const float* ref, int count) {
     return ok;
 }
 
+/* Compare a BOOL-dtype output against 0/1 expectations. */
+static bool out_matches_bool(Tensor* t, const float* ref, int count) {
+    if (!t || tensor_ensure_executed(t) != 0)
+        return false;
+    const void* p = tensor_data_ptr(t);
+    if (!p)
+        return false;
+    for (int i = 0; i < count; i++) {
+        int got = (t->dtype == DTYPE_BOOL || t->dtype == DTYPE_UINT8 || t->dtype == DTYPE_INT8)
+                      ? (int)((const uint8_t*)p)[i]
+                      : (int)((const float*)p)[i];
+        if (got != (int)ref[i]) {
+            if (getenv("ONNX_TEST_DEBUG"))
+                printf("\n    elem %d: got %d want %d (dtype %d)\n", i, got, (int)ref[i],
+                       (int)t->dtype);
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool out_shape_is(Tensor* t, const int* shape, int ndim) {
     if (!t || t->ndim != ndim)
         return false;
@@ -993,6 +1014,144 @@ static void test_slice_steps_axes(void) {
     FREE_MODEL(rr);
 }
 
+/* MaxPool/AveragePool used to reduce over the whole spatial extent -- that is
+ * GlobalMaxPool, not a 2x2 window. A [1,1,4,4] input came back [1,1,1,1] instead
+ * of [1,1,2,2], and every downstream layer then saw the wrong shape. */
+static void test_maxpool_is_windowed(void) {
+    printf("Test: MaxPool windowed (not global)\n");
+
+    /* [1,1,4,4] counting up; 2x2 stride 2 takes the max of each quadrant-ish
+     * 2x2 block, which for this layout is the bottom-right of each block. */
+    float xd[16];
+    for (int i = 0; i < 16; i++)
+        xd[i] = (float)i;
+    int64_t xdims[4] = {1, 1, 4, 4};
+    int64_t k[2]     = {2, 2};
+    int64_t s[2]     = {2, 2};
+
+    Buf attrs[2]       = {attr_ints("kernel_shape", k, 2), attr_ints("strides", s, 2)};
+    const char* ins[]  = {"X"};
+    const char* outs[] = {"Y"};
+    Buf nodes[1]       = {make_node("MaxPool", ins, 1, outs, 1, attrs, 2)};
+
+    RunResult rr = run_model(nodes, 1, NULL, 0, xdims, 4, xd, outs, 1);
+    CHECK("maxpool: run", rr.rc == 0);
+    if (rr.rc == 0 && rr.outs[0]) {
+        Tensor* y = rr.outs[0];
+        CHECK("maxpool: output is [1,1,2,2] not [1,1,1,1]",
+              y->ndim == 4 && y->shape[0] == 1 && y->shape[1] == 1 && y->shape[2] == 2 &&
+                  y->shape[3] == 2);
+        float ref[4] = {5, 7, 13, 15};
+        CHECK("maxpool: values", out_matches(y, ref, 4));
+    }
+    FREE_MODEL(rr);
+}
+
+static void test_avgpool_is_windowed(void) {
+    printf("Test: AveragePool windowed (not global)\n");
+
+    float xd[16];
+    for (int i = 0; i < 16; i++)
+        xd[i] = (float)i;
+    int64_t xdims[4] = {1, 1, 4, 4};
+    int64_t k[2]     = {2, 2};
+    int64_t s[2]     = {2, 2};
+
+    Buf attrs[2]       = {attr_ints("kernel_shape", k, 2), attr_ints("strides", s, 2)};
+    const char* ins[]  = {"X"};
+    const char* outs[] = {"Y"};
+    Buf nodes[1]       = {make_node("AveragePool", ins, 1, outs, 1, attrs, 2)};
+
+    RunResult rr = run_model(nodes, 1, NULL, 0, xdims, 4, xd, outs, 1);
+    CHECK("avgpool: run", rr.rc == 0);
+    if (rr.rc == 0 && rr.outs[0]) {
+        Tensor* y = rr.outs[0];
+        CHECK("avgpool: output is [1,1,2,2]", y->ndim == 4 && y->shape[2] == 2 && y->shape[3] == 2);
+        /* means of {0,1,4,5}, {2,3,6,7}, {8,9,12,13}, {10,11,14,15} */
+        float ref[4] = {2.5f, 4.5f, 10.5f, 12.5f};
+        CHECK("avgpool: values", out_matches(y, ref, 4));
+    }
+    FREE_MODEL(rr);
+}
+
+/* A pool with no kernel_shape used to silently return the input unchanged. */
+static void test_pool_without_kernel_rejected(void) {
+    printf("Test: MaxPool without kernel_shape is refused\n");
+
+    float xd[4]      = {1, 2, 3, 4};
+    int64_t xdims[4] = {1, 1, 2, 2};
+
+    const char* ins[]  = {"X"};
+    const char* outs[] = {"Y"};
+    Buf nodes[1]       = {make_node("MaxPool", ins, 1, outs, 1, NULL, 0)};
+
+    RunResult rr = run_model(nodes, 1, NULL, 0, xdims, 4, xd, outs, 1);
+    CHECK("maxpool no kernel: refused", rr.rc != 0);
+    FREE_MODEL(rr);
+}
+
+/* These ops are emitted by the exporter but the importer could not parse them,
+ * so a CML-exported model failed to load back. */
+static void test_roundtrip_ops_importable(void) {
+    printf("Test: ops the exporter emits are importable\n");
+
+    const char* names[] = {"Sin", "Cos", "HardSigmoid"};
+    float xd[3]         = {0.5f, -0.25f, 1.0f};
+    int64_t xdims[1]    = {3};
+
+    for (int i = 0; i < 3; i++) {
+        const char* ins[]  = {"X"};
+        const char* outs[] = {"Y"};
+        Buf nodes[1]       = {make_node(names[i], ins, 1, outs, 1, NULL, 0)};
+        RunResult rr       = run_model(nodes, 1, NULL, 0, xdims, 1, xd, outs, 1);
+        char label[64];
+        snprintf(label, sizeof(label), "%s: run", names[i]);
+        CHECK(label, rr.rc == 0 && rr.outs[0] != NULL);
+        FREE_MODEL(rr);
+    }
+
+    /* sin/cos values, to show they map to the right op and not just *an* op. */
+    const char* ins[]  = {"X"};
+    const char* outs[] = {"Y"};
+    Buf sn[1]          = {make_node("Sin", ins, 1, outs, 1, NULL, 0)};
+    RunResult rs       = run_model(sn, 1, NULL, 0, xdims, 1, xd, outs, 1);
+    float ref_sin[3]   = {sinf(0.5f), sinf(-0.25f), sinf(1.0f)};
+    CHECK("Sin: values", rs.rc == 0 && out_matches(rs.outs[0], ref_sin, 3));
+    FREE_MODEL(rs);
+}
+
+/* Comparison ops: exporter emits Less/Greater/Equal/LessOrEqual/GreaterOrEqual. */
+static void test_comparison_ops(void) {
+    printf("Test: comparison ops importable\n");
+
+    float ad[4]     = {1.0f, 2.0f, 3.0f, 4.0f};
+    float bd[4]     = {2.0f, 2.0f, 1.0f, 5.0f};
+    int64_t dims[1] = {4};
+    Buf inits[1]    = {init_f32("B", dims, 1, bd, 4)};
+
+    /* Comparisons yield BOOL tensors (uop_binary_ex(..., BINARY_DTYPE_BOOL)),
+     * so the payload is one byte per element -- reading it as float32 would give
+     * denormals, not 0/1. */
+    struct {
+        const char* op;
+        float ref[4];
+    } cases[] = {
+        {"Less", {1, 0, 0, 1}},        {"Greater", {0, 0, 1, 0}},        {"Equal", {0, 1, 0, 0}},
+        {"LessOrEqual", {1, 1, 0, 1}}, {"GreaterOrEqual", {0, 1, 1, 0}},
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        const char* ins[]  = {"X", "B"};
+        const char* outs[] = {"Y"};
+        Buf nodes[1]       = {make_node(cases[i].op, ins, 2, outs, 1, NULL, 0)};
+        RunResult rr       = run_model(nodes, 1, inits, 1, dims, 1, ad, outs, 1);
+        char label[64];
+        snprintf(label, sizeof(label), "%s: values", cases[i].op);
+        CHECK(label, rr.rc == 0 && out_matches_bool(rr.outs[0], cases[i].ref, 4));
+        FREE_MODEL(rr);
+    }
+}
+
 static void test_unsupported_op_rejected(void) {
     printf("Test: unsupported op (LSTM) rejected cleanly\n");
     float xd[4]        = {1, 2, 3, 4};
@@ -1030,6 +1189,11 @@ int main(void) {
     test_variadic_elw();
     test_gemm_attrs();
     test_slice_steps_axes();
+    test_maxpool_is_windowed();
+    test_avgpool_is_windowed();
+    test_pool_without_kernel_rejected();
+    test_roundtrip_ops_importable();
+    test_comparison_ops();
     test_unsupported_op_rejected();
 
     return TEST_SUMMARY();

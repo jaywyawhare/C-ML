@@ -24,10 +24,8 @@ int optimizer_init(Optimizer* optimizer, const char* name, StepFn step, ZeroGrad
     optimizer->param_groups           = NULL;
     optimizer->num_param_groups       = 0;
     optimizer->param_groups_capacity  = 0;
-    optimizer->use_amp                = false;
     optimizer->grad_clip_norm         = 0.0f;
     optimizer->amsgrad                = false;
-    optimizer->lr_scheduler_factor    = 1.0f;
     optimizer->lr_scheduler_step_size = 0;
     optimizer->lr_scheduler_gamma     = 1.0f;
     optimizer->training_metrics       = NULL;
@@ -482,11 +480,29 @@ int optimizer_state_load(Optimizer* optimizer, FILE* f) {
     return 0;
 }
 
+/* StepLR decay for optimizer_set_lr_scheduler(): every `step_size` steps, scale
+ * each group's lr by `gamma`. The two settings used to be stored and never read,
+ * so the scheduler silently did nothing while
+ * optimizer_supports_lr_scheduling() reported it was active. Applied after the
+ * update so the step that triggers the decay still uses the old rate, matching
+ * the usual step-then-decay convention. */
+static void optimizer_apply_lr_schedule(Optimizer* optimizer) {
+    if (optimizer->lr_scheduler_step_size <= 0)
+        return;
+
+    for (int g = 0; g < optimizer->num_param_groups; g++) {
+        ParameterGroup* group = &optimizer->param_groups[g];
+        if (group->step_count > 0 && group->step_count % optimizer->lr_scheduler_step_size == 0)
+            group->lr *= optimizer->lr_scheduler_gamma;
+    }
+}
+
 void optimizer_step(Optimizer* optimizer) {
     if (!optimizer || !optimizer->step)
         return;
 
     optimizer->step(optimizer);
+    optimizer_apply_lr_schedule(optimizer);
     training_metrics_auto_capture_optimizer(optimizer);
 }
 
@@ -554,12 +570,6 @@ void optimizer_set_lr_scheduler(Optimizer* optimizer, int step_size, float gamma
 
     optimizer->lr_scheduler_step_size = step_size;
     optimizer->lr_scheduler_gamma     = gamma;
-}
-
-void optimizer_set_amp(Optimizer* optimizer, bool use_amp) {
-    if (optimizer) {
-        optimizer->use_amp = use_amp;
-    }
 }
 
 void optimizer_set_grad_clip_norm(Optimizer* optimizer, float norm) {

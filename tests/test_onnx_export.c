@@ -258,6 +258,64 @@ static void test_full_flatten_stays_flatten(void) {
     cml_reset_ir_context();
 }
 
+/* Pooling round-trip. The importer used to reduce over the whole spatial extent
+ * (a global pool), so this shape check is the thing that would have caught it.
+ *
+ * Note the graph is exported WITHOUT being executed first: execution runs the
+ * decompose pass, which rewrites MAXPOOL2D into UNFOLD + a reduce, and UNFOLD has
+ * no ONNX equivalent. Export the graph you built, not the lowered one. */
+static void test_roundtrip_maxpool(void) {
+    printf("Test: export/import/run round-trip (MaxPool 2x2 stride 2)\n");
+
+    const char* path = "/tmp/cml_onnx_pool.onnx";
+    TensorConfig cfg = {0};
+    int xshape[]     = {1, 1, 4, 4};
+    static float xd[16];
+    for (int i = 0; i < 16; i++)
+        xd[i] = (float)i;
+
+    Tensor* X        = tensor_from_data(xd, xshape, 4, &cfg);
+    Pool2DParams p   = {0};
+    p.kernel_size[0] = p.kernel_size[1] = 2;
+    p.stride[0] = p.stride[1] = 2;
+    p.dilation[0] = p.dilation[1] = 1;
+    Tensor* Y                     = uop_maxpool2d(X, &p);
+    CHECK("maxpool built", Y != NULL && Y->ndim == 4);
+
+    int rc = cml_onnx_export_graph(Y->ir_context, (Tensor*[]){X}, 1, (Tensor*[]){Y}, 1, path);
+    CHECK("maxpool export succeeded", rc == 0);
+
+    size_t flen     = 0;
+    char* bytes     = read_file(path, &flen);
+    CMLONNXModel* m = bytes ? cml_onnx_load_buffer((const uint8_t*)bytes, flen) : NULL;
+    CHECK("reimport succeeded", m != NULL);
+
+    if (m) {
+        int last = m->graph.num_nodes - 1;
+        CHECK("op is MaxPool", last >= 0 && strcmp(m->graph.nodes[last].op_type, "MaxPool") == 0);
+
+        Tensor* in_t  = tensor_from_data(xd, xshape, 4, &cfg);
+        Tensor* out_t = NULL;
+        int rrc       = cml_onnx_run(m, (Tensor*[]){in_t}, 1, &out_t, 1);
+        CHECK("onnx run succeeded", rrc == 0);
+        if (rrc == 0 && out_t) {
+            CHECK("pooled shape is [1,1,2,2] (windowed, not global)",
+                  out_t->ndim == 4 && out_t->shape[2] == 2 && out_t->shape[3] == 2);
+            tensor_ensure_executed(out_t);
+            float* od    = (float*)out_t->data;
+            float ref[4] = {5, 7, 13, 15};
+            int ok       = od != NULL && out_t->numel == 4;
+            for (int i = 0; i < 4 && ok; i++)
+                ok = APPROX(od[i], ref[i]);
+            CHECK("pooled values match", ok);
+        }
+    }
+
+    free(bytes);
+    remove(path);
+    cml_reset_ir_context();
+}
+
 int main(void) {
     printf("=== ONNX Export Tests ===\n\n");
 
@@ -265,6 +323,7 @@ int main(void) {
     test_roundtrip_linear();
     test_partial_flatten_lowers_to_reshape();
     test_full_flatten_stays_flatten();
+    test_roundtrip_maxpool();
 
     return TEST_SUMMARY();
 }

@@ -246,6 +246,61 @@ static int test_lr_scheduler_step(void) {
     return ok;
 }
 
+/* optimizer_set_lr_scheduler() is the optimizer's own StepLR knob, separate from
+ * the LRScheduler subsystem above. It used to store step_size/gamma and never
+ * read them, so the lr never moved while optimizer_supports_lr_scheduling()
+ * reported the scheduler was active. */
+static int test_builtin_step_lr_decays(void) {
+    Sequential* model;
+    Parameter** params;
+    int num_params;
+    create_test_model(&model, &params, &num_params);
+
+    Optimizer* opt = cml_optim_sgd(params, num_params, 0.1f, 0.0f, 0.0f);
+    if (!opt)
+        return 0;
+
+    optimizer_set_lr_scheduler(opt, 1, 0.1f); /* decay every step by 10x */
+    int ok = optimizer_supports_lr_scheduling(opt);
+
+    const float want[3] = {0.01f, 0.001f, 0.0001f};
+    for (int i = 0; i < 3 && ok; i++) {
+        optimizer_step(opt);
+        float lr = optimizer_get_group_lr(opt, 0);
+        if (fabsf(lr - want[i]) > want[i] * 1e-3f) {
+            printf("(step %d: lr %g, want %g) ", i + 1, (double)lr, (double)want[i]);
+            ok = 0;
+        }
+    }
+
+    optimizer_free(opt);
+    cml_free(params);
+    module_free((Module*)model);
+    return ok;
+}
+
+/* step_size 0 means no schedule: the lr must stay put. */
+static int test_builtin_step_lr_off_by_default(void) {
+    Sequential* model;
+    Parameter** params;
+    int num_params;
+    create_test_model(&model, &params, &num_params);
+
+    Optimizer* opt = cml_optim_sgd(params, num_params, 0.1f, 0.0f, 0.0f);
+    if (!opt)
+        return 0;
+
+    int ok = !optimizer_supports_lr_scheduling(opt);
+    for (int i = 0; i < 3; i++)
+        optimizer_step(opt);
+    ok = ok && fabsf(optimizer_get_group_lr(opt, 0) - 0.1f) < 1e-6f;
+
+    optimizer_free(opt);
+    cml_free(params);
+    module_free((Module*)model);
+    return ok;
+}
+
 static int test_optim_for_model(void) {
     Sequential* model = cml_nn_sequential();
     sequential_add(model, (Module*)cml_nn_linear(2, 4, DTYPE_FLOAT32, DEVICE_CPU, true));
@@ -364,6 +419,8 @@ int main(void) {
     TEST(zero_grad);
     TEST(optim_for_model);
     TEST(lr_scheduler_step);
+    TEST(builtin_step_lr_decays);
+    TEST(builtin_step_lr_off_by_default);
     TEST(fuse_optim_matches_default);
 
     return TEST_SUMMARY();

@@ -84,8 +84,7 @@ static int test_movement_fuses_with_anything(void) {
 static int test_default_options(void) {
     CMLScheduleOptions opts = cml_schedule_default_options();
     return opts.enable_fusion == true && opts.enable_movement_fold == true &&
-           opts.max_fused_ops == CML_SCHEDULE_MAX_FUSED_OPS && opts.estimate_costs == true &&
-           opts.topological_sort == true;
+           opts.max_fused_ops == CML_SCHEDULE_MAX_FUSED_OPS && opts.estimate_costs == true;
 }
 
 static int test_schedule_empty_graph(void) {
