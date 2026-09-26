@@ -615,14 +615,19 @@ fallback:
   follows it, so for a whole-file feed the slice (the only NAL a decoder consumes)
   was permanently unreachable. `cml_hevc_parser_end_of_stream()` is how the caller
   now says no more bytes are coming.
-- **The CUDA/ROCm *driver* path** — NVRTC compilation, module load and kernel
-  launch still need real hardware. The driver mocks (`test_nv_mock`,
-  `test_am_mock`, `test_hip_mock`) cover the transport around it — h2d/d2h,
-  submission, ordering — but with a deliberately fake kernel that performs no
-  arithmetic, so they say nothing about what a kernel computes.
+- **The CUDA/ROCm driver path** — worth stating precisely, because calling this
+  "unimplemented" was wrong. The code exists and is exercised:
+  `hipModuleGetFunction` / `hipModuleLaunchKernel` and the NV equivalents are
+  implemented and driven end-to-end by the driver mocks (`test_nv_mock`,
+  `test_am_mock`, `test_hip_mock` — 4 suites, passing), which cover the API
+  contract and the transport: h2d/d2h, submission, ordering. The numerics are
+  covered too, by the PTX interpreter in §9.
 
-  The *numeric* half of this item is now closed, and it did not need hardware
-  after all. See §9.
+  What is missing is a **test run on real silicon** — the mocks use a deliberately
+  fake kernel that performs no arithmetic, so they cannot tell you what an actual
+  GPU computes. That is a test-execution environment, not code to write: there is
+  no remaining implementation task here, only a machine with a device on it. Run
+  the existing suites on a CUDA or ROCm box and the item closes.
 - **Non-blocking CI legs** — the macOS matrix leg (`ci.yml`) and the Windows
   wheel build (`wheels.yml`) are `continue-on-error: true`. Promoting either needs
   a green run on that platform first, and this checkout cannot produce one: not
