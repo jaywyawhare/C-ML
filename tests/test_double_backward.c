@@ -363,10 +363,23 @@ static int test_no_create_graph_grad_inert(void) {
 
 int main(void) {
     printf("double-backward (create_graph):\n");
-    TEST(quad_double_grad_exact);
-    TEST(quad_double_grad_finite_diff);
-    TEST(matmul_double_grad_finite_diff);
-    TEST(composite_vjp_double_grad);
+
+    /* create_graph needs the graph engine: under GRAD_MODE=eager, gradients are
+     * plain data with nothing left to differentiate, so tensor_backward warns and
+     * ignores the flag (autograd.c). Reporting the four second-order cases as
+     * FAIL there was a misleading signal -- it is a documented engine property, not
+     * a defect -- and it meant this suite could not be run under eager at all.
+     * Skipping them keeps the run honest in both modes; the first-order
+     * expectation below still applies and is checked either way. */
+    if (!cml_autodiff_use_graph()) {
+        printf("  (skipping 4 create_graph cases: unsupported by the eager engine)\n");
+    } else {
+        TEST(quad_double_grad_exact);
+        TEST(quad_double_grad_finite_diff);
+        TEST(matmul_double_grad_finite_diff);
+        TEST(composite_vjp_double_grad);
+    }
+
     TEST(no_create_graph_grad_inert);
     return TEST_SUMMARY();
 }

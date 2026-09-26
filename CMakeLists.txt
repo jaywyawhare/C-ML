@@ -736,7 +736,9 @@ if(BUILD_TESTS)
     # that is how the eager-only VJP gaps (DIAGONAL, SORT, TOPK, the
     # zero-gradient ops, GATHER's index dtype) went unnoticed -- every one of them
     # was silently wrong under eager while the suite was green.
-    set(CML_EAGER_GRAD_SUITES test_autodiff_ops test_autograd)
+    set(CML_EAGER_GRAD_SUITES test_autodiff_ops test_autograd test_backward_eager
+                              test_grad_check test_gradcheck_core test_double_backward
+                              test_flip_grad test_sparse_autograd)
 
     # Mock-driver suites need special definitions/libraries; added below.
     list(FILTER TEST_SOURCES EXCLUDE REGEX "tests/test_nv_driver.c$")
