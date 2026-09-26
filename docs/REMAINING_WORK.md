@@ -491,6 +491,27 @@ fallback:
   node-pointer version was reverted rather than shipped, because a latent
   use-after-free to satisfy a checkbox is worse than an inert feature.
 
+  **What a correct CPU replay would actually require** — the existing design is
+  already slot-based and graph-independent, which is the right shape: entries hold
+  *slot indices*, and `cml_trace_replay(trace, tensor_ptrs, n)` binds them to the
+  current graph's buffers. `cml_ir_output_slots()` enumerates nodes in `head→next`
+  order, so slot `i` means the same logical node across two structurally identical
+  graphs. Two concrete gaps, not a vague rewrite:
+
+  1. **Slots cover node outputs only.** Graph leaves (inputs and weights) get no
+     slot, but every kernel reads them, so a CPU entry cannot name its operands.
+     The enumeration has to include leaves.
+  2. **Kernels take `IRNode*`, not buffers.** `cpu_execute_node(node)` is the
+     dispatcher, so replay needs either a synthesized node built from the record or
+     a parallel dispatch keyed on (op type, params, operand buffers, shapes).
+
+  Both are tractable; neither is safe to do casually, because this is the default
+  execution path and a wrong field in a synthesized node is silent numerical
+  corruption everywhere rather than a crash. Worth doing behind a value-checking
+  test (`tests/test_tiny_jit.c` already has `values_ok`) and measured against the
+  overhead it is meant to remove — the win is skipping the graph walk, so it should
+  be shown to be worth the risk before being switched on.
+
   Two things found while doing this that matter more than the feature:
 
   **The empty-trace guard is load-bearing on the DEFAULT path.** TinyJit is on
