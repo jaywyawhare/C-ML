@@ -651,8 +651,25 @@ fallback:
   the existing suites on a CUDA or ROCm box and the item closes.
 - **Non-blocking CI legs** — the macOS matrix leg (`ci.yml`) and the Windows
   wheel build (`wheels.yml`) are `continue-on-error: true`. Promoting either needs
-  a green run on that platform first, and this checkout cannot produce one: not
-  even a compile check is possible.
+  a green run on that platform first.
+
+  For **Windows** that is one package away, and it would be a *faithful* check, not
+  an approximation: `wheels.yml` builds under **MinGW64** (`msystem: MINGW64`,
+  `mingw-w64-x86_64-gcc`, `compiler=mingw32`), and `mingw-w64-gcc` in `extra` is
+  that same toolchain family. Installing it enables compiling the tree with the
+  compiler CI actually uses. (279.79 MiB; a sudo change, so it needs the repo
+  owner's go-ahead rather than being done silently.)
+
+  Worth recording so it is not "fixed" by mistake: scanning for POSIX APIs that
+  MSVC lacks — `strcasecmp` (`src/cml.c:404`), `strtok_r`
+  (`src/torch/selective_build.c:68`), `unistd.h`, `dlfcn.h`, `pthread.h` — finds
+  plenty, and **none of it is a bug**, because MinGW provides all of them. A
+  "portability lint" built on that list would be pure false positives. The project
+  already has `cml_strdup` where a genuine wrapper was needed. Only MSVC/clang-cl
+  would make those a problem, and that is not what this project targets.
+
+  **macOS** has no cross path at all (no osxcross, no Darwin SDK), so it needs a
+  real machine.
 
 Checked rather than assumed, on the machine this work was done on:
 
