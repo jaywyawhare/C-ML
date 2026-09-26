@@ -409,6 +409,22 @@ vacuous (compare the tensor's real numel against what the test thinks it has),
 and ASAN silence is not evidence of memory correctness — valgrind found in one
 run what ASAN could not see at all.
 
+**Re-verified since**, because "the eager engine is nondeterministic" is a sticky
+claim worth being able to disprove on demand: every gradient suite gives identical
+results run to run under `GRAD_MODE=eager` (`test_autodiff_ops` 51/51 across 20
+consecutive runs; `test_autograd`, `test_backward_eager`, `test_grad_check`,
+`test_gradcheck_core`, `test_flip_grad`, `test_sparse_autograd` and
+`test_conv_nograd` all stable over 6 each), and valgrind reports **0**
+uninitialised-value errors under eager.
+
+`test_double_backward` was the one confusing signal left. It reported four FAILs
+under eager for a *documented engine property* — `create_graph` requires the graph
+engine, because eager gradients are plain data with nothing left to differentiate
+(§4) — which reads as eager flakiness and meant the suite could not be run under
+eager at all. Those four cases now skip with a message, so the run is honest in
+both modes, and **eight** gradient suites rather than two are gated under
+`GRAD_MODE=eager` in CMakeLists.
+
 ## 9. GPU codegen is now numerically validated without a GPU
 
 This was listed for several passes as "codegen exists but numeric validation needs
@@ -692,7 +708,7 @@ matching hardware or toolchain can pick them up directly.
 cmake -S . -B build && make -C build -j$(nproc) && (cd build && ctest --output-on-failure)
 ```
 
-All 203 ctest suites pass (176 unit suites + 25 example smoke tests + 2
+All 209 ctest suites pass (176 unit suites + 25 example smoke tests + 8
 eager-engine gradient re-runs), plus
 78 Python tests.
 
