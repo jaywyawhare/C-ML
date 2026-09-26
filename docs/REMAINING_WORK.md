@@ -596,28 +596,34 @@ fallback:
   decodes real streams wrongly. That is the exact silent-failure mode the rest of
   this document is about removing.
 
-  The blocker is narrower than "the tables", and it is worth pinning down which
-  ones. **The transform matrices are obtainable and self-verifiable.** The 8-, 16-
-  and 32-point matrices derive directly —
-  `round(64·√2·cos(π·i·(2j+1)/64))` reproduces their spec rows exactly. The 4-point
-  matrix is a hand-adjusted special case where that formula gives
-  `[84, 35, -35, -84]` instead of the spec's `[83, 36, -36, -83]`, but the right
-  answer is decidable without the spec: both candidates are exactly orthogonal, so
-  orthogonality does not discriminate, while row-norm preservation does —
+  **None of the spec tables can be reliably reconstructed here.** An earlier
+  revision of this entry claimed the transform matrices were obtainable, because the
+  8/16/32-point ones appear to derive from
+  `round(64*sqrt(2)*cos(pi*i*(2j+1)/64))`. Checked properly, that is wrong --
+  recorded because it is the exact trap a future attempt would fall into:
 
-  | candidate | row norm | error vs ideal 128 |
-  | --- | --- | --- |
-  | `83, 36` | 127.945 | 0.055 |
-  | `84, 35` | 128.693 | 0.693 |
+  - **M4**: formula gives `[84, 35, -35, -84]`; spec is `[83, 36, -36, -83]`.
+  - **M16 row 1**: formula gives `..., 43, 26, 9`; spec is `..., 43, 25, 9`
+    (26.274 rounds to 26, but the spec says 25).
 
-  — a 12x worse deviation, which picks out `83/36` and confirms it. So a transform
-  implementation can be written *and checked* here.
+  Two independent disagreements, so the formula does not reproduce the spec
+  matrices. Orthogonality shows why: the hardcoded spec M4 is **perfectly**
+  orthogonal (0 offending pairs), while every derived matrix is not (M8: 4 pairs,
+  M16: 12, M32: 108). The spec matrices are tuned for exact integer orthogonality;
+  the cosine formula's are merely close.
 
-  **What is genuinely blocked is the CABAC context-initialization table** (~200
-  values). Those are probability-state seeds: no generating formula, and no
-  orthogonality or norm property to test a guess against. A wrong entry does not
-  fail loudly, it desynchronises the arithmetic decoder somewhere downstream. That
-  is the one piece recall cannot supply and arithmetic cannot check.
+  What the arithmetic *can* do is **detect** a wrong table, not generate a right
+  one. Row-norm deviation separates the two M4 candidates (`83/36` -> 0.055 vs
+  `84/35` -> 0.693, a 12x gap), and orthogonality flags the derived matrices as not
+  being the spec's. Keep that as an acceptance test for whenever the real tables
+  arrive -- it is what stopped a transform module from being written with wrong
+  constants.
+
+  So every table is external input: the DCT/DST matrices, the ~200 CABAC
+  context-init values, `rangeTabLPS`, `transIdxLPS/MPS`, `intraPredAngle`, the scan
+  orders. The CABAC ones are the worst case -- no formula *and* no orthogonality or
+  norm property to test a guess against, so a wrong entry does not fail loudly, it
+  desynchronises the arithmetic decoder somewhere downstream.
 
   Nothing local supplies them: no spec document, no libde265 or HM source, and
   libavcodec ships headers only (the tables live in `.c` files that are not
