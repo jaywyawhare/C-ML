@@ -596,13 +596,28 @@ fallback:
   decodes real streams wrongly. That is the exact silent-failure mode the rest of
   this document is about removing.
 
-  Reconstructing those tables from memory is demonstrably not safe. The 8-, 16- and
-  32-point matrices *can* be derived (`round(64·√2·cos(π·i·(2j+1)/64))` reproduces
-  their spec rows exactly), but the 4-point matrix is a hand-adjusted special case:
-  the formula yields `[84, 35, -35, -84]` where the spec requires
-  `[83, 36, -36, -83]`. One checkable row already disagrees, so the ~200 CABAC
-  values — which have no generating formula and no cheap self-check — cannot be
-  trusted from recall either.
+  The blocker is narrower than "the tables", and it is worth pinning down which
+  ones. **The transform matrices are obtainable and self-verifiable.** The 8-, 16-
+  and 32-point matrices derive directly —
+  `round(64·√2·cos(π·i·(2j+1)/64))` reproduces their spec rows exactly. The 4-point
+  matrix is a hand-adjusted special case where that formula gives
+  `[84, 35, -35, -84]` instead of the spec's `[83, 36, -36, -83]`, but the right
+  answer is decidable without the spec: both candidates are exactly orthogonal, so
+  orthogonality does not discriminate, while row-norm preservation does —
+
+  | candidate | row norm | error vs ideal 128 |
+  | --- | --- | --- |
+  | `83, 36` | 127.945 | 0.055 |
+  | `84, 35` | 128.693 | 0.693 |
+
+  — a 12x worse deviation, which picks out `83/36` and confirms it. So a transform
+  implementation can be written *and checked* here.
+
+  **What is genuinely blocked is the CABAC context-initialization table** (~200
+  values). Those are probability-state seeds: no generating formula, and no
+  orthogonality or norm property to test a guess against. A wrong entry does not
+  fail loudly, it desynchronises the arithmetic decoder somewhere downstream. That
+  is the one piece recall cannot supply and arithmetic cannot check.
 
   Nothing local supplies them: no spec document, no libde265 or HM source, and
   libavcodec ships headers only (the tables live in `.c` files that are not
