@@ -186,6 +186,53 @@ static int test_untruncated_trace_is_complete(void) {
     return ok;
 }
 
+/* A graph shape that records nothing is remembered as such, so later executes
+ * skip the record attempt instead of re-allocating a trace and re-hashing to
+ * rediscover it every time. The saving is real -- that probe cost ~37% of a small
+ * step -- but the shortcut must not change results, which is what this checks:
+ * values stay correct across repeats, and it still never reports a replay. */
+static int test_empty_trace_is_negatively_cached(void) {
+    cml_reset_ir_context();
+    Tensor* x = NULL;
+    Tensor* y = build_graph(&x, NELT, 4.0f);
+    if (!y) {
+        cml_reset_ir_context();
+        return 0;
+    }
+
+    CMLTinyJit* jit = cml_tinyjit_create();
+    REQUIRE(jit);
+
+    int ok = 1;
+    for (int r = 0; r < 8 && ok; r++) {
+        ok = cml_tinyjit_execute(jit, y->ir_context) == 0;
+        ok = ok && values_ok(y, NELT, 4.0f);
+    }
+
+    size_t hits = 0, misses = 0, inval = 0;
+    cml_tinyjit_stats(jit, &hits, &misses, &inval);
+
+    /* Still no replay: the negative entry is a shortcut past recording, never a
+     * licence to hand back cached values. */
+    if (ok && hits != 0) {
+        printf("(reported a replay: hits=%zu) ", hits);
+        ok = 0;
+    }
+    /* The point of the negative cache is that the record attempt is paid a BOUNDED
+     * number of times, not once per execute. Two is expected here, not one: the
+     * first execute runs the fusion pass, which rewrites nodes and so changes the
+     * graph hash, giving one shape before fusion and one after. It is stable from
+     * then on, so eight executes must still cost only those two. */
+    if (ok && misses > 2) {
+        printf("(record attempted per execute: misses=%zu of 8 calls, inval=%zu) ", misses, inval);
+        ok = 0;
+    }
+
+    cml_tinyjit_free(jit);
+    cml_reset_ir_context();
+    return ok;
+}
+
 static int test_bad_args(void) {
     CMLTinyJit* jit = cml_tinyjit_create();
     REQUIRE(jit);
@@ -206,6 +253,7 @@ int main(void) {
 
     printf("\nThe fallback stays honest:\n");
     TEST(never_replays_an_empty_trace);
+    TEST(empty_trace_is_negatively_cached);
     TEST(truncated_trace_is_not_complete);
     TEST(untruncated_trace_is_complete);
 

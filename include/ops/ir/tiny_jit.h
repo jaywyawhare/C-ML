@@ -31,6 +31,13 @@ typedef struct {
     int shape_len;
 
     bool occupied;
+    /* Negative cache: this graph shape was recorded once and produced no trace
+     * entries, so it can never be replayed. Remembering that lets later executes
+     * skip the whole record attempt -- which is not free: it allocates a CMLTrace
+     * (a 256-entry table, tens of KB) and hashes the graph on every single
+     * execute. Measured on a 24-node chain, re-probing cost ~1.8us of a 4.9us
+     * step, about 37%, for a trace that could never hit. */
+    bool records_nothing;
 } CMLJitEntry;
 
 typedef struct {

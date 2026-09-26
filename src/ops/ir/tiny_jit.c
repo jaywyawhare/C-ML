@@ -80,6 +80,11 @@ int cml_tinyjit_execute(CMLTinyJit* jit, CMLGraph_t ir) {
              * replay skips the graph walk, DCE, fusion decisions and scheduling and
              * re-runs just those nodes. A truncated trace is never marked complete,
              * so it cannot be replayed in part. */
+            /* Known to record nothing: run it directly rather than paying for
+             * another trace allocation and hash on every execute. */
+            if (entry->records_nothing)
+                return cml_ir_execute(ir);
+
             if (entry->trace && entry->trace->is_complete && entry->trace->num_entries > 0) {
                 void* tensor_ptrs[CML_TRACE_MAX_ENTRIES];
                 int n = cml_ir_output_slots(ir, tensor_ptrs, CML_TRACE_MAX_ENTRIES);
@@ -118,9 +123,34 @@ int cml_tinyjit_execute(CMLTinyJit* jit, CMLGraph_t ir) {
 
     /* Don't cache an empty or truncated trace: an empty one would "replay" as a
      * no-op and a truncated one would skip the graph's tail, either way returning
-     * stale outputs. Leaving it uncached means the next call re-executes for real. */
+     * stale outputs. Leaving it uncached means the next call re-executes for real.
+     *
+     * An EMPTY trace is also worth remembering as such. The CPU path records
+     * nothing, so without a negative entry every execute re-allocated a CMLTrace
+     * and re-hashed the graph to rediscover that -- pure overhead on the default
+     * path (about 37% of a small step, measured). A truncated trace is not
+     * negatively cached: it recorded work, just not all of it, and a different
+     * run could fit. */
     if (trace->num_entries == 0 || !trace->is_complete) {
+        bool empty = (trace->num_entries == 0);
         cml_trace_free(trace);
+        if (empty && jit->count < CML_JIT_CACHE_SIZE) {
+            idx = hash % CML_JIT_CACHE_SIZE;
+            for (int probe = 0; probe < CML_JIT_CACHE_SIZE; probe++) {
+                uint64_t slot      = (idx + (uint64_t)probe) % CML_JIT_CACHE_SIZE;
+                CMLJitEntry* entry = &jit->entries[slot];
+                if (!entry->occupied) {
+                    entry->graph_hash      = hash;
+                    entry->trace           = NULL;
+                    entry->records_nothing = true;
+                    memcpy(entry->shape_sig, sig, sizeof(int) * (size_t)sig_len);
+                    entry->shape_len = sig_len;
+                    entry->occupied  = true;
+                    jit->count++;
+                    break;
+                }
+            }
+        }
         return rc;
     }
 

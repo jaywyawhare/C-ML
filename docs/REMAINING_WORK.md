@@ -491,6 +491,36 @@ fallback:
   node-pointer version was reverted rather than shipped, because a latent
   use-after-free to satisfy a checkbox is worse than an inert feature.
 
+  **Measured, and it inverts the priority.** A 24-node chain of 4096-element ops,
+  repeated `cml_ir_clear_executed` + `cml_ir_execute` (the path TinyJit dispatches
+  on):
+
+  | path | us/iter |
+  | --- | --- |
+  | `TINYJIT` on (before) | 6.7 |
+  | `TINYJIT=0` | 4.9 |
+  | `cml_ir_reexecute` (bypasses TinyJit) | 4.8 |
+
+  So the feature *cost* ~1.8us of a 4.9us step — about **37%** — to allocate a
+  ~25KB `CMLTrace`, hash the graph and probe the cache, then fall through, on every
+  single execute of the default path. Meanwhile the most a working replay could
+  ever recover is the 4.9 -> 4.8 gap, roughly **2%**: the graph walk it would skip
+  is already nearly free, because decompose is guarded by `is_decomposed` and the
+  fusers are idempotent, so neither re-runs.
+
+  That reverses what is worth doing. Implementing replay would risk silent
+  numerical corruption on the default path to chase 2%; **removing the wasted probe
+  was the actual win**. A graph shape that records nothing is now negatively cached
+  (`CMLJitEntry.records_nothing`), so the attempt is made a bounded number of times
+  instead of once per execute: overhead fell from 1.8us to 0.2us, about 89% of the
+  waste gone, with results unchanged.
+
+  Two executes are expected to attempt recording, not one: the first runs the
+  fusion pass, which rewrites nodes and changes the graph hash, so there is one
+  shape before fusion and one after. It is stable from then on --
+  `test_empty_trace_is_negatively_cached` asserts eight executes still cost only
+  those two, and that no replay is ever reported.
+
   **What a correct CPU replay would actually require** — the existing design is
   already slot-based and graph-independent, which is the right shape: entries hold
   *slot indices*, and `cml_trace_replay(trace, tensor_ptrs, n)` binds them to the
