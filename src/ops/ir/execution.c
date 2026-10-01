@@ -5415,6 +5415,15 @@ void cml_reset_exec_stats(void) {
  * g_in_jit guards the re-entrancy (cml_tinyjit_execute calls cml_ir_execute
  * internally to record the fused execution on first sight). */
 static CMLTinyJit* g_tinyjit = NULL;
+
+/* Replay hits on the process-global TinyJit (opt-in TINYJIT_REPLAY path). Lets a
+ * test confirm replay actually engaged rather than only that results are correct. */
+size_t cml_ir_tinyjit_replay_hits(void) {
+    size_t h = 0;
+    if (g_tinyjit)
+        cml_tinyjit_stats(g_tinyjit, &h, NULL, NULL);
+    return h;
+}
 static __thread int g_in_jit = 0;
 
 static int cml_tinyjit_active(void) {

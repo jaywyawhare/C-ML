@@ -487,6 +487,26 @@ fallback:
   original assessment holds; recording it as a trace of IR nodes cannot work. Worth
   writing down so it is not re-attempted the same way.
 
+  **Update — a safe opt-in replay now exists** (`TINYJIT_REPLAY=1`, default off).
+  The insight the analysis below reaches — "record ops plus buffers with an
+  executor of their own" — is sidestepped by *not serializing a trace at all*:
+  replay drives the **live** graph's nodes through `cpu_execute_node` in
+  `head->next` order, skipping only `cpu_execute_ir`'s DCE marking and scheduler
+  dispatch. There is nothing to go stale (no copied params, no slot binding, no
+  `IRNode*` outliving its graph), which removes every hazard the serialized-trace
+  route hit. A shape is replayed only after `cml_tinyjit_verify()` recomputes
+  every node into scratch buffers and confirms the plain walk reproduces the
+  scheduled result **bit-for-bit**; a shape it cannot reproduce is poisoned, never
+  mis-run. It stays **off by default**, so the standard path is byte-for-byte
+  unchanged, and it is scoped honestly: it verifies against the **unfused** walk,
+  so with the fusion scheduler on (the default) fused graphs poison and fall back
+  — replay engages for the `FUSION_SCHEDULER=0` path. `tests/test_tiny_jit_replay.c`
+  reuses one graph shape with *different* input data every iteration (the hash is
+  structural, not data-dependent): a stale replay would return the first run's
+  values and fail, so passing proves replay recomputes from the live buffers, and
+  a hit count > 0 proves it actually engaged. The measured-cost analysis below
+  still holds — this is a correctness-preserving opt-in, not a default win.
+
   `cml_trace_get_active` and `cml_trace_record_kernel` have no call sites outside
   `trace.c`, so no trace ever captured anything and the JIT could never engage.
   The obvious CPU fix looks easy: `cpu_execute_node()` exists, so record the node

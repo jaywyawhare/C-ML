@@ -2,8 +2,10 @@
 #include "ops/ir/internal.h"
 #include "ops/ir/trace.h"
 #include "ops/ir/execution.h"
+#include "tensor/tensor.h"
 #include "core/logging.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "alloc/cml_allocator.h"
@@ -42,9 +44,180 @@ void cml_tinyjit_free(CMLTinyJit* jit) {
     cml_free(jit);
 }
 
+/* ---- Opt-in CPU replay (TINYJIT_REPLAY=1) ------------------------------------
+ * Replay executes the *live* graph by a plain head->next walk of
+ * cpu_execute_node, skipping cpu_execute_ir's DCE marking and scheduler
+ * dispatch. Because it drives the real per-node kernels over the real nodes,
+ * there is no serialized trace to go stale (no copied params, no slot binding,
+ * no IRNode* outliving its graph) -- the hazards that made a serialized CPU
+ * trace unsafe. A shape is only ever replayed after a self-check proves the
+ * walk reproduces the scheduled execution bit-for-bit, so a graph whose correct
+ * result depends on the scheduler's ordering is poisoned, not mis-run. Off by
+ * default: the standard path is byte-for-byte unchanged. */
+static int cml_tinyjit_replay_enabled(void) {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("TINYJIT_REPLAY");
+        v             = (e && e[0] == '1') ? 1 : 0;
+    }
+    return v;
+}
+
+static int cml_tinyjit_plain_walk(CMLGraph_t ir) {
+    for (struct IRNode* node = ir->head; node; node = node->next) {
+        if (!node->output)
+            continue;
+        if (cpu_execute_node(node) != 0)
+            return -1;
+    }
+    return 0;
+}
+
+/* Recompute every node into scratch buffers and require bit-identical results
+ * against the just-produced real outputs. The live outputs are swapped out and
+ * restored, so a failed check never corrupts the current execution. */
+static bool cml_tinyjit_verify(CMLGraph_t ir) {
+    int n = 0;
+    for (struct IRNode* nd = ir->head; nd; nd = nd->next)
+        n++;
+    if (n == 0)
+        return false;
+
+    typedef struct {
+        Tensor* out;
+        void* real;
+        bool owns;
+        bool cache;
+        size_t bytes;
+    } Saved;
+    Saved* sv = (Saved*)cml_calloc((size_t)n, sizeof(Saved));
+    if (!sv)
+        return false;
+
+    bool fatal = false;
+    int idx    = 0;
+    for (struct IRNode* nd = ir->head; nd; nd = nd->next, idx++) {
+        Tensor* o   = nd->output;
+        sv[idx].out = o;
+        if (!o || !o->data || o->numel == 0)
+            continue;
+        size_t bytes  = o->numel * cml_dtype_size(o->dtype);
+        void* scratch = cml_buffer_cache_alloc(bytes);
+        if (!scratch) {
+            fatal = true;
+            break;
+        }
+        sv[idx].real         = o->data;
+        sv[idx].owns         = o->owns_data;
+        sv[idx].cache        = o->from_buffer_cache;
+        sv[idx].bytes        = bytes;
+        o->data              = scratch;
+        o->owns_data         = true;
+        o->from_buffer_cache = true;
+    }
+
+    bool verified = false;
+    if (!fatal && cml_tinyjit_plain_walk(ir) == 0) {
+        verified = true;
+        idx      = 0;
+        for (struct IRNode* nd = ir->head; nd; nd = nd->next, idx++) {
+            if (!sv[idx].real)
+                continue;
+            Tensor* o = sv[idx].out;
+            if (!o->data || memcmp(o->data, sv[idx].real, sv[idx].bytes) != 0) {
+                verified = false;
+                break;
+            }
+        }
+    }
+
+    /* Restore the real outputs; free whatever the walk left behind. */
+    idx = 0;
+    for (struct IRNode* nd = ir->head; nd; nd = nd->next, idx++) {
+        if (!sv[idx].real)
+            continue;
+        Tensor* o = sv[idx].out;
+        if (o->data && o->data != sv[idx].real) {
+            if (o->from_buffer_cache)
+                cml_buffer_cache_free(o->data, sv[idx].bytes);
+            else if (o->owns_data)
+                cml_free(o->data);
+        }
+        o->data              = sv[idx].real;
+        o->owns_data         = sv[idx].owns;
+        o->from_buffer_cache = sv[idx].cache;
+    }
+    cml_free(sv);
+    return verified;
+}
+
+static CMLJitEntry* cml_tinyjit_find(CMLTinyJit* jit, uint64_t hash, const int* sig, int sig_len) {
+    uint64_t idx = hash % CML_JIT_CACHE_SIZE;
+    for (int probe = 0; probe < CML_JIT_CACHE_SIZE; probe++) {
+        CMLJitEntry* e = &jit->entries[(idx + (uint64_t)probe) % CML_JIT_CACHE_SIZE];
+        if (!e->occupied)
+            return NULL;
+        if (e->graph_hash == hash && shape_matches(e, sig, sig_len))
+            return e;
+    }
+    return NULL;
+}
+
+static CMLJitEntry* cml_tinyjit_insert(CMLTinyJit* jit, uint64_t hash, const int* sig,
+                                       int sig_len) {
+    if (jit->count >= CML_JIT_CACHE_SIZE)
+        return NULL;
+    uint64_t idx = hash % CML_JIT_CACHE_SIZE;
+    for (int probe = 0; probe < CML_JIT_CACHE_SIZE; probe++) {
+        CMLJitEntry* e = &jit->entries[(idx + (uint64_t)probe) % CML_JIT_CACHE_SIZE];
+        if (!e->occupied) {
+            e->graph_hash   = hash;
+            e->trace        = NULL;
+            e->shape_len    = sig_len;
+            e->replay_state = 0;
+            memcpy(e->shape_sig, sig, sizeof(int) * (size_t)sig_len);
+            e->occupied = true;
+            jit->count++;
+            return e;
+        }
+    }
+    return NULL;
+}
+
+static int cml_tinyjit_cpu_replay(CMLTinyJit* jit, CMLGraph_t ir) {
+    uint64_t hash = cml_ir_graph_hash(ir);
+    int sig[32];
+    int sig_len = 0;
+    compute_shape_sig(ir, sig, &sig_len, 32);
+
+    CMLJitEntry* e = cml_tinyjit_find(jit, hash, sig, sig_len);
+
+    if (e && e->replay_state == 1) {
+        if (cml_tinyjit_plain_walk(ir) == 0) {
+            jit->hits++;
+            return 0;
+        }
+        e->replay_state = 2; /* unexpected walk failure -> never replay again */
+    }
+
+    int rc = cml_ir_execute(ir);
+    if (rc != 0)
+        return rc;
+    jit->misses++;
+
+    if (!e)
+        e = cml_tinyjit_insert(jit, hash, sig, sig_len);
+    if (e && e->replay_state == 0)
+        e->replay_state = cml_tinyjit_verify(ir) ? 1 : 2;
+    return 0;
+}
+
 int cml_tinyjit_execute(CMLTinyJit* jit, CMLGraph_t ir) {
     if (!jit || !ir)
         return -1;
+
+    if (cml_tinyjit_replay_enabled())
+        return cml_tinyjit_cpu_replay(jit, ir);
 
     uint64_t hash = cml_ir_graph_hash(ir);
     int sig[32];

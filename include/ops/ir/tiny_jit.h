@@ -38,6 +38,13 @@ typedef struct {
      * execute. Measured on a 24-node chain, re-probing cost ~1.8us of a 4.9us
      * step, about 37%, for a trace that could never hit. */
     bool records_nothing;
+
+    /* CPU replay (opt-in, TINYJIT_REPLAY=1): a verified shape can be executed by
+     * a plain head->next node walk that bypasses the DCE/fusion scheduler. The
+     * walk is trusted only after a self-check recomputes every node into scratch
+     * buffers and confirms bit-identical results, so a shape the walk would
+     * mis-order can never return wrong values. 0=unchecked, 1=verified, 2=poisoned. */
+    signed char replay_state;
 } CMLJitEntry;
 
 typedef struct {

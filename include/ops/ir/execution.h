@@ -9,6 +9,9 @@ extern "C" {
 #endif
 
 int cml_ir_execute(CMLGraph_t ir);
+
+/* Replay-hit count on the global TinyJit (TINYJIT_REPLAY path); for tests. */
+size_t cml_ir_tinyjit_replay_hits(void);
 int cml_ir_execute_cpu(CMLGraph_t ir);
 
 /* Simple scalar interpreter used as a fallback when other backends
