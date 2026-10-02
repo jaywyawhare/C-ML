@@ -17,6 +17,7 @@ import numpy as np
 import pytest
 
 torch = pytest.importorskip("torch")
+import torch.nn.functional as F
 
 import cml
 
@@ -46,6 +47,29 @@ def _check(name, x_np, cml_fn, torch_fn):
         f"{name}: grad mismatch (max {np.abs(gc - gt).max():.3e})"
 
 
+def _check_bin(name, a_np, b_np, cml_fn, torch_fn):
+    """Compare forward + both input grads of a two-input op (broadcasting aware)."""
+    ac = cml.Tensor(a_np.copy()); ac.requires_grad_(True)
+    bc = cml.Tensor(b_np.copy()); bc.requires_grad_(True)
+    oc = cml_fn(ac, bc)
+    fwd_c = np.asarray(oc.numpy())
+    oc.sum().backward()
+    ga_c = np.asarray(ac.grad.numpy())
+    gb_c = np.asarray(bc.grad.numpy())
+
+    at = torch.tensor(a_np, requires_grad=True)
+    bt = torch.tensor(b_np, requires_grad=True)
+    ot = torch_fn(at, bt)
+    ot.sum().backward()
+
+    assert np.allclose(fwd_c.reshape(ot.shape), ot.detach().numpy(), atol=TOL, rtol=TOL), \
+        f"{name}: forward mismatch"
+    assert np.allclose(ga_c.reshape(a_np.shape), at.grad.numpy(), atol=TOL, rtol=TOL), \
+        f"{name}: grad-a mismatch"
+    assert np.allclose(gb_c.reshape(b_np.shape), bt.grad.numpy(), atol=TOL, rtol=TOL), \
+        f"{name}: grad-b mismatch"
+
+
 rs = np.random.RandomState(7)
 X = rs.randn(4, 5).astype(np.float32)
 XPOS = np.abs(X) + 0.5  # strictly positive, for log/sqrt
@@ -73,15 +97,7 @@ def test_binary_parity():
         ("sub", lambda x, y: x - y, lambda x, y: x - y),
         ("mul", lambda x, y: x * y, lambda x, y: x * y),
     ]:
-        ac = cml.Tensor(a.copy()); ac.requires_grad_(True)
-        bc = cml.Tensor(b.copy()); bc.requires_grad_(True)
-        oc = cf(ac, bc); oc.sum().backward()
-        at = torch.tensor(a, requires_grad=True)
-        bt = torch.tensor(b, requires_grad=True)
-        ot = tf(at, bt); ot.sum().backward()
-        assert np.allclose(np.asarray(oc.numpy()), ot.detach().numpy(), atol=TOL), name
-        assert np.allclose(np.asarray(ac.grad.numpy()), at.grad.numpy(), atol=TOL), f"{name} da"
-        assert np.allclose(np.asarray(bc.grad.numpy()), bt.grad.numpy(), atol=TOL), f"{name} db"
+        _check_bin(name, a, b, cf, tf)
 
 
 def test_matmul_parity():
@@ -266,3 +282,86 @@ def test_where_parity():
     assert np.allclose(np.asarray(oc.numpy()), ot.detach().numpy(), atol=TOL), "where fwd"
     assert np.allclose(np.asarray(ac.grad.numpy()), at.grad.numpy(), atol=TOL), "where da"
     assert np.allclose(np.asarray(bc.grad.numpy()), bt.grad.numpy(), atol=TOL), "where db"
+
+
+# ── parity at scale ────────────────────────────────────────────────────────
+# Sweep the proven differentiable ops over a grid of ranks and broadcast-prone
+# shapes, checking forward AND input-grad against torch for every combination.
+SWEEP_SHAPES = [(1,), (7,), (3, 4), (1, 5), (5, 1),
+                (2, 3, 4), (2, 1, 4), (1, 3, 1), (2, 3, 4, 5)]
+
+_GEN_UNARY = [
+    ("relu", lambda t: t.relu(), torch.relu),
+    ("sigmoid", lambda t: t.sigmoid(), torch.sigmoid),
+    ("tanh", lambda t: t.tanh(), torch.tanh),
+    ("exp", lambda t: t.exp(), torch.exp),
+    ("sin", lambda t: t.sin(), torch.sin),
+    ("cos", lambda t: t.cos(), torch.cos),
+    ("square", lambda t: t.square(), lambda t: t * t),
+    ("sinh", lambda t: t.sinh(), torch.sinh),
+    ("gelu", lambda t: t.gelu(), lambda t: F.gelu(t, approximate="tanh")),
+    ("softplus", lambda t: t.softplus(), F.softplus),
+    ("softsign", lambda t: t.softsign(), F.softsign),
+    ("logsigmoid", lambda t: t.logsigmoid(), F.logsigmoid),
+]
+_POS_UNARY = [
+    ("log", lambda t: t.log(), torch.log),
+    ("sqrt", lambda t: t.sqrt(), torch.sqrt),
+    ("rsqrt", lambda t: t.rsqrt(), torch.rsqrt),
+    ("reciprocal", lambda t: t.reciprocal(), torch.reciprocal),
+    ("log10", lambda t: t.log10(), torch.log10),
+]
+
+
+@pytest.mark.parametrize("shape", SWEEP_SHAPES)
+@pytest.mark.parametrize("name,cf,tf", _GEN_UNARY)
+def test_unary_shape_sweep(shape, name, cf, tf):
+    _check(f"{name}{shape}", rs.randn(*shape).astype(np.float32), cf, tf)
+
+
+@pytest.mark.parametrize("shape", SWEEP_SHAPES)
+@pytest.mark.parametrize("name,cf,tf", _POS_UNARY)
+def test_pos_unary_shape_sweep(shape, name, cf, tf):
+    x = (np.abs(rs.randn(*shape)) + 0.5).astype(np.float32)
+    _check(f"{name}{shape}", x, cf, tf)
+
+
+# Newly bound activations: lock in their backward pass (not only forward).
+@pytest.mark.parametrize("name,cf,tf,dom", [
+    ("cosh", lambda t: t.cosh(), torch.cosh, "x"),
+    ("asinh", lambda t: t.asinh(), torch.asinh, "x"),
+    ("atanh", lambda t: t.atanh(), torch.atanh, "unit"),
+    ("quick_gelu", lambda t: t.quick_gelu(), lambda t: t * torch.sigmoid(1.702 * t), "x"),
+    ("relu6", lambda t: t.relu6(), F.relu6, "x"),
+    ("hard_sigmoid", lambda t: t.hard_sigmoid(), F.hardsigmoid, "x"),
+    ("hard_tanh", lambda t: t.hard_tanh(), F.hardtanh, "x"),
+    ("celu", lambda t: t.celu(1.0), lambda t: F.celu(t, 1.0), "x"),
+])
+def test_new_activation_autograd(name, cf, tf, dom):
+    x = np.clip(X, -0.9, 0.9) if dom == "unit" else X
+    _check(name, x, cf, tf)
+
+
+# Broadcasting binaries: the backward must correctly sum-reduce over the
+# broadcast dimensions on each operand.
+_BCAST_PAIRS = [
+    ((3, 4), (4,)),
+    ((3, 1), (1, 4)),
+    ((2, 3, 4), (3, 4)),
+    ((2, 3, 4), (1,)),
+    ((2, 1, 4), (2, 3, 4)),
+]
+
+
+@pytest.mark.parametrize("sa,sb", _BCAST_PAIRS)
+@pytest.mark.parametrize("name,cf,tf", [
+    ("add", lambda x, y: x + y, lambda x, y: x + y),
+    ("sub", lambda x, y: x - y, lambda x, y: x - y),
+    ("mul", lambda x, y: x * y, lambda x, y: x * y),
+    ("minimum", lambda x, y: x.minimum(y), torch.minimum),
+    ("maximum", lambda x, y: x.maximum(y), torch.maximum),
+])
+def test_binary_broadcast_sweep(sa, sb, name, cf, tf):
+    a = rs.randn(*sa).astype(np.float32)
+    b = rs.randn(*sb).astype(np.float32)
+    _check_bin(f"{name}{sa}x{sb}", a, b, cf, tf)
