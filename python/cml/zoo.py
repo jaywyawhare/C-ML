@@ -162,20 +162,29 @@ def _build_vgg(cfg, num_classes, pretrained, name, dtype, device):
 
 
 def _try_load_pretrained(model, name):
+    """Load cached pretrained weights into `model`.
+
+    Weights live at ``$CML_WEIGHTS_DIR/<name>.safetensors`` (default
+    ``~/.cml/weights``) and are loaded through the real safetensors loader, which
+    matches parameters by their dotted module names and checks shapes. The old
+    path looked for a ``.bin`` and called a ``model_load`` C entry point that does
+    not exist, so `pretrained=True` silently loaded nothing.
+    """
     import os
+    from . import safetensors as _st
+
     weights_dir = os.environ.get("CML_WEIGHTS_DIR",
-                                  os.path.expanduser("~/.cml/weights"))
-    path = os.path.join(weights_dir, f"{name}.bin")
+                                 os.path.expanduser("~/.cml/weights"))
+    path = os.path.join(weights_dir, f"{name}.safetensors")
 
     if os.path.exists(path):
         try:
-            lib = _get_lib()
-            if hasattr(lib, 'model_load'):
-                lib.model_load(model._handle, path.encode())
-        except Exception as e:
-            print(f"Warning: Failed to load pretrained weights for {name}: {e}")
+            loaded = _st.load_pretrained(model, path)
+            print(f"Loaded {loaded} pretrained tensors for '{name}' from {path}")
+        except Exception as e:  # noqa: BLE001 - surface any load failure, don't crash construction
+            print(f"Warning: failed to load pretrained weights for '{name}': {e}")
     else:
-        print(f"Note: Pretrained weights not found at {path}. "
+        print(f"Note: pretrained weights not found at {path}. "
               f"Download with: cml.zoo.download_weights('{name}')")
 
 
@@ -188,14 +197,14 @@ def download_weights(model_name, weights_dir=None):
                                       os.path.expanduser("~/.cml/weights"))
 
     os.makedirs(weights_dir, exist_ok=True)
-    path = os.path.join(weights_dir, f"{model_name}.bin")
+    path = os.path.join(weights_dir, f"{model_name}.safetensors")
 
     if os.path.exists(path):
         print(f"Weights already cached: {path}")
         return path
 
     base_url = os.environ.get("CML_WEIGHTS_URL", "https://weights.cml-lib.org/v1")
-    url = f"{base_url}/{model_name}.bin"
+    url = f"{base_url}/{model_name}.safetensors"
 
     print(f"Downloading weights: {url} -> {path}")
     try:
