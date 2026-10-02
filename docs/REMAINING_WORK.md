@@ -737,6 +737,28 @@ matching hardware or toolchain can pick them up directly.
 
 ---
 
+## 11. FFT: only the forward 1-D transform is correct
+
+While widening the Python surface, the FFT family was checked against
+`numpy.fft`:
+
+- `cml_fft(x, inverse=0)` on a complex `[n, 2]` signal matches `np.fft.fft`
+  to `atol=1e-3`. **Exposed** as `Tensor.fft()`.
+- `cml_fft(x, inverse=1)` (inverse 1-D) returns a **null tensor** — fails at
+  realization. Not exposed.
+- `cml_fft2(x, inverse=0/1)` (2-D, on `[H, W, 2]`) also returns a **null
+  tensor**. Not exposed.
+
+So the Python binding deliberately ships forward-1-D only. The C inverse and
+2-D paths (`src/.../fft*`, declared in `include/cml.h:98-99`) need to be
+implemented/fixed and verified against `np.fft.ifft` / `np.fft.fft2` before a
+`Tensor.ifft()` / `Tensor.fft2()` can be bound. Repro: build the cffi
+extension, then `cml.Tensor(np.zeros((n,2),np.float32)) .fft()` works but the
+`inverse=1` / `fft2` calls yield a tensor that raises "Cannot convert null
+tensor to numpy".
+
+---
+
 ## Build & Test
 
 ```bash
