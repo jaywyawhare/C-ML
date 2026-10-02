@@ -34,7 +34,7 @@ def test_diag_extract_and_build():
     assert np.allclose(_t(A).diag().numpy().ravel(), np.diag(A))
     assert np.allclose(_t(A).diag(1).numpy().ravel(), np.diag(A, 1))
     v = np.array([5, 6, 7], dtype=np.float32)
-    assert np.allclose(_t(v).diag().numpy(), np.diag(v))  # 1-D -> diagonal matrix
+    assert np.allclose(_t(v).diag().numpy(), np.diag(v))
 
 
 def test_repeat_and_tile():
@@ -89,7 +89,7 @@ def test_outer():
 def test_hyperbolic_and_trunc():
     import torch
     A = (np.random.rand(3, 4).astype(np.float32) * 2 - 1)
-    Ap = np.random.rand(3, 4).astype(np.float32) + 1  # >1 for acosh
+    Ap = np.random.rand(3, 4).astype(np.float32) + 1
     a, ap = _t(A), _t(Ap)
     assert np.allclose(a.sinh().numpy(), np.sinh(A), atol=1e-4)
     assert np.allclose(a.cosh().numpy(), np.cosh(A), atol=1e-4)
@@ -162,7 +162,7 @@ def test_scatter():
 
 def test_fft_forward():
     x = np.random.rand(8).astype(np.float32)
-    xi = np.stack([x, np.zeros_like(x)], axis=1)  # [n,2] complex
+    xi = np.stack([x, np.zeros_like(x)], axis=1)
     out = _t(xi).fft().numpy()
     ref = np.fft.fft(x)
     assert np.allclose(out[:, 0], ref.real, atol=1e-3)
