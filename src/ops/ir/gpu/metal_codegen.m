@@ -2,6 +2,7 @@
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
 #include "core/logging.h"
+#include "alloc/cml_allocator.h"
 
 #import <Metal/Metal.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -585,7 +586,10 @@ static int download_tensor(CMLMetalBackend* b,
     if (!gpu_buf) return -1;
     size_t bytes = t->numel * sizeof(float);
     if (!t->data) {
-        t->data = malloc(bytes);
+        /* cml_malloc, not malloc: tensor_free releases owned data with
+         * cml_free, which reads an allocation header in front of the pointer.
+         * For a page-aligned malloc block that read faults (SIGBUS on macOS). */
+        t->data = cml_malloc(bytes);
         if (!t->data) return -1;
         t->owns_data = true;
     }
@@ -1132,7 +1136,7 @@ int cml_metal_execute_graph(CMLMetalBackend* backend, CMLGraph_t graph) {
                 if (!consumed) {
                     size_t bytes = t->numel * sizeof(float);
                     if (!t->data) {
-                        t->data = malloc(bytes);
+                        t->data = cml_malloc(bytes);
                         if (t->data) t->owns_data = true;
                     }
                     if (t->data) {
