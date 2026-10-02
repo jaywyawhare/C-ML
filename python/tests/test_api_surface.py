@@ -50,3 +50,17 @@ def test_gather_along_dim0():
     idx = [2, 0, 1]
     got = _t(A).gather(0, _t(idx)).numpy()
     assert np.allclose(got, A[idx])
+
+
+def test_permute():
+    A = np.arange(24, dtype=np.float32).reshape(2, 3, 4)
+    a = _t(A)
+    for axes in ((2, 0, 1), (0, 2, 1), (2, 1, 0)):
+        assert np.allclose(a.permute(*axes).numpy(), np.transpose(A, axes)), f"permute {axes}"
+
+
+def test_expand():
+    B = np.arange(3, dtype=np.float32).reshape(1, 3)
+    assert np.allclose(_t(B).expand(4, 3).numpy(), np.broadcast_to(B, (4, 3)))
+    C = np.arange(2, dtype=np.float32).reshape(2, 1)
+    assert np.allclose(_t(C).expand(2, 5).numpy(), np.broadcast_to(C, (2, 5)))

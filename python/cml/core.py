@@ -559,6 +559,22 @@ class Tensor:
         idx = index if isinstance(index, Tensor) else Tensor(index)
         return Tensor(lib.uop_gather(self._tensor, idx._tensor, int(dim)))
 
+    def permute(self, *dims) -> "Tensor":
+        """Reorder dimensions (torch.Tensor.permute / np.transpose)."""
+        if len(dims) == 1 and isinstance(dims[0], (list, tuple)):
+            dims = tuple(dims[0])
+        perm = ffi.new("int[]", [int(d) for d in dims])
+        params = ffi.new("PermuteParams*", {"perm": perm, "num_dims": len(dims)})
+        return Tensor(lib.uop_permute(self._tensor, params))
+
+    def expand(self, *shape) -> "Tensor":
+        """Broadcast to a larger shape without copying (torch.Tensor.expand)."""
+        if len(shape) == 1 and isinstance(shape[0], (list, tuple)):
+            shape = tuple(shape[0])
+        ns = ffi.new("int[]", [int(d) for d in shape])
+        params = ffi.new("ExpandParams*", {"new_shape": ns, "new_ndim": len(shape)})
+        return Tensor(lib.uop_expand(self._tensor, params))
+
     def sum(self, dim=-1, keepdim=False):
         return Tensor(lib.cml_sum(self._tensor, dim, keepdim))
 
