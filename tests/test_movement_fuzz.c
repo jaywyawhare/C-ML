@@ -89,6 +89,11 @@ static void coords_of(size_t flat, const int* shape, int ndim, int* c) {
 }
 
 static size_t flat_of(const int* c, const size_t* st, int ndim) {
+    /* Every coordinate array here holds MAXD + 2 entries. Saying so lets gcc
+     * see the reads stay in bounds; without it gcc 13 -O3 reports the fully
+     * zero-initialized scratch arrays as "may be used uninitialized". */
+    if (ndim > MAXD + 2)
+        ndim = MAXD + 2;
     size_t f = 0;
     for (int d = 0; d < ndim; d++)
         f += (size_t)c[d] * st[d];
@@ -148,9 +153,7 @@ static void check(int op, int iter, Tensor* r, const int* want_shape, int want_n
 
     size_t n_out = numel_of(want_shape, want_nd);
     for (size_t i = 0; i < n_out; i++) {
-        /* Zeroed: coords_of fills only want_nd slots, but the reference
-         * callbacks copy x->nd of them, and gcc cannot prove the two match. */
-        int c[MAXD + 2] = {0};
+        int c[MAXD + 2];
         coords_of(i, want_shape, want_nd, c);
         float want = ref(c, ctx);
         float got  = tensor_get_float(r, i);
