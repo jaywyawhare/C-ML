@@ -422,6 +422,9 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    /* Unbuffered: under ctest stdout is a pipe, and a crash would otherwise
+     * discard everything printed so far, hiding which backend failed. */
+    setvbuf(stdout, NULL, _IONBF, 0);
     printf("\nCML Backend Performance Benchmark\n");
 
     srand(42);

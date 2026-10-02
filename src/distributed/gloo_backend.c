@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include "alloc/cml_allocator.h"
+#include "sock_util.h"
 
 #define GLOO_DEFAULT_PORT_BASE 29500
 #define GLOO_DEFAULT_MASTER_ADDR "127.0.0.1"
@@ -459,36 +460,20 @@ static int gloo_init(void* ctx, int world_size, int rank) {
 
     /* Connect to all higher-ranked peers */
     for (int peer = rank + 1; peer < world_size; peer++) {
-        int sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (sock < 0) {
-            LOG_ERROR("Gloo init: failed to create socket for peer %d: %s", peer, strerror(errno));
-            goto cleanup_error;
-        }
-
         struct sockaddr_in peer_addr;
         memset(&peer_addr, 0, sizeof(peer_addr));
         peer_addr.sin_family = AF_INET;
         peer_addr.sin_port   = htons((uint16_t)(gctx->port_base + peer));
         if (inet_pton(AF_INET, gctx->master_addr, &peer_addr.sin_addr) <= 0) {
             LOG_ERROR("Gloo init: invalid master address '%s'", gctx->master_addr);
-            close(sock);
             goto cleanup_error;
         }
 
-        /* Retry connection since peer might not be listening yet */
-        int connected = 0;
-        for (int retry = 0; retry < GLOO_MAX_CONNECT_RETRIES; retry++) {
-            if (connect(sock, (struct sockaddr*)&peer_addr, sizeof(peer_addr)) == 0) {
-                connected = 1;
-                break;
-            }
-            usleep(GLOO_CONNECT_RETRY_US);
-        }
-
-        if (!connected) {
+        int sock = cml_sock_connect_retry((struct sockaddr*)&peer_addr, sizeof(peer_addr),
+                                          GLOO_MAX_CONNECT_RETRIES, GLOO_CONNECT_RETRY_US);
+        if (sock < 0) {
             LOG_ERROR("Gloo init: failed to connect to rank %d at %s:%d: %s", peer,
                       gctx->master_addr, gctx->port_base + peer, strerror(errno));
-            close(sock);
             goto cleanup_error;
         }
 

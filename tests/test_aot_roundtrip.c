@@ -406,6 +406,10 @@ static void test_multidim_reduce(void) {
 }
 
 int main(void) {
+#ifndef CML_HAS_LLVM_BACKEND
+    printf("SKIP: AOT compilation needs the LLVM backend (built without it)\n");
+    return 0;
+#endif
     if (cml_init() != 0) {
         printf("cml_init failed\n");
         return 1;

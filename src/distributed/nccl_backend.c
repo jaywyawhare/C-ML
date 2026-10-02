@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include "sock_util.h"
 #include "alloc/cml_allocator.h"
 
 #define NCCL_UNIQUE_ID_BYTES 128
@@ -178,33 +179,19 @@ static int nccl_exchange_unique_id(NCCLContext* nccl, int world_size, int rank, 
         return 0;
     }
 
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
-        LOG_ERROR("NCCL bootstrap: failed to create socket for rank %d", rank);
-        return -1;
-    }
-
     struct sockaddr_in master;
     memset(&master, 0, sizeof(master));
     master.sin_family = AF_INET;
     master.sin_port   = htons((uint16_t)port);
     if (inet_pton(AF_INET, master_addr, &master.sin_addr) <= 0) {
         LOG_ERROR("NCCL bootstrap: invalid MASTER_ADDR '%s'", master_addr);
-        close(sock);
         return -1;
     }
 
-    int connected = 0;
-    for (int retry = 0; retry < NCCL_BOOTSTRAP_RETRIES; retry++) {
-        if (connect(sock, (struct sockaddr*)&master, sizeof(master)) == 0) {
-            connected = 1;
-            break;
-        }
-        usleep(NCCL_BOOTSTRAP_RETRY_US);
-    }
-    if (!connected) {
+    int sock = cml_sock_connect_retry((struct sockaddr*)&master, sizeof(master),
+                                      NCCL_BOOTSTRAP_RETRIES, NCCL_BOOTSTRAP_RETRY_US);
+    if (sock < 0) {
         LOG_ERROR("NCCL bootstrap: failed to connect to %s:%d", master_addr, port);
-        close(sock);
         return -1;
     }
 

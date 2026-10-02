@@ -6,12 +6,15 @@
 #include <stdio.h>
 #include <errno.h>
 
-#ifdef __linux__
+#include "alloc/cml_allocator.h"
+
+/* mmap is POSIX, not Linux-only: gating it on __linux__ left macOS on the
+ * no-mmap path. */
+#ifndef _WIN32
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "alloc/cml_allocator.h"
 #define HAS_MMAP 1
 #else
 #define HAS_MMAP 0
@@ -231,37 +234,25 @@ CMLDiskTensor* cml_disk_mmap_tensor(CMLDiskBackend* backend, const char* name) {
     if (!path)
         return NULL;
 
+    /* Parse the header with stdio on every platform: the no-mmap path used to
+     * skip it, leaving ndim/data_size at 0 so cml_disk_tensor_to_tensor built
+     * an empty tensor instead of falling back to a file read. */
+    DiskTensorHeader hdr;
+    FILE* f   = fopen(path, "rb");
+    int valid = f && fread(&hdr, sizeof(hdr), 1, f) == 1 && memcmp(hdr.magic, "CMLTENS", 8) == 0;
+    if (f)
+        fclose(f);
+    if (!valid) {
+        cml_free(path);
+        return NULL;
+    }
+
     CMLDiskTensor* dt = (CMLDiskTensor*)cml_calloc(1, sizeof(CMLDiskTensor));
     if (!dt) {
         cml_free(path);
         return NULL;
     }
-    dt->file_path = path;
-
-#if HAS_MMAP
-    int fd = open(path, O_RDONLY);
-    if (fd < 0) {
-        cml_free(dt->file_path);
-        cml_free(dt);
-        return NULL;
-    }
-
-    /* Read header first */
-    DiskTensorHeader hdr;
-    if (read(fd, &hdr, sizeof(hdr)) != sizeof(hdr)) {
-        close(fd);
-        cml_free(dt->file_path);
-        cml_free(dt);
-        return NULL;
-    }
-
-    if (memcmp(hdr.magic, "CMLTENS", 8) != 0) {
-        close(fd);
-        cml_free(dt->file_path);
-        cml_free(dt);
-        return NULL;
-    }
-
+    dt->file_path   = path;
     dt->ndim        = hdr.ndim;
     dt->dtype       = (DType)hdr.dtype;
     dt->data_size   = hdr.data_size;
@@ -269,22 +260,19 @@ CMLDiskTensor* cml_disk_mmap_tensor(CMLDiskBackend* backend, const char* name) {
     for (int i = 0; i < hdr.ndim && i < 8; i++)
         dt->shape[i] = hdr.shape[i];
 
-    /* Memory map the file */
-    size_t total_size = sizeof(hdr) + hdr.data_size;
-    dt->mmap_addr     = mmap(NULL, total_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    close(fd);
-
-    if (dt->mmap_addr == MAP_FAILED) {
-        dt->mmap_addr = NULL;
-        dt->is_mapped = false;
-    } else {
-        dt->mmap_len  = total_size;
-        dt->is_mapped = true;
-        backend->num_mmaps++;
+#if HAS_MMAP
+    int fd = open(path, O_RDONLY);
+    if (fd >= 0) {
+        size_t total_size = sizeof(hdr) + hdr.data_size;
+        void* addr        = mmap(NULL, total_size, PROT_READ, MAP_PRIVATE, fd, 0);
+        close(fd);
+        if (addr != MAP_FAILED) {
+            dt->mmap_addr = addr;
+            dt->mmap_len  = total_size;
+            dt->is_mapped = true;
+            backend->num_mmaps++;
+        }
     }
-#else
-    /* No mmap support - fall back to regular loading */
-    dt->is_mapped = false;
 #endif
 
     return dt;

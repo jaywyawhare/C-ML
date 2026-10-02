@@ -133,7 +133,7 @@ static int test_mmap_tensor(void) {
     CMLDiskTensor* dt = cml_disk_mmap_tensor(b, "mmap_test");
     int ok            = (dt != NULL);
 
-    if (ok && dt->is_mapped) {
+    if (ok) {
         float buf[4];
         int ret = cml_disk_tensor_read(dt, buf, 0, sizeof(buf));
         ok      = (ret == 0);

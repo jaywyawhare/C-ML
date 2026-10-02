@@ -125,6 +125,9 @@ static const char* CONFIGS[] = {
 };
 #define NUM_CONFIGS ((int)(sizeof(CONFIGS) / sizeof(CONFIGS[0])))
 
+/* Path of this binary, from argv[0]: /proc/self/exe is Linux-only. */
+static const char* g_self;
+
 /* Re-exec self with `cfg` set, capturing stdout. */
 static char* capture(const char* cfg) {
     int fds[2];
@@ -149,7 +152,7 @@ static char* capture(const char* cfg) {
                 setenv(buf, eq + 1, 1);
             }
         }
-        execl("/proc/self/exe", "test_path_equivalence", "--battery", (char*)NULL);
+        execlp(g_self, "test_path_equivalence", "--battery", (char*)NULL);
         _exit(127);
     }
     close(fds[1]);
@@ -182,6 +185,7 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    g_self = argv[0];
     printf("Execution-path equivalence (%d configurations):\n", NUM_CONFIGS);
     char* base = capture(NULL);
     REQUIRE(base != NULL && base[0] != '\0');
