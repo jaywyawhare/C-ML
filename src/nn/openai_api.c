@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/tcp.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -213,12 +214,10 @@ static void handle_models(int fd, CMLOpenAIServer* srv) {
     send_http_response(fd, 200, "OK", "application/json", body);
 }
 
-static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json) {
+static void chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json,
+                             const ChatMessage* msgs, int num_msgs) {
     CMLLLaMAModel* model    = (CMLLLaMAModel*)srv->model;
     CMLTokenizer* tokenizer = (CMLTokenizer*)srv->tokenizer;
-
-    ChatMessage msgs[MAX_MESSAGES];
-    int num_msgs = parse_messages(body_json, msgs, MAX_MESSAGES);
 
     const char* model_p = json_find_key(body_json, "model");
     (void)model_p;
@@ -379,6 +378,22 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
     }
 }
 
+/* The message array lives on the heap: 64 messages are ~0.5 MB, more than a
+ * default macOS secondary-thread stack (512 KB), and the server normally runs
+ * on its own thread. On the stack it overflowed (SIGBUS) once inlined into
+ * handle_request, even for requests that never reach this handler. */
+static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json) {
+    ChatMessage* msgs = (ChatMessage*)cml_malloc(MAX_MESSAGES * sizeof(*msgs));
+    if (!msgs) {
+        send_http_response(fd, 500, "Internal Server Error", "application/json",
+                           "{\"error\":{\"message\":\"out of memory\"}}");
+        return;
+    }
+    int num_msgs = parse_messages(body_json, msgs, MAX_MESSAGES);
+    chat_completions(fd, srv, body_json, msgs, num_msgs);
+    cml_free(msgs);
+}
+
 /* Request dispatch */
 
 static void handle_request(int fd, CMLOpenAIServer* srv, const char* request) {
@@ -520,6 +535,18 @@ int cml_openai_server_run(CMLOpenAIServer* srv) {
     }
 
     while (srv->running) {
+        /* Poll with a timeout instead of blocking in accept(): stop() cannot
+         * rely on shutdown() of a listening socket to wake accept() -- Linux
+         * does, macOS does not, so the server thread never exited there. */
+        struct pollfd pfd = {.fd = srv->listen_fd, .events = POLLIN};
+        int ready         = poll(&pfd, 1, 100);
+        if (ready < 0 && errno != EINTR) {
+            LOG_ERROR("openai_api: poll() failed: %s", strerror(errno));
+            break;
+        }
+        if (ready <= 0)
+            continue;
+
         struct sockaddr_in client_addr;
         socklen_t addr_len = sizeof(client_addr);
         int client_fd      = accept(srv->listen_fd, (struct sockaddr*)&client_addr, &addr_len);

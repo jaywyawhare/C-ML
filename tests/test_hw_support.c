@@ -157,17 +157,9 @@ static int test_am_defines(void) {
     return 1;
 }
 
-static int test_amx_availability(void) {
-    bool avail = cml_amx_available();
-#if defined(__APPLE__) && defined(__aarch64__)
-    if (!avail)
-        return 0;
-#else
-    if (avail)
-        return 0;
-#endif
-    return 1;
-}
+/* No AMX matmul is wired up on any target (the kernels return -1), so it must
+ * never be advertised: tc_opt would route matmuls to the stub. */
+static int test_amx_availability(void) { return !cml_amx_available(); }
 
 static int test_amx_null_args(void) {
     int ret = cml_amx_matmul_f32(NULL, NULL, NULL, 0, 0, 0, 0, 0, 0);

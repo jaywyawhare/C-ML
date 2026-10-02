@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include "alloc/cml_allocator.h"
+#include "sock_util.h"
 
 #define IBV_QPT_RC 2
 #define IBV_QPS_INIT 1
@@ -492,26 +493,13 @@ static int mock_build_mesh(int rank, int ws) {
     }
 
     for (int peer = rank + 1; peer < ws; peer++) {
-        int s = socket(AF_INET, SOCK_STREAM, 0);
-        if (s < 0) {
-            close(lfd);
-            return -1;
-        }
         struct sockaddr_in pa;
         memset(&pa, 0, sizeof(pa));
         pa.sin_family = AF_INET;
         pa.sin_port   = htons((uint16_t)(base + peer));
         inet_pton(AF_INET, "127.0.0.1", &pa.sin_addr);
-        int conn = 0;
-        for (int r = 0; r < 100; r++) {
-            if (connect(s, (struct sockaddr*)&pa, sizeof(pa)) == 0) {
-                conn = 1;
-                break;
-            }
-            usleep(100000);
-        }
-        if (!conn) {
-            close(s);
+        int s = cml_sock_connect_retry((struct sockaddr*)&pa, sizeof(pa), 100, 100000);
+        if (s < 0) {
             close(lfd);
             return -1;
         }
@@ -811,22 +799,10 @@ static int tcp_exchange(const char* addr, int is_server, void* send_data, void* 
     } else {
         if (getaddrinfo(host, port_str, &hints, &res) != 0)
             return -1;
-        fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-        if (fd < 0) {
-            freeaddrinfo(res);
-            return -1;
-        }
-
-        int retries = 50;
-        while (connect(fd, res->ai_addr, res->ai_addrlen) < 0 && retries > 0) {
-            usleep(100000);
-            retries--;
-        }
+        fd = cml_sock_connect_retry(res->ai_addr, res->ai_addrlen, 50, 100000);
         freeaddrinfo(res);
-        if (retries <= 0) {
-            close(fd);
+        if (fd < 0)
             return -1;
-        }
     }
 
     ssize_t n = send(fd, send_data, size, 0);
