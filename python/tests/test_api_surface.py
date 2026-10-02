@@ -84,3 +84,66 @@ def test_outer():
     v = np.array([1, 2, 3], dtype=np.float32)
     w = np.array([4, 5], dtype=np.float32)
     assert np.allclose(_t(v).outer(_t(w)).numpy(), np.outer(v, w))
+
+
+def test_hyperbolic_and_trunc():
+    import torch
+    A = (np.random.rand(3, 4).astype(np.float32) * 2 - 1)
+    Ap = np.random.rand(3, 4).astype(np.float32) + 1  # >1 for acosh
+    a, ap = _t(A), _t(Ap)
+    assert np.allclose(a.sinh().numpy(), np.sinh(A), atol=1e-4)
+    assert np.allclose(a.cosh().numpy(), np.cosh(A), atol=1e-4)
+    assert np.allclose(a.asinh().numpy(), np.arcsinh(A), atol=1e-4)
+    assert np.allclose(ap.acosh().numpy(), np.arccosh(Ap), atol=1e-4)
+    assert np.allclose(a.atanh().numpy(), np.arctanh(A), atol=1e-4)
+    assert np.allclose(a.trunc().numpy(), np.trunc(A), atol=1e-4)
+    assert np.allclose(a.erfc().numpy(), torch.special.erfc(torch.from_numpy(A)).numpy(), atol=1e-4)
+
+
+def test_predicates():
+    B = np.array([[1.0, np.nan, np.inf], [-np.inf, 2.0, 0.0]], dtype=np.float32)
+    b = _t(B)
+    assert np.allclose(b.isnan().numpy(), np.isnan(B))
+    assert np.allclose(b.isinf().numpy(), np.isinf(B))
+    assert np.allclose(b.isfinite().numpy(), np.isfinite(B))
+    C = np.array([[0.0, 1.0, 2.0], [0.0, 0.0, 3.0]], dtype=np.float32)
+    assert np.allclose(_t(C).logical_not().numpy(), np.logical_not(C))
+
+
+def test_activations_vs_torch():
+    import torch
+    import torch.nn.functional as F
+    A = np.random.rand(3, 4).astype(np.float32) * 2 - 1
+    a, T = _t(A), torch.from_numpy(A)
+    assert np.allclose(a.gelu().numpy(), F.gelu(T, approximate="tanh").numpy(), atol=1e-4)
+    assert np.allclose(a.quick_gelu().numpy(), (T * torch.sigmoid(1.702 * T)).numpy(), atol=1e-4)
+    assert np.allclose(a.relu6().numpy(), F.relu6(T).numpy(), atol=1e-4)
+    assert np.allclose(a.hard_sigmoid().numpy(), F.hardsigmoid(T).numpy(), atol=1e-4)
+    assert np.allclose(a.hard_tanh().numpy(), F.hardtanh(T).numpy(), atol=1e-4)
+    assert np.allclose(a.softplus().numpy(), F.softplus(T).numpy(), atol=1e-4)
+    assert np.allclose(a.softsign().numpy(), F.softsign(T).numpy(), atol=1e-4)
+    assert np.allclose(a.logsigmoid().numpy(), F.logsigmoid(T).numpy(), atol=1e-4)
+    assert np.allclose(a.celu(1.0).numpy(), F.celu(T, 1.0).numpy(), atol=1e-4)
+
+
+def test_elementwise_min_max_and_masked_fill():
+    X = np.random.rand(3, 4).astype(np.float32)
+    Y = np.random.rand(3, 4).astype(np.float32)
+    x, y = _t(X), _t(Y)
+    assert np.allclose(x.minimum(y).numpy(), np.minimum(X, Y))
+    assert np.allclose(x.maximum(y).numpy(), np.maximum(X, Y))
+    M = (X > 0.5)
+    assert np.allclose(x.masked_fill(_t(M.astype(np.float32)), -1.0).numpy(), np.where(M, -1.0, X))
+
+
+def test_repeat_interleave_diagonal_cummaxmin():
+    V = np.array([1, 2, 3], dtype=np.float32)
+    assert np.allclose(_t(V).repeat_interleave(2, 0).numpy(), np.repeat(V, 2))
+    D = np.arange(12, dtype=np.float32).reshape(3, 4)
+    d = _t(D)
+    assert np.allclose(d.diagonal(0, 0, 1).numpy(), np.diagonal(D, 0, 0, 1))
+    assert np.allclose(d.diagonal(1, 0, 1).numpy(), np.diagonal(D, 1, 0, 1))
+    W = np.array([[1., 3., 2., 5., 4.]], dtype=np.float32)
+    w = _t(W)
+    assert np.allclose(w.cummax(1).numpy(), np.maximum.accumulate(W, axis=1))
+    assert np.allclose(w.cummin(1).numpy(), np.minimum.accumulate(W, axis=1))

@@ -815,6 +815,57 @@ class Tensor:
     def floor(self) -> "Tensor": return Tensor(lib.cml_floor(self._tensor))
     def square(self) -> "Tensor": return Tensor(lib.cml_square(self._tensor))
     def round(self, decimals: int = 0) -> "Tensor": return Tensor(lib.cml_round(self._tensor))
+    def sinh(self) -> "Tensor": return Tensor(lib.uop_sinh(self._tensor))
+    def cosh(self) -> "Tensor": return Tensor(lib.uop_cosh(self._tensor))
+    def asinh(self) -> "Tensor": return Tensor(lib.uop_asinh(self._tensor))
+    def acosh(self) -> "Tensor": return Tensor(lib.uop_acosh(self._tensor))
+    def atanh(self) -> "Tensor": return Tensor(lib.uop_atanh(self._tensor))
+    def trunc(self) -> "Tensor": return Tensor(lib.uop_trunc(self._tensor))
+    def erfc(self) -> "Tensor": return Tensor(lib.uop_erfc(self._tensor))
+    def isnan(self) -> "Tensor": return Tensor(lib.uop_isnan(self._tensor))
+    def isinf(self) -> "Tensor": return Tensor(lib.uop_isinf(self._tensor))
+    def isfinite(self) -> "Tensor": return Tensor(lib.uop_isfinite(self._tensor))
+    def logical_not(self) -> "Tensor": return Tensor(lib.uop_logical_not(self._tensor))
+    def gelu(self) -> "Tensor": return Tensor(lib.uop_gelu(self._tensor))
+    def quick_gelu(self) -> "Tensor": return Tensor(lib.uop_quick_gelu(self._tensor))
+    def relu6(self) -> "Tensor": return Tensor(lib.uop_relu6(self._tensor))
+    def hard_sigmoid(self) -> "Tensor": return Tensor(lib.uop_hard_sigmoid(self._tensor))
+    def hard_tanh(self) -> "Tensor": return Tensor(lib.uop_hard_tanh(self._tensor))
+    def softplus(self) -> "Tensor": return Tensor(lib.uop_softplus(self._tensor))
+    def softsign(self) -> "Tensor": return Tensor(lib.uop_softsign(self._tensor))
+    def logsigmoid(self) -> "Tensor": return Tensor(lib.uop_logsigmoid(self._tensor))
+    def celu(self, alpha: float = 1.0) -> "Tensor": return Tensor(lib.uop_celu(self._tensor, alpha))
+
+    def minimum(self, other: "Tensor") -> "Tensor":
+        """Elementwise minimum of two tensors (torch.minimum / np.minimum)."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        return Tensor(lib.uop_minimum(self._tensor, o._tensor))
+
+    def maximum(self, other: "Tensor") -> "Tensor":
+        """Elementwise maximum of two tensors (torch.maximum / np.maximum)."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        return Tensor(lib.uop_max(self._tensor, o._tensor))
+
+    def masked_fill(self, mask: "Tensor", value: float) -> "Tensor":
+        """Fill elements where `mask` is true with `value` (torch.masked_fill)."""
+        m = mask if isinstance(mask, Tensor) else Tensor(mask)
+        return Tensor(lib.uop_masked_fill(self._tensor, m._tensor, float(value)))
+
+    def repeat_interleave(self, repeats: int, dim: int) -> "Tensor":
+        """Repeat each element `repeats` times along `dim` (torch.repeat_interleave)."""
+        return Tensor(lib.uop_repeat_interleave(self._tensor, int(repeats), int(dim)))
+
+    def diagonal(self, offset: int = 0, dim1: int = 0, dim2: int = 1) -> "Tensor":
+        """Diagonal along the plane spanned by dim1/dim2 (torch.diagonal)."""
+        return Tensor(lib.cml_diagonal(self._tensor, int(offset), int(dim1), int(dim2)))
+
+    def cummax(self, dim: int) -> "Tensor":
+        """Cumulative maximum along `dim` (values only)."""
+        return Tensor(lib.uop_cummax(self._tensor, int(dim)))
+
+    def cummin(self, dim: int) -> "Tensor":
+        """Cumulative minimum along `dim` (values only)."""
+        return Tensor(lib.uop_cummin(self._tensor, int(dim)))
 
     def log10(self) -> "Tensor":
         return Tensor.from_numpy(np.log10(self.numpy()))
