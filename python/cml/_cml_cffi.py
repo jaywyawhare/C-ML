@@ -499,6 +499,12 @@ ffi.cdef(
     typedef struct { int* new_shape; int new_ndim; } ShapeParams;
     typedef ShapeParams ExpandParams;
     typedef struct { int* perm; int num_dims; } PermuteParams;
+    typedef struct { int* dims; int num_dims; bool keepdim; } ReduceParams;
+    Tensor* uop_any(Tensor* a, ReduceParams* params);
+    Tensor* uop_all(Tensor* a, ReduceParams* params);
+    Tensor* uop_logsumexp(Tensor* a, ReduceParams* params);
+    Tensor* uop_unflatten(Tensor* a, int dim, int* sizes, int num_sizes);
+    Tensor* uop_scatter_add(Tensor* index, Tensor* src, int dim, int dim_size);
     Tensor* uop_permute(Tensor* a, PermuteParams* params);
     Tensor* uop_expand(Tensor* a, ExpandParams* params);
     Tensor* cml_pad(Tensor* a, int* pad_widths, int num_dims, float value);

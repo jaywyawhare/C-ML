@@ -204,6 +204,15 @@ def where(condition, x, y) -> "Tensor":
     return Tensor(lib.cml_where(ct._tensor, xt._tensor, yt._tensor))
 
 
+def scatter_add(index, src, dim, dim_size) -> "Tensor":
+    """Segment-sum: add each `src` element into a fresh zero tensor of length
+    `dim_size` at the position in `index` along `dim` — equivalent to
+    ``torch.zeros(dim_size).scatter_add_(dim, index, src)``."""
+    idx = index if isinstance(index, Tensor) else Tensor(index)
+    s = src if isinstance(src, Tensor) else Tensor(src)
+    return Tensor(lib.uop_scatter_add(idx._tensor, s._tensor, int(dim), int(dim_size)))
+
+
 # Type-promotion lattice (torch semantics, restricted to the dtypes the
 # bindings can represent). Higher rank wins within a category; a floating
 # operand always wins over an integral one. All ranks here are distinct, so
@@ -903,6 +912,35 @@ class Tensor:
         o = other if isinstance(other, Tensor) else Tensor(other)
         lib.cml_div_(self._tensor, o._tensor)
         return self
+
+    def _reduce(self, cfn, dim, keepdim):
+        """Call a ReduceParams-taking C op. `dim` may be None (all dims), an int,
+        or a sequence of ints. The param array is kept alive for the C call."""
+        if dim is None:
+            dims, n = ffi.NULL, 0
+        else:
+            dl = [dim] if isinstance(dim, int) else list(dim)
+            dims, n = ffi.new("int[]", [int(d) for d in dl]), len(dl)
+        params = ffi.new("ReduceParams*",
+                         {"dims": dims, "num_dims": n, "keepdim": bool(keepdim)})
+        return Tensor(cfn(self._tensor, params))
+
+    def any(self, dim=None, keepdim: bool = False) -> "Tensor":
+        """True where any element is nonzero, over `dim` (or all dims)."""
+        return self._reduce(lib.uop_any, dim, keepdim)
+
+    def all(self, dim=None, keepdim: bool = False) -> "Tensor":
+        """True where all elements are nonzero, over `dim` (or all dims)."""
+        return self._reduce(lib.uop_all, dim, keepdim)
+
+    def logsumexp(self, dim, keepdim: bool = False) -> "Tensor":
+        """Numerically-stable log(sum(exp(x))) along `dim` (torch.logsumexp)."""
+        return self._reduce(lib.uop_logsumexp, dim, keepdim)
+
+    def unflatten(self, dim: int, sizes) -> "Tensor":
+        """Expand `dim` into several dims of the given `sizes` (torch.unflatten)."""
+        arr = ffi.new("int[]", [int(s) for s in sizes])
+        return Tensor(lib.uop_unflatten(self._tensor, int(dim), arr, len(sizes)))
 
     def log10(self) -> "Tensor":
         return Tensor.from_numpy(np.log10(self.numpy()))

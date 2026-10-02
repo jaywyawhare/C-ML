@@ -181,3 +181,43 @@ def test_inplace_ops():
         ref = np_fn(a, b)
         assert np.allclose(ret.numpy().ravel(), ref), cml_fn
         assert np.allclose(ta.numpy().ravel(), ref), f"{cml_fn} did not mutate self"
+
+
+def test_any_all():
+    B = np.array([[1, 0, 0], [0, 0, 0], [1, 1, 1]], dtype=np.float32)
+    b = _t(B)
+    assert np.allclose(b.any(1).numpy().ravel(), (B != 0).any(axis=1))
+    assert np.allclose(b.all(1).numpy().ravel(), (B != 0).all(axis=1))
+    assert np.allclose(b.any().numpy().ravel(), (B != 0).any())
+    assert np.allclose(b.all().numpy().ravel(), (B != 0).all())
+
+
+def test_logsumexp():
+    A = np.random.rand(4, 5).astype(np.float32)
+    a = _t(A)
+    assert np.allclose(a.logsumexp(1).numpy().ravel(),
+                       np.log(np.sum(np.exp(A), axis=1)), atol=1e-4)
+
+
+def test_unflatten():
+    V = np.arange(12, dtype=np.float32).reshape(3, 4)
+    out = _t(V).unflatten(1, [2, 2]).numpy()
+    assert out.shape == (3, 2, 2)
+    assert np.allclose(out.reshape(3, 4), V)
+
+
+def test_scatter_add_segment_sum():
+    idx = np.array([0, 1, 0, 2], dtype=np.float32)
+    src = np.array([1., 2., 3., 4.], dtype=np.float32)
+    out = cml.scatter_add(_t(idx), _t(src), 0, 3).numpy().ravel()
+    ref = np.zeros(3, dtype=np.float32)
+    np.add.at(ref, idx.astype(int), src)
+    assert np.allclose(out, ref)
+
+
+def test_stepped_slice_correct():
+    A = np.arange(24, dtype=np.float32).reshape(4, 6)
+    a = _t(A)
+    assert np.allclose(a[0:4:2, 0:6:2].numpy(), A[0:4:2, 0:6:2])
+    assert np.allclose(a[::2].numpy(), A[::2])
+    assert np.allclose(a[:, 1::3].numpy(), A[:, 1::3])
