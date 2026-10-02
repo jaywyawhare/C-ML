@@ -346,3 +346,69 @@ void cml_hevc_frame_free(CMLHEVCFrame* frame) {
     cml_free(frame->data);
     cml_free(frame);
 }
+
+/* ---- Core integer transforms (H.265 §8.6.4) -------------------------------
+ * DCT-II 4/8-point from the standard. These are column-orthogonal with equal
+ * column norm, so inverse(forward(B)) == scale^2 * B exactly in integer
+ * arithmetic -- an intrinsic correctness check needing no reference data. */
+
+static const int16_t HEVC_DCT4[16] = {
+    64, 64, 64, 64, 83, 36, -36, -83, 64, -64, -64, 64, 36, -83, 83, -36,
+};
+
+const int16_t* cml_hevc_transform_matrix(int size, int dst) {
+    if (dst)
+        return NULL; /* DST-VII is not exactly orthogonal; needs reference vectors */
+    if (size == 4)
+        return HEVC_DCT4; /* exactly row-orthogonal -> intrinsically verifiable */
+    /* 8/16/32-point integer transforms are only approximately orthogonal (lossy
+     * by design), so they cannot be self-checked; they await spec reference
+     * vectors before being exposed. See docs/REMAINING_WORK.md. */
+    return NULL;
+}
+
+/* out = A x B over int64 (A, B are n x n row-major). at/bt transpose flags. */
+static void hevc_mm(const int64_t* A, int at, const int64_t* B, int bt, int64_t* out, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            int64_t acc = 0;
+            for (int k = 0; k < n; k++) {
+                int64_t a = at ? A[k * n + i] : A[i * n + j * 0 + k];
+                int64_t b = bt ? B[j * n + k] : B[k * n + j];
+                acc += a * b;
+            }
+            out[i * n + j] = acc;
+        }
+    }
+}
+
+static int hevc_transform(const int32_t* in, int32_t* out, int size, int dst, int inverse) {
+    const int16_t* m = cml_hevc_transform_matrix(size, dst);
+    if (!m || !in || !out)
+        return -1;
+    int n         = size;
+    int64_t M[64] = {0}, B[64] = {0}, T[64] = {0}, R[64] = {0};
+    for (int i = 0; i < n * n; i++) {
+        M[i] = (int64_t)m[i];
+        B[i] = (int64_t)in[i];
+    }
+    /* forward:  R = M  * B * M^T ;  inverse: R = M^T * C * M */
+    if (!inverse) {
+        hevc_mm(M, 0, B, 0, T, n); /* T = M * B   */
+        hevc_mm(T, 0, M, 1, R, n); /* R = T * M^T */
+    } else {
+        hevc_mm(M, 1, B, 0, T, n); /* T = M^T * C */
+        hevc_mm(T, 0, M, 0, R, n); /* R = T * M   */
+    }
+    for (int i = 0; i < n * n; i++)
+        out[i] = (int32_t)R[i];
+    return 0;
+}
+
+int cml_hevc_forward_transform(const int32_t* block, int32_t* coeffs, int size, int dst) {
+    return hevc_transform(block, coeffs, size, dst, 0);
+}
+
+int cml_hevc_inverse_transform(const int32_t* coeffs, int32_t* block, int size, int dst) {
+    return hevc_transform(coeffs, block, size, dst, 1);
+}

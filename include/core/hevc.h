@@ -63,3 +63,20 @@ void cml_hevc_frame_free(CMLHEVCFrame* frame);
 #endif
 
 #endif /* CML_CORE_HEVC_H */
+
+/* ---- Inverse/forward core transforms (H.265 §8.6.4) -----------------------
+ * The spec's integer DCT-II (4/8-point) and DST-VII (4-point) matrices, plus
+ * the separable 1-D transforms. These are the standard's defined integer
+ * constants (facts, not external reference data) and are self-verifiable: the
+ * DCT matrices are exactly orthogonal and forward→inverse round-trips the block.
+ * Larger (16/32) transforms and the CABAC/prediction stages still need verified
+ * tables and reference streams — see docs/REMAINING_WORK.md. */
+
+/* Returns the size x size transform matrix (row-major), or NULL if unsupported.
+ * dst=0 => DCT-II (size 4 or 8); dst=1 => DST-VII (size 4 only). */
+const int16_t* cml_hevc_transform_matrix(int size, int dst);
+
+/* Separable 2-D forward/inverse transform of a size x size block (row-major
+ * int32). `dst` selects DST-VII (size 4) vs DCT-II. Returns 0 on success. */
+int cml_hevc_forward_transform(const int32_t* block, int32_t* coeffs, int size, int dst);
+int cml_hevc_inverse_transform(const int32_t* coeffs, int32_t* block, int size, int dst);

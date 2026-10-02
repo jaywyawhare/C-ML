@@ -614,6 +614,21 @@ fallback:
   fallback safe to leave alone — the tempting "fix" of caching the trace anyway
   returns the recording run's values forever.
 - **HEVC intra-frame decode** (`src/core/hevc.c`) — NAL and SPS parsing only.
+
+  **Update — the 4-point DCT core is now implemented and intrinsically verified.**
+  The one stage that needs no external reference data is the transform: the
+  spec's 4-point DCT-II matrix is *exactly* row-orthogonal (the discriminator
+  this entry already identified), so it can be checked without a reference stream.
+  `cml_hevc_transform_matrix` / `cml_hevc_forward_transform` /
+  `cml_hevc_inverse_transform` ship the 4-point DCT, and
+  `tests/test_hevc_transform.c` proves (a) `M·Mᵀ` is exactly diagonal and (b) the
+  forward transform reconstructs through the norm-normalized inverse. The 8/16/32
+  integer transforms are only *approximately* orthogonal (lossy by design —
+  verified here: the spec 8-point has `row1·row3 = -50`), so an
+  approximately-orthogonal wrong matrix would pass a loose check; they stay
+  unexposed until spec reference vectors are available, as do CABAC and
+  prediction. So: the transform stage is no longer a stub, and the honest
+  blocker narrows to the CABAC context tables + reference streams.
   Previously dismissed here as "out of scope", which was the wrong reason. It needs
   no special hardware, and a verification path does exist on a normal machine:
 
