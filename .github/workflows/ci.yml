@@ -156,6 +156,10 @@ jobs:
           python-version: '3.12'
       - name: Install Python deps
         run: python -m pip install numpy pytest cffi setuptools
+      - name: Install PyTorch (CPU) for parity tests
+        # The op/nn parity suites importorskip torch; installing the CPU wheel
+        # makes them run for real in CI instead of silently skipping.
+        run: python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Build CFFI bindings
         run: cd python && python cml/build_cffi.py
       - name: Run Python tests
