@@ -64,3 +64,23 @@ def test_expand():
     assert np.allclose(_t(B).expand(4, 3).numpy(), np.broadcast_to(B, (4, 3)))
     C = np.arange(2, dtype=np.float32).reshape(2, 1)
     assert np.allclose(_t(C).expand(2, 5).numpy(), np.broadcast_to(C, (2, 5)))
+
+
+def test_log_softmax():
+    A = np.random.rand(3, 5).astype(np.float32)
+    a = _t(A)
+    ref = A - np.log(np.sum(np.exp(A), axis=1, keepdims=True))
+    assert np.allclose(a.log_softmax(1).numpy(), ref, atol=1e-5)
+
+
+def test_norm_full_and_dim():
+    A = np.random.rand(4, 6).astype(np.float32)
+    a = _t(A)
+    assert np.allclose(a.norm().numpy().ravel()[0], np.linalg.norm(A), atol=1e-4)
+    assert np.allclose(a.norm(2, 1).numpy().ravel(), np.linalg.norm(A, axis=1), atol=1e-4)
+
+
+def test_outer():
+    v = np.array([1, 2, 3], dtype=np.float32)
+    w = np.array([4, 5], dtype=np.float32)
+    assert np.allclose(_t(v).outer(_t(w)).numpy(), np.outer(v, w))

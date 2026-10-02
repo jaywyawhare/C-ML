@@ -575,6 +575,27 @@ class Tensor:
         params = ffi.new("ExpandParams*", {"new_shape": ns, "new_ndim": len(shape)})
         return Tensor(lib.uop_expand(self._tensor, params))
 
+    def log_softmax(self, dim: int = 1) -> "Tensor":
+        """Log of the softmax along `dim` (log(softmax(x)))."""
+        return self.softmax(dim).log()
+
+    def norm(self, p: int = 2, dim=None) -> "Tensor":
+        """L2 (Frobenius) norm over all elements, or along `dim` if given."""
+        if p != 2:
+            raise NotImplementedError("Tensor.norm currently supports p=2 only")
+        sq = self * self
+        if dim is None:
+            sq = sq.reshape(self.numel)
+            return sq.sum(0).sqrt()
+        return sq.sum(dim).sqrt()
+
+    def outer(self, other: "Tensor") -> "Tensor":
+        """Outer product of two 1-D tensors -> [len(self), len(other)]."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        a = self.reshape(self.numel, 1)
+        b = o.reshape(1, o.numel)
+        return a * b
+
     def sum(self, dim=-1, keepdim=False):
         return Tensor(lib.cml_sum(self._tensor, dim, keepdim))
 
