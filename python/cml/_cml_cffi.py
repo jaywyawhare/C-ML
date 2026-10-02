@@ -536,6 +536,12 @@ ffi.cdef(
     Tensor* uop_repeat_interleave(Tensor* a, int repeats, int dim);
     Tensor* uop_cummax(Tensor* a, int dim);
     Tensor* uop_cummin(Tensor* a, int dim);
+    Tensor* uop_scatter(Tensor* a, int dim, Tensor* index, Tensor* src);
+    Tensor* cml_fft(Tensor* x, int inverse);
+    Tensor* cml_add_(Tensor* a, Tensor* b);
+    Tensor* cml_sub_(Tensor* a, Tensor* b);
+    Tensor* cml_mul_(Tensor* a, Tensor* b);
+    Tensor* cml_div_(Tensor* a, Tensor* b);
     Tensor** cml_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs);
     Tensor* cml_diagonal(Tensor* a, int offset, int dim1, int dim2);
     Tensor* cml_lerp(Tensor* a, Tensor* b, float weight);

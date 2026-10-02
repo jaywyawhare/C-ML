@@ -147,3 +147,37 @@ def test_repeat_interleave_diagonal_cummaxmin():
     w = _t(W)
     assert np.allclose(w.cummax(1).numpy(), np.maximum.accumulate(W, axis=1))
     assert np.allclose(w.cummin(1).numpy(), np.minimum.accumulate(W, axis=1))
+
+
+def test_scatter():
+    base = np.zeros((3, 4), dtype=np.float32)
+    idx = np.array([[0, 1, 2, 0]], dtype=np.float32)
+    src = np.array([[10, 20, 30, 40]], dtype=np.float32)
+    out = _t(base).scatter(0, _t(idx), _t(src)).numpy()
+    ref = base.copy()
+    for j in range(4):
+        ref[int(idx[0, j]), j] = src[0, j]
+    assert np.allclose(out, ref)
+
+
+def test_fft_forward():
+    x = np.random.rand(8).astype(np.float32)
+    xi = np.stack([x, np.zeros_like(x)], axis=1)  # [n,2] complex
+    out = _t(xi).fft().numpy()
+    ref = np.fft.fft(x)
+    assert np.allclose(out[:, 0], ref.real, atol=1e-3)
+    assert np.allclose(out[:, 1], ref.imag, atol=1e-3)
+
+
+def test_inplace_ops():
+    for cml_fn, np_fn in [("add_", lambda a, b: a + b),
+                          ("sub_", lambda a, b: a - b),
+                          ("mul_", lambda a, b: a * b),
+                          ("div_", lambda a, b: a / b)]:
+        a = np.array([4., 9., 12.], dtype=np.float32)
+        b = np.array([2., 3., 4.], dtype=np.float32)
+        ta = _t(a)
+        ret = getattr(ta, cml_fn)(_t(b))
+        ref = np_fn(a, b)
+        assert np.allclose(ret.numpy().ravel(), ref), cml_fn
+        assert np.allclose(ta.numpy().ravel(), ref), f"{cml_fn} did not mutate self"

@@ -867,6 +867,43 @@ class Tensor:
         """Cumulative minimum along `dim` (values only)."""
         return Tensor(lib.uop_cummin(self._tensor, int(dim)))
 
+    def scatter(self, dim: int, index: "Tensor", src: "Tensor") -> "Tensor":
+        """Write `src` into a copy of self at positions given by `index` along
+        `dim` (torch.Tensor.scatter)."""
+        idx = index if isinstance(index, Tensor) else Tensor(index)
+        s = src if isinstance(src, Tensor) else Tensor(src)
+        return Tensor(lib.uop_scatter(self._tensor, int(dim), idx._tensor, s._tensor))
+
+    def fft(self) -> "Tensor":
+        """Forward 1-D FFT of a complex signal stored as ``[n, 2]`` (real, imag),
+        returning ``[n, 2]``. Only the forward transform is wired through; the C
+        inverse/2-D paths are not exposed."""
+        return Tensor(lib.cml_fft(self._tensor, 0))
+
+    def add_(self, other: "Tensor") -> "Tensor":
+        """In-place elementwise add; mutates and returns self (torch.add_)."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        lib.cml_add_(self._tensor, o._tensor)
+        return self
+
+    def sub_(self, other: "Tensor") -> "Tensor":
+        """In-place elementwise subtract; mutates and returns self."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        lib.cml_sub_(self._tensor, o._tensor)
+        return self
+
+    def mul_(self, other: "Tensor") -> "Tensor":
+        """In-place elementwise multiply; mutates and returns self."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        lib.cml_mul_(self._tensor, o._tensor)
+        return self
+
+    def div_(self, other: "Tensor") -> "Tensor":
+        """In-place elementwise divide; mutates and returns self."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        lib.cml_div_(self._tensor, o._tensor)
+        return self
+
     def log10(self) -> "Tensor":
         return Tensor.from_numpy(np.log10(self.numpy()))
 
