@@ -2,6 +2,7 @@
 #include "ops/ir/internal.h"
 #include "ops/ir/context.h"
 #include "core/logging.h"
+#include "alloc/cml_allocator.h"
 #include "nn.h"
 
 #include <stdlib.h>
@@ -1220,7 +1221,7 @@ int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs, Tensor*
         Tensor* t = i < num_inputs ? inputs[i] : outputs[i - num_inputs];
         /* Allocate output data lazily if the caller left it NULL. */
         if (t && !t->data && t->numel > 0) {
-            t->data      = calloc(t->numel, sizeof(float));
+            t->data      = cml_calloc(t->numel, sizeof(float));
             t->owns_data = true;
         }
         if (!t || !t->data) {
