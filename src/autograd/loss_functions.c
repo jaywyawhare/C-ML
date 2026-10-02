@@ -181,6 +181,13 @@ Tensor* tensor_huber_loss(Tensor* input, Tensor* target, float delta) {
     TensorConfig config = (TensorConfig){
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
 
+    /* huber(d) = 0.5*a^2 + delta*(|d| - a), where a = clamp(|d|, 0, delta).
+     *   quadratic region (|d| <= delta): a = |d| -> 0.5*d^2
+     *   linear region    (|d|  > delta): a = delta -> delta*|d| - 0.5*delta^2
+     * This clamp form is used instead of where(|d|<delta, quad, lin): the
+     * where/cmplt branch-select produced wrong values *and* gradients (it did
+     * not pick the quadratic branch), while clamp has a correct, verified
+     * gradient. Verified against torch.nn.functional.huber_loss on both passes. */
     Tensor* diff = uop_sub(input, target);
     if (!diff)
         return NULL;
@@ -189,25 +196,12 @@ Tensor* tensor_huber_loss(Tensor* input, Tensor* target, float delta) {
     if (!abs_diff)
         return NULL;
 
-    Tensor* ones = tensor_ones(input->shape, input->ndim, &config);
-    if (!ones)
+    Tensor* a = uop_clamp(abs_diff, 0.0f, delta);
+    if (!a)
         return NULL;
 
-    float delta_array[1] = {delta};
-    Tensor* delta_scalar = tensor_from_array_2d(delta_array, 1, 1);
-    if (!delta_scalar)
-        return NULL;
-
-    Tensor* delta_tensor = uop_mul(ones, delta_scalar);
-    if (!delta_tensor)
-        return NULL;
-
-    Tensor* condition = uop_cmplt(abs_diff, delta_tensor);
-    if (!condition)
-        return NULL;
-
-    Tensor* diff_squared = uop_mul(diff, diff);
-    if (!diff_squared)
+    Tensor* a_sq = uop_mul(a, a);
+    if (!a_sq)
         return NULL;
 
     float half_array[1] = {0.5f};
@@ -223,33 +217,32 @@ Tensor* tensor_huber_loss(Tensor* input, Tensor* target, float delta) {
     if (!half_tensor)
         return NULL;
 
-    Tensor* squared_term = uop_mul(half_tensor, diff_squared);
+    Tensor* squared_term = uop_mul(half_tensor, a_sq);
     if (!squared_term)
         return NULL;
 
-    Tensor* delta_abs = uop_mul(delta_tensor, abs_diff);
-    if (!delta_abs)
+    Tensor* residual = uop_sub(abs_diff, a);
+    if (!residual)
         return NULL;
 
-    float half_delta_sq_array[1] = {0.5f * delta * delta};
-    Tensor* half_delta_sq_scalar = tensor_from_array_2d(half_delta_sq_array, 1, 1);
-    if (!half_delta_sq_scalar)
+    float delta_array[1] = {delta};
+    Tensor* delta_scalar = tensor_from_array_2d(delta_array, 1, 1);
+    if (!delta_scalar)
         return NULL;
 
-    Tensor* ones_for_offset = tensor_ones(input->shape, input->ndim, &config);
-    if (!ones_for_offset)
+    Tensor* ones_for_delta = tensor_ones(input->shape, input->ndim, &config);
+    if (!ones_for_delta)
         return NULL;
 
-    Tensor* half_delta_sq_tensor = uop_mul(ones_for_offset, half_delta_sq_scalar);
-    if (!half_delta_sq_tensor)
+    Tensor* delta_tensor = uop_mul(ones_for_delta, delta_scalar);
+    if (!delta_tensor)
         return NULL;
 
-    Tensor* linear_term = uop_sub(delta_abs, half_delta_sq_tensor);
+    Tensor* linear_term = uop_mul(delta_tensor, residual);
     if (!linear_term)
         return NULL;
 
-    WhereParams where_params = {.cond = condition, .a = squared_term, .b = linear_term};
-    Tensor* loss_per_element = uop_where(&where_params);
+    Tensor* loss_per_element = uop_add(squared_term, linear_term);
     if (!loss_per_element)
         return NULL;
 

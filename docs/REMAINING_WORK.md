@@ -775,19 +775,38 @@ instead of assuming C-contiguity, and reconcile the two code paths.
 
 ---
 
-## 13. huber_loss backward is wrong in the quadratic region
+## 13. huber_loss branch-select bug ✅ FIXED
 
-Surfaced by the weight-synced loss-parity test against PyTorch
-(`tests/test_torch_parity.py::test_huber_backward_parity`, an `xfail`). The
-**forward** value of `losses.huber_loss(pred, target, delta)` matches
-`torch.nn.functional.huber_loss` exactly. The **backward** is correct only in
-the linear region (`|pred-target| > delta`, grad `= delta*sign/N`); in the
-quadratic region (`|pred-target| <= delta`, expected grad `= (pred-target)/N`)
-the C-ML gradient is too large by an input-dependent factor (observed 4.5x and
-56x on individual elements). Fix is in the huber backward op in the C autograd
-layer (the forward in `src/.../losses` is fine). When fixed, flip the `xfail`
-in `test_torch_parity.py` to a normal assert. Other losses (mse, mae/L1,
-cross_entropy, nll, bce on probabilities) match torch on both passes.
+Surfaced by the weight-synced loss-parity test against PyTorch. `tensor_huber_loss`
+(`src/autograd/loss_functions.c`) was built as
+`where(|d|<delta, 0.5*d^2, delta*|d| - 0.5*delta^2)`, but the `uop_where`/
+`uop_cmplt` branch select never picked the quadratic branch — it always used the
+linear term. This passed forward parity for normal-range inputs (mostly in the
+linear region anyway) but gave a *negative* loss for small inputs and wrong
+gradients in the quadratic region (observed 4.5x–56x off). Rewritten in terms of
+`clamp`: `huber = 0.5*a^2 + delta*(|d| - a)` with `a = clamp(|d|, 0, delta)`,
+which has no branch select and a verified-correct gradient. Now matches
+`torch.nn.functional.huber_loss` on forward and backward across input ranges and
+deltas (`tests/test_torch_parity.py::test_huber_parity`). Root cause is §14.
+
+---
+
+## 14. uop_cmplt (and the comparison UOPs) produce garbage through the JIT
+
+The real cause of the huber bug. `uop_cmplt(a, b)` (and presumably the sibling
+`uop_cmpgt/le/ge/eq/ne`) does not yield a 0/1 mask when realized through the
+normal execute path — a direct call returns garbage (e.g. `9.86e25`) or fails
+LLVM output allocation ("OOM for output tensor"). The old `where`-based huber
+relied on `uop_cmplt` for its condition, so the `where` never saw a valid mask
+and always took the false branch.
+
+This is masked at the Python layer: `Tensor.__lt__`/`_cmp` (`python/cml/core.py`)
+compute comparisons **eagerly via NumPy** and return a materialized mask, so
+`a < b` from Python is correct and the longtail comparison tests pass. Only
+direct C callers of `uop_cmplt` hit the bug. Fix belongs in the comparison-op
+codegen/execution (output-tensor dtype/allocation for `UOP_CMPLT` et al. — the
+op is listed in `execution.c`, `execution_typed.c`, `llvm`/`aot` codegen, but
+the realized result is wrong). Verify any fix against `(a < b)` from NumPy.
 
 ---
 

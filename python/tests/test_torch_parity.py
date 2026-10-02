@@ -396,25 +396,19 @@ def test_nll_parity():
     assert np.allclose(gc, gt, atol=2e-4, rtol=2e-4)
 
 
-def test_huber_forward_parity():
+# huber: forward + backward, over input ranges that exercise BOTH the quadratic
+# (|err|<=delta) and linear regions. The quadratic-region backward was the bug
+# (where/cmplt branch-select never picked the quadratic branch); now clamp-based.
+@pytest.mark.parametrize("scale,delta", [(0.2, 1.0), (1.0, 1.0), (3.0, 1.0),
+                                         (1.0, 0.5), (2.0, 2.0)])
+def test_huber_parity(scale, delta):
     rs = np.random.RandomState(3)
-    P = rs.randn(10, 4).astype(np.float32)
-    T = rs.randn(10, 4).astype(np.float32)
-    fv = float(np.asarray(closses.huber_loss(cml.Tensor(P.copy()), cml.Tensor(T.copy()), 1.0)
-                          .numpy()).ravel()[0])
-    ft = float(F.huber_loss(_torch_from(P), _torch_from(T), delta=1.0).item())
-    assert abs(fv - ft) < 2e-4
-
-
-@pytest.mark.xfail(reason="huber_loss backward is wrong in the quadratic |err|<=delta "
-                          "region; forward is correct. See REMAINING_WORK §13.",
-                   strict=True)
-def test_huber_backward_parity():
-    rs = np.random.RandomState(3)
-    P = rs.randn(10, 4).astype(np.float32)
-    T = rs.randn(10, 4).astype(np.float32)
-    _, _, gc, gt = _loss_fwd_grad(
+    P = (rs.rand(10, 4).astype(np.float32) * scale)
+    T = (rs.rand(10, 4).astype(np.float32) * scale)
+    fv, ft, gc, gt = _loss_fwd_grad(
         P,
-        lambda t: closses.huber_loss(t, cml.Tensor(T.copy()), 1.0),
-        lambda t: F.huber_loss(t, _torch_from(T), delta=1.0))
-    assert np.allclose(gc, gt, atol=2e-4, rtol=2e-4)
+        lambda t: closses.huber_loss(t, cml.Tensor(T.copy()), delta),
+        lambda t: F.huber_loss(t, _torch_from(T), delta=delta))
+    assert abs(fv - ft) < 2e-4, f"huber forward (scale={scale}, delta={delta})"
+    assert np.allclose(gc, gt, atol=2e-4, rtol=2e-4), \
+        f"huber backward (scale={scale}, delta={delta})"
