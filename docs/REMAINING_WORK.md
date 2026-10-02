@@ -775,6 +775,22 @@ instead of assuming C-contiguity, and reconcile the two code paths.
 
 ---
 
+## 13. huber_loss backward is wrong in the quadratic region
+
+Surfaced by the weight-synced loss-parity test against PyTorch
+(`tests/test_torch_parity.py::test_huber_backward_parity`, an `xfail`). The
+**forward** value of `losses.huber_loss(pred, target, delta)` matches
+`torch.nn.functional.huber_loss` exactly. The **backward** is correct only in
+the linear region (`|pred-target| > delta`, grad `= delta*sign/N`); in the
+quadratic region (`|pred-target| <= delta`, expected grad `= (pred-target)/N`)
+the C-ML gradient is too large by an input-dependent factor (observed 4.5x and
+56x on individual elements). Fix is in the huber backward op in the C autograd
+layer (the forward in `src/.../losses` is fine). When fixed, flip the `xfail`
+in `test_torch_parity.py` to a normal assert. Other losses (mse, mae/L1,
+cross_entropy, nll, bce on probabilities) match torch on both passes.
+
+---
+
 ## Build & Test
 
 ```bash

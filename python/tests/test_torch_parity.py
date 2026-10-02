@@ -17,10 +17,13 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
+import torch.nn.functional as F
+
 import cml
 import cml.nn as cnn
 import cml.losses as closses
 import cml.optim as coptim
+from cml.safetensors import _copy_into
 
 cml.init()
 
@@ -273,3 +276,145 @@ def test_transformer_block_training_loss_curve_parity():
         "cml transformer block does not converge"
     assert diffs.max() < 1e-4, \
         f"cml transformer loss curve diverges from torch (max {diffs.max():.3e})"
+
+
+# ── optimizer parity ───────────────────────────────────────────────────────
+# Push identical known weights into a C-ML and a torch Linear, train both on
+# the same batch, and require the *parameters* (not just the loss) to agree
+# after every step. This is what catches an optimizer-math divergence.
+def _synced_linear(in_f=4, out_f=3, seed=0):
+    rs = np.random.RandomState(seed)
+    W = rs.randn(out_f, in_f).astype(np.float32)
+    B = rs.randn(out_f).astype(np.float32)
+    lin_c = cnn.Linear(in_f, out_f)
+    model_c = cnn.Sequential(lin_c)
+    pc = lin_c.parameters()
+    _copy_into(pc[0].tensor, W)
+    _copy_into(pc[1].tensor, B)
+    lin_t = torch.nn.Linear(in_f, out_f)
+    with torch.no_grad():
+        lin_t.weight.copy_(_torch_from(W))
+        lin_t.bias.copy_(_torch_from(B))
+    return model_c, pc, lin_t
+
+
+_OPTIMIZERS = [
+    ("sgd",        lambda m: coptim.SGD(m, lr=0.1),
+                   lambda l: torch.optim.SGD(l.parameters(), lr=0.1)),
+    ("sgd_mom",    lambda m: coptim.SGD(m, lr=0.1, momentum=0.9),
+                   lambda l: torch.optim.SGD(l.parameters(), lr=0.1, momentum=0.9)),
+    ("sgd_mom_wd", lambda m: coptim.SGD(m, lr=0.1, momentum=0.9, weight_decay=0.01),
+                   lambda l: torch.optim.SGD(l.parameters(), lr=0.1, momentum=0.9, weight_decay=0.01)),
+    ("adam",       lambda m: coptim.Adam(m, lr=0.05),
+                   lambda l: torch.optim.Adam(l.parameters(), lr=0.05)),
+    ("adamw",      lambda m: coptim.AdamW(m, lr=0.05, weight_decay=0.01),
+                   lambda l: torch.optim.AdamW(l.parameters(), lr=0.05, weight_decay=0.01)),
+    ("rmsprop",    lambda m: coptim.RMSprop(m, lr=0.05),
+                   lambda l: torch.optim.RMSprop(l.parameters(), lr=0.05)),
+    ("adagrad",    lambda m: coptim.AdaGrad(m, lr=0.1),
+                   lambda l: torch.optim.Adagrad(l.parameters(), lr=0.1)),
+]
+
+
+@pytest.mark.parametrize("name,make_c,make_t", _OPTIMIZERS)
+def test_optimizer_param_parity(name, make_c, make_t):
+    model_c, pc, lin_t = _synced_linear(seed=0)
+    oc = make_c(model_c)
+    ot = make_t(lin_t)
+    rs = np.random.RandomState(7)
+    X = rs.randn(16, 4).astype(np.float32)
+    Y = rs.randn(16, 3).astype(np.float32)
+    for step in range(5):
+        pred = model_c(cml.Tensor(X.copy()))
+        loss = closses.mse_loss(pred, cml.Tensor(Y.copy()))
+        loss.backward()
+        oc.step()
+        oc.zero_grad()
+        cml.reset_graph()
+
+        ot.zero_grad()
+        F.mse_loss(lin_t(_torch_from(X)), _torch_from(Y)).backward()
+        ot.step()
+
+        wc = np.asarray(pc[0].tensor.numpy())
+        bc = np.asarray(pc[1].tensor.numpy())
+        assert np.allclose(wc, lin_t.weight.detach().numpy(), atol=2e-4), f"{name} weight @step{step}"
+        assert np.allclose(bc, lin_t.bias.detach().numpy(), atol=2e-4), f"{name} bias @step{step}"
+
+
+# ── loss parity (forward + input-grad) ─────────────────────────────────────
+def _loss_fwd_grad(x_np, cml_loss, torch_loss):
+    xc = cml.Tensor(x_np.copy())
+    xc.requires_grad_(True)
+    lc = cml_loss(xc)
+    fv = float(np.asarray(lc.numpy()).ravel()[0])
+    lc.backward()
+    gc = np.asarray(xc.grad.numpy()).reshape(x_np.shape)
+    xt = torch.tensor(x_np, requires_grad=True)
+    lt = torch_loss(xt)
+    ft = float(lt.item())
+    lt.backward()
+    return fv, ft, gc, xt.grad.numpy()
+
+
+def test_loss_parity():
+    rs = np.random.RandomState(1)
+    P = rs.randn(8, 5).astype(np.float32)
+    T = rs.randn(8, 5).astype(np.float32)
+    lab = rs.randint(0, 5, size=8)
+    labf = lab.astype(np.float32)
+    prob = (rs.rand(8, 5) * 0.98 + 0.01).astype(np.float32)
+    bt = (rs.rand(8, 5) > 0.5).astype(np.float32)
+    cases = [
+        ("mse", P, lambda t: closses.mse_loss(t, cml.Tensor(T.copy())),
+                   lambda t: F.mse_loss(t, _torch_from(T))),
+        ("mae", P, lambda t: closses.mae_loss(t, cml.Tensor(T.copy())),
+                   lambda t: F.l1_loss(t, _torch_from(T))),
+        ("cross_entropy", rs.randn(8, 5).astype(np.float32),
+                   lambda t: closses.cross_entropy_loss(t, cml.Tensor(labf.copy())),
+                   lambda t: F.cross_entropy(t, torch.tensor(lab))),
+        ("bce_prob", prob, lambda t: closses.bce_loss(t, cml.Tensor(bt.copy())),
+                   lambda t: F.binary_cross_entropy(t, _torch_from(bt))),
+    ]
+    for name, x, cf, tf in cases:
+        fv, ft, gc, gt = _loss_fwd_grad(x, cf, tf)
+        assert abs(fv - ft) < 2e-4, f"{name} forward {fv:.5f} vs {ft:.5f}"
+        assert np.allclose(gc, gt, atol=2e-4, rtol=2e-4), f"{name} input-grad"
+
+
+def test_nll_parity():
+    rs = np.random.RandomState(2)
+    lab = rs.randint(0, 5, size=8)
+    labf = lab.astype(np.float32)
+    logp = np.log(F.softmax(torch.tensor(rs.randn(8, 5).astype(np.float32)), dim=1).numpy()
+                  + 1e-9).astype(np.float32)
+    fv, ft, gc, gt = _loss_fwd_grad(
+        logp,
+        lambda t: closses.nll_loss(t, cml.Tensor(labf.copy())),
+        lambda t: F.nll_loss(t, torch.tensor(lab)))
+    assert abs(fv - ft) < 2e-4
+    assert np.allclose(gc, gt, atol=2e-4, rtol=2e-4)
+
+
+def test_huber_forward_parity():
+    rs = np.random.RandomState(3)
+    P = rs.randn(10, 4).astype(np.float32)
+    T = rs.randn(10, 4).astype(np.float32)
+    fv = float(np.asarray(closses.huber_loss(cml.Tensor(P.copy()), cml.Tensor(T.copy()), 1.0)
+                          .numpy()).ravel()[0])
+    ft = float(F.huber_loss(_torch_from(P), _torch_from(T), delta=1.0).item())
+    assert abs(fv - ft) < 2e-4
+
+
+@pytest.mark.xfail(reason="huber_loss backward is wrong in the quadratic |err|<=delta "
+                          "region; forward is correct. See REMAINING_WORK §13.",
+                   strict=True)
+def test_huber_backward_parity():
+    rs = np.random.RandomState(3)
+    P = rs.randn(10, 4).astype(np.float32)
+    T = rs.randn(10, 4).astype(np.float32)
+    _, _, gc, gt = _loss_fwd_grad(
+        P,
+        lambda t: closses.huber_loss(t, cml.Tensor(T.copy()), 1.0),
+        lambda t: F.huber_loss(t, _torch_from(T), delta=1.0))
+    assert np.allclose(gc, gt, atol=2e-4, rtol=2e-4)
