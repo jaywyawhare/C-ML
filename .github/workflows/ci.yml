@@ -70,6 +70,7 @@ jobs:
             -DBUILD_EXAMPLES=OFF \
             -DCML_WARNINGS_AS_ERRORS=ON \
             -DCMAKE_C_COMPILER=$CC \
+            -DCML_NATIVE_OPTIMIZATIONS=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache
         env:
           CC: ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
@@ -113,6 +114,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTS=OFF \
             -DBUILD_EXAMPLES=ON \
+            -DCML_NATIVE_OPTIMIZATIONS=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache
 
       - name: Build examples
@@ -143,6 +145,7 @@ jobs:
             -DBUILD_TESTS=ON \
             -DBUILD_EXAMPLES=OFF \
             -DENABLE_SANITIZERS=ON \
+            -DCML_NATIVE_OPTIMIZATIONS=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache
 
       - name: Build
