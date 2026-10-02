@@ -504,6 +504,8 @@ ffi.cdef(
     Tensor* uop_all(Tensor* a, ReduceParams* params);
     Tensor* uop_logsumexp(Tensor* a, ReduceParams* params);
     Tensor* uop_unflatten(Tensor* a, int dim, int* sizes, int num_sizes);
+    Tensor* cml_fft2(Tensor* x, int inverse);
+    Tensor* uop_log10(Tensor* a);
     Tensor* uop_scatter_add(Tensor* index, Tensor* src, int dim, int dim_size);
     Tensor* uop_permute(Tensor* a, PermuteParams* params);
     Tensor* uop_expand(Tensor* a, ExpandParams* params);

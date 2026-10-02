@@ -883,11 +883,24 @@ class Tensor:
         s = src if isinstance(src, Tensor) else Tensor(src)
         return Tensor(lib.uop_scatter(self._tensor, int(dim), idx._tensor, s._tensor))
 
-    def fft(self) -> "Tensor":
-        """Forward 1-D FFT of a complex signal stored as ``[n, 2]`` (real, imag),
-        returning ``[n, 2]``. Only the forward transform is wired through; the C
-        inverse/2-D paths are not exposed."""
-        return Tensor(lib.cml_fft(self._tensor, 0))
+    def fft(self, inverse: bool = False) -> "Tensor":
+        """1-D FFT of a complex signal stored as ``[n, 2]`` (real, imag),
+        returning ``[n, 2]``. Radix-2 Cooley-Tukey for power-of-two ``n``, naive
+        DFT otherwise. ``inverse=True`` gives the 1/n-normalized inverse."""
+        return Tensor(lib.cml_fft(self._tensor, 1 if inverse else 0))
+
+    def ifft(self) -> "Tensor":
+        """Inverse 1-D FFT; shorthand for ``fft(inverse=True)``."""
+        return self.fft(inverse=True)
+
+    def fft2(self, inverse: bool = False) -> "Tensor":
+        """2-D FFT of a complex image stored as ``[H, W, 2]`` (real, imag),
+        returning ``[H, W, 2]`` (separable: along W then H)."""
+        return Tensor(lib.cml_fft2(self._tensor, 1 if inverse else 0))
+
+    def ifft2(self) -> "Tensor":
+        """Inverse 2-D FFT; shorthand for ``fft2(inverse=True)``."""
+        return self.fft2(inverse=True)
 
     def add_(self, other: "Tensor") -> "Tensor":
         """In-place elementwise add; mutates and returns self (torch.add_)."""
@@ -943,7 +956,7 @@ class Tensor:
         return Tensor(lib.uop_unflatten(self._tensor, int(dim), arr, len(sizes)))
 
     def log10(self) -> "Tensor":
-        return Tensor.from_numpy(np.log10(self.numpy()))
+        return Tensor(lib.uop_log10(self._tensor))
 
     def reciprocal(self) -> "Tensor":
         ones = Tensor.full(self.shape or [self.size], 1.0)

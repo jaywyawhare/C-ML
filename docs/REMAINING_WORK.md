@@ -737,25 +737,41 @@ matching hardware or toolchain can pick them up directly.
 
 ---
 
-## 11. FFT: only the forward 1-D transform is correct
+## 11. FFT: fully working (forward/inverse, 1-D and 2-D)
 
-While widening the Python surface, the FFT family was checked against
-`numpy.fft`:
+The FFT family in `src/tensor/tensor_ops_extra.c` (radix-2 Cooley-Tukey for
+power-of-two `n`, naive O(n²) DFT otherwise) is a real implementation and is
+verified against `numpy.fft`, all to `atol=1e-3`:
 
-- `cml_fft(x, inverse=0)` on a complex `[n, 2]` signal matches `np.fft.fft`
-  to `atol=1e-3`. **Exposed** as `Tensor.fft()`.
-- `cml_fft(x, inverse=1)` (inverse 1-D) returns a **null tensor** — fails at
-  realization. Not exposed.
-- `cml_fft2(x, inverse=0/1)` (2-D, on `[H, W, 2]`) also returns a **null
-  tensor**. Not exposed.
+- `cml_fft(x, inverse)` on complex `[n, 2]` — forward matches `np.fft.fft`,
+  inverse matches `np.fft.ifft` (1/n normalized), both power-of-two and the
+  DFT fallback path. Exposed as `Tensor.fft(inverse=False)` / `Tensor.ifft()`.
+- `cml_fft2(x, inverse)` on complex `[H, W, 2]` — matches `np.fft.fft2`;
+  inverse round-trips. Exposed as `Tensor.fft2(inverse=False)` /
+  `Tensor.ifft2()`.
 
-So the Python binding deliberately ships forward-1-D only. The C inverse and
-2-D paths (`src/.../fft*`, declared in `include/cml.h:98-99`) need to be
-implemented/fixed and verified against `np.fft.ifft` / `np.fft.fft2` before a
-`Tensor.ifft()` / `Tensor.fft2()` can be bound. Repro: build the cffi
-extension, then `cml.Tensor(np.zeros((n,2),np.float32)) .fft()` works but the
-`inverse=1` / `fft2` calls yield a tensor that raises "Cannot convert null
-tensor to numpy".
+An earlier revision of this section wrongly claimed the inverse/2-D paths
+returned null. That was a **test artifact**, not a C bug: the probe passed a
+freshly constructed tensor as a temporary (`cml.Tensor(arr)._tensor`) which was
+garbage-collected — freeing the C tensor — before the C call read it. Holding a
+reference (as every real method does via `self`) makes all paths correct. The
+binding ships the complete FFT surface.
+
+---
+
+## 12. uop_slice ignores input strides (stepped-slice correctness)
+
+`uop_slice` (`src/ops/uops.c:681-819`, realized kernel
+`src/ops/ir/execution.c:4966-5008`) computes the gather source index from
+`node->inputs[0]->shape` only, ignoring the input's `strides`/`storage_offset`.
+For a contiguous input the shape/offset math is right, but with mixed per-dim
+steps the realized result is wrong (observed: `[4,6]` with `step=[2,1]` yields
+shape `(2,6)` but corrupted contents), and the eager `tensor_as_strided` view
+path and the realized contiguous-gather kernel disagree on whether input
+strides are honored. Because of this, stepped `__getitem__` deliberately keeps
+its eager NumPy fallback and `uop_slice` is **not** bound. Fix: make the
+execution.c kernel address through `inputs[0]->strides` + `storage_offset`
+instead of assuming C-contiguity, and reconcile the two code paths.
 
 ---
 

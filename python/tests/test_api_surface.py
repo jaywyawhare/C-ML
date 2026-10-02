@@ -169,6 +169,32 @@ def test_fft_forward():
     assert np.allclose(out[:, 1], ref.imag, atol=1e-3)
 
 
+def test_fft_inverse_and_npot():
+    c = (np.random.rand(8) + 1j * np.random.rand(8)).astype(np.complex64)
+    ci = np.ascontiguousarray(np.stack([c.real, c.imag], axis=1).astype(np.float32))
+    inv = _t(ci).ifft().numpy()
+    assert np.allclose(inv[:, 0] + 1j * inv[:, 1], np.fft.ifft(c), atol=1e-3)
+    y = np.random.rand(6).astype(np.float32)  # non-power-of-two -> naive DFT path
+    yi = np.ascontiguousarray(np.stack([y, np.zeros_like(y)], axis=1))
+    out = _t(yi).fft().numpy()
+    assert np.allclose(out[:, 0] + 1j * out[:, 1], np.fft.fft(y), atol=1e-3)
+
+
+def test_fft2_and_inverse():
+    img = (np.random.rand(4, 4) + 1j * np.random.rand(4, 4)).astype(np.complex64)
+    ii = np.ascontiguousarray(np.stack([img.real, img.imag], axis=2).astype(np.float32))
+    t = _t(ii)
+    fwd = t.fft2().numpy()
+    assert np.allclose(fwd[:, :, 0] + 1j * fwd[:, :, 1], np.fft.fft2(img), atol=1e-3)
+    inv = _t(np.ascontiguousarray(fwd)).ifft2().numpy()
+    assert np.allclose(inv[:, :, 0] + 1j * inv[:, :, 1], img, atol=1e-3)
+
+
+def test_log10_lazy():
+    A = np.random.rand(3, 4).astype(np.float32) * 100 + 0.01
+    assert np.allclose(_t(A).log10().numpy(), np.log10(A), atol=1e-4)
+
+
 def test_inplace_ops():
     for cml_fn, np_fn in [("add_", lambda a, b: a + b),
                           ("sub_", lambda a, b: a - b),
