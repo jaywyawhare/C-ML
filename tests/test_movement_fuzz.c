@@ -148,7 +148,9 @@ static void check(int op, int iter, Tensor* r, const int* want_shape, int want_n
 
     size_t n_out = numel_of(want_shape, want_nd);
     for (size_t i = 0; i < n_out; i++) {
-        int c[MAXD + 2];
+        /* Zeroed: coords_of fills only want_nd slots, but the reference
+         * callbacks copy x->nd of them, and gcc cannot prove the two match. */
+        int c[MAXD + 2] = {0};
         coords_of(i, want_shape, want_nd, c);
         float want = ref(c, ctx);
         float got  = tensor_get_float(r, i);

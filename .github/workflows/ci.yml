@@ -80,6 +80,16 @@ jobs:
       - name: Run tests
         run: cd build && ctest --output-on-failure --timeout 240
 
+      - name: Show crash reports (macOS)
+        # ctest only reports "Bus error"/"Exception"; macOS records a full,
+        # symbolicated backtrace for every crash, which is what we need to fix it.
+        if: failure() && runner.os == 'macOS'
+        run: |
+          shopt -s nullglob
+          for f in ~/Library/Logs/DiagnosticReports/*.ips; do
+            echo "::group::$(basename "$f")"; cat "$f"; echo "::endgroup::"
+          done
+
   examples:
     # The ~60 example targets are part of the public API surface; a compile
     # regression there should fail CI even though we don't run them.
