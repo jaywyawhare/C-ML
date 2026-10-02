@@ -524,6 +524,41 @@ class Tensor:
     def T(self) -> "Tensor":
         return self.transpose(0, 1)
 
+    def repeat(self, *repeats) -> "Tensor":
+        """Tile the tensor `repeats[d]` times along each dim (torch.Tensor.repeat / np.tile)."""
+        if len(repeats) == 1 and isinstance(repeats[0], (list, tuple)):
+            repeats = tuple(repeats[0])
+        arr = ffi.new("int[]", [int(r) for r in repeats])
+        return Tensor(lib.cml_repeat(self._tensor, arr, len(repeats)))
+
+    def tile(self, *repeats) -> "Tensor":
+        """Alias of repeat: tile along each dim."""
+        if len(repeats) == 1 and isinstance(repeats[0], (list, tuple)):
+            repeats = tuple(repeats[0])
+        arr = ffi.new("int[]", [int(r) for r in repeats])
+        return Tensor(lib.uop_tile(self._tensor, arr, len(repeats)))
+
+    def tril(self, diagonal: int = 0) -> "Tensor":
+        """Lower-triangular part, zeroing everything above the k-th diagonal."""
+        return Tensor(lib.cml_tril(self._tensor, int(diagonal)))
+
+    def triu(self, diagonal: int = 0) -> "Tensor":
+        """Upper-triangular part, zeroing everything below the k-th diagonal."""
+        return Tensor(lib.cml_triu(self._tensor, int(diagonal)))
+
+    def diag(self, offset: int = 0) -> "Tensor":
+        """Diagonal of a 2-D tensor, or a diagonal matrix from a 1-D tensor."""
+        return Tensor(lib.uop_diag(self._tensor, int(offset)))
+
+    def trace(self) -> "Tensor":
+        """Sum along the main diagonal of a 2-D tensor."""
+        return Tensor(lib.uop_trace(self._tensor))
+
+    def gather(self, dim: int, index) -> "Tensor":
+        """Gather values along `dim` using an integer-index tensor."""
+        idx = index if isinstance(index, Tensor) else Tensor(index)
+        return Tensor(lib.uop_gather(self._tensor, idx._tensor, int(dim)))
+
     def sum(self, dim=-1, keepdim=False):
         return Tensor(lib.cml_sum(self._tensor, dim, keepdim))
 

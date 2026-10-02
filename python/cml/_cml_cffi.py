@@ -493,6 +493,9 @@ ffi.cdef(
     Tensor** cml_chunk(Tensor* a, int chunks, int dim, int* out_count);
     Tensor* cml_triu(Tensor* a, int diagonal);
     Tensor* cml_tril(Tensor* a, int diagonal);
+    Tensor* uop_tile(Tensor* a, int* repeats, int num_dims);
+    Tensor* uop_diag(Tensor* a, int offset);
+    Tensor* uop_trace(Tensor* a);
     Tensor* cml_pad(Tensor* a, int* pad_widths, int num_dims, float value);
     Tensor* cml_pad_reflect(Tensor* a, int* pad_widths, int num_dims);
     Tensor* cml_pad_replicate(Tensor* a, int* pad_widths, int num_dims);
