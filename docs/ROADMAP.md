@@ -35,11 +35,25 @@ from-scratch project usually is:
 4. **Training-stack depth.** AMP/bf16 proven; still want FSDP/ZeRO-style sharding,
    robust grad-accumulation + loss-scaling at scale, and a fully exercised
    optimizer/scheduler set.
+   *ZeRO-1 attempt, recorded so it is not re-tried the same way:* a Python
+   `ZeroRedundancyOptimizer` (round-robin param ownership, subset C optimizer per
+   rank, broadcast-after-step) is straightforward to write, but a subset optimizer
+   built over `cml_optim_sgd(Parameter**, ...)` and the owning model then both
+   claim the parameters, so teardown double-frees — surfaced as order-dependent
+   `free(): invalid size` only in the full suite. And its one locally-testable
+   mode (`world_size==1`) is a degenerate no-op. Correct sharding needs a real
+   process group to exercise *and* a clear ownership contract between a sharded
+   optimizer and the model; deferred rather than shipped with a heap bug.
 
 ## Tier 2 — the moat (mostly ecosystem, not code)
 
 5. **Pretrained weights out of the box.** GGUF/SafeTensors/ONNX import is the
    foundation; the goal is `llama.generate(...)` / `resnet50(pretrained=True)`.
+   *Status:* the local path works — `zoo.<model>(pretrained=True)` now loads a
+   cached `~/.cml/weights/<name>.safetensors` through the real safetensors loader
+   (was a no-op calling a non-existent `model_load`); tested in
+   `python/tests/test_hub_pretrained.py`. What remains is a real weights host +
+   HF-name convenience (network/ecosystem, not code).
 6. **Real models running end-to-end, fast.** tinygrad's proof is Llama/SD/Whisper.
    C-ML has the architectures; it needs them running with real weights at
    competitive speed (gated on §Hardware for the "fast" half).
