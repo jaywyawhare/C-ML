@@ -60,6 +60,10 @@ DTYPE_TO_NUMPY = {
     DTYPE_FLOAT64: np.float64,
     DTYPE_INT32: np.int32,
     DTYPE_INT64: np.int64,
+    DTYPE_BOOL: np.bool_,
+    DTYPE_FLOAT16: np.float16,
+    DTYPE_INT8: np.int8,
+    DTYPE_UINT8: np.uint8,
 }
 
 NUMPY_TO_DTYPE = {v: k for k, v in DTYPE_TO_NUMPY.items()}
@@ -168,12 +172,27 @@ def _create(lib_fn, shape, dtype, device, *extra_args):
     return Tensor(lib_fn(*args))
 
 
-def _cmp(self, other, np_op):
+_CMP_UOPS = {
+    operator.lt: "uop_cmplt",
+    operator.gt: "uop_cmpgt",
+    operator.le: "uop_cmple",
+    operator.ge: "uop_cmpge",
+    operator.ne: "uop_cmpne",
+}
+
+
+def _cmp(self, other, op):
+    """Elementwise comparison, built into the graph (not realized on the host).
+    The C op yields a bool mask; multiplying by 1.0 promotes it to the float32
+    0/1 mask the rest of the Python API expects while staying lazy (cml_cast
+    would realize it)."""
     if isinstance(other, (int, float)):
-        return Tensor.from_numpy(np_op(self.numpy(), other).astype(np.float32))
-    if isinstance(other, Tensor):
-        return Tensor.from_numpy(np_op(self.numpy(), other.numpy()).astype(np.float32))
-    return NotImplemented
+        other = Tensor(np.array([other], dtype=np.float32))
+    elif not isinstance(other, Tensor):
+        return NotImplemented
+    one  = Tensor(np.ones(1, dtype=np.float32))  # held: a temporary would be freed mid-call
+    mask = getattr(lib, _CMP_UOPS[op])(self._tensor, other._tensor)
+    return Tensor(lib.cml_mul(mask, one._tensor))
 
 
 def tensor(data, dtype=None, device=None, requires_grad=False) -> "Tensor":
@@ -844,6 +863,46 @@ class Tensor:
     def softsign(self) -> "Tensor": return Tensor(lib.uop_softsign(self._tensor))
     def logsigmoid(self) -> "Tensor": return Tensor(lib.uop_logsigmoid(self._tensor))
     def celu(self, alpha: float = 1.0) -> "Tensor": return Tensor(lib.uop_celu(self._tensor, alpha))
+    def silu(self) -> "Tensor": return Tensor(lib.cml_silu(self._tensor))
+    def mish(self) -> "Tensor": return Tensor(lib.cml_mish(self._tensor))
+    def selu(self) -> "Tensor": return Tensor(lib.cml_selu(self._tensor))
+    def hardswish(self) -> "Tensor": return Tensor(lib.cml_hardswish(self._tensor))
+    def elu(self, alpha: float = 1.0) -> "Tensor": return Tensor(lib.cml_elu(self._tensor, float(alpha)))
+
+    def leaky_relu(self, negative_slope: float = 0.01) -> "Tensor":
+        return Tensor(lib.cml_leaky_relu(self._tensor, float(negative_slope)))
+
+    def lerp(self, end: "Tensor", weight: float) -> "Tensor":
+        """self + weight * (end - self) for a scalar ``weight`` (torch.lerp)."""
+        e = end if isinstance(end, Tensor) else Tensor(end)
+        return Tensor(lib.cml_lerp(self._tensor, e._tensor, float(weight)))
+
+    _SCATTER_REDUCE = {"sum": 0, "prod": 1, "mean": 2, "amax": 3, "amin": 4}
+
+    def scatter_reduce(self, dim: int, index: "Tensor", src: "Tensor", reduce: str,
+                       include_self: bool = True) -> "Tensor":
+        """Reduce ``src`` into a copy of self at ``index`` along ``dim``
+        (torch.Tensor.scatter_reduce; reduce is sum/prod/mean/amax/amin)."""
+        if not include_self:
+            raise NotImplementedError("scatter_reduce: only include_self=True is supported")
+        if reduce not in self._SCATTER_REDUCE:
+            raise ValueError(f"scatter_reduce: unknown reduce {reduce!r}")
+        idx = index if isinstance(index, Tensor) else Tensor(index)
+        s = src if isinstance(src, Tensor) else Tensor(src)
+        return Tensor(lib.cml_scatter_reduce(self._tensor, int(dim), idx._tensor, s._tensor,
+                                             self._SCATTER_REDUCE[reduce]))
+
+    def unfold(self, dimension: int, size: int, step: int) -> "Tensor":
+        """Sliding windows of ``size`` with stride ``step`` along ``dimension``,
+        appended as a new last axis (torch.Tensor.unfold). The C op unfolds the
+        last axis, so other axes are swapped there and back."""
+        last = self.ndim - 1
+        d = dimension + self.ndim if dimension < 0 else dimension
+        if d == last:
+            return Tensor(lib.cml_unfold(self._tensor, int(size), int(step)))
+        moved = self.transpose(d, last)
+        out = Tensor(lib.cml_unfold(moved._tensor, int(size), int(step)))
+        return out.transpose(d, last)
 
     def minimum(self, other: "Tensor") -> "Tensor":
         """Elementwise minimum of two tensors (torch.minimum / np.minimum)."""
@@ -965,6 +1024,9 @@ class Tensor:
     def numpy(self) -> np.ndarray:
         if self._tensor is None or self._tensor == ffi.NULL:
             raise RuntimeError("Cannot convert null tensor to numpy")
+
+        if self.numel == 0:  # an empty tensor has no buffer to read
+            return np.empty(self.shape, dtype=DTYPE_TO_NUMPY.get(self.dtype, np.float32))
 
         lib.tensor_ensure_executed(self._tensor)
 
@@ -1123,16 +1185,25 @@ class Tensor:
             raise TypeError("len() of unsized tensor")
         return shape[0]
 
-    def _shrink_dim(self, dim: int, start: int, stop: int) -> "Tensor":
-        """Slice [start, stop) along ``dim`` (lazy, single shrink node)."""
+    def _shrink_dim(self, dim: int, start: int, stop: int, step: int = 1) -> "Tensor":
+        """Slice [start, stop) with a positive ``step`` along ``dim`` (lazy, one node)."""
         shp = self.shape
         starts = [0] * len(shp)
         ends = list(shp)
         starts[dim] = start
         ends[dim] = stop
-        return Tensor(lib.uop_shrink(self._tensor,
-                                     ffi.new("int[]", starts),
-                                     ffi.new("int[]", ends), len(shp)))
+        if step == 1:
+            return Tensor(lib.uop_shrink(self._tensor,
+                                         ffi.new("int[]", starts),
+                                         ffi.new("int[]", ends), len(shp)))
+        steps = [1] * len(shp)
+        steps[dim] = step
+        # cffi does not keep an array alive through a struct field that points at
+        # it, so the arrays must be held in locals for the duration of the call.
+        c_start, c_end, c_step = (ffi.new("int[]", v) for v in (starts, ends, steps))
+        params = ffi.new("SliceParams*", {"start": c_start, "end": c_end,
+                                          "step": c_step, "num_dims": len(shp)})
+        return Tensor(lib.uop_slice(self._tensor, params))
 
     def _gather_indices(self, indices, dim: int) -> "Tensor":
         """Gather along ``dim`` with an integer index array (lazy gather).
@@ -1220,10 +1291,13 @@ class Tensor:
                 continue  # consumed the dim
 
             if isinstance(item, slice):
-                if item.step not in (None, 1):
-                    return Tensor.from_numpy(self.numpy()[idx])
-                s, e, _ = slice(item.start, item.stop, 1).indices(size)
-                t = t._shrink_dim(dim, s, e)
+                s, e, st = item.indices(size)
+                if st < 0:
+                    # x[s:e:-k] == flip(x)[L-1-s : L-1-e : k] along this axis,
+                    # which keeps reversing slices lazy and differentiable.
+                    t = t.flip(dim)
+                    s, e, st = size - 1 - s, size - 1 - e, -st
+                t = t._shrink_dim(dim, s, max(s, e), st)
                 dim += 1
                 continue
 
@@ -1390,6 +1464,16 @@ class Tensor:
     def linspace(start: float, end: float, steps: int = 100, dtype=None, device=None) -> "Tensor":
         config = _make_config(dtype, device)
         return Tensor(lib.cml_linspace(float(start), float(end), int(steps), config))
+
+    # torch-style dtype shorthands. Kept last in the class body: names such as
+    # `int` and `bool` would otherwise shadow the builtins for any later
+    # class-level expression.
+    def float(self) -> "Tensor": return self.cast(DTYPE_FLOAT32)
+    def double(self) -> "Tensor": return self.cast(DTYPE_FLOAT64)
+    def half(self) -> "Tensor": return self.cast(DTYPE_FLOAT16)
+    def int(self) -> "Tensor": return self.cast(DTYPE_INT32)
+    def long(self) -> "Tensor": return self.cast(DTYPE_INT64)
+    def bool(self) -> "Tensor": return self.cast(DTYPE_BOOL)
 
 
 class _TensorView(Tensor):

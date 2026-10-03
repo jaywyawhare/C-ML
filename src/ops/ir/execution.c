@@ -2148,8 +2148,29 @@ static void direct_conv_task(void* vd, size_t start, size_t end) {
  *
  * Detaching the output and resetting its view metadata makes the contiguous
  * write and every subsequent read agree. Returns the buffer to write to. */
+bool cml_slice_src(const Tensor* in, const Tensor* layout, const Tensor* out, const SliceParams* sp,
+                   size_t i, size_t* src) {
+    size_t off = layout->storage_offset, rem = i, contig = 1;
+    for (int d = in->ndim - 1; d >= 0; d--) {
+        size_t coord = rem % (size_t)out->shape[d];
+        rem /= (size_t)out->shape[d];
+        int sc = sp->start[d] + (int)coord * (sp->step ? sp->step[d] : 1);
+        if (sc < 0 || sc >= in->shape[d])
+            return false;
+        off += (size_t)sc * (layout->strides ? layout->strides[d] : contig);
+        contig *= (size_t)layout->shape[d];
+    }
+    *src = off;
+    return true;
+}
+
 static float* unview_output(Tensor* out, const float* in_data) {
-    if (out->data == (const void*)in_data) {
+    /* A view output aliases an ancestor's buffer, not necessarily in_data: in a
+     * chain of slices the input may already own a fresh buffer while this
+     * output still points at the base tensor. Writing the result there
+     * overwrote the base tensor's data, so any output that does not own its
+     * storage gets a buffer of its own. */
+    if (!out->owns_data || out->data == (const void*)in_data) {
         size_t size    = out->numel * cml_dtype_size(out->dtype);
         float* new_buf = (float*)cml_buffer_cache_alloc(size);
         if (!new_buf)
@@ -4979,30 +5000,10 @@ not_empty_reduction:;
             memcpy(out_data, in1_data, n * sizeof(float));
             break;
         }
-        /* Multi-dim slice: iterate output indices, map to input */
-        int ndim = node->inputs[0]->ndim;
+        Tensor* in = node->inputs[0];
         for (size_t i = 0; i < out->numel; i++) {
-            size_t src = 0;
-            size_t rem = i;
-            bool valid = true;
-            for (int d = ndim - 1; d >= 0; d--) {
-                int out_dim_size = out->shape[d];
-                size_t coord     = rem % (size_t)out_dim_size;
-                rem /= (size_t)out_dim_size;
-                int step      = sp->step ? sp->step[d] : 1;
-                int start     = sp->start[d];
-                int src_coord = start + (int)coord * step;
-                if (src_coord < 0 || src_coord >= node->inputs[0]->shape[d]) {
-                    valid = false;
-                    break;
-                }
-                /* Accumulate using input strides */
-                size_t in_stride = 1;
-                for (int dd = d + 1; dd < ndim; dd++)
-                    in_stride *= (size_t)node->inputs[0]->shape[dd];
-                src += (size_t)src_coord * in_stride;
-            }
-            out_data[i] = (valid && src < in1_numel) ? in1_data[src] : 0.0f;
+            size_t src;
+            out_data[i] = cml_slice_src(in, in, out, sp, i, &src) ? in1_data[src] : 0.0f;
         }
         break;
     }

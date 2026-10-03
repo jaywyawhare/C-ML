@@ -221,6 +221,11 @@ if(ENABLE_METAL AND APPLE)
     find_library(FOUNDATION_FRAMEWORK Foundation)
     if(METAL_FRAMEWORK AND FOUNDATION_FRAMEWORK)
         enable_language(OBJC)
+        # The Metal sources are written for ARC (__bridge / CFBridgingRetain).
+        # Built without it, every new*/Create* object handed to CFBridgingRetain
+        # was retained twice and released once: devices, queues, pipelines and
+        # all GPU buffers leaked.
+        add_compile_options($<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>)
         add_definitions(-DCML_HAS_METAL)
         set(METAL_LIBS ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK})
         set(METAL_FOUND TRUE)

@@ -759,19 +759,34 @@ binding ships the complete FFT surface.
 
 ---
 
-## 12. uop_slice ignores input strides (stepped-slice correctness)
+## 12. Strided slicing ✅ FIXED (three separate bugs)
 
-`uop_slice` (`src/ops/uops.c:681-819`, realized kernel
-`src/ops/ir/execution.c:4966-5008`) computes the gather source index from
-`node->inputs[0]->shape` only, ignoring the input's `strides`/`storage_offset`.
-For a contiguous input the shape/offset math is right, but with mixed per-dim
-steps the realized result is wrong (observed: `[4,6]` with `step=[2,1]` yields
-shape `(2,6)` but corrupted contents), and the eager `tensor_as_strided` view
-path and the realized contiguous-gather kernel disagree on whether input
-strides are honored. Because of this, stepped `__getitem__` deliberately keeps
-its eager NumPy fallback and `uop_slice` is **not** bound. Fix: make the
-execution.c kernel address through `inputs[0]->strides` + `storage_offset`
-instead of assuming C-contiguity, and reconcile the two code paths.
+Stepped `__getitem__` used to fall back to NumPy because lazy slicing gave
+wrong answers. The causes, in the order they were found:
+
+- **Python binding lifetime (not a C bug).** The first attempt built
+  `SliceParams` with `ffi.new("int[]", ...)` arrays inline; cffi does not keep
+  an array alive through a struct field pointing at it, so `uop_slice` read
+  freed memory. `_shrink_dim` now holds the arrays in locals.
+- **Realizing a view chain overwrote the base tensor.** Every slice is a
+  strided view of the base buffer. `unview_output` (`execution.c`) only gave
+  the output a private buffer when it aliased the *direct* input; in a chain,
+  once the first slice owned a buffer, the middle slice's result was written
+  into the base tensor's storage. The first read looked right; later reads of
+  the base saw corrupted data. Now any output that does not own its storage
+  gets a buffer (this also covers EXPAND, the other caller).
+- **Stepped slices had no gradient.** The graph-autodiff rule (`autodiff.c`)
+  handled step 1 only, so any stepped slice silently trained with zero
+  gradient; the eager backward handled 1-D/2-D but ignored the slice for 3-D+.
+  The graph rule now interleaves zeros per stepped axis; the eager backward and
+  both forward kernels share one index map, `cml_slice_src`, which also
+  addresses non-contiguous inputs through their strides and offset.
+
+`__getitem__` slicing is now fully lazy and differentiable, including negative
+steps (via `flip`), and has no NumPy fallback. Guarded by
+`test_dtype_conformance::chained_slices_preserve_base`,
+`test_autodiff_ops::slice_step`/`slice_offset_step` (all fail on the old code)
+and the slicing tests in `python/tests/test_api_surface.py`.
 
 ---
 
@@ -787,26 +802,35 @@ gradients in the quadratic region (observed 4.5x–56x off). Rewritten in terms 
 `clamp`: `huber = 0.5*a^2 + delta*(|d| - a)` with `a = clamp(|d|, 0, delta)`,
 which has no branch select and a verified-correct gradient. Now matches
 `torch.nn.functional.huber_loss` on forward and backward across input ranges and
-deltas (`tests/test_torch_parity.py::test_huber_parity`). Root cause is §14.
+deltas (`tests/test_torch_parity.py::test_huber_parity`). The underlying cause is §14.
 
 ---
 
-## 14. uop_cmplt (and the comparison UOPs) produce garbage through the JIT
+## 14. Comparison masks feeding arithmetic ✅ FIXED
 
-The real cause of the huber bug. `uop_cmplt(a, b)` (and presumably the sibling
-`uop_cmpgt/le/ge/eq/ne`) does not yield a 0/1 mask when realized through the
-normal execute path — a direct call returns garbage (e.g. `9.86e25`) or fails
-LLVM output allocation ("OOM for output tensor"). The old `where`-based huber
-relied on `uop_cmplt` for its condition, so the `where` never saw a valid mask
-and always took the false branch.
+The real cause of the huber bug, and not where it first appeared. `uop_cmplt`
+and its siblings are correct: they return a `DTYPE_BOOL` mask with the right
+values. Two consumers mishandled that mask:
 
-This is masked at the Python layer: `Tensor.__lt__`/`_cmp` (`python/cml/core.py`)
-compute comparisons **eagerly via NumPy** and return a materialized mask, so
-`a < b` from Python is correct and the longtail comparison tests pass. Only
-direct C callers of `uop_cmplt` hit the bug. Fix belongs in the comparison-op
-codegen/execution (output-tensor dtype/allocation for `UOP_CMPLT` et al. — the
-op is listed in `execution.c`, `execution_typed.c`, `llvm`/`aot` codegen, but
-the realized result is wrong). Verify any fix against `(a < b)` from NumPy.
+- **Lowering kept the wrong dtype.** `create_primitive_node`
+  (`src/ops/ir/decompose.c`) gave every lowered node its *first input's* dtype.
+  SUB lowers to `ADD(a, MUL(b, -1))`, so for a bool `b` the MUL was a bool node
+  and `true * -1` stayed `true`: `1 - mask` evaluated to `1 + mask`.
+  `uop_where` is built as `cond*a + (1-cond)*b`, so it returned `a + 2b` wherever
+  the mask was set, with matching wrong gradients. Lowered nodes now use the
+  same `cml_promote_dtype` rule as `uop_binary` (WHERE's condition excluded).
+  `tensor_add/sub/mul/div` carried a duplicate of `uop_binary` without that
+  promotion (`forward_binary`); they now call the uops directly and the
+  duplicate is gone.
+- **Python read bool buffers as float32.** `DTYPE_TO_NUMPY` had no bool (or
+  int8/uint8/float16) entry, so `numpy()` reinterpreted 1-byte masks as 4-byte
+  floats -- the "garbage" (`9.86e25`) seen earlier.
+
+With both fixed, Python comparisons (`<`, `>`, `<=`, `>=`, `!=`) are built into
+the graph instead of being computed eagerly with NumPy; they still return a
+float32 0/1 mask. Guarded by `test_dtype_conformance::bool_mask_arithmetic`
+(fails on the old lowering) and the comparison tests in
+`python/tests/test_api_surface.py`.
 
 ---
 

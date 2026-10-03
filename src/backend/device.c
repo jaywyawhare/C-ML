@@ -3,6 +3,9 @@
 #include "core/cml_flags.h"
 #include "tensor/tensor.h"
 #include "nn/layers/linear.h"
+#ifdef CML_HAS_METAL
+#include "ops/ir/gpu/metal_backend.h"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -161,7 +164,11 @@ static bool check_cuda_available(void) {
 }
 
 static bool check_metal_available(void) {
-#ifdef __APPLE__
+#if defined(CML_HAS_METAL)
+    /* The backend caches its device; probing here created (and leaked) a new
+     * one on every detection pass. */
+    return cml_metal_available();
+#elif defined(__APPLE__)
     // Try to load Metal framework dynamically
     void* metal_framework =
         CML_DLOPEN("/System/Library/Frameworks/Metal.framework/Metal", RTLD_LAZY);

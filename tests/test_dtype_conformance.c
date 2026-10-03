@@ -13,6 +13,7 @@
 
 #include "cml.h"
 #include "tensor/dtype_access.h"
+#include "ops/uops.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -685,8 +686,85 @@ static void run_int_cases(DType dt) {
     cml_reset_ir_context();
 }
 
+/* A comparison yields a bool mask. Lowering SUB to ADD(a, MUL(b, -1)) once
+ * gave the MUL its first input's dtype, so for a bool mask `1 - mask` came out
+ * as `1 + mask`, and where(mask, a, b) -- which lowers through that SUB --
+ * returned a + 2b where the mask was true, with matching wrong gradients. The
+ * mask must not be realized first: the bug only showed in a single graph. */
+static int test_bool_mask_arithmetic(void) {
+    float av[6] = {1, 5, 3, -2, 0, 7}, bv[6] = {2, 4, 3, -1, 1, 6};
+    int sh[1]        = {6};
+    TensorConfig c   = cfg_of(DTYPE_FLOAT32);
+    Tensor* a        = tensor_from_data(av, sh, 1, &c);
+    Tensor* b        = tensor_from_data(bv, sh, 1, &c);
+    a->requires_grad = true;
+    b->requires_grad = true;
+
+    Tensor* not_mask = uop_sub(uop_fill(sh, 1, 1.0f), uop_cmplt(a, b));
+    WhereParams wp   = {.cond = uop_cmplt(a, b), .a = a, .b = b};
+    Tensor* w        = uop_where(&wp);
+    ReduceParams rp  = {0};
+    Tensor* s        = uop_sum(w, &rp);
+    tensor_ensure_executed(not_mask);
+    tensor_ensure_executed(s);
+    cml_backward(s, NULL, false, false);
+
+    const float want_not[6] = {0, 1, 1, 0, 0, 1}; /* a < b: 1 0 0 1 1 0 */
+    const float want_w[6]   = {1, 4, 3, -2, 0, 6};
+    const float want_da[6]  = {1, 0, 0, 1, 1, 0};
+    const float want_db[6]  = {0, 1, 1, 0, 0, 1};
+    int ok                  = a->grad && b->grad;
+    for (int i = 0; i < 6 && ok; i++)
+        ok = tensor_get_float(not_mask, i) == want_not[i] && tensor_get_float(w, i) == want_w[i] &&
+             tensor_get_float(a->grad, i) == want_da[i] &&
+             tensor_get_float(b->grad, i) == want_db[i];
+    cml_reset_ir_context();
+    return ok;
+}
+
+/* Each slice in a chain is a strided view of the base tensor. Realizing one
+ * only gave the output a private buffer when it aliased the *direct* input, so
+ * once the first slice had its own buffer the middle one was written straight
+ * into the base tensor's storage. The first chain still read correctly; any
+ * later read of the base -- here, the same chain again -- saw corrupted data. */
+static int test_chained_slices_preserve_base(void) {
+    float av[120];
+    for (int i = 0; i < 120; i++)
+        av[i] = (float)i;
+    int sh[3]      = {4, 6, 5};
+    TensorConfig c = cfg_of(DTYPE_FLOAT32);
+    Tensor* a      = tensor_from_data(av, sh, 3, &c);
+    int ok         = a != NULL;
+    for (int rep = 0; rep < 2 && ok; rep++) {
+        SliceParams p0 = {.start    = (int[]){0, 0, 0},
+                          .end      = (int[]){4, 6, 5},
+                          .step     = (int[]){3, 1, 1},
+                          .num_dims = 3};
+        SliceParams p1 = {.start    = (int[]){0, 1, 0},
+                          .end      = (int[]){2, 6, 5},
+                          .step     = (int[]){1, 2, 1},
+                          .num_dims = 3};
+        SliceParams p2 = {.start    = (int[]){0, 0, 0},
+                          .end      = (int[]){2, 3, 5},
+                          .step     = (int[]){1, 1, 2},
+                          .num_dims = 3};
+        Tensor* z      = uop_slice(uop_slice(uop_slice(a, &p0), &p1), &p2); /* a[::3,1::2,::2] */
+        tensor_ensure_executed(z);
+        size_t k = 0;
+        for (int i = 0; i < 4 && ok; i += 3)
+            for (int j = 1; j < 6 && ok; j += 2)
+                for (int l = 0; l < 5 && ok; l += 2)
+                    ok = tensor_get_float(z, k++) == av[i * 30 + j * 5 + l];
+    }
+    cml_reset_ir_context();
+    return ok;
+}
+
 int main(void) {
     cml_init();
+
+    TEST(bool_mask_arithmetic);
+    TEST(chained_slices_preserve_base);
 
     const DType DTYPES[] = {DTYPE_FLOAT64, DTYPE_FLOAT16, DTYPE_BFLOAT16, DTYPE_UINT8,
                             DTYPE_INT32,   DTYPE_INT64,   DTYPE_INT16,    DTYPE_INT8};
