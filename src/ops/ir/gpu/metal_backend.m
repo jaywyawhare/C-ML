@@ -245,14 +245,58 @@ static id<MTLComputePipelineState> compile_pipeline(id<MTLDevice> device,
     return pso;
 }
 
+/* One device and one compiled copy of the static kernels per process. Every
+ * backend init used to recompile the static MSL library (~7 ms and a new
+ * compiler context per cml_dispatch_init), and availability checks created a
+ * fresh device each call. */
+static id<MTLDevice> shared_device(void) {
+    static id<MTLDevice> device;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        device = MTLCreateSystemDefaultDevice();
+    });
+    return device;
+}
+
+enum {
+    PSO_FILL,
+    PSO_RELU,
+    PSO_SIGMOID,
+    PSO_TANH,
+    PSO_SUM_REDUCE,
+    PSO_MAX_REDUCE,
+    PSO_MATMUL_OPT,
+    PSO_MATMUL_FUSED_BIAS_RELU,
+    PSO_COUNT
+};
+
+static const char* const g_pso_names[PSO_COUNT] = {
+    "k_fill",       "k_relu",       "k_sigmoid",    "k_tanh_k",
+    "k_sum_reduce", "k_max_reduce", "k_matmul_opt", "k_matmul_fused_bias_relu",
+};
+
+static id<MTLComputePipelineState> const* shared_static_psos(id<MTLDevice> device) {
+    static id<MTLComputePipelineState> psos[PSO_COUNT];
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSString* src = [NSString stringWithUTF8String:g_mtl_static_kernels];
+        NSError* err = nil;
+        id<MTLLibrary> lib = [device newLibraryWithSource:src options:nil error:&err];
+        if (!lib) {
+            LOG_ERROR("Metal static library compile failed: %s",
+                      err ? [[err localizedDescription] UTF8String] : "unknown");
+            return;
+        }
+        for (int i = 0; i < PSO_COUNT; i++)
+            psos[i] = compile_pipeline(device, lib, g_pso_names[i]);
+        LOG_INFO("Metal static kernels compiled successfully");
+    });
+    return psos;
+}
+
 /* ── Availability ── */
 
-bool cml_metal_available(void) {
-    @autoreleasepool {
-        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-        return device != nil;
-    }
-}
+bool cml_metal_available(void) { return shared_device() != nil; }
 
 /* ── Lifecycle ── */
 
@@ -274,7 +318,7 @@ int cml_metal_backend_init(CMLMetalBackend* backend) {
     }
 
     @autoreleasepool {
-        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+        id<MTLDevice> device = shared_device();
         if (!device) {
             LOG_ERROR("MTLCreateSystemDefaultDevice() returned nil");
             return -1;
@@ -307,28 +351,17 @@ int cml_metal_backend_init(CMLMetalBackend* backend) {
             backend->total_memory = 0;
         }
 
-        NSString* src = [NSString stringWithUTF8String:g_mtl_static_kernels];
-        NSError* err = nil;
-        id<MTLLibrary> lib = [device newLibraryWithSource:src options:nil error:&err];
-        if (!lib) {
-            LOG_ERROR("Metal static library compile failed: %s",
-                      err ? [[err localizedDescription] UTF8String] : "unknown");
-        } else {
-#define COMPILE_PSO(field, name) \
-            { id<MTLComputePipelineState> pso = compile_pipeline(device, lib, name); \
-              if (pso) backend->field = (void*)CFBridgingRetain(pso); }
-
-            COMPILE_PSO(k_fill,                   "k_fill");
-            COMPILE_PSO(k_relu,                   "k_relu");
-            COMPILE_PSO(k_sigmoid,                "k_sigmoid");
-            COMPILE_PSO(k_tanh_k,                 "k_tanh_k");
-            COMPILE_PSO(k_sum_reduce,             "k_sum_reduce");
-            COMPILE_PSO(k_max_reduce,             "k_max_reduce");
-            COMPILE_PSO(k_matmul_opt,             "k_matmul_opt");
-            COMPILE_PSO(k_matmul_fused_bias_relu, "k_matmul_fused_bias_relu");
-#undef COMPILE_PSO
-            LOG_INFO("Metal static kernels compiled successfully");
-        }
+        /* Each backend holds its own reference to the shared pipelines, so
+         * cml_metal_backend_free's releases stay balanced. */
+        id<MTLComputePipelineState> const* psos = shared_static_psos(device);
+        void** fields[PSO_COUNT] = {
+            &backend->k_fill,       &backend->k_relu,       &backend->k_sigmoid,
+            &backend->k_tanh_k,     &backend->k_sum_reduce, &backend->k_max_reduce,
+            &backend->k_matmul_opt, &backend->k_matmul_fused_bias_relu,
+        };
+        for (int i = 0; i < PSO_COUNT; i++)
+            if (psos[i])
+                *fields[i] = (void*)CFBridgingRetain(psos[i]);
 
         backend->initialized = true;
         backend->buffer_count = 0;
