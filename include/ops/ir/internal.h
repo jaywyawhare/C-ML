@@ -184,6 +184,14 @@ void cml_lanes_of(const Tensor* t, int dim, size_t* outer, size_t* count, size_t
 void cml_lane_order(const void* src, DType dt, size_t base, size_t inner, size_t cnt, size_t k,
                     bool desc, size_t* ord);
 
+/* Element of `in` read by flat output index `i` of a strided slice, addressed
+ * through `layout` (normally `in` itself, which may be a view: its data points
+ * at the base buffer, so its strides and storage_offset apply; or a contiguous
+ * buffer of in's shape, such as its gradient). Returns false when the element
+ * falls outside `in`. Shared by both forward kernels and the backward. */
+bool cml_slice_src(const Tensor* in, const Tensor* layout, const Tensor* out, const SliceParams* sp,
+                   size_t i, size_t* src);
+
 const char* uop_type_to_string(UOpType type);
 void free_fused_kernel(FusedKernel* kernel);
 int cpu_execute_node(struct IRNode* node);

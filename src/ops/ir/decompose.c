@@ -153,10 +153,22 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type, Tensor*
         out_tensor->numel = numel;
     }
 
-    // Inherit dtype/device from first input
+    /* Device from the first input. Dtype follows the same promotion as
+     * uop_binary: inheriting the first input's dtype made MUL(bool_mask,
+     * FILL(-1)) -- the SUB lowering -- a bool node, so `1 - mask` evaluated to
+     * `1 + mask`. WHERE's condition is a mask and does not take part. */
     if (num_inputs > 0 && inputs && inputs[0]) {
-        out_tensor->dtype  = inputs[0]->dtype;
         out_tensor->device = inputs[0]->device;
+        out_tensor->dtype  = inputs[0]->dtype;
+        bool is_cmp        = type == UOP_CMPLT || type == UOP_CMPGT || type == UOP_CMPLE ||
+                      type == UOP_CMPGE || type == UOP_CMPEQ || type == UOP_CMPNE;
+        int first = (type == UOP_WHERE && num_inputs == 3) ? 1 : 0;
+        if (!is_cmp && inputs[first]) {
+            out_tensor->dtype = inputs[first]->dtype;
+            for (int i = first + 1; i < num_inputs; i++)
+                if (inputs[i])
+                    out_tensor->dtype = cml_promote_dtype(out_tensor->dtype, inputs[i]->dtype);
+        }
     } else {
         out_tensor->dtype  = DTYPE_FLOAT32;
         out_tensor->device = DEVICE_CPU;

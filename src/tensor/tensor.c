@@ -1489,99 +1489,69 @@ Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
         return NULL;
     tensor_ensure_executed(output);
 
-    // For simplicity, handle 1D and 2D cases
-    if (self->ndim == 1) {
-        for (size_t i = 0; i < index->numel; i++) {
-            int idx = (int)tensor_get_float(index, i);
-            if (idx < 0 || idx >= self->shape[0])
-                continue;
-            float src_val = tensor_get_float(src, i);
-            float cur_val = tensor_get_float(output, idx);
-            float new_val;
-            switch (mode) {
-            case SCATTER_REDUCE_SUM:
-                new_val = cur_val + src_val;
-                break;
-            case SCATTER_REDUCE_PROD:
-                new_val = cur_val * src_val;
-                break;
-            case SCATTER_REDUCE_AMAX:
-                new_val = src_val > cur_val ? src_val : cur_val;
-                break;
-            case SCATTER_REDUCE_AMIN:
-                new_val = src_val < cur_val ? src_val : cur_val;
-                break;
-            case SCATTER_REDUCE_MEAN:
-                new_val = cur_val + src_val;
-                break; // accumulate, divide later
-            default:
-                new_val = cur_val;
-                break;
-            }
-            tensor_set_float(output, idx, new_val);
+    /* N-d: each element of `index` names, along `dim`, where its `src` element
+     * goes; every other coordinate is its own. This replaces separate 1-D and
+     * 2-D branches: the 2-D one never divided for MEAN, and higher ranks were
+     * returned unchanged. */
+    int nd = self->ndim;
+    if (index->ndim != nd || src->ndim != nd || nd > 16) {
+        LOG_ERROR("tensor_scatter_reduce: index/src must have the same rank as self");
+        tensor_free(output);
+        return NULL;
+    }
+    size_t ostr[16], sstr[16], o = 1, so = 1;
+    for (int d = nd - 1; d >= 0; d--) {
+        ostr[d] = o;
+        sstr[d] = so;
+        o *= (size_t)self->shape[d];
+        so *= (size_t)src->shape[d];
+    }
+    int* counts = mode == SCATTER_REDUCE_MEAN ? cml_calloc(output->numel, sizeof(int)) : NULL;
+    if (mode == SCATTER_REDUCE_MEAN && !counts) {
+        tensor_free(output);
+        return NULL;
+    }
+    for (size_t i = 0; i < index->numel; i++) {
+        size_t rem = i, out_off = 0, src_off = 0;
+        bool in_range = true;
+        for (int d = nd - 1; d >= 0 && in_range; d--) {
+            int c = (int)(rem % (size_t)index->shape[d]);
+            rem /= (size_t)index->shape[d];
+            int oc   = d == dim ? (int)tensor_get_float(index, i) : c;
+            in_range = oc >= 0 && oc < self->shape[d] && c < src->shape[d];
+            out_off += (size_t)oc * ostr[d];
+            src_off += (size_t)c * sstr[d];
         }
-        if (mode == SCATTER_REDUCE_MEAN) {
-            // Count contributions per index
-            int* counts = cml_calloc(self->shape[0], sizeof(int));
-            if (counts) {
-                for (int i = 0; i < self->shape[0]; i++)
-                    counts[i] = 1; // self contributes 1
-                for (size_t i = 0; i < index->numel; i++) {
-                    int idx = (int)tensor_get_float(index, i);
-                    if (idx >= 0 && idx < self->shape[0])
-                        counts[idx]++;
-                }
-                for (int i = 0; i < self->shape[0]; i++) {
-                    if (counts[i] > 1) {
-                        tensor_set_float(output, i, tensor_get_float(output, i) / counts[i]);
-                    }
-                }
-                cml_free(counts);
-            }
+        if (!in_range)
+            continue;
+        float cur = tensor_get_float(output, out_off);
+        float val = tensor_get_float(src, src_off);
+        float res;
+        switch (mode) {
+        case SCATTER_REDUCE_PROD:
+            res = cur * val;
+            break;
+        case SCATTER_REDUCE_AMAX:
+            res = val > cur ? val : cur;
+            break;
+        case SCATTER_REDUCE_AMIN:
+            res = val < cur ? val : cur;
+            break;
+        case SCATTER_REDUCE_SUM:
+        case SCATTER_REDUCE_MEAN: /* MEAN accumulates; divided below */
+        default:
+            res = cur + val;
+            break;
         }
-    } else if (self->ndim == 2) {
-        int rows = self->shape[0], cols = self->shape[1];
-        for (size_t i = 0; i < index->numel; i++) {
-            int r          = (int)(i / index->shape[1]);
-            int c          = (int)(i % index->shape[1]);
-            int idx        = (int)tensor_get_float(index, i);
-            size_t src_off = r * src->shape[1] + c;
-            float src_val  = tensor_get_float(src, src_off);
-
-            size_t out_off;
-            if (dim == 0) {
-                if (idx < 0 || idx >= rows)
-                    continue;
-                out_off = idx * cols + c;
-            } else {
-                if (idx < 0 || idx >= cols)
-                    continue;
-                out_off = r * cols + idx;
-            }
-            float cur_val = tensor_get_float(output, out_off);
-            float new_val;
-            switch (mode) {
-            case SCATTER_REDUCE_SUM:
-                new_val = cur_val + src_val;
-                break;
-            case SCATTER_REDUCE_PROD:
-                new_val = cur_val * src_val;
-                break;
-            case SCATTER_REDUCE_AMAX:
-                new_val = src_val > cur_val ? src_val : cur_val;
-                break;
-            case SCATTER_REDUCE_AMIN:
-                new_val = src_val < cur_val ? src_val : cur_val;
-                break;
-            case SCATTER_REDUCE_MEAN:
-                new_val = cur_val + src_val;
-                break;
-            default:
-                new_val = cur_val;
-                break;
-            }
-            tensor_set_float(output, out_off, new_val);
-        }
+        tensor_set_float(output, out_off, res);
+        if (counts)
+            counts[out_off]++;
+    }
+    if (counts) { /* include_self: self is one of the averaged values */
+        for (size_t j = 0; j < output->numel; j++)
+            if (counts[j])
+                tensor_set_float(output, j, tensor_get_float(output, j) / (float)(counts[j] + 1));
+        cml_free(counts);
     }
     return output;
 }

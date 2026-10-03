@@ -1906,26 +1906,16 @@ static int cpu_backward_node(struct IRNode* node) {
             if (g1 && g1->data) {
                 float* g1d      = (float*)g1->data;
                 SliceParams* sp = (SliceParams*)node->params;
-                if (!sp || in1->ndim == 0) {
+                if (!sp || !sp->start || in1->ndim == 0) {
                     accumulate_grad(in1, out_grad, out_numel);
-                } else if (in1->ndim == 1) {
-                    int st   = sp->start ? sp->start[0] : 0;
-                    int step = (sp->step && sp->step[0] != 0) ? sp->step[0] : 1;
-                    for (size_t i = 0; i < out_numel; i++)
-                        g1d[st + (int)i * step] += out_grad[i];
-                } else if (in1->ndim == 2) {
-                    int r0       = sp->start ? sp->start[0] : 0;
-                    int c0       = sp->start ? sp->start[1] : 0;
-                    int rs       = (sp->step && sp->step[0]) ? sp->step[0] : 1;
-                    int cs       = (sp->step && sp->step[1]) ? sp->step[1] : 1;
-                    int out_cols = out->shape[1];
-                    int in_cols  = in1->shape[1];
-                    for (int r = 0; r < out->shape[0]; r++)
-                        for (int c = 0; c < out_cols; c++)
-                            g1d[(r0 + r * rs) * in_cols + c0 + c * cs] +=
-                                out_grad[r * out_cols + c];
                 } else {
-                    accumulate_grad(in1, out_grad, out_numel);
+                    /* Scatter through the same index map as the forward. The
+                     * gradient is a contiguous buffer of in1's shape. */
+                    for (size_t i = 0; i < out_numel; i++) {
+                        size_t src;
+                        if (cml_slice_src(in1, g1, out, sp, i, &src))
+                            g1d[src] += out_grad[i];
+                    }
                 }
             }
         }

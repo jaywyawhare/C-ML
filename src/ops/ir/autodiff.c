@@ -498,36 +498,62 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             }
             break;
         }
-        case UOP_SLICE: { /* dX = pad(g) back (step==1 only) */
+        case UOP_SLICE: { /* dX: g scattered back to the sliced positions */
+            /* Axis by axis: a step k spreads g's elements k apart (interleave
+             * k-1 zeros: reshape [.., n, ..] -> [.., n, 1, ..], pad the new
+             * axis to k, merge to [.., n*k, ..]), then the result is shifted to
+             * `start` and trimmed or zero-filled to the input length. The old
+             * rule handled only step 1, so stepped slices got no gradient. */
             SliceParams* sp = (SliceParams*)nd->params;
-            if (sp && sp->start && sp->end && a->ndim <= 16) {
-                bool step1 = true;
-                for (int d = 0; d < a->ndim; d++)
-                    if ((sp->step ? sp->step[d] : 1) != 1)
-                        step1 = false;
-                if (step1) {
-                    int pw[32];
-                    for (int d = 0; d < a->ndim; d++) {
-                        int s = sp->start[d];
-                        if (s < 0)
-                            s += a->shape[d];
-                        if (s < 0)
-                            s = 0;
-                        if (s > a->shape[d])
-                            s = a->shape[d];
-                        int e = sp->end[d];
-                        if (e < 0)
-                            e += a->shape[d];
-                        if (e < 0)
-                            e = 0;
-                        if (e > a->shape[d])
-                            e = a->shape[d];
-                        pw[2 * d]     = s;
-                        pw[2 * d + 1] = a->shape[d] - e;
+            int ndim        = a->ndim;
+            if (!sp || !sp->start || !sp->end || ndim > 16)
+                break;
+            Tensor* dx = g;
+            for (int d = 0; d < ndim && dx; d++) {
+                int L = a->shape[d];
+                int s = sp->start[d];
+                if (s < 0)
+                    s += L;
+                s     = s < 0 ? 0 : (s > L ? L : s);
+                int k = sp->step ? sp->step[d] : 1;
+                int n = dx->shape[d];
+                if (k > 1 && n > 0) {
+                    int sh[17], pw[34] = {0};
+                    for (int i = 0, j = 0; i < ndim; i++) {
+                        sh[j++] = dx->shape[i];
+                        if (i == d)
+                            sh[j++] = 1;
                     }
-                    gm_accum(&map, a, uop_pad(g, pw, a->ndim, 0.0f));
+                    pw[2 * (d + 1) + 1] = k - 1;
+                    dx = uop_pad(uop_reshape_to(dx, sh, ndim + 1), pw, ndim + 1, 0.0f);
+                    if (!dx)
+                        break;
+                    int merged[16];
+                    for (int i = 0; i < ndim; i++)
+                        merged[i] = dx->shape[i < d ? i : i + 1];
+                    merged[d] = n * k;
+                    dx        = uop_reshape_to(dx, merged, ndim);
+                    if (!dx)
+                        break;
                 }
+                int len = dx->shape[d];
+                if (s + len > L) {
+                    int st[16] = {0}, en[16];
+                    for (int i = 0; i < ndim; i++)
+                        en[i] = dx->shape[i];
+                    en[d] = L - s;
+                    len   = L - s;
+                    dx    = uop_shrink(dx, st, en, ndim);
+                    if (!dx)
+                        break;
+                }
+                int pw[32]    = {0};
+                pw[2 * d]     = s;
+                pw[2 * d + 1] = L - s - len;
+                dx            = uop_pad(dx, pw, ndim, 0.0f);
             }
+            if (dx)
+                gm_accum(&map, a, dx);
             break;
         }
         case UOP_EXP: /* d/dx e^x = out */

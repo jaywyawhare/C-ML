@@ -138,6 +138,18 @@ static Tensor* w_roll(Tensor* a) { return uop_roll(a, 1, 1); }
 static Tensor* w_cumsum(Tensor* a) { return uop_cumsum(a, 1); }
 static Tensor* w_cumprod(Tensor* a) { return uop_cumprod(a, 1); }
 static Tensor* w_lcse(Tensor* a) { return uop_logcumsumexp(a, 1); }
+/* Stepped slices: the graph rule used to cover step 1 only, so these returned
+ * no gradient at all. */
+static Tensor* w_slice_step(Tensor* a) {
+    SliceParams p = {
+        .start = (int[]){0, 0}, .end = (int[]){3, 3}, .step = (int[]){2, 2}, .num_dims = 2};
+    return uop_slice(a, &p);
+}
+static Tensor* w_slice_offset_step(Tensor* a) {
+    SliceParams p = {
+        .start = (int[]){1, 1}, .end = (int[]){3, 3}, .step = (int[]){1, 2}, .num_dims = 2};
+    return uop_slice(a, &p);
+}
 static Tensor* w_prod(Tensor* a) {
     ReduceParams p = {0};
     return uop_prod(a, &p);
@@ -219,6 +231,8 @@ MATRIX(diagonal, w_diagonal)
 MATRIX(sort, w_sort)
 MATRIX(sort_descending, w_sort_desc)
 MATRIX(topk, w_topk)
+MATRIX(slice_step, w_slice_step)
+MATRIX(slice_offset_step, w_slice_offset_step)
 
 /* Derivative is zero almost everywhere. What matters is that the chain
  * terminates with zeros rather than breaking: returning no gradient leaves
@@ -514,6 +528,8 @@ int main(void) {
     TEST(sort);
     TEST(sort_descending);
     TEST(topk);
+    TEST(slice_step);
+    TEST(slice_offset_step);
 
     TEST(floor_zero_grad);
     TEST(ceil_zero_grad);
