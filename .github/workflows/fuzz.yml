@@ -41,3 +41,23 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: ./build-asan/bin/${{ matrix.suite }}
+
+  python-parity-sweep:
+    # The full torch-parity shape sweep (pytest -m slow): ~180 forward+backward
+    # cases, each JIT-compiling its backward, so it runs nightly instead of on
+    # every push. The fast parity tests run in ci.yml's python-tests job.
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python deps
+        run: python -m pip install numpy pytest cffi setuptools
+      - name: Install PyTorch (CPU)
+        run: python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: Build CFFI bindings
+        run: cd python && python cml/build_cffi.py
+      - name: Run slow parity sweep
+        run: cd python && python -m pytest tests/ -q -m slow

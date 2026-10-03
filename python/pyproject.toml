@@ -62,6 +62,13 @@ include = ["cml*"]
 "cml" = ["py.typed", "*.pyi", "*.so", "*.dylib", "*.dll"]
 "cml.viz" = ["static/**/*"]
 
+[tool.pytest.ini_options]
+markers = [
+    "slow: long-running parity sweeps (every backward JIT-compiles); run with -m slow",
+]
+# Keep the default run fast; the slow sweeps run nightly in CI (fuzz.yml).
+addopts = "-m 'not slow'"
+
 [tool.black]
 line-length = 100
 target-version = ["py38", "py39", "py310", "py311", "py312"]

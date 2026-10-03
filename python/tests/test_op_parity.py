@@ -287,6 +287,8 @@ def test_where_parity():
 # ── parity at scale ────────────────────────────────────────────────────────
 # Sweep the proven differentiable ops over a grid of ranks and broadcast-prone
 # shapes, checking forward AND input-grad against torch for every combination.
+# Marked slow (every backward JIT-compiles): deselected by default, run nightly
+# via `pytest -m slow`.
 SWEEP_SHAPES = [(1,), (7,), (3, 4), (1, 5), (5, 1),
                 (2, 3, 4), (2, 1, 4), (1, 3, 1), (2, 3, 4, 5)]
 
@@ -313,12 +315,14 @@ _POS_UNARY = [
 ]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("shape", SWEEP_SHAPES)
 @pytest.mark.parametrize("name,cf,tf", _GEN_UNARY)
 def test_unary_shape_sweep(shape, name, cf, tf):
     _check(f"{name}{shape}", rs.randn(*shape).astype(np.float32), cf, tf)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("shape", SWEEP_SHAPES)
 @pytest.mark.parametrize("name,cf,tf", _POS_UNARY)
 def test_pos_unary_shape_sweep(shape, name, cf, tf):
@@ -353,6 +357,7 @@ _BCAST_PAIRS = [
 ]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("sa,sb", _BCAST_PAIRS)
 @pytest.mark.parametrize("name,cf,tf", [
     ("add", lambda x, y: x + y, lambda x, y: x + y),
