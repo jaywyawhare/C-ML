@@ -11,6 +11,10 @@
 #define MAX_COLS 256
 #define MAX_LABELS 64
 
+/**
+ * Return non-zero if the string parses as a number, tolerating leading spaces,
+ * sign, decimal point, and exponent notation. Used to tell data rows from headers.
+ */
 static int is_numeric(const char* s) {
     if (!s || !*s)
         return 0;
@@ -36,6 +40,10 @@ static int is_numeric(const char* s) {
     return has_digit;
 }
 
+/**
+ * Guess the field delimiter of a line by majority count: tab, then semicolon,
+ * otherwise defaulting to comma.
+ */
 static char detect_delimiter(const char* line) {
     int commas = 0, semicolons = 0, tabs = 0;
     for (const char* p = line; *p; p++) {
@@ -84,6 +92,10 @@ typedef struct {
     int count;
 } LabelMap;
 
+/**
+ * Return the index of a (whitespace-trimmed) label, inserting it if new. Returns
+ * -1 on an empty label or when the fixed MAX_LABELS table is full.
+ */
 static int label_map_get_or_add(LabelMap* lm, const char* s) {
     /* Trim whitespace */
     while (*s == ' ')
@@ -109,6 +121,12 @@ static int label_map_get_or_add(LabelMap* lm, const char* s) {
     return lm->count++;
 }
 
+/**
+ * Parse a delimited file into feature/target arrays, auto-detecting the delimiter
+ * and an optional header row. target_col may be negative to index from the end;
+ * non-numeric targets are mapped to class indices. Allocates *X_out, *y_out, and
+ * optionally *class_names_out (all cml_malloc, caller frees). Returns 0 on success.
+ */
 int cml_csv_parse(const char* filepath, int target_col, float** X_out, float** y_out,
                   int* num_samples, int* num_features, int* num_classes, char*** class_names_out) {
     FILE* f = fopen(filepath, "r");
@@ -275,6 +293,10 @@ int cml_csv_parse(const char* filepath, int target_col, float** X_out, float** y
     return 0;
 }
 
+/**
+ * Load a CSV file into a Dataset, using target_col as the label column, and
+ * populate feature statistics. Returns NULL on error; the caller owns the Dataset.
+ */
 Dataset* cml_dataset_from_csv(const char* filepath, int target_col) {
     if (!filepath)
         return NULL;

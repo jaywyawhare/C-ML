@@ -11,15 +11,20 @@ def _num_samples(X: Tensor) -> int:
 
 
 class Dataset:
+    """In-memory ``(X, y)`` pair with tensor indexing (torch.utils.data.TensorDataset)."""
+
     def __init__(self, X: Tensor, y: Optional[Tensor] = None):
+        """Wrap features ``X`` and optional targets ``y``; caches the sample count."""
         self.X = X
         self.y = y
         self.size = _num_samples(X)
 
     def __len__(self) -> int:
+        """Number of samples (dim-0 length)."""
         return self.size
 
     def __getitem__(self, idx: Union[int, slice]) -> Tuple[Tensor, Optional[Tensor]]:
+        """Fetch one sample or a contiguous slice as an ``(X, y)`` pair; always keeps dim 0."""
         if isinstance(idx, slice):
             start = idx.start or 0
             stop = self.size if idx.stop is None else idx.stop
@@ -40,6 +45,9 @@ class Dataset:
 
 
 class DataLoader:
+    """Batches a ``Dataset`` into an iterable, optionally reshuffling each epoch
+    (torch.utils.data.DataLoader). ``num_workers`` is accepted but ignored."""
+
     def __init__(
         self,
         dataset: Union[Dataset, Tensor],
@@ -47,6 +55,7 @@ class DataLoader:
         shuffle: bool = False,
         num_workers: int = 0,
     ):
+        """Wrap ``dataset`` (a bare ``Tensor`` is auto-wrapped in a ``Dataset``) for batching."""
         if isinstance(dataset, Tensor):
             self.dataset = Dataset(dataset)
         else:
@@ -58,6 +67,7 @@ class DataLoader:
         self.indices = list(range(len(self.dataset)))
 
     def __iter__(self):
+        """Yield ``(X, y)`` batches; when ``shuffle`` draws a fresh index order per epoch."""
         n = len(self.dataset)
         if self.shuffle:
             import random
@@ -69,16 +79,19 @@ class DataLoader:
                 yield self.dataset[i : min(i + self.batch_size, n)]
 
     def __len__(self) -> int:
+        """Number of batches per epoch (``ceil(num_samples / batch_size)``)."""
         return (len(self.dataset) + self.batch_size - 1) // self.batch_size
 
 
 def create_dataset(X: Tensor, y: Optional[Tensor] = None) -> Dataset:
+    """Convenience constructor for a ``Dataset``."""
     return Dataset(X, y)
 
 
 def create_dataloader(
     dataset: Union[Dataset, Tensor], batch_size: int = 32, shuffle: bool = False
 ) -> DataLoader:
+    """Convenience constructor for a ``DataLoader``."""
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 
@@ -89,6 +102,11 @@ def train_test_split(
     random_state: Optional[int] = None,
     shuffle: bool = True,
 ) -> Tuple:
+    """Split into train/test partitions (sklearn.model_selection.train_test_split).
+
+    Returns ``(X_train, X_test)`` or, when ``y`` is given, ``(X_train, X_test, y_train,
+    y_test)``. Without ``shuffle`` the test set is simply the tail of the data.
+    """
     num_samples = _num_samples(X)
     num_test = int(num_samples * test_size)
     num_train = num_samples - num_test
@@ -119,6 +137,10 @@ def train_test_split(
 def normalize(
     X: Tensor, mean: Optional[Tensor] = None, std: Optional[Tensor] = None
 ) -> Tensor:
+    """Per-feature z-score standardization (sklearn.preprocessing.StandardScaler).
+
+    Computes mean/std over dim 0 when not supplied; zero-std columns are left unscaled.
+    """
     import numpy as np
     arr = X.numpy()
     if mean is None:
@@ -135,10 +157,15 @@ def normalize(
 
 
 def standardize(X: Tensor) -> Tensor:
+    """Z-score standardize ``X`` using its own per-feature mean/std (alias of ``normalize``)."""
     return normalize(X)
 
 
 def minmax_scale(X: Tensor, min_val: float = 0.0, max_val: float = 1.0) -> Tensor:
+    """Per-feature min-max rescale to ``[min_val, max_val]`` (sklearn.preprocessing.MinMaxScaler).
+
+    Constant columns (zero range) map to ``min_val``.
+    """
     import numpy as np
     arr = X.numpy()
     x_min = np.min(arr, axis=0)
@@ -151,6 +178,7 @@ def minmax_scale(X: Tensor, min_val: float = 0.0, max_val: float = 1.0) -> Tenso
 
 
 def one_hot_encode(labels: Tensor, num_classes: int) -> Tensor:
+    """One-hot encode integer ``labels`` into a ``(N, num_classes)`` float matrix (torch.nn.functional.one_hot)."""
     import numpy as np
     arr = labels.numpy().flatten().astype(int)
     one_hot = np.zeros((len(arr), num_classes), dtype=np.float32)
@@ -161,6 +189,10 @@ def one_hot_encode(labels: Tensor, num_classes: int) -> Tensor:
 def split_into_batches(
     X: Tensor, y: Optional[Tensor] = None, batch_size: int = 32
 ) -> List[Tuple]:
+    """Split ``X`` (and optional ``y``) into a list of contiguous ``(X_batch, y_batch)`` chunks.
+
+    The final batch may be smaller than ``batch_size``.
+    """
     batches = []
     num_samples = _num_samples(X)
 
@@ -174,6 +206,7 @@ def split_into_batches(
 
 
 def _try_sklearn_load(name: str):
+    """Call ``sklearn.datasets.load_<name>`` if available; ``(None, None)`` on missing sklearn."""
     try:
         import sklearn.datasets
         loader = getattr(sklearn.datasets, f"load_{name}", None)

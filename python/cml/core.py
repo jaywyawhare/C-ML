@@ -70,6 +70,7 @@ NUMPY_TO_DTYPE = {v: k for k, v in DTYPE_TO_NUMPY.items()}
 
 
 def init():
+    """Initialize the CML C runtime; call once before creating tensors."""
     lib.cml_init()
 
 
@@ -86,19 +87,23 @@ def reset_graph():
 
 
 def cleanup():
+    """Tear down the CML C runtime and release its global resources."""
     lib.cml_cleanup()
 
 
 def seed(s):
+    """Seed both the C RNG and numpy's RNG for reproducible results."""
     lib.cml_seed(int(s))
     np.random.seed(s)
 
 
 def get_device():
+    """Return the current default device id used for new tensors."""
     return lib.cml_get_default_device()
 
 
 def set_device(device: int):
+    """Set the default device for new tensors; warns and keeps CPU if unavailable."""
     try:
         lib.cml_set_default_device(device)
     except (AttributeError, Exception):
@@ -108,14 +113,18 @@ def set_device(device: int):
 
 
 def get_dtype():
+    """Return the current default dtype id used for new tensors."""
     return lib.cml_get_default_dtype()
 
 
 def set_dtype(dtype):
+    """Set the default dtype for new tensors."""
     lib.cml_set_default_dtype(dtype)
 
 
 def _make_config(dtype=None, device=None):
+    """Build a C ``TensorConfig`` for a factory call, defaulting dtype to the
+    global default and leaving device unset (C side picks the default)."""
     config = ffi.new("TensorConfig*")
     if dtype is not None:
         config.dtype = dtype
@@ -132,12 +141,14 @@ def _make_config(dtype=None, device=None):
 
 
 def _coerce_shape(shape):
+    """Normalize a shape arg (int or sequence) to a list of ints."""
     if isinstance(shape, int):
         shape = [shape]
     return list(shape)
 
 
 def _validate_shape(shape):
+    """Coerce and validate a shape: non-empty, all int, all non-negative."""
     shape = _coerce_shape(shape)
     if not shape:
         raise ValueError("shape must be non-empty")
@@ -150,6 +161,8 @@ def _validate_shape(shape):
 
 
 def _validate_dtype(dtype):
+    """Resolve a dtype (None, name string, or id) to a supported dtype id;
+    defaults to float32 and raises on anything unrecognized."""
     if dtype is None:
         return DTYPE_FLOAT32
     if isinstance(dtype, str):
@@ -164,6 +177,8 @@ def _validate_dtype(dtype):
 
 
 def _create(lib_fn, shape, dtype, device, *extra_args):
+    """Shared factory helper: validate shape/dtype, build config, and wrap the
+    C tensor returned by ``lib_fn``. ``extra_args`` are appended after config."""
     shape = _validate_shape(shape)
     dtype = _validate_dtype(dtype)
     shape_array = ffi.new("int[]", shape)
@@ -326,6 +341,7 @@ class Tensor:
         return obj
 
     def __del__(self):
+        """Release this wrapper's external reference to the C tensor (unless borrowed)."""
         if (
             not getattr(self, "_borrowed", False)
             and hasattr(self, "_tensor")
@@ -383,27 +399,35 @@ class Tensor:
         return Tensor(lib_fn(a._tensor, b._tensor))
 
     def __add__(self, other):
+        """Elementwise add (torch.Tensor.add / ``+``)."""
         return self._binary(other, lib.cml_add)
 
     def __radd__(self, other):
+        """Reflected add; addition commutes, so defers to ``__add__``."""
         return self.__add__(other)
 
     def __sub__(self, other):
+        """Elementwise subtract (torch.Tensor.sub / ``-``)."""
         return self._binary(other, lib.cml_sub)
 
     def __rsub__(self, other):
+        """Reflected subtract: ``other - self``."""
         return self._rbin(other, lib.cml_sub)
 
     def __mul__(self, other):
+        """Elementwise multiply (torch.Tensor.mul / ``*``)."""
         return self._binary(other, lib.cml_mul)
 
     def __rmul__(self, other):
+        """Reflected multiply; multiplication commutes, so defers to ``__mul__``."""
         return self.__mul__(other)
 
     def __truediv__(self, other):
+        """Elementwise true division (torch.Tensor.div / ``/``)."""
         return self._binary(other, lib.cml_div)
 
     def __rtruediv__(self, other):
+        """Reflected division: ``other / self``."""
         return self._rbin(other, lib.cml_div)
 
     def _rbin(self, other, lib_fn):
@@ -424,12 +448,14 @@ class Tensor:
         return Tensor(lib_fn(a._tensor, b._tensor))
 
     def __matmul__(self, other):
+        """Matrix product (torch.Tensor.matmul / ``@``)."""
         if isinstance(other, Tensor):
             return Tensor(lib.cml_matmul(self._tensor, other._tensor))
         return NotImplemented
 
     @property
     def shape(self) -> Tuple[int, ...]:
+        """Shape as a tuple of ints; ``()`` for a null tensor. Cached after first read."""
         if self._shape_cache is not None:
             return self._shape_cache
         if self._tensor is None or self._tensor == ffi.NULL:
@@ -446,49 +472,58 @@ class Tensor:
 
     @property
     def ndim(self) -> int:
+        """Number of dimensions; 0 for a null tensor."""
         if self._tensor is None or self._tensor == ffi.NULL:
             return 0
         return self._tensor.ndim
 
     @property
     def numel(self) -> int:
+        """Total element count (torch.Tensor.numel)."""
         if self._tensor is None or self._tensor == ffi.NULL:
             return 0
         return self._tensor.numel
 
     @property
     def size(self) -> int:
+        """Total element count; alias of ``numel`` (note: not torch's shape accessor)."""
         return self.numel
 
     @property
     def dtype(self) -> int:
+        """Dtype id of this tensor; float32 for a null tensor."""
         if self._tensor is None or self._tensor == ffi.NULL:
             return DTYPE_FLOAT32
         return self._tensor.dtype
 
     @property
     def device(self) -> int:
+        """Device id this tensor lives on; CPU for a null tensor."""
         if self._tensor is None or self._tensor == ffi.NULL:
             return DEVICE_CPU
         return self._tensor.device
 
     @property
     def requires_grad(self) -> bool:
+        """Whether autograd tracks this tensor (torch.Tensor.requires_grad)."""
         if self._tensor is None or self._tensor == ffi.NULL:
             return False
         return self._tensor.requires_grad
 
     @requires_grad.setter
     def requires_grad(self, value: bool):
+        """Enable/disable autograd tracking for this tensor."""
         if self._tensor is not None and self._tensor != ffi.NULL:
             lib.cml_set_requires_grad(self._tensor, value)
 
     def requires_grad_(self, requires_grad: bool = True) -> "Tensor":
+        """In-place set of ``requires_grad``; returns self (torch.Tensor.requires_grad_)."""
         self.requires_grad = requires_grad
         return self
 
     @property
     def grad(self) -> Optional["Tensor"]:
+        """Accumulated gradient as a non-owning view, or None if unset."""
         if self._tensor is None or self._tensor == ffi.NULL:
             return None
         grad_ptr = self._tensor.grad
@@ -498,16 +533,20 @@ class Tensor:
 
     @property
     def is_contiguous(self) -> bool:
+        """Whether the underlying buffer is C-contiguous (torch.Tensor.is_contiguous)."""
         if self._tensor is None or self._tensor == ffi.NULL:
             return True
         return lib.tensor_is_contiguous(self._tensor)
 
     def is_scalar(self) -> bool:
+        """Whether this is a scalar (0-d) tensor."""
         if self._tensor is None or self._tensor == ffi.NULL:
             return False
         return lib.tensor_is_scalar(self._tensor)
 
     def item(self) -> float:
+        """Return the single element as a Python float (torch.Tensor.item); raises
+        unless the tensor has exactly one element."""
         if self.numel != 1:
             raise ValueError(
                 f"only one element tensors can be converted to Python scalars, got {self.numel} elements"
@@ -515,12 +554,15 @@ class Tensor:
         return lib.tensor_get_float(self._tensor, 0)
 
     def reshape(self, *new_shape):
+        """Return a tensor with the same data and a new shape (torch.Tensor.reshape).
+        Accepts dims as varargs or a single list/tuple."""
         if len(new_shape) == 1 and isinstance(new_shape[0], (list, tuple)):
             new_shape = new_shape[0]
         shape_array = ffi.new("int[]", new_shape)
         return Tensor(lib.cml_reshape(self._tensor, shape_array, len(new_shape)))
 
     def view(self, *new_shape) -> "Tensor":
+        """Reshape alias (torch.Tensor.view)."""
         return self.reshape(*new_shape)
 
     def slice(self, start: int, stop: int) -> "Tensor":
@@ -546,10 +588,12 @@ class Tensor:
         return Tensor(lib.uop_gather(self._tensor, idx._tensor, 0))
 
     def transpose(self, dim0=0, dim1=1):
+        """Swap two dimensions (torch.Tensor.transpose)."""
         return Tensor(lib.cml_transpose(self._tensor, dim0, dim1))
 
     @property
     def T(self) -> "Tensor":
+        """Transpose of the first two dims (torch.Tensor.T for 2-D tensors)."""
         return self.transpose(0, 1)
 
     def repeat(self, *repeats) -> "Tensor":
@@ -625,75 +669,97 @@ class Tensor:
         return a * b
 
     def sum(self, dim=-1, keepdim=False):
+        """Sum over ``dim`` (torch.Tensor.sum)."""
         return Tensor(lib.cml_sum(self._tensor, dim, keepdim))
 
     def mean(self, dim=-1, keepdim=False):
+        """Arithmetic mean over ``dim`` (torch.Tensor.mean)."""
         return Tensor(lib.cml_mean(self._tensor, dim, keepdim))
 
     def max(self, dim=-1, keepdim=False):
+        """Maximum values over ``dim`` (torch.Tensor.max; values only)."""
         return Tensor(lib.cml_max(self._tensor, dim, keepdim))
 
     def min(self, dim=-1, keepdim=False):
+        """Minimum values over ``dim`` (torch.Tensor.min; values only)."""
         return Tensor(lib.cml_min(self._tensor, dim, keepdim))
 
     def prod(self, dim=-1, keepdim=False):
+        """Product over ``dim`` (torch.Tensor.prod)."""
         return Tensor(lib.cml_prod(self._tensor, dim, keepdim))
 
     def argmax(self, dim=-1):
+        """Indices of the maxima along ``dim`` (torch.Tensor.argmax)."""
         return Tensor(lib.cml_argmax(self._tensor, dim))
 
     def argmin(self, dim=-1):
+        """Indices of the minima along ``dim`` (torch.Tensor.argmin)."""
         return Tensor(lib.cml_argmin(self._tensor, dim))
 
     def var(self, dim=-1, unbiased=True, keepdim=False):
+        """Variance over ``dim`` (torch.Tensor.var); ``unbiased`` uses Bessel's N-1."""
         return Tensor(lib.cml_var(self._tensor, dim, unbiased, keepdim))
 
     def std(self, dim=-1, unbiased=True, keepdim=False):
+        """Standard deviation over ``dim`` (torch.Tensor.std)."""
         return Tensor(lib.cml_std(self._tensor, dim, unbiased, keepdim))
 
     def softmax(self, dim=1):
+        """Softmax along ``dim`` (torch.Tensor.softmax)."""
         return Tensor(lib.cml_softmax(self._tensor, dim))
 
     def pow(self, other):
+        """Elementwise power (torch.Tensor.pow); tensor or scalar exponent."""
         if isinstance(other, Tensor):
             return Tensor(lib.cml_pow(self._tensor, other._tensor))
         return self.__pow__(other)  # scalar exponent, like torch.Tensor.pow
 
     def clamp(self, min_val, max_val):
+        """Clamp elements into ``[min_val, max_val]`` (torch.Tensor.clamp)."""
         return Tensor(lib.cml_clamp(self._tensor, float(min_val), float(max_val)))
 
     def clone(self):
+        """Deep copy that stays in the autograd graph (torch.Tensor.clone)."""
         return Tensor(lib.cml_clone(self._tensor))
 
     def detach(self):
+        """Return a view detached from the autograd graph (torch.Tensor.detach)."""
         return Tensor(lib.cml_detach(self._tensor))
 
     def contiguous(self) -> "Tensor":
+        """Return a C-contiguous copy, or self if already contiguous."""
         if self.is_contiguous:
             return self
         return Tensor(lib.cml_contiguous(self._tensor))
 
     def squeeze(self, dim: Optional[int] = None) -> "Tensor":
+        """Remove size-1 dims, or just ``dim`` if given (torch.Tensor.squeeze)."""
         if dim is None:
             dim = -1
         return Tensor(lib.cml_squeeze(self._tensor, dim))
 
     def unsqueeze(self, dim: int) -> "Tensor":
+        """Insert a size-1 dim at ``dim`` (torch.Tensor.unsqueeze)."""
         return Tensor(lib.cml_unsqueeze(self._tensor, dim))
 
     def flip(self, dim: int) -> "Tensor":
+        """Reverse the order of elements along ``dim`` (torch.Tensor.flip)."""
         return Tensor(lib.cml_flip(self._tensor, dim))
 
     def sort(self, dim: int = -1, descending: bool = False) -> "Tensor":
+        """Sorted values along ``dim`` (torch.Tensor.sort; values only)."""
         return Tensor(lib.cml_sort(self._tensor, dim, descending))
 
     def cast(self, dtype: int) -> "Tensor":
+        """Cast to another dtype (torch.Tensor.to with a dtype)."""
         return Tensor(lib.cml_cast(self._tensor, dtype))
 
     def dot(self, other: "Tensor") -> "Tensor":
+        """Dot product of two 1-D tensors (torch.Tensor.dot)."""
         return Tensor(lib.cml_dot(self._tensor, other._tensor))
 
     def matmul(self, other: "Tensor") -> "Tensor":
+        """Matrix product (torch.Tensor.matmul)."""
         return Tensor(lib.cml_matmul(self._tensor, other._tensor))
 
     def where(self, condition, other):
@@ -709,11 +775,13 @@ class Tensor:
         return Tensor(lib.cml_roll(self._tensor, int(shift), int(axis)))
 
     def copysign(self, other) -> "Tensor":
+        """Magnitude of self with the sign of ``other``, elementwise (torch.copysign)."""
         if not isinstance(other, Tensor):
             other = Tensor(np.asarray(other, dtype=np.float32))
         return Tensor(lib.cml_copysign(self._tensor, other._tensor))
 
     def logaddexp(self, other) -> "Tensor":
+        """Numerically-stable log(exp(self) + exp(other)), elementwise (torch.logaddexp)."""
         if not isinstance(other, Tensor):
             other = Tensor(np.asarray(other, dtype=np.float32))
         return Tensor(lib.cml_logaddexp(self._tensor, other._tensor))
@@ -724,15 +792,20 @@ class Tensor:
         return Tensor(lib.cml_one_hot(self._tensor, int(num_classes)))
 
     def cumsum(self, dim: int = -1) -> "Tensor":
+        """Cumulative sum along ``dim`` (torch.Tensor.cumsum)."""
         return Tensor(lib.cml_cumsum(self._tensor, dim))
 
     def cumprod(self, dim: int = -1) -> "Tensor":
+        """Cumulative product along ``dim`` (torch.Tensor.cumprod)."""
         return Tensor(lib.cml_cumprod(self._tensor, dim))
 
     def logcumsumexp(self, dim: int = -1) -> "Tensor":
+        """Numerically-stable log of the cumulative sum of exp along ``dim``
+        (torch.logcumsumexp)."""
         return Tensor(lib.cml_logcumsumexp(self._tensor, dim))
 
     def argsort(self, dim: int = -1, descending: bool = False) -> "Tensor":
+        """Indices that sort the tensor along ``dim`` (torch.Tensor.argsort)."""
         return Tensor(lib.cml_argsort(self._tensor, dim, descending))
 
     def topk(self, k: int, dim: int = -1, largest: bool = True,
@@ -822,47 +895,169 @@ class Tensor:
             return Tensor(lib.cml_pad_replicate(self._tensor, widths, nd))
         raise ValueError(f"pad: unsupported mode {mode!r}")
 
-    def relu(self): return Tensor(lib.cml_relu(self._tensor))
-    def sigmoid(self): return Tensor(lib.cml_sigmoid(self._tensor))
-    def tanh(self): return Tensor(lib.cml_tanh(self._tensor))
-    def exp(self): return Tensor(lib.cml_exp(self._tensor))
-    def log(self): return Tensor(lib.cml_log(self._tensor))
-    def sqrt(self): return Tensor(lib.cml_sqrt(self._tensor))
-    def sin(self): return Tensor(lib.cml_sin(self._tensor))
-    def cos(self): return Tensor(lib.cml_cos(self._tensor))
-    def log2(self) -> "Tensor": return Tensor(lib.cml_log2(self._tensor))
-    def tan(self) -> "Tensor": return Tensor(lib.cml_tan(self._tensor))
-    def asin(self) -> "Tensor": return Tensor(lib.cml_asin(self._tensor))
-    def acos(self) -> "Tensor": return Tensor(lib.cml_acos(self._tensor))
-    def atan(self) -> "Tensor": return Tensor(lib.cml_atan(self._tensor))
-    def rsqrt(self) -> "Tensor": return Tensor(lib.cml_rsqrt(self._tensor))
-    def erf(self) -> "Tensor": return Tensor(lib.cml_erf(self._tensor))
-    def exp2(self) -> "Tensor": return Tensor(lib.cml_exp2(self._tensor))
-    def sign(self) -> "Tensor": return Tensor(lib.cml_sign(self._tensor))
-    def ceil(self) -> "Tensor": return Tensor(lib.cml_ceil(self._tensor))
-    def floor(self) -> "Tensor": return Tensor(lib.cml_floor(self._tensor))
-    def square(self) -> "Tensor": return Tensor(lib.cml_square(self._tensor))
-    def round(self, decimals: int = 0) -> "Tensor": return Tensor(lib.cml_round(self._tensor))
-    def sinh(self) -> "Tensor": return Tensor(lib.uop_sinh(self._tensor))
-    def cosh(self) -> "Tensor": return Tensor(lib.uop_cosh(self._tensor))
-    def asinh(self) -> "Tensor": return Tensor(lib.uop_asinh(self._tensor))
-    def acosh(self) -> "Tensor": return Tensor(lib.uop_acosh(self._tensor))
-    def atanh(self) -> "Tensor": return Tensor(lib.uop_atanh(self._tensor))
-    def trunc(self) -> "Tensor": return Tensor(lib.uop_trunc(self._tensor))
-    def erfc(self) -> "Tensor": return Tensor(lib.uop_erfc(self._tensor))
-    def isnan(self) -> "Tensor": return Tensor(lib.uop_isnan(self._tensor))
-    def isinf(self) -> "Tensor": return Tensor(lib.uop_isinf(self._tensor))
-    def isfinite(self) -> "Tensor": return Tensor(lib.uop_isfinite(self._tensor))
-    def logical_not(self) -> "Tensor": return Tensor(lib.uop_logical_not(self._tensor))
-    def gelu(self) -> "Tensor": return Tensor(lib.uop_gelu(self._tensor))
-    def quick_gelu(self) -> "Tensor": return Tensor(lib.uop_quick_gelu(self._tensor))
-    def relu6(self) -> "Tensor": return Tensor(lib.uop_relu6(self._tensor))
-    def hard_sigmoid(self) -> "Tensor": return Tensor(lib.uop_hard_sigmoid(self._tensor))
-    def hard_tanh(self) -> "Tensor": return Tensor(lib.uop_hard_tanh(self._tensor))
-    def softplus(self) -> "Tensor": return Tensor(lib.uop_softplus(self._tensor))
-    def softsign(self) -> "Tensor": return Tensor(lib.uop_softsign(self._tensor))
-    def logsigmoid(self) -> "Tensor": return Tensor(lib.uop_logsigmoid(self._tensor))
-    def celu(self, alpha: float = 1.0) -> "Tensor": return Tensor(lib.uop_celu(self._tensor, alpha))
+    def relu(self):
+        """ReLU activation, max(x, 0) (torch.Tensor.relu)."""
+        return Tensor(lib.cml_relu(self._tensor))
+
+    def sigmoid(self):
+        """Logistic sigmoid, 1 / (1 + exp(-x)) (torch.Tensor.sigmoid)."""
+        return Tensor(lib.cml_sigmoid(self._tensor))
+
+    def tanh(self):
+        """Hyperbolic tangent (torch.Tensor.tanh)."""
+        return Tensor(lib.cml_tanh(self._tensor))
+
+    def exp(self):
+        """Elementwise exponential (torch.Tensor.exp)."""
+        return Tensor(lib.cml_exp(self._tensor))
+
+    def log(self):
+        """Natural logarithm (torch.Tensor.log)."""
+        return Tensor(lib.cml_log(self._tensor))
+
+    def sqrt(self):
+        """Elementwise square root (torch.Tensor.sqrt)."""
+        return Tensor(lib.cml_sqrt(self._tensor))
+
+    def sin(self):
+        """Elementwise sine (torch.Tensor.sin)."""
+        return Tensor(lib.cml_sin(self._tensor))
+
+    def cos(self):
+        """Elementwise cosine (torch.Tensor.cos)."""
+        return Tensor(lib.cml_cos(self._tensor))
+
+    def log2(self) -> "Tensor":
+        """Base-2 logarithm (torch.Tensor.log2)."""
+        return Tensor(lib.cml_log2(self._tensor))
+
+    def tan(self) -> "Tensor":
+        """Elementwise tangent (torch.Tensor.tan)."""
+        return Tensor(lib.cml_tan(self._tensor))
+
+    def asin(self) -> "Tensor":
+        """Elementwise arcsine (torch.Tensor.asin)."""
+        return Tensor(lib.cml_asin(self._tensor))
+
+    def acos(self) -> "Tensor":
+        """Elementwise arccosine (torch.Tensor.acos)."""
+        return Tensor(lib.cml_acos(self._tensor))
+
+    def atan(self) -> "Tensor":
+        """Elementwise arctangent (torch.Tensor.atan)."""
+        return Tensor(lib.cml_atan(self._tensor))
+
+    def rsqrt(self) -> "Tensor":
+        """Reciprocal square root, 1 / sqrt(x) (torch.Tensor.rsqrt)."""
+        return Tensor(lib.cml_rsqrt(self._tensor))
+
+    def erf(self) -> "Tensor":
+        """Gauss error function (torch.Tensor.erf)."""
+        return Tensor(lib.cml_erf(self._tensor))
+
+    def exp2(self) -> "Tensor":
+        """Base-2 exponential, 2**x (torch.Tensor.exp2)."""
+        return Tensor(lib.cml_exp2(self._tensor))
+
+    def sign(self) -> "Tensor":
+        """Elementwise sign, -1/0/+1 (torch.Tensor.sign)."""
+        return Tensor(lib.cml_sign(self._tensor))
+
+    def ceil(self) -> "Tensor":
+        """Round up to the nearest integer (torch.Tensor.ceil)."""
+        return Tensor(lib.cml_ceil(self._tensor))
+
+    def floor(self) -> "Tensor":
+        """Round down to the nearest integer (torch.Tensor.floor)."""
+        return Tensor(lib.cml_floor(self._tensor))
+
+    def square(self) -> "Tensor":
+        """Elementwise square, x**2 (torch.Tensor.square)."""
+        return Tensor(lib.cml_square(self._tensor))
+
+    def round(self, decimals: int = 0) -> "Tensor":
+        """Round to the nearest integer (torch.Tensor.round); ``decimals`` is ignored."""
+        return Tensor(lib.cml_round(self._tensor))
+
+    def sinh(self) -> "Tensor":
+        """Hyperbolic sine (torch.Tensor.sinh)."""
+        return Tensor(lib.uop_sinh(self._tensor))
+
+    def cosh(self) -> "Tensor":
+        """Hyperbolic cosine (torch.Tensor.cosh)."""
+        return Tensor(lib.uop_cosh(self._tensor))
+
+    def asinh(self) -> "Tensor":
+        """Inverse hyperbolic sine (torch.Tensor.asinh)."""
+        return Tensor(lib.uop_asinh(self._tensor))
+
+    def acosh(self) -> "Tensor":
+        """Inverse hyperbolic cosine (torch.Tensor.acosh)."""
+        return Tensor(lib.uop_acosh(self._tensor))
+
+    def atanh(self) -> "Tensor":
+        """Inverse hyperbolic tangent (torch.Tensor.atanh)."""
+        return Tensor(lib.uop_atanh(self._tensor))
+
+    def trunc(self) -> "Tensor":
+        """Truncate toward zero to an integer (torch.Tensor.trunc)."""
+        return Tensor(lib.uop_trunc(self._tensor))
+
+    def erfc(self) -> "Tensor":
+        """Complementary error function, 1 - erf(x) (torch.Tensor.erfc)."""
+        return Tensor(lib.uop_erfc(self._tensor))
+
+    def isnan(self) -> "Tensor":
+        """Mask of NaN elements (torch.Tensor.isnan)."""
+        return Tensor(lib.uop_isnan(self._tensor))
+
+    def isinf(self) -> "Tensor":
+        """Mask of infinite elements (torch.Tensor.isinf)."""
+        return Tensor(lib.uop_isinf(self._tensor))
+
+    def isfinite(self) -> "Tensor":
+        """Mask of finite elements (torch.Tensor.isfinite)."""
+        return Tensor(lib.uop_isfinite(self._tensor))
+
+    def logical_not(self) -> "Tensor":
+        """Elementwise logical NOT (torch.Tensor.logical_not)."""
+        return Tensor(lib.uop_logical_not(self._tensor))
+
+    def gelu(self) -> "Tensor":
+        """GELU activation (torch.nn.functional.gelu)."""
+        return Tensor(lib.uop_gelu(self._tensor))
+
+    def quick_gelu(self) -> "Tensor":
+        """Quick GELU approximation, x * sigmoid(1.702 * x)."""
+        return Tensor(lib.uop_quick_gelu(self._tensor))
+
+    def relu6(self) -> "Tensor":
+        """ReLU6 activation, min(max(x, 0), 6) (torch.nn.functional.relu6)."""
+        return Tensor(lib.uop_relu6(self._tensor))
+
+    def hard_sigmoid(self) -> "Tensor":
+        """Hard sigmoid approximation (torch.nn.functional.hardsigmoid)."""
+        return Tensor(lib.uop_hard_sigmoid(self._tensor))
+
+    def hard_tanh(self) -> "Tensor":
+        """Hard tanh, clamping x to [-1, 1] (torch.nn.functional.hardtanh)."""
+        return Tensor(lib.uop_hard_tanh(self._tensor))
+
+    def softplus(self) -> "Tensor":
+        """Softplus activation, log(1 + exp(x)) (torch.nn.functional.softplus)."""
+        return Tensor(lib.uop_softplus(self._tensor))
+
+    def softsign(self) -> "Tensor":
+        """Softsign activation, x / (1 + |x|) (torch.nn.functional.softsign)."""
+        return Tensor(lib.uop_softsign(self._tensor))
+
+    def logsigmoid(self) -> "Tensor":
+        """Log of the sigmoid (torch.nn.functional.logsigmoid)."""
+        return Tensor(lib.uop_logsigmoid(self._tensor))
+
+    def celu(self, alpha: float = 1.0) -> "Tensor":
+        """CELU activation (torch.nn.functional.celu)."""
+        return Tensor(lib.uop_celu(self._tensor, alpha))
     def silu(self) -> "Tensor":
         """SiLU / swish activation, x * sigmoid(x) (torch.nn.functional.silu)."""
         return Tensor(lib.cml_silu(self._tensor))
@@ -1026,13 +1221,16 @@ class Tensor:
         return Tensor(lib.uop_unflatten(self._tensor, int(dim), arr, len(sizes)))
 
     def log10(self) -> "Tensor":
+        """Base-10 logarithm (torch.Tensor.log10)."""
         return Tensor(lib.uop_log10(self._tensor))
 
     def reciprocal(self) -> "Tensor":
+        """Elementwise reciprocal, 1 / x (torch.Tensor.reciprocal)."""
         ones = Tensor.full(self.shape or [self.size], 1.0)
         return Tensor(lib.cml_div(ones._tensor, self._tensor))
 
     def numpy(self) -> np.ndarray:
+        """Copy to a numpy array (torch.Tensor.numpy); realizes any pending ops."""
         if self._tensor is None or self._tensor == ffi.NULL:
             raise RuntimeError("Cannot convert null tensor to numpy")
 
@@ -1058,6 +1256,7 @@ class Tensor:
         return arr
 
     def __array__(self, dtype=None) -> np.ndarray:
+        """NumPy array protocol: lets ``np.asarray(tensor)`` work, optionally casting."""
         arr = self.numpy()
         if dtype is not None:
             arr = arr.astype(dtype)
@@ -1066,6 +1265,8 @@ class Tensor:
     @classmethod
     def from_numpy(cls, arr: np.ndarray, requires_grad: bool = False,
                    dtype: Optional[int] = None) -> "Tensor":
+        """Build a tensor from a numpy array (torch.from_numpy); copies into a
+        new C tensor and casts to ``dtype`` (default float32)."""
         if not isinstance(arr, np.ndarray):
             raise TypeError(f"from_numpy expects numpy.ndarray, got {type(arr).__name__}")
 
@@ -1105,6 +1306,8 @@ class Tensor:
         return tensor
 
     def to(self, device: Union[int, str] = None, dtype: Union[int, str] = None) -> "Tensor":
+        """Cast/move the tensor (torch.Tensor.to); only CPU is supported, so a
+        device other than CPU raises. With ``dtype`` casts; otherwise clones."""
         if device is not None:
             dev = device.lower() if isinstance(device, str) else device
             if dev not in (DEVICE_CPU, "cpu"):
@@ -1116,10 +1319,12 @@ class Tensor:
         return self.clone()
 
     def backward(self, gradient=None, retain_graph=False, create_graph=False):
+        """Accumulate gradients back through the graph (torch.Tensor.backward)."""
         grad_ptr = gradient._tensor if gradient is not None else ffi.NULL
         lib.cml_backward(self._tensor, grad_ptr, retain_graph, create_graph)
 
     def flatten(self, start_dim: int = 0, end_dim: int = -1) -> "Tensor":
+        """Collapse the dims from ``start_dim`` to ``end_dim`` into one (torch.Tensor.flatten)."""
         shape = list(self.shape)
         if end_dim < 0:
             end_dim = len(shape) + end_dim
@@ -1132,34 +1337,59 @@ class Tensor:
         return self.reshape(new_shape)
 
     def __neg__(self) -> "Tensor":
+        """Elementwise negation (unary ``-``)."""
         neg_one = Tensor.full(self.shape, -1.0)
         return self * neg_one
 
     def __pos__(self) -> "Tensor":
+        """Unary ``+``; returns self unchanged."""
         return self
 
     def __abs__(self) -> "Tensor":
+        """Elementwise absolute value (``abs(t)`` / torch.Tensor.abs)."""
         return self.relu() + (-self).relu()
 
     def __eq__(self, other) -> bool:
+        """Identity equality: True only if both wrap the same C tensor handle.
+
+        This is object identity (so Tensors stay hashable and usable as dict
+        keys), not an elementwise ``==``; use a comparison op for that.
+        """
         if isinstance(other, Tensor):
             return self._tensor == other._tensor
         return False
 
     def __hash__(self) -> int:
+        """Hash by the underlying C tensor pointer, consistent with ``__eq__``."""
         return hash(int(ffi.cast("uintptr_t", self._tensor)))
 
-    def __lt__(self, other): return _cmp(self, other, operator.lt)
-    def __gt__(self, other): return _cmp(self, other, operator.gt)
-    def __le__(self, other): return _cmp(self, other, operator.le)
-    def __ge__(self, other): return _cmp(self, other, operator.ge)
-    def __ne__(self, other): return _cmp(self, other, operator.ne)
+    def __lt__(self, other):
+        """Elementwise less-than, returns a 0/1 mask (torch ``<``)."""
+        return _cmp(self, other, operator.lt)
+
+    def __gt__(self, other):
+        """Elementwise greater-than, returns a 0/1 mask (torch ``>``)."""
+        return _cmp(self, other, operator.gt)
+
+    def __le__(self, other):
+        """Elementwise less-or-equal, returns a 0/1 mask (torch ``<=``)."""
+        return _cmp(self, other, operator.le)
+
+    def __ge__(self, other):
+        """Elementwise greater-or-equal, returns a 0/1 mask (torch ``>=``)."""
+        return _cmp(self, other, operator.ge)
+
+    def __ne__(self, other):
+        """Elementwise not-equal, returns a 0/1 mask (torch ``!=``)."""
+        return _cmp(self, other, operator.ne)
 
     def __pow__(self, power: Union[int, float]) -> "Tensor":
+        """Elementwise power with a scalar exponent (``**`` / torch.Tensor.pow)."""
         power_tensor = Tensor.full(self.shape or [self.size], float(power))
         return Tensor(lib.cml_pow(self._tensor, power_tensor._tensor))
 
     def __mod__(self, other: Union[int, float, "Tensor"]) -> "Tensor":
+        """Elementwise modulo against a scalar or tensor (``%`` / torch.Tensor.fmod)."""
         if isinstance(other, (int, float)):
             other_t = Tensor.full(self.shape or [self.size], float(other))
             return Tensor(lib.cml_mod(self._tensor, other_t._tensor))
@@ -1168,6 +1398,7 @@ class Tensor:
         raise TypeError(f"Cannot compute modulo of Tensor and {type(other)}")
 
     def __floordiv__(self, other: Union[int, float, "Tensor"]) -> "Tensor":
+        """Elementwise floor division (``//``); divides then floors the result."""
         if isinstance(other, (int, float)):
             other_t = Tensor.full(self.shape or [self.size], float(other))
             result = lib.cml_div(self._tensor, other_t._tensor)
@@ -1178,6 +1409,7 @@ class Tensor:
         raise TypeError("Floor division with tensors not supported")
 
     def __repr__(self) -> str:
+        """Concise metadata summary (shape, dtype, device) without realizing data."""
         shape_str = str(self.shape) if self.shape else "()"
         dtype_str = DTYPE_NAMES.get(self.dtype, "unknown")
         device_str = DEVICE_NAMES.get(self.device, "unknown")
@@ -1185,12 +1417,14 @@ class Tensor:
         return f"Tensor(shape={shape_str}, dtype={dtype_str}, device={device_str}{grad_str})"
 
     def __str__(self) -> str:
+        """Human-readable form showing realized values, falling back to ``repr``."""
         try:
             return f"Tensor({self.numpy()})"
         except Exception:
             return repr(self)
 
     def __len__(self) -> int:
+        """Size of the first dimension (``len(t)``); raises for a 0-d tensor."""
         shape = self.shape
         if not shape:
             raise TypeError("len() of unsized tensor")
@@ -1234,6 +1468,12 @@ class Tensor:
         return g
 
     def __getitem__(self, idx):
+        """Index/slice the tensor (``t[...]``), numpy/torch-style.
+
+        Supports ints, slices (including negative steps), Ellipsis, None
+        (newaxis), and integer-array or boolean-mask advanced indexing. Scalar
+        element access returns a Python float; everything else stays lazy.
+        """
         if isinstance(idx, int):
             shape = self.shape
             if not shape:
@@ -1369,6 +1609,8 @@ class Tensor:
         return t
 
     def __setitem__(self, idx, value: float):
+        """Assign into the tensor in place (``t[idx] = value``) by an int index or
+        a full index tuple; a row index can take a scalar or a matching tensor."""
         if isinstance(idx, int):
             shape = self.shape
             if not shape:
@@ -1418,34 +1660,42 @@ class Tensor:
 
     @staticmethod
     def zeros(shape, dtype=None, device=None):
+        """Tensor of the given shape filled with zeros (torch.zeros)."""
         return _create(lib.cml_zeros, shape, dtype, device)
 
     @staticmethod
     def ones(shape, dtype=None, device=None):
+        """Tensor of the given shape filled with ones (torch.ones)."""
         return _create(lib.cml_ones, shape, dtype, device)
 
     @staticmethod
     def randn(shape, dtype=None, device=None):
+        """Tensor sampled from the standard normal distribution (torch.randn)."""
         return _create(lib.cml_randn, shape, dtype, device)
 
     @staticmethod
     def rand(shape, dtype=None, device=None):
+        """Tensor sampled uniformly from [0, 1) (torch.rand)."""
         return _create(lib.cml_rand, shape, dtype, device)
 
     @staticmethod
     def full(shape, value, dtype=None, device=None):
+        """Tensor of the given shape filled with ``value`` (torch.full)."""
         return _create(lib.cml_full, shape, dtype, device, float(value))
 
     @staticmethod
     def empty(shape, dtype=None, device=None):
+        """Uninitialized tensor of the given shape (torch.empty)."""
         return _create(lib.cml_empty, shape, dtype, device)
 
     @staticmethod
     def logspace(start: float, end: float, steps: int = 50) -> "Tensor":
+        """``steps`` points spaced evenly on a log10 scale (torch.logspace)."""
         return Tensor.from_numpy(np.logspace(start, end, steps, dtype=np.float32))
 
     @staticmethod
     def stack(tensors: list, dim: int = 0) -> "Tensor":
+        """Stack tensors along a new dimension ``dim`` (torch.stack)."""
         if not tensors:
             raise ValueError("Need at least one tensor to stack")
         c_tensors = ffi.new("Tensor*[]", [t._tensor for t in tensors])
@@ -1453,6 +1703,7 @@ class Tensor:
 
     @staticmethod
     def cat(tensors: list, dim: int = 0) -> "Tensor":
+        """Concatenate tensors along an existing dimension ``dim`` (torch.cat)."""
         if not tensors:
             raise ValueError("Need at least one tensor")
         c_tensors = ffi.new("Tensor*[]", [t._tensor for t in tensors])
@@ -1460,11 +1711,14 @@ class Tensor:
 
     @staticmethod
     def eye(n: int, m: Optional[int] = None, dtype=None, device=None) -> "Tensor":
+        """Identity matrix of order ``n`` (torch.eye); ``m`` is currently ignored."""
         config = _make_config(dtype, device)
         return Tensor(lib.cml_eye(n, config))
 
     @staticmethod
     def arange(start: float, end: float = None, step: float = 1.0, dtype=None, device=None) -> "Tensor":
+        """Evenly spaced values over [start, end) with the given step (torch.arange).
+        Called with one positional value, that value is ``end`` and start is 0."""
         if end is None:
             end = float(start)
             start = 0.0
@@ -1473,6 +1727,7 @@ class Tensor:
 
     @staticmethod
     def linspace(start: float, end: float, steps: int = 100, dtype=None, device=None) -> "Tensor":
+        """``steps`` values spaced evenly over the closed interval [start, end] (torch.linspace)."""
         config = _make_config(dtype, device)
         return Tensor(lib.cml_linspace(float(start), float(end), int(steps), config))
 
@@ -1508,34 +1763,46 @@ class _TensorView(Tensor):
     """Non-owning view; does not free the underlying C tensor."""
 
     def __init__(self, c_tensor):
+        """Wrap an existing C tensor pointer as a non-owning view."""
         self._tensor = c_tensor
         self._shape_cache = None
 
     def __del__(self):
+        """No-op: a view never frees the C tensor it borrows."""
         pass
 
 
 class init_context:
+    """Context manager that calls ``init()`` on entry and ``cleanup()`` on exit."""
+
     def __init__(self):
+        """Create the context manager; the runtime is initialized on entry."""
         self._initialized = False
 
     def __enter__(self):
+        """Initialize the CML C runtime and return self."""
         lib.cml_init()
         self._initialized = True
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Tear down the runtime on exit; never suppresses exceptions."""
         if self._initialized:
             lib.cml_cleanup()
         return False
 
 
 class set_grad_enabled:
+    """Context manager that sets autograd on/off and restores it on exit
+    (torch.set_grad_enabled)."""
+
     def __init__(self, mode: bool):
+        """Record the desired grad mode to apply on entry."""
         self._mode = mode
         self._prev = True
 
     def __enter__(self):
+        """Apply the grad mode, saving the previous state for restoration."""
         self._prev = lib.cml_is_grad_enabled()
         if self._mode:
             lib.cml_enable_grad()
@@ -1544,6 +1811,7 @@ class set_grad_enabled:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Restore the previous grad mode; never suppresses exceptions."""
         if self._prev:
             lib.cml_enable_grad()
         else:
@@ -1552,20 +1820,28 @@ class set_grad_enabled:
 
 
 class no_grad(set_grad_enabled):
+    """Context manager that disables autograd within its block (torch.no_grad)."""
+
     def __init__(self):
+        """Create a context that turns autograd off on entry."""
         super().__init__(False)
 
 
 class enable_grad(set_grad_enabled):
+    """Context manager that enables autograd within its block (torch.enable_grad)."""
+
     def __init__(self):
+        """Create a context that turns autograd on on entry."""
         super().__init__(True)
 
 
 def is_grad_enabled() -> bool:
+    """Whether autograd is currently enabled (torch.is_grad_enabled)."""
     return lib.cml_is_grad_enabled()
 
 
 def is_device_available(device: int) -> bool:
+    """Whether the given device backend is compiled in and usable; CPU is always True."""
     if device == DEVICE_CPU:
         return True
     try:

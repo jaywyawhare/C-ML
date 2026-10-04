@@ -28,16 +28,22 @@
  * aligned pair to keep alloc/free consistent. */
 #ifdef _WIN32
 #include <malloc.h>
+/** System backing malloc (Windows); 16-byte aligned so it pairs with system_free. */
 static inline void* system_malloc(size_t sz) { return _aligned_malloc(sz ? sz : 1, 16); }
+/** Release memory from any system_* allocation (Windows requires _aligned_free). */
 static inline void system_free(void* p) { _aligned_free(p); }
+/** Aligned system allocation (Windows); returns 0 or ENOMEM(12) like posix_memalign. */
 static inline int system_posix_memalign(void** memptr, size_t alignment, size_t size) {
     void* q = _aligned_malloc(size ? size : 1, alignment);
     *memptr = q;
     return q ? 0 : 12; /* 12 == ENOMEM */
 }
 #else
+/** System backing malloc for slab/large acquisition; never routes through cml_*. */
 static inline void* system_malloc(size_t sz) { return malloc(sz); }
+/** Release memory obtained from the system_* backing allocator. */
 static inline void system_free(void* p) { free(p); }
+/** Aligned system allocation; thin wrapper over posix_memalign. */
 static inline int system_posix_memalign(void** memptr, size_t alignment, size_t size) {
     return posix_memalign(memptr, alignment, size);
 }
@@ -65,12 +71,14 @@ _Static_assert(sizeof(AllocHeader) <= CML_HEADER_SIZE, "AllocHeader must fit in 
 
 #define ALLOC_MAGIC 0xC4A1
 
+/** Recover the AllocHeader sitting CML_HEADER_SIZE bytes before a user pointer; NULL-safe. */
 static inline AllocHeader* header_from_user(void* user) {
     if (!user)
         return NULL;
     return (AllocHeader*)((char*)user - CML_HEADER_SIZE);
 }
 
+/** User payload pointer for a header: the bytes immediately past the fixed-size header. */
 static inline void* user_from_header(AllocHeader* h) { return (char*)h + CML_HEADER_SIZE; }
 
 /* ---------------- Size classes ----------------
@@ -102,6 +110,8 @@ static const size_t SIZE_CLASSES[] = {
     49152, 65536, 98304};
 #define NUM_SIZE_CLASSES (sizeof(SIZE_CLASSES) / sizeof(SIZE_CLASSES[0]))
 
+/** Map a byte size to its size-class index, or -1 when it exceeds the largest class
+ *  (caller then takes the large/direct path). Linear scan, used only off the hot path. */
 static inline int size_to_class(size_t size) {
     if (size <= SIZE_CLASSES[0])
         return 0;
@@ -114,6 +124,7 @@ static inline int size_to_class(size_t size) {
     return -1; /* large */
 }
 
+/** Byte size held by a size class, or 0 if the index is out of range. */
 static inline size_t class_to_size(int cls) {
     if (cls < 0 || (size_t)cls >= NUM_SIZE_CLASSES)
         return 0;
@@ -193,6 +204,7 @@ static void flush_local_to_central(int cls, int keep);
 
 /* ---------------- Initialization ---------------- */
 
+/** Initialize every central bin's mutex and empty its freelist; run once at startup. */
 static void init_central_bins(void) {
     for (size_t i = 0; i < NUM_SIZE_CLASSES; ++i) {
         pthread_mutex_init(&g_central[i].lock, NULL);
@@ -201,6 +213,7 @@ static void init_central_bins(void) {
     }
 }
 
+/** Idempotent one-time init of the central bins, serialized by g_init_lock. */
 static void init_once(void) {
     pthread_mutex_lock(&g_init_lock);
     if (!g_initialized) {
@@ -210,6 +223,7 @@ static void init_once(void) {
     pthread_mutex_unlock(&g_init_lock);
 }
 
+/** Ensure the global bins and this thread's TLS cache are initialized before use. */
 static inline void ensure_init(void) {
     if (!g_initialized) {
         init_once();
@@ -222,6 +236,9 @@ static inline void ensure_init(void) {
 
 /* ---------------- Slab carving ---------------- */
 
+/** Carve a fresh CML_SLAB_SIZE slab for class `cls` from the system allocator, thread the
+ *  carved blocks onto the class's central freelist, and register the slab so its original
+ *  system_base is never lost (slabs are process-lifetime today). Returns NULL on OOM. */
 static Slab* carve_new_slab(int cls) {
     size_t bin_size = class_to_size(cls);
     if (bin_size == 0)
@@ -297,6 +314,8 @@ static Slab* carve_new_slab(int cls) {
 
 /* ---------------- Refill / flush ---------------- */
 
+/** Move a batch of free blocks from the class's central freelist into this thread's cache,
+ *  taking the central lock only for the splice. */
 static void refill_from_central(int cls) {
     /* Steal a batch from central into thread local */
     const int want   = 32; /* batch size */
@@ -326,6 +345,8 @@ static void refill_from_central(int cls) {
     }
 }
 
+/** Return this thread's surplus blocks for `cls` to the central freelist, keeping at most
+ *  `keep` cached locally so per-thread memory stays bounded. */
 static void flush_local_to_central(int cls, int keep) {
     FreeNode* list = tl_cache.heads[cls];
     uint16_t cnt   = tl_cache.counts[cls];
@@ -397,33 +418,41 @@ static int pt_fault_hit(void) {
     return 0;
 }
 
+/** Arm fault injection: the nth subsequent allocation returns NULL, then it disarms itself. */
 void cml_malloc_fault_after(int n) {
     atomic_store_explicit(&g_fault_countdown, (long)n, memory_order_relaxed);
     atomic_store_explicit(&g_alloc_index, 0, memory_order_relaxed);
 }
+/** Disarm allocation fault injection so every allocation succeeds again. */
 void cml_malloc_fault_reset(void) {
     atomic_store_explicit(&g_fault_countdown, -1L, memory_order_relaxed);
 }
+/** Allocations observed since the last fault_after, for pinpointing a failing call site. */
 long cml_malloc_alloc_index(void) {
     return atomic_load_explicit(&g_alloc_index, memory_order_relaxed);
 }
 
+/** Passthrough cml_malloc: straight to libc malloc (0 becomes 1) so ASAN sees each block. */
 void* cml_malloc(size_t size) {
     if (pt_fault_hit())
         return NULL;
     return malloc(size ? size : 1);
 }
+/** Passthrough cml_calloc: zeroing libc calloc, honoring the fault-injection hook. */
 void* cml_calloc(size_t n, size_t sz) {
     if (pt_fault_hit())
         return NULL;
     return calloc(n ? n : 1, sz ? sz : 1);
 }
+/** Passthrough cml_realloc over libc realloc, honoring the fault-injection hook. */
 void* cml_realloc(void* p, size_t n) {
     if (pt_fault_hit())
         return NULL;
     return realloc(p, n ? n : 1);
 }
+/** Passthrough cml_free: plain libc free. */
 void cml_free(void* p) { free(p); }
+/** Passthrough cml_strdup over libc strdup; NULL-safe and fault-injectable. */
 char* cml_strdup(const char* s) {
     if (!s)
         return NULL;
@@ -431,6 +460,7 @@ char* cml_strdup(const char* s) {
         return NULL;
     return strdup(s);
 }
+/** Passthrough aligned allocation via posix_memalign; release with cml_aligned_free. */
 void* cml_aligned_alloc(size_t size, size_t al) {
     void* p = NULL;
     if (al < sizeof(void*))
@@ -439,11 +469,15 @@ void* cml_aligned_alloc(size_t size, size_t al) {
         return NULL;
     return p;
 }
+/** Passthrough free for cml_aligned_alloc memory (plain libc free). */
 void cml_aligned_free(void* p) { free(p); }
 #else
 
 /* ---------------- Allocation paths ---------------- */
 
+/** Allocate one object of size class `cls` for a `user_size` request. Pops the thread-local
+ *  cache first (lockless fast path), else refills from central / carves a slab, and falls
+ *  back to a lone system_malloc block on OOM. Stamps the header and bumps stats. */
 static void* alloc_from_class(int cls, size_t user_size) {
     ensure_init();
 
@@ -512,6 +546,8 @@ static void* alloc_from_class(int cls, size_t user_size) {
     return user_from_header(hdr);
 }
 
+/** Direct path for large requests: a single 64-byte-aligned system allocation carrying the
+ *  header, tagged with class_idx 0xffff so cml_free routes it back to free_large. */
 static void* alloc_large(size_t size) {
     ensure_init();
     /* Large: allocate with extra header using system backing (never our cml_*) */
@@ -538,6 +574,9 @@ static void* alloc_large(size_t size) {
     return user_from_header(hdr);
 }
 
+/** Primary allocation entry point: 0 is treated as 1, requests >= CML_LARGE_THRESHOLD (or
+ *  beyond the largest size class) take the large/direct path, the rest go to a size class.
+ *  Also drives fault injection when armed. Returns NULL on failure. */
 void* cml_malloc(size_t size) {
     if (size == 0)
         size = 1; /* classic */
@@ -565,6 +604,7 @@ void* cml_malloc(size_t size) {
     return alloc_from_class(cls, size);
 }
 
+/** Zero-initialized allocation; returns NULL if nmemb*size overflows size_t. */
 void* cml_calloc(size_t nmemb, size_t size) {
     size_t bytes;
     if (__builtin_mul_overflow(nmemb, size, &bytes))
@@ -576,6 +616,9 @@ void* cml_calloc(size_t nmemb, size_t size) {
     return p;
 }
 
+/** Resize a block: NULL ptr acts as cml_malloc, size 0 frees and returns NULL. Shrinks in
+ *  place (no return to the freelist); grows by allocate-copy-free. Returns NULL and leaves
+ *  the original block intact on a foreign/corrupt header or allocation failure. */
 void* cml_realloc(void* ptr, size_t new_size) {
     if (!ptr)
         return cml_malloc(new_size);
@@ -610,6 +653,8 @@ void* cml_realloc(void* ptr, size_t new_size) {
     return newp;
 }
 
+/** Return a small block to its thread-local cache, poisoning the magic to catch double-frees
+ *  and flushing half the cache to central once it grows past CML_MAX_LOCAL_CACHE. */
 static void free_to_class(int cls, void* user_ptr, size_t user_size) {
     (void)user_size;
     ensure_init();
@@ -634,6 +679,8 @@ static void free_to_class(int cls, void* user_ptr, size_t user_size) {
     }
 }
 
+/** Release a large/direct allocation back to the system allocator via its header start;
+ *  no-op on a foreign or corrupt header. */
 static void free_large(void* ptr) {
     AllocHeader* hdr = header_from_user(ptr);
     if (!hdr || hdr->magic != ALLOC_MAGIC)
@@ -647,6 +694,8 @@ static void free_large(void* ptr) {
     system_free(hdr);
 }
 
+/** Free a cml_* allocation, dispatching to the large or size-class path by its header.
+ *  NULL is ignored, as is any pointer whose header magic does not match (foreign pointer). */
 void cml_free(void* ptr) {
     if (!ptr)
         return;
@@ -668,6 +717,7 @@ void cml_free(void* ptr) {
     free_to_class(cls, ptr, sz);
 }
 
+/** Duplicate a C string into a cml_malloc'd buffer the caller must cml_free; NULL in, NULL out. */
 char* cml_strdup(const char* s) {
     if (!s)
         return NULL;
@@ -678,6 +728,9 @@ char* cml_strdup(const char* s) {
     return p;
 }
 
+/** Allocate `size` bytes aligned to `alignment` (rounded up to a power of two, min
+ *  CML_MIN_ALIGN). Over-allocates and stores the offset back to the real block just before
+ *  the returned pointer; it MUST be released with cml_aligned_free, not cml_free. */
 void* cml_aligned_alloc(size_t size, size_t alignment) {
     if (alignment < CML_MIN_ALIGN)
         alignment = CML_MIN_ALIGN;
@@ -719,6 +772,7 @@ void* cml_aligned_alloc(size_t size, size_t alignment) {
     return (void*)aligned;
 }
 
+/** Free memory from cml_aligned_alloc by recovering the real block via the stored offset. */
 void cml_aligned_free(void* ptr) {
     if (!ptr)
         return;
@@ -728,6 +782,7 @@ void cml_aligned_free(void* ptr) {
     cml_free(real_user);
 }
 
+/** Snapshot the best-effort allocator counters into any non-NULL out params (racy, not exact). */
 void cml_allocator_get_stats(size_t* bytes_allocated, size_t* peak_bytes, size_t* alloc_count) {
     if (bytes_allocated)
         *bytes_allocated = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
@@ -737,6 +792,8 @@ void cml_allocator_get_stats(size_t* bytes_allocated, size_t* peak_bytes, size_t
         *alloc_count = atomic_load_explicit(&g_alloc_count, memory_order_relaxed);
 }
 
+/** Return every block in the calling thread's cache to the central freelists; call before a
+ *  thread exits so its cached memory is reusable by others. */
 void cml_allocator_flush_thread_cache(void) {
     if (!tl_cache.initialized)
         return;
@@ -749,15 +806,18 @@ void cml_allocator_flush_thread_cache(void) {
 
 /* --- Fault injection API --- */
 
+/** Arm fault injection: the nth subsequent cml_malloc returns NULL, then it disarms itself. */
 void cml_malloc_fault_after(int n) {
     atomic_store_explicit(&g_fault_countdown, (long)n, memory_order_relaxed);
     atomic_store_explicit(&g_alloc_index, 0, memory_order_relaxed);
 }
 
+/** Disarm allocation fault injection so every allocation succeeds again. */
 void cml_malloc_fault_reset(void) {
     atomic_store_explicit(&g_fault_countdown, -1L, memory_order_relaxed);
 }
 
+/** Allocations observed since the last fault_after, for pinpointing a failing call site. */
 long cml_malloc_alloc_index(void) {
     return atomic_load_explicit(&g_alloc_index, memory_order_relaxed);
 }

@@ -9,12 +9,14 @@ class TrainingContext:
     """Sets device/dtype for a block, restoring on exit."""
 
     def __init__(self, device: Optional[str] = None, dtype: Optional[str] = None):
+        """Record the target ``device``/``dtype`` names to apply on entry."""
         self.device = device
         self.dtype = dtype
         self.old_device = None
         self.old_dtype = None
 
     def __enter__(self):
+        """Set the requested global device/dtype, stashing the previous values for restore."""
         if self.device:
             self.old_device = cml.get_device()
             if self.device.lower() == "cuda":
@@ -36,6 +38,7 @@ class TrainingContext:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Restore the device/dtype that were in effect before the block."""
         if self.old_device is not None:
             cml.set_device(self.old_device)
         if self.old_dtype is not None:
@@ -44,6 +47,7 @@ class TrainingContext:
 
 @contextmanager
 def training_mode(model, training: bool = True):
+    """Context manager toggling ``model`` train/eval mode, restoring the prior state on exit."""
     old_training = model.is_training() if hasattr(model, 'is_training') else not training
     try:
         model.set_training(training)
@@ -54,6 +58,7 @@ def training_mode(model, training: bool = True):
 
 @contextmanager
 def disable_grad():
+    """Context manager disabling autograd for the block; like torch.no_grad."""
     from cml.core import no_grad as _no_grad
     ctx = _no_grad()
     ctx.__enter__()
@@ -65,6 +70,7 @@ def disable_grad():
 
 @contextmanager
 def enable_grad():
+    """Context manager enabling autograd for the block; like torch.enable_grad."""
     from cml.core import enable_grad as _enable_grad
     ctx = _enable_grad()
     ctx.__enter__()
@@ -75,9 +81,11 @@ def enable_grad():
 
 
 def timer(fn: Callable) -> Callable:
+    """Decorator printing the wall-clock time taken by ``fn`` on each call."""
     import time
 
     def wrapper(*args, **kwargs):
+        """Time the wrapped call and print its elapsed duration."""
         start = time.time()
         result = fn(*args, **kwargs)
         elapsed = time.time() - start
@@ -88,7 +96,9 @@ def timer(fn: Callable) -> Callable:
 
 
 def suppress_output(fn: Callable) -> Callable:
+    """Decorator silencing stdout produced while ``fn`` runs."""
     def wrapper(*args, **kwargs):
+        """Redirect stdout to a throwaway buffer for the wrapped call."""
         import sys
         from io import StringIO
 
@@ -107,25 +117,31 @@ def suppress_output(fn: Callable) -> Callable:
 
 class MetricsTracker:
     def __init__(self):
+        """Create an empty tracker mapping metric names to their logged values."""
         self.metrics: Dict[str, list] = {}
 
     def log(self, name: str, value: float):
+        """Append a value to the named metric's history."""
         if name not in self.metrics:
             self.metrics[name] = []
         self.metrics[name].append(value)
 
     def get(self, name: str) -> list:
+        """Return the full history of the named metric, or an empty list."""
         return self.metrics.get(name, [])
 
     def average(self, name: str) -> float:
+        """Return the mean of the named metric's values, or 0.0 if none."""
         values = self.get(name)
         return sum(values) / len(values) if values else 0.0
 
     def latest(self, name: str) -> Optional[float]:
+        """Return the most recent value of the named metric, or None."""
         values = self.get(name)
         return values[-1] if values else None
 
     def __str__(self) -> str:
+        """Return a one-line summary of each metric's latest value."""
         parts = []
         for name, values in self.metrics.items():
             if values:
@@ -133,17 +149,20 @@ class MetricsTracker:
         return " | ".join(parts)
 
     def __repr__(self) -> str:
+        """Return a short representation naming the number of tracked metrics."""
         return f"MetricsTracker({len(self.metrics)} metrics)"
 
 
 class EarlyStopping:
     def __init__(self, patience: int = 10, min_delta: float = 0.0):
+        """Configure how long to wait, and by how much loss must improve, before stopping."""
         self.patience = patience
         self.min_delta = min_delta
         self.best_loss = float("inf")
         self.wait_count = 0
 
     def __call__(self, loss: float) -> bool:
+        """Record a loss and return True once it has stalled for ``patience`` calls."""
         if loss < self.best_loss - self.min_delta:
             self.best_loss = loss
             self.wait_count = 0
@@ -167,6 +186,7 @@ class LearningRateScheduler:
     _SCHEDULES = ("step", "exponential")
 
     def __init__(self, optimizer, schedule: str = "step", **kwargs):
+        """Configure a step or exponential decay schedule over the given optimizer."""
         if schedule not in self._SCHEDULES:
             # Anything else used to fall through step() silently, leaving the
             # learning rate untouched for the whole run.
@@ -183,6 +203,7 @@ class LearningRateScheduler:
         self.epoch = 0
 
     def step(self):
+        """Advance one epoch and apply the scheduled learning rate to the optimizer."""
         if self.schedule == "step":
             if self.epoch % self.step_size == 0:
                 new_lr = self.initial_lr * (

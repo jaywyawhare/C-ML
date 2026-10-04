@@ -54,6 +54,7 @@ _NP_TO_ST = {
 
 
 def _st_dtype(np_dtype: np.dtype) -> str:
+    """Map a numpy dtype to its safetensors dtype string (e.g. ``"F32"``)."""
     key = np_dtype.str.lower()
     if key not in _NP_TO_ST:
         raise TypeError(f"unsupported safetensors dtype {np_dtype}")
@@ -166,6 +167,7 @@ def load_pretrained(
 
 
 def _remap(key: str, prefixes) -> str:
+    """Rewrite ``key`` by the longest matching ``{src_prefix: dst_prefix}`` rule, else unchanged."""
     pairs = prefixes.items() if isinstance(prefixes, dict) else prefixes
     for src, dst in sorted(pairs, key=lambda kv: len(kv[0]), reverse=True):
         if key.startswith(src):

@@ -10,6 +10,8 @@ from cml.nn import Sequential, Linear, ReLU, Dropout
 def build_model(
     layer_sizes: List[int], dropout: float = 0.0, activation: str = "relu"
 ) -> Sequential:
+    """Build an MLP ``Sequential`` from ``layer_sizes``, inserting the chosen activation
+    (and optional dropout) between every hidden pair but not after the final ``Linear``."""
     if len(layer_sizes) < 2:
         raise ValueError("Need at least 2 layer sizes (input and output)")
 
@@ -49,6 +51,8 @@ def train_model(
     optimizer: str = "adam",
     verbose: bool = True,
 ) -> List[float]:
+    """Full-batch train ``model`` for ``epochs`` and return the per-epoch loss history.
+    ``batch_size`` is accepted for API symmetry but each epoch runs one full-batch step."""
     loss_function = get_loss_function(loss_fn)
     opt = create_optimizer(model, optimizer, learning_rate)
 
@@ -82,6 +86,7 @@ def train_model(
 def evaluate_model(
     model: Sequential, X_test: Tensor, y_test: Tensor, loss_fn: str = "mse"
 ) -> float:
+    """Run ``model`` in eval mode over ``X_test`` and return the scalar loss vs ``y_test``."""
     model.set_training(False)
     loss_function = get_loss_function(loss_fn)
     output = model(X_test)
@@ -89,6 +94,7 @@ def evaluate_model(
 
 
 def predict(model: Sequential, X: Tensor) -> Tensor:
+    """Run ``model`` in eval mode (dropout off) and return its output for ``X``."""
     model.set_training(False)
     return model(X)
 
@@ -96,6 +102,8 @@ def predict(model: Sequential, X: Tensor) -> Tensor:
 def create_optimizer(
     model: Sequential, optimizer: str = "adam", learning_rate: float = 0.001, **kwargs
 ) -> cml.optim.Optimizer:
+    """Construct the named optimizer (``adam``/``sgd``/``rmsprop``/``adagrad``) for ``model``;
+    optimizer-specific hyperparameters are read from ``kwargs``."""
     if optimizer == "adam":
         return cml.Adam(
             model,
@@ -125,6 +133,8 @@ def create_optimizer(
 
 
 def get_loss_function(loss_fn: str) -> Callable:
+    """Resolve a loss name (``mse``/``mae``/``cross_entropy``/``bce``/``huber``/``kl``) to its
+    ``cml`` loss callable."""
     loss_map = {
         "mse": cml.mse_loss,
         "mae": cml.mae_loss,
@@ -139,6 +149,8 @@ def get_loss_function(loss_fn: str) -> Callable:
 
 
 def batch_iterator(X: Tensor, y: Tensor, batch_size: int):
+    """Yield ``(X, y)`` row slices of up to ``batch_size`` along dim 0, including a final
+    partial batch."""
     shape = X.shape
     num_samples = shape[0] if shape else 0
 

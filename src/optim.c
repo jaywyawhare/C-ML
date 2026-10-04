@@ -14,6 +14,9 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** Initialize an already-allocated optimizer in place: store its name and
+ *  step/zero-grad callbacks and reset all groups and scheduler state to
+ *  defaults. Returns -1 on any NULL argument, 0 otherwise. */
 int optimizer_init(Optimizer* optimizer, const char* name, StepFn step, ZeroGradFn zero_grad) {
     if (!optimizer || !name || !step || !zero_grad)
         return -1;
@@ -35,6 +38,8 @@ int optimizer_init(Optimizer* optimizer, const char* name, StepFn step, ZeroGrad
     return 0;
 }
 
+/** Allocate an optimizer and initialize it; returns NULL (with an error pushed)
+ *  on allocation or init failure. */
 Optimizer* optimizer_create(const char* name, StepFn step, ZeroGradFn zero_grad) {
     Optimizer* optimizer = cml_malloc(sizeof(Optimizer));
     if (!optimizer) {
@@ -91,6 +96,8 @@ typedef struct MuonState {
 
 typedef void (*StateInitFn)(void* state, Tensor* tensor, TensorConfig* config);
 
+/** Allocate the per-parameter state array for `group` and run `init_fn` on each
+ *  parameter's slot; parameters without a tensor keep a NULL slot. */
 static void* optimizer_alloc_state(ParameterGroup* group, size_t state_size, StateInitFn init_fn) {
     void** states = cml_malloc((size_t)group->num_parameters * sizeof(void*));
     if (!states)
@@ -122,11 +129,14 @@ static Tensor* optim_zeros(int* shape, int ndim, TensorConfig* config) {
     return t;
 }
 
+/** Zero-initialize one parameter's SGD momentum buffer. */
 static void sgd_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     SGDMomentumState* s = (SGDMomentumState*)state;
     s->momentum_buffer  = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
+/** Zero-initialize one parameter's Adam first/second moments; the amsgrad
+ *  maximum stays NULL until enabled. */
 static void adam_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     AdamState* s      = (AdamState*)state;
     s->exp_avg        = optim_zeros(tensor->shape, tensor->ndim, config);
@@ -134,33 +144,40 @@ static void adam_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     s->max_exp_avg_sq = NULL;
 }
 
+/** Zero-initialize one parameter's RMSprop running squared-gradient average. */
 static void rmsprop_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     RMSpropState* s = (RMSpropState*)state;
     s->square_avg   = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
+/** Zero-initialize one parameter's Adagrad accumulated squared-gradient sum. */
 static void adagrad_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     AdagradState* s = (AdagradState*)state;
     s->sum_sq_grad  = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
+/** Zero-initialize one parameter's AdaDelta squared-gradient and squared-update
+ *  accumulators. */
 static void adadelta_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     AdaDeltaState* s = (AdaDeltaState*)state;
     s->acc_grad      = optim_zeros(tensor->shape, tensor->ndim, config);
     s->acc_update    = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
+/** Zero-initialize one parameter's LAMB first/second moments. */
 static void lamb_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     LAMBState* s  = (LAMBState*)state;
     s->exp_avg    = optim_zeros(tensor->shape, tensor->ndim, config);
     s->exp_avg_sq = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
+/** Zero-initialize one parameter's LARS momentum buffer. */
 static void lars_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     LARSState* s       = (LARSState*)state;
     s->momentum_buffer = optim_zeros(tensor->shape, tensor->ndim, config);
 }
 
+/** Zero-initialize one parameter's Muon momentum buffer. */
 static void muon_state_init(void* state, Tensor* tensor, TensorConfig* config) {
     MuonState* s       = (MuonState*)state;
     s->momentum_buffer = optim_zeros(tensor->shape, tensor->ndim, config);
@@ -174,6 +191,8 @@ static void muon_state_init(void* state, Tensor* tensor, TensorConfig* config) {
  * when the name has no known state layout. */
 static int optim_state_tensor_ptrs(const char* name, void* state, Tensor*** ptrs);
 
+/** Free an optimizer: untrack it, then release every group's parameter array and
+ *  per-parameter state tensors (via the known state layout) before the struct. */
 void optimizer_free(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -213,6 +232,9 @@ void optimizer_free(Optimizer* optimizer) {
     cml_free(optimizer);
 }
 
+/** Append a parameter group with its own lr and weight decay, growing the group
+ *  array as needed; remaining hyper-parameters take optimizer defaults. Returns
+ *  -1 on bad args or allocation failure. */
 int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int num_parameters,
                               float lr, float weight_decay) {
     if (!optimizer || !parameters || num_parameters <= 0) {
@@ -264,6 +286,8 @@ int optimizer_add_param_group(Optimizer* optimizer, Parameter** parameters, int 
     return 0;
 }
 
+/** Expose the internal group array and/or its count through the out-params
+ *  (either may be NULL). Returns -1 only when `optimizer` is NULL. */
 int optimizer_get_param_groups(Optimizer* optimizer, ParameterGroup** groups, int* num_groups) {
     if (!optimizer)
         return -1;
@@ -279,6 +303,7 @@ int optimizer_get_param_groups(Optimizer* optimizer, ParameterGroup** groups, in
     return 0;
 }
 
+/** Return the group at `index`, or NULL when the index is out of range. */
 ParameterGroup* optimizer_get_param_group(Optimizer* optimizer, int index) {
     if (!optimizer || index < 0 || index >= optimizer->num_param_groups) {
         return NULL;
@@ -338,6 +363,8 @@ static int optim_state_tensor_ptrs(const char* name, void* state, Tensor*** ptrs
     return -1;
 }
 
+/** Byte size of one parameter's state struct for optimizer `name`, or 0 for an
+ *  unknown name. Used to lazily reallocate state when loading a checkpoint. */
 static size_t optim_state_struct_size(const char* name) {
     if (strcmp(name, "SGD") == 0)
         return sizeof(SGDMomentumState);
@@ -359,6 +386,9 @@ static size_t optim_state_struct_size(const char* name) {
     return 0;
 }
 
+/** Serialize every group's per-parameter moment tensors to `f`: slot count,
+ *  then each slot's element count followed by its float data. Returns -1 on
+ *  NULL args. */
 int optimizer_state_save(Optimizer* optimizer, FILE* f) {
     if (!optimizer || !f)
         return -1;
@@ -405,6 +435,9 @@ int optimizer_state_save(Optimizer* optimizer, FILE* f) {
     return 0;
 }
 
+/** Restore per-parameter moment tensors written by optimizer_state_save,
+ *  allocating state lazily and skipping any slot whose element count no longer
+ *  matches. Returns 0 (incl. legacy checkpoints with no state block), -1 on error. */
 int optimizer_state_load(Optimizer* optimizer, FILE* f) {
     if (!optimizer || !f)
         return -1;
@@ -497,6 +530,8 @@ static void optimizer_apply_lr_schedule(Optimizer* optimizer) {
     }
 }
 
+/** Run the optimizer's parameter update, then apply the built-in StepLR decay
+ *  and auto-capture training metrics. */
 void optimizer_step(Optimizer* optimizer) {
     if (!optimizer || !optimizer->step)
         return;
@@ -506,6 +541,7 @@ void optimizer_step(Optimizer* optimizer) {
     training_metrics_auto_capture_optimizer(optimizer);
 }
 
+/** Attach a TrainingMetrics sink for later auto-capture during step. */
 void optimizer_set_metrics(Optimizer* optimizer, void* metrics) {
     if (!optimizer) {
         LOG_ERROR("Invalid optimizer");
@@ -514,6 +550,7 @@ void optimizer_set_metrics(Optimizer* optimizer, void* metrics) {
     optimizer->training_metrics = metrics;
 }
 
+/** Clear all parameter gradients via the optimizer's zero-grad callback. */
 void optimizer_zero_grad(Optimizer* optimizer) {
     if (!optimizer || !optimizer->zero_grad)
         return;
@@ -523,6 +560,7 @@ void optimizer_zero_grad(Optimizer* optimizer) {
     training_metrics_mark_zero_grad();
 }
 
+/** Step count of the first parameter group, or 0 when there are none. */
 int optimizer_get_step_count(Optimizer* optimizer) {
     if (!optimizer || optimizer->num_param_groups == 0)
         return 0;
@@ -530,6 +568,7 @@ int optimizer_get_step_count(Optimizer* optimizer) {
     return optimizer->param_groups[0].step_count;
 }
 
+/** Set the learning rate on every parameter group. */
 void optimizer_set_lr(Optimizer* optimizer, float lr) {
     if (!optimizer)
         return;
@@ -542,6 +581,7 @@ void optimizer_set_lr(Optimizer* optimizer, float lr) {
               optimizer->num_param_groups);
 }
 
+/** Set the learning rate of a single group; no-op on an out-of-range index. */
 void optimizer_set_group_lr(Optimizer* optimizer, int group_index, float lr) {
     if (!optimizer || group_index < 0 || group_index >= optimizer->num_param_groups) {
         LOG_WARNING("Invalid group index %d for optimizer with %d groups", group_index,
@@ -554,6 +594,7 @@ void optimizer_set_group_lr(Optimizer* optimizer, int group_index, float lr) {
     LOG_DEBUG("Set learning rate to %.6f for parameter group %d", (double)lr, group_index);
 }
 
+/** Learning rate of one group, or 0 on an out-of-range index. */
 float optimizer_get_group_lr(Optimizer* optimizer, int group_index) {
     if (!optimizer || group_index < 0 || group_index >= optimizer->num_param_groups) {
         LOG_WARNING("Invalid group index %d for optimizer with %d groups", group_index,
@@ -564,6 +605,8 @@ float optimizer_get_group_lr(Optimizer* optimizer, int group_index) {
     return optimizer->param_groups[group_index].lr;
 }
 
+/** Configure the built-in StepLR decay: scale lr by `gamma` every `step_size`
+ *  steps (step_size <= 0 disables it). */
 void optimizer_set_lr_scheduler(Optimizer* optimizer, int step_size, float gamma) {
     if (!optimizer)
         return;
@@ -572,20 +615,24 @@ void optimizer_set_lr_scheduler(Optimizer* optimizer, int step_size, float gamma
     optimizer->lr_scheduler_gamma     = gamma;
 }
 
+/** Set the global gradient-norm clip threshold (0 disables clipping). */
 void optimizer_set_grad_clip_norm(Optimizer* optimizer, float norm) {
     if (optimizer) {
         optimizer->grad_clip_norm = norm;
     }
 }
 
+/** Toggle the AMSGrad variant for Adam-family optimizers. */
 void optimizer_set_amsgrad(Optimizer* optimizer, bool amsgrad) {
     if (optimizer) {
         optimizer->amsgrad = amsgrad;
     }
 }
 
+/** Optimizer name, or NULL when `optimizer` is NULL. */
 const char* optimizer_get_name(Optimizer* optimizer) { return optimizer ? optimizer->name : NULL; }
 
+/** Total parameter count summed across all groups. */
 int optimizer_get_total_parameters(Optimizer* optimizer) {
     if (!optimizer)
         return 0;
@@ -598,6 +645,8 @@ int optimizer_get_total_parameters(Optimizer* optimizer) {
     return total;
 }
 
+/** Print the optimizer and its per-group parameter counts and rates, indented by
+ *  `indent` levels of two spaces. */
 void optimizer_print_summary(Optimizer* optimizer, int indent) {
     if (!optimizer)
         return;
@@ -616,12 +665,14 @@ void optimizer_print_summary(Optimizer* optimizer, int indent) {
     }
 }
 
+/** True when the built-in StepLR decay is configured (step_size > 0). */
 bool optimizer_supports_lr_scheduling(Optimizer* optimizer) {
     if (!optimizer)
         return false;
     return optimizer->lr_scheduler_step_size > 0;
 }
 
+/** True when a gradient-norm clip threshold is set. */
 bool optimizer_supports_grad_clipping(Optimizer* optimizer) {
     if (!optimizer)
         return false;
@@ -706,6 +757,9 @@ static float* optim_param_buffers(ParameterGroup* group, int i, float** grad_dat
     return param_data;
 }
 
+/** SGD update for every group: emit a uop_sgd_step IR node per parameter
+ *  (applying weight decay and momentum). Under FUSE_OPTIM the realizes are
+ *  deferred and run in one graph pass before the buffers are adopted. */
 static void sgd_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -840,6 +894,7 @@ int optimizer_step_inplace(Optimizer* optimizer) {
     return 1;
 }
 
+/** Default zero-grad: clear the gradient of every parameter in every group. */
 static void generic_zero_grad(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -857,6 +912,9 @@ static void generic_zero_grad(Optimizer* optimizer) {
     }
 }
 
+/** Adam update: optionally clip gradients to a global L2 norm, then emit a
+ *  uop_adam_step IR node per parameter using bias-corrected moments (amsgrad
+ *  uses the running max second moment). */
 static void adam_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -950,6 +1008,8 @@ static void adam_step(Optimizer* optimizer) {
     }
 }
 
+/** RMSprop update: keep a decayed (alpha) running mean of squared grads and step
+ *  by lr * grad / (sqrt(mean) + eps), with optional weight decay. */
 static void rmsprop_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -1001,6 +1061,8 @@ static void rmsprop_step(Optimizer* optimizer) {
     }
 }
 
+/** Adagrad update: accumulate squared grads and step by
+ *  lr * grad / (sqrt(sum) + eps), with optional weight decay. */
 static void adagrad_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -1049,6 +1111,8 @@ static void adagrad_step(Optimizer* optimizer) {
     }
 }
 
+/** AdamW update: decoupled weight decay (applied directly to the parameter)
+ *  followed by bias-corrected Adam, optionally with the amsgrad max. */
 static void adamw_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -1112,6 +1176,8 @@ static void adamw_step(Optimizer* optimizer) {
     }
 }
 
+/** AdaDelta update: scale each grad by the ratio of RMS of past updates to RMS of
+ *  past grads (both decayed by rho), needing no base learning rate. */
 static void adadelta_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -1188,6 +1254,8 @@ static ParameterGroup* optim_new(Optimizer** out, const char* name, StepFn step,
     return (*out)->num_param_groups > 0 ? &(*out)->param_groups[0] : NULL;
 }
 
+/** Create an SGD optimizer over `parameters` with the given lr, momentum and
+ *  weight decay. */
 Optimizer* optim_sgd(Parameter** parameters, int num_parameters, float lr, float momentum,
                      float weight_decay) {
     Optimizer* optimizer;
@@ -1200,6 +1268,8 @@ Optimizer* optim_sgd(Parameter** parameters, int num_parameters, float lr, float
     return optimizer;
 }
 
+/** Create an Adam optimizer; non-positive beta/epsilon fall back to the usual
+ *  defaults (0.9, 0.999, 1e-8). */
 Optimizer* optim_adam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                       float beta1, float beta2, float epsilon) {
     Optimizer* optimizer;
@@ -1214,6 +1284,8 @@ Optimizer* optim_adam(Parameter** parameters, int num_parameters, float lr, floa
     return optimizer;
 }
 
+/** Create an RMSprop optimizer; `alpha` is the squared-grad decay rate (default
+ *  0.99 when non-positive). */
 Optimizer* optim_rmsprop(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                          float alpha, float epsilon) {
     Optimizer* optimizer;
@@ -1227,6 +1299,7 @@ Optimizer* optim_rmsprop(Parameter** parameters, int num_parameters, float lr, f
     return optimizer;
 }
 
+/** Create an Adagrad optimizer (epsilon defaults to 1e-8 when non-positive). */
 Optimizer* optim_adagrad(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                          float epsilon) {
     Optimizer* optimizer;
@@ -1239,6 +1312,8 @@ Optimizer* optim_adagrad(Parameter** parameters, int num_parameters, float lr, f
     return optimizer;
 }
 
+/** Create an AdamW optimizer (decoupled weight decay); betas/epsilon fall back to
+ *  the usual Adam defaults. */
 Optimizer* optim_adamw(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                        float beta1, float beta2, float epsilon) {
     Optimizer* optimizer;
@@ -1253,6 +1328,8 @@ Optimizer* optim_adamw(Parameter** parameters, int num_parameters, float lr, flo
     return optimizer;
 }
 
+/** Create an AdaDelta optimizer; `rho` is the decay rate (default 0.9) and the
+ *  base lr is fixed at 1.0 since AdaDelta is self-scaling. */
 Optimizer* optim_adadelta(Parameter** parameters, int num_parameters, float rho, float weight_decay,
                           float epsilon) {
     Optimizer* optimizer;
@@ -1266,6 +1343,8 @@ Optimizer* optim_adadelta(Parameter** parameters, int num_parameters, float rho,
     return optimizer;
 }
 
+/** Build an Adam optimizer over all trainable parameters of `model` and register
+ *  it for tracked cleanup. Returns NULL if parameter collection fails. */
 Optimizer* optim_adam_for_model(Module* model, float lr, float weight_decay, float beta1,
                                 float beta2, float eps) {
     if (!model) {
@@ -1289,6 +1368,8 @@ Optimizer* optim_adam_for_model(Module* model, float lr, float weight_decay, flo
     return optimizer;
 }
 
+/** LAMB update: bias-corrected Adam direction with decoupled weight decay,
+ *  rescaled per parameter by the trust ratio ||param|| / ||update||. */
 static void lamb_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -1371,6 +1452,8 @@ static void lamb_step(Optimizer* optimizer) {
     }
 }
 
+/** LARS update: layer-wise rate lr * trust_coeff * ||param|| / ||grad|| applied
+ *  through an optional momentum buffer, with weight decay folded into the grad. */
 static void lars_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -1446,6 +1529,7 @@ static void lars_step(Optimizer* optimizer) {
     }
 }
 
+/** Create a LAMB optimizer; betas/epsilon fall back to defaults (0.9, 0.999, 1e-6). */
 Optimizer* optim_lamb(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                       float beta1, float beta2, float epsilon) {
     Optimizer* optimizer;
@@ -1460,6 +1544,8 @@ Optimizer* optim_lamb(Parameter** parameters, int num_parameters, float lr, floa
     return optimizer;
 }
 
+/** Create a LARS optimizer; momentum defaults to 0.9 and the trust coefficient
+ *  (stored in epsilon) to 0.02 when non-positive. */
 Optimizer* optim_lars(Parameter** parameters, int num_parameters, float lr, float momentum,
                       float weight_decay, float trust_coefficient) {
     Optimizer* optimizer;
@@ -1487,6 +1573,8 @@ static void newton_schulz_inplace(float* data, size_t numel) {
     }
 }
 
+/** Muon update: accumulate (optionally Nesterov) momentum, orthogonalize the
+ *  update via Newton-Schulz, then step. Weight decay is folded into the grad. */
 static void muon_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -1549,6 +1637,8 @@ static void muon_step(Optimizer* optimizer) {
     }
 }
 
+/** Create a Muon optimizer; momentum defaults to 0.95 and `nesterov` is stored in
+ *  the amsgrad flag. */
 Optimizer* optim_muon(Parameter** parameters, int num_parameters, float lr, float momentum,
                       float weight_decay, bool nesterov) {
     Optimizer* optimizer;
@@ -1565,6 +1655,7 @@ Optimizer* optim_muon(Parameter** parameters, int num_parameters, float lr, floa
     return optimizer;
 }
 
+/** Nadam update: Adam with a Nesterov-corrected first moment in the numerator. */
 static void nadam_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -1621,6 +1712,7 @@ static void nadam_step(Optimizer* optimizer) {
     }
 }
 
+/** Create a Nadam optimizer; betas/epsilon fall back to the usual Adam defaults. */
 Optimizer* optim_nadam(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                        float beta1, float beta2, float epsilon) {
     Optimizer* optimizer;
@@ -1635,6 +1727,8 @@ Optimizer* optim_nadam(Parameter** parameters, int num_parameters, float lr, flo
     return optimizer;
 }
 
+/** AdaMax update: Adam variant using the infinity norm (running max of |grad|) in
+ *  place of the second moment. */
 static void adamax_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
@@ -1685,6 +1779,7 @@ static void adamax_step(Optimizer* optimizer) {
     }
 }
 
+/** Create an AdaMax optimizer; betas/epsilon fall back to the usual Adam defaults. */
 Optimizer* optim_adamax(Parameter** parameters, int num_parameters, float lr, float weight_decay,
                         float beta1, float beta2, float epsilon) {
     Optimizer* optimizer;
@@ -1699,6 +1794,8 @@ Optimizer* optim_adamax(Parameter** parameters, int num_parameters, float lr, fl
     return optimizer;
 }
 
+/** Build an SGD optimizer over all trainable parameters of `model`. Returns NULL
+ *  if parameter collection fails. */
 Optimizer* optim_sgd_for_model(Module* model, float lr, float momentum, float weight_decay) {
     if (!model) {
         return NULL;

@@ -51,6 +51,7 @@ def checkpoint(fn, *inputs, verify_determinism: bool = False):
             out2 = fn(*inputs)
 
     def _values(o):
+        """Deep-copy any Tensors in ``o`` into fresh history-less leaves."""
         if isinstance(o, Tensor):
             v = o.numpy()
             return Tensor(v.copy())
@@ -75,6 +76,7 @@ def checkpoint(fn, *inputs, verify_determinism: bool = False):
 
 
 def _flatten(obj):
+    """Yield every Tensor in a nested list/tuple structure, depth-first."""
     if isinstance(obj, Tensor):
         yield obj
     elif isinstance(obj, (list, tuple)):

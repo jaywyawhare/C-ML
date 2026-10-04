@@ -55,12 +55,15 @@ def disable_grad(tensor=None):
 
 
 def zero_grad(tensor):
+    """Zero the accumulated gradient of a tensor in place."""
     lib.cml_zero_grad(tensor._tensor)
 
 
 def requires_grad(tensor):
+    """Return whether the tensor currently tracks gradients."""
     return lib.cml_requires_grad(tensor._tensor)
 
 
 def is_leaf(tensor):
+    """Return whether the tensor is a graph leaf (has no autograd history)."""
     return lib.cml_is_leaf(tensor._tensor)

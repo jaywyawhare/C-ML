@@ -102,7 +102,9 @@ def randn(shape: Sequence[int], opts: Optional[TensorOptions] = None) -> Tensor:
 
 
 def _shape_factory(c_fn):
+    """Build a shape-plus-``opts`` factory bound to native ``c_fn`` (e.g. ``torch_empty``)."""
     def factory(shape: Sequence[int], opts: Optional[TensorOptions] = None) -> Tensor:
+        """Create a tensor of ``shape`` via the bound native constructor; defaults to float32 CPU."""
         opts = opts or TensorOptions()
         c_shape = ffi.new("int[]", list(shape))
         return _make_tensor(c_fn(c_shape, len(shape), opts._to_c_ptr()))
@@ -141,25 +143,32 @@ def linspace(start: float, end: float, steps: int,
 
 
 def zeros_like(t: Tensor) -> Tensor:
+    """Create a zero tensor matching ``t``'s shape/dtype/device (torch.zeros_like)."""
     return _make_tensor(lib.torch_zeros_like(t._tensor))
 
 
 def ones_like(t: Tensor) -> Tensor:
+    """Create a ones tensor matching ``t``'s shape/dtype/device (torch.ones_like)."""
     return _make_tensor(lib.torch_ones_like(t._tensor))
 
 
 def randn_like(t: Tensor) -> Tensor:
+    """Create a standard-normal tensor matching ``t``'s shape/dtype/device (torch.randn_like)."""
     return _make_tensor(lib.torch_randn_like(t._tensor))
 
 
 def _binary(c_fn):
+    """Build a two-tensor op bound to native ``c_fn`` (e.g. ``torch_add``)."""
     def op(a: Tensor, b: Tensor) -> Tensor:
+        """Apply the bound native binary op to ``a`` and ``b``."""
         return _make_tensor(c_fn(a._tensor, b._tensor))
     return op
 
 
 def _unary(c_fn):
+    """Build a single-tensor op bound to native ``c_fn`` (e.g. ``torch_relu``)."""
     def op(a: Tensor) -> Tensor:
+        """Apply the bound native unary op to ``a``."""
         return _make_tensor(c_fn(a._tensor))
     return op
 
@@ -180,11 +189,14 @@ contiguous = _unary(lib.torch_contiguous)
 
 
 def softmax(a: Tensor, dim: int = -1) -> Tensor:
+    """Softmax over ``dim`` (torch.softmax)."""
     return _make_tensor(lib.torch_softmax(a._tensor, dim))
 
 
 def _reduction(c_fn):
+    """Build a dim-reduction op bound to native ``c_fn`` (e.g. ``torch_sum``)."""
     def op(a: Tensor, dim: int = -1, keepdim: bool = False) -> Tensor:
+        """Reduce ``a`` over ``dim`` via the bound native op, optionally keeping the reduced dim."""
         return _make_tensor(c_fn(a._tensor, dim, keepdim))
     return op
 
@@ -196,27 +208,33 @@ min = _reduction(lib.torch_min)
 
 
 def reshape(a: Tensor, shape: Sequence[int]) -> Tensor:
+    """View ``a`` with a new ``shape`` (torch.reshape)."""
     c_shape = ffi.new("int[]", list(shape))
     return _make_tensor(lib.torch_reshape(a._tensor, c_shape, len(shape)))
 
 
 def transpose(a: Tensor, dim0: int = 0, dim1: int = 1) -> Tensor:
+    """Swap axes ``dim0`` and ``dim1`` (torch.transpose)."""
     return _make_tensor(lib.torch_transpose(a._tensor, dim0, dim1))
 
 
 def squeeze(a: Tensor, dim: int = -1) -> Tensor:
+    """Remove the size-1 axis ``dim`` (torch.squeeze)."""
     return _make_tensor(lib.torch_squeeze(a._tensor, dim))
 
 
 def unsqueeze(a: Tensor, dim: int) -> Tensor:
+    """Insert a size-1 axis at ``dim`` (torch.unsqueeze)."""
     return _make_tensor(lib.torch_unsqueeze(a._tensor, dim))
 
 
 def cat(tensors: Sequence[Tensor], dim: int = 0) -> Tensor:
+    """Concatenate ``tensors`` along existing axis ``dim`` (torch.cat)."""
     arr = ffi.new("Tensor*[]", [t._tensor for t in tensors])
     return _make_tensor(lib.torch_cat(arr, len(tensors), dim))
 
 
 def stack(tensors: Sequence[Tensor], dim: int = 0) -> Tensor:
+    """Stack ``tensors`` along a new axis ``dim`` (torch.stack)."""
     arr = ffi.new("Tensor*[]", [t._tensor for t in tensors])
     return _make_tensor(lib.torch_stack(arr, len(tensors), dim))

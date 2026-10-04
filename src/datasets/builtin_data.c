@@ -11,6 +11,10 @@ static const float airline_data[144] = {
     340, 318, 362, 348, 363, 435, 491, 505, 404, 359, 310, 337, 360, 342, 406, 396, 420, 472,
     548, 559, 463, 407, 362, 405, 417, 391, 419, 461, 472, 535, 622, 606, 508, 461, 390, 432};
 
+/**
+ * Return the built-in monthly airline-passenger series (144 points); writes the
+ * length to *n. The buffer is static and read-only -- the caller must not free it.
+ */
 const float* cml_builtin_airline_data(int* n) {
     *n = 144;
     return airline_data;
@@ -65,6 +69,11 @@ static float digits_X[1797 * 64];
 static float digits_y[1797];
 static int digits_initialized = 0;
 
+/**
+ * Lazily fill the static digits_X/digits_y buffers on first use. Each of the 10
+ * templates is expanded into ~180 samples by adding deterministic LCG noise, so
+ * results are reproducible across runs.
+ */
 static void init_digits(void) {
     if (digits_initialized)
         return;
@@ -95,6 +104,11 @@ static void init_digits(void) {
     }
 }
 
+/**
+ * Return the 1797x64 digits feature matrix, generating it on first call; writes
+ * the sample count to *n and the per-sample feature stride to *features. The
+ * buffer is static and read-only.
+ */
 const float* cml_builtin_digits_data(int* n, int* features) {
     init_digits();
     *n        = 1797;
@@ -102,6 +116,10 @@ const float* cml_builtin_digits_data(int* n, int* features) {
     return digits_X;
 }
 
+/**
+ * Return the 1797 digit labels (each in 0-9) matching the digits feature matrix,
+ * generating them on first call; writes the count to *n. The buffer is read-only.
+ */
 const float* cml_builtin_digits_labels(int* n) {
     init_digits();
     *n = 1797;

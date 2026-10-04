@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include "alloc/cml_allocator.h"
 
+/**
+ * Read a big-endian 32-bit unsigned integer from the stream (IDX files are
+ * big-endian). Returns 0 on a short read.
+ */
 static uint32_t read_u32_be(FILE* f) {
     uint8_t b[4];
     if (fread(b, 1, 4, f) != 4)
@@ -12,6 +16,11 @@ static uint32_t read_u32_be(FILE* f) {
     return ((uint32_t)b[0] << 24) | ((uint32_t)b[1] << 16) | ((uint32_t)b[2] << 8) | (uint32_t)b[3];
 }
 
+/**
+ * Load an IDX image file (magic 2051), normalizing pixels to [0,1]. Writes image
+ * count and dimensions; returns a cml_malloc buffer of *n * rows * cols floats
+ * (caller frees), or NULL on a bad magic or truncated file.
+ */
 float* cml_idx_load_images(const char* path, int* n, int* rows, int* cols) {
     FILE* f = fopen(path, "rb");
     if (!f) {
@@ -62,6 +71,11 @@ float* cml_idx_load_images(const char* path, int* n, int* rows, int* cols) {
     return data;
 }
 
+/**
+ * Load an IDX label file (magic 2049) as floats. Writes the count; returns a
+ * cml_malloc buffer of *n floats (caller frees), or NULL on a bad magic or
+ * truncated file.
+ */
 float* cml_idx_load_labels(const char* path, int* n) {
     FILE* f = fopen(path, "rb");
     if (!f) {
