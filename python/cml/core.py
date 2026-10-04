@@ -863,13 +863,24 @@ class Tensor:
     def softsign(self) -> "Tensor": return Tensor(lib.uop_softsign(self._tensor))
     def logsigmoid(self) -> "Tensor": return Tensor(lib.uop_logsigmoid(self._tensor))
     def celu(self, alpha: float = 1.0) -> "Tensor": return Tensor(lib.uop_celu(self._tensor, alpha))
-    def silu(self) -> "Tensor": return Tensor(lib.cml_silu(self._tensor))
-    def mish(self) -> "Tensor": return Tensor(lib.cml_mish(self._tensor))
-    def selu(self) -> "Tensor": return Tensor(lib.cml_selu(self._tensor))
-    def hardswish(self) -> "Tensor": return Tensor(lib.cml_hardswish(self._tensor))
-    def elu(self, alpha: float = 1.0) -> "Tensor": return Tensor(lib.cml_elu(self._tensor, float(alpha)))
+    def silu(self) -> "Tensor":
+        """SiLU / swish activation, x * sigmoid(x) (torch.nn.functional.silu)."""
+        return Tensor(lib.cml_silu(self._tensor))
+    def mish(self) -> "Tensor":
+        """Mish activation, x * tanh(softplus(x)) (torch.nn.functional.mish)."""
+        return Tensor(lib.cml_mish(self._tensor))
+    def selu(self) -> "Tensor":
+        """Scaled ELU activation (torch.nn.functional.selu)."""
+        return Tensor(lib.cml_selu(self._tensor))
+    def hardswish(self) -> "Tensor":
+        """Hard-swish activation, x * relu6(x + 3) / 6 (torch.nn.functional.hardswish)."""
+        return Tensor(lib.cml_hardswish(self._tensor))
+    def elu(self, alpha: float = 1.0) -> "Tensor":
+        """ELU activation: x if x > 0 else alpha * (exp(x) - 1) (torch.nn.functional.elu)."""
+        return Tensor(lib.cml_elu(self._tensor, float(alpha)))
 
     def leaky_relu(self, negative_slope: float = 0.01) -> "Tensor":
+        """Leaky ReLU: x if x > 0 else negative_slope * x (torch.nn.functional.leaky_relu)."""
         return Tensor(lib.cml_leaky_relu(self._tensor, float(negative_slope)))
 
     def lerp(self, end: "Tensor", weight: float) -> "Tensor":
@@ -1468,12 +1479,29 @@ class Tensor:
     # torch-style dtype shorthands. Kept last in the class body: names such as
     # `int` and `bool` would otherwise shadow the builtins for any later
     # class-level expression.
-    def float(self) -> "Tensor": return self.cast(DTYPE_FLOAT32)
-    def double(self) -> "Tensor": return self.cast(DTYPE_FLOAT64)
-    def half(self) -> "Tensor": return self.cast(DTYPE_FLOAT16)
-    def int(self) -> "Tensor": return self.cast(DTYPE_INT32)
-    def long(self) -> "Tensor": return self.cast(DTYPE_INT64)
-    def bool(self) -> "Tensor": return self.cast(DTYPE_BOOL)
+    def float(self) -> "Tensor":
+        """Cast to float32 (torch.Tensor.float)."""
+        return self.cast(DTYPE_FLOAT32)
+
+    def double(self) -> "Tensor":
+        """Cast to float64 (torch.Tensor.double)."""
+        return self.cast(DTYPE_FLOAT64)
+
+    def half(self) -> "Tensor":
+        """Cast to float16 (torch.Tensor.half)."""
+        return self.cast(DTYPE_FLOAT16)
+
+    def int(self) -> "Tensor":
+        """Cast to int32 (torch.Tensor.int)."""
+        return self.cast(DTYPE_INT32)
+
+    def long(self) -> "Tensor":
+        """Cast to int64 (torch.Tensor.long)."""
+        return self.cast(DTYPE_INT64)
+
+    def bool(self) -> "Tensor":
+        """Cast to bool, by truthiness (torch.Tensor.bool)."""
+        return self.cast(DTYPE_BOOL)
 
 
 class _TensorView(Tensor):

@@ -35,12 +35,16 @@ static Tensor* forward_unary(Tensor* a, UOpType type) {
     return tensor_from_ir_node(node, ir);
 }
 
+/** Elementwise a + b, broadcast and dtype-promoted (lazy). @see uop_add */
 Tensor* tensor_add(Tensor* a, Tensor* b) { return uop_add(a, b); }
 
+/** Elementwise a - b, broadcast and dtype-promoted (lazy). @see uop_sub */
 Tensor* tensor_sub(Tensor* a, Tensor* b) { return uop_sub(a, b); }
 
+/** Elementwise a * b, broadcast and dtype-promoted (lazy). @see uop_mul */
 Tensor* tensor_mul(Tensor* a, Tensor* b) { return uop_mul(a, b); }
 
+/** Elementwise a / b, broadcast and dtype-promoted (lazy). @see uop_div */
 Tensor* tensor_div(Tensor* a, Tensor* b) { return uop_div(a, b); }
 
 Tensor* tensor_pow(Tensor* a, Tensor* b) {

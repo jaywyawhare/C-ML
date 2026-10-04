@@ -672,6 +672,9 @@ static int diagonal_nd_typed(const void* ad, const Tensor* a, const Tensor* out,
     return 0;
 }
 
+/** Non-float dtype path for the movement/layout ops (reshape, permute, slice,
+ * ...): copy elements by index, element-size-generic, since the float kernels in
+ * execution.c assume float32. Returns 0 on success, -1 if unsupported. */
 static int layout_kernel(struct IRNode* node, Tensor* out, void* od) {
     Tensor* a  = in_at(node, 0);
     size_t esz = cml_dtype_size(out->dtype);

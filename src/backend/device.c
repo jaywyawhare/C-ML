@@ -163,6 +163,8 @@ static bool check_cuda_available(void) {
     return false;
 }
 
+/** True if a Metal device is present. Delegates to the backend's cached probe
+ *  when Metal is compiled in, else dynamically loads the framework once. */
 static bool check_metal_available(void) {
 #if defined(CML_HAS_METAL)
     /* The backend caches its device; probing here created (and leaked) a new

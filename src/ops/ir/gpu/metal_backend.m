@@ -275,6 +275,8 @@ static const char* const g_pso_names[PSO_COUNT] = {
     "k_sum_reduce", "k_max_reduce", "k_matmul_opt", "k_matmul_fused_bias_relu",
 };
 
+/** The static compute pipelines, compiled from g_mtl_static_kernels once per
+ *  process (dispatch_once). Indexed by the PSO_* enum. */
 static id<MTLComputePipelineState> const* shared_static_psos(id<MTLDevice> device) {
     static id<MTLComputePipelineState> psos[PSO_COUNT];
     static dispatch_once_t once;
@@ -296,6 +298,7 @@ static id<MTLComputePipelineState> const* shared_static_psos(id<MTLDevice> devic
 
 /* ── Availability ── */
 
+/** True if the system has a default Metal device (cached). */
 bool cml_metal_available(void) { return shared_device() != nil; }
 
 /* ── Lifecycle ── */
@@ -309,6 +312,11 @@ CMLMetalBackend* cml_metal_backend_create(void) {
     return backend;
 }
 
+/**
+ * Initialize `backend`: bind the shared device and command queue and retain a
+ * reference to each shared static pipeline. Idempotent; returns 0 on success or
+ * if already initialized, -1 if no device or the command queue cannot be made.
+ */
 int cml_metal_backend_init(CMLMetalBackend* backend) {
     if (!backend) return -1;
 

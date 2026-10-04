@@ -153,6 +153,9 @@ static float* backward_contiguous(Tensor* t, bool* owned) {
     return buf;
 }
 
+/** Accumulate the vector-Jacobian product for one IR node into its inputs'
+ * gradients (the CPU eager backward). Dispatches on node->type; each case adds
+ * this node's contribution to grad of the inputs that require it. Returns 0/-1. */
 static int cpu_backward_node(struct IRNode* node) {
     if (!node || !node->output)
         return 0;

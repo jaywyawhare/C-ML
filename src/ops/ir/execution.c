@@ -2164,6 +2164,15 @@ bool cml_slice_src(const Tensor* in, const Tensor* layout, const Tensor* out, co
     return true;
 }
 
+/**
+ * Give a view-output its own contiguous, correctly-strided buffer before a
+ * kernel writes it, and return that buffer.
+ *
+ * Movement ops (SLICE, EXPAND) hand back an output that still aliases an
+ * ancestor's storage; a kernel writing it contiguously from index 0 would
+ * corrupt whatever it is a view of, so any output that does not own its data
+ * is detached onto a fresh buffer first.
+ */
 static float* unview_output(Tensor* out, const float* in_data) {
     /* A view output aliases an ancestor's buffer, not necessarily in_data: in a
      * chain of slices the input may already own a fresh buffer while this
@@ -2191,6 +2200,9 @@ static float* unview_output(Tensor* out, const float* in_data) {
     return (float*)out->data;
 }
 
+/** Execute one IR node on the CPU interpreter: materialize its inputs if
+ * needed, dispatch on node->type to the matching kernel, and write node->output.
+ * Returns 0 on success, -1 on failure. The large switch is the per-op kernel set. */
 int cpu_execute_node(struct IRNode* node) {
     if (!node || !node->output) {
         return -1;

@@ -311,6 +311,8 @@ static inline double cml_load_f64(const void* p, size_t i, DType d) {
     }
 }
 
+/** Store double `v` into element `i` of buffer `p` typed as `d`, converting to
+ *  the target representation (bool stores truthiness; integers truncate). */
 static inline void cml_store_f64(void* p, size_t i, DType d, double v) {
     switch (d) {
     case DTYPE_BOOL: /* truthiness: the integer path below truncated -0.4 to false */

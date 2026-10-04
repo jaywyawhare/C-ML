@@ -1467,6 +1467,13 @@ Tensor* tensor_dot(Tensor* a, Tensor* b) {
     return uop_sum(prod, &params);
 }
 
+/**
+ * Reduce `src` into a clone of `self` at the positions named by `index` along
+ * `dim`, combining collisions with `mode` (SUM/PROD/MEAN/AMAX/AMIN; MEAN counts
+ * `self` as one contributor). `index` and `src` must match `self`'s rank.
+ * Equivalent to torch.Tensor.scatter_reduce(..., include_self=True).
+ * @return a newly allocated result tensor, or NULL on error.
+ */
 Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
                               ScatterReduceMode mode) {
     if (!self || !index || !src)
