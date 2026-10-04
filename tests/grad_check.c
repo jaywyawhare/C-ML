@@ -3,7 +3,6 @@
 #include <math.h>
 #include <string.h>
 #include <stdbool.h>
-#include <time.h>
 
 #include "cml.h"
 
@@ -702,7 +701,16 @@ static int required_passed = 0;
     } while (0)
 
 int main(void) {
-    srand((unsigned)time(NULL));
+    /* Deterministic by default: a time-based seed made this intermittently fail
+     * in CI, because the finite-difference check is sensitive to inputs that
+     * land near an op kink (relu/abs/max) or where f is steep relative to eps.
+     * A fixed seed keeps the sampled inputs reproducible across runs and
+     * platforms (BLAS and scalar paths alike). Override with GRAD_CHECK_SEED. */
+    unsigned seed        = 20240517u;
+    const char* seed_env = getenv("GRAD_CHECK_SEED");
+    if (seed_env && seed_env[0])
+        seed = (unsigned)strtoul(seed_env, NULL, 10);
+    srand(seed);
 
     printf("grad_check  eps=%.1e  tol=%.1e\n\n", (double)EPS, (double)TOL);
 
