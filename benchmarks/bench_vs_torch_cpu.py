@@ -4,7 +4,7 @@
 Forces materialization each iteration (C-ML is lazy; .numpy() realizes it, and
 torch eager is realized on .numpy() too), warms up, and reports the median of N
 runs. GPU numbers are out of scope here (no device in this environment) — this is
-the CPU credibility baseline called for in docs/ROADMAP.md Tier 1.
+the CPU credibility baseline (a Tier-1 item).
 
 Run:  cd python && ../benchmarks/.venv/bin/python ../benchmarks/bench_vs_torch_cpu.py
 """

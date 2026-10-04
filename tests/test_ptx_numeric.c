@@ -4,8 +4,8 @@
  * instructions. That catches a missing op but not a wrong one: a kernel that
  * reads the wrong register, swaps two operands, or picks the wrong rounding mode
  * emits perfectly plausible text. Confirming the numbers needed an NVIDIA GPU,
- * and CI has none -- so `docs/REMAINING_WORK.md` carried "codegen exists but
- * numeric validation needs hardware" as an open item.
+ * and CI has none, so numeric validation of the codegen needed hardware and
+ * stayed an open item.
  *
  * It does not, for this class of kernel. The emitted elementwise kernels are
  * straight-line scalar f32 with a bounds guard, so tests/ptx_interp.h executes

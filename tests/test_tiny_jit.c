@@ -7,7 +7,7 @@
  * recording run's values on every later call, which is silently wrong.
  *
  * Attempting the CPU recording is what showed why it cannot work as a trace of
- * IR nodes; the finding is written up in docs/REMAINING_WORK.md. In short: after a
+ * IR nodes. In short: after a
  * graph executes its nodes are marked executed and a re-run is a no-op, so there is
  * nothing to replay; and getting a fresh run means `cml_reset_ir_context()`, which
  * frees the very nodes a trace would point at. A CPU trace therefore has to record

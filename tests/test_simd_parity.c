@@ -12,7 +12,7 @@
  * alignment edge cases are exercised.  Binary ops additionally cover the
  * broadcast cases (equal / lhs-scalar / rhs-scalar).
  *
- * This is the correctness gate referenced by docs/shape_specific_simd_plan.md:
+ * This is the correctness gate for shape-specialized SIMD/JIT emission:
  * it must pass before the hand-rolled SIMD library is deleted.
  */
 #include <stdio.h>

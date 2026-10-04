@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """C-ML vs PyTorch across available devices (CPU always; CUDA when present).
 
-GPU is the number that decides a framework claim (docs/ROADMAP.md). This box has
+GPU is the number that decides a framework claim. This box has
 no device, so the CUDA section skips here — but the code runs unchanged on a
 machine with a GPU, which is exactly the artifact the roadmap asks for.
 

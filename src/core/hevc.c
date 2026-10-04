@@ -388,7 +388,7 @@ const int16_t* cml_hevc_transform_matrix(int size, int dst) {
         return HEVC_DCT4; /* exactly row-orthogonal -> intrinsically verifiable */
     /* 8/16/32-point integer transforms are only approximately orthogonal (lossy
      * by design), so they cannot be self-checked; they await spec reference
-     * vectors before being exposed. See docs/REMAINING_WORK.md. */
+     * vectors before being exposed. */
     return NULL;
 }
 

@@ -2,7 +2,7 @@
 
 Head-to-head timing against PyTorch. **CPU only** — this environment has no GPU,
 so GPU numbers (the ones that matter most for a framework claim) are still owed;
-see docs/ROADMAP.md. These are a baseline, not a victory lap.
+These are a baseline, not a victory lap.
 
 ## Method
 

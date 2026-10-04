@@ -157,7 +157,7 @@ paths.
 | [Benchmarks](docs/benchmarks.md) | [Examples](docs/examples.md) |
 | [Miscellaneous](docs/miscellaneous.md) | [External Deps](docs/EXTERNAL_DEPENDENCIES.md) |
 | [Python Bindings](docs/python_installation.md) | [Python (repo)](python/INSTALLATION.md) |
-| [License](docs/license.md) | [Documentation index](docs/index.md) |
+| [License](LICENSE.md) | [Documentation index](docs/index.md) |
 
 </details>
 
