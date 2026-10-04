@@ -85,7 +85,7 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
     /* Additional roots: nodes whose output escaped the graph (pinned /
      * externally referenced by a caller). Rooting only at the tail declares
      * the producer of any intermediate tensor handed to the user dead in
-     * multi-output graphs — its "dead" node was holding live data. */
+     * multi-output graphs - its "dead" node was holding live data. */
     node = ir->head;
     while (node) {
         if (!node->is_used && node->output && node->output->external_refs > 0) {
@@ -170,7 +170,7 @@ static int remove_dead_nodes(CMLGraph_t ir) {
             /* Same reason as decompose: a dead node must leave the CSE table
              * before its memory goes, or a later lookup probes a freed node. */
             cml_intern_remove(ir->intern_table, node);
-            /* Canonical teardown — the hand-rolled field list this used to
+            /* Canonical teardown - the hand-rolled field list this used to
              * duplicate leaked params/scope/build_stack/input_shapes. */
             cml_ir_release_node_storage(node);
             cml_free(node);
@@ -595,7 +595,7 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
     if (!ir || ir->node_count <= 0)
         return -1;
 
-    /* Walk the linked list to get the real count — earlier passes
+    /* Walk the linked list to get the real count - earlier passes
        (CSE, DCE, fusion) can leave ir->node_count stale. */
     int actual_count = 0;
     for (struct IRNode* n = ir->head; n; n = n->next)

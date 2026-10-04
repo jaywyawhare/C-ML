@@ -346,7 +346,7 @@ int backend_init(BackendType type) {
         g_current_backend->ops = scalar_ops;
         break;
     case BACKEND_CUDA:
-        /* The legacy backend API has no CUDA compute path — this selects host
+        /* The legacy backend API has no CUDA compute path - this selects host
          * scalar ops only. Fail loudly instead of lending the label false
          * credibility; GPU execution goes through dispatch/IR (cml_dispatch_*,
          * cml_ir_execute) or HCQ. */

@@ -240,7 +240,7 @@ def where(condition, x, y) -> "Tensor":
 
 def scatter_add(index, src, dim, dim_size) -> "Tensor":
     """Segment-sum: add each `src` element into a fresh zero tensor of length
-    `dim_size` at the position in `index` along `dim` — equivalent to
+    `dim_size` at the position in `index` along `dim` - equivalent to
     ``torch.zeros(dim_size).scatter_add_(dim, index, src)``."""
     idx = index if isinstance(index, Tensor) else Tensor(index)
     s = src if isinstance(src, Tensor) else Tensor(src)
@@ -295,7 +295,7 @@ class Tensor:
         """Create a tensor.
 
         Accepts either raw data (a Python scalar / (nested) list / tuple /
-        numpy array) — the ergonomic, PyTorch-style path — or, internally, an
+        numpy array) - the ergonomic, PyTorch-style path - or, internally, an
         existing C tensor handle (a CFFI cdata pointer) which is simply wrapped.
         """
         self._shape_cache = None
@@ -358,7 +358,7 @@ class Tensor:
         tensor that the C ops broadcast), or return None for unsupported types.
 
         Python scalars are weakly typed (torch rule): they adopt the tensor's
-        dtype instead of widening it — except a float scalar meeting an
+        dtype instead of widening it - except a float scalar meeting an
         integral tensor, which promotes to float32 like torch's default
         floating dtype.
         """
@@ -1293,7 +1293,7 @@ class Tensor:
 
         shape_array = ffi.new("int[]", shape)
         data_ptr = ffi.cast("void*", arr.ctypes.data)
-        # Pass the dtype through — a NULL config defaults to float32, which
+        # Pass the dtype through - a NULL config defaults to float32, which
         # reinterprets non-f32 array bytes as float garbage.
         config = ffi.new("TensorConfig*", {"dtype": target_dtype, "has_dtype": True})
         c_tensor = lib.tensor_from_data(data_ptr, shape_array, len(shape), config)
@@ -1558,7 +1558,7 @@ class Tensor:
                     arr = item.numpy()
                 else:
                     arr = np.asarray(item)
-                # Comparisons currently yield f32 0/1 tensors — accept them
+                # Comparisons currently yield f32 0/1 tensors - accept them
                 # (and any all-0/1 array) as boolean masks.
                 is_mask = arr.dtype == bool or (
                     arr.dtype.kind == "f" and arr.size > 0

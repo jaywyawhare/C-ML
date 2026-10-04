@@ -143,7 +143,7 @@ int cml_disk_save_tensor(CMLDiskBackend* backend, const char* name, Tensor* tens
         return -1;
     }
 
-    /* Write tensor data — raw bytes in the tensor's own dtype (was f32-only,
+    /* Write tensor data - raw bytes in the tensor's own dtype (was f32-only,
      * silently truncating every other dtype to its first quarter). */
     if (tensor->data && tensor->numel > 0) {
         if (fwrite(tensor->data, elem_size, tensor->numel, f) != tensor->numel) {

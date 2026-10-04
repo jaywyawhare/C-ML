@@ -1,5 +1,5 @@
 /* Zero-rebuild static graph: build a graph once, then re-run it on new input /
- * weight buffers via cml_ir_reexecute — no per-iteration rebuild (constant node
+ * weight buffers via cml_ir_reexecute - no per-iteration rebuild (constant node
  * count), results identical to a fresh dynamic rebuild.
  *
  *  - inference : swap the input buffer, re-run, compare to a dynamic rebuild.

@@ -1,7 +1,7 @@
 /* Branch coverage for the EAGER backward engine (src/ops/ir/backward.c).
  *
  * The whole suite exercises the graph-mode autodiff (cml_ir_grad); the eager
- * engine behind GRAD_MODE=eager / cml_ir_execute_backward had ZERO coverage —
+ * engine behind GRAD_MODE=eager / cml_ir_execute_backward had ZERO coverage -
  * every VJP rule, the loss-rooted subgraph pruning, and the gradient
  * accumulator ran only in production. This runs the same op battery through
  * tensor_backward() with GRAD_MODE=eager, checking each analytic gradient
@@ -26,7 +26,7 @@ static void fill(Tensor* t, const float* xs) {
 
 static float read_at(Tensor* t, size_t i) { return ((float*)tensor_data_ptr(t))[i]; }
 
-/* Sum of op(x) as a scalar loss — the standard hook to differentiate. */
+/* Sum of op(x) as a scalar loss - the standard hook to differentiate. */
 static Tensor* sum_loss(Tensor* y) {
     ReduceParams rp = {0};
     return uop_sum(y, &rp);

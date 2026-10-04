@@ -166,7 +166,7 @@ void cml_serving_set_model(CMLServingContext* ctx, CMLServingForwardFn forward_f
 }
 
 /* xorshift RNG for stochastic sampling (per-context determinism not required;
- * greedy decoding — temperature <= 0 — is fully deterministic). */
+ * greedy decoding - temperature <= 0 - is fully deterministic). */
 static uint32_t serving_rng_state = 0x2545F491u;
 /** Next uniform float in [0,1) from the xorshift state. */
 static float serving_rand_uniform(void) {

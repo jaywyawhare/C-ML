@@ -12,7 +12,7 @@
 #include "test_harness.h"
 
 /* Mock library journal accessors (resolved via dlsym on the SAME instance
- * the backend dlopen'd — see fastrpc_mock.c). */
+ * the backend dlopen'd - see fastrpc_mock.c). */
 typedef int (*fn_int)(void);
 static fn_int p_mock_journal_len;
 static fn_int p_mock_open_handles;

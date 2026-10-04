@@ -1,5 +1,5 @@
 /*
- * pte.h — C-ML PyTorch Edge (.cpte) portable program format
+ * pte.h - C-ML PyTorch Edge (.cpte) portable program format
  *
  * ExecuTorch PTE analogue: ahead-of-time serialized program with linear
  * instruction list, constant/weight segments, memory plan, and backend metadata.

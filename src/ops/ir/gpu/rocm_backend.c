@@ -108,7 +108,7 @@ static int load_hip_functions(CMLROCmBackend* backend) {
     LOAD_FUNC(hipStreamSynchronize);
     LOAD_FUNC(hipDeviceSynchronize);
 
-    /* Optional: HCQ signal support. Absence is not fatal — the HCQ adapter
+    /* Optional: HCQ signal support. Absence is not fatal - the HCQ adapter
      * falls back to stream-synchronize semantics. */
     LOAD_FUNC(hipEventCreate);
     LOAD_FUNC(hipEventDestroy);

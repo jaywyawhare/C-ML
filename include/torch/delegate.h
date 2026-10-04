@@ -1,5 +1,5 @@
 /*
- * delegate.h — Backend delegation for subgraph execution
+ * delegate.h - Backend delegation for subgraph execution
  *
  * ExecuTorch backend-delegate analogue: hardware vendors register AOT compilers
  * and runtime executors; the partitioner routes compatible subgraphs to delegates

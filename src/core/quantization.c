@@ -196,7 +196,7 @@ int cml_qmatmul_affine_int8(const float* x, const int8_t* w, float scale, int32_
             float xmk = xr[k];
             xsum += xmk;
             const int8_t* wr = w + (size_t)k * N;
-            /* contiguous in n — the compiler auto-vectorizes this */
+            /* contiguous in n - the compiler auto-vectorizes this */
             for (int n = 0; n < N; n++)
                 yr[n] += xmk * (float)wr[n];
         }

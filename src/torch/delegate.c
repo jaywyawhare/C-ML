@@ -1,5 +1,5 @@
 /*
- * delegate.c — Backend delegation for subgraph execution
+ * delegate.c - Backend delegation for subgraph execution
  */
 
 #include "torch/delegate.h"

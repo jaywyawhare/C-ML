@@ -24,7 +24,7 @@ CMLRNNTConfig cml_zoo_rnnt_config_default(void) {
 }
 
 /** Single-tensor forward: encode the audio, run the prediction network on a
- * blank start token, and evaluate the joint at every encoder frame — returns
+ * blank start token, and evaluate the joint at every encoder frame - returns
  * [frames, vocab] first-step logits. Streaming decode drives
  * cml_rnnt_encode/predict/joint directly instead. */
 static Tensor* rnnt_forward(Module* module, Tensor* input) {

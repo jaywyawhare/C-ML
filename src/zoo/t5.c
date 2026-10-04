@@ -35,7 +35,7 @@ static int t5_rel_bucket(int rel, bool bidirectional, int num_buckets, int max_d
 }
 
 /** Build the [1, H, Sq, Sk] additive attention bias by gathering from the
- * flattened [H*num_buckets] parameter with precomputed bucket indices — the
+ * flattened [H*num_buckets] parameter with precomputed bucket indices - the
  * gather keeps the graph differentiable so rel_bias trains. */
 static Tensor* t5_build_rel_bias(Parameter* rel_bias, int n_head, int num_buckets, int seq_q,
                                  int seq_k, bool bidirectional) {

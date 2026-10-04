@@ -182,7 +182,7 @@ static Tensor* maxpool3d_forward(Module* module, Tensor* input) {
     int N = input->shape[0], C = input->shape[1];
     int D = input->shape[2], H = input->shape[3], W = input->shape[4];
 
-    /* Lazy, composed from the tested 2D pool — no new UOP. Max is separable, so
+    /* Lazy, composed from the tested 2D pool - no new UOP. Max is separable, so
      * a 3D max-pool == pool (H,W) then pool D. Each axis is placed in the 2D
      * pool's spatial slot via reshape (no permute needed); backward is automatic
      * from the reshape/pool grad rules. (dilation=1 path; eager fallback below.) */

@@ -306,7 +306,7 @@ Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
     float* out_data = (float*)tensor_data_ptr(output);
 
     /*
-     * base_out = input @ W^T with W dequantized from NF4 one row at a time —
+     * base_out = input @ W^T with W dequantized from NF4 one row at a time -
      * the full float32 weight is never materialized, so the NF4 memory saving
      * holds during forward, not just at rest. Peak extra memory: in_f floats.
      * out[b][o] = sum_i( input[b][i] * W[o][i] )

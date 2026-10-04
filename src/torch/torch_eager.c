@@ -1,5 +1,5 @@
 /*
- * torch_eager.c — Zero-IR eager execution for hot ops.
+ * torch_eager.c - Zero-IR eager execution for hot ops.
  *
  * Bypasses IR construction/teardown entirely: hot ops compute directly into
  * freshly allocated, materialized leaf tensors (tensor_create) using the SIMD
@@ -250,7 +250,7 @@ Tensor* torch_eager_unary(int uop, Tensor* a) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Fused linear (matmul + bias [+ relu]) — single GEMM + one epilogue  */
+/* Fused linear (matmul + bias [+ relu]) - single GEMM + one epilogue  */
 /* ------------------------------------------------------------------ */
 
 /** Eager fused linear: one BLAS GEMM (input @ weight^T) plus a fused bias/relu

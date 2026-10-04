@@ -107,7 +107,7 @@ void cml_nv_mock_shutdown(void) {
         return;
 
     for (int i = 0; i < g_mock.num_allocs; i++)
-        free(g_mock.alloc_table[i]); /* aligned_alloc'd in cml_nv_mock_mmap — not cml_malloc */
+        free(g_mock.alloc_table[i]); /* aligned_alloc'd in cml_nv_mock_mmap - not cml_malloc */
 
     cml_free(g_mock.alloc_table);
     memset(&g_mock, 0, sizeof(g_mock));
@@ -280,7 +280,7 @@ int cml_nv_mock_munmap(void* addr, size_t length) {
         return munmap(addr, length);
 
     if (mock_untrack_alloc(addr)) {
-        free(addr); /* aligned_alloc'd in cml_nv_mock_mmap — must not go through cml_free */
+        free(addr); /* aligned_alloc'd in cml_nv_mock_mmap - must not go through cml_free */
         return 0;
     }
 

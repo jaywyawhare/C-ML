@@ -375,7 +375,7 @@ Tensor* tensor_einsum(const char* equation, Tensor** tensors, int num_tensors) {
 }
 
 /* ── In-place elementwise ops (eager) ───────────────────────────────────────
- * a op= b, mutating a's realized buffer directly (no new IR node / no alloc) —
+ * a op= b, mutating a's realized buffer directly (no new IR node / no alloc) -
  * for optimizer/manual updates and gradient accumulation. Realizes both inputs
  * first, then SIMD-updates a. f32 only; b may be a's shape, a scalar [1], or a
  * contiguous trailing broadcast (i % b->numel). Returns a, or NULL on error.

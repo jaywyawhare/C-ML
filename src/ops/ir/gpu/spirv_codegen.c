@@ -225,7 +225,7 @@ static void emit_entry_point(SPIRVBuilder* b, uint32_t func_id, uint32_t global_
 static void emit_execution_mode(SPIRVBuilder* b, uint32_t func_id, int lx, int ly, int lz) {
     /* OpExecutionMode (opcode 16) <func> LocalSize(17) lx ly lz.
      * The opcode must be SpvOpExecutionMode; SpvExecutionModeLocalSize is the
-     * mode *operand* emitted below — previously it was wrongly used as the
+     * mode *operand* emitted below - previously it was wrongly used as the
      * opcode too, which made every generated module fail SPIR-V validation. */
     emit_op(b, SpvOpExecutionMode, 6);
     spirv_builder_emit(b, func_id);

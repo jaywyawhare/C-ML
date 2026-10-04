@@ -61,7 +61,7 @@ typedef struct CMLGemmCacheEntry {
 
 typedef struct CMLOCLBufferEntry {
     Tensor* tensor; /* tensor pointer (for current graph) */
-    void* data_ptr; /* CPU data pointer — used as cache key for inputs */
+    void* data_ptr; /* CPU data pointer - used as cache key for inputs */
     cl_mem gpu_buf;
     size_t size;
     bool valid;    /* GPU data is up-to-date */

@@ -308,7 +308,7 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
      * mis-compare in entries_match_ex rather than as a crash. */
     cml_intern_remove(ir->intern_table, original);
 
-    // Free the original node (but NOT its output tensor — we kept it)
+    // Free the original node (but NOT its output tensor - we kept it)
     original->output = NULL; // Prevent double-free
     if (original->input_names) {
         for (int i = 0; i < original->num_inputs; i++) {
@@ -1449,7 +1449,7 @@ static int decompose_mean(CMLGraph_t ir, struct IRNode* node) {
         n = (float)x->numel;
     }
 
-    // 1/n constant (in the input's dtype so the mean — forward and backward —
+    // 1/n constant (in the input's dtype so the mean - forward and backward -
     // stays in half precision when x is fp16/bf16)
     struct IRNode* inv_n = chain_fill_dt(ir, &head, &tail, out_shape, out_ndim, 1.0f / n, x->dtype);
     if (!inv_n)
@@ -1527,7 +1527,7 @@ static int decompose_min_reduce(CMLGraph_t ir, struct IRNode* node) {
 }
 
 /**
- * LOGICAL_NOT: where(x, 0, 1) — but x is float, so where(x != 0, 0, 1)
+ * LOGICAL_NOT: where(x, 0, 1) - but x is float, so where(x != 0, 0, 1)
  * Simplified: we treat nonzero as true. where(x < 0 OR 0 < x, 0, 1)
  * Even simpler: use CMPEQ with 0, which gives 1 where x==0 and 0 where x!=0
  * But CMPEQ itself gets decomposed. So: where(x < 0, 0, where(0 < x, 0, 1))
@@ -2669,7 +2669,7 @@ static struct IRNode* insert_expand(CMLGraph_t ir, Tensor* in, const int* new_sh
  */
 static int decompose_conv2d(CMLGraph_t ir, struct IRNode* node) {
     /* Inference (no_grad): keep CONV2D whole so the executor runs a direct /
-     * Winograd / im2col kernel — far faster than the im2col+matmul primitive
+     * Winograd / im2col kernel - far faster than the im2col+matmul primitive
      * chain and no backward graph is needed. Under grad, lower to primitives so
      * graph-autodiff (which has no CONV2D VJP) can differentiate it. */
     if (!autograd_is_grad_enabled())
@@ -3441,7 +3441,7 @@ static int decompose_scan(CMLGraph_t ir, struct IRNode* start) {
         }
 
         if (atomic_load(&g_decompose_counter) == counter_before)
-            break; /* fixpoint reached — no new nodes created this scan */
+            break; /* fixpoint reached - no new nodes created this scan */
     }
 
     ir->is_decomposed = true;

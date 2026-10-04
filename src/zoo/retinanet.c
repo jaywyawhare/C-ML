@@ -206,7 +206,7 @@ static Tensor* retinanet_forward(Module* module, Tensor* input) {
     /* RetinaNet's classification subnet is shared across levels. Run it on each
      * pyramid level, flatten the spatial dims to [B, A*num_classes, H*W], and
      * concatenate across levels so every anchor over the whole pyramid is
-     * scored — not just the finest level P3 as before. */
+     * scored - not just the finest level P3 as before. */
     Tensor* flat[3];
     int ns[3][3];
     for (int l = 0; l < 3; l++) {

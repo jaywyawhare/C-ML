@@ -580,7 +580,7 @@ char* cml_ptx_gen_binary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name)
                         "    sub.f32 %%f2, %%f0, %%f2;\n\n"); // a - b*floor(a/b)
         break;
     case UOP_IDIV:
-        // idiv(a, b) = floor(a / b) — div.rn for the same reason as MOD.
+        // idiv(a, b) = floor(a / b) - div.rn for the same reason as MOD.
         pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
                         "    div.rn.f32 %%f2, %%f0, %%f1;\n"    // a / b (full precision)
                         "    cvt.rmi.f32.f32 %%f2, %%f2;\n\n"); // floor(a / b)

@@ -865,7 +865,7 @@ int cml_context_set_param(CMLContext_t ctx, Tensor* tensor) {
         }
         tensor->buffer_handle = ctx->buffer;
     } else {
-        /* No context buffer — parameter is externally managed.  Just mark it
+        /* No context buffer - parameter is externally managed.  Just mark it
          * as non-owning so the context does not attempt to free it. */
         tensor->owns_data = false;
     }

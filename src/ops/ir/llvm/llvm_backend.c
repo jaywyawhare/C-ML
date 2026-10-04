@@ -26,7 +26,7 @@
 #include "alloc/cml_allocator.h"
 
 /* Kernel cache: keyed by (op type + concrete shape) so every kernel is
- * shape-specialized — loop bounds and broadcast patterns are baked in as
+ * shape-specialized - loop bounds and broadcast patterns are baked in as
  * compile-time constants and LLVM emits width-specific SIMD for each shape.
  * Open-addressed with a short linear-probe window; evict on a full window. */
 #define OP_CACHE_SIZE 1024
@@ -126,7 +126,7 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
         return NULL;
     }
 
-    /* Single persistent LLJIT — all kernels share it. */
+    /* Single persistent LLJIT - all kernels share it. */
     LLVMErrorRef jit_err = LLVMOrcCreateLLJIT(&b->jit, NULL);
     if (jit_err) {
         char* msg = LLVMGetErrorMessage(jit_err);
@@ -315,7 +315,7 @@ static LLVMValueRef extern_libm(LLVMModuleRef mod, LLVMContextRef ctx, const cha
  * Binary elementwise: out[i] = op(in0[i%n0], in1[i%n1])
  * Shape-specialized: out_n/in0_n/in1_n are baked in as compile-time constants
  * so the trip count is fixed and broadcasting is resolved at codegen time.
- * Signature: void(ptr in0, ptr in1, ptr out, i64, i64, i64) — the three size
+ * Signature: void(ptr in0, ptr in1, ptr out, i64, i64, i64) - the three size
  * params are retained for ABI stability but unused (the shapes are constants).
  * ---------------------------------------------------------------------- */
 static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type, const char* fn_name,
@@ -914,7 +914,7 @@ static LLVMModuleRef build_reduction_axis(LLVMContextRef ctx, UOpType type, cons
 }
 
 /* -------------------------------------------------------------------------
- * Fill: out[i] = val  (val passed at runtime — allows caching)
+ * Fill: out[i] = val  (val passed at runtime - allows caching)
  * Signature: void(ptr out, i64 n, float val)
  * ---------------------------------------------------------------------- */
 static LLVMModuleRef build_fill_op(LLVMContextRef ctx, const char* fn_name, int64_t out_numel) {
@@ -1411,7 +1411,7 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend, LLVMModuleRef mod
  * Fused elementwise chain: native JIT codegen
  *
  * Emits ONE function that evaluates the whole elementwise chain in a single
- * loop, keeping intermediates in SSA values (registers) — no intermediate
+ * loop, keeping intermediates in SSA values (registers) - no intermediate
  * buffers. LLVM's O2 vectorizer turns the arithmetic steps into SIMD. This is
  * the true-codegen path for UOP_FUSED_ELEMENTWISE (the blocked C interpreter in
  * execution.c is the fallback when the JIT is unavailable).
@@ -1790,14 +1790,14 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
      * source buffer (out->numel > input numel, owns_data==false).  Because
      * out->data is already non-NULL, the allocation below is skipped and a JIT
      * expand kernel would write out->numel elements into the small aliased
-     * buffer — a heap overflow that silently corrupts adjacent memory (JIT code
+     * buffer - a heap overflow that silently corrupts adjacent memory (JIT code
      * is not sanitizer-instrumented).  The interpreter's UOP_EXPAND correctly
      * allocates a fresh full-size buffer and broadcasts, so defer to it. */
     if (node->type == UOP_EXPAND)
         return cpu_execute_node(node);
 
     if (!out->data && out->numel > 0) {
-        /* Size by the actual dtype — f64/int kernels write 8 bytes/elem, not 4;
+        /* Size by the actual dtype - f64/int kernels write 8 bytes/elem, not 4;
          * sizeof(float) under-allocated and the kernel overflowed its output. */
         out->data = cml_buffer_cache_alloc(out->numel * cml_dtype_size(out->dtype));
         if (!out->data) {

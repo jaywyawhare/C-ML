@@ -475,7 +475,7 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
         }
 
         /* Last stage is seeded with the sliced loss gradient (passed as the
-         * backward seed, which tensor_backward CLONES — so we retain
+         * backward seed, which tensor_backward CLONES - so we retain
          * ownership of the slice and free it below; the previous code raw-
          * assigned it into mb_output->grad, leaving ownership unmanaged).
          * Intermediate stages get NULL: their gradient already arrived via
@@ -512,7 +512,7 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
 /* ── True cross-rank pipeline parallelism ──────────────────────────────────
  * world_size == num_stages; rank r runs ONLY stage r and streams micro-batch
  * activations to r+1 / receives from r-1. Because the stages are separate
- * processes, they execute concurrently — real pipeline overlap.
+ * processes, they execute concurrently - real pipeline overlap.
  *
  * A fixed-size activation-shape header [ndim, dim0..dim7] (as floats) precedes
  * each activation so the receiver can allocate before the data arrives. Meta and

@@ -1,5 +1,5 @@
 /*
- * torch_c_inline.h — Header inlines for zero-overhead hot paths.
+ * torch_c_inline.h - Header inlines for zero-overhead hot paths.
  *
  * Include after torch/torch_c.h. These compile to direct field access / calls
  * with no extra function-call indirection through libcml.

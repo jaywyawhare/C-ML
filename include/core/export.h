@@ -2,7 +2,7 @@
 #define CML_CORE_EXPORT_H
 
 #ifdef CML_STATIC_DEFINE
-/* Static library — all symbols visible by default */
+/* Static library - all symbols visible by default */
 #define CML_API
 #else
 #ifdef _WIN32

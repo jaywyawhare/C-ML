@@ -1,8 +1,8 @@
 /*
  * AUDIT #10: the CPU is now a first-class HCQ backend (g_hcq_cpu_ops) rather
  * than open-coded special-cases scattered through hcq.c. This exercises the
- * full ops surface via the CPU backend — queue, memcpy, a real submitted
- * kernel, signals, synchronize, and a pipeline — proving the unified
+ * full ops surface via the CPU backend - queue, memcpy, a real submitted
+ * kernel, signals, synchronize, and a pipeline - proving the unified
  * abstraction runs end-to-end with no GPU hardware.
  */
 #include <stdio.h>

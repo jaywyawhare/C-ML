@@ -48,7 +48,7 @@ void gguf_close(GGUFContext* ctx);
 int gguf_get_num_tensors(GGUFContext* ctx);
 const char* gguf_get_tensor_name(GGUFContext* ctx, int index);
 /* Tokenizer metadata (tokenizer.ggml.tokens / .merges) captured at open time.
- * Pointers stay owned by the context — copy before gguf_close. Returns 0 when
+ * Pointers stay owned by the context - copy before gguf_close. Returns 0 when
  * a vocab is present, -1 otherwise. */
 int gguf_get_tokenizer(GGUFContext* ctx, char*** tokens_out, int* num_tokens_out,
                        char*** merges_out, int* num_merges_out);

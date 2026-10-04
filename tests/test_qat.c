@@ -5,7 +5,7 @@
  * Covers (a) observer convergence to a known range for both modes,
  * (b) the fake-quant error bound |fq(x) - x| <= scale/2,
  * (c) STE gradient identity via tensor_backward + finite differences of the
- *     surrogate (NOT the raw forward — fake-quant is piecewise constant, so a
+ *     surrogate (NOT the raw forward - fake-quant is piecewise constant, so a
  *     literal forward finite difference is ~0 almost everywhere and says
  *     nothing about the estimator), and (d) a tiny end-to-end regression in
  *     which a linear layer trained through weight fake-quant reduces its loss.
@@ -162,7 +162,7 @@ static int test_fake_quant_error_bound(int n) {
 /* STE gradient: with loss L = sum(w * fq(x)), dL/dx must equal w exactly
  * (identity pass-through), including for elements outside the calibrated
  * range. Cross-checked against central differences of the STE surrogate
- * f(x) = sum(w * (x + c)) with c = fq - x frozen from the base evaluation —
+ * f(x) = sum(w * (x + c)) with c = fq - x frozen from the base evaluation -
  * differencing the raw forward would probe the piecewise-constant rounding,
  * not the estimator. */
 static int test_ste_gradient_identity(void) {

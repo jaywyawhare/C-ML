@@ -41,7 +41,7 @@ typedef struct CachedModelGraph {
     ResolvedInput** resolved; // [num_nodes][num_inputs_per_node]
     float* orig_model_input;  // Cached original model-input data pointer
 
-    /* Reusable output tensor — avoids malloc per forward pass */
+    /* Reusable output tensor - avoids malloc per forward pass */
     Tensor* reuse_output; // Allocated once, data overwritten each pass
 
     bool valid; // Is cache valid?

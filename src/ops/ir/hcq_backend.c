@@ -5,11 +5,11 @@
 #include <string.h>
 
 /* -------------------------------------------------------------------------
- * CPU HCQ backend — synchronous, host==device address space.
+ * CPU HCQ backend - synchronous, host==device address space.
  *
  * Previously the CPU path was open-coded as special-cases scattered through
  * hcq.c (~8 `if (backend != CML_HCQ_CPU)` branches). It is now a first-class
- * ops entry so every backend — CPU included — dispatches uniformly through
+ * ops entry so every backend - CPU included - dispatches uniformly through
  * cml_hcq_backend_ops(). This is the reference implementation the GPU backends
  * converge onto, and it makes the queue/signal/pipeline machinery testable
  * without any GPU hardware.
@@ -50,7 +50,7 @@ static int hcq_cpu_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* desc) {
     return 0;
 }
 
-/** Host-to-device copy — a plain memcpy in the shared CPU address space. */
+/** Host-to-device copy - a plain memcpy in the shared CPU address space. */
 static int hcq_cpu_memcpy_h2d(CMLHCQQueue* q, void* dst, const void* src, size_t bytes) {
     (void)q;
     if (!dst || !src) {
@@ -61,7 +61,7 @@ static int hcq_cpu_memcpy_h2d(CMLHCQQueue* q, void* dst, const void* src, size_t
     return 0;
 }
 
-/** Device-to-host copy — a plain memcpy in the shared CPU address space. */
+/** Device-to-host copy - a plain memcpy in the shared CPU address space. */
 static int hcq_cpu_memcpy_d2h(CMLHCQQueue* q, void* dst, const void* src, size_t bytes) {
     (void)q;
     if (!dst || !src) {
@@ -75,7 +75,7 @@ static int hcq_cpu_memcpy_d2h(CMLHCQQueue* q, void* dst, const void* src, size_t
 /** No-op on the synchronous CPU backend; just clears pending wait signals. */
 static int hcq_cpu_queue_synchronize(CMLHCQQueue* q) {
     if (q)
-        q->num_wait_signals = 0; /* synchronous — nothing to wait for */
+        q->num_wait_signals = 0; /* synchronous - nothing to wait for */
     return 0;
 }
 
@@ -99,7 +99,7 @@ static void hcq_cpu_signal_destroy(CMLHCQSignal* s) {
 /** Mark the signal ready immediately and bump its timeline (synchronous). */
 static int hcq_cpu_signal_record(CMLHCQQueue* q, CMLHCQSignal* s) {
     (void)q;
-    s->signaled = true; /* synchronous — immediately ready */
+    s->signaled = true; /* synchronous - immediately ready */
     s->timeline_value++;
     return 0;
 }
@@ -201,7 +201,7 @@ extern int cml_hcq_am_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal);
 extern int cml_hcq_am_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms);
 
 /* ROCm adapter (hcq_rocm.c): compiles everywhere, fails gracefully without
- * libamdhip64 — same contract as the NV/AM adapters. */
+ * libamdhip64 - same contract as the NV/AM adapters. */
 extern CMLHCQQueue* cml_hcq_rocm_queue_create(void);
 extern void cml_hcq_rocm_queue_destroy(CMLHCQQueue* queue);
 extern int cml_hcq_rocm_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc);
@@ -230,7 +230,7 @@ static const CMLHCQBackendOps g_hcq_rocm_ops = {
 };
 
 /* WebGPU adapter (hcq_webgpu.c): real implementation under CML_HAS_WEBGPU,
- * graceful stubs otherwise — same contract as the NV adapter. */
+ * graceful stubs otherwise - same contract as the NV adapter. */
 extern CMLHCQQueue* cml_hcq_webgpu_queue_create(void);
 extern void cml_hcq_webgpu_queue_destroy(CMLHCQQueue* queue);
 extern int cml_hcq_webgpu_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc);

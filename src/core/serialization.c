@@ -241,7 +241,7 @@ int module_save_stream(Module* module, FILE* file) {
         return -1;
     }
     /* The header must declare how many records actually follow, so invalid
-     * entries are excluded up front — skipping them mid-loop would desync the
+     * entries are excluded up front - skipping them mid-loop would desync the
      * loader's declared-vs-actual record count. */
     int num_valid_params = 0;
     for (int i = 0; i < num_params; i++) {

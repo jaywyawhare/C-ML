@@ -846,7 +846,7 @@ static void sgd_step(Optimizer* optimizer) {
 }
 
 /* In-place SGD update (lr / momentum / weight_decay) applied directly to the
- * parameter buffers from param->grad->data — allocates NO IR nodes. This is what
+ * parameter buffers from param->grad->data - allocates NO IR nodes. This is what
  * lets a static-graph training step stay zero-rebuild (the normal sgd_step emits
  * a uop_sgd_step per parameter each iteration). Matches sgd_step's math
  * (dampening=0, nesterov=false). Intended for SGD optimizers; other optimizers

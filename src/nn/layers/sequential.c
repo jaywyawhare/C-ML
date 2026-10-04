@@ -65,7 +65,7 @@ typedef struct SequentialFastPath {
     size_t input_numel;
     float* result_buf; /* final output (== ops[num_ops-1].out_buf) */
     size_t result_numel;
-    Tensor* output_tensor; /* reused every call — avoids malloc per forward */
+    Tensor* output_tensor; /* reused every call - avoids malloc per forward */
     bool valid;
 } SequentialFastPath;
 
@@ -146,7 +146,7 @@ static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
             op->out_numel = (prev_out_numel / (size_t)lin->in_features) * (size_t)lin->out_features;
 
             /* Pre-transpose weight from (out×in) → (in×out) so the BLAS call
-             * is NoTrans/NoTrans — enables our AVX2 microkernel for small sizes. */
+             * is NoTrans/NoTrans - enables our AVX2 microkernel for small sizes. */
             op->weight_transposed =
                 cml_malloc((size_t)lin->in_features * lin->out_features * sizeof(float));
             if (!op->weight_transposed) {
@@ -507,7 +507,7 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
 
     /* Zero-IR fast path and cached-graph execution both return tensors detached
      * from the autograd graph, so they are only valid when no backward pass will
-     * follow. Gate on grad being disabled (not merely eval mode) — otherwise a
+     * follow. Gate on grad being disabled (not merely eval mode) - otherwise a
      * training loop on a not-yet-train()-flagged model silently stops learning. */
     bool autograd_active = autograd_is_grad_enabled();
 
@@ -565,7 +565,7 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
     }
 
     /* Build the zero-IR fast path after the first successful eval-mode forward
-     * (only when autograd is off — the fast path detaches from the grad graph). */
+     * (only when autograd is off - the fast path detaches from the grad graph). */
     if (!((Module*)seq)->training && !autograd_active && !seq->fast_path) {
         seq->fast_path = fast_path_build(seq, input);
         if (seq->fast_path)

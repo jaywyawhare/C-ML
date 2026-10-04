@@ -2,7 +2,7 @@
  * produces a gradient for its (sharded) weight after backward.
  *
  * Before the fix, the TP forward did a raw matmul into a fresh buffer with no
- * autograd edge, so tensor_backward produced NO weight gradient — TP layers
+ * autograd edge, so tensor_backward produced NO weight gradient - TP layers
  * were inference-only. This test would have failed (grad == NULL). */
 
 #include <stdio.h>

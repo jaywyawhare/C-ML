@@ -18,7 +18,7 @@
  * Fork/join thread pool built around a single "generation" broadcast plus
  * atomic chunk claiming. The previous implementation had two independent,
  * mutually-inconsistent code paths (a task queue the workers serviced, and a
- * parallel_for that signalled a condition the workers never waited on) — its
+ * parallel_for that signalled a condition the workers never waited on) - its
  * fork path deadlocked and its queue path could double-process a chunk. It only
  * ever appeared to work because callers fell back to running serially.
  *
@@ -59,7 +59,7 @@ struct ThreadPool {
     _Atomic uint64_t claim; /* (generation << 32) | next chunk index  */
     /* (generation << 32) | completed-chunk count for THAT generation. Packing
      * matters: a straggler finishing a chunk of batch N while batch N+1 is
-     * live must not count toward N+1 — an unpacked counter let stale
+     * live must not count toward N+1 - an unpacked counter let stale
      * completions release the submitter before every chunk had run
      * (use-after-free / hang). */
     _Atomic uint64_t done; /* (generation << 32) | chunks finished   */
@@ -109,7 +109,7 @@ static Batch batch_snapshot(const ThreadPool* pool) {
 
 /* Run one chunk index against `b` (no-op for empty tail chunks), then record
  * the completion generation-tagged. A straggler whose batch has moved on finds
- * a done-word with a different generation and drops the increment — it must
+ * a done-word with a different generation and drops the increment - it must
  * not release a submitter waiting on a newer batch. */
 static void run_chunk(ThreadPool* pool, const Batch* b, size_t c) {
     size_t start = c * b->chunk;

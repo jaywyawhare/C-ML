@@ -1,8 +1,8 @@
 /*
  * AUDIT #12: unified error propagation.
  *
- * Verifies that any failure logged via LOG_ERROR — regardless of whether the
- * function returns NULL or an int code — is recorded in the thread-local error
+ * Verifies that any failure logged via LOG_ERROR - regardless of whether the
+ * function returns NULL or an int code - is recorded in the thread-local error
  * stack and is queryable through the public API (cml_get_last_error /
  * cml_get_last_error_code / cml_error_string / cml_clear_last_error).
  */
@@ -54,7 +54,7 @@ int main(void) {
     int rc = cml_qmatmul_affine_int8(NULL, NULL, 1.0f, 0, NULL, -1, -1, -1);
     check("int_op_returns_code", rc == -1);
     /* (that particular guard returns before logging; verify the stack API is
-     * still consistent — no error unless one was logged) */
+     * still consistent - no error unless one was logged) */
     check("clear_resets", (cml_clear_last_error(), cml_get_last_error() == NULL &&
                                                        cml_get_last_error_code() == CM_SUCCESS));
 

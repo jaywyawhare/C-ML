@@ -1880,7 +1880,7 @@ static int gpu_execute_node(CMLGPUCodegen* cg, struct IRNode* node) {
         int32_t kh        = (int32_t)weight->shape[2];
         int32_t kw        = (int32_t)weight->shape[3];
         /* stride[2]/padding[2] are fixed 2-element arrays, so [1] is always the
-         * real W value — do NOT fall back to [0] when it's 0 (that clobbered a
+         * real W value - do NOT fall back to [0] when it's 0 (that clobbered a
          * legitimate asymmetric stride/pad of e.g. (1,0)). */
         int32_t sh = cp->stride ? (int32_t)cp->stride[0] : 1;
         int32_t sw = cp->stride ? (int32_t)cp->stride[1] : 1;
@@ -2029,7 +2029,7 @@ static int gpu_execute_node(CMLGPUCodegen* cg, struct IRNode* node) {
     }
 
     if (mod) {
-        // Module wasn't consumed (error path) — dispose it
+        // Module wasn't consumed (error path) - dispose it
         LLVMDisposeModule(mod);
     }
 

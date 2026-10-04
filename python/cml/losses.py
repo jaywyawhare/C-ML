@@ -10,7 +10,7 @@ def _wrap(result, name):
     shape)."""
     if result == ffi.NULL:
         raise RuntimeError(
-            f"{name}: the C library returned NULL — check the argument shapes/"
+            f"{name}: the C library returned NULL - check the argument shapes/"
             f"dtypes (e.g. cross_entropy_loss wants 1-D integer class-index "
             f"targets, not one-hot)."
         )
@@ -31,7 +31,7 @@ def cross_entropy_loss(logits, labels):
     """Cross entropy over logits (softmax applied internally).
 
     `labels` must be a 1-D tensor of integer class indices (PyTorch-style), one
-    per sample — NOT one-hot vectors.
+    per sample - NOT one-hot vectors.
     """
     return _wrap(lib.cml_nn_cross_entropy_loss(logits._tensor, labels._tensor),
                  "cross_entropy_loss")

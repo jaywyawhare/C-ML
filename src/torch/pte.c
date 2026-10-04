@@ -1,5 +1,5 @@
 /*
- * pte.c — C-ML PyTorch Edge (.cpte) portable program format
+ * pte.c - C-ML PyTorch Edge (.cpte) portable program format
  */
 
 #include "torch/pte.h"
@@ -110,7 +110,7 @@ static int pte_collect_ir(CMLGraph_t ir, CMLPTEInstruction** out_instrs, int* ou
         int node_out_ndim = node->output ? node->output->ndim : node->output_ndim;
         if (!torch_pte_runtime_supports((UOpType)node->type) ||
             ((UOpType)node->type == UOP_PERMUTE && node_out_ndim > 2)) {
-            LOG_ERROR("PTE export: op %d (%s) has no PTE runtime kernel — refusing export",
+            LOG_ERROR("PTE export: op %d (%s) has no PTE runtime kernel - refusing export",
                       node->type, uop_type_to_string(node->type));
             free(instrs);
             if (sd)

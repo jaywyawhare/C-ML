@@ -913,7 +913,7 @@ static int layout_kernel(struct IRNode* node, Tensor* out, void* od) {
     }
 
     case UOP_GATHER: {
-        /* out[o, j, k] = a[o, idx[j], k] — gather along `dim` with 1-D
+        /* out[o, j, k] = a[o, idx[j], k] - gather along `dim` with 1-D
          * indices of any dtype (read through cml_load_i64). Mirrors the
          * f32 kernel's layout in execution.c. */
         Tensor* idx = in_at(node, 1);

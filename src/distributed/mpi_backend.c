@@ -195,7 +195,7 @@ static int mpi_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
 
 /* Async metadata, kept in its OWN allocation rather than packed into the
  * MPI_Request buffer. The previous code aliased recvbuf/tensor/numel into the
- * same 128-byte block MPI writes through as the request handle — MPI's writes
+ * same 128-byte block MPI writes through as the request handle - MPI's writes
  * during Iallreduce/Wait could corrupt the packed pointers (and vice-versa).
  * `request` is a separate opaque buffer sized generously for any MPI_Request. */
 typedef struct MPIAsyncWork {
@@ -314,7 +314,7 @@ static int mpi_init(void* ctx, int world_size, int rank) {
         mpi->initialized = true;
     }
 
-    /* Validate the caller's rank/world against what MPI actually reports —
+    /* Validate the caller's rank/world against what MPI actually reports -
      * the arguments used to be ignored entirely, so a stale or wrong launch
      * configuration (e.g. mpirun -np 2 with a hard-coded world of 1) silently
      * produced mismatched collectives instead of a clear error. */
@@ -356,7 +356,7 @@ static void mpi_destroy(void* ctx) {
 /** Dynamically load libmpi, resolve the needed symbols, and build the ops table.
  * Returns NULL if MPI is absent, if Open MPI is detected (its pointer-handle ABI
  * is incompatible with this integer-handle binding), or if MPI_Allreduce is
- * missing — the caller then falls back to another backend. */
+ * missing - the caller then falls back to another backend. */
 DistCommOps* cml_dist_create_mpi_backend(void) {
     void* handle = CML_DLOPEN("libmpi.so", RTLD_NOW | RTLD_LOCAL);
     if (!handle) {
@@ -373,7 +373,7 @@ DistCommOps* cml_dist_create_mpi_backend(void) {
     /* This binding hardcodes MPICH-family integer handle constants
      * (CML_MPI_COMM_WORLD/FLOAT/SUM/...). OpenMPI instead uses POINTER handles
      * (addresses of ompi_mpi_* globals) and 64-bit datatype/op handles, which
-     * do not fit these int-typed signatures — passing the MPICH constants to
+     * do not fit these int-typed signatures - passing the MPICH constants to
      * OpenMPI yields garbage handles and undefined behavior. Detect OpenMPI via
      * one of its private globals and refuse rather than crash; the caller then
      * falls back to the Gloo backend. */

@@ -528,7 +528,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
                     tensor_realize(batch->y);
                 if (!batch->X || !batch->y || batch->X->numel != sg_xn ||
                     batch->y->numel != sg_yn || !batch->X->data || !batch->y->data) {
-                    /* shape changed (e.g. a smaller trailing batch) — skip it */
+                    /* shape changed (e.g. a smaller trailing batch) - skip it */
                     batch_free(batch);
                     continue;
                 }
@@ -593,7 +593,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
             clip_gradients_by_norm(model, grad_clip_norm);
             /* static mode: in-place SGD (no IR nodes), then CAPTURE the graph so
              * every later batch reuses it. The optimizer's normal step would emit
-             * uop_sgd_step nodes into this graph — breaking the static reuse — so
+             * uop_sgd_step nodes into this graph - breaking the static reuse - so
              * we use the in-place update on the first batch too. */
             if (sg_mode && !sg_captured) {
                 optimizer_step_inplace(optimizer);
@@ -616,7 +616,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
             if (callbacks.on_batch_end) {
                 callbacks.on_batch_end(epoch, batch->batch_index, loss_value, callbacks.user_data);
             }
-            /* In static mode the loss/output tensors ARE the persistent graph — keep them. */
+            /* In static mode the loss/output tensors ARE the persistent graph - keep them. */
             if (!sg_mode) {
                 tensor_free(loss);
                 tensor_free(output);

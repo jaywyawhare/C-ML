@@ -7,7 +7,7 @@
  */
 #include "torch/torch_c.h"
 
-/* Backward-compatible macro aliases (deprecated — use torch_* functions). */
+/* Backward-compatible macro aliases (deprecated - use torch_* functions). */
 #define torch_tensor_create tensor_empty
 #define torch_from_numpy tensor_from_data
 #define torch_where tensor_where

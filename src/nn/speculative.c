@@ -238,9 +238,9 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
      * logits row (prefix_len - 1 + i): the target predicts "next token
      * given everything up to position prefix_len + i - 1".
      *
-     * Greedy mode: accept iff the target argmax equals the draft token —
+     * Greedy mode: accept iff the target argmax equals the draft token -
      * the output is then exactly the target model's greedy decode.
-     * Stochastic mode (config.stochastic_accept): Leviathan et al. rule —
+     * Stochastic mode (config.stochastic_accept): Leviathan et al. rule -
      * accept with prob min(1, p/q), resample rejects from norm(max(0,p-q)). */
     int num_accepted     = 0;
     int correction_token = -1;

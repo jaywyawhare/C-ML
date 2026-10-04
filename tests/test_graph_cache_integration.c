@@ -1,5 +1,5 @@
 /*
- * Test graph cache integration — verifies buffer reuse across reset cycles
+ * Test graph cache integration - verifies buffer reuse across reset cycles
  * and SSE Winograd transform correctness.
  */
 #include <stdio.h>

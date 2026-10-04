@@ -292,7 +292,7 @@ int cml_hevc_parse_sps(const uint8_t* sps_data, size_t sps_size, int* width, int
     }
 
     for (uint32_t i = 0; i < sps_max_sub_layers_minus1; i++) {
-        /* skip sub_layer profile_tier_level — simplified */
+        /* skip sub_layer profile_tier_level - simplified */
         bs_read_bits(&bs, 8);
         bs_read_bits(&bs, 32);
         bs_read_bits(&bs, 32);
@@ -353,7 +353,7 @@ CMLHEVCFrame* cml_hevc_decode_iframe(CMLHEVCParser* parser, CMLHEVCNalUnit* nal)
         return NULL;
 
     /* Frame reconstruction (slice header parsing, intra prediction, transform,
-     * deblocking) is not implemented — fail loudly instead of returning a
+     * deblocking) is not implemented - fail loudly instead of returning a
      * fake frame that would silently corrupt any pipeline consuming it. The
      * parser/NAL/SPS layers above are fully functional. */
     cml_free(rbsp);

@@ -50,7 +50,7 @@ class Module:
         """Wrap a C module handle; this object owns and frees it unless reparented."""
         self._module = c_module
         # A module frees its own C handle unless it has been handed to a parent
-        # container (e.g. Sequential) that owns and frees it — see add()/append().
+        # container (e.g. Sequential) that owns and frees it - see add()/append().
         self._owned = True
 
     def _as_module(self):
@@ -107,7 +107,7 @@ class Module:
         if m is not None and m != ffi.NULL and getattr(self, "_owned", False):
             # Layer handles are typed as their concrete struct (Linear*, ReLU*,
             # ...); module_free takes the base Module*, so cast. Modules owned by
-            # a parent container are freed by that parent — don't double-free.
+            # a parent container are freed by that parent - don't double-free.
             lib.module_free(ffi.cast("Module*", m))
             self._module = ffi.NULL
 

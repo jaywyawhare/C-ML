@@ -119,7 +119,7 @@ int cml_hcq_webgpu_queue_synchronize(CMLHCQQueue* queue) {
         void* device = backend->device;
         void* queue  = backend->queue;
         if (device && queue) {
-            queue_submit(queue, NULL);         /* WGPUQueueSubmit(q, 0, NULL) — fence */
+            queue_submit(queue, NULL);         /* WGPUQueueSubmit(q, 0, NULL) - fence */
             if (!device_poll(device, 1, NULL)) /* wait for the fence */
                 return -1;
             return 0;

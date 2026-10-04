@@ -181,7 +181,7 @@ void tensor_detach_keep(Tensor* t);
  * the storage block behind `src` (attaching one to src's root if needed), so
  * the block outlives the base temporary; call it once at view creation.
  * tensor_storage_release() drops a tensor's hold and frees the block when the
- * last reference goes — use it wherever owned data is freed or replaced. */
+ * last reference goes - use it wherever owned data is freed or replaced. */
 void tensor_storage_share(Tensor* view, Tensor* src);
 void tensor_storage_release(Tensor* t);
 Tensor* tensor_clone(Tensor* t);

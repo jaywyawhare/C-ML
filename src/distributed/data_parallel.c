@@ -166,7 +166,7 @@ Tensor* cml_ddp_shard_input(CMLDataParallel* ddp, Tensor* full_batch) {
 
     /* Split the batch (dim 0) across ranks; the first `rem` ranks take one extra
      * row so all rows are covered when B isn't divisible by world_size. Returns
-     * a fresh materialized tensor holding just this rank's rows — the caller owns
+     * a fresh materialized tensor holding just this rank's rows - the caller owns
      * it and should free it. Without this every rank trained on the full batch. */
     int B     = full_batch->shape[0];
     int base  = B / ws;

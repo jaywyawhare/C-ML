@@ -9,8 +9,8 @@
  *
  * The naive "send to right, then recv from left" order deadlocks once a chunk
  * exceeds the kernel socket send buffer: every rank blocks in send() and nobody
- * is receiving. Ordering by rank parity breaks the cycle — even ranks send then
- * receive, odd ranks receive then send — so a blocking sender is always paired
+ * is receiving. Ordering by rank parity breaks the cycle - even ranks send then
+ * receive, odd ranks receive then send - so a blocking sender is always paired
  * with a peer that has already posted (or is about to post) the matching
  * receive. The send and recv buffers are disjoint here, so this is safe. */
 static int ring_sendrecv(DistCommOps* ops, Tensor* send_t, int right, Tensor* recv_t, int left,

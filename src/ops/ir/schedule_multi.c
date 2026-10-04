@@ -170,7 +170,7 @@ int multi_schedule_run(MultiDeviceSchedule* ms) {
 
             /* A cross-device relocation needs a destination buffer on the
              * target device. This single-buffer planner has none, so the old
-             * code did device_copy(data, data, ...) — a self-copy that moved
+             * code did device_copy(data, data, ...) - a self-copy that moved
              * nothing while pretending to. Perform a copy only when there is a
              * genuinely distinct destination (there isn't in-process); when
              * the device backends materialize separate buffers this becomes a

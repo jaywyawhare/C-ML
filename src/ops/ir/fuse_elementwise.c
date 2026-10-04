@@ -4,7 +4,7 @@
  * Collapses a maximal tree of primitive elementwise ops (all producing the same
  * output shape, connected by single-use edges) into ONE UOP_FUSED_ELEMENTWISE
  * node. cpu_execute_node then runs the whole chain as a single per-element loop
- * with register-held intermediates — the intermediate tensor buffers are never
+ * with register-held intermediates - the intermediate tensor buffers are never
  * materialized.
  *
  * Safety: an internal edge is only fused when the producer's output is used by
@@ -104,7 +104,7 @@ static size_t node_numel(struct IRNode* n) {
 /* True if `in` broadcasts over `rootnode`'s output shape via contiguous
  * trailing-dim tiling, so out[i] = in[i % in->numel] is the correct numpy
  * broadcast (e.g. a bias [N] over [M,N]). Requires in's dims to equal the
- * trailing dims of the output — every fused executor uses exactly i%numel. */
+ * trailing dims of the output - every fused executor uses exactly i%numel. */
 static int is_trailing_bcast(struct IRNode* rootnode, Tensor* in) {
     if (!in || !in->shape || in->ndim <= 0)
         return 0;
@@ -122,7 +122,7 @@ static int is_trailing_bcast(struct IRNode* rootnode, Tensor* in) {
  * on use_count to keep backward-needed intermediates materialized. This is only
  * safe when the WHOLE fwd+bwd graph is present (so use_count reflects backward
  * refs) and forward is not yet realized. tensor_backward sets it around the
- * combined-graph execute; it is 0 (conservative) everywhere else — a lone
+ * combined-graph execute; it is 0 (conservative) everywhere else - a lone
  * forward realization must never fuse differentiable nodes. */
 static __thread int g_fe_allow_grad = 0;
 /** Toggle whether requires_grad forward chains may be fused (set only around fwd+bwd execute). */
@@ -288,7 +288,7 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
                     if (internal >= 0) {
                         ref[k] = -(internal + 1); /* prior step */
                     } else {
-                        /* external input — every executor broadcasts via i%numel.
+                        /* external input - every executor broadcasts via i%numel.
                          * Correct for full-size, scalar, OR a contiguous trailing
                          * broadcast (bias [N] over [M,N]). Any other partial
                          * broadcast (e.g. leading-dim [M,1]) is NOT i%n and aborts. */
@@ -413,7 +413,7 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
             ir->tail = fnode;
 
         /* Re-walk and unlink every consumed member still in the list. We free the
-         * NODE structs but NEVER the member output tensors — those may be owned by
+         * NODE structs but NEVER the member output tensors - those may be owned by
          * the user (e.g. an intermediate returned by cml_mul that the caller later
          * tensor_free()s) or by the IR context. We just detach them (ir_node=NULL)
          * so nothing dereferences the freed node. root's output was transferred to
@@ -463,7 +463,7 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
         }
 
         /* root was spliced out of the list before the walk, so the loop above
-         * never visited it — free its orphaned shell here. Its output tensor was
+         * never visited it - free its orphaned shell here. Its output tensor was
          * transferred to fnode, so NULL it first. */
         root->output = NULL;
         if (root->input_names) {
@@ -500,7 +500,7 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
 /* ── Matmul epilogue fusion ───────────────────────────────────────────────
  * Fold a bias-add + activation chain (already collapsed by the elementwise
  * fuser into ONE UOP_FUSED_ELEMENTWISE that reads the gemm output) INTO the
- * matmul node, so it is applied in-place to the M*N result — eliminating the
+ * matmul node, so it is applied in-place to the M*N result - eliminating the
  * separate elementwise kernel's extra read+write pass over the output. The
  * epilogue is stored as a FusedElementwiseParams on the matmul node's params
  * (MATMUL_ACC_REF = the gemm result); every backend (BLAS, interpreter, JIT)

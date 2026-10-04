@@ -4,7 +4,7 @@
  * rewrites), pattern_matcher.c / tree_automaton.c (rewrite engine) and
  * intern.c (CSE) all ran near 0% branch coverage: the suites execute graphs
  * but rarely drive the passes through their distinct arms. This exercises
- * each pass directly — every composite that decompose knows, DCE on
+ * each pass directly - every composite that decompose knows, DCE on
  * single- and multi-output graphs, CSE hits and misses, and the pattern
  * builder/matcher API including malformed patterns.
  */

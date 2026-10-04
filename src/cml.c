@@ -1114,7 +1114,7 @@ void cml_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool crea
 }
 
 /* End-of-training-step boundary. Detaches `keep` (typically the loss) from the
- * autograd graph — materializing its data so callers can still read it — and
+ * autograd graph - materializing its data so callers can still read it - and
  * then discards the accumulated forward/backward graph. Without this, a hand-
  * written training loop that reuses the same parameters piles every step's graph
  * onto them, so each backward re-traverses all prior steps (O(n^2) blow-up and
@@ -1122,7 +1122,7 @@ void cml_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool crea
  * the loss each step; this gives the same guarantee explicitly and is safe for
  * language bindings that keep the loss object alive (it's detached first, so the
  * reset never frees a tensor the caller still references). */
-/* Declared in ops/ir/graph_cache.c — drops cached execution plans (whose tensor
+/* Declared in ops/ir/graph_cache.c - drops cached execution plans (whose tensor
  * pointers dangle once the graph is freed) without freeing the pooled buffers. */
 void cml_graph_cache_reset_global(void);
 
@@ -1145,7 +1145,7 @@ void cml_autograd_step_end(Tensor* keep) {
 /* Post-optimizer-step graph reset. Frees the accumulated autograd graph AND
  * drops the execution-plan cache, which would otherwise keep pointers into this
  * step's freed intermediate buffers and be replayed (crash) for a differently-
- * allocated tensor of the same shape — e.g. a second model in the same process.
+ * allocated tensor of the same shape - e.g. a second model in the same process.
  * The pooled buffers themselves and the parameters' realized data are kept, so
  * this is safe to call every step (unlike the full cml_reset_ir_context). */
 void cml_autograd_reset_after_step(void) { cml_ir_reset_graph_only(); }

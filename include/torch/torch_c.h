@@ -1,9 +1,9 @@
 /*
- * torch_c.h — PyTorch-like C API for C-ML
+ * torch_c.h - PyTorch-like C API for C-ML
  *
  * Inspired by ExecuTorch's runtime façade (Section 5.2): a thin, PyTorch-native
  * surface over the C-ML core runtime.  Provides eager-mode tensor ops, Module
- * forward, state_dict, device/options, and AOT runtime loading — all without
+ * forward, state_dict, device/options, and AOT runtime loading - all without
  * requiring Python or C++.
  *
  * Usage:

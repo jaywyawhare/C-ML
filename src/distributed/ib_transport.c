@@ -30,7 +30,7 @@ typedef struct ibv_cq ibv_cq;
 typedef struct ibv_qp ibv_qp;
 
 /* Public libibverbs ABI layout for struct ibv_mr (stable for years). Defined
- * fully — rather than left opaque — so we can read the driver-assigned lkey/rkey
+ * fully - rather than left opaque - so we can read the driver-assigned lkey/rkey
  * that ibv_reg_mr writes here. A work request whose SGE lkey doesn't match the
  * MR's real key is rejected by the HCA with a local-protection error, which is
  * why the previous lkey=0 made every send/recv fail on real hardware. */
@@ -261,8 +261,8 @@ bool cml_ib_available(void) {
 
 /* ══════════════════════════════════════════════════════════════════════════
  * Mock verbs (IB_MOCK=1): a TCP-loopback emulation of the tiny verbs subset
- * this transport uses, so the RDMA data-path logic — MR key handling, the ring
- * all-reduce, parity-ordered send/recv, poll_completion — runs on a plain
+ * this transport uses, so the RDMA data-path logic - MR key handling, the ring
+ * all-reduce, parity-ordered send/recv, poll_completion - runs on a plain
  * socket mesh with no HCA. mock_post_send/recv ASSERT the work-request SGE lkey
  * is one that mock_reg_mr handed out, i.e. they fail loudly if the lkey ever
  * regresses to 0 (the exact bug this validates). One mock transport per
@@ -723,7 +723,7 @@ CMLIBTransport* cml_ib_create(int rank, int world_size) {
     }
 
     /* The mock's socket mesh is already established, so no real QP handshake is
-     * needed — mark connected and skip cml_ib_connect. */
+     * needed - mark connected and skip cml_ib_connect. */
     if (use_mock)
         ib->connected = true;
 
@@ -1059,7 +1059,7 @@ int cml_ib_recv(CMLIBTransport* ib, int peer, void* buf, size_t size) {
 }
 
 /* Deadlock-free paired send/recv for a ring step. cml_ib_send blocks until its
- * RC send is acked, which requires the receiver to already have a recv posted —
+ * RC send is acked, which requires the receiver to already have a recv posted -
  * so every rank sending first (the old order) deadlocks with no receives up.
  * Ordering by rank parity guarantees a pre-posted receive for each send. Since
  * each call blocks to completion, only one WR is outstanding at a time, so the

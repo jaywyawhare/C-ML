@@ -484,7 +484,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
 
     // Unoptimized view: one kernel per node; nothing removed; fusion is only an
     // opportunity. Optimized view: dead code removed and fused groups collapsed
-    // to a single kernel — this is what makes the before/after differ.
+    // to a single kernel - this is what makes the before/after differ.
     int shown_kernels =
         optimized ? (total_nodes - dead_nodes) - (fused_members - fused_groups) : total_nodes;
     append_format(&buffer, &offset, &capacity,
@@ -628,7 +628,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
                       (!optimized && !node->is_used && node->use_count == 0) ? "true" : "false",
                       as_fused ? "true" : "false");
 
-        // Fused Kernel ID (for grouping) — only meaningful in the optimized view
+        // Fused Kernel ID (for grouping) - only meaningful in the optimized view
         if (as_fused) {
             append_format(&buffer, &offset, &capacity, ",\"fusedKernelId\":\"%p\"",
                           (void*)node->fused_kernel);

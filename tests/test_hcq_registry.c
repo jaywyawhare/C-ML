@@ -25,7 +25,7 @@ static int check(const char* name, int ok) {
     return ok;
 }
 
-/* Every enum value resolves to ops or NULL — never a crash — and any ops
+/* Every enum value resolves to ops or NULL - never a crash - and any ops
  * table it does return has a name and the mandatory entry points. */
 static int test_registry_complete(void) {
     for (int b = 0; b < CML_HCQ_BACKEND_COUNT; b++) {

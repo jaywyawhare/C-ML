@@ -61,10 +61,10 @@ int cml_qmatmul_affine_int8(const float* x, const int8_t* w, float scale, int32_
  * compressed payload lives in ->quant_data (GGUF convention), so the matmul
  * executor can dispatch to the fused GEMM below without a dequant round-trip.
  *
- *   cml_quantize_weight_int4 — per-tensor symmetric affine: q in [-8,7],
+ *   cml_quantize_weight_int4 - per-tensor symmetric affine: q in [-8,7],
  *     scale = absmax/8, zero_point 0.  Payload is ceil(K*N/2) bytes, two
  *     signed nibbles per byte (high nibble = even flat index).
- *   cml_quantize_weight_nf4 — block-wise NF4 with per-block absmax scales.
+ *   cml_quantize_weight_nf4 - block-wise NF4 with per-block absmax scales.
  *     Payload layout: [num_scales floats][packed nibbles], same nibble order;
  *     block size recorded on the tensor (quant_block_size).
  */
@@ -140,7 +140,7 @@ int cml_qat_observer_update(QatObserver* obs, Tensor* tensor);
 QuantParams cml_qat_observer_params(const QatObserver* obs);
 
 /*
- * Fake quantization: dequant(quant(t)) with per-tensor params — the exact
+ * Fake quantization: dequant(quant(t)) with per-tensor params - the exact
  * round-to-grid forward value, composed from existing DIV/ADD/ROUND/CLAMP/
  * SUB/MUL uops.
  *
@@ -150,7 +150,7 @@ QuantParams cml_qat_observer_params(const QatObserver* obs);
  *
  *     out = t + stop_gradient(fake_quant(t) - t),
  *
- * i.e. exact forward values with an identity gradient w.r.t. t — the
+ * i.e. exact forward values with an identity gradient w.r.t. t - the
  * straight-through estimator. This keeps autodiff.c untouched (a global
  * identity VJP on ROUND would silently change every other round/floor user).
  */

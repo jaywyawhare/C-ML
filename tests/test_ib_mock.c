@@ -1,5 +1,5 @@
 /* Exercises the InfiniBand transport's RDMA data path via the built-in mock
- * verbs layer (IB_MOCK=1) — a TCP-loopback emulation with no HCA. This validates
+ * verbs layer (IB_MOCK=1) - a TCP-loopback emulation with no HCA. This validates
  * the fixes that were previously untestable: the ring all-reduce with
  * parity-ordered send/recv, and the MR lkey handling (the mock post_send FAILS
  * the completion if the SGE lkey isn't a real registered-MR key, i.e. it would

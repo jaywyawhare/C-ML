@@ -44,7 +44,7 @@ Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
 
     /* A view aliases the base's data pointer. If the base is still lazy (an
      * IR node that has not been realized), its ->data is NULL and the view
-     * would be born dangling with no way to realize later — views carry no
+     * would be born dangling with no way to realize later - views carry no
      * ir_node. Realize the base first so the view sees valid storage. */
     if (t->ir_node && (!t->is_executed || !t->data)) {
         tensor_ensure_executed(t);
@@ -89,7 +89,7 @@ Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
          * shared storage (attached to the owning root on first view). When the
          * root is not an owned allocation (e.g. borrowed plan buffer) no
          * storage can be attached and the documented non-owning contract
-         * applies — the base must outlive the view. */
+         * applies - the base must outlive the view. */
         tensor_storage_share(view, t);
 
         LOG_DEBUG("Created reshape view: (%d, ...) -> (%d, ...)", t->ndim, new_ndim);

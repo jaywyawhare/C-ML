@@ -1,5 +1,5 @@
 /*
- * torch_c_internal.h — Internal helpers for torch_c hot paths (not public API).
+ * torch_c_internal.h - Internal helpers for torch_c hot paths (not public API).
  */
 
 #ifndef CML_TORCH_C_INTERNAL_H

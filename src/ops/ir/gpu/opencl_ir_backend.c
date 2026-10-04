@@ -1,5 +1,5 @@
 /*
- * OpenCL IR backend — executes CML IR graphs on GPU via OpenCL.
+ * OpenCL IR backend - executes CML IR graphs on GPU via OpenCL.
  * Uses static kernel strings compiled at init time.
  * Keeps intermediate buffers on GPU, only does D2H for final outputs.
  */
@@ -328,7 +328,7 @@ static cl_mem ocl_ensure_gpu(CMLOpenCLIRBackend* b, Tensor* t) {
     if (e && e->valid) {
         /* Leaf inputs (weights/activations) can be mutated in place between
          * executions (e.g. an optimizer weight update) while keeping the same
-         * allocation, so the cached device copy may be stale — re-upload the
+         * allocation, so the cached device copy may be stale - re-upload the
          * current host contents (the buffer itself is still reused). Computed
          * GPU-resident intermediates (is_input==false) live on the device and
          * are never stale, so they are left untouched. */
@@ -647,7 +647,7 @@ static void ocl_beam_compile_variants(CMLOpenCLIRBackend* b) {
                         .reg_m       = reg_blocks[ri][0],
                         .reg_n       = reg_blocks[ri][1],
                         .slm_pad     = pad_values[pi],
-                        .transpose_a = true /* always use A-transposed — proven faster */
+                        .transpose_a = true /* always use A-transposed - proven faster */
                     };
                     if (!ocl_beam_params_valid(&p))
                         continue;
@@ -1326,7 +1326,7 @@ static int ocl_exec_reduce(CMLOpenCLIRBackend* b, cl_kernel kernel, cl_mem buf_i
     cl_int err;
 
     if (num_groups == 1) {
-        /* Single pass — output directly */
+        /* Single pass - output directly */
         clSetKernelArg(kernel, 0, sizeof(cl_mem), &buf_in);
         clSetKernelArg(kernel, 1, sizeof(cl_mem), &buf_out);
         clSetKernelArg(kernel, 2, local * sizeof(float), NULL);
@@ -1425,7 +1425,7 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
         return -1;
 
     /* Estimate total FLOPS. Skip GPU for small graphs where kernel launch
-     * overhead dominates — CPU is faster for MLP forward, small conv, etc. */
+     * overhead dominates - CPU is faster for MLP forward, small conv, etc. */
     {
         int64_t total_flops = 0;
         struct IRNode* scan = ir->head;
@@ -1463,7 +1463,7 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
 
         /* View ops: share the input buffer, just update tensor metadata */
         if (is_view_op(node->type)) {
-            /* Fall back to CPU for view ops — they're just metadata updates */
+            /* Fall back to CPU for view ops - they're just metadata updates */
             /* Ensure inputs have CPU data */
             for (int i = 0; i < node->num_inputs; i++) {
                 Tensor* inp = node->inputs[i];
@@ -1674,7 +1674,7 @@ int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
         continue;
     }
 
-    /* D2H — only download leaf outputs (not consumed by later GPU nodes).
+    /* D2H - only download leaf outputs (not consumed by later GPU nodes).
      * Intermediates stay on GPU; they'll be downloaded on-demand if needed. */
     node = ir->head;
     while (node) {

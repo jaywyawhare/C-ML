@@ -40,7 +40,7 @@ Tensor* f_pixel_shuffle(Tensor* input, int upscale_factor) {
     int out_channels = in_channels / (r * r);
 
     /* Pure rearrange = reshape -> permute -> reshape (lazy, so it builds IR and
-     * is graph-autodiff differentiable — was an eager ->data loop).
+     * is graph-autodiff differentiable - was an eager ->data loop).
      * input[n, c*r*r+r1*r+r2, h, w] -> out[n, c, h*r+r1, w*r+r2]. */
     int s6[6]         = {batch, out_channels, r, r, in_h, in_w}; /* split C -> (c,r1,r2) */
     ReshapeParams rs1 = {s6, 6};

@@ -588,7 +588,7 @@ static void handle_client(int client_fd) {
             size_t slen       = strlen(so_path);
             so_path[slen - 2] = '.';
             so_path[slen - 1] = 's';
-            /* need one more char; so_path has room — adjust: use a local buf */
+            /* need one more char; so_path has room - adjust: use a local buf */
             char so_path2[64];
             snprintf(so_path2, sizeof(so_path2), "%.*s.so", (int)(slen - 2), so_path);
 

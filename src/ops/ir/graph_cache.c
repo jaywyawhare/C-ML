@@ -234,12 +234,12 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
          * ops (UOP_EXPAND/RESHAPE/PERMUTE/...) alias a smaller source buffer with
          * an enlarged numel and owns_data=false; copying numel*elemsize out of them
          * over-reads the aliased buffer (heap-buffer-overflow).  Skipping them just
-         * means they re-alias on a cache hit — cheap and correct. */
+         * means they re-alias on a cache hit - cheap and correct. */
         if (node->output && node->output->numel > 0 && node->output->owns_data &&
             (int)node->output->dtype >= 0 && (int)node->output->dtype < 32 &&
             node->output->numel < ((size_t)1 << 40)) {
             /* buffer_sizes holds BYTES (numel * dtype size), not element count, so
-             * the plan buffer and its memcpy/rebind are correct for every dtype —
+             * the plan buffer and its memcpy/rebind are correct for every dtype -
              * sizeof(float) over-read int16/f16 sources and under-copied f64/i64. */
             size_t nbytes = (size_t)node->output->numel * cml_dtype_size(node->output->dtype);
             plan->buffer_sizes[idx]   = nbytes;

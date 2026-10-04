@@ -24,7 +24,7 @@ typedef int ncclRedOp_t;
 typedef int ncclDataType_t;
 
 /* ncclDataType_t enum values (NCCL public ABI): ncclInt8=0 ... ncclFloat32=7.
- * The collectives here operate on float32 tensors, so they must pass 7 — the
+ * The collectives here operate on float32 tensors, so they must pass 7 - the
  * previous hardcoded 0 meant ncclInt8, which reinterprets each 4-byte float as
  * four int8 elements and silently corrupts every reduction. */
 #define NCCL_FLOAT32 7
@@ -256,7 +256,7 @@ static int nccl_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     int result = nccl->ncclAllReduce(tensor->data, tensor->data, tensor->numel, NCCL_FLOAT32,
                                      nccl_op, nccl->comm, nccl->stream);
 
-    /* Average if requested — must wait for the reduce to complete first, else
+    /* Average if requested - must wait for the reduce to complete first, else
      * we'd scale stale data. */
     if (op == DIST_REDUCE_AVG && result == 0) {
         nccl_stream_sync(nccl);

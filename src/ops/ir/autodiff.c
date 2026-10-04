@@ -10,7 +10,7 @@
  * Run AFTER cml_ir_decompose so we only need VJPs for the minimal primitive
  * set. Covered here: ADD MUL MAX MATMUL SUM RESHAPE PERMUTE EXPAND EXP LOG
  * RECIP SQRT SIN NEG; FILL/CONST/CMPLT contribute no gradient. Ops without a
- * rule yet are skipped (grad does not flow through them) — the eager engine
+ * rule yet are skipped (grad does not flow through them) - the eager engine
  * remains the default until coverage is complete.
  */
 #include "ops/ir/autodiff.h"
@@ -38,7 +38,7 @@ int cml_autodiff_use_graph(void) {
 
 /* Strict-gradient policy: when CML_STRICT_GRAD=1, a backward walk that
  * reaches an op with no VJP records an error and fails the backward instead
- * of silently producing no gradient — silent zero-flow is the single most
+ * of silently producing no gradient - silent zero-flow is the single most
  * dangerous correctness class for users. Default off for backwards
  * compatibility with graphs that intentionally detach exotic ops. */
 static int autodiff_strict_grad(void) {
@@ -267,7 +267,7 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
     GradMap map = {0};
 
     /* seed: d loss / d loss = ones (loss dtype: an fp32 seed zeroes out
-     * half/bf16 graphs — the executor drops mismatched-dtype grads) */
+     * half/bf16 graphs - the executor drops mismatched-dtype grads) */
     Tensor* lo = loss_node->output;
     gm_put(&map, lo, uop_fill_ex(lo->shape, lo->ndim, 1.0f, lo->dtype, lo->device));
 
@@ -396,19 +396,19 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
         case UOP_EXPAND:
             gm_accum(&map, a, unbroadcast(g, a->shape, a->ndim));
             break;
-        case UOP_UNFOLD: { /* dX = fold(g) — scatter windows back */
+        case UOP_UNFOLD: { /* dX = fold(g) - scatter windows back */
             UnfoldParams* up = (UnfoldParams*)nd->params;
             if (up)
                 gm_accum(&map, a, uop_fold(g, up->kernel_size, up->stride, a->shape[a->ndim - 1]));
             break;
         }
-        case UOP_FOLD: { /* dX = unfold(g) — the adjoint */
+        case UOP_FOLD: { /* dX = unfold(g) - the adjoint */
             FoldParams* fp = (FoldParams*)nd->params;
             if (fp)
                 gm_accum(&map, a, uop_unfold(g, fp->kernel_size, fp->stride));
             break;
         }
-        case UOP_IM2COL: { /* dX = col2im(g) — scatter windows back */
+        case UOP_IM2COL: { /* dX = col2im(g) - scatter windows back */
             Im2colParams* ip = (Im2colParams*)nd->params;
             if (ip && a->ndim == 4) {
                 Col2imParams cp = {ip->kh, ip->kw, ip->sh,      ip->sw,      ip->ph,     ip->pw,
@@ -417,7 +417,7 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             }
             break;
         }
-        case UOP_COL2IM: { /* dX = im2col(g) — the adjoint */
+        case UOP_COL2IM: { /* dX = im2col(g) - the adjoint */
             Col2imParams* cp = (Col2imParams*)nd->params;
             if (cp) {
                 Im2colParams ip = {cp->kh, cp->kw, cp->sh, cp->sw, cp->ph, cp->pw, cp->dh, cp->dw};
@@ -434,7 +434,7 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
                 Tensor* idx = nd->inputs[1];
                 /* NumPy-style gather with a 1-D index collapses the gathered dim,
                  * so g and idx have rank a->ndim-1. scatter_add is same-rank, so
-                 * reshape both to a's shape with a size-1 slot at `dim` — the
+                 * reshape both to a's shape with a size-1 slot at `dim` - the
                  * scatter then expands that slot back to a->shape[dim]. (This is
                  * the cross-entropy path: a=[N,C], dim=1, g/idx=[N] -> [N,1].)
                  * When g already matches a's rank (same-rank gather), fall through
@@ -1323,7 +1323,7 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             /* Uncovered primitive: gradient does not flow (yet). Under the
              * strict policy this is an error, not a silent zero. */
             if (autodiff_strict_grad()) {
-                LOG_ERROR("autograd: no VJP for op '%s' — gradient would "
+                LOG_ERROR("autograd: no VJP for op '%s' - gradient would "
                           "silently not flow (CML_STRICT_GRAD=1)",
                           uop_type_to_string(nd->type));
                 error_stack_push(CM_NOT_IMPLEMENTED,
@@ -1340,7 +1340,7 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
      * Pin the grad as an external reference of its parent value. A grad may be
      * (or alias) a graph node output; without the pin, the graph teardown frees
      * it while the surviving parent still holds it via ->grad and frees it again
-     * on destruction — a double free that corrupts the exec buffer cache across
+     * on destruction - a double free that corrupts the exec buffer cache across
      * models. Pinning makes the teardown detach-and-keep it instead; the parent
      * then owns it and releases the pin in tensor_free. Release any prior grad
      * (e.g. a parameter's grad from the previous step) first. */
@@ -1374,7 +1374,7 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
 
     /* Double-backward: a value that an EARLIER grad pass of this context
      * gave a differentiable grad but that this pass never reached must not
-     * keep the stale grad — consumers would read d(previous root)/dv as if
+     * keep the stale grad - consumers would read d(previous root)/dv as if
      * it were d(current root)/dv. Replace it with explicit zeros. Only
      * values this context itself published are candidates; foreign/eager
      * grads and non-requiring values are left alone. */
@@ -1409,7 +1409,7 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
     ir->decomposed_frontier = ir->tail;
 
     /* NOTE: the VJPs may emit a few composite ops (NEG/SUB/CMPGE/COS…). We do
-     * NOT re-run cml_ir_decompose here — a second decompose pass over the mixed
+     * NOT re-run cml_ir_decompose here - a second decompose pass over the mixed
      * forward+backward graph corrupts references (e.g. zeroes MAX_REDUCE masks).
      * The emitted composites execute correctly via the executor's own kernels;
      * lowering the backward to pure primitives is deferred. */

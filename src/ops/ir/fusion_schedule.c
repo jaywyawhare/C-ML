@@ -615,7 +615,7 @@ int cml_ir_execute_fusion(CMLGraph_t ir) {
      * requires_grad node) and not yet decomposed, lower composites (RELU→MAX+FILL)
      * so elementwise + epilogue fusion can collapse them. Restricted to inference
      * because decomposing a training graph here (fwd+bwd, partially executed via
-     * this path) corrupts the buffer lifecycle — training graphs are already
+     * this path) corrupts the buffer lifecycle - training graphs are already
      * decomposed by the cml_ir_execute (backward) path anyway. Re-mark all nodes
      * used since the new decomposed nodes weren't in the caller's DCE walk (a cold
      * inference graph has no freed-tensor dead nodes to worry about). */
@@ -636,7 +636,7 @@ int cml_ir_execute_fusion(CMLGraph_t ir) {
     /* Real kernel fusion: collapse maximal single-use elementwise chains into
      * UOP_FUSED_ELEMENTWISE nodes so cpu_execute_node runs each chain as ONE
      * per-element loop with register-held intermediates (no intermediate buffer
-     * materialization). Safe wrt autodiff — only fuses use_count==1 edges. */
+     * materialization). Safe wrt autodiff - only fuses use_count==1 edges. */
     int fused = cml_ir_fuse_elementwise(ir);
     if (fused > 0)
         LOG_DEBUG("Real fusion collapsed %d elementwise chain(s)", fused);

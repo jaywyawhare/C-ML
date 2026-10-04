@@ -503,7 +503,7 @@ static int cpu_backward_node(struct IRNode* node) {
                 float* g1_data   = (float*)g1->data;
                 ReduceParams* rp = (ReduceParams*)node->params;
 
-                /* Global reduce (no dims specified) — broadcast scalar grad */
+                /* Global reduce (no dims specified) - broadcast scalar grad */
                 if (!rp || rp->num_dims == 0) {
                     float scale = (node->type == UOP_MEAN && in1->numel > 0)
                                       ? 1.0f / (float)in1->numel
@@ -529,7 +529,7 @@ static int cpu_backward_node(struct IRNode* node) {
                     /* Dim-specific reduce: outer × reduce × inner layout.
                      * grad_input[outer, j, inner] += grad_out[outer, inner] / reduce_size */
                     int ndim = in1->ndim;
-                    /* Handle first reduce dim — general single-dim path works for the
+                    /* Handle first reduce dim - general single-dim path works for the
                      * common case; multi-dim reduce falls back to modulo broadcast. */
                     int rd = rp->dims[0];
                     if (rd < 0)
@@ -577,7 +577,7 @@ static int cpu_backward_node(struct IRNode* node) {
                                 g1_data[i] += out_grad[i];
                         }
                     } else if (in2->numel == 1) {
-                        /* Common: relu = max(x, 0) — scalar broadcast */
+                        /* Common: relu = max(x, 0) - scalar broadcast */
                         float threshold = in2_data[0];
                         for (size_t i = 0; i < out_numel; i++) {
                             if (in1_data[i % in1->numel] >= threshold)
@@ -622,7 +622,7 @@ static int cpu_backward_node(struct IRNode* node) {
         int M = in1->shape[in1->ndim - 2];
         int K = in1->shape[in1->ndim - 1];
         int N = in2->shape[in2->ndim - 1];
-        /* Flatten all leading batch dims — treat as [batch * M, K] @ [K, N] */
+        /* Flatten all leading batch dims - treat as [batch * M, K] @ [K, N] */
         size_t batch = in1->numel / ((size_t)M * K);
 
         CMLBlasContext* blas = get_blas_context();
@@ -3141,7 +3141,7 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
-        /* ── UNFOLD: fold (transpose of unfold) — add overlapping windows ─── */
+        /* ── UNFOLD: fold (transpose of unfold) - add overlapping windows ─── */
 
     case UOP_UNFOLD: {
         if (!in1 || !in1->requires_grad || !node->params)
@@ -3458,7 +3458,7 @@ static int cpu_backward_node(struct IRNode* node) {
     }
 
     case UOP_IM2COL: {
-        /* adjoint: col2im — scatter-add overlapping windows back to [N,C,H,W] */
+        /* adjoint: col2im - scatter-add overlapping windows back to [N,C,H,W] */
         if (in1 && in1->requires_grad && in1->data && node->params && in1->ndim == 4) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
@@ -3496,7 +3496,7 @@ static int cpu_backward_node(struct IRNode* node) {
     }
 
     case UOP_COL2IM: {
-        /* adjoint: im2col — extract overlapping windows from the gradient */
+        /* adjoint: im2col - extract overlapping windows from the gradient */
         if (in1 && in1->requires_grad && in1->data && node->params) {
             Tensor* g1 = ensure_grad(in1);
             if (g1 && g1->data) {
@@ -3680,7 +3680,7 @@ static int cpu_execute_backward(CMLGraph_t ir, struct IRNode* loss_node) {
         n        = n->next;
     }
 
-    /* Loss gradient is already set up by cml_ir_execute_backward — no need to redo here */
+    /* Loss gradient is already set up by cml_ir_execute_backward - no need to redo here */
 
     /* Restrict the pass to the loss-rooted subgraph. A node with
      * requires_grad whose output does not feed the loss (a detached training
@@ -3688,7 +3688,7 @@ static int cpu_execute_backward(CMLGraph_t ir, struct IRNode* loss_node) {
      * unused and running it is wasted work at best. Reachability is computed
      * backwards over input->ir_node edges from the tail. Inputs always sit at
      * lower indices in this list (nodes are appended after their inputs), so a
-     * single reverse sweep suffices — given an index map from node pointer to
+     * single reverse sweep suffices - given an index map from node pointer to
      * position, built here as a small open-addressing table. */
     unsigned char* reach = (unsigned char*)cml_calloc((size_t)node_count, 1);
     size_t map_cap       = 16;

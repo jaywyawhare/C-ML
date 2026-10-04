@@ -226,7 +226,7 @@ Tensor* cml_column_parallel_forward(CMLColumnParallelLinear* cp, Tensor* input) 
     }
     /* Materialize at the layer boundary (a TP layer is a natural
      * communication/realization point). This keeps the autograd node intact for
-     * backward while giving callers a concrete activation to chain — matching
+     * backward while giving callers a concrete activation to chain - matching
      * the materialized-input contract the rest of the TP path expects. */
     tensor_ensure_executed(output);
     return output;
@@ -357,7 +357,7 @@ Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input) {
     (void)local_in;
 
     /* Autograd-tracked partial: output = input_shard @ weight^T (+ bias on
-     * rank 0), shape [batch, out_features]. This is each rank's PARTIAL — the
+     * rank 0), shape [batch, out_features]. This is each rank's PARTIAL - the
      * caller must all-reduce-sum the partials across ranks (see
      * cml_row_parallel_all_reduce) for the final result. Built via uop_linear
      * so gradients flow back to the sharded `weight`. */

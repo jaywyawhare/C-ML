@@ -515,7 +515,7 @@ CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx) {
      * when tensors are on a GPU device.
      */
 
-    /* GPU backends — only beneficial when data is already on device */
+    /* GPU backends - only beneficial when data is already on device */
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_NV))
         return CML_BACKEND_NV;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_CUDA))
@@ -531,11 +531,11 @@ CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx) {
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_METAL))
         return CML_BACKEND_METAL;
 
-    /* CPU backends — prefer LLVM JIT over software Vulkan/WebGPU */
+    /* CPU backends - prefer LLVM JIT over software Vulkan/WebGPU */
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_CPU_LLVM))
         return CML_BACKEND_CPU_LLVM;
 
-    /* Software GPU backends — last resort before pure fallback */
+    /* Software GPU backends - last resort before pure fallback */
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_VULKAN))
         return CML_BACKEND_VULKAN;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_WEBGPU))

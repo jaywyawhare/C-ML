@@ -7,7 +7,7 @@
 #include "alloc/cml_allocator.h"
 
 /*
- * Every backend — including CPU — is a first-class entry in the
+ * Every backend - including CPU - is a first-class entry in the
  * CMLHCQBackendOps table (see hcq_backend.c). These thin dispatchers just look
  * up the ops for a queue/signal's backend and forward; there are no per-backend
  * special-cases here anymore.
@@ -27,7 +27,7 @@ void cml_hcq_queue_destroy(CMLHCQQueue* queue) {
     if (!queue)
         return;
 
-    /* Read backend before destroy — the ops may free the queue wrapper. */
+    /* Read backend before destroy - the ops may free the queue wrapper. */
     CMLHCQBackendType backend   = queue->backend;
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(backend);
     if (ops && ops->queue_destroy) {

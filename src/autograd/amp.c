@@ -129,7 +129,7 @@ Tensor* grad_scaler_scale(GradScaler* scaler, Tensor* loss) {
     tensor_ensure_executed(loss);
 
     /* bf16 shares fp32's 8-bit exponent range, so gradients cannot underflow
-     * the way they do in fp16 — loss scaling is unnecessary (a no-op). */
+     * the way they do in fp16 - loss scaling is unnecessary (a no-op). */
     if (autocast_get_dtype() == DTYPE_BFLOAT16)
         return loss;
 

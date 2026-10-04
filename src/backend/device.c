@@ -554,7 +554,7 @@ void* device_alloc(size_t size, DeviceType device) {
         /* OpenCL device memory is cl_mem owned by the OpenCL IR backend; this
          * host-pointer API cannot serve it. Fail loudly rather than silently
          * handing back host memory the caller will treat as device-resident. */
-        LOG_ERROR("device_alloc: DEVICE_OPENCL is not served by this API — "
+        LOG_ERROR("device_alloc: DEVICE_OPENCL is not served by this API - "
                   "OpenCL buffers live in the OpenCL IR backend (cml_opencl_*)");
         return NULL;
 
@@ -636,7 +636,7 @@ void device_free(void* ptr, DeviceType device) {
 
     case DEVICE_OPENCL:
         /* Nothing is ever allocated through device_alloc for OpenCL (it fails
-         * loudly), so a free here means the caller mixed APIs — say so. */
+         * loudly), so a free here means the caller mixed APIs - say so. */
         LOG_WARNING("device_free: DEVICE_OPENCL pointer %p was not allocated "
                     "by device_alloc; ignoring",
                     ptr);

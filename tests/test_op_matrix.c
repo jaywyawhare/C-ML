@@ -12,7 +12,7 @@
  *                    CHECK_OOB=1, NOOPT + SPLIT_REDUCEOP=0
  *
  * Assertions are deliberately structural (executes and produces data, or a
- * clean NULL) — numeric truth is owned by the conformance/grad suites.
+ * clean NULL) - numeric truth is owned by the conformance/grad suites.
  */
 #include <stdio.h>
 #include <stdlib.h>

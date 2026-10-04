@@ -180,7 +180,7 @@ static int test_vulkan_available(void) {
     /* Just test that the function doesn't crash */
     bool avail = cml_vulkan_available();
     printf("(vulkan=%s) ", avail ? "yes" : "no");
-    return 1; /* Always passes — just reports availability */
+    return 1; /* Always passes - just reports availability */
 }
 
 static int test_vulkan_backend_create_free(void) {
@@ -296,7 +296,7 @@ static int test_vulkan_kernel_dispatch(void) {
     if (!kernel) {
         printf("(kernel creation failed) ");
         cml_vulkan_backend_free(backend);
-        return 1; /* Not a hard failure — may be driver issue */
+        return 1; /* Not a hard failure - may be driver issue */
     }
 
     cml_vulkan_kernel_free(backend, kernel);

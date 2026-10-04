@@ -485,7 +485,7 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
                                     op->src_regs[0], op->src_regs[1]);
                     break;
                 case UOP_POW:
-                    /* a**b = exp2(b * log2(a)) — PTX has no pow. */
+                    /* a**b = exp2(b * log2(a)) - PTX has no pow. */
                     pos += snprintf(buf + pos, FUSED_BUF_SIZE - pos,
                                     "    lg2.approx.f32 %%f%d, %%f%d;\n"
                                     "    mul.f32 %%f%d, %%f%d, %%f%d;\n"

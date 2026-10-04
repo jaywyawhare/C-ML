@@ -53,7 +53,7 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
         !tensor_nbytes_checked(numel, dtype, &total_size))
         return NULL;
 
-    /* calloc: every field must start zeroed — Tensor structs are recycled from
+    /* calloc: every field must start zeroed - Tensor structs are recycled from
      * the allocator freelist, where free() poisons pointer fields. */
     Tensor* t = (Tensor*)cml_calloc(1, sizeof(Tensor));
     if (!t)
@@ -556,7 +556,7 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
         return node->output;
     }
 
-    /* calloc: every field must start zeroed — Tensor structs are recycled from
+    /* calloc: every field must start zeroed - Tensor structs are recycled from
      * the allocator freelist, where free() poisons pointer fields. */
     Tensor* t = (Tensor*)cml_calloc(1, sizeof(Tensor));
     if (!t)
@@ -604,7 +604,7 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
          * the output must take the dtype of the data operand instead.
          * UOP_SCATTER_ADD is {index, src}: inheriting index's dtype made every
          * embedding gradient an INT32 buffer (floats written into it read back
-         * as denormal garbage ≈ 0 — silent zero gradients). */
+         * as denormal garbage ≈ 0 - silent zero gradients). */
         int di = 0;
         if (node->type == UOP_SCATTER_ADD && node->num_inputs > 1 && node->inputs[1])
             di = 1;
@@ -744,7 +744,7 @@ void tensor_detach_keep(Tensor* t) {
             t->data      = owned;
             t->owns_data = true;
         } else {
-            /* Can't copy — drop the borrowed pointer so we never free plan memory. */
+            /* Can't copy - drop the borrowed pointer so we never free plan memory. */
             t->data = NULL;
         }
         /* If this tensor shares a storage block (a pinned view), drop its
@@ -810,7 +810,7 @@ void tensor_storage_share(Tensor* view, Tensor* src) {
      * data block it owned is still alive through shared storage. */
     CMLTensorStorage* s = src->storage ? src->storage : tensor_storage_attach(src);
     if (!s)
-        return; /* No owned block to share — legacy non-owning view contract. */
+        return; /* No owned block to share - legacy non-owning view contract. */
     s->refs++;
     view->storage = s;
 }
@@ -849,7 +849,7 @@ void tensor_free(Tensor* t) {
         return;
 
     /* An external owner (e.g. a language binding) still holds this tensor. Don't
-     * free it — a graph teardown must not pull it out from under the owner.
+     * free it - a graph teardown must not pull it out from under the owner.
      * Detach it from the graph and keep it alive; tensor_release() frees it once
      * the owner is done. ref_count stays at 0 so a later free proceeds. */
     if (t->external_refs > 0) {
@@ -1568,7 +1568,7 @@ Tensor* tensor_dot(Tensor* a, Tensor* b) {
     if (a->ndim != 1 || b->ndim != 1 || a->numel != b->numel) {
         CML_ERR_NULL("tensor_dot: both tensors must be 1D with same size");
     }
-    /* Lazy: dot(a,b) = sum(a * b) — builds IR, defers execution, and is now
+    /* Lazy: dot(a,b) = sum(a * b) - builds IR, defers execution, and is now
      * differentiable (was: eager tensor_ensure_executed + get_float loop). */
     Tensor* prod = uop_mul(a, b);
     if (!prod)
@@ -1722,7 +1722,7 @@ Tensor* tensor_bitcast(Tensor* a, DType target_dtype) {
         return NULL;
     tensor_ensure_executed(out);
 
-    // Raw memcpy — reinterpret bits
+    // Raw memcpy - reinterpret bits
     memcpy(out->data, a->data, total_bytes);
     return out;
 }

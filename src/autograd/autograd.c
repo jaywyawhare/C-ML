@@ -122,7 +122,7 @@ bool tensor_is_leaf(Tensor* t) {
     if (!t)
         return false;
     /* A leaf tensor has no IR node, or is a zero-input creation op
-     * (FILL, CONST, RAND, etc.) — i.e., not computed from other tensors. */
+     * (FILL, CONST, RAND, etc.) - i.e., not computed from other tensors. */
     if (!t->ir_node)
         return true;
     struct IRNode* node = (struct IRNode*)t->ir_node;
@@ -310,7 +310,7 @@ void tensor_zero_grad(Tensor* tensor) {
         return;
 
     if (tensor->grad && tensor->grad->data) {
-        /* Zero in-place instead of freeing — avoids reallocation in backward */
+        /* Zero in-place instead of freeing - avoids reallocation in backward */
         memset(tensor->grad->data, 0, tensor->grad->numel * cml_dtype_size(tensor->grad->dtype));
     } else if (tensor->grad) {
         tensor_free(tensor->grad);
@@ -358,7 +358,7 @@ Tensor* tensor_get_grad(Tensor* tensor) { return tensor ? tensor->grad : NULL; }
  * engine, fires backward hooks, frees non-retained intermediate grads, and optionally
  * exports the graph for visualization. create_graph is honored only by the graph engine. */
 void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph) {
-    /* The eager engine writes gradients as plain data, not graph nodes —
+    /* The eager engine writes gradients as plain data, not graph nodes -
      * there is nothing to differentiate through a second time. */
     int graph_mode = cml_autodiff_use_graph();
     if (create_graph && !graph_mode) {
@@ -386,7 +386,7 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
     /* Eager autodiff needs the forward realized before it can read activations.
      * Graph autodiff DEFERS realization: cml_ir_grad builds the backward into the
      * still-lazy forward graph, then the whole fwd+bwd graph is fused + realized
-     * together (below) — this is what lets forward elementwise chains fuse
+     * together (below) - this is what lets forward elementwise chains fuse
      * (training-forward fusion), with use_count keeping backward-needed
      * intermediates materialized. Metrics capture moves after the execute. */
     if (!graph_mode) {
@@ -451,7 +451,7 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
          * materialized); it is cleared right after so no lone forward realization
          * ever fuses differentiable nodes. Assumes a ones/scalar seed. */
         /* Strict-gradient policy: a -1 here means CML_STRICT_GRAD=1 caught an
-         * op with no VJP — do not execute a backward graph missing gradient
+         * op with no VJP - do not execute a backward graph missing gradient
          * terms (it would silently train on partial gradients). */
         if (cml_ir_grad(tensor->ir_context, tensor->ir_node, create_graph) != 0) {
             LOG_ERROR("tensor_backward: gradient construction failed "

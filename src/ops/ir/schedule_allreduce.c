@@ -328,7 +328,7 @@ int schedule_allreduce_inject(CMLSchedule* sched, ScheduleAllReduce* ar) {
         item->device_id    = (ar->steps[s].dst_rank >= 0 && ar->steps[s].dst_rank < ar->num_devices)
                                  ? ar->device_ids[ar->steps[s].dst_rank]
                                  : 0;
-        /* ops / inputs / outputs stay NULL — sched_item_free frees NULLs safely. */
+        /* ops / inputs / outputs stay NULL - sched_item_free frees NULLs safely. */
 
         int idx           = sched->num_items;
         sched->items[idx] = item;

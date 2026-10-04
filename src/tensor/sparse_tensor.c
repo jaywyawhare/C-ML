@@ -402,7 +402,7 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
             }
         }
         if (!attached) {
-            LOG_WARNING("sparse_matmul: could not record SPMM node — "
+            LOG_WARNING("sparse_matmul: could not record SPMM node - "
                         "output will not be differentiable");
             output->requires_grad = false;
             if (rows)

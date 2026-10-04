@@ -400,7 +400,7 @@ void cml_imagenet_free(CMLImageNetLoader* loader) {
         return;
     /* All allocations here go through the CML allocator (cml_strdup for the path
      * strings, cml_malloc/cml_calloc for the arrays and struct), so everything is
-     * released with cml_free — no allocator mismatch. */
+     * released with cml_free - no allocator mismatch. */
     for (int i = 0; i < loader->num_samples; i++)
         cml_free(loader->image_paths[i]);
     cml_free(loader->image_paths);

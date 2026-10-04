@@ -1,5 +1,5 @@
 /*
- * Test OpenCL IR backend — verifies GPU execution produces correct results.
+ * Test OpenCL IR backend - verifies GPU execution produces correct results.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -360,7 +360,7 @@ static void test_large_matmul_perf(void) {
 int main(void) {
 #ifdef CML_HAS_OPENCL
     if (!cml_opencl_ir_available()) {
-        printf("No OpenCL GPU found — skipping tests\n");
+        printf("No OpenCL GPU found - skipping tests\n");
         return 0;
     }
     printf("OpenCL GPU detected\n\n");
@@ -374,7 +374,7 @@ int main(void) {
 
     return TEST_SUMMARY();
 #else
-    printf("OpenCL not compiled — skipping\n");
+    printf("OpenCL not compiled - skipping\n");
     return 0;
 #endif
 }

@@ -51,8 +51,8 @@ typedef struct CMLPipelineParallel {
      * (stage_id == rank). These cache the per-micro-batch input/output tensors
      * of THIS rank's stage so the distributed backward can back-propagate and
      * stream input-gradients upstream. */
-    Tensor** dist_stage_inputs;  /* [micro_batch] — recv'd (or sliced on rank 0) */
-    Tensor** dist_stage_outputs; /* [micro_batch] — this stage's forward output */
+    Tensor** dist_stage_inputs;  /* [micro_batch] - recv'd (or sliced on rank 0) */
+    Tensor** dist_stage_outputs; /* [micro_batch] - this stage's forward output */
 } CMLPipelineParallel;
 
 CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
@@ -90,7 +90,7 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output);
 /* True cross-rank pipeline parallelism: world_size == num_stages and this rank
  * runs ONLY stage `rank`, streaming micro-batch activations to rank+1 and
  * receiving from rank-1 over the process group. Because each stage is a separate
- * process, stages run concurrently — real pipeline overlap. `input` is used only
+ * process, stages run concurrently - real pipeline overlap. `input` is used only
  * on rank 0; every other rank passes NULL and receives from upstream. Returns
  * the assembled output on the LAST rank and NULL on all others (check rank). */
 Tensor* cml_pipeline_dist_forward(CMLPipelineParallel* pipeline, Tensor* input);

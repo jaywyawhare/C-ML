@@ -1,5 +1,5 @@
 /*
- * torch_c.c — PyTorch-like C API for C-ML (optimized hot paths)
+ * torch_c.c - PyTorch-like C API for C-ML (optimized hot paths)
  *
  * Optimizations (no inline assembly):
  *  - Cached default dtype/device avoids mutex on tensor creation

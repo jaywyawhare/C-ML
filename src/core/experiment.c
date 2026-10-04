@@ -1,4 +1,4 @@
-/* experiment.c — see experiment.h. Dependency-free append-only run logger. */
+/* experiment.c - see experiment.h. Dependency-free append-only run logger. */
 #include "core/experiment.h"
 
 #include <stdio.h>
@@ -252,7 +252,7 @@ CMLRun* cml_exp_run_init(const char* project, const char* name, const char* conf
     snprintf(cpath, sizeof(cpath), "%s/console.log", run->dir);
     run->console = fopen(cpath, "wb");
 
-    /* Run metadata (git commit, host, OS) — the run-overview page. */
+    /* Run metadata (git commit, host, OS) - the run-overview page. */
 #ifdef _WIN32
     {
         DWORD _sz = (DWORD)sizeof(run->host);

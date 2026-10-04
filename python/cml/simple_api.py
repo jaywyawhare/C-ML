@@ -69,7 +69,7 @@ def train_model(
         # Record the scalar value. Retaining the loss Tensor across steps is
         # safe (the per-step graph reset copies any Python-held tensor's borrowed
         # buffer into owned storage via tensor_pin/tensor_detach_keep, so it
-        # survives opt teardown) — but a float is cheaper (no per-step
+        # survives opt teardown) - but a float is cheaper (no per-step
         # malloc+copy) and matches the familiar Keras-style history.
         loss_value = float(np.asarray(loss.numpy()).reshape(-1)[0])
         losses.append(loss_value)

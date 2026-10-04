@@ -883,7 +883,7 @@ static void free_ir_node(struct IRNode* node) {
  * itself and without ref_count accounting. This is the single source of
  * truth for which fields a node owns (params, scope, build_stack, per-input
  * shape arrays, ...); custom free paths must call this instead of open-coding
- * the field list — the DCE removal path used to hand-roll it and leaked
+ * the field list - the DCE removal path used to hand-roll it and leaked
  * params/scope/build_stack/input_shapes on every removed node. */
 void cml_ir_release_node_storage(struct IRNode* node) {
     if (!node)
@@ -1105,7 +1105,7 @@ void cml_ir_free(CMLGraph_t ir) {
                     continue;
                 }
                 /* Only detach from THIS graph's context. Do NOT clear ir_node
-                 * before tensor_free — tensor_free needs ir_node to clear the
+                 * before tensor_free - tensor_free needs ir_node to clear the
                  * original node's output pointer when ref_count reaches 0. */
                 if (tr->ir_context == ir)
                     tr->ir_context = NULL;
@@ -1170,7 +1170,7 @@ void cml_ir_free(CMLGraph_t ir) {
     }
 
     /* Log of values that received lazy grads (see autodiff.c publish). The
-     * entries are plain Tensor* borrows owned elsewhere — only the array. */
+     * entries are plain Tensor* borrows owned elsewhere - only the array. */
     if (ir->grad_publish_log) {
         cml_free(ir->grad_publish_log);
         ir->grad_publish_log   = NULL;

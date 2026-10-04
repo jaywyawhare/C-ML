@@ -1,5 +1,5 @@
 /*
- * selective_build.c — Selective kernel build for embedded deployment
+ * selective_build.c - Selective kernel build for embedded deployment
  */
 
 #include "torch/selective_build.h"

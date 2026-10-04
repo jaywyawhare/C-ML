@@ -380,7 +380,7 @@ static int test_reshape4_reduce_axis2(void) { return reshape_then_reduce_backwar
 /* GATHER's VJP is a SCATTER_ADD whose FIRST input is an integer index tensor.
  * The output tensor used to inherit inputs[0]'s dtype, so every embedding
  * gradient came back as an INT32 buffer: float grads stored into it read back
- * as denormal garbage ≈ 0 — silent zero gradients, grad_check embedding 17/18.
+ * as denormal garbage ≈ 0 - silent zero gradients, grad_check embedding 17/18.
  * The output must take the dtype of the DATA operand (inputs[1]). */
 static int test_gather_grad_dtype_and_value(void) {
     cml_reset_ir_context();

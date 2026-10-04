@@ -265,7 +265,7 @@ void simd_max_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b
 }
 
 /* -------------------------------------------------------------------------
- * Thread-parallel variants (threading only — the per-chunk kernel is scalar).
+ * Thread-parallel variants (threading only - the per-chunk kernel is scalar).
  * ---------------------------------------------------------------------- */
 #include "backend/threadpool.h"
 #include "alloc/cml_allocator.h"

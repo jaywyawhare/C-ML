@@ -158,7 +158,7 @@ void lstm_cell_forward(LSTMCell* cell, Tensor* input, Tensor* h_prev, Tensor* c_
     if (cell->bias_hh)
         gates = tensor_add(gates, cell->bias_hh->tensor);
 
-    /* Split gates into i, f, g, o via shrink — each [batch, hs] */
+    /* Split gates into i, f, g, o via shrink - each [batch, hs] */
     int starts_full[] = {0, 0};
     int ends_full[]   = {batch, hs};
 

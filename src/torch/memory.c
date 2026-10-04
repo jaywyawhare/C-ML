@@ -1,5 +1,5 @@
 /*
- * memory.c — User-provided memory arenas for edge deployment
+ * memory.c - User-provided memory arenas for edge deployment
  */
 
 #include "torch/memory.h"

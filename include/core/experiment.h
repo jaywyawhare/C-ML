@@ -1,5 +1,5 @@
 /*
- * experiment.h — lightweight W&B-style experiment tracking (prototype).
+ * experiment.h - lightweight W&B-style experiment tracking (prototype).
  *
  * Emits an append-only event log per run under .cml/experiments/runs/<id>/.
  * A separate server (viz/exp_server.py) ingests these into SQLite and serves
@@ -73,7 +73,7 @@ void cml_exp_log_console(CMLRun* run, const char* line);
 /* Set a custom summary value (the "final" number shown in the run table). */
 void cml_exp_summary_set(CMLRun* run, const char* key, double value);
 
-/* Raise an alert (level: "info"/"warn"/"error") — surfaces in the Alerts tab
+/* Raise an alert (level: "info"/"warn"/"error") - surfaces in the Alerts tab
  * and can flag diverging/NaN runs. */
 void cml_exp_alert(CMLRun* run, const char* level, const char* message);
 

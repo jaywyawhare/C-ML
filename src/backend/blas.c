@@ -50,7 +50,7 @@ static inline void blas_unlock(void) { pthread_mutex_unlock(&g_blas_lock); }
 
 static CMLBlasContext* g_blas_ctx = NULL;
 
-/* ILP64 scipy_openblas64 paths — probed first on Linux because it is faster
+/* ILP64 scipy_openblas64 paths - probed first on Linux because it is faster
  * than the system OpenBLAS (no OpenMP thread overhead, better-tuned kernels). */
 static const char* ilp64_library_paths[] = {
 #ifdef __linux__
@@ -227,7 +227,7 @@ CMLBlasContext* cml_blas_init(void) {
         LOG_WARNING("Failed to load BLAS from BLAS_LIB=%s, trying defaults", env_blas);
     }
 
-    /* Probe ILP64 paths before LP64 — scipy_openblas64 is significantly faster
+    /* Probe ILP64 paths before LP64 - scipy_openblas64 is significantly faster
      * on Linux due to no OpenMP threading overhead. */
     for (int i = 0; ilp64_library_paths[i] != NULL; i++) {
         ctx->lib_handle = LIB_LOAD(ilp64_library_paths[i]);
@@ -262,7 +262,7 @@ CMLBlasContext* cml_blas_init(void) {
         }
     }
 
-    fprintf(stderr, "[CML] WARNING: No BLAS library found — using scalar fallback\n");
+    fprintf(stderr, "[CML] WARNING: No BLAS library found - using scalar fallback\n");
     cml_free(ctx);
     return NULL;
 }
@@ -319,7 +319,7 @@ int cml_blas_get_num_threads(void) {
 
 /** Return the lazily-initialized global BLAS context (double-checked under lock). */
 CMLBlasContext* cml_blas_get_context(void) {
-    /* Fast path: context already initialized — no lock needed */
+    /* Fast path: context already initialized - no lock needed */
     CMLBlasContext* ctx =
         atomic_load_explicit((_Atomic(CMLBlasContext*)*)&g_blas_ctx, memory_order_acquire);
     if (ctx)
@@ -432,7 +432,7 @@ static void pack_A_panel(const float* src, float* dst, int MR_cur, int KC_cur, i
 /* 6×16 FMA micro-kernel.
  * A_p: [KC × MR] packed, stride PACKED_MR per k.
  * B_p: [KC × NR] packed, stride PACKED_NR per k.
- * Both are fully sequential — L1 cache never misses in the hot loop.
+ * Both are fully sequential - L1 cache never misses in the hot loop.
  * k loop unrolled ×4 to hide 4-cycle FMA latency (Haswell/Skylake). */
 static void sgemm_ukr_6x16(float* C, int ldc, const float* A_p, const float* B_p, int KC,
                            float alpha, float beta) {
@@ -665,7 +665,7 @@ static void autotune_load(void) {
     FILE* f = fopen(path, "r");
     if (!f)
         return;
-    /* flat line format: M N K mc kc nc — one entry per line */
+    /* flat line format: M N K mc kc nc - one entry per line */
     int m, n, k, mc, kc, nc;
     while (g_at_count < AT_MAX_ENTRIES &&
            fscanf(f, "%d %d %d %d %d %d", &m, &n, &k, &mc, &kc, &nc) == 6) {
@@ -778,7 +778,7 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
         /* Medium-matrix path: packed 6×16 kernel.
          * For ILP64: only use when both flops are small AND N fits in one NC-panel
          * (N > PACKED_NC means ILP64's multi-threading beats the single-threaded
-         * packed kernel even at small flops — e.g. im2col GEMM M=16, N=7200, K=27).
+         * packed kernel even at small flops - e.g. im2col GEMM M=16, N=7200, K=27).
          * Without ILP64: always use packed (far better than LP64 OpenBLAS-OpenMP). */
         bool use_packed = !ctx->is_ilp64 || (flops < MEDIUM_GEMM_THRESHOLD && N <= PACKED_NC);
         if (use_packed) {
@@ -787,7 +787,7 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
                 nc_alloc = PACKED_NC;
             size_t need_a = (size_t)PACKED_MC * PACKED_KC * sizeof(float);
             size_t need_b = (size_t)nc_alloc * PACKED_KC * sizeof(float);
-            /* Grow context-resident buffers lazily — amortises alloc across calls */
+            /* Grow context-resident buffers lazily - amortises alloc across calls */
             if (ctx->pack_a_size < need_a) {
                 cml_aligned_free(ctx->pack_a_buf);
                 ctx->pack_a_buf  = (float*)cml_aligned_alloc(need_a, 32);
@@ -863,7 +863,7 @@ int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float
 
 #if defined(__AVX2__) || defined(__AVX__)
     /* Small/thin-GEMM fast path (mirrors cml_blas_sgemm). Threaded BLAS pays a
-     * fork-join barrier per call that dwarfs the compute for small matrices —
+     * fork-join barrier per call that dwarfs the compute for small matrices -
      * most painfully the im2col conv GEMM A[M,K] @ B[N,K]^T (e.g.
      * [7200,27] @ [27,16]^T), which spends ~25ms in OpenBLAS exec_blas thread
      * barriers versus microseconds single-threaded. cml_blas_sgemm has the

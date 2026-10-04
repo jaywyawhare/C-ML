@@ -71,7 +71,7 @@ static cl_mem gpu_pool_alloc(cl_context ctx, cl_mem_flags flags, size_t size, vo
         return g_gpu_pool.entries[best].buffer;
     }
 
-    /* No suitable buffer found — allocate a new one */
+    /* No suitable buffer found - allocate a new one */
     cl_int err;
     cl_mem buf = clCreateBuffer(ctx, flags, size, host_ptr, &err);
     if (errcode)
@@ -97,7 +97,7 @@ static void gpu_pool_release(cl_mem buf) {
             return;
         }
     }
-    /* Buffer not in pool — release it directly */
+    /* Buffer not in pool - release it directly */
     clReleaseMemObject(buf);
 }
 
