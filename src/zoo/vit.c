@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
+/** Config for ViT-Tiny/16 (hidden 192, 12 layers, 3 heads, MLP 768). */
 ViTConfig cml_zoo_vit_config_tiny(void) {
     return (ViTConfig){.image_size  = 224,
                        .patch_size  = 16,
@@ -17,6 +18,7 @@ ViTConfig cml_zoo_vit_config_tiny(void) {
                        .mlp_dim     = 768};
 }
 
+/** Config for ViT-Small/16 (hidden 384, 12 layers, 6 heads, MLP 1536). */
 ViTConfig cml_zoo_vit_config_small(void) {
     return (ViTConfig){.image_size  = 224,
                        .patch_size  = 16,
@@ -27,6 +29,7 @@ ViTConfig cml_zoo_vit_config_small(void) {
                        .mlp_dim     = 1536};
 }
 
+/** Config for ViT-Base/16 (hidden 768, 12 layers, 12 heads, MLP 3072). */
 ViTConfig cml_zoo_vit_config_base(void) {
     return (ViTConfig){.image_size  = 224,
                        .patch_size  = 16,
@@ -37,6 +40,7 @@ ViTConfig cml_zoo_vit_config_base(void) {
                        .mlp_dim     = 3072};
 }
 
+/** Config for ViT-Large/16 (hidden 1024, 24 layers, 16 heads, MLP 4096). */
 ViTConfig cml_zoo_vit_config_large(void) {
     return (ViTConfig){.image_size  = 224,
                        .patch_size  = 16,
@@ -47,6 +51,7 @@ ViTConfig cml_zoo_vit_config_large(void) {
                        .mlp_dim     = 4096};
 }
 
+/** Build one ViT transformer encoder block as a shared pre-norm attention+MLP block. */
 static Module* create_vit_block(int hidden_size, int n_head, int mlp_dim, DType dtype,
                                 DeviceType device) {
     return (Module*)zoo_prenorm_block("ViTBlock", hidden_size, n_head, mlp_dim, 1e-6f, dtype,
@@ -66,6 +71,7 @@ typedef struct {
     int n_layer;
 } ViTModel;
 
+/** Forward: patch-embed, prepend CLS token, add pos embed, run blocks, norm, classify head. */
 static Tensor* vit_forward(Module* module, Tensor* input) {
     ViTModel* vit = (ViTModel*)module;
     if (!vit || !input)
@@ -110,6 +116,7 @@ static Tensor* vit_forward(Module* module, Tensor* input) {
     return module_forward((Module*)vit->head, x);
 }
 
+/** Free the ViT patch embed, encoder blocks, final norm and classification head. */
 static void vit_free(Module* module) {
     ViTModel* vit = (ViTModel*)module;
     if (!vit)
@@ -125,6 +132,8 @@ static void vit_free(Module* module) {
     cml_free(vit);
 }
 
+/** Build a Vision Transformer from @p config: conv patch embed, CLS and pos params, N blocks,
+ * final norm and classification head. */
 Module* cml_zoo_vit_create(ViTConfig* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;

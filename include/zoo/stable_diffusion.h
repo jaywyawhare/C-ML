@@ -87,7 +87,7 @@ int cml_sd_scheduler_step(CMLSDScheduler* sched, const float* eps, float* latent
 /* Denoising loop: iterates the scheduler over `num_inference_steps`, calling
  * `unet` on the current latent as the noise predictor each step, then applies
  * the DDIM update in place. Returns the final latent (caller frees).
- * Note: the Sequential UNet takes only the latent — timestep/context
+ * Note: the Sequential UNet takes only the latent - timestep/context
  * conditioning needs a modular UNet forward and is not wired here. */
 Tensor* cml_sd_generate(Module* unet, CMLSDScheduler* sched, Tensor* initial_latent,
                         int num_inference_steps);

@@ -13,6 +13,7 @@ typedef struct {
     CMLScheduleItemType type;
 } GroupSignature;
 
+/** Build a group's signature: its external (non-internal) input tensors and schedule type. */
 static void collect_group_inputs(const CMLFusionGroup* g, GroupSignature* sig) {
     sig->num_inputs = 0;
     sig->type       = g->type;
@@ -51,6 +52,7 @@ static void collect_group_inputs(const CMLFusionGroup* g, GroupSignature* sig) {
     }
 }
 
+/** True if two groups share the same type and the same set of external inputs. */
 static int signatures_match(const GroupSignature* a, const GroupSignature* b) {
     if (a->type != b->type)
         return 0;
@@ -71,6 +73,7 @@ static int signatures_match(const GroupSignature* a, const GroupSignature* b) {
     return 1;
 }
 
+/** True if two groups produce no common output tensor (safe to merge). */
 static int groups_have_distinct_outputs(const CMLFusionGroup* a, const CMLFusionGroup* b) {
     for (int i = 0; i < a->num_nodes; i++) {
         if (!a->nodes[i] || !a->nodes[i]->output)
@@ -85,6 +88,8 @@ static int groups_have_distinct_outputs(const CMLFusionGroup* a, const CMLFusion
     return 1;
 }
 
+/* Find elementwise groups sharing the same inputs but distinct outputs; return them as
+ * merge pairs so one kernel can produce several outputs. */
 int cml_multi_output_analyze(CMLFusionSchedule* sched, int** merge_groups, int* num_merges) {
     if (!sched || !merge_groups || !num_merges)
         return -1;
@@ -163,6 +168,8 @@ int cml_multi_output_analyze(CMLFusionSchedule* sched, int** merge_groups, int* 
     return count;
 }
 
+/* Merge each analyzed pair by absorbing the secondary group's nodes into the primary,
+ * then compact the schedule's group list and rebuild the execution order. */
 int cml_multi_output_fuse(CMLFusionSchedule* sched, int* merge_groups, int num_merges) {
     if (!sched || !merge_groups || num_merges <= 0)
         return -1;

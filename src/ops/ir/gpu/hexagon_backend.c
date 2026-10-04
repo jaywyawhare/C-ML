@@ -16,6 +16,7 @@ static remote_handle_open_fn fn_remote_handle_open     = NULL;
 static remote_handle_invoke_fn fn_remote_handle_invoke = NULL;
 static remote_handle_close_fn fn_remote_handle_close   = NULL;
 
+/** Open the FastRPC DSP transport, honoring the CML_DSP_RPC_LIB test override. */
 static void* try_dlopen_dsp(void) {
     /* Mock/alternative transport override (used by tests to exercise the
      * full session lifecycle without DSP hardware). */
@@ -41,6 +42,7 @@ static void* try_dlopen_dsp(void) {
     return NULL;
 }
 
+/** Probe whether a Hexagon DSP FastRPC library can be loaded. */
 bool cml_hexagon_available(void) {
     void* h = try_dlopen_dsp();
     if (h) {
@@ -50,6 +52,7 @@ bool cml_hexagon_available(void) {
     return false;
 }
 
+/** Allocate a zeroed Hexagon backend handle. */
 CMLHexagonBackend* cml_hexagon_backend_create(void) {
     CMLHexagonBackend* b = (CMLHexagonBackend*)cml_calloc(1, sizeof(CMLHexagonBackend));
     if (!b) {
@@ -58,6 +61,7 @@ CMLHexagonBackend* cml_hexagon_backend_create(void) {
     return b;
 }
 
+/** Load FastRPC symbols, open a probe DSP session, and detect HVX/HMX capability. */
 int cml_hexagon_backend_init(CMLHexagonBackend* backend) {
     if (!backend)
         return -1;
@@ -120,6 +124,7 @@ fail:
     return -1;
 }
 
+/** Close the DSP library, clear FastRPC pointers, and free the backend. */
 void cml_hexagon_backend_free(CMLHexagonBackend* backend) {
     if (!backend)
         return;
@@ -137,6 +142,7 @@ void cml_hexagon_backend_free(CMLHexagonBackend* backend) {
     cml_free(backend);
 }
 
+/** Walk the IR graph, invoking one FastRPC method per node on a DSP session. */
 int cml_hexagon_execute(CMLHexagonBackend* backend, CMLGraph_t ir) {
     if (!backend || !backend->initialized) {
         LOG_ERROR("Hexagon backend not initialized");

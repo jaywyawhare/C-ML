@@ -1,5 +1,5 @@
 /*
- * memory.c — User-provided memory arenas for edge deployment
+ * memory.c - User-provided memory arenas for edge deployment
  */
 
 #include "torch/memory.h"
@@ -20,13 +20,17 @@
 
 #define TORCH_MEMORY_ALIGN 64
 
+/** Round n up to the next multiple of align (a power of two). */
 static size_t align_up(size_t n, size_t align) { return (n + align - 1) & ~(align - 1); }
 
+/** Default arena options: 64-byte alignment with peak tracking enabled. */
 TorchMemoryOptions torch_memory_default_options(void) {
     TorchMemoryOptions opts = {.alignment = TORCH_MEMORY_ALIGN, .track_peak = true};
     return opts;
 }
 
+/** Allocate an owned, aligned arena of `size` bytes plus its CML context and graph
+ *  allocator; returns NULL on bad size or allocation failure. */
 TorchMemoryManager* torch_memory_create(size_t size) {
     if (size == 0)
         return NULL;
@@ -65,6 +69,7 @@ TorchMemoryManager* torch_memory_create(size_t size) {
     return mgr;
 }
 
+/** Wrap a caller-supplied buffer as an arena (not freed on destroy); NULL on failure. */
 TorchMemoryManager* torch_memory_from_buffer(void* buffer, size_t size) {
     if (!buffer || size == 0)
         return NULL;
@@ -94,6 +99,7 @@ TorchMemoryManager* torch_memory_from_buffer(void* buffer, size_t size) {
     return mgr;
 }
 
+/** Destroy a memory manager, freeing its context, allocator, and owned buffer. */
 void torch_memory_free(TorchMemoryManager* mgr) {
     if (!mgr)
         return;
@@ -106,6 +112,7 @@ void torch_memory_free(TorchMemoryManager* mgr) {
     free(mgr);
 }
 
+/** Bump-allocate aligned bytes from the arena; NULL if exhausted. Updates peak usage. */
 void* torch_memory_alloc(TorchMemoryManager* mgr, size_t size) {
     if (!mgr || size == 0)
         return NULL;
@@ -122,16 +129,20 @@ void* torch_memory_alloc(TorchMemoryManager* mgr, size_t size) {
     return ptr;
 }
 
+/** Bytes currently allocated from the arena. */
 size_t torch_memory_used(const TorchMemoryManager* mgr) { return mgr ? mgr->used_bytes : 0; }
 
+/** High-water mark of arena usage since creation. */
 size_t torch_memory_peak(const TorchMemoryManager* mgr) { return mgr ? mgr->peak_bytes : 0; }
 
+/** Bytes still available before the arena is exhausted. */
 size_t torch_memory_remaining(const TorchMemoryManager* mgr) {
     if (!mgr)
         return 0;
     return mgr->arena_size > mgr->used_bytes ? mgr->arena_size - mgr->used_bytes : 0;
 }
 
+/** Rewind the bump pointer to reuse the arena; invalidates prior allocations, keeps peak. */
 void torch_memory_reset(TorchMemoryManager* mgr) {
     if (!mgr)
         return;
@@ -139,10 +150,12 @@ void torch_memory_reset(TorchMemoryManager* mgr) {
     mgr->used_bytes = 0;
 }
 
+/** Pre-reserve graph buffers for a worst-case IR graph via the arena's allocator. */
 bool torch_memory_reserve_graph(TorchMemoryManager* mgr, CMLGraph_t graph) {
     if (!mgr || !mgr->graph_allocator)
         return false;
     return cml_graph_allocator_reserve(mgr->graph_allocator, graph);
 }
 
+/** Return the CML context backing this arena, for tensor creation against it. */
 CMLContext_t torch_memory_get_context(TorchMemoryManager* mgr) { return mgr ? mgr->context : NULL; }

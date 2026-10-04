@@ -2,8 +2,8 @@
  * Multi-dtype compute (increment 1): float64 and integer elementwise binary ops.
  *
  * The executor was formerly float32-only. These tests confirm the ops now run
- * in their native C type — verified by values that float32 CANNOT represent
- * (proving it isn't secretly going through the f32 path) — plus broadcasting.
+ * in their native C type - verified by values that float32 CANNOT represent
+ * (proving it isn't secretly going through the f32 path) - plus broadcasting.
  */
 #include <stdio.h>
 #include <stdint.h>
@@ -63,7 +63,7 @@ static int test_f64_arith(void) {
     return ok;
 }
 
-/* 1e8 + 1 is exact in f64 but rounds to 1e8 in f32 — proves native f64 compute. */
+/* 1e8 + 1 is exact in f64 but rounds to 1e8 in f32 - proves native f64 compute. */
 static int test_f64_precision(void) {
     double a[] = {1e8};
     double b[] = {1.0};
@@ -442,7 +442,7 @@ static int test_half(void) {
     tensor_ensure_executed(sm); /* 1+2+3+4 = 10 */
     ok = ok && sm->dtype == DTYPE_FLOAT16 && fabsf(tensor_get_float(sm, 0) - 10.0f) < 1e-1f;
 
-    /* bf16 add (wider tolerance — 8-bit mantissa) */
+    /* bf16 add (wider tolerance - 8-bit mantissa) */
     Tensor* ba = tensor_cast(af, DTYPE_BFLOAT16);
     Tensor* bb = tensor_cast(bf, DTYPE_BFLOAT16);
     Tensor* bs = uop_add(ba, bb);

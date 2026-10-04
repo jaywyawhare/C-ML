@@ -20,6 +20,7 @@
 /* Rejects strings containing shell metacharacters that could allow
  * arbitrary command execution when passed to popen/system. */
 static bool aot_validate_path(const char* path) __attribute__((unused));
+/** Reject paths containing shell metacharacters before they reach popen/system. */
 static bool aot_validate_path(const char* path) {
     if (!path)
         return false;
@@ -35,6 +36,7 @@ static bool aot_validate_path(const char* path) {
     return true;
 }
 
+/** Return the default AOT compile options (O3, shared lib, PIC, header on). */
 AOTCompileOptions cml_aot_default_options(void) {
     AOTCompileOptions opts = {.target_triple        = NULL,
                               .cpu                  = NULL,
@@ -73,6 +75,7 @@ typedef struct {
     int cap;
 } AotBufMap;
 
+/** Look up the buffer entry for a tensor, or NULL if not yet mapped. */
 static AotBuf* aot_map_find(AotBufMap* m, Tensor* t) {
     for (int i = 0; i < m->count; i++)
         if (m->items[i].t == t)
@@ -80,6 +83,7 @@ static AotBuf* aot_map_find(AotBufMap* m, Tensor* t) {
     return NULL;
 }
 
+/** Append a tensor->buffer mapping (input/output/intermediate), growing the map. */
 static AotBuf* aot_map_add(AotBufMap* m, Tensor* t, int kind, int index) {
     if (m->count == m->cap) {
         int nc     = m->cap ? m->cap * 2 : 16;
@@ -149,6 +153,7 @@ static const char* aot_f32(char* buf, size_t cap, float v) {
     return buf;
 }
 
+/** Emit an elementwise unary loop `for (i) O[i] = <expr>` over `x = A[i]`. */
 static void aot_emit_unary(FILE* cf, const char* name, const char* O, const char* A, int64_t n,
                            const char* expr) {
     fprintf(cf, "    /* %s */\n", name);
@@ -1125,6 +1130,10 @@ int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOpti
 #endif
 }
 
+/**
+ * Trace a module's forward pass on a sample input to capture its IR, then
+ * AOT-compile that graph to `output_path`.
+ */
 int cml_aot_compile_module(struct Module* module, Tensor* sample_input, const char* output_path,
                            const AOTCompileOptions* options) {
     if (!module || !sample_input || !output_path) {
@@ -1151,6 +1160,10 @@ int cml_aot_compile_module(struct Module* module, Tensor* sample_input, const ch
     return cml_aot_compile(ir, output_path, options);
 }
 
+/**
+ * dlopen a compiled AOT model and resolve its forward entry point
+ * (cml_model_forward, falling back to main).
+ */
 CMLAOTModel* cml_aot_load(const char* path) {
     if (!path) {
         LOG_ERROR("NULL path for AOT model load");
@@ -1190,6 +1203,10 @@ CMLAOTModel* cml_aot_load(const char* path) {
     return model;
 }
 
+/**
+ * Wrap input/output tensors in MemRef descriptors matching the generated ABI
+ * and invoke the model's forward function (allocating output data if needed).
+ */
 int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs, Tensor** outputs,
                     int num_outputs) {
     if (!model || !model->forward_fn || !inputs || !outputs) {
@@ -1251,6 +1268,7 @@ int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs, Tensor*
     return 0;
 }
 
+/** Close the model's dynamic library and free its shape metadata and handle. */
 void cml_aot_free(CMLAOTModel* model) {
     if (!model)
         return;
@@ -1274,6 +1292,10 @@ void cml_aot_free(CMLAOTModel* model) {
     free(model);
 }
 
+/**
+ * Write a C header declaring the generated forward function, inferring the
+ * input/output counts from the graph's unproduced-tensor leaves and tail node.
+ */
 int cml_aot_generate_header(CMLGraph_t ir, const char* header_path, const char* function_name) {
     if (!header_path) {
         LOG_ERROR("NULL header path");

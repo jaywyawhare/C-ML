@@ -1,5 +1,5 @@
 /*
- * selective_build.h — Link only the kernels required by a deployed model
+ * selective_build.h - Link only the kernels required by a deployed model
  *
  * ExecuTorch selective-build analogue: at compile or load time, restrict the
  * runtime to a subset of UOp kernels to reduce binary size on embedded targets.

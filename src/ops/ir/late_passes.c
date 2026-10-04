@@ -6,6 +6,7 @@
 
 #define MAX_WORKGROUP_EXTENT 256
 
+/** Grow the program's op array so at least `needed` more ops fit. */
 static int ensure_capacity(LinearProgram* prog, int needed) {
     if (prog->num_ops + needed <= prog->capacity)
         return 0;
@@ -20,6 +21,7 @@ static int ensure_capacity(LinearProgram* prog, int needed) {
     return 0;
 }
 
+/** Rewrite any source operand equal to `old_reg` to `new_reg`. */
 static void remap_srcs(LinearOp* op, int old_reg, int new_reg) {
     for (int s = 0; s < op->num_srcs; s++) {
         if (op->src_regs[s] == old_reg)
@@ -69,6 +71,7 @@ static int scalarize_op(struct LinearProgram* prog, int i, int lanes, bool remap
     return 0;
 }
 
+/** Lower every vec_width>1 op into scalar per-lane copies (loads, computes, and stores). */
 int cml_devectorize(struct LinearProgram* prog) {
     if (!prog)
         return -1;
@@ -117,6 +120,7 @@ int cml_devectorize(struct LinearProgram* prog) {
     return 0;
 }
 
+/** Split loops whose extent exceeds the max workgroup size into chunked sub-loops. */
 int cml_expand_groups(struct LinearProgram* prog) {
     if (!prog)
         return -1;
@@ -214,6 +218,7 @@ int cml_expand_groups(struct LinearProgram* prog) {
     return 0;
 }
 
+/** Run the late lowering passes in order: devectorize then expand oversized groups. */
 int cml_late_lower(struct LinearProgram* prog) {
     if (!prog)
         return -1;

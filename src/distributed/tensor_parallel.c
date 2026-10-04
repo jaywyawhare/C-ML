@@ -9,6 +9,9 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** Extract this rank's shard of a 2-D @p weight along @p dim (0 = rows, 1 =
+ * cols) into a fresh caller-owned tensor. The sharded dimension must divide
+ * evenly by @p tp_size; returns NULL on bad args or allocation failure. */
 Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank) {
     if (!weight) {
         LOG_ERROR("cml_tp_shard_weight: weight is NULL");
@@ -87,6 +90,9 @@ Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank) {
     }
 }
 
+/** Build a column-parallel linear layer by sharding @p full_weight (and bias)
+ * along the output dimension so each rank owns out_features/tp_size rows.
+ * out_features must divide by @p tp_size; returns NULL on error. */
 CMLColumnParallelLinear* cml_column_parallel_create(Tensor* full_weight, Tensor* full_bias,
                                                     int tp_size, int tp_rank) {
     if (!full_weight) {
@@ -173,6 +179,7 @@ CMLColumnParallelLinear* cml_column_parallel_create(Tensor* full_weight, Tensor*
     return cp;
 }
 
+/** Free a column-parallel layer and its sharded weight/bias tensors. */
 void cml_column_parallel_free(CMLColumnParallelLinear* cp) {
     if (!cp)
         return;
@@ -183,6 +190,9 @@ void cml_column_parallel_free(CMLColumnParallelLinear* cp) {
     cml_free(cp);
 }
 
+/** Forward a [batch, in_features] input through the local weight shard, yielding
+ * this rank's [batch, out_features/tp] output. Autograd-tracked; gather across
+ * ranks with cml_tp_all_gather to form the full output. */
 Tensor* cml_column_parallel_forward(CMLColumnParallelLinear* cp, Tensor* input) {
     if (!cp || !input) {
         LOG_ERROR("cml_column_parallel_forward: NULL argument");
@@ -216,12 +226,15 @@ Tensor* cml_column_parallel_forward(CMLColumnParallelLinear* cp, Tensor* input) 
     }
     /* Materialize at the layer boundary (a TP layer is a natural
      * communication/realization point). This keeps the autograd node intact for
-     * backward while giving callers a concrete activation to chain — matching
+     * backward while giving callers a concrete activation to chain - matching
      * the materialized-input contract the rest of the TP path expects. */
     tensor_ensure_executed(output);
     return output;
 }
 
+/** Build a row-parallel linear layer by sharding @p full_weight along the input
+ * dimension (in_features/tp_size cols per rank). The bias lives only on rank 0,
+ * since partials are summed later. in_features must divide by @p tp_size. */
 CMLRowParallelLinear* cml_row_parallel_create(Tensor* full_weight, Tensor* full_bias, int tp_size,
                                               int tp_rank) {
     if (!full_weight) {
@@ -306,6 +319,7 @@ CMLRowParallelLinear* cml_row_parallel_create(Tensor* full_weight, Tensor* full_
     return rp;
 }
 
+/** Free a row-parallel layer and its sharded weight/bias tensors. */
 void cml_row_parallel_free(CMLRowParallelLinear* rp) {
     if (!rp)
         return;
@@ -316,6 +330,9 @@ void cml_row_parallel_free(CMLRowParallelLinear* rp) {
     cml_free(rp);
 }
 
+/** Forward this rank's [batch, in_features/tp] input shard through the local
+ * weight, yielding a [batch, out_features] PARTIAL. Callers must all-reduce-sum
+ * the partials (cml_row_parallel_all_reduce) for the final result. */
 Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input) {
     if (!rp || !input) {
         LOG_ERROR("cml_row_parallel_forward: NULL argument");
@@ -340,7 +357,7 @@ Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input) {
     (void)local_in;
 
     /* Autograd-tracked partial: output = input_shard @ weight^T (+ bias on
-     * rank 0), shape [batch, out_features]. This is each rank's PARTIAL — the
+     * rank 0), shape [batch, out_features]. This is each rank's PARTIAL - the
      * caller must all-reduce-sum the partials across ranks (see
      * cml_row_parallel_all_reduce) for the final result. Built via uop_linear
      * so gradients flow back to the sharded `weight`. */
@@ -354,6 +371,9 @@ Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input) {
     return output;
 }
 
+/** Sum @p num_parts equally-shaped partial tensors into a new tensor. Local
+ * helper for single-process TP simulation; verifies shapes match and returns
+ * NULL on mismatch or allocation failure. */
 Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts) {
     if (!partials || num_parts <= 0) {
         LOG_ERROR("cml_tp_all_reduce_sum: invalid arguments");
@@ -422,6 +442,8 @@ Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts) {
     return result;
 }
 
+/** Concatenate column-parallel @p partials along @p dim into the full output, in
+ * rank order. Local helper for single-process TP simulation. */
 Tensor* cml_tp_all_gather(Tensor** partials, int num_parts, int dim) {
     if (!partials || num_parts <= 0) {
         LOG_ERROR("cml_tp_all_gather: invalid arguments");
@@ -439,6 +461,9 @@ Tensor* cml_tp_all_gather(Tensor** partials, int num_parts, int dim) {
     return tensor_concat(partials, num_parts, dim);
 }
 
+/** All-reduce-sum a row-parallel @p partial in place across the process group
+ * (no-op at world_size 1). The sum's gradient is identity per rank, so in-place
+ * reduction keeps per-rank weight gradients correct. */
 int cml_row_parallel_all_reduce(Tensor* partial) {
     if (!partial) {
         LOG_ERROR("cml_row_parallel_all_reduce: partial is NULL");

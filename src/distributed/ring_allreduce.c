@@ -9,8 +9,8 @@
  *
  * The naive "send to right, then recv from left" order deadlocks once a chunk
  * exceeds the kernel socket send buffer: every rank blocks in send() and nobody
- * is receiving. Ordering by rank parity breaks the cycle — even ranks send then
- * receive, odd ranks receive then send — so a blocking sender is always paired
+ * is receiving. Ordering by rank parity breaks the cycle - even ranks send then
+ * receive, odd ranks receive then send - so a blocking sender is always paired
  * with a peer that has already posted (or is about to post) the matching
  * receive. The send and recv buffers are disjoint here, so this is safe. */
 static int ring_sendrecv(DistCommOps* ops, Tensor* send_t, int right, Tensor* recv_t, int left,
@@ -27,6 +27,8 @@ static int ring_sendrecv(DistCommOps* ops, Tensor* send_t, int right, Tensor* re
     return ops->send(send_t, right, tag, ctx);
 }
 
+/** Fold @p src into @p dst element-wise under @p op (sum/avg accumulate; avg is
+ * scaled later once, after the ring completes). */
 static void apply_reduce_op(float* dst, const float* src, size_t n, DistReduceOp op) {
     for (size_t i = 0; i < n; i++) {
         switch (op) {
@@ -49,6 +51,10 @@ static void apply_reduce_op(float* dst, const float* src, size_t n, DistReduceOp
     }
 }
 
+/** Bandwidth-optimal ring all-reduce of @p data in place: a reduce-scatter phase
+ * followed by an all-gather phase, each world_size-1 steps over the @p ops
+ * send/recv pair. @p op's averaging, if any, is applied once at the end. Returns
+ * 0 on success, -1 on bad args or a transport error. */
 int cml_ring_allreduce(float* data, size_t count, int world_size, int rank, DistReduceOp op,
                        DistCommOps* ops, void* ctx) {
     if (!data || !ops || world_size <= 0 || rank < 0 || rank >= world_size)

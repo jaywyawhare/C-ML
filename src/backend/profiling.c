@@ -9,10 +9,12 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
+/** Convert a timespec to milliseconds. */
 static double timespec_to_ms(struct timespec* ts) {
     return (double)ts->tv_sec * 1000.0 + (double)ts->tv_nsec / 1000000.0;
 }
 
+/** Allocate a zeroed timer, copying the optional name. */
 Timer* profiler_timer_create(const char* name) {
     Timer* timer = cml_malloc(sizeof(Timer));
     if (!timer)
@@ -37,6 +39,7 @@ Timer* profiler_timer_create(const char* name) {
     return timer;
 }
 
+/** Free a timer and its name string. */
 void profiler_timer_free(Timer* timer) {
     if (!timer)
         return;
@@ -47,6 +50,7 @@ void profiler_timer_free(Timer* timer) {
     cml_free(timer);
 }
 
+/** Start (or restart) a timer from the monotonic clock. */
 int profiler_timer_start(Timer* timer) {
     if (!timer)
         return -1;
@@ -61,6 +65,7 @@ int profiler_timer_start(Timer* timer) {
     return 0;
 }
 
+/** Stop a running timer and return the elapsed milliseconds. */
 double profiler_timer_stop(Timer* timer) {
     if (!timer || !timer->is_running)
         return -1.0;
@@ -78,6 +83,7 @@ double profiler_timer_stop(Timer* timer) {
     return timer->elapsed_ms;
 }
 
+/** Elapsed milliseconds: live time if still running, else the recorded total. */
 double profiler_timer_elapsed(Timer* timer) {
     if (!timer)
         return -1.0;
@@ -96,6 +102,7 @@ double profiler_timer_elapsed(Timer* timer) {
     return current_ms - start_ms;
 }
 
+/** Clear a timer's times and running state. */
 void profiler_timer_reset(Timer* timer) {
     if (!timer)
         return;
@@ -108,6 +115,7 @@ void profiler_timer_reset(Timer* timer) {
     timer->is_running         = false;
 }
 
+/** Allocate an empty, enabled profiler with no timers. */
 Profiler* profiler_create(void) {
     Profiler* profiler = cml_malloc(sizeof(Profiler));
     if (!profiler)
@@ -121,6 +129,7 @@ Profiler* profiler_create(void) {
     return profiler;
 }
 
+/** Free a profiler and all timers it owns. */
 void profiler_free(Profiler* profiler) {
     if (!profiler)
         return;
@@ -137,12 +146,14 @@ void profiler_free(Profiler* profiler) {
     cml_free(profiler);
 }
 
+/** Enable or disable timing collection on the profiler. */
 void profiler_set_enabled(Profiler* profiler, bool enabled) {
     if (!profiler)
         return;
     profiler->enabled = enabled;
 }
 
+/** Start a named timer, growing the timer array as needed; returns its id. */
 int profiler_start(Profiler* profiler, const char* name) {
     if (!profiler || !name || !profiler->enabled)
         return -1;
@@ -174,6 +185,7 @@ int profiler_start(Profiler* profiler, const char* name) {
     return timer_id;
 }
 
+/** Stop the timer with the given id and return its elapsed milliseconds. */
 double profiler_stop(Profiler* profiler, int timer_id) {
     if (!profiler || timer_id < 0 || timer_id >= profiler->num_timers) {
         return -1.0;
@@ -186,6 +198,7 @@ double profiler_stop(Profiler* profiler, int timer_id) {
     return profiler_timer_stop(timer);
 }
 
+/** Print a per-timer timing table with the total across all timers. */
 void profiler_print_report(Profiler* profiler) {
     if (!profiler)
         return;
@@ -207,6 +220,7 @@ void profiler_print_report(Profiler* profiler) {
     printf("\n");
 }
 
+/** Sum the elapsed time of every timer matching the given name. */
 double profiler_get_total_time(Profiler* profiler, const char* name) {
     if (!profiler || !name)
         return -1.0;

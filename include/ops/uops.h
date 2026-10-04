@@ -244,7 +244,7 @@ typedef enum {
      * eager tensors so the VJP can gather/scatter with the primitive uops. */
     UOP_SPMM, // C = A_coo @ B  (SpMMParams)
 
-    UOP_FLIP, // reverse along dimension (FlipParams) — appended here to
+    UOP_FLIP, // reverse along dimension (FlipParams) - appended here to
               // keep existing UOp enum values stable
 
     UOP_COUNT // Total count
@@ -748,7 +748,7 @@ typedef struct {
     int output_len;  // length of the reconstructed (folded) last axis
 } FoldParams;
 
-/* Sparse COO @ dense matmul: only the dense output extent [M, K] — the
+/* Sparse COO @ dense matmul: only the dense output extent [M, K] - the
  * coordinate columns travel as eager input tensors (see UOP_SPMM). */
 typedef struct {
     int M; // rows of the sparse operand

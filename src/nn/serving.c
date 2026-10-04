@@ -8,12 +8,14 @@
 #include <time.h>
 #include "alloc/cml_allocator.h"
 
+/** Monotonic clock reading in milliseconds, for request timing stats. */
 static double serving_time_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1.0e6;
 }
 
+/** Find a request by id across both the pending queue and the active batch. */
 static CMLSequenceRequest* find_request(CMLServingContext* ctx, int request_id) {
     if (!ctx)
         return NULL;
@@ -36,6 +38,7 @@ static CMLSequenceRequest* find_request(CMLServingContext* ctx, int request_id) 
     return NULL;
 }
 
+/** Free a request and its prompt/generated token buffers. */
 static void free_request(CMLSequenceRequest* req) {
     if (!req)
         return;
@@ -44,6 +47,7 @@ static void free_request(CMLSequenceRequest* req) {
     cml_free(req);
 }
 
+/** Default serving config (batch 8, queue 256, 2048 ctx, temp 0.8, top-p 0.9). */
 CMLServingConfig cml_serving_default_config(void) {
     CMLServingConfig config = {
         .max_batch_size         = 8,
@@ -56,6 +60,8 @@ CMLServingConfig cml_serving_default_config(void) {
     return config;
 }
 
+/** Create a serving context: allocate the request queue and active-batch arrays, clamping
+ * limits. */
 CMLServingContext* cml_serving_create(const CMLServingConfig* config) {
     if (!config) {
         LOG_ERROR("cml_serving_create: NULL config");
@@ -114,6 +120,7 @@ CMLServingContext* cml_serving_create(const CMLServingConfig* config) {
     return ctx;
 }
 
+/** Free the context and every queued or active request it still holds. */
 void cml_serving_free(CMLServingContext* ctx) {
     if (!ctx)
         return;
@@ -138,6 +145,7 @@ void cml_serving_free(CMLServingContext* ctx) {
     cml_free(ctx);
 }
 
+/** Attach a paged KV cache (not owned) to the serving context. */
 void cml_serving_set_kv_cache(CMLServingContext* ctx, CMLPagedKVCache* cache) {
     if (!ctx)
         return;
@@ -145,6 +153,7 @@ void cml_serving_set_kv_cache(CMLServingContext* ctx, CMLPagedKVCache* cache) {
     LOG_INFO("Paged KV cache set on serving context");
 }
 
+/** Attach the model forward callback plus its vocab size and EOS id used during decoding. */
 void cml_serving_set_model(CMLServingContext* ctx, CMLServingForwardFn forward_fn, void* model,
                            int vocab_size, int eos_token_id) {
     if (!ctx)
@@ -157,8 +166,9 @@ void cml_serving_set_model(CMLServingContext* ctx, CMLServingForwardFn forward_f
 }
 
 /* xorshift RNG for stochastic sampling (per-context determinism not required;
- * greedy decoding — temperature <= 0 — is fully deterministic). */
+ * greedy decoding - temperature <= 0 - is fully deterministic). */
 static uint32_t serving_rng_state = 0x2545F491u;
+/** Next uniform float in [0,1) from the xorshift state. */
 static float serving_rand_uniform(void) {
     uint32_t x = serving_rng_state;
     x ^= x << 13;
@@ -168,6 +178,7 @@ static float serving_rand_uniform(void) {
     return (float)(x & 0xffffff) / (float)0x1000000;
 }
 
+/** Index of the largest logit among `n` values. */
 static int serving_argmax(const float* logits, int n) {
     int best = 0;
     float bv = logits[0];
@@ -305,6 +316,7 @@ static int serving_generate_one(CMLServingContext* ctx, CMLSequenceRequest* req)
     return 0;
 }
 
+/** Enqueue a new generation request (prompt copied in); returns its request id or -1. */
 int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens, int num_tokens,
                        int max_new_tokens) {
     if (!ctx) {
@@ -375,6 +387,11 @@ int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens, int num
     return req->request_id;
 }
 
+/**
+ * Advance one scheduler step: admit queued requests into the batch, move them
+ * through prefill to decoding, and generate one token per active sequence
+ * (continuous batching). Returns the current batch size.
+ */
 int cml_serving_step(CMLServingContext* ctx) {
     if (!ctx)
         return 0;
@@ -424,6 +441,7 @@ int cml_serving_step(CMLServingContext* ctx) {
     return ctx->batch_size;
 }
 
+/** Current status of a request, or CML_SEQ_STATUS_ERROR if unknown. */
 CMLSequenceStatus cml_serving_get_status(CMLServingContext* ctx, int request_id) {
     CMLSequenceRequest* req = find_request(ctx, request_id);
     if (!req)
@@ -431,6 +449,7 @@ CMLSequenceStatus cml_serving_get_status(CMLServingContext* ctx, int request_id)
     return req->status;
 }
 
+/** Borrowed pointer to a request's generated tokens; count returned via `out_count`. */
 const int* cml_serving_get_tokens(CMLServingContext* ctx, int request_id, int* out_count) {
     if (out_count)
         *out_count = 0;
@@ -442,6 +461,8 @@ const int* cml_serving_get_tokens(CMLServingContext* ctx, int request_id, int* o
     return req->generated_tokens;
 }
 
+/** Finalize an active request: update timing/throughput stats, free it, and evict it from
+ * the batch. */
 int cml_serving_finish_request(CMLServingContext* ctx, int request_id) {
     if (!ctx)
         return -1;
@@ -499,6 +520,7 @@ int cml_serving_finish_request(CMLServingContext* ctx, int request_id) {
     return 0;
 }
 
+/** Snapshot of the context's aggregate serving statistics (zeroed if ctx is NULL). */
 CMLServingStats cml_serving_get_stats(const CMLServingContext* ctx) {
     if (!ctx) {
         CMLServingStats empty = {0};

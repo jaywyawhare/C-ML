@@ -82,6 +82,7 @@ static bool g_opencl_init_attempted         = false;
 static CMLDispatchContext* g_dispatch_ctx           = NULL;
 static CMLHCQQueue* g_hcq_queues[CML_BACKEND_COUNT] = {0};
 
+/** Map a dispatch backend enum to its HCQ queue type (CPU backends have none). */
 static CMLHCQBackendType dispatch_backend_to_hcq(CMLBackendType backend) {
     switch (backend) {
     case CML_BACKEND_CUDA:
@@ -101,10 +102,12 @@ static CMLHCQBackendType dispatch_backend_to_hcq(CMLBackendType backend) {
     }
 }
 
+/** True when `backend` uses a hardware command queue (any non-CPU GPU backend). */
 static bool dispatch_backend_has_hcq(CMLBackendType backend) {
     return dispatch_backend_to_hcq(backend) != CML_HCQ_CPU;
 }
 
+/** Destroy and clear all lazily-created per-backend HCQ queues. */
 static void dispatch_destroy_hcq_queues(void) {
     for (int i = 0; i < CML_BACKEND_COUNT; i++) {
         if (g_hcq_queues[i]) {
@@ -133,6 +136,8 @@ static const char* backend_descriptions[] = {
     "OpenCL GPU compute",
 };
 
+/** Allocate a dispatch context with the CPU fallback available and the GPU-first fallback
+ *  chain primed; backends are not yet probed (see cml_dispatch_init). */
 CMLDispatchContext* cml_dispatch_create(void) {
     CMLDispatchContext* ctx = (CMLDispatchContext*)cml_calloc(1, sizeof(CMLDispatchContext));
     if (!ctx) {
@@ -174,6 +179,8 @@ CMLDispatchContext* cml_dispatch_create(void) {
     return ctx;
 }
 
+/** Detect backends, pick the best active one, apply the BACKEND env override, and create the
+ *  kernel cache. Returns 0 on success, -1 on NULL ctx. */
 int cml_dispatch_init(CMLDispatchContext* ctx) {
     if (!ctx)
         return -1;
@@ -193,6 +200,8 @@ int cml_dispatch_init(CMLDispatchContext* ctx) {
     return 0;
 }
 
+/** Free the context, its kernel cache, and every initialized global backend/driver and HCQ
+ *  queue; clears the global pointer if this was the global context. */
 void cml_dispatch_free(CMLDispatchContext* ctx) {
     if (!ctx)
         return;
@@ -247,6 +256,7 @@ void cml_dispatch_free(CMLDispatchContext* ctx) {
         g_dispatch_ctx = NULL;
 }
 
+/** Lazily create and initialize the process-wide dispatch context. */
 CMLDispatchContext* cml_dispatch_get_global(void) {
     if (!g_dispatch_ctx) {
         g_dispatch_ctx = cml_dispatch_create();
@@ -257,6 +267,8 @@ CMLDispatchContext* cml_dispatch_get_global(void) {
     return g_dispatch_ctx;
 }
 
+/** Probe every compiled-in backend, initializing those present and marking their status;
+ *  returns the count of available backends (CPU fallback always counts 1). */
 int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
     if (!ctx)
         return 0;
@@ -464,6 +476,7 @@ int cml_dispatch_detect_backends(CMLDispatchContext* ctx) {
     return available;
 }
 
+/** Set the preferred backend, switching the active one to it if it is available. */
 int cml_dispatch_set_preferred(CMLDispatchContext* ctx, CMLBackendType backend) {
     if (!ctx || backend >= CML_BACKEND_COUNT)
         return -1;
@@ -474,6 +487,7 @@ int cml_dispatch_set_preferred(CMLDispatchContext* ctx, CMLBackendType backend) 
     return 0;
 }
 
+/** Return the cached info record for `backend`, or NULL if out of range. */
 const CMLBackendInfo* cml_dispatch_get_backend_info(CMLDispatchContext* ctx,
                                                     CMLBackendType backend) {
     if (!ctx || backend >= CML_BACKEND_COUNT)
@@ -481,12 +495,15 @@ const CMLBackendInfo* cml_dispatch_get_backend_info(CMLDispatchContext* ctx,
     return &ctx->backends[backend];
 }
 
+/** True when `backend` has reached at least AVAILABLE status. */
 bool cml_dispatch_backend_available(CMLDispatchContext* ctx, CMLBackendType backend) {
     if (!ctx || backend >= CML_BACKEND_COUNT)
         return false;
     return ctx->backends[backend].status >= CML_BACKEND_STATUS_AVAILABLE;
 }
 
+/** Pick the highest-priority available backend: hardware GPUs first, then LLVM JIT, then
+ *  software GPU backends, falling back to the CPU interpreter. */
 CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx) {
     if (!ctx)
         return CML_BACKEND_CPU_FALLBACK;
@@ -498,7 +515,7 @@ CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx) {
      * when tensors are on a GPU device.
      */
 
-    /* GPU backends — only beneficial when data is already on device */
+    /* GPU backends - only beneficial when data is already on device */
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_NV))
         return CML_BACKEND_NV;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_CUDA))
@@ -514,11 +531,11 @@ CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx) {
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_METAL))
         return CML_BACKEND_METAL;
 
-    /* CPU backends — prefer LLVM JIT over software Vulkan/WebGPU */
+    /* CPU backends - prefer LLVM JIT over software Vulkan/WebGPU */
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_CPU_LLVM))
         return CML_BACKEND_CPU_LLVM;
 
-    /* Software GPU backends — last resort before pure fallback */
+    /* Software GPU backends - last resort before pure fallback */
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_VULKAN))
         return CML_BACKEND_VULKAN;
     if (cml_dispatch_backend_available(ctx, CML_BACKEND_WEBGPU))
@@ -527,12 +544,15 @@ CMLBackendType cml_dispatch_get_best_backend(CMLDispatchContext* ctx) {
     return CML_BACKEND_CPU_FALLBACK;
 }
 
+/** Human-readable name for a backend enum ("Unknown" if out of range). */
 const char* cml_dispatch_backend_name(CMLBackendType backend) {
     if (backend >= CML_BACKEND_COUNT)
         return "Unknown";
     return backend_names[backend];
 }
 
+/** Execute the IR graph on a specific backend, selecting the matching codegen/driver path
+ *  (with PTX fallback for CUDA). Returns 0 on success, -1 on failure. */
 int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CMLGraph_t ir,
                             Tensor** inputs, int nin, Tensor** outputs, int nout) {
     /* inputs/outputs are accepted for signature parity with
@@ -783,6 +803,8 @@ int cml_dispatch_execute_on(CMLDispatchContext* ctx, CMLBackendType backend, CML
     }
 }
 
+/** Async entry point; graph execution is still synchronous, so this defers to
+ *  cml_dispatch_execute (HCQ queues cover async memcpy/submit on GPU backends). */
 int cml_dispatch_execute_async(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** inputs,
                                int num_inputs, Tensor** outputs, int num_outputs) {
     /* Graph execution is still synchronous; HCQ queues are used for memcpy,
@@ -790,6 +812,8 @@ int cml_dispatch_execute_async(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** 
     return cml_dispatch_execute(ctx, ir, inputs, num_inputs, outputs, num_outputs);
 }
 
+/** Execute on the active backend, then walk the fallback chain on failure. Returns 0 if any
+ *  backend succeeds, -1 if all fail. */
 int cml_dispatch_execute(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** inputs, int nin,
                          Tensor** outputs, int nout) {
     if (!ctx)
@@ -822,6 +846,8 @@ int cml_dispatch_execute(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** inputs
     return -1;
 }
 
+/** Choose a backend for `ir` from its tensors' device residency (CUDA/ROCm), else the
+ *  preferred backend, else the best available. */
 CMLBackendType cml_dispatch_select_backend(CMLDispatchContext* ctx, CMLGraph_t ir) {
     if (!ctx || !ir)
         return CML_BACKEND_CPU_FALLBACK;
@@ -849,6 +875,7 @@ CMLBackendType cml_dispatch_select_backend(CMLDispatchContext* ctx, CMLGraph_t i
     return cml_dispatch_get_best_backend(ctx);
 }
 
+/** (Re)create the kernel cache with `max_entries` capacity. Returns 0 on success. */
 int cml_dispatch_enable_cache(CMLDispatchContext* ctx, size_t max_entries) {
     if (!ctx)
         return -1;
@@ -858,6 +885,7 @@ int cml_dispatch_enable_cache(CMLDispatchContext* ctx, size_t max_entries) {
     return ctx->cache ? 0 : -1;
 }
 
+/** Free and detach the kernel cache. */
 void cml_dispatch_disable_cache(CMLDispatchContext* ctx) {
     if (!ctx || !ctx->cache)
         return;
@@ -865,12 +893,14 @@ void cml_dispatch_disable_cache(CMLDispatchContext* ctx) {
     ctx->cache = NULL;
 }
 
+/** Drop all cached kernels without destroying the cache. */
 void cml_dispatch_clear_cache(CMLDispatchContext* ctx) {
     if (!ctx || !ctx->cache)
         return;
     kernel_cache_clear((CMLKernelCache*)ctx->cache);
 }
 
+/** Report hit/miss counts and cache size, from the live kernel cache when present. */
 void cml_dispatch_cache_stats(CMLDispatchContext* ctx, size_t* hits, size_t* misses, size_t* size) {
     if (!ctx)
         return;
@@ -887,6 +917,7 @@ void cml_dispatch_cache_stats(CMLDispatchContext* ctx, size_t* hits, size_t* mis
     }
 }
 
+/** Print the context's backend table and execution statistics to stdout. */
 void cml_dispatch_print_status(CMLDispatchContext* ctx) {
     if (!ctx) {
         printf("Dispatch context: NULL\n");
@@ -932,6 +963,7 @@ void cml_dispatch_print_status(CMLDispatchContext* ctx) {
     printf("\n");
 }
 
+/** Block until all initialized backends and their HCQ queues finish pending work. */
 void cml_dispatch_synchronize(CMLDispatchContext* ctx) {
     if (!ctx)
         return;
@@ -956,8 +988,10 @@ void cml_dispatch_synchronize(CMLDispatchContext* ctx) {
     }
 }
 
+/** Accessor for the global CUDA backend (NULL if uninitialized). */
 struct CMLCUDABackend* cml_dispatch_get_cuda_backend(void) { return g_cuda_backend; }
 
+/** Accessor for the global Vulkan backend (NULL if unavailable). */
 struct CMLVulkanBackend* cml_dispatch_get_vulkan_backend(void) {
 #ifdef CML_HAS_VULKAN
     return g_vulkan_backend;
@@ -966,6 +1000,7 @@ struct CMLVulkanBackend* cml_dispatch_get_vulkan_backend(void) {
 #endif
 }
 
+/** Accessor for the global NV userspace driver (NULL if unavailable). */
 struct CMLNVDriver* cml_dispatch_get_nv_driver(void) {
 #ifdef CML_HAS_NV_DRIVER
     return g_nv_driver;
@@ -974,6 +1009,7 @@ struct CMLNVDriver* cml_dispatch_get_nv_driver(void) {
 #endif
 }
 
+/** Accessor for the global AM userspace driver (NULL if unavailable). */
 struct CMLAMDriver* cml_dispatch_get_am_driver(void) {
 #ifdef CML_HAS_AM_DRIVER
     return g_am_driver;
@@ -982,6 +1018,7 @@ struct CMLAMDriver* cml_dispatch_get_am_driver(void) {
 #endif
 }
 
+/** Accessor for the global OpenCL IR backend (NULL if unavailable). */
 struct CMLOpenCLIRBackend* cml_dispatch_get_opencl_backend(void) {
 #ifdef CML_HAS_OPENCL
     return g_opencl_backend;
@@ -990,6 +1027,7 @@ struct CMLOpenCLIRBackend* cml_dispatch_get_opencl_backend(void) {
 #endif
 }
 
+/** Return (lazily creating) the HCQ queue for `backend`, or NULL if it has none. */
 CMLHCQQueue* cml_dispatch_get_hcq_queue(CMLBackendType backend) {
     if (backend < 0 || backend >= CML_BACKEND_COUNT)
         return NULL;
@@ -1002,6 +1040,8 @@ CMLHCQQueue* cml_dispatch_get_hcq_queue(CMLBackendType backend) {
     return g_hcq_queues[backend];
 }
 
+/** Execute via the TinyJit capture-and-replay trace, falling back to regular dispatch when
+ *  the traced path is unavailable. */
 int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** inputs,
                              int num_inputs, Tensor** outputs, int num_outputs) {
     /*
@@ -1034,6 +1074,8 @@ int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** in
     return cml_dispatch_execute(ctx, ir, inputs, num_inputs, outputs, num_outputs);
 }
 
+/** Apply the BACKEND environment variable as the preferred backend; returns 0 when unset or
+ *  applied, -1 on an unknown value. */
 int cml_dispatch_set_from_env(CMLDispatchContext* ctx) {
     if (!ctx)
         return -1;

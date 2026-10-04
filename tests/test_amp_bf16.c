@@ -22,7 +22,7 @@ static DType amp_env_expected_dtype(void) {
 
 /* Tiny linear layer y = w·x trained under bf16 autocast. The forward runs in
  * bf16 (cast-in), gradients come back through the bf16 graph, and the fp32
- * master weight is updated manually — the canonical AMP loop without an
+ * master weight is updated manually - the canonical AMP loop without an
  * optimizer, so the test isolates autocast/scaler behavior. */
 static int test_bf16_training(void) {
     if (autocast_is_enabled())
@@ -46,7 +46,7 @@ static int test_bf16_training(void) {
     /* Each epoch is a self-contained graph: rebuild the (tiny) inputs from the
      * fp32 master weight, run forward/backward, read the gradient, then reset
      * the IR context. Persisting the tensors across epochs instead makes the
-     * autograd graph accumulate (replay cost goes quadratic — minutes of
+     * autograd graph accumulate (replay cost goes quadratic - minutes of
      * runtime) and leaves a bf16 grad that the next backward would try to
      * accumulate into (bf16 has no elementwise-add kernel → crash). */
     for (int epoch = 0; epoch < 300 && grads_finite; epoch++) {
@@ -178,7 +178,7 @@ static int test_scaler_noop_under_bf16(void) {
     Tensor* scaled = grad_scaler_scale(scaler, loss);
     bool noop      = (scaled == loss);
 
-    /* unscale divides by 1.0 under bf16 — values unchanged */
+    /* unscale divides by 1.0 under bf16 - values unchanged */
     Parameter param      = {.tensor = loss, .requires_grad = true, .name = NULL};
     Parameter* params[1] = {&param};
     loss->grad           = grad;

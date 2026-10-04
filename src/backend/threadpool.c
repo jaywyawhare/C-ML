@@ -18,7 +18,7 @@
  * Fork/join thread pool built around a single "generation" broadcast plus
  * atomic chunk claiming. The previous implementation had two independent,
  * mutually-inconsistent code paths (a task queue the workers serviced, and a
- * parallel_for that signalled a condition the workers never waited on) — its
+ * parallel_for that signalled a condition the workers never waited on) - its
  * fork path deadlocked and its queue path could double-process a chunk. It only
  * ever appeared to work because callers fell back to running serially.
  *
@@ -59,7 +59,7 @@ struct ThreadPool {
     _Atomic uint64_t claim; /* (generation << 32) | next chunk index  */
     /* (generation << 32) | completed-chunk count for THAT generation. Packing
      * matters: a straggler finishing a chunk of batch N while batch N+1 is
-     * live must not count toward N+1 — an unpacked counter let stale
+     * live must not count toward N+1 - an unpacked counter let stale
      * completions release the submitter before every chunk had run
      * (use-after-free / hang). */
     _Atomic uint64_t done; /* (generation << 32) | chunks finished   */
@@ -71,10 +71,12 @@ static pthread_mutex_t g_pool_lock;
 static bool g_pool_lock_initialized = false;
 static ThreadPool* g_global_pool    = NULL;
 
+/** Acquire the global-pool lock if it has been initialized. */
 static inline void pool_lock(void) {
     if (g_pool_lock_initialized)
         pthread_mutex_lock(&g_pool_lock);
 }
+/** Release the global-pool lock if it has been initialized. */
 static inline void pool_unlock(void) {
     if (g_pool_lock_initialized)
         pthread_mutex_unlock(&g_pool_lock);
@@ -107,7 +109,7 @@ static Batch batch_snapshot(const ThreadPool* pool) {
 
 /* Run one chunk index against `b` (no-op for empty tail chunks), then record
  * the completion generation-tagged. A straggler whose batch has moved on finds
- * a done-word with a different generation and drops the increment — it must
+ * a done-word with a different generation and drops the increment - it must
  * not release a submitter waiting on a newer batch. */
 static void run_chunk(ThreadPool* pool, const Batch* b, size_t c) {
     size_t start = c * b->chunk;
@@ -153,6 +155,8 @@ static void drain_chunks(ThreadPool* pool, const Batch* b) {
     }
 }
 
+/** Worker loop: wait for each new generation, snapshot the batch, and drain its
+ *  chunks, advancing one generation at a time; exits on shutdown. */
 static void* worker_thread(void* arg) {
     ThreadPool* pool  = (ThreadPool*)arg;
     uint64_t last_gen = 0;
@@ -178,6 +182,8 @@ static void* worker_thread(void* arg) {
     return NULL;
 }
 
+/** Create a pool of num_threads workers (0 = autodetect cores), spawning one
+ *  fewer OS thread since the submitter participates in every batch. */
 ThreadPool* threadpool_create(size_t num_threads) {
     if (num_threads == 0) {
 #ifdef _WIN32
@@ -223,6 +229,7 @@ ThreadPool* threadpool_create(size_t num_threads) {
     return pool;
 }
 
+/** Signal shutdown, join all worker threads, and free the pool. */
 void threadpool_destroy(ThreadPool* pool) {
     if (!pool)
         return;
@@ -244,6 +251,8 @@ void threadpool_destroy(ThreadPool* pool) {
     cml_free(pool);
 }
 
+/** Split [0,n) into one contiguous chunk per worker, run func across them, and
+ *  block until the whole batch (this generation) completes. */
 void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t n) {
     if (!pool)
         pool = threadpool_get_global();
@@ -288,10 +297,13 @@ int threadpool_submit(ThreadPool* pool, Task* task) {
     threadpool_parallel_for(pool, task->func, task->data, task->total_size);
     return 0;
 }
+/** No-op: submit already runs synchronously, so there is nothing to wait on. */
 void threadpool_wait(ThreadPool* pool) { (void)pool; }
 
+/** Number of workers (including the submitter) in the pool. */
 size_t threadpool_get_num_threads(ThreadPool* pool) { return pool ? pool->num_threads : 0; }
 
+/** Return the process-wide pool, creating it on first use. */
 ThreadPool* threadpool_get_global(void) {
     if (!g_pool_lock_initialized) {
         pthread_mutex_init(&g_pool_lock, NULL);
@@ -305,6 +317,7 @@ ThreadPool* threadpool_get_global(void) {
     return result;
 }
 
+/** Install a pool as the global one, destroying any previous global pool. */
 void threadpool_set_global(ThreadPool* pool) {
     if (!g_pool_lock_initialized) {
         pthread_mutex_init(&g_pool_lock, NULL);

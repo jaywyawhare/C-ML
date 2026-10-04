@@ -20,6 +20,7 @@
 #endif
 
 #if defined(__linux__) || defined(__APPLE__)
+/** dlopen a shared library, logging on failure (POSIX). */
 static void* wgpu_load_library(const char* name) {
     void* lib = dlopen(name, RTLD_LAZY | RTLD_LOCAL);
     if (!lib) {
@@ -28,13 +29,16 @@ static void* wgpu_load_library(const char* name) {
     return lib;
 }
 
+/** Resolve a symbol from a loaded library (POSIX). */
 static void* wgpu_get_symbol(void* lib, const char* name) { return dlsym(lib, name); }
 
+/** Close a loaded library (POSIX). */
 static void wgpu_unload_library(void* lib) {
     if (lib)
         dlclose(lib);
 }
 #elif defined(_WIN32)
+/** Load a DLL, logging on failure (Windows). */
 static void* wgpu_load_library(const char* name) {
     HMODULE lib = LoadLibraryA(name);
     if (!lib) {
@@ -43,24 +47,29 @@ static void* wgpu_load_library(const char* name) {
     return (void*)lib;
 }
 
+/** Resolve a symbol from a loaded DLL (Windows). */
 static void* wgpu_get_symbol(void* lib, const char* name) {
     return (void*)GetProcAddress((HMODULE)lib, name);
 }
 
+/** Close a loaded DLL (Windows). */
 static void wgpu_unload_library(void* lib) {
     if (lib)
         FreeLibrary((HMODULE)lib);
 }
 #else
+/** Stub library loader for platforms without dynamic loading. */
 static void* wgpu_load_library(const char* name) {
     (void)name;
     return NULL;
 }
+/** Stub symbol resolver for platforms without dynamic loading. */
 static void* wgpu_get_symbol(void* lib, const char* name) {
     (void)lib;
     (void)name;
     return NULL;
 }
+/** Stub library unloader for platforms without dynamic loading. */
 static void wgpu_unload_library(void* lib) { (void)lib; }
 #endif
 
@@ -102,6 +111,7 @@ typedef struct {
     bool done;
 } AdapterUserData;
 
+/** Completion callback for async adapter requests; stores the adapter and sets done. */
 static void adapter_request_cb(WGPURequestAdapterStatus status, WGPUAdapter adapter,
                                const char* message, void* userdata) {
     AdapterUserData* ud = (AdapterUserData*)userdata;
@@ -119,6 +129,7 @@ typedef struct {
     bool done;
 } DeviceUserData;
 
+/** Completion callback for async device requests; stores the device and sets done. */
 static void device_request_cb(WGPURequestDeviceStatus status, WGPUDevice device,
                               const char* message, void* userdata) {
     DeviceUserData* ud = (DeviceUserData*)userdata;
@@ -136,12 +147,14 @@ typedef struct {
     bool done;
 } MapUserData;
 
+/** Completion callback for async buffer mapping; records success and sets done. */
 static void buffer_map_cb(WGPUBufferMapAsyncStatus status, void* userdata) {
     MapUserData* ud = (MapUserData*)userdata;
     ud->success     = (status == WGPUBufferMapAsyncStatus_Success);
     ud->done        = true;
 }
 
+/** Probe for wgpu-native by loading the library and checking for wgpuCreateInstance. */
 bool cml_webgpu_available(void) {
 #ifndef WGPU_LIB_NAME
     return false;
@@ -156,6 +169,7 @@ bool cml_webgpu_available(void) {
 #endif
 }
 
+/** Allocate the backend, load wgpu-native, and resolve its WebGPU entry-point symbols. */
 CMLWebGPUBackend* cml_webgpu_backend_create(void) {
     CMLWebGPUBackend* backend = (CMLWebGPUBackend*)cml_calloc(1, sizeof(CMLWebGPUBackend));
     if (!backend) {
@@ -213,6 +227,7 @@ CMLWebGPUBackend* cml_webgpu_backend_create(void) {
 #endif /* WGPU_LIB_NAME */
 }
 
+/** Create the instance, request an adapter and device, and acquire the default queue. */
 int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
     if (!backend)
         return -1;
@@ -298,6 +313,7 @@ int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
     return 0;
 }
 
+/** Release the WebGPU instance, unload the library, and free the backend. */
 void cml_webgpu_backend_free(CMLWebGPUBackend* backend) {
     if (!backend)
         return;
@@ -329,6 +345,7 @@ void cml_webgpu_backend_free(CMLWebGPUBackend* backend) {
     cml_free(backend);
 }
 
+/** Compile WGSL into a shader module and auto-layout compute pipeline wrapped as a kernel. */
 CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend, const char* wgsl_source,
                                          const char* entry_point) {
     if (!backend || !backend->initialized || !wgsl_source || !entry_point) {
@@ -450,6 +467,7 @@ CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend, const char* 
     return kernel;
 }
 
+/** Free the kernel wrapper; the pipeline/module are reference-counted by wgpu-native. */
 void cml_webgpu_kernel_free(CMLWebGPUKernel* kernel) {
     if (!kernel)
         return;
@@ -460,6 +478,7 @@ void cml_webgpu_kernel_free(CMLWebGPUKernel* kernel) {
     cml_free(kernel);
 }
 
+/** Bind buffers, encode a compute pass dispatching `workgroup_count` groups, submit, and wait. */
 int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend, CMLWebGPUKernel* kernel,
                              size_t workgroup_count[3], void** buffers, size_t* buffer_sizes,
                              int num_buffers) {
@@ -593,6 +612,7 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend, CMLWebGPUKernel* kernel,
     return 0;
 }
 
+/** Create a storage buffer (STORAGE|COPY_SRC|COPY_DST) of `size` bytes. */
 void* cml_webgpu_alloc(CMLWebGPUBackend* backend, size_t size) {
     if (!backend || !backend->initialized || size == 0)
         return NULL;
@@ -627,6 +647,7 @@ void* cml_webgpu_alloc(CMLWebGPUBackend* backend, size_t size) {
     return buffer;
 }
 
+/** Destroy a WebGPU buffer. */
 void cml_webgpu_free(CMLWebGPUBackend* backend, void* buffer) {
     if (!backend || !buffer)
         return;
@@ -638,6 +659,7 @@ void cml_webgpu_free(CMLWebGPUBackend* backend, void* buffer) {
     }
 }
 
+/** Upload host data into a device buffer via the queue's write-buffer path. */
 int cml_webgpu_upload(CMLWebGPUBackend* backend, void* dst_buffer, const void* src_host,
                       size_t size) {
     if (!backend || !backend->initialized || !dst_buffer || !src_host || size == 0)
@@ -654,6 +676,7 @@ int cml_webgpu_upload(CMLWebGPUBackend* backend, void* dst_buffer, const void* s
     return 0;
 }
 
+/** Download device data via a MAP_READ staging buffer: copy, map, memcpy, unmap, destroy. */
 int cml_webgpu_download(CMLWebGPUBackend* backend, void* dst_host, void* src_buffer, size_t size) {
     if (!backend || !backend->initialized || !dst_host || !src_buffer || size == 0)
         return -1;
@@ -778,17 +801,22 @@ int cml_webgpu_download(CMLWebGPUBackend* backend, void* dst_host, void* src_buf
 
 #else /* !CML_HAS_WEBGPU */
 
+/** Fallback: WebGPU is never available when the backend is not compiled in. */
 bool cml_webgpu_available(void) { return false; }
 
+/** Fallback stub when WebGPU support is not compiled in. */
 CMLWebGPUBackend* cml_webgpu_backend_create(void) { return NULL; }
 
+/** Fallback stub when WebGPU support is not compiled in. */
 int cml_webgpu_backend_init(CMLWebGPUBackend* backend) {
     (void)backend;
     return -1;
 }
 
+/** Fallback stub when WebGPU support is not compiled in. */
 void cml_webgpu_backend_free(CMLWebGPUBackend* backend) { (void)backend; }
 
+/** Fallback stub when WebGPU support is not compiled in. */
 CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend, const char* wgsl_source,
                                          const char* entry_point) {
     (void)backend;
@@ -797,8 +825,10 @@ CMLWebGPUKernel* cml_webgpu_compile_wgsl(CMLWebGPUBackend* backend, const char* 
     return NULL;
 }
 
+/** Fallback stub when WebGPU support is not compiled in. */
 void cml_webgpu_kernel_free(CMLWebGPUKernel* kernel) { (void)kernel; }
 
+/** Fallback stub when WebGPU support is not compiled in. */
 int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend, CMLWebGPUKernel* kernel,
                              size_t workgroup_count[3], void** buffers, size_t* buffer_sizes,
                              int num_buffers) {
@@ -811,17 +841,20 @@ int cml_webgpu_launch_kernel(CMLWebGPUBackend* backend, CMLWebGPUKernel* kernel,
     return -1;
 }
 
+/** Fallback stub when WebGPU support is not compiled in. */
 void* cml_webgpu_alloc(CMLWebGPUBackend* backend, size_t size) {
     (void)backend;
     (void)size;
     return NULL;
 }
 
+/** Fallback stub when WebGPU support is not compiled in. */
 void cml_webgpu_free(CMLWebGPUBackend* backend, void* buffer) {
     (void)backend;
     (void)buffer;
 }
 
+/** Fallback stub when WebGPU support is not compiled in. */
 int cml_webgpu_upload(CMLWebGPUBackend* backend, void* dst_buffer, const void* src_host,
                       size_t size) {
     (void)backend;
@@ -831,6 +864,7 @@ int cml_webgpu_upload(CMLWebGPUBackend* backend, void* dst_buffer, const void* s
     return -1;
 }
 
+/** Fallback stub when WebGPU support is not compiled in. */
 int cml_webgpu_download(CMLWebGPUBackend* backend, void* dst_host, void* src_buffer, size_t size) {
     (void)backend;
     (void)dst_host;

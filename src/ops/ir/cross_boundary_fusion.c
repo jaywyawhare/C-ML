@@ -160,6 +160,7 @@ static bool output_only_consumed_by_backward(struct IRNode* fwd_node) {
     return fwd_node->use_count > 0;
 }
 
+/** Locate a node in the schedule, encoding its position as group*1000 + node index. */
 static int find_node_index_in_schedule(CMLFusionSchedule* sched, struct IRNode* node) {
     for (int g = 0; g < sched->num_groups; g++) {
         CMLFusionGroup* group = sched->groups[g];
@@ -173,6 +174,8 @@ static int find_node_index_in_schedule(CMLFusionSchedule* sched, struct IRNode* 
     return -1;
 }
 
+/* Scan the schedule for softmax/layernorm/GELU forward nodes whose output is consumed only
+ * by their backward counterpart, recording each as a cross-boundary fusion candidate. */
 int cml_cross_boundary_analyze(CMLFusionSchedule* sched, CMLCrossBoundaryFusion** out, int* count) {
     if (!sched || !out || !count)
         return -1;
@@ -331,8 +334,10 @@ int cml_cross_boundary_fuse(CMLFusionSchedule* sched, CMLCrossBoundaryFusion* fu
     return applied;
 }
 
+/** Free the cross-boundary fusion array. */
 void cml_cross_boundary_fusions_free(CMLCrossBoundaryFusion* fusions) { cml_free(fusions); }
 
+/** Estimate memory and FLOP savings across the fusions, by pattern type. */
 CMLCrossBoundaryStats cml_cross_boundary_stats(const CMLCrossBoundaryFusion* fusions, int count) {
     CMLCrossBoundaryStats stats = {0};
     if (!fusions || count <= 0)

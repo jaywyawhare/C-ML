@@ -24,6 +24,7 @@ typedef struct VecDType {
     int n;
 } VecDType;
 
+/** Wrap a scalar dtype as a width-1 VecDType. */
 static inline VecDType dtype_scalar(DType d) {
     VecDType vt;
     vt.scalar = d;
@@ -41,6 +42,7 @@ const char* dtype_vec_c_name(VecDType vt);
 
 size_t dtype_vec_alignment(VecDType vt);
 
+/** True when the vector type carries a single lane. */
 static inline bool dtype_vec_is_scalar(VecDType vt) { return vt.n == 1; }
 
 VecDType dtype_vec_widen(VecDType vt);

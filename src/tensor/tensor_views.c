@@ -6,6 +6,8 @@
 #include "core/logging.h"
 #include "alloc/cml_allocator.h"
 
+/** True when a reshape to `new_shape` can alias `t`'s storage: `t` is contiguous
+ *  and the element count is unchanged. */
 static bool can_reshape_as_view(Tensor* t, int* new_shape, int new_ndim) {
     if (!t->is_contiguous)
         return false;
@@ -17,6 +19,7 @@ static bool can_reshape_as_view(Tensor* t, int* new_shape, int new_ndim) {
     return true;
 }
 
+/** Return a contiguous copy of `t` (always a fresh clone). NULL on error. */
 Tensor* tensor_contiguous(Tensor* t) {
     if (!t)
         return NULL;
@@ -24,6 +27,9 @@ Tensor* tensor_contiguous(Tensor* t) {
     return tensor_clone(t);
 }
 
+/** Reshape `t` (numel preserved). Returns a non-owning view sharing storage when
+ *  `t` is contiguous (realizing a lazy base first); otherwise reshapes a copy.
+ *  Returns NULL on a numel mismatch or OOM. */
 Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
     if (!t || !new_shape || new_ndim <= 0) {
         LOG_ERROR("Invalid arguments to tensor_reshape");
@@ -38,7 +44,7 @@ Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
 
     /* A view aliases the base's data pointer. If the base is still lazy (an
      * IR node that has not been realized), its ->data is NULL and the view
-     * would be born dangling with no way to realize later — views carry no
+     * would be born dangling with no way to realize later - views carry no
      * ir_node. Realize the base first so the view sees valid storage. */
     if (t->ir_node && (!t->is_executed || !t->data)) {
         tensor_ensure_executed(t);
@@ -83,7 +89,7 @@ Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
          * shared storage (attached to the owning root on first view). When the
          * root is not an owned allocation (e.g. borrowed plan buffer) no
          * storage can be attached and the documented non-owning contract
-         * applies — the base must outlive the view. */
+         * applies - the base must outlive the view. */
         tensor_storage_share(view, t);
 
         LOG_DEBUG("Created reshape view: (%d, ...) -> (%d, ...)", t->ndim, new_ndim);
@@ -102,10 +108,14 @@ Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim) {
     return reshaped;
 }
 
+/** Alias for tensor_reshape (returns a view when the layout permits). */
 Tensor* tensor_view(Tensor* t, int* new_shape, int new_ndim) {
     return tensor_reshape(t, new_shape, new_ndim);
 }
 
+/** Create a non-owning view over `t`'s storage with arbitrary `shape`, `strides`
+ *  and `storage_offset`; contiguity is derived from the strides. NULL on error.
+ *  The caller is responsible for keeping the strides within the backing storage. */
 Tensor* tensor_as_strided(Tensor* t, int* shape, int ndim, size_t* strides, size_t storage_offset) {
     if (!t || !shape || !strides || ndim <= 0) {
         LOG_ERROR("Invalid arguments to tensor_as_strided");
@@ -155,6 +165,7 @@ Tensor* tensor_as_strided(Tensor* t, int* shape, int ndim, size_t* strides, size
     return view;
 }
 
+/** Flat storage offset of a multi-index, honoring strides and storage_offset. */
 size_t tensor_compute_offset(Tensor* t, int* indices) {
     if (!t || !indices)
         return 0;

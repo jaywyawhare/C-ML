@@ -7,6 +7,7 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
+/** Append a JSON-escaped, quoted string to the growable buffer. */
 static void append_json_string(char** buffer, size_t* offset, size_t* capacity, const char* str) {
     if (!str)
         str = "";
@@ -60,6 +61,7 @@ static void append_json_string(char** buffer, size_t* offset, size_t* capacity, 
     (*buffer)[(*offset)++] = '"';
 }
 
+/** printf-style append to the growable buffer, resizing to fit the result. */
 static void append_format(char** buffer, size_t* offset, size_t* capacity, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -94,6 +96,7 @@ static void append_format(char** buffer, size_t* offset, size_t* capacity, const
     va_end(args);
 }
 
+/** Generate an illustrative C code snippet for a single node's op (caller frees). */
 static char* generate_kernel_code_snippet(struct IRNode* node) {
     if (!node)
         return NULL;
@@ -309,6 +312,7 @@ static char* generate_kernel_code_snippet(struct IRNode* node) {
     return code;
 }
 
+/** Generate a C code snippet for a fused kernel per its fusion type (caller frees). */
 static char* generate_fused_kernel_code(FusedKernel* kernel) {
     if (!kernel || kernel->num_ops == 0)
         return NULL;
@@ -391,6 +395,7 @@ static char* generate_fused_kernel_code(FusedKernel* kernel) {
     return code;
 }
 
+/** Compute per-node use counts and liveness flags for dead-code reporting. */
 static void analyze_usage(CMLGraph_t ir) {
     if (!ir || !ir->head)
         return;
@@ -439,6 +444,10 @@ static void analyze_usage(CMLGraph_t ir) {
     cml_free(nodes);
 }
 
+/**
+ * Export a JSON report of the graph's kernel structure (node/fusion/dead-code
+ * stats and generated code snippets) as a freshly allocated string (caller frees).
+ */
 char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
     if (!ir)
         return NULL;
@@ -475,7 +484,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
 
     // Unoptimized view: one kernel per node; nothing removed; fusion is only an
     // opportunity. Optimized view: dead code removed and fused groups collapsed
-    // to a single kernel — this is what makes the before/after differ.
+    // to a single kernel - this is what makes the before/after differ.
     int shown_kernels =
         optimized ? (total_nodes - dead_nodes) - (fused_members - fused_groups) : total_nodes;
     append_format(&buffer, &offset, &capacity,
@@ -619,7 +628,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
                       (!optimized && !node->is_used && node->use_count == 0) ? "true" : "false",
                       as_fused ? "true" : "false");
 
-        // Fused Kernel ID (for grouping) — only meaningful in the optimized view
+        // Fused Kernel ID (for grouping) - only meaningful in the optimized view
         if (as_fused) {
             append_format(&buffer, &offset, &capacity, ",\"fusedKernelId\":\"%p\"",
                           (void*)node->fused_kernel);
@@ -665,6 +674,7 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
     return buffer;
 }
 
+/** Serialize the full IR graph (nodes and edges) to a JSON string (caller frees). */
 char* cml_ir_export_graph_json(CMLGraph_t ir) {
     if (!ir)
         return NULL;

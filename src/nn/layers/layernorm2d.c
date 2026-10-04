@@ -5,6 +5,8 @@
 #include "core/logging.h"
 #include "alloc/cml_allocator.h"
 
+/** LayerNorm over the whole C*H*W volume per sample, then the optional affine. Expects 4D
+ *  [N,C,H,W]; NULL on shape/channel mismatch. (torch.nn.LayerNorm over [C,H,W].) */
 static Tensor* layernorm2d_forward(Module* module, Tensor* input) {
     LayerNorm2d* ln = (LayerNorm2d*)module;
 
@@ -32,11 +34,14 @@ static Tensor* layernorm2d_forward(Module* module, Tensor* input) {
     return nn_norm_affine(output, ln->weight, ln->bias, input->shape, 4, 1);
 }
 
+/** Free the LayerNorm2d module; affine parameters are released by module_free. */
 static void layernorm2d_free(Module* module) {
     if (module)
         cml_free(module);
 }
 
+/** Construct a LayerNorm2d layer over num_channels; allocates weight/bias when affine.
+ *  eps falls back to 1e-5 if non-positive. Returns NULL on failure. */
 LayerNorm2d* nn_layernorm2d(int num_channels, float eps, bool affine, DType dtype,
                             DeviceType device) {
     LayerNorm2d* ln = cml_malloc(sizeof(LayerNorm2d));

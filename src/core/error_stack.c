@@ -23,6 +23,7 @@ static ErrorStackNotifyFn g_error_notify_fn = NULL;
 static void* g_error_notify_context         = NULL;
 static pthread_mutex_t g_notify_lock        = PTHREAD_MUTEX_INITIALIZER;
 
+/** Lazily allocate the thread-local error stack on first use. */
 static void error_stack_ensure_initialized(void) {
     if (g_error_stack_initialized)
         return;
@@ -39,6 +40,7 @@ static void error_stack_ensure_initialized(void) {
     g_message_buffer_index    = 0;
 }
 
+/** Install a process-wide callback invoked (under lock) on every pushed error. */
 void error_stack_set_notify(ErrorStackNotifyFn fn, void* context) {
     pthread_mutex_lock(&g_notify_lock);
     g_error_notify_fn      = fn;
@@ -46,6 +48,7 @@ void error_stack_set_notify(ErrorStackNotifyFn fn, void* context) {
     pthread_mutex_unlock(&g_notify_lock);
 }
 
+/** Map a CM_* error code to a short human-readable description. */
 const char* cml_error_string(int code) {
     switch (code) {
     case CM_SUCCESS:
@@ -65,8 +68,10 @@ const char* cml_error_string(int code) {
     }
 }
 
+/** Eagerly initialize the thread-local error stack. */
 void error_stack_init(void) { error_stack_ensure_initialized(); }
 
+/** Drop all recorded errors without freeing the backing storage. */
 void error_stack_clear(void) {
     if (!g_error_stack_initialized || !g_error_stack)
         return;
@@ -74,6 +79,7 @@ void error_stack_clear(void) {
     g_message_buffer_index = 0;
 }
 
+/** Free the thread-local error stack and reset it to the uninitialized state. */
 void error_stack_cleanup(void) {
     if (!g_error_stack_initialized)
         return;
@@ -89,6 +95,11 @@ void error_stack_cleanup(void) {
     g_message_buffer_index    = 0;
 }
 
+/**
+ * Record an error (code, message, source location) on the thread-local stack,
+ * copying strings into ring buffers. Oldest entry is evicted when full, and any
+ * registered notify callback fires. Falls back to stderr if allocation failed.
+ */
 void error_stack_push(int code, const char* message, const char* file, int line,
                       const char* function) {
     error_stack_ensure_initialized();
@@ -147,6 +158,7 @@ void error_stack_push(int code, const char* message, const char* file, int line,
         notify_fn(code, entry->message, notify_ctx);
 }
 
+/** Return the most recently pushed error, or NULL if the stack is empty. */
 ErrorEntry* error_stack_peek(void) {
     if (!g_error_stack_initialized || !g_error_stack || g_error_stack_size == 0)
         return NULL;
@@ -154,6 +166,7 @@ ErrorEntry* error_stack_peek(void) {
     return &g_error_stack[g_error_stack_size - 1];
 }
 
+/** True if the thread's error stack holds at least one entry. */
 bool error_stack_has_errors(void) {
     if (!g_error_stack_initialized)
         return false;
@@ -161,6 +174,7 @@ bool error_stack_has_errors(void) {
     return g_error_stack_size > 0;
 }
 
+/** Print the full error stack (oldest first) with source locations to stderr. */
 void error_stack_print_all(void) {
     if (!g_error_stack_initialized || !g_error_stack || g_error_stack_size == 0)
         return;
@@ -174,11 +188,13 @@ void error_stack_print_all(void) {
     fprintf(stderr, "\n");
 }
 
+/** Message of the most recent error, or NULL if none. */
 const char* error_stack_get_last_message(void) {
     ErrorEntry* entry = error_stack_peek();
     return entry ? entry->message : NULL;
 }
 
+/** Code of the most recent error, or CM_SUCCESS if none. */
 int error_stack_get_last_code(void) {
     ErrorEntry* entry = error_stack_peek();
     return entry ? entry->code : CM_SUCCESS;

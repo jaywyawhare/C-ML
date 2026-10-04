@@ -329,6 +329,7 @@ typedef struct {
 #define VK_ACCESS_TRANSFER_READ_BIT 0x00000080
 #define VK_PIPELINE_BIND_POINT_COMPUTE 1
 
+/** dlopen the Vulkan loader, logging on failure; NULL for a NULL name. */
 static void* vk_load_library(const char* name) {
     if (!name)
         return NULL;
@@ -339,8 +340,10 @@ static void* vk_load_library(const char* name) {
     return lib;
 }
 
+/** Resolve a symbol from the loaded Vulkan loader. */
 static void* vk_get_symbol(void* lib, const char* name) { return CML_DLSYM(lib, name); }
 
+/** Close the Vulkan loader library. */
 static void vk_unload_library(void* lib) {
     if (lib)
         CML_DLCLOSE(lib);
@@ -353,6 +356,7 @@ static void vk_unload_library(void* lib) {
         return -1;                                                                                 \
     }
 
+/** Resolve all Vulkan entry points into the backend's pointer table; -1 if any is missing. */
 static int load_vulkan_functions(CMLVulkanBackend* backend) {
     VK_LOAD_FUNC(vkCreateInstance);
     VK_LOAD_FUNC(vkDestroyInstance);
@@ -407,6 +411,7 @@ static int load_vulkan_functions(CMLVulkanBackend* backend) {
 
 #undef VK_LOAD_FUNC
 
+/** Probe for a Vulkan loader exposing vkCreateInstance (Linux only). */
 bool cml_vulkan_available(void) {
 #ifndef __linux__
     /* Currently only Linux is supported for Vulkan dynamic loading */
@@ -424,6 +429,7 @@ bool cml_vulkan_available(void) {
 #endif
 }
 
+/** Allocate a zeroed Vulkan backend handle. */
 CMLVulkanBackend* cml_vulkan_backend_create(void) {
     CMLVulkanBackend* backend = (CMLVulkanBackend*)cml_calloc(1, sizeof(CMLVulkanBackend));
     if (!backend) {
@@ -433,6 +439,7 @@ CMLVulkanBackend* cml_vulkan_backend_create(void) {
     return backend;
 }
 
+/** Find the first memory type matching the type-bits mask and required property flags. */
 static uint32_t find_memory_type(VkPhysicalDeviceMemoryProperties_t* mem_props, uint32_t type_bits,
                                  VkFlags required_flags) {
     if (!mem_props)
@@ -446,6 +453,7 @@ static uint32_t find_memory_type(VkPhysicalDeviceMemoryProperties_t* mem_props, 
     return UINT32_MAX;
 }
 
+/** Create the instance/device, pick a compute queue and memory types, and open a command pool. */
 int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
     if (!backend)
         return -1;
@@ -589,6 +597,7 @@ int cml_vulkan_backend_init(CMLVulkanBackend* backend) {
     return 0;
 }
 
+/** Wait for idle, destroy the command pool/device/instance, and free the backend. */
 void cml_vulkan_backend_free(CMLVulkanBackend* backend) {
     if (!backend)
         return;
@@ -610,6 +619,7 @@ void cml_vulkan_backend_free(CMLVulkanBackend* backend) {
     cml_free(backend);
 }
 
+/** Create a storage buffer and backing memory; host-visible buffers are persistently mapped. */
 CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSize size,
                                           bool device_local) {
     if (!backend || !backend->initialized || size == 0)
@@ -669,6 +679,7 @@ CMLVulkanBuffer* cml_vulkan_buffer_create(CMLVulkanBackend* backend, VkDeviceSiz
     return buf;
 }
 
+/** Unmap, free the memory, destroy the buffer, and free the wrapper. */
 void cml_vulkan_buffer_free(CMLVulkanBackend* backend, CMLVulkanBuffer* buf) {
     if (!backend || !buf)
         return;
@@ -682,6 +693,7 @@ void cml_vulkan_buffer_free(CMLVulkanBackend* backend, CMLVulkanBuffer* buf) {
     cml_free(buf);
 }
 
+/** Upload host data: direct memcpy if mapped, else via a staging buffer and copy command. */
 int cml_vulkan_buffer_upload(CMLVulkanBackend* backend, CMLVulkanBuffer* dst, const void* src,
                              size_t size) {
     if (!backend || !dst || !src)
@@ -730,6 +742,7 @@ int cml_vulkan_buffer_upload(CMLVulkanBackend* backend, CMLVulkanBuffer* dst, co
     return 0;
 }
 
+/** Download device data: direct memcpy if mapped, else copy to a staging buffer and read back. */
 int cml_vulkan_buffer_download(CMLVulkanBackend* backend, CMLVulkanBuffer* src, void* dst,
                                size_t size) {
     if (!backend || !src || !dst)
@@ -778,6 +791,7 @@ int cml_vulkan_buffer_download(CMLVulkanBackend* backend, CMLVulkanBuffer* src, 
     return 0;
 }
 
+/** Build a compute pipeline from SPIR-V with `num_buffers` storage bindings + descriptor set. */
 CMLVulkanKernel* cml_vulkan_kernel_create(CMLVulkanBackend* backend, const uint32_t* spirv,
                                           size_t spirv_size, const char* entry_point,
                                           int num_buffers) {
@@ -874,6 +888,7 @@ fail:
     return NULL;
 }
 
+/** Destroy the kernel's descriptor pool, pipeline, layouts, and shader module. */
 void cml_vulkan_kernel_free(CMLVulkanBackend* backend, CMLVulkanKernel* kernel) {
     if (!backend || !kernel)
         return;
@@ -892,6 +907,7 @@ void cml_vulkan_kernel_free(CMLVulkanBackend* backend, CMLVulkanKernel* kernel) 
     cml_free(kernel);
 }
 
+/** Point a descriptor-set binding at a storage buffer via vkUpdateDescriptorSets. */
 int cml_vulkan_kernel_bind_buffer(CMLVulkanBackend* backend, CMLVulkanKernel* kernel, int binding,
                                   CMLVulkanBuffer* buffer) {
     if (!backend || !kernel || !buffer)
@@ -916,6 +932,7 @@ int cml_vulkan_kernel_bind_buffer(CMLVulkanBackend* backend, CMLVulkanKernel* ke
     return 0;
 }
 
+/** Record and submit a dispatch of (gx,gy,gz) workgroups with a barrier, waiting on a fence. */
 int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kernel, uint32_t gx,
                                uint32_t gy, uint32_t gz) {
     if (!backend || !kernel)
@@ -977,6 +994,7 @@ int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kerne
 static CMLVulkanBackend* g_vk_backend = NULL;
 static int g_vk_backend_tried         = 0;
 
+/** Lazily create and init the shared process-wide backend; NULL if Vulkan is unavailable. */
 CMLVulkanBackend* cml_vulkan_get_backend(void) {
     if (g_vk_backend_tried)
         return g_vk_backend;
@@ -992,7 +1010,7 @@ CMLVulkanBackend* cml_vulkan_get_backend(void) {
     return g_vk_backend;
 }
 
-/* Classify an IR node for GPU dispatch.
+/** Classify an IR node for GPU dispatch.
  * Returns: 1=binary elementwise, 2=unary elementwise, 3=matmul, 0=unsupported.
  * On a supported op, *op_code holds the shader's op selector. */
 static int vk_classify(UOpType t, int num_inputs, int* op_code) {
@@ -1062,7 +1080,7 @@ static int vk_classify(UOpType t, int num_inputs, int* op_code) {
     return 0;
 }
 
-/* Execute a single IR node on the GPU (float32 only).  Uploads inputs, dispatches
+/** Execute a single IR node on the GPU (float32 only).  Uploads inputs, dispatches
  * the matching compute shader, downloads the result into node->output->data.
  * Returns 0 on success, -1 if the op/dtype is unsupported (caller falls back to CPU). */
 int cml_vulkan_execute_node(CMLVulkanBackend* backend, struct IRNode* node) {
@@ -1184,6 +1202,7 @@ done:
     return rc;
 }
 
+/** Run each IR node via the per-node GPU path, falling back to the CPU for unsupported nodes. */
 int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
     if (!backend || !backend->initialized || !ir)
         return -1;
@@ -1212,6 +1231,7 @@ int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir) {
     return 0;
 }
 
+/** Block until the device finishes all submitted work (vkDeviceWaitIdle). */
 int cml_vulkan_synchronize(CMLVulkanBackend* backend) {
     if (!backend || !backend->initialized)
         return -1;

@@ -5,7 +5,7 @@
  * dependency were removed.  Shape-specialized SIMD is now emitted by the LLVM
  * JIT backend (src/ops/ir/llvm/llvm_backend.c); the implementations behind this
  * API are portable scalar loops that the C compiler auto-vectorizes.  The API
- * (including CMLSimdCaps) is kept for source compatibility — the caps struct
+ * (including CMLSimdCaps) is kept for source compatibility - the caps struct
  * now reports no hand-rolled SIMD.
  */
 

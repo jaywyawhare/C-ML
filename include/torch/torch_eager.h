@@ -1,9 +1,9 @@
 /*
- * torch_eager.h — Zero-IR eager execution for hot ops.
+ * torch_eager.h - Zero-IR eager execution for hot ops.
  *
  * When eager mode is enabled, hot tensor ops (add/sub/mul/div, matmul, relu,
  * sigmoid, tanh) and fused linear(+relu) compute IMMEDIATELY into materialized
- * leaf tensors using SIMD + BLAS — no IR node allocation, no intern hashing,
+ * leaf tensors using SIMD + BLAS - no IR node allocation, no intern hashing,
  * no graph teardown, and no context reset needed in tight inference loops.
  *
  * Eager mode does not build an autograd graph. To preserve correct gradients,

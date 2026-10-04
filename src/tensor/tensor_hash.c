@@ -5,6 +5,7 @@
 #define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
 #define FNV_PRIME 0x100000001b3ULL
 
+/** FNV-1a hash over `t`'s realized bytes; realizes `t` first, 0 if unavailable. */
 uint64_t tensor_hash(Tensor* t) {
     if (!t)
         return 0;
@@ -42,6 +43,8 @@ static const int keccak_pi[25] = {
     0, 10, 20, 5, 15, 16, 1, 11, 21, 6, 7, 17, 2, 12, 22, 23, 8, 18, 3, 13, 14, 24, 9, 19, 4,
 };
 
+/** 64-bit left rotation with the count masked so a zero rotation is the identity
+ *  (avoids the undefined `x >> 64`). */
 static inline uint64_t rotl64(uint64_t x, int n) {
     /* Keccak's rotation table starts with 0, and `x >> 64` is undefined. Mask
      * both shift counts so a zero rotation is the identity instead of UB. */
@@ -49,6 +52,7 @@ static inline uint64_t rotl64(uint64_t x, int n) {
     return (x << n) | (x >> ((64 - n) & 63));
 }
 
+/** In-place Keccak-f[1600] permutation (24 rounds of theta/rho/pi/chi/iota). */
 static void keccak_f1600(uint64_t state[25]) {
     for (int round = 0; round < 24; round++) {
         /* theta */
@@ -83,6 +87,8 @@ static void keccak_f1600(uint64_t state[25]) {
 
 #define SHA3_256_RATE 136
 
+/** SHA3-256 digest of `t`'s realized bytes, writing up to 32 bytes into `out`
+ *  (longer requests are clamped). Returns 0 on success, -1 on error. */
 int tensor_keccak(Tensor* t, uint8_t* out, size_t out_len) {
     if (!t || !out || out_len == 0)
         return -1;

@@ -8,12 +8,14 @@
 #include <time.h>
 #include "alloc/cml_allocator.h"
 
+/** Monotonic clock reading in milliseconds, for timing draft/verify phases. */
 static double now_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1.0e6;
 }
 
+/** Index of the max logit in row `row_index` of a [rows, vocab_size] logits tensor. */
 static int argmax_at_row(Tensor* logits, int row_index, int vocab_size) {
     if (!logits || !logits->data) {
         tensor_ensure_executed(logits);
@@ -34,6 +36,7 @@ static int argmax_at_row(Tensor* logits, int row_index, int vocab_size) {
     return best;
 }
 
+/** Default speculative-decoding config (5 draft tokens, greedy acceptance). */
 CMLSpeculativeConfig cml_speculative_default_config(void) {
     CMLSpeculativeConfig cfg;
     cfg.num_draft_tokens  = 5;
@@ -62,6 +65,7 @@ static void softmax_row(const float* row, int vocab, float temperature, float* p
         probs[i] *= inv;
 }
 
+/** Draw a token index from a normalized probability row by inverse-CDF sampling. */
 static int sample_from_probs(const float* probs, int vocab) {
     float u   = (float)rand() / ((float)RAND_MAX + 1.0f);
     float acc = 0.0f;
@@ -73,6 +77,7 @@ static int sample_from_probs(const float* probs, int vocab) {
     return vocab - 1;
 }
 
+/** Allocate a speculative decoder from `config`; model callbacks are set separately. */
 CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config, int vocab_size) {
     if (!config) {
         LOG_ERROR("cml_speculative_create: config is NULL");
@@ -100,12 +105,14 @@ CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config
     return dec;
 }
 
+/** Free the decoder (model contexts are owned by the caller). */
 void cml_speculative_free(CMLSpeculativeDecoder* decoder) {
     if (!decoder)
         return;
     cml_free(decoder);
 }
 
+/** Register the small draft model's context and forward/sample callbacks. */
 void cml_speculative_set_draft_model(CMLSpeculativeDecoder* dec, void* ctx,
                                      CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn) {
     if (!dec)
@@ -115,6 +122,7 @@ void cml_speculative_set_draft_model(CMLSpeculativeDecoder* dec, void* ctx,
     dec->draft_sample    = sample_fn;
 }
 
+/** Register the large target model's context and forward/sample callbacks. */
 void cml_speculative_set_target_model(CMLSpeculativeDecoder* dec, void* ctx,
                                       CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn) {
     if (!dec)
@@ -124,6 +132,11 @@ void cml_speculative_set_target_model(CMLSpeculativeDecoder* dec, void* ctx,
     dec->target_sample    = sample_fn;
 }
 
+/**
+ * One speculative step: draft K tokens with the draft model, verify them in a
+ * single target forward, then accept/reject (greedy or Leviathan stochastic rule)
+ * and append a correction or bonus token. Returns the accepted tokens and stats.
+ */
 CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
                                                   const int* prefix_tokens, int prefix_len) {
     if (!dec) {
@@ -225,9 +238,9 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
      * logits row (prefix_len - 1 + i): the target predicts "next token
      * given everything up to position prefix_len + i - 1".
      *
-     * Greedy mode: accept iff the target argmax equals the draft token —
+     * Greedy mode: accept iff the target argmax equals the draft token -
      * the output is then exactly the target model's greedy decode.
-     * Stochastic mode (config.stochastic_accept): Leviathan et al. rule —
+     * Stochastic mode (config.stochastic_accept): Leviathan et al. rule -
      * accept with prob min(1, p/q), resample rejects from norm(max(0,p-q)). */
     int num_accepted     = 0;
     int correction_token = -1;
@@ -367,6 +380,7 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
     return result;
 }
 
+/** Free a result returned by cml_speculative_decode_step. */
 void cml_speculative_result_free(CMLSpeculativeResult* result) {
     if (!result)
         return;
@@ -374,6 +388,7 @@ void cml_speculative_result_free(CMLSpeculativeResult* result) {
     cml_free(result);
 }
 
+/** Lifetime acceptance rate (total accepted / total drafted) across all steps. */
 float cml_speculative_acceptance_rate(const CMLSpeculativeDecoder* dec) {
     if (!dec || dec->total_drafted == 0)
         return 0.0f;

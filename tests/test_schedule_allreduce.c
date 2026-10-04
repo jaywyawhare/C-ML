@@ -2,7 +2,7 @@
  *
  * Covers the two bugs the audit flagged:
  *   1. schedule_allreduce_run reduced the buffer against itself (x += x),
- *      doubling it regardless of device count — data corruption.
+ *      doubling it regardless of device count - data corruption.
  *   2. schedule_allreduce_inject was a stub that returned success without
  *      touching the schedule.
  */

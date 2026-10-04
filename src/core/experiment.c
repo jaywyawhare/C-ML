@@ -1,4 +1,4 @@
-/* experiment.c — see experiment.h. Dependency-free append-only run logger. */
+/* experiment.c - see experiment.h. Dependency-free append-only run logger. */
 #include "core/experiment.h"
 
 #include <stdio.h>
@@ -50,12 +50,14 @@ struct CMLRun {
     char cmd[512];
 };
 
+/** Current wall-clock time in seconds (realtime clock), used for run timing. */
 static double now_sec(void) {
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
+/** Create `path` and every missing parent directory (mkdir -p). */
 static void mkdirs(const char* path) {
     char tmp[1024];
     size_t n = strlen(path);
@@ -106,6 +108,8 @@ static void json_escape(FILE* f, const char* s) {
     fputc('"', f);
 }
 
+/** Rewrite the run's meta.json with the given status, filling in end/duration
+ * once the run is no longer "running". */
 static void write_meta(CMLRun* run, const char* status) {
     char path[1100];
     snprintf(path, sizeof(path), "%s/meta.json", run->dir);
@@ -175,6 +179,7 @@ static void sappend(char** buf, size_t* len, size_t* cap, const char* frag) {
     *len += fl;
 }
 
+/** Append a `"key":value_json` pair to the run's config JSON buffer. */
 static void config_append(CMLRun* run, const char* key, const char* value_json) {
     if (!key || !value_json)
         return;
@@ -214,6 +219,9 @@ static void read_git(char* out, size_t n) {
     out[12] = '\0'; /* short sha */
 }
 
+/** Start a new experiment run: allocate it, create its directory tree and log
+ * files, capture host/OS/git/command metadata, seed config, and write the
+ * initial meta.json. Returns the run handle, or NULL on failure. */
 CMLRun* cml_exp_run_init(const char* project, const char* name, const char* config_json) {
     CMLRun* run = calloc(1, sizeof(CMLRun));
     if (!run)
@@ -244,7 +252,7 @@ CMLRun* cml_exp_run_init(const char* project, const char* name, const char* conf
     snprintf(cpath, sizeof(cpath), "%s/console.log", run->dir);
     run->console = fopen(cpath, "wb");
 
-    /* Run metadata (git commit, host, OS) — the run-overview page. */
+    /* Run metadata (git commit, host, OS) - the run-overview page. */
 #ifdef _WIN32
     {
         DWORD _sz = (DWORD)sizeof(run->host);
@@ -301,6 +309,7 @@ CMLRun* cml_exp_run_init(const char* project, const char* name, const char* conf
     return run;
 }
 
+/** Associate the run with a sweep id and persist it to meta.json. */
 void cml_exp_set_sweep(CMLRun* run, const char* sweep_id) {
     if (!run || !sweep_id)
         return;
@@ -308,6 +317,7 @@ void cml_exp_set_sweep(CMLRun* run, const char* sweep_id) {
     write_meta(run, "running");
 }
 
+/** Set a config entry (value is raw JSON) and rewrite meta.json, under lock. */
 void cml_exp_config_set(CMLRun* run, const char* key, const char* value_json) {
     if (!run)
         return;
@@ -317,6 +327,7 @@ void cml_exp_config_set(CMLRun* run, const char* key, const char* value_json) {
     pthread_mutex_unlock(&run->lock);
 }
 
+/** Append a scalar metric event (name, step, value) to the events log. */
 void cml_exp_log_scalar(CMLRun* run, const char* name, long step, double value) {
     if (!run || !run->events)
         return;
@@ -328,6 +339,8 @@ void cml_exp_log_scalar(CMLRun* run, const char* name, long step, double value) 
     pthread_mutex_unlock(&run->lock);
 }
 
+/** Bin `values` into `bins` buckets (clamped to [1,256]) and append the
+ * histogram, with its min/max, to the events log. */
 void cml_exp_log_histogram(CMLRun* run, const char* name, long step, const float* values, size_t n,
                            int bins) {
     if (!run || !run->events || !values || n == 0)
@@ -369,6 +382,8 @@ void cml_exp_log_histogram(CMLRun* run, const char* name, long step, const float
     free(counts);
 }
 
+/** Sample process RSS and CPU% (the latter since the previous call) from /proc
+ * and append a system-metrics event. */
 void cml_exp_log_system(CMLRun* run, long step) {
     if (!run || !run->events)
         return;
@@ -424,6 +439,8 @@ void cml_exp_log_system(CMLRun* run, long step) {
     pthread_mutex_unlock(&run->lock);
 }
 
+/** Write raw RGB pixels to a media file and append an image event referencing
+ * it. */
 void cml_exp_log_image(CMLRun* run, const char* name, long step, const unsigned char* rgb,
                        int width, int height) {
     if (!run || !run->events || !rgb || width <= 0 || height <= 0)
@@ -447,6 +464,7 @@ void cml_exp_log_image(CMLRun* run, const char* name, long step, const unsigned 
     pthread_mutex_unlock(&run->lock);
 }
 
+/** Append a table event carrying a CSV payload to the events log. */
 void cml_exp_log_table(CMLRun* run, const char* name, long step, const char* csv) {
     if (!run || !run->events || !csv)
         return;
@@ -460,6 +478,8 @@ void cml_exp_log_table(CMLRun* run, const char* name, long step, const char* csv
     pthread_mutex_unlock(&run->lock);
 }
 
+/** Append an artifact event, recording the referenced file's size and FNV-1a
+ * content hash for provenance. */
 void cml_exp_log_artifact(CMLRun* run, const char* name, const char* type, const char* path,
                           const char* aliases) {
     if (!run || !run->events)
@@ -491,6 +511,7 @@ void cml_exp_log_artifact(CMLRun* run, const char* name, const char* type, const
     pthread_mutex_unlock(&run->lock);
 }
 
+/** Append a tag to the run's tag array and persist it to meta.json. */
 void cml_exp_add_tag(CMLRun* run, const char* tag) {
     if (!run || !tag)
         return;
@@ -502,6 +523,7 @@ void cml_exp_add_tag(CMLRun* run, const char* tag) {
     pthread_mutex_unlock(&run->lock);
 }
 
+/** Replace the run's free-text notes and persist them to meta.json. */
 void cml_exp_set_notes(CMLRun* run, const char* notes) {
     if (!run)
         return;
@@ -512,6 +534,7 @@ void cml_exp_set_notes(CMLRun* run, const char* notes) {
     pthread_mutex_unlock(&run->lock);
 }
 
+/** Append a line to the run's console log. */
 void cml_exp_log_console(CMLRun* run, const char* line) {
     if (!run || !run->console || !line)
         return;
@@ -521,6 +544,7 @@ void cml_exp_log_console(CMLRun* run, const char* line) {
     pthread_mutex_unlock(&run->lock);
 }
 
+/** Set a scalar summary value shown in the run table (flushed by write_meta). */
 void cml_exp_summary_set(CMLRun* run, const char* key, double value) {
     if (!run || !key)
         return;
@@ -531,6 +555,7 @@ void cml_exp_summary_set(CMLRun* run, const char* key, double value) {
     pthread_mutex_unlock(&run->lock);
 }
 
+/** Append an alert event at the given level and echo it to the console log. */
 void cml_exp_alert(CMLRun* run, const char* level, const char* message) {
     if (!run || !run->events)
         return;
@@ -548,6 +573,7 @@ void cml_exp_alert(CMLRun* run, const char* level, const char* message) {
     }
 }
 
+/** Append a labelled (xs, ys) curve of `n` points to the events log. */
 void cml_exp_log_curve(CMLRun* run, const char* name, const char* xlabel, const char* ylabel,
                        const float* xs, const float* ys, size_t n) {
     if (!run || !run->events || !xs || !ys || n == 0)
@@ -570,6 +596,8 @@ void cml_exp_log_curve(CMLRun* run, const char* name, const char* xlabel, const 
     pthread_mutex_unlock(&run->lock);
 }
 
+/** Finalize the run: write terminal meta.json, close the logs, and free the
+ * run and all its buffers. */
 void cml_exp_run_finish(CMLRun* run, const char* status) {
     if (!run)
         return;
@@ -590,4 +618,5 @@ void cml_exp_run_finish(CMLRun* run, const char* status) {
     free(run);
 }
 
+/** The run's unique id, or an empty string when `run` is NULL. */
 const char* cml_exp_run_id(const CMLRun* run) { return run ? run->id : ""; }

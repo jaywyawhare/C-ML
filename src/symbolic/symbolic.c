@@ -7,6 +7,7 @@
 
 static _Atomic int g_var_id_counter = 0;
 
+/** Allocate a zeroed expression node of `type` with its reference count set to 1. */
 static SymExpr* sym_alloc(SymExprType type) {
     SymExpr* e = (SymExpr*)calloc(1, sizeof(SymExpr));
     if (!e)
@@ -16,9 +17,15 @@ static SymExpr* sym_alloc(SymExprType type) {
     return e;
 }
 
+/** Signed 64-bit minimum. */
 static int64_t i64_min(int64_t a, int64_t b) { return a < b ? a : b; }
+/** Signed 64-bit maximum. */
 static int64_t i64_max(int64_t a, int64_t b) { return a > b ? a : b; }
 
+/**
+ * Fold a binary op over two concrete operands into `out`. Returns 1 on success and
+ * 0 for division/modulo by zero or an op type that cannot be folded here.
+ */
 static int sym_fold_binop(SymExprType type, int64_t left, int64_t right, int64_t* out) {
     if (!out)
         return 0;
@@ -50,6 +57,7 @@ static int sym_fold_binop(SymExprType type, int64_t left, int64_t right, int64_t
     }
 }
 
+/** Build a constant-valued expression node. */
 SymExpr* sym_const(int64_t value) {
     SymExpr* e = sym_alloc(SYM_CONST);
     if (e)
@@ -57,6 +65,7 @@ SymExpr* sym_const(int64_t value) {
     return e;
 }
 
+/** Build a named variable bounded by [vmin, vmax], tagged with a process-unique id. */
 SymExpr* sym_var(const char* name, int64_t vmin, int64_t vmax) {
     if (!name)
         return NULL;
@@ -71,6 +80,11 @@ SymExpr* sym_var(const char* name, int64_t vmin, int64_t vmax) {
     return e;
 }
 
+/**
+ * Build a binary-op node over `a` and `b`, constant-folding when both are constants.
+ * Returns NULL on a fold that is undefined (e.g. divide by zero) or on allocation
+ * failure; otherwise retains both operands.
+ */
 static SymExpr* sym_binop(SymExprType type, SymExpr* a, SymExpr* b) {
     if (!a || !b)
         return NULL;
@@ -92,13 +106,24 @@ static SymExpr* sym_binop(SymExprType type, SymExpr* a, SymExpr* b) {
     return e;
 }
 
+/** Symbolic addition a + b. */
 SymExpr* sym_add(SymExpr* a, SymExpr* b) { return sym_binop(SYM_ADD, a, b); }
+/** Symbolic multiplication a * b. */
 SymExpr* sym_mul(SymExpr* a, SymExpr* b) { return sym_binop(SYM_MUL, a, b); }
+/** Symbolic truncating division a / b. */
 SymExpr* sym_div(SymExpr* a, SymExpr* b) { return sym_binop(SYM_DIV, a, b); }
+/** Symbolic remainder a % b. */
 SymExpr* sym_mod(SymExpr* a, SymExpr* b) { return sym_binop(SYM_MOD, a, b); }
+/** Symbolic minimum min(a, b). */
 SymExpr* sym_min_expr(SymExpr* a, SymExpr* b) { return sym_binop(SYM_MIN, a, b); }
+/** Symbolic maximum max(a, b). */
 SymExpr* sym_max_expr(SymExpr* a, SymExpr* b) { return sym_binop(SYM_MAX, a, b); }
 
+/**
+ * Lower bound of an expression over its variables' ranges via interval arithmetic.
+ * MUL/DIV test all four endpoint combinations to stay correct across negative ranges;
+ * a DIV whose divisor range spans zero returns INT64_MIN as a conservative bound.
+ */
 int64_t sym_expr_min(const SymExpr* e) {
     if (!e)
         return 0;
@@ -149,6 +174,11 @@ int64_t sym_expr_min(const SymExpr* e) {
     return 0;
 }
 
+/**
+ * Upper bound of an expression over its variables' ranges via interval arithmetic.
+ * MUL/DIV test all four endpoint combinations to stay correct across negative ranges;
+ * a DIV whose divisor range spans zero returns INT64_MAX as a conservative bound.
+ */
 int64_t sym_expr_max(const SymExpr* e) {
     if (!e)
         return 0;
@@ -196,6 +226,11 @@ int64_t sym_expr_max(const SymExpr* e) {
     return 0;
 }
 
+/**
+ * Evaluate an expression to a concrete value given a variable name/value table.
+ * Returns 0 on success, or -1 on an unbound variable or an undefined fold (e.g.
+ * divide by zero).
+ */
 int sym_eval(const SymExpr* e, const char** var_names, const int64_t* values, int num_vars,
              int64_t* out) {
     if (!e || !out)
@@ -229,6 +264,10 @@ int sym_eval(const SymExpr* e, const char** var_names, const int64_t* values, in
     return -1;
 }
 
+/**
+ * Return a freshly-owned simplified expression: recursively folds constant subtrees
+ * and applies identity rules (x+0, x*1, x*0, x/1, 0/x, x%1). Caller releases the result.
+ */
 SymExpr* sym_simplify(SymExpr* e) {
     if (!e)
         return NULL;
@@ -330,11 +369,13 @@ SymExpr* sym_simplify(SymExpr* e) {
     return out;
 }
 
+/** Increment the expression's reference count. */
 void sym_expr_retain(SymExpr* e) {
     if (e)
         e->ref_count++;
 }
 
+/** Drop one reference; frees the node and recursively releases children at zero. */
 void sym_expr_release(SymExpr* e) {
     if (!e)
         return;
@@ -348,6 +389,10 @@ void sym_expr_release(SymExpr* e) {
     free(e);
 }
 
+/**
+ * Render the expression into `buf`; binary ops print infix as "(a op b)" while min/max
+ * print as "min(a, b)". Returns the snprintf length (bytes that would be written).
+ */
 int sym_expr_to_string(const SymExpr* e, char* buf, int buf_size) {
     if (!e || !buf || buf_size <= 0)
         return 0;
@@ -397,6 +442,7 @@ int sym_expr_to_string(const SymExpr* e, char* buf, int buf_size) {
     }
 }
 
+/** Wrap a fixed integer extent as a concrete (non-symbolic) dimension. */
 SymDim sym_dim_concrete(int value) {
     SymDim d;
     d.is_symbolic = false;
@@ -404,6 +450,7 @@ SymDim sym_dim_concrete(int value) {
     return d;
 }
 
+/** Wrap an expression as a symbolic dimension, retaining a reference to it. */
 SymDim sym_dim_symbolic(SymExpr* expr) {
     SymDim d;
     d.is_symbolic = true;
@@ -413,6 +460,7 @@ SymDim sym_dim_symbolic(SymExpr* expr) {
     return d;
 }
 
+/** Release the expression backing a symbolic dimension, if any, and clear it. */
 void sym_dim_release(SymDim* dim) {
     if (dim && dim->is_symbolic && dim->expr) {
         sym_expr_release(dim->expr);
@@ -420,6 +468,7 @@ void sym_dim_release(SymDim* dim) {
     }
 }
 
+/** Build a shape of `ndim` concrete dimensions from a plain int array. */
 SymShape* sym_shape_from_concrete(const int* dims, int ndim) {
     if (!dims || ndim <= 0)
         return NULL;
@@ -441,6 +490,11 @@ SymShape* sym_shape_from_concrete(const int* dims, int ndim) {
     return s;
 }
 
+/**
+ * Broadcast two shapes NumPy-style (right-aligned): a dim of 1 takes the other
+ * operand's extent, two symbolic dims collapse to their max, and a symbolic paired
+ * with a non-1 concrete keeps the symbolic. Returns NULL on an incompatible pair.
+ */
 SymShape* sym_shape_broadcast(const SymShape* a, const SymShape* b) {
     if (!a || !b)
         return NULL;
@@ -527,6 +581,10 @@ SymShape* sym_shape_broadcast(const SymShape* a, const SymShape* b) {
     return out;
 }
 
+/**
+ * Resolve every dimension to a concrete int using the variable table, writing results
+ * into `out_dims`. Returns 0 on success, or -1 if a symbolic dim fails to evaluate.
+ */
 int sym_shape_eval(const SymShape* shape, const char** var_names, const int64_t* values,
                    int num_vars, int* out_dims) {
     if (!shape || !out_dims)
@@ -545,6 +603,7 @@ int sym_shape_eval(const SymShape* shape, const char** var_names, const int64_t*
     return 0;
 }
 
+/** Render the shape as "(d0, d1, ...)" into `buf`; returns total chars written. */
 int sym_shape_to_string(const SymShape* shape, char* buf, int buf_size) {
     if (!shape || !buf || buf_size <= 0)
         return 0;
@@ -568,11 +627,13 @@ int sym_shape_to_string(const SymShape* shape, char* buf, int buf_size) {
     return written;
 }
 
+/** Increment the shape's reference count. */
 void sym_shape_retain(SymShape* shape) {
     if (shape)
         shape->ref_count++;
 }
 
+/** Drop one reference; releases each dim and frees the shape at zero. */
 void sym_shape_release(SymShape* shape) {
     if (!shape)
         return;

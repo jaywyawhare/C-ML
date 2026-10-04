@@ -34,6 +34,7 @@ struct SafeTensorsContext {
     size_t write_data_cap;
 };
 
+/** Map an internal DType to its safetensors type string (e.g. "F32", "BF16"). */
 static const char* dtype_to_safetensor_str(DType dtype) {
     switch (dtype) {
     case DTYPE_FLOAT32:
@@ -75,6 +76,7 @@ static const char* dtype_to_safetensor_str(DType dtype) {
     }
 }
 
+/** Map a safetensors type string back to a DType, defaulting to float32. */
 static DType safetensor_str_to_dtype(const char* str) {
     if (!str)
         return DTYPE_FLOAT32;
@@ -115,12 +117,14 @@ static DType safetensor_str_to_dtype(const char* str) {
     return DTYPE_FLOAT32;
 }
 
+/** Advance past JSON whitespace and return the new position. */
 static char* skip_ws(char* p) {
     while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t')
         p++;
     return p;
 }
 
+/** Parse a JSON string literal into a newly allocated buffer; NULL if not a string. */
 static char* parse_string(char* p, char** out) {
     if (*p != '"')
         return NULL;
@@ -140,6 +144,7 @@ static char* parse_string(char* p, char** out) {
     return p;
 }
 
+/** Parse a signed decimal integer and return the position past it. */
 static char* parse_int(char* p, int64_t* out) {
     *out    = 0;
     int neg = 0;
@@ -156,6 +161,8 @@ static char* parse_int(char* p, int64_t* out) {
     return p;
 }
 
+/** Open a safetensors file for reading: reads the 8-byte header size and parses the
+ *  JSON header into per-tensor name/dtype/shape/offset records (__metadata__ skipped). */
 SafeTensorsContext* safetensors_open_read(const char* filepath) {
     FILE* f = fopen(filepath, "rb");
     if (!f) {
@@ -317,6 +324,7 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
     return ctx;
 }
 
+/** Create a write context that buffers tensor data in memory until close. */
 SafeTensorsContext* safetensors_open_write(const char* filepath) {
     SafeTensorsContext* ctx = cml_calloc(1, sizeof(SafeTensorsContext));
     if (!ctx)
@@ -333,6 +341,8 @@ SafeTensorsContext* safetensors_open_write(const char* filepath) {
     return ctx;
 }
 
+/** Close the context. For write contexts, first flushes the JSON header and
+ *  buffered tensor data to the file. Frees all owned resources. */
 void safetensors_close(SafeTensorsContext* ctx) {
     if (!ctx)
         return;
@@ -391,14 +401,17 @@ void safetensors_close(SafeTensorsContext* ctx) {
     cml_free(ctx);
 }
 
+/** Number of tensors in an opened-for-read file. */
 int safetensors_get_num_tensors(SafeTensorsContext* ctx) { return ctx ? ctx->num_tensors : 0; }
 
+/** Name of the tensor at the given index, or NULL if out of range. */
 const char* safetensors_get_tensor_name(SafeTensorsContext* ctx, int index) {
     if (!ctx || index < 0 || index >= ctx->num_tensors)
         return NULL;
     return ctx->tensors[index].name;
 }
 
+/** Read a named tensor's raw bytes from the file into a new Tensor; NULL if absent. */
 Tensor* safetensors_read_tensor(SafeTensorsContext* ctx, const char* name) {
     if (!ctx || !name || ctx->is_write)
         return NULL;
@@ -433,6 +446,7 @@ Tensor* safetensors_read_tensor(SafeTensorsContext* ctx, const char* name) {
     return t;
 }
 
+/** Append a tensor to the write buffer, recording its header metadata; -1 on error. */
 int safetensors_write_tensor(SafeTensorsContext* ctx, const char* name, Tensor* tensor) {
     if (!ctx || !name || !tensor || !ctx->is_write)
         return -1;
@@ -467,6 +481,8 @@ int safetensors_write_tensor(SafeTensorsContext* ctx, const char* name, Tensor* 
     return 0;
 }
 
+/** Save a module's parameters and buffers (under a "buffers." prefix) to a
+ *  safetensors file so running stats survive a round trip. */
 int module_save_safetensors(Module* module, const char* filepath) {
     if (!module || !filepath)
         return -1;
@@ -511,6 +527,8 @@ int module_save_safetensors(Module* module, const char* filepath) {
     return 0;
 }
 
+/** Load parameters and buffers into a module from a safetensors file, copying only
+ *  where element counts match; missing buffer keys (older files) are skipped. */
 int module_load_safetensors(Module* module, const char* filepath) {
     if (!module || !filepath)
         return -1;

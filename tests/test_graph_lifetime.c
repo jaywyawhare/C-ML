@@ -1,7 +1,7 @@
 /* Regression guard for the training-loop graph-accumulation fix.
  *
  * A hand-written loop that reuses the same parameters (as the Python bindings
- * do) must not pile every step's autograd graph onto them — otherwise each
+ * do) must not pile every step's autograd graph onto them - otherwise each
  * backward re-traverses all prior steps (O(n^2) blow-up + compounding gradients
  * -> divergence/hang). The C training loop avoids this by freeing the loss each
  * step; cml_autograd_step_end() gives the same guarantee without freeing the

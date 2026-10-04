@@ -32,10 +32,12 @@ typedef struct {
     uint16_t extra_len;
 } __attribute__((packed)) ZipLocalHeader;
 
+/** Read a little-endian uint32 from a byte pointer. */
 static uint32_t read_u32_le(const uint8_t* p) {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 
+/** Read a little-endian uint16 from a byte pointer. */
 static uint16_t read_u16_le(const uint8_t* p) { return (uint16_t)p[0] | ((uint16_t)p[1] << 8); }
 
 typedef struct {
@@ -47,6 +49,9 @@ typedef struct {
     int num_storages;
 } PickleScanResult;
 
+/** Scan the pickle stream for parameter-like string keys (opcodes SHORT_BINUNICODE
+ *  and BINUNICODE), keeping only names that look like tensor keys (.weight, .bias,
+ *  running stats, embeddings). A pragmatic substitute for a full pickle VM. */
 static PickleScanResult* scan_pickle_keys(const uint8_t* data, size_t size) {
     PickleScanResult* result = (PickleScanResult*)cml_calloc(1, sizeof(PickleScanResult));
     if (!result)
@@ -121,6 +126,7 @@ static PickleScanResult* scan_pickle_keys(const uint8_t* data, size_t size) {
     return result;
 }
 
+/** Free a PickleScanResult and all collected key strings. */
 static void free_pickle_result(PickleScanResult* result) {
     if (!result)
         return;
@@ -132,6 +138,11 @@ static void free_pickle_result(PickleScanResult* result) {
     cml_free(result);
 }
 
+/**
+ * Load a PyTorch .pth file (an uncompressed ZIP of a data.pkl plus raw storages).
+ * Walks the ZIP local headers, scans the pickle for keys, and pairs each key with
+ * a data/N storage in order to build a state dict of float32 tensors.
+ */
 CMLPthStateDict* cml_pth_load(const char* path) {
     if (!path)
         return NULL;
@@ -268,6 +279,7 @@ CMLPthStateDict* cml_pth_load(const char* path) {
     return sd;
 }
 
+/** Free a state dict, its entry tensors, and the model-name string. */
 void cml_pth_free(CMLPthStateDict* sd) {
     if (!sd)
         return;
@@ -280,6 +292,7 @@ void cml_pth_free(CMLPthStateDict* sd) {
     cml_free(sd);
 }
 
+/** Look up a tensor by exact key; NULL if absent. */
 Tensor* cml_pth_get_tensor(const CMLPthStateDict* sd, const char* key) {
     if (!sd || !key)
         return NULL;
@@ -290,18 +303,23 @@ Tensor* cml_pth_get_tensor(const CMLPthStateDict* sd, const char* key) {
     return NULL;
 }
 
+/** Number of entries in the state dict (0 if NULL). */
 int cml_pth_num_entries(const CMLPthStateDict* sd) { return sd ? sd->num_entries : 0; }
 
+/** Key string at the given entry index, or NULL if out of range. */
 const char* cml_pth_get_key(const CMLPthStateDict* sd, int index) {
     if (!sd || index < 0 || index >= sd->num_entries)
         return NULL;
     return sd->entries[index].key;
 }
 
+/** True if the state dict contains the given key. */
 bool cml_pth_has_key(const CMLPthStateDict* sd, const char* key) {
     return cml_pth_get_tensor(sd, key) != NULL;
 }
 
+/** Return a newly allocated array of key pointers (borrowed strings); caller frees
+ *  the array. Sets *count to the number of entries. */
 const char** cml_pth_list_keys(const CMLPthStateDict* sd, int* count) {
     if (!sd || !count)
         return NULL;
@@ -314,6 +332,8 @@ const char** cml_pth_list_keys(const CMLPthStateDict* sd, int* count) {
     return keys;
 }
 
+/** Copy matching tensors into a module's parameters, matching by exact name or by
+ *  dotted-suffix fallback and only when element counts agree; -1 if nothing loaded. */
 int cml_pth_load_into_module(const CMLPthStateDict* sd, struct Module* module) {
     if (!sd || !module)
         return -1;
@@ -363,6 +383,7 @@ int cml_pth_load_into_module(const CMLPthStateDict* sd, struct Module* module) {
     return loaded > 0 ? 0 : -1;
 }
 
+/** Print a summary of the state dict (entry count, totals, per-key sizes). */
 void cml_pth_print(const CMLPthStateDict* sd) {
     if (!sd) {
         printf("PthStateDict: NULL\n");
@@ -381,6 +402,7 @@ void cml_pth_print(const CMLPthStateDict* sd) {
     printf("\n");
 }
 
+/** Sum of element counts across all entries. */
 size_t cml_pth_total_params(const CMLPthStateDict* sd) {
     if (!sd)
         return 0;
@@ -390,6 +412,7 @@ size_t cml_pth_total_params(const CMLPthStateDict* sd) {
     return total;
 }
 
+/** Total float32 byte footprint across all entries. */
 size_t cml_pth_total_bytes(const CMLPthStateDict* sd) {
     if (!sd)
         return 0;

@@ -10,6 +10,8 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** torch.nn.Conv2d forward: grouped cross-correlation of a 4D input [N, C_in, H, W] with the
+ *  weight via uop_conv2d. Validates rank/channels; returns NULL on mismatch or op failure. */
 static Tensor* conv2d_forward(Module* module, Tensor* input) {
     Conv2d* conv2d = (Conv2d*)module;
 
@@ -75,6 +77,7 @@ static Tensor* conv2d_forward(Module* module, Tensor* input) {
     return output;
 }
 
+/** Free the Conv2d module; owned parameters are released by module_free. */
 static void conv2d_free(Module* module) {
     Conv2d* conv2d = (Conv2d*)module;
     if (!conv2d)
@@ -83,11 +86,14 @@ static void conv2d_free(Module* module) {
     cml_free(conv2d);
 }
 
+/** Default weight initializer: Kaiming/He with fan-in over in_channels * kernel area. */
 static void kaiming_init(Tensor* tensor, int in_channels, int out_channels, int kernel_size) {
     (void)out_channels;
     nn_init_kaiming(tensor, in_channels, kernel_size * kernel_size);
 }
 
+/** Construct a square-kernel Conv2d (groups=1); weight is Kaiming-init, bias (zeros) added when
+ *  use_bias. Returns NULL on failure. */
 Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
                   int dilation, bool use_bias, DType dtype, DeviceType device) {
     Conv2d* conv2d = cml_malloc(sizeof(Conv2d));

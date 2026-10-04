@@ -1,5 +1,5 @@
 /* Lifecycle stress: repeatedly build models, train steps, reset the graph,
- * take views of temporaries and drop bases, and churn the buffer cache —
+ * take views of temporaries and drop bases, and churn the buffer cache -
  * the exact patterns that historically produced use-after-free / double
  * cache-return corruption. Designed to run clean under ASAN. */
 #include <stdio.h>
@@ -48,7 +48,7 @@ static int test_model_churn(void) {
                 optimizer_zero_grad(opt);
             }
             cml_reset_ir_context();
-            /* Inputs are creation-node outputs owned by the freed graph —
+            /* Inputs are creation-node outputs owned by the freed graph -
              * pinning is the documented contract for holders across resets,
              * but these die with the graph here, so do NOT touch them after
              * the reset. */

@@ -127,7 +127,7 @@ static int test_sim_gpu_oom(void) {
 
     device_sim_gpu_set_device(0);
     void* p = device_alloc(2048, DEVICE_SIM_GPU);
-    ASSERT(p == NULL); /* Should fail — not enough memory */
+    ASSERT(p == NULL); /* Should fail - not enough memory */
 
     /* Smaller alloc should succeed */
     void* p2 = device_alloc(512, DEVICE_SIM_GPU);
@@ -404,7 +404,7 @@ static int test_dist_async_allreduce(void) {
     ASSERT(t != NULL);
     tensor_ensure_executed(t);
 
-    /* Async allreduce — Gloo falls back to sync */
+    /* Async allreduce - Gloo falls back to sync */
     DistWork* work = cml_dist_allreduce_async(t, DIST_REDUCE_SUM);
     ASSERT(work != NULL);
     ASSERT(work->completed);
@@ -518,7 +518,7 @@ static int test_ddp_gradient_sync(void) {
 
     tensor_backward(loss, NULL, false, false);
 
-    /* Sync gradients — with world_size=1, it's a no-op */
+    /* Sync gradients - with world_size=1, it's a no-op */
     int ret = cml_ddp_sync_gradients(ddp);
     ASSERT(ret == 0);
 
@@ -803,7 +803,7 @@ static int test_ddp_training_loop(void) {
     cml_ddp_free(ddp);
     module_free((Module*)model);
     cml_dist_destroy();
-    return loss_decreased ? 1 : 1; /* Pass regardless — training can be noisy */
+    return loss_decreased ? 1 : 1; /* Pass regardless - training can be noisy */
 }
 
 static int test_dist_multi_rank_simulation(void) {

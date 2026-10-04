@@ -48,8 +48,8 @@ typedef struct {
 } BlockQ5_K;
 
 typedef struct {
-    uint8_t ql[QK_K / 2];     /* quants – lower 4 bits */
-    uint8_t qh[QK_K / 4];     /* quants – upper 2 bits */
+    uint8_t ql[QK_K / 2];     /* quants - lower 4 bits */
+    uint8_t qh[QK_K / 4];     /* quants - upper 2 bits */
     int8_t scales[QK_K / 16]; /* scales, quantized with 8 bits */
     uint16_t d;               /* super-block scale (fp16) */
 } BlockQ6_K;

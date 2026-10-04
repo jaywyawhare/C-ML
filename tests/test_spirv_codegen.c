@@ -4,7 +4,7 @@
  *   2. every instruction's word-count sums exactly to the module size
  *      (a malformed opcode/word-count desyncs this walk), and
  *   3. an OpExecutionMode (opcode 16) with the LocalSize(17) operand is present
- *      — previously opcode 17 was wrongly emitted as the opcode, so no valid
+ *      - previously opcode 17 was wrongly emitted as the opcode, so no valid
  *      OpExecutionMode existed and the instruction walk desynced. */
 
 #include <stdio.h>

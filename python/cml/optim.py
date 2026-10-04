@@ -34,36 +34,46 @@ class Optimizer:
     """Base optimizer wrapping a C Optimizer pointer."""
 
     def __init__(self, c_optimizer):
+        """Wrap an existing C Optimizer handle."""
         self._optimizer = c_optimizer
 
     def step(self):
+        """Apply one parameter update; like torch.optim.Optimizer.step."""
         lib.cml_optim_step(self._optimizer)
         if _HAS_STEP_RESET:
             lib.cml_autograd_reset_after_step()
 
     def zero_grad(self):
+        """Zero all parameter gradients; like torch.optim.Optimizer.zero_grad."""
         lib.cml_optim_zero_grad(self._optimizer)
 
     def set_lr(self, lr):
+        """Set the learning rate for every parameter group."""
         lib.optimizer_set_lr(self._optimizer, float(lr))
 
     def get_lr(self, group_index=0):
+        """Return the learning rate of the given parameter group."""
         return lib.optimizer_get_group_lr(self._optimizer, group_index)
 
     def set_group_lr(self, group_index, lr):
+        """Set the learning rate for a single parameter group."""
         lib.optimizer_set_group_lr(self._optimizer, group_index, float(lr))
 
     def set_grad_clip_norm(self, norm):
+        """Enable gradient clipping to the given max norm; like torch.nn.utils.clip_grad_norm_."""
         lib.optimizer_set_grad_clip_norm(self._optimizer, float(norm))
 
     def set_amsgrad(self, amsgrad):
+        """Toggle the AMSGrad variant for Adam-family optimizers."""
         lib.optimizer_set_amsgrad(self._optimizer, amsgrad)
 
     @property
     def name(self):
+        """Return the optimizer's name as reported by the C backend."""
         return ffi.string(lib.optimizer_get_name(self._optimizer)).decode()
 
     def __del__(self):
+        """Free the underlying C optimizer and reset the IR graph."""
         if hasattr(self, '_optimizer') and self._optimizer != ffi.NULL:
             lib.optimizer_free(self._optimizer)
             self._optimizer = ffi.NULL
@@ -73,6 +83,7 @@ class Optimizer:
 
 class Adam(Optimizer):
     def __init__(self, model, lr=0.001, weight_decay=0.0, beta1=0.9, beta2=0.999, epsilon=1e-8):
+        """Build an Adam optimizer over the model's parameters; like torch.optim.Adam."""
         optimizer = lib.cml_optim_adam_for_model(
             _as_module(model), float(lr), float(weight_decay),
             float(beta1), float(beta2), float(epsilon)
@@ -82,6 +93,7 @@ class Adam(Optimizer):
 
 class SGD(Optimizer):
     def __init__(self, model, lr=0.01, momentum=0.0, weight_decay=0.0):
+        """Build an SGD optimizer over the model's parameters; like torch.optim.SGD."""
         optimizer = lib.cml_optim_sgd_for_model(
             _as_module(model), float(lr), float(momentum), float(weight_decay)
         )
@@ -90,6 +102,7 @@ class SGD(Optimizer):
 
 class RMSprop(Optimizer):
     def __init__(self, model, lr=0.001, alpha=0.99, epsilon=1e-8, weight_decay=0.0):
+        """Build an RMSprop optimizer over the model's parameters; like torch.optim.RMSprop."""
         params, num_params = _collect_parameters(model)
         optimizer = lib.cml_optim_rmsprop(
             params, num_params, float(lr), float(weight_decay),
@@ -100,6 +113,7 @@ class RMSprop(Optimizer):
 
 class AdaGrad(Optimizer):
     def __init__(self, model, lr=0.01, epsilon=1e-10, weight_decay=0.0):
+        """Build an AdaGrad optimizer over the model's parameters; like torch.optim.Adagrad."""
         params, num_params = _collect_parameters(model)
         optimizer = lib.cml_optim_adagrad(
             params, num_params, float(lr), float(weight_decay), float(epsilon)
@@ -111,6 +125,7 @@ class AdamW(Optimizer):
     """AdamW optimizer (Adam with decoupled weight decay)."""
 
     def __init__(self, model, lr=0.001, weight_decay=0.01, beta1=0.9, beta2=0.999, epsilon=1e-8):
+        """Build an AdamW optimizer over the model's parameters; like torch.optim.AdamW."""
         params, num_params = _collect_parameters(model)
         optimizer = lib.cml_optim_adamw(
             params, num_params, float(lr), float(weight_decay),
@@ -123,6 +138,7 @@ class NAdam(Optimizer):
     """NAdam optimizer (Adam with Nesterov momentum)."""
 
     def __init__(self, model, lr=0.001, weight_decay=0.0, beta1=0.9, beta2=0.999, epsilon=1e-8):
+        """Build a NAdam optimizer over the model's parameters; like torch.optim.NAdam."""
         params, num_params = _collect_parameters(model)
         optimizer = lib.cml_optim_nadam(
             params, num_params, float(lr), float(weight_decay),
@@ -133,6 +149,7 @@ class NAdam(Optimizer):
 
 class Adamax(Optimizer):
     def __init__(self, model, lr=0.002, weight_decay=0.0, beta1=0.9, beta2=0.999, epsilon=1e-8):
+        """Build an Adamax optimizer over the model's parameters; like torch.optim.Adamax."""
         params, num_params = _collect_parameters(model)
         optimizer = lib.cml_optim_adamax(
             params, num_params, float(lr), float(weight_decay),
@@ -143,6 +160,7 @@ class Adamax(Optimizer):
 
 class Adadelta(Optimizer):
     def __init__(self, model, rho=0.9, weight_decay=0.0, epsilon=1e-6):
+        """Build an Adadelta optimizer over the model's parameters; like torch.optim.Adadelta."""
         params, num_params = _collect_parameters(model)
         optimizer = lib.cml_optim_adadelta(
             params, num_params, float(rho), float(weight_decay), float(epsilon)
@@ -154,6 +172,7 @@ class LAMB(Optimizer):
     """LAMB optimizer (Layer-wise Adaptive Moments for Batch training)."""
 
     def __init__(self, model, lr=0.001, weight_decay=0.0, beta1=0.9, beta2=0.999, epsilon=1e-6):
+        """Build a LAMB optimizer over the model's parameters (no torch.optim equivalent)."""
         params, num_params = _collect_parameters(model)
         optimizer = lib.cml_optim_lamb(
             params, num_params, float(lr), float(weight_decay),
@@ -166,6 +185,7 @@ class LARS(Optimizer):
     """LARS optimizer (Layer-wise Adaptive Rate Scaling)."""
 
     def __init__(self, model, lr=0.1, momentum=0.9, weight_decay=0.0, trust_coefficient=0.001):
+        """Build a LARS optimizer over the model's parameters (no torch.optim equivalent)."""
         params, num_params = _collect_parameters(model)
         optimizer = lib.cml_optim_lars(
             params, num_params, float(lr), float(momentum),
@@ -176,6 +196,7 @@ class LARS(Optimizer):
 
 class Muon(Optimizer):
     def __init__(self, model, lr=0.01, momentum=0.9, weight_decay=0.0, nesterov=False):
+        """Build a Muon optimizer over the model's parameters (no torch.optim equivalent)."""
         params, num_params = _collect_parameters(model)
         optimizer = lib.cml_optim_muon(
             params, num_params, float(lr), float(momentum),
@@ -188,6 +209,7 @@ class LRScheduler:
     """Base learning rate scheduler wrapping a C LRScheduler pointer."""
 
     def __init__(self, c_scheduler):
+        """Wrap an existing C LRScheduler handle."""
         self._scheduler = c_scheduler
 
     def step(self, metric=0.0):
@@ -203,6 +225,7 @@ class LRScheduler:
         return lib.cml_lr_scheduler_get_lr(self._scheduler)
 
     def __del__(self):
+        """Free the underlying C scheduler."""
         if hasattr(self, '_scheduler') and self._scheduler != ffi.NULL:
             lib.cml_lr_scheduler_free(self._scheduler)
 
@@ -211,6 +234,7 @@ class StepLR(LRScheduler):
     """Decays the learning rate by gamma every step_size epochs."""
 
     def __init__(self, optimizer, step_size, gamma=0.1):
+        """Build a StepLR scheduler on the optimizer; like torch.optim.lr_scheduler.StepLR."""
         scheduler = lib.cml_lr_scheduler_step(
             optimizer._optimizer, int(step_size), float(gamma)
         )
@@ -221,6 +245,7 @@ class ExponentialLR(LRScheduler):
     """Decays the learning rate by gamma every epoch."""
 
     def __init__(self, optimizer, gamma):
+        """Build an ExponentialLR scheduler; like torch.optim.lr_scheduler.ExponentialLR."""
         scheduler = lib.cml_lr_scheduler_exponential(
             optimizer._optimizer, float(gamma)
         )
@@ -231,6 +256,7 @@ class CosineAnnealingLR(LRScheduler):
     """Cosine annealing learning rate schedule."""
 
     def __init__(self, optimizer, T_max, eta_min=0.0):
+        """Build a cosine annealing scheduler; like torch.optim.lr_scheduler.CosineAnnealingLR."""
         scheduler = lib.cml_lr_scheduler_cosine(
             optimizer._optimizer, int(T_max), float(eta_min)
         )
@@ -241,6 +267,7 @@ class ReduceOnPlateau(LRScheduler):
     """Reduce learning rate when a metric has stopped improving."""
 
     def __init__(self, optimizer, factor=0.1, patience=10, min_lr=0.0):
+        """Build a plateau scheduler; like torch.optim.lr_scheduler.ReduceLROnPlateau."""
         scheduler = lib.cml_lr_scheduler_reduce_on_plateau(
             optimizer._optimizer, float(factor), int(patience), float(min_lr)
         )
@@ -252,6 +279,7 @@ class OneCycleLR(LRScheduler):
 
     def __init__(self, optimizer, max_lr, total_steps,
                  pct_start=0.3, div_factor=25.0, final_div_factor=1e4):
+        """Build a one-cycle scheduler; like torch.optim.lr_scheduler.OneCycleLR."""
         scheduler = lib.cml_lr_scheduler_one_cycle(
             optimizer._optimizer, float(max_lr), int(total_steps),
             float(pct_start), float(div_factor), float(final_div_factor)
@@ -263,6 +291,7 @@ class MultiStepLR(LRScheduler):
     """Decays the learning rate by gamma at each milestone."""
 
     def __init__(self, optimizer, milestones, gamma=0.1):
+        """Build a MultiStepLR scheduler; like torch.optim.lr_scheduler.MultiStepLR."""
         milestones_arr = ffi.new("int[]", milestones)
         scheduler = lib.cml_lr_scheduler_multi_step(
             optimizer._optimizer, milestones_arr, len(milestones), float(gamma)
@@ -274,6 +303,7 @@ class PolynomialLR(LRScheduler):
     """Polynomial learning rate decay."""
 
     def __init__(self, optimizer, total_iters, power=1.0, min_lr=0.0):
+        """Build a PolynomialLR scheduler; like torch.optim.lr_scheduler.PolynomialLR."""
         scheduler = lib.cml_lr_scheduler_polynomial(
             optimizer._optimizer, int(total_iters), float(power), float(min_lr)
         )
@@ -284,6 +314,7 @@ class WarmupLR(LRScheduler):
     """Warmup wrapper around another scheduler."""
 
     def __init__(self, inner_scheduler, warmup_steps, warmup_start_factor=0.0):
+        """Wrap another scheduler with a linear warmup phase."""
         scheduler = lib.cml_lr_scheduler_warmup(
             inner_scheduler._scheduler, int(warmup_steps), float(warmup_start_factor)
         )

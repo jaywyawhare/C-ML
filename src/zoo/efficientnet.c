@@ -8,6 +8,7 @@
 #include <string.h>
 #include <math.h>
 
+/** Baseline EfficientNet-B0 config (width 1.0, depth 1.0, dropout 0.2). */
 EfficientNetConfig efficientnet_b0_config(int num_classes) {
     EfficientNetConfig cfg = {.num_classes  = num_classes > 0 ? num_classes : 1000,
                               .dropout_rate = 0.2f,
@@ -24,6 +25,7 @@ static const EfficientNetBlockConfig b0_blocks[] = {
     {6, 192, 320, 3, 1, 1, 4},
 };
 
+/** Append a squeeze-and-excitation block (global pool -> 1x1 squeeze -> 1x1 excite -> sigmoid). */
 static void add_se_block(Sequential* seq, int channels, int se_channels, DType dtype,
                          DeviceType device) {
     sequential_add(seq, (Module*)nn_adaptive_avgpool2d(1, 1));
@@ -33,6 +35,7 @@ static void add_se_block(Sequential* seq, int channels, int se_channels, DType d
     sequential_add(seq, (Module*)nn_sigmoid());
 }
 
+/** Append an MBConv block: optional 1x1 expand, depthwise conv, SE block, then 1x1 project. */
 static void add_mbconv(Sequential* model, int in_ch, int out_ch, int expand_ratio, int kernel_size,
                        int stride, int se_ratio, DType dtype, DeviceType device) {
     int expanded = in_ch * expand_ratio;
@@ -61,6 +64,7 @@ static void add_mbconv(Sequential* model, int in_ch, int out_ch, int expand_rati
     sequential_add(model, (Module*)nn_batchnorm2d(out_ch, 1e-5f, 0.1f, true, true, dtype, device));
 }
 
+/** Build the baseline EfficientNet-B0: conv stem, 7 MBConv stages, conv head and classifier. */
 Module* cml_zoo_efficientnet_b0(const EfficientNetConfig* config) {
     EfficientNetConfig cfg = config ? *config : efficientnet_b0_config(1000);
 
@@ -95,6 +99,7 @@ Module* cml_zoo_efficientnet_b0(const EfficientNetConfig* config) {
     return (Module*)model;
 }
 
+/** Scale channel count by @p width_mult and round to the nearest multiple of 8 (min 8). */
 static int round_channels(int c, float width_mult) {
     int new_c   = (int)(c * width_mult);
     int divisor = 8;
@@ -104,6 +109,7 @@ static int round_channels(int c, float width_mult) {
     return rounded;
 }
 
+/** Scale a stage's block repeat count by @p depth_mult (ceil, min 1; stages of 1 stay 1). */
 static int scale_depth(int n, float depth_mult) {
     if (n == 1)
         return 1;
@@ -111,6 +117,7 @@ static int scale_depth(int n, float depth_mult) {
     return scaled < 1 ? 1 : scaled;
 }
 
+/** Build an EfficientNet by compound-scaling the B0 block template by width and depth. */
 static Module* build_efficientnet(float width_mult, float depth_mult, int num_classes,
                                   float dropout_rate, DType dtype, DeviceType device) {
     Sequential* model = nn_sequential();
@@ -152,6 +159,7 @@ static Module* build_efficientnet(float width_mult, float depth_mult, int num_cl
     return (Module*)model;
 }
 
+/** EfficientNet-B1 config (width 1.0, depth 1.1, dropout 0.2). */
 EfficientNetConfig efficientnet_b1_config(int num_classes) {
     EfficientNetConfig cfg = {.num_classes  = num_classes > 0 ? num_classes : 1000,
                               .dropout_rate = 0.2f,
@@ -162,6 +170,7 @@ EfficientNetConfig efficientnet_b1_config(int num_classes) {
     return cfg;
 }
 
+/** Build EfficientNet-B1 by compound-scaling the B0 template. */
 Module* cml_zoo_efficientnet_b1(const EfficientNetConfig* config) {
     EfficientNetConfig cfg = config ? *config : efficientnet_b1_config(1000);
     Module* m              = build_efficientnet(cfg.width_mult, cfg.depth_mult, cfg.num_classes,
@@ -170,6 +179,7 @@ Module* cml_zoo_efficientnet_b1(const EfficientNetConfig* config) {
     return m;
 }
 
+/** EfficientNet-B2 config (width 1.1, depth 1.2, dropout 0.3). */
 EfficientNetConfig efficientnet_b2_config(int num_classes) {
     EfficientNetConfig cfg = {.num_classes  = num_classes > 0 ? num_classes : 1000,
                               .dropout_rate = 0.3f,
@@ -180,6 +190,7 @@ EfficientNetConfig efficientnet_b2_config(int num_classes) {
     return cfg;
 }
 
+/** Build EfficientNet-B2 by compound-scaling the B0 template. */
 Module* cml_zoo_efficientnet_b2(const EfficientNetConfig* config) {
     EfficientNetConfig cfg = config ? *config : efficientnet_b2_config(1000);
     Module* m              = build_efficientnet(cfg.width_mult, cfg.depth_mult, cfg.num_classes,
@@ -188,6 +199,7 @@ Module* cml_zoo_efficientnet_b2(const EfficientNetConfig* config) {
     return m;
 }
 
+/** EfficientNet-B3 config (width 1.2, depth 1.4, dropout 0.3). */
 EfficientNetConfig efficientnet_b3_config(int num_classes) {
     EfficientNetConfig cfg = {.num_classes  = num_classes > 0 ? num_classes : 1000,
                               .dropout_rate = 0.3f,
@@ -198,6 +210,7 @@ EfficientNetConfig efficientnet_b3_config(int num_classes) {
     return cfg;
 }
 
+/** Build EfficientNet-B3 by compound-scaling the B0 template. */
 Module* cml_zoo_efficientnet_b3(const EfficientNetConfig* config) {
     EfficientNetConfig cfg = config ? *config : efficientnet_b3_config(1000);
     Module* m              = build_efficientnet(cfg.width_mult, cfg.depth_mult, cfg.num_classes,
@@ -206,6 +219,7 @@ Module* cml_zoo_efficientnet_b3(const EfficientNetConfig* config) {
     return m;
 }
 
+/** EfficientNet-B4 config (width 1.4, depth 1.8, dropout 0.4). */
 EfficientNetConfig efficientnet_b4_config(int num_classes) {
     EfficientNetConfig cfg = {.num_classes  = num_classes > 0 ? num_classes : 1000,
                               .dropout_rate = 0.4f,
@@ -216,6 +230,7 @@ EfficientNetConfig efficientnet_b4_config(int num_classes) {
     return cfg;
 }
 
+/** Build EfficientNet-B4 by compound-scaling the B0 template. */
 Module* cml_zoo_efficientnet_b4(const EfficientNetConfig* config) {
     EfficientNetConfig cfg = config ? *config : efficientnet_b4_config(1000);
     Module* m              = build_efficientnet(cfg.width_mult, cfg.depth_mult, cfg.num_classes,
@@ -224,6 +239,7 @@ Module* cml_zoo_efficientnet_b4(const EfficientNetConfig* config) {
     return m;
 }
 
+/** EfficientNet-B5 config (width 1.6, depth 2.2, dropout 0.4). */
 EfficientNetConfig efficientnet_b5_config(int num_classes) {
     EfficientNetConfig cfg = {.num_classes  = num_classes > 0 ? num_classes : 1000,
                               .dropout_rate = 0.4f,
@@ -234,6 +250,7 @@ EfficientNetConfig efficientnet_b5_config(int num_classes) {
     return cfg;
 }
 
+/** Build EfficientNet-B5 by compound-scaling the B0 template. */
 Module* cml_zoo_efficientnet_b5(const EfficientNetConfig* config) {
     EfficientNetConfig cfg = config ? *config : efficientnet_b5_config(1000);
     Module* m              = build_efficientnet(cfg.width_mult, cfg.depth_mult, cfg.num_classes,
@@ -242,6 +259,7 @@ Module* cml_zoo_efficientnet_b5(const EfficientNetConfig* config) {
     return m;
 }
 
+/** EfficientNet-B6 config (width 1.8, depth 2.6, dropout 0.5). */
 EfficientNetConfig efficientnet_b6_config(int num_classes) {
     EfficientNetConfig cfg = {.num_classes  = num_classes > 0 ? num_classes : 1000,
                               .dropout_rate = 0.5f,
@@ -252,6 +270,7 @@ EfficientNetConfig efficientnet_b6_config(int num_classes) {
     return cfg;
 }
 
+/** Build EfficientNet-B6 by compound-scaling the B0 template. */
 Module* cml_zoo_efficientnet_b6(const EfficientNetConfig* config) {
     EfficientNetConfig cfg = config ? *config : efficientnet_b6_config(1000);
     Module* m              = build_efficientnet(cfg.width_mult, cfg.depth_mult, cfg.num_classes,
@@ -260,6 +279,7 @@ Module* cml_zoo_efficientnet_b6(const EfficientNetConfig* config) {
     return m;
 }
 
+/** EfficientNet-B7 config (width 2.0, depth 3.1, dropout 0.5). */
 EfficientNetConfig efficientnet_b7_config(int num_classes) {
     EfficientNetConfig cfg = {.num_classes  = num_classes > 0 ? num_classes : 1000,
                               .dropout_rate = 0.5f,
@@ -270,6 +290,7 @@ EfficientNetConfig efficientnet_b7_config(int num_classes) {
     return cfg;
 }
 
+/** Build EfficientNet-B7 by compound-scaling the B0 template. */
 Module* cml_zoo_efficientnet_b7(const EfficientNetConfig* config) {
     EfficientNetConfig cfg = config ? *config : efficientnet_b7_config(1000);
     Module* m              = build_efficientnet(cfg.width_mult, cfg.depth_mult, cfg.num_classes,

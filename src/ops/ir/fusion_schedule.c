@@ -63,6 +63,7 @@ static size_t tensor_elems(const Tensor* t) {
     return n;
 }
 
+/** Allocate an empty fusion group (weakest MOVEMENT type until nodes promote it). */
 static CMLFusionGroup* fusion_group_create(void) {
     CMLFusionGroup* g = cml_calloc(1, sizeof(CMLFusionGroup));
     if (!g)
@@ -86,6 +87,7 @@ static CMLFusionGroup* fusion_group_create(void) {
     return g;
 }
 
+/** Append a node to the group, promoting its dominant type and accumulating flop/memory cost. */
 static int fusion_group_add_node(CMLFusionGroup* g, struct IRNode* node) {
     if (!g || !node)
         return -1;
@@ -142,6 +144,7 @@ static int fusion_group_add_node(CMLFusionGroup* g, struct IRNode* node) {
     return 0;
 }
 
+/** Record a buffer index whose materialization is eliminated by fusion. */
 static void fusion_group_add_eliminated(CMLFusionGroup* g, int buffer_idx) {
     if (!g)
         return;
@@ -170,6 +173,7 @@ static void fusion_push_group(CMLFusionSchedule* sched, CMLFusionGroup* group) {
     sched->groups[sched->num_groups++] = group;
 }
 
+/** Free a fusion group's node and eliminated-buffer arrays. */
 static void fusion_group_free(CMLFusionGroup* g) {
     if (!g)
         return;
@@ -178,6 +182,8 @@ static void fusion_group_free(CMLFusionGroup* g) {
     cml_free(g);
 }
 
+/** Analyze fusing producer `a` into consumer `b`: fuseability, buffer eliminated, and a
+ *  memory-saving-based benefit estimate. */
 CMLFusionAnalysis cml_schedule_analyze_fusion(struct IRNode* a, struct IRNode* b) {
     CMLFusionAnalysis result = {0};
     if (!a || !b)
@@ -204,6 +210,8 @@ CMLFusionAnalysis cml_schedule_analyze_fusion(struct IRNode* a, struct IRNode* b
     return result;
 }
 
+/** Build a fusion schedule by greedily grouping fuseable ops (movement is free, reduce->elem
+ *  guarded), then order groups (BFS or sequential) and derive a memory plan. */
 CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opts) {
     CMLScheduleOptions default_opts;
     if (!opts) {
@@ -527,6 +535,7 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph, const CMLSchedul
     return sched;
 }
 
+/** Free a fusion schedule, its groups, execution order, and memory plan. */
 void cml_fusion_schedule_free(CMLFusionSchedule* sched) {
     if (!sched)
         return;
@@ -540,6 +549,7 @@ void cml_fusion_schedule_free(CMLFusionSchedule* sched) {
     cml_free(sched);
 }
 
+/** Human-readable name for a schedule item type. */
 static const char* fusion_sched_type_name(CMLScheduleItemType type) {
     switch (type) {
     case SCHED_ELEMENTWISE:
@@ -561,6 +571,7 @@ static const char* fusion_sched_type_name(CMLScheduleItemType type) {
     }
 }
 
+/** Print fusion statistics and each group's nodes (and memory plan) to stdout. */
 void cml_fusion_schedule_print(const CMLFusionSchedule* sched) {
     if (!sched) {
         printf("FusionSchedule: (null)\n");
@@ -594,6 +605,8 @@ void cml_fusion_schedule_print(const CMLFusionSchedule* sched) {
         cml_memory_plan_print(sched->memory_plan);
 }
 
+/** Execute a graph through real fusion: decompose inference composites, collapse single-use
+ *  elementwise chains and matmul epilogues, then run on the CPU. */
 int cml_ir_execute_fusion(CMLGraph_t ir) {
     if (!ir)
         return -1;
@@ -602,7 +615,7 @@ int cml_ir_execute_fusion(CMLGraph_t ir) {
      * requires_grad node) and not yet decomposed, lower composites (RELU→MAX+FILL)
      * so elementwise + epilogue fusion can collapse them. Restricted to inference
      * because decomposing a training graph here (fwd+bwd, partially executed via
-     * this path) corrupts the buffer lifecycle — training graphs are already
+     * this path) corrupts the buffer lifecycle - training graphs are already
      * decomposed by the cml_ir_execute (backward) path anyway. Re-mark all nodes
      * used since the new decomposed nodes weren't in the caller's DCE walk (a cold
      * inference graph has no freed-tensor dead nodes to worry about). */
@@ -623,7 +636,7 @@ int cml_ir_execute_fusion(CMLGraph_t ir) {
     /* Real kernel fusion: collapse maximal single-use elementwise chains into
      * UOP_FUSED_ELEMENTWISE nodes so cpu_execute_node runs each chain as ONE
      * per-element loop with register-held intermediates (no intermediate buffer
-     * materialization). Safe wrt autodiff — only fuses use_count==1 edges. */
+     * materialization). Safe wrt autodiff - only fuses use_count==1 edges. */
     int fused = cml_ir_fuse_elementwise(ir);
     if (fused > 0)
         LOG_DEBUG("Real fusion collapsed %d elementwise chain(s)", fused);

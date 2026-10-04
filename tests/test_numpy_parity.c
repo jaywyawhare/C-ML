@@ -79,7 +79,7 @@ int main(void) {
     check("nan_add", isnan(ev2(uop_add, nan, 1.0f)));
     check("nan_mul", isnan(ev2(uop_mul, nan, 2.0f)));
 
-    /* comparisons with nan (IEEE: all false except !=) — results are bool 0/1 */
+    /* comparisons with nan (IEEE: all false except !=) - results are bool 0/1 */
     check("nan_lt_false", ev2(uop_cmplt, nan, 1.0f) == 0.0f);
     check("nan_eq_false", ev2(uop_cmpeq, nan, nan) == 0.0f);
     check("nan_ne_true", ev2(uop_cmpne, nan, nan) == 1.0f);

@@ -82,7 +82,7 @@ int main(void) {
         free(a);
     }
 
-    /* 3. Rapid repeated batches — stress wakeup/generation logic for deadlock. */
+    /* 3. Rapid repeated batches - stress wakeup/generation logic for deadlock. */
     {
         size_t n = 4096;
         g_hits   = calloc(n, sizeof(_Atomic int));

@@ -41,6 +41,7 @@ struct GGUFContext {
     size_t write_data_cap;
 };
 
+/** Map a (non-quantized) GGUF tensor type to an internal DType. */
 static DType gguf_type_to_dtype(GGUFTensorType type) {
     switch (type) {
     case GGUF_TENSOR_F32:
@@ -58,6 +59,7 @@ static DType gguf_type_to_dtype(GGUFTensorType type) {
     }
 }
 
+/** Map an internal DType to a GGUF tensor type (defaults to F32). */
 static GGUFTensorType dtype_to_gguf_type(DType dtype) {
     switch (dtype) {
     case DTYPE_FLOAT32:
@@ -75,6 +77,7 @@ static GGUFTensorType dtype_to_gguf_type(DType dtype) {
     }
 }
 
+/** Read a GGUF length-prefixed string (u64 len + bytes) into a NUL-terminated buffer. */
 static char* read_gguf_string(FILE* f) {
     uint64_t len;
     if (fread(&len, 8, 1, f) != 1)
@@ -92,12 +95,14 @@ static char* read_gguf_string(FILE* f) {
     return str;
 }
 
+/** Write a GGUF length-prefixed string (u64 len + bytes). */
 static void write_gguf_string(FILE* f, const char* str) {
     uint64_t len = strlen(str);
     fwrite(&len, 8, 1, f);
     fwrite(str, 1, len, f);
 }
 
+/** Seek past a GGUF metadata value of the given type, recursing into arrays. */
 static void skip_gguf_value(FILE* f, uint32_t type) {
     switch (type) {
     case GGUF_TYPE_UINT8:
@@ -138,6 +143,11 @@ static void skip_gguf_value(FILE* f, uint32_t type) {
     }
 }
 
+/**
+ * Open a GGUF file for reading: validates the magic/version, captures the tokenizer
+ * vocab and BPE merges from the metadata (skipping everything else), and records each
+ * tensor's shape/type/offset/size. The data section is 32-byte aligned.
+ */
 GGUFContext* gguf_open_read(const char* filepath) {
     FILE* f = fopen(filepath, "rb");
     if (!f) {
@@ -279,6 +289,7 @@ GGUFContext* gguf_open_read(const char* filepath) {
     return ctx;
 }
 
+/** Create a write context that buffers tensor data in memory until close. */
 GGUFContext* gguf_open_write(const char* filepath) {
     GGUFContext* ctx = cml_calloc(1, sizeof(GGUFContext));
     if (!ctx)
@@ -295,6 +306,8 @@ GGUFContext* gguf_open_write(const char* filepath) {
     return ctx;
 }
 
+/** Close the context. For write contexts, emits the header, tensor infos, 32-byte
+ *  alignment padding, and buffered data. Frees all owned resources. */
 void gguf_close(GGUFContext* ctx) {
     if (!ctx)
         return;
@@ -361,6 +374,8 @@ void gguf_close(GGUFContext* ctx) {
     cml_free(ctx);
 }
 
+/** Hand back the context-owned tokenizer vocab and merge lists (borrowed, not copied);
+ *  -1 if no tokenizer metadata was present. */
 int gguf_get_tokenizer(GGUFContext* ctx, char*** tokens_out, int* num_tokens_out,
                        char*** merges_out, int* num_merges_out) {
     if (tokens_out)
@@ -384,14 +399,18 @@ int gguf_get_tokenizer(GGUFContext* ctx, char*** tokens_out, int* num_tokens_out
     return 0;
 }
 
+/** Number of tensors in an opened-for-read file. */
 int gguf_get_num_tensors(GGUFContext* ctx) { return ctx ? ctx->num_tensors : 0; }
 
+/** Name of the tensor at the given index, or NULL if out of range. */
 const char* gguf_get_tensor_name(GGUFContext* ctx, int index) {
     if (!ctx || index < 0 || index >= ctx->num_tensors)
         return NULL;
     return ctx->tensors[index].name;
 }
 
+/** Read a named tensor. Quantized tensors are dequantized to float32 while the raw
+ *  blocks are retained on the tensor (quant_data) for requantized compute; NULL if absent. */
 Tensor* gguf_read_tensor(GGUFContext* ctx, const char* name) {
     if (!ctx || !name || ctx->is_write)
         return NULL;
@@ -470,6 +489,7 @@ Tensor* gguf_read_tensor(GGUFContext* ctx, const char* name) {
     return t;
 }
 
+/** Append a tensor's raw bytes to the write buffer, recording its metadata; -1 on error. */
 int gguf_write_tensor(GGUFContext* ctx, const char* name, Tensor* tensor) {
     if (!ctx || !name || !tensor || !ctx->is_write)
         return -1;
@@ -504,6 +524,7 @@ int gguf_write_tensor(GGUFContext* ctx, const char* name, Tensor* tensor) {
     return 0;
 }
 
+/** Save all of a module's named parameters to a GGUF file. */
 int module_save_gguf(Module* module, const char* filepath) {
     if (!module || !filepath)
         return -1;
@@ -530,6 +551,7 @@ int module_save_gguf(Module* module, const char* filepath) {
     return 0;
 }
 
+/** Load a module's parameters from a GGUF file, copying only where element counts match. */
 int module_load_gguf(Module* module, const char* filepath) {
     if (!module || !filepath)
         return -1;

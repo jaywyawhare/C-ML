@@ -6,6 +6,7 @@
 #include <assert.h>
 #include "alloc/cml_allocator.h"
 
+/** Allocate and copy an n-element int64 array; NULL on NULL input or OOM. */
 static int64_t* dup_i64(const int64_t* src, int n) {
     if (!src)
         return NULL;
@@ -15,6 +16,7 @@ static int64_t* dup_i64(const int64_t* src, int n) {
     return dst;
 }
 
+/** Allocate and copy an n-element int array; NULL on NULL input or OOM. */
 static int* dup_int(const int* src, int n) {
     if (!src)
         return NULL;
@@ -24,6 +26,8 @@ static int* dup_int(const int* src, int n) {
     return dst;
 }
 
+/** Allocate a view owning copies of shape/strides and, if both are given, the
+ *  begin/end mask. Returns NULL on bad args or OOM (partial state is freed). */
 STView* st_view_create(const int* shape, const int64_t* strides, int64_t offset,
                        const int64_t* mask_begin, const int64_t* mask_end, int ndim) {
     if (!shape || ndim <= 0)
@@ -50,12 +54,14 @@ fail:
     return NULL;
 }
 
+/** Deep-copy a view (shape, strides, offset, mask). NULL on NULL input or OOM. */
 STView* st_view_copy(const STView* v) {
     if (!v)
         return NULL;
     return st_view_create(v->shape, v->strides, v->offset, v->mask_begin, v->mask_end, v->ndim);
 }
 
+/** Free a view and all arrays it owns. */
 void st_view_free(STView* v) {
     if (!v)
         return;
@@ -66,6 +72,7 @@ void st_view_free(STView* v) {
     cml_free(v);
 }
 
+/** Build a contiguous, unmasked view for `shape`; size-1 dims get stride 0 (broadcastable). */
 STView* st_view_from_shape(const int* shape, int ndim) {
     if (!shape || ndim <= 0)
         return NULL;
@@ -83,6 +90,8 @@ STView* st_view_from_shape(const int* shape, int ndim) {
     return v;
 }
 
+/** True if the view is dense row-major with zero offset and no mask (stride-0
+ *  broadcast dims allowed). */
 bool st_view_is_contiguous(const STView* v) {
     if (!v || v->has_mask || v->offset != 0)
         return false;
@@ -97,6 +106,7 @@ bool st_view_is_contiguous(const STView* v) {
 
 #define ST_INIT_CAPACITY 4
 
+/** Create a tracker seeded with a single contiguous view of `shape`. NULL on OOM. */
 ShapeTracker* shape_tracker_create(const int* shape, int ndim) {
     if (!shape || ndim <= 0)
         return NULL;
@@ -121,6 +131,7 @@ ShapeTracker* shape_tracker_create(const int* shape, int ndim) {
     return st;
 }
 
+/** Deep-copy a tracker and every view in its stack. NULL on OOM. */
 ShapeTracker* shape_tracker_copy(const ShapeTracker* src) {
     if (!src)
         return NULL;
@@ -147,6 +158,7 @@ ShapeTracker* shape_tracker_copy(const ShapeTracker* src) {
     return dst;
 }
 
+/** Free the tracker and all views it holds. */
 void shape_tracker_free(ShapeTracker* st) {
     if (!st)
         return;
@@ -156,10 +168,12 @@ void shape_tracker_free(ShapeTracker* st) {
     cml_free(st);
 }
 
+/** The current (innermost) view on the stack, or NULL if empty. */
 static STView* st_top(const ShapeTracker* st) {
     return (st->num_views > 0) ? st->views[st->num_views - 1] : NULL;
 }
 
+/** Push a view, growing the stack as needed. Returns 0, or -1 on OOM. */
 static int st_push(ShapeTracker* st, STView* v) {
     if (st->num_views >= st->views_capacity) {
         int new_cap  = st->views_capacity * 2;
@@ -173,16 +187,19 @@ static int st_push(ShapeTracker* st, STView* v) {
     return 0;
 }
 
+/** Shape of the current view (borrowed, do not free); NULL if empty. */
 const int* shape_tracker_shape(const ShapeTracker* st) {
     STView* v = st_top(st);
     return v ? v->shape : NULL;
 }
 
+/** Rank of the current view; 0 if empty. */
 int shape_tracker_ndim(const ShapeTracker* st) {
     STView* v = st_top(st);
     return v ? v->ndim : 0;
 }
 
+/** Product of the current view's dimensions; 0 if empty. */
 int64_t shape_tracker_numel(const ShapeTracker* st) {
     STView* v = st_top(st);
     if (!v)
@@ -193,6 +210,8 @@ int64_t shape_tracker_numel(const ShapeTracker* st) {
     return n;
 }
 
+/** Reshape the top view (numel must be preserved): rewrites it in place when
+ *  contiguous, else pushes a fresh view. Returns 0 on success, -1 on error. */
 int shape_tracker_reshape(ShapeTracker* st, const int* new_shape, int new_ndim) {
     if (!st || !new_shape || new_ndim <= 0)
         return -1;
@@ -230,6 +249,8 @@ int shape_tracker_reshape(ShapeTracker* st, const int* new_shape, int new_ndim) 
     return st_push(st, v);
 }
 
+/** Reorder the top view's axes by `perm` (and its mask, if any), editing it in
+ *  place. Returns 0 on success, -1 on bad permutation or OOM. */
 int shape_tracker_permute(ShapeTracker* st, const int* perm) {
     if (!st || !perm)
         return -1;
@@ -282,6 +303,8 @@ int shape_tracker_permute(ShapeTracker* st, const int* perm) {
     return 0;
 }
 
+/** Broadcast the top view to `new_shape`: prepended and size-1 dims get stride 0.
+ *  Returns 0 on success, -1 if the new rank is smaller or on OOM. */
 int shape_tracker_expand(ShapeTracker* st, const int* new_shape, int new_ndim) {
     if (!st || !new_shape || new_ndim <= 0)
         return -1;
@@ -318,6 +341,8 @@ int shape_tracker_expand(ShapeTracker* st, const int* new_shape, int new_ndim) {
     return 0;
 }
 
+/** Slice the top view to [begin, end) per axis, folding the start into the offset.
+ *  Returns 0 on success, -1 if any range is out of bounds or empty. */
 int shape_tracker_shrink(ShapeTracker* st, const int64_t* begin, const int64_t* end) {
     if (!st || !begin || !end)
         return -1;
@@ -337,6 +362,8 @@ int shape_tracker_shrink(ShapeTracker* st, const int64_t* begin, const int64_t* 
     return 0;
 }
 
+/** Pad the top view by `before`/`after` per axis, recording the in-bounds region
+ *  as a mask (allocated on first pad). Returns 0 on success, -1 on OOM. */
 int shape_tracker_pad(ShapeTracker* st, const int64_t* before, const int64_t* after) {
     if (!st || !before || !after)
         return -1;
@@ -368,6 +395,8 @@ int shape_tracker_pad(ShapeTracker* st, const int64_t* before, const int64_t* af
     return 0;
 }
 
+/** Subsample the top view by positive per-axis steps, scaling strides and shrinking
+ *  sizes (ceil division). Returns 0 on success, -1 on a non-positive step. */
 int shape_tracker_stride(ShapeTracker* st, const int64_t* new_strides) {
     if (!st || !new_strides)
         return -1;
@@ -386,6 +415,8 @@ int shape_tracker_stride(ShapeTracker* st, const int64_t* new_strides) {
     return 0;
 }
 
+/** Reverse the marked axes by negating their strides and advancing the offset to
+ *  the last element. Returns 0 on success, -1 on bad args. */
 int shape_tracker_flip(ShapeTracker* st, const bool* flip_dims) {
     if (!st || !flip_dims)
         return -1;
@@ -401,6 +432,9 @@ int shape_tracker_flip(ShapeTracker* st, const bool* flip_dims) {
     return 0;
 }
 
+/** Render the current view's flat-index formula over `loop_vars` into `out_buf`,
+ *  and, if requested, the mask's bounds predicate into `valid_buf` ("1" when
+ *  unmasked). Returns 0 on success, -1 on bad args. */
 int shape_tracker_index_expr(const ShapeTracker* st, const char* const* loop_vars, char* out_buf,
                              size_t out_size, char* valid_buf, size_t valid_size) {
     if (!st || !loop_vars || !out_buf || out_size == 0)
@@ -451,6 +485,8 @@ int shape_tracker_index_expr(const ShapeTracker* st, const char* const* loop_var
     return 0;
 }
 
+/** Collapse stacked views where an inner contiguous view sits over an unmasked
+ *  outer one. Returns the number of views removed. */
 int shape_tracker_simplify(ShapeTracker* st) {
     if (!st || st->num_views < 2)
         return 0;
@@ -473,6 +509,7 @@ int shape_tracker_simplify(ShapeTracker* st) {
     return collapsed;
 }
 
+/** True only if every view in the stack is contiguous. */
 bool shape_tracker_is_contiguous(const ShapeTracker* st) {
     if (!st)
         return false;
@@ -482,6 +519,7 @@ bool shape_tracker_is_contiguous(const ShapeTracker* st) {
     return true;
 }
 
+/** Dump every view (shape, strides, offset, mask) to stderr for debugging. */
 void shape_tracker_print(const ShapeTracker* st) {
     if (!st) {
         fprintf(stderr, "ShapeTracker(NULL)\n");

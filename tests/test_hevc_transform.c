@@ -1,4 +1,4 @@
-/* HEVC core transforms (H.265 §8.6.4) verified intrinsically — no reference
+/* HEVC core transforms (H.265 §8.6.4) verified intrinsically - no reference
  * stream or external table, which is what blocked the rest of the decoder.
  *
  * The spec DCT-II matrices have exactly orthogonal rows (M·Mᵀ is diagonal), the

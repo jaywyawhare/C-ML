@@ -7,6 +7,9 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
+/** Create a pipeline over a copy of @p stages, allocating the per-stage,
+ * per-micro-batch activation cache. Defaults to 4 micro-batches when @p config
+ * is NULL. Returns NULL on bad args or allocation failure. */
 CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
                                          const PipelineConfig* config) {
     if (!stages || num_stages <= 0) {
@@ -90,6 +93,10 @@ static void pipe_fill_stage_program(PipeUnit* out, int stage, int P, int M) {
         out[k++] = (PipeUnit){.stage = stage, .micro_batch = m, .kind = PIPE_UNIT_BACKWARD};
 }
 
+/** Build the forward/backward execution schedule as a caller-owned array of
+ * 2*P*M units: a simple GPipe order, or a 1F1B interleaved order that retires
+ * activations as early as dependencies allow. Writes the count to
+ * @p out_num_units; returns NULL on bad args, overflow, or a scheduling stall. */
 PipeUnit* cml_pipeline_build_schedule(int num_stages, int num_micro_batches, bool interleaved,
                                       int* out_num_units) {
     int P = num_stages, M = num_micro_batches;
@@ -196,6 +203,8 @@ PipeUnit* cml_pipeline_build_schedule(int num_stages, int num_micro_batches, boo
     return out;
 }
 
+/** Copy rows [@p start, @p end) of @p input along dim 0 into a fresh
+ * caller-owned tensor. Returns NULL on bad range or allocation/overflow. */
 static Tensor* slice_batch_dim(Tensor* input, int start, int end) {
     if (!input || start < 0 || end <= start || end > input->shape[0])
         return NULL;
@@ -235,6 +244,8 @@ static Tensor* slice_batch_dim(Tensor* input, int start, int end) {
     return result;
 }
 
+/** Concatenate @p count tensors along dim 0 into a fresh caller-owned tensor
+ * (inverse of slice_batch_dim). Returns NULL on bad args or allocation/overflow. */
 static Tensor* concat_batch_dim(Tensor** tensors, int count) {
     if (!tensors || count <= 0 || !tensors[0])
         return NULL;
@@ -287,6 +298,9 @@ static Tensor* concat_batch_dim(Tensor** tensors, int count) {
     return result;
 }
 
+/** Single-process pipeline forward: split @p input into micro-batches, run the
+ * scheduled forward units caching each stage's outputs, and concatenate the
+ * final stage's micro-batch outputs. Returns the combined output, or NULL. */
 Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input) {
     if (!pipeline || !input)
         return NULL;
@@ -393,6 +407,10 @@ fwd_fail:
     return NULL;
 }
 
+/** Single-process pipeline backward: slice @p grad_output per micro-batch and run
+ * the scheduled backward units over the cached activations, seeding only the last
+ * stage. Under 1F1B, a micro-batch's activations are freed once its backward
+ * reaches stage 0. Returns 0 on success, -1 on error. */
 int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
     if (!pipeline || !grad_output)
         return -1;
@@ -457,7 +475,7 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
         }
 
         /* Last stage is seeded with the sliced loss gradient (passed as the
-         * backward seed, which tensor_backward CLONES — so we retain
+         * backward seed, which tensor_backward CLONES - so we retain
          * ownership of the slice and free it below; the previous code raw-
          * assigned it into mb_output->grad, leaving ownership unmanaged).
          * Intermediate stages get NULL: their gradient already arrived via
@@ -494,7 +512,7 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
 /* ── True cross-rank pipeline parallelism ──────────────────────────────────
  * world_size == num_stages; rank r runs ONLY stage r and streams micro-batch
  * activations to r+1 / receives from r-1. Because the stages are separate
- * processes, they execute concurrently — real pipeline overlap.
+ * processes, they execute concurrently - real pipeline overlap.
  *
  * A fixed-size activation-shape header [ndim, dim0..dim7] (as floats) precedes
  * each activation so the receiver can allocate before the data arrives. Meta and
@@ -502,6 +520,9 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
 #define PIPE_META_LEN 9
 #define PIPE_MAX_NDIM 8
 
+/** Send activation @p t to @p dst for micro-batch @p mb: a fixed-size shape
+ * header on tag 2*mb, then the data on tag 2*mb+1, so the receiver can allocate
+ * first and distinct micro-batches never collide. */
 static int pipe_send_tensor(Tensor* t, int dst, int mb) {
     tensor_ensure_executed(t);
     if (!t->data)
@@ -528,6 +549,9 @@ static int pipe_send_tensor(Tensor* t, int dst, int mb) {
     return cml_dist_send(t, dst, 2 * mb + 1);
 }
 
+/** Receive an activation from @p src for micro-batch @p mb: read the shape header
+ * (tag 2*mb), allocate, then read the data (tag 2*mb+1). Returns a fresh
+ * caller-owned tensor, or NULL on error. Counterpart to pipe_send_tensor. */
 static Tensor* pipe_recv_tensor(int src, int mb) {
     float meta[PIPE_META_LEN];
     int mshape[1] = {PIPE_META_LEN};
@@ -575,6 +599,8 @@ static Tensor* pipe_recv_tensor(int src, int mb) {
     return out;
 }
 
+/** Free the cross-rank forward cache (per-micro-batch stage inputs and outputs)
+ * and null the pointers, so a new dist forward can start clean. */
 static void dist_free_cache(CMLPipelineParallel* p) {
     if (p->dist_stage_inputs) {
         for (int mb = 0; mb < p->num_micro_batches; mb++)
@@ -592,6 +618,10 @@ static void dist_free_cache(CMLPipelineParallel* p) {
     }
 }
 
+/** True cross-rank pipeline forward (world_size == num_stages): rank r runs only
+ * stage r, receiving activations from r-1 and streaming to r+1. Caches inputs and
+ * outputs for backward. Returns the concatenated output on the last rank, NULL
+ * elsewhere (or on error). */
 Tensor* cml_pipeline_dist_forward(CMLPipelineParallel* pipeline, Tensor* input) {
     if (!pipeline)
         return NULL;
@@ -685,6 +715,10 @@ fail:
     return NULL;
 }
 
+/** True cross-rank pipeline backward: each rank backprops its cached stage over
+ * all micro-batches, seeding the output gradient from @p grad_output on the last
+ * rank or receiving it from r+1 otherwise, and streams the input gradient to r-1.
+ * Must follow cml_pipeline_dist_forward. Returns 0 on success, -1 on error. */
 int cml_pipeline_dist_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
     if (!pipeline)
         return -1;
@@ -748,6 +782,8 @@ int cml_pipeline_dist_backward(CMLPipelineParallel* pipeline, Tensor* grad_outpu
     return 0;
 }
 
+/** Free the pipeline: the cross-rank cache, all cached micro-batch activations,
+ * the stage copy, and the struct. Does not free the stage modules themselves. */
 void cml_pipeline_free(CMLPipelineParallel* pipeline) {
     if (!pipeline)
         return;

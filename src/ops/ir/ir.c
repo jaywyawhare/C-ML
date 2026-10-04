@@ -22,6 +22,7 @@ static int cml_stack_is_internal(const char* folded);
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** Human-readable name for a UOp type; used in profiles, graph export and logs. */
 const char* uop_type_to_string(UOpType type) {
     switch (type) {
     case UOP_ADD:
@@ -338,6 +339,8 @@ const char* uop_type_to_string(UOpType type) {
     }
 }
 
+/** Allocate an empty IR graph for @p target, explicitly zeroing every field
+ *  (the pool allocator recycles blocks without clearing them). */
 CMLGraph_t cml_ir_new(IRTarget target) {
     CMLGraph_t ir = cml_malloc(sizeof(struct CMLGraph));
     if (!ir)
@@ -377,6 +380,7 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     return ir;
 }
 
+/** Free the op-specific params struct owned by @p node, dispatching on node type. */
 void cml_ir_free_node_params(struct IRNode* node) {
     if (!node || !node->params)
         return;
@@ -861,6 +865,7 @@ void cml_ir_free_node_params(struct IRNode* node) {
 }
 
 static void free_ir_node(struct IRNode* node);
+/** Drop one reference to @p node, releasing its storage and the node when it hits zero. */
 static void free_ir_node(struct IRNode* node) {
     if (!node)
         return;
@@ -878,7 +883,7 @@ static void free_ir_node(struct IRNode* node) {
  * itself and without ref_count accounting. This is the single source of
  * truth for which fields a node owns (params, scope, build_stack, per-input
  * shape arrays, ...); custom free paths must call this instead of open-coding
- * the field list — the DCE removal path used to hand-roll it and leaked
+ * the field list - the DCE removal path used to hand-roll it and leaked
  * params/scope/build_stack/input_shapes on every removed node. */
 void cml_ir_release_node_storage(struct IRNode* node) {
     if (!node)
@@ -978,6 +983,7 @@ typedef struct {
     int n, cap;
 } FreedSet;
 
+/** Append @p t to the freed-tensor set, growing the backing array on demand. */
 static void freed_set_add(FreedSet* fs, Tensor* t) {
     if (!t || !fs->p)
         return;
@@ -997,12 +1003,14 @@ static void freed_set_add(FreedSet* fs, Tensor* t) {
     fs->p[fs->n++] = t;
 }
 
+/** qsort comparator ordering tensors by pointer address. */
 static int freed_set_cmp(const void* a, const void* b) {
     Tensor* x = *(Tensor* const*)a;
     Tensor* y = *(Tensor* const*)b;
     return (x > y) - (x < y);
 }
 
+/** Binary-search the (sorted) freed set for @p t. */
 static bool freed_set_contains(const FreedSet* fs, Tensor* t) {
     if (!fs->p || fs->n == 0)
         return false;
@@ -1019,6 +1027,9 @@ static bool freed_set_contains(const FreedSet* fs, Tensor* t) {
     return false;
 }
 
+/** Tear down an IR graph: free forward/backward output tensors, tensor refs,
+ *  nodes, intern table and bookkeeping, guarding tensors reachable twice from
+ *  being freed a second time. */
 void cml_ir_free(CMLGraph_t ir) {
     if (!ir)
         return;
@@ -1094,7 +1105,7 @@ void cml_ir_free(CMLGraph_t ir) {
                     continue;
                 }
                 /* Only detach from THIS graph's context. Do NOT clear ir_node
-                 * before tensor_free — tensor_free needs ir_node to clear the
+                 * before tensor_free - tensor_free needs ir_node to clear the
                  * original node's output pointer when ref_count reaches 0. */
                 if (tr->ir_context == ir)
                     tr->ir_context = NULL;
@@ -1159,7 +1170,7 @@ void cml_ir_free(CMLGraph_t ir) {
     }
 
     /* Log of values that received lazy grads (see autodiff.c publish). The
-     * entries are plain Tensor* borrows owned elsewhere — only the array. */
+     * entries are plain Tensor* borrows owned elsewhere - only the array. */
     if (ir->grad_publish_log) {
         cml_free(ir->grad_publish_log);
         ir->grad_publish_log   = NULL;
@@ -1185,6 +1196,8 @@ static void cml_ir_release_same_graph_input_refs(CMLGraph_t ir, Tensor** inputs,
     }
 }
 
+/** Append a uop node to @p ir (or reuse an interned equivalent), naming inputs
+ *  and output and taking input refcounts. Returns 0 on success, -1 on failure. */
 int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs, void* params) {
     if (!ir || (num_inputs > 0 && !inputs) || num_inputs < 0) {
         LOG_ERROR("Invalid parameters for cml_ir_add_uop");
@@ -1461,12 +1474,14 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
     return 0;
 }
 
+/** Node of interest at the graph's end: the most recent result, else the tail. */
 struct IRNode* cml_ir_get_tail(CMLGraph_t ir) {
     if (!ir)
         return NULL;
     return ir->last_result ? ir->last_result : ir->tail;
 }
 
+/** Legacy codegen entry point, now removed; always logs an error and returns NULL. */
 char* cml_ir_compile(CMLGraph_t ir, const char* output_file) {
     if (!ir)
         return NULL;
@@ -1476,6 +1491,7 @@ char* cml_ir_compile(CMLGraph_t ir, const char* output_file) {
     return NULL;
 }
 
+/** Render the graph as a human-readable listing of numbered ops. Caller frees. */
 char* cml_ir_to_string(CMLGraph_t ir) {
     if (!ir)
         return NULL;
@@ -1511,6 +1527,7 @@ char* cml_ir_to_string(CMLGraph_t ir) {
 
 #define IR_TENSOR_MAX_NDIM 16
 
+/** Resolve a tensor's effective shape, preferring its IR node's output shape. */
 static bool ir_tensor_resolve_shape(const Tensor* t, const int** out_shape, int* out_ndim) {
     if (!t || !out_shape || !out_ndim)
         return false;
@@ -1531,6 +1548,8 @@ static bool ir_tensor_resolve_shape(const Tensor* t, const int** out_shape, int*
     return false;
 }
 
+/** Compute and store the broadcasted output shape for a multi-input node;
+ *  returns -1 on shape mismatch or allocation failure. */
 int cml_ir_compute_broadcast_shape(struct IRNode* node) {
     if (!node || node->num_inputs < 2)
         return -1;
@@ -1629,6 +1648,7 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
     return 0;
 }
 
+/** Linear scan for the node producing @p output_name. */
 struct IRNode* cml_ir_find_by_output(CMLGraph_t ir, const char* output_name) {
     if (!ir || !output_name)
         return NULL;
@@ -1638,6 +1658,7 @@ struct IRNode* cml_ir_find_by_output(CMLGraph_t ir, const char* output_name) {
     return NULL;
 }
 
+/** Remove @p node from the graph's linked list without freeing it. */
 void cml_ir_unlink_node(CMLGraph_t ir, struct IRNode* node) {
     if (!ir || !node)
         return;
@@ -1661,6 +1682,7 @@ void cml_ir_unlink_node(CMLGraph_t ir, struct IRNode* node) {
     }
 }
 
+/** Rewrite every input reference to @p old_name so it points at @p new_name. */
 void cml_ir_replace_refs(CMLGraph_t ir, const char* old_name, const char* new_name) {
     if (!ir || !old_name || !new_name)
         return;
@@ -1674,6 +1696,7 @@ void cml_ir_replace_refs(CMLGraph_t ir, const char* old_name, const char* new_na
     }
 }
 
+/** Splice @p new_node into the list just ahead of @p before (appends if @p before is NULL). */
 void cml_ir_insert_before(CMLGraph_t ir, struct IRNode* new_node, struct IRNode* before) {
     if (!ir || !new_node)
         return;
@@ -1720,6 +1743,7 @@ static _Thread_local int g_scope_ends[IR_SCOPE_MAX_DEPTH]; /* path length after 
 static _Thread_local int g_scope_depth = 0;
 static int g_scope_enabled             = -1; /* -1 = not yet probed */
 
+/** Whether module-scope path tracking is on (VIZ env set, export not disabled). */
 bool cml_ir_scope_enabled(void) {
     if (cml_flag_enabled(CML_FLAG_NO_EXPORT))
         return false;
@@ -1821,6 +1845,8 @@ static int cml_stack_is_internal(const char* folded) {
     return 0;
 }
 
+/** Capture and fold the current build-time call stack, interning identical
+ *  stacks so each distinct call path is symbolized only once. */
 static char* cml_capture_build_stack(void) {
 #ifdef _WIN32
     return NULL; /* no execinfo/backtrace on Windows; flame graph omits stacks */
@@ -1870,6 +1896,7 @@ static char* cml_capture_build_stack(void) {
 #endif /* _WIN32 */
 }
 
+/** Push @p name onto the thread-local module scope path (for graph grouping). */
 void cml_ir_scope_push(const char* name) {
     if (!cml_ir_scope_enabled() || !name || g_scope_depth >= IR_SCOPE_MAX_DEPTH)
         return;
@@ -1887,6 +1914,7 @@ void cml_ir_scope_push(const char* name) {
     g_scope_ends[g_scope_depth++] = (int)strlen(g_scope_path);
 }
 
+/** Pop the innermost module scope, truncating the path back to its parent. */
 void cml_ir_scope_pop(void) {
     if (!cml_ir_scope_enabled() || g_scope_depth <= 0)
         return;
@@ -1895,6 +1923,7 @@ void cml_ir_scope_pop(void) {
     g_scope_path[keep] = '\0';
 }
 
+/** Current module scope path, or NULL when scoping is disabled or empty. */
 const char* cml_ir_scope_current(void) {
     return (cml_ir_scope_enabled() && g_scope_path[0]) ? g_scope_path : NULL;
 }

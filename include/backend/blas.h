@@ -35,7 +35,7 @@ typedef struct CMLBlasContext {
                    const float* alpha, const float* A, const int* lda, const float* B,
                    const int* ldb, const float* beta, float* C, const int* ldc);
 
-    /* ILP64 function pointers (int64_t arguments — scipy_openblas64 layout) */
+    /* ILP64 function pointers (int64_t arguments - scipy_openblas64 layout) */
     void (*ilp64_sgemm)(int64_t Order, int64_t TransA, int64_t TransB, int64_t M, int64_t N,
                         int64_t K, float alpha, const float* A, int64_t lda, const float* B,
                         int64_t ldb, float beta, float* C, int64_t ldc);
@@ -57,7 +57,7 @@ typedef struct CMLBlasContext {
     int max_threads;
     int cur_threads;
 
-    /* Reusable pack scratch buffers — allocated lazily, grown as needed.
+    /* Reusable pack scratch buffers - allocated lazily, grown as needed.
      * Eliminates per-call aligned_alloc/free in the packed GEMM hot path. */
     float* pack_a_buf;
     size_t pack_a_size;
@@ -81,7 +81,7 @@ int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float
                       int K, float alpha, float beta, bool transA, bool transB);
 
 /* f64 GEMM through cblas_dgemm (row-major, no transposes). Returns -1 when
- * no BLAS is available — the caller falls back to the generic kernel. */
+ * no BLAS is available - the caller falls back to the generic kernel. */
 int cml_blas_dgemm(CMLBlasContext* ctx, const double* A, const double* B, double* C, int M, int N,
                    int K, double alpha, double beta);
 

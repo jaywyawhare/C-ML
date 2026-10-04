@@ -53,6 +53,7 @@ static CMLBlasContext* g_exec_blas_ctx = NULL;
 #ifdef CML_HAS_LLVM_BACKEND
 static CMLLLVMBackend* g_llvm_backend = NULL;
 
+/** Return the process-wide LLVM JIT backend, initializing it on first use. */
 CMLLLVMBackend* cml_get_llvm_backend(void) {
     if (!g_llvm_backend) {
         g_llvm_backend = cml_llvm_backend_init();
@@ -129,6 +130,7 @@ static bool g_exec_tlsf_destroyed =
               after shutdown */
 static pthread_mutex_t g_exec_alloc_lock = PTHREAD_MUTEX_INITIALIZER;
 
+/** Allocate from the shared TLSF execution pool, falling back to malloc on exhaustion. */
 static void* exec_pool_alloc(size_t size) {
     pthread_mutex_lock(&g_exec_alloc_lock);
     if (!g_exec_tlsf && !g_exec_tlsf_destroyed) {
@@ -141,6 +143,7 @@ static void* exec_pool_alloc(size_t size) {
     return malloc(size);
 }
 
+/** Return a buffer to the TLSF pool, or free() it when it came from the malloc fallback. */
 static void exec_pool_free(void* ptr, size_t size) {
     (void)size;
     if (!ptr)
@@ -154,16 +157,17 @@ static void exec_pool_free(void* ptr, size_t size) {
     }
     pthread_mutex_unlock(&g_exec_alloc_lock);
     /* Pointer is outside the current TLSF pool bounds.  It came from either:
-     *   (a) the TLSF OOM malloc() fallback — always 16-byte aligned on Linux, or
-     *   (b) a stale pointer from an old TLSF pool — not 16-byte aligned.
+     *   (a) the TLSF OOM malloc() fallback - always 16-byte aligned on Linux, or
+     *   (b) a stale pointer from an old TLSF pool - not 16-byte aligned.
      * Distinguish by alignment: libc malloc guarantees 16-byte alignment on
      * 64-bit Linux; TLSF sub-allocations can be 4-byte aligned.
-     * For case (b) just discard — the backing pool memory is already gone. */
+     * For case (b) just discard - the backing pool memory is already gone. */
     if (((uintptr_t)ptr & 0xF) == 0)
         free(ptr); /* 16-byte aligned → malloc fallback, safe to free */
     /* else: stale TLSF ptr, discarded (tiny leak, crash-safe) */
 }
 
+/** Map an allocation size to its power-of-two cache bucket index, or -1 if too small/large. */
 static int get_bucket_index(size_t size) {
     if (size == 0)
         return -1;
@@ -183,6 +187,7 @@ static int get_bucket_index(size_t size) {
     return bucket - BUFFER_CACHE_MIN_BUCKET;
 }
 
+/** Initialize the per-size free lists of the buffer cache (idempotent). */
 static void init_buffer_cache(void) {
     if (g_buffer_cache.initialized)
         return;
@@ -195,6 +200,7 @@ static void init_buffer_cache(void) {
     g_buffer_cache.initialized = true;
 }
 
+/** Allocate a scratch buffer, reusing a cached same-bucket buffer when available. */
 void* cml_buffer_cache_alloc(size_t size) {
     if (size == 0)
         return NULL;
@@ -224,7 +230,7 @@ void* cml_buffer_cache_alloc(size_t size) {
         pthread_mutex_unlock(&g_exec_alloc_lock);
 
         cml_free(cached);
-        /* Don't zero — callers that need zeroing (e.g. reduce ops) do it themselves.
+        /* Don't zero - callers that need zeroing (e.g. reduce ops) do it themselves.
          * Most ops (matmul, add, relu, conv) write every output element. */
         return data;
     }
@@ -236,6 +242,7 @@ void* cml_buffer_cache_alloc(size_t size) {
     return exec_pool_alloc(alloc_size);
 }
 
+/** Return a buffer to its size bucket's free list (or to the pool when the bucket is full). */
 void cml_buffer_cache_free(void* ptr, size_t size) {
     if (!ptr)
         return;
@@ -272,6 +279,7 @@ void cml_buffer_cache_free(void* ptr, size_t size) {
     pthread_mutex_unlock(&g_exec_alloc_lock);
 }
 
+/** Release all cached buffers back to the pool; the TLSF pool itself is kept alive. */
 void cml_cleanup_buffer_cache(void) {
     if (!g_buffer_cache.initialized)
         return;
@@ -296,6 +304,7 @@ void cml_cleanup_buffer_cache(void) {
      * cml_exec_pool_shutdown() only after all tensors have been freed. */
 }
 
+/** Destroy the TLSF execution pool; call only after all tensors backed by it are freed. */
 void cml_exec_pool_shutdown(void) {
     pthread_mutex_lock(&g_exec_alloc_lock);
     if (g_exec_tlsf) {
@@ -306,6 +315,7 @@ void cml_exec_pool_shutdown(void) {
     pthread_mutex_unlock(&g_exec_alloc_lock);
 }
 
+/** Print buffer-cache hit rate and occupancy to stdout. */
 void cml_print_buffer_cache_stats(void) {
     pthread_mutex_lock(&g_exec_alloc_lock);
     if (!g_buffer_cache.initialized) {
@@ -339,6 +349,7 @@ void cml_print_buffer_cache_stats(void) {
     printf("  Total alloc:   %.2f KB\n", alloc / 1024.0f);
 }
 
+/** Return the shared BLAS context, initializing acceleration on first use. */
 CMLBlasContext* get_blas_context(void) {
     if (!g_exec_blas_ctx) {
         g_exec_blas_ctx = cml_blas_init();
@@ -349,7 +360,7 @@ CMLBlasContext* get_blas_context(void) {
     return g_exec_blas_ctx;
 }
 
-/* Winograd F(2,3) hardcoded transforms — adds/subs only, no multiply.
+/* Winograd F(2,3) hardcoded transforms - adds/subs only, no multiply.
  * Input transform: V = B^T * d * B for a 4x4 tile
  * B^T = [1,0,-1,0; 0,1,1,0; 0,-1,1,0; 0,1,0,-1] */
 #ifdef __SSE__
@@ -569,7 +580,7 @@ static int winograd_conv2d_blas(CMLBlasContext* blas, const float* input, const 
             }
         }
 
-        /* Step 3: Pointwise multiply — BLAS GEMM for large K, inline for small */
+        /* Step 3: Pointwise multiply - BLAS GEMM for large K, inline for small */
         if (ic_pg >= 8) {
             for (int p = 0; p < 16; p++) {
                 float* Up = U_buf + (size_t)p * oc_pg * ic_pg;
@@ -642,6 +653,7 @@ static int winograd_conv2d_blas(CMLBlasContext* blas, const float* input, const 
 // Numpy-style broadcast index: given a flat index in the output tensor,
 // compute the corresponding flat index in a (possibly smaller) input tensor.
 // Handles cases like [N,M] op [N,1] or [N,M] op [1,M] correctly.
+/** Map an output flat index to the matching input flat index under numpy broadcasting. */
 static inline size_t _broadcast_idx(Tensor* inp, Tensor* out_t, size_t flat_i) {
     if (inp->numel == 1)
         return 0;
@@ -697,19 +709,19 @@ static inline int _detect_broadcast_2d(Tensor* a, Tensor* b, Tensor* out, size_t
 
     /* a is the big tensor, b is the broadcast one */
     if (a->numel == out->numel) {
-        /* [R,C] op [1,C] — b is a row vector broadcast across rows */
+        /* [R,C] op [1,C] - b is a row vector broadcast across rows */
         if (b->ndim == 2 && b->shape[0] == 1 && (size_t)b->shape[1] == *cols)
             return 1;
         if (b->ndim == 1 && (size_t)b->shape[0] == *cols)
             return 1;
-        /* [R,C] op [R,1] — b is a column vector broadcast across cols */
+        /* [R,C] op [R,1] - b is a column vector broadcast across cols */
         if (b->ndim == 2 && (size_t)b->shape[0] == *rows && b->shape[1] == 1)
             return 2;
     }
     return 0;
 }
 
-/* Fast broadcast binary op for 2D: [R,C] op [1,C] (row broadcast) — each row is a
+/* Fast broadcast binary op for 2D: [R,C] op [1,C] (row broadcast) - each row is a
  * full-length SIMD op against the shared [C] operand. */
 #define BROADCAST_ROW_SIMD(simd_fn)                                                                \
     do {                                                                                           \
@@ -739,16 +751,18 @@ static inline int _detect_broadcast_2d(Tensor* a, Tensor* b, Tensor* out, size_t
  * The float32 hot path (SIMD + the broadcast loops below) stays as-is; when an
  * op's output dtype is something else (float64 / integer types) we run this
  * dtype-generic path, which mirrors the same broadcasting semantics. This is
- * the first increment of real multi-dtype compute — the executor was formerly
+ * the first increment of real multi-dtype compute - the executor was formerly
  * float32-only. Returns 0 on success, -1 if (dtype, op) isn't handled here.
  * ---------------------------------------------------------------------- */
 static int is_half_dtype(DType d) { return d == DTYPE_FLOAT16 || d == DTYPE_BFLOAT16; }
 
+/** True for the six comparison UOps. */
 static int is_comparison_op(UOpType t) {
     return t == UOP_CMPLT || t == UOP_CMPGT || t == UOP_CMPLE || t == UOP_CMPGE || t == UOP_CMPEQ ||
            t == UOP_CMPNE;
 }
 
+/** True for element-wise binary arithmetic and comparison UOps. */
 static int is_elementwise_binary(UOpType t) {
     return t == UOP_ADD || t == UOP_SUB || t == UOP_MUL || t == UOP_DIV || t == UOP_MAX ||
            t == UOP_CMPLT || t == UOP_CMPGT || t == UOP_CMPLE || t == UOP_CMPGE || t == UOP_CMPEQ ||
@@ -852,6 +866,7 @@ static size_t* build_bcast_map(Tensor* in, Tensor* out) {
     return m;
 }
 
+/** Dtype-generic element-wise binary kernel with per-operand broadcast maps; 0, -1 on bad dtype. */
 static int cpu_binary_generic(UOpType type, const void* in1, size_t in1_n, const void* in2,
                               size_t in2_n, void* out, size_t n, DType dt, const size_t* bmap1,
                               const size_t* bmap2) {
@@ -877,6 +892,7 @@ static int cpu_binary_generic(UOpType type, const void* in1, size_t in1_n, const
     }
 }
 
+/** True for the element-wise unary UOps handled by the generic path. */
 static int is_elementwise_unary(UOpType t) {
     switch (t) {
     case UOP_NEG:
@@ -923,6 +939,7 @@ static int is_elementwise_unary(UOpType t) {
         return -1;                                                                                 \
     }
 
+/** Dtype-generic element-wise unary kernel (half types compute in f32); 0, -1 on bad dtype/op. */
 static int cpu_unary_generic(UOpType type, const void* in, size_t in_n, void* out, size_t n,
                              DType dt) {
     if (dt == DTYPE_FLOAT32) { /* used for half-precision compute-in-f32 */
@@ -1023,12 +1040,13 @@ static int cpu_unary_generic(UOpType type, const void* in, size_t in_n, void* ou
     }
 }
 
+/** True for the reductions handled by cpu_reduce_generic (sum/mean/max/min). */
 static int is_reduction_op(UOpType t) {
     return t == UOP_SUM || t == UOP_MEAN || t == UOP_MAX_REDUCE || t == UOP_MIN_REDUCE;
 }
 
-/* Dtype-generic reduction (sum/mean/max/min). All layouts — global, 2D-per-dim,
- * and N-d-per-dim — collapse to a single (outer, inner, count) formulation:
+/* Dtype-generic reduction (sum/mean/max/min). All layouts - global, 2D-per-dim,
+ * and N-d-per-dim - collapse to a single (outer, inner, count) formulation:
  * output p reduces `count` elements starting at (p/inner)*count*inner + (p%inner)
  * with stride `inner`. Mean/sum accumulate in double then cast to the output
  * type (int mean truncates, matching the same-dtype output convention). */
@@ -1599,7 +1617,7 @@ void cml_apply_matmul_epilogue(struct IRNode* node, float* out_data, size_t tota
     }
 }
 
-/* Direct convolution worker — one task handles a contiguous range of flattened
+/* Direct convolution worker - one task handles a contiguous range of flattened
  * (batch, out_channel) tiles, whose output regions are disjoint (race-free). See
  * the UOP_CONV2D case for the algorithm rationale (shallow-input fast path). */
 typedef struct {
@@ -1634,6 +1652,7 @@ typedef enum {
     RAX_ARGMIN
 } ReduceAxisKind;
 
+/** f32 single-axis (or whole-tensor) reduction over the (outer,count,inner) layout for `kind`. */
 static void reduce_axis_f32(const float* in, const Tensor* inp, int dim, float* out,
                             ReduceAxisKind kind) {
     size_t outer = 1, inner = 1, count;
@@ -1741,6 +1760,7 @@ static void reduce_axis_f32(const float* in, const Tensor* inp, int dim, float* 
  * rank-3 tensor was a no-op along every axis. */
 typedef enum { CAX_SUM, CAX_PROD, CAX_MAX, CAX_MIN, CAX_LOGSUMEXP } CumAxisKind;
 
+/** f32 cumulative scan (cumsum/cumprod) along one axis. */
 static void cum_axis_f32(const float* in, const Tensor* inp, int dim, float* out,
                          CumAxisKind kind) {
     if (dim < 0)
@@ -1857,6 +1877,7 @@ static void movement_lanes(const Tensor* t, int dim, size_t* outer, size_t* coun
     *inner = n;
 }
 
+/** f32 circular shift of elements along one axis by `shift`. */
 static void roll_axis_f32(const float* in, const Tensor* inp, int shift, int dim, float* out) {
     if (dim < 0)
         dim += inp->ndim;
@@ -1873,6 +1894,7 @@ static void roll_axis_f32(const float* in, const Tensor* inp, int shift, int dim
                 out[(o * count + (j + s) % count) * inner + m] = in[(o * count + j) * inner + m];
 }
 
+/** f32 reversal of elements along one axis. */
 static void flip_axis_f32(const float* in, const Tensor* inp, int dim, float* out) {
     if (dim < 0)
         dim += inp->ndim;
@@ -1888,6 +1910,7 @@ static void flip_axis_f32(const float* in, const Tensor* inp, int dim, float* ou
                 out[(o * count + (count - 1 - j)) * inner + m] = in[(o * count + j) * inner + m];
 }
 
+/** f32 repeat-interleave: each slice along `dim` is duplicated `reps` times. */
 static void repeat_interleave_axis_f32(const float* in, const Tensor* inp, int reps, int dim,
                                        float* out) {
     if (dim < 0)
@@ -2082,8 +2105,9 @@ static size_t nonzero_nd_f32(const float* in, const Tensor* inp, size_t out_nume
         }                                                                                          \
         break;
 
+/** Thread-pool task computing a contiguous range of (batch, out_channel, out_row) conv outputs. */
 static void direct_conv_task(void* vd, size_t start, size_t end) {
-    /* Work is flattened over (batch, out_channel, out_row) — a fine enough
+    /* Work is flattened over (batch, out_channel, out_row) - a fine enough
      * granularity that even small batch×channel counts exceed the thread pool's
      * min-work threshold, while each unit still does OW·IC·kh·kw FMAs. Each
      * (n,oc,oh) output row is disjoint, so no synchronisation is needed. */
@@ -2164,6 +2188,15 @@ bool cml_slice_src(const Tensor* in, const Tensor* layout, const Tensor* out, co
     return true;
 }
 
+/**
+ * Give a view-output its own contiguous, correctly-strided buffer before a
+ * kernel writes it, and return that buffer.
+ *
+ * Movement ops (SLICE, EXPAND) hand back an output that still aliases an
+ * ancestor's storage; a kernel writing it contiguously from index 0 would
+ * corrupt whatever it is a view of, so any output that does not own its data
+ * is detached onto a fresh buffer first.
+ */
 static float* unview_output(Tensor* out, const float* in_data) {
     /* A view output aliases an ancestor's buffer, not necessarily in_data: in a
      * chain of slices the input may already own a fresh buffer while this
@@ -2191,6 +2224,9 @@ static float* unview_output(Tensor* out, const float* in_data) {
     return (float*)out->data;
 }
 
+/** Execute one IR node on the CPU interpreter: materialize its inputs if
+ * needed, dispatch on node->type to the matching kernel, and write node->output.
+ * Returns 0 on success, -1 on failure. The large switch is the per-op kernel set. */
 int cpu_execute_node(struct IRNode* node) {
     if (!node || !node->output) {
         return -1;
@@ -2229,7 +2265,7 @@ int cpu_execute_node(struct IRNode* node) {
     for (int _i = 0; _i < node->num_inputs && node->inputs; _i++) {
         Tensor* inp = node->inputs[_i];
         if (inp && !inp->data && !inp->ir_node) {
-            /* Detached leaf tensor with no data — allocate zero-filled */
+            /* Detached leaf tensor with no data - allocate zero-filled */
             if (inp->numel > 0) {
                 size_t sz      = inp->numel * cml_dtype_size(inp->dtype);
                 inp->data      = cml_calloc(1, sz);
@@ -2410,7 +2446,7 @@ not_empty_reduction:;
     }
     if (out->dtype != DTYPE_FLOAT32 && is_reduction_op(node->type) && node->num_inputs >= 1 &&
         node->inputs[0]->data && node->inputs[0]->dtype == out->dtype) {
-        /* Handle here or fail cleanly — never fall through to the f32 path. */
+        /* Handle here or fail cleanly - never fall through to the f32 path. */
         DType odt = out->dtype;
         int rc;
         if (is_half_dtype(odt)) {
@@ -2698,7 +2734,7 @@ not_empty_reduction:;
         /* Non-float32 matmul: computed in the native type. Requires all three
          * tensors to share the dtype (mixed-dtype matmul isn't promoted here);
          * otherwise fail cleanly rather than reinterpret bytes as float.
-         * Quantized weights (int8/GGUF) are NOT this case — they keep f32
+         * Quantized weights (int8/GGUF) are NOT this case - they keep f32
          * activations and are handled by the quant dispatch just below. */
         if (b->quant_type == CML_QUANT_NONE &&
             (out->dtype != DTYPE_FLOAT32 || a->dtype != DTYPE_FLOAT32 ||
@@ -2956,7 +2992,7 @@ not_empty_reduction:;
          * offset as an incremental odometer: for each output dim precompute the
          * input stride it maps to (perm_stride[i] = in_strides[perm[i]]), then
          * advance one element at a time. This avoids the per-element mod/div and
-         * full in_lin recomputation the naive form paid on every element — a big
+         * full in_lin recomputation the naive form paid on every element - a big
          * win for the deep (5-D/6-D) permutes the conv im2col path emits. */
         size_t perm_stride[16];
         int out_dim[16];
@@ -4379,21 +4415,21 @@ not_empty_reduction:;
 
         CMLBlasContext* conv_blas = get_blas_context();
 
-        /* Direct convolution — the fast path for shallow inputs (small
+        /* Direct convolution - the fast path for shallow inputs (small
          * K = Cin·kh·kw, e.g. the 3-channel RGB first layer). im2col+GEMM has too
          * little arithmetic intensity there (K≈27 gives a memory-bound skinny
          * GEMM) and Winograd's transform overhead isn't amortised below 16
          * channels. This vectorises over the contiguous output-width run: the
          * inner ow-loop has a precomputed valid range so it is branch-free and
          * the compiler emits packed FMAs (weight broadcast × input row).
-         * Reached only when the conv graph was NOT decomposed — i.e. under
+         * Reached only when the conv graph was NOT decomposed - i.e. under
          * no_grad inference; training still lowers to im2col+matmul for autodiff. */
         if (groups == 1 && in_channels < 16 && out->dtype == DTYPE_FLOAT32) {
             DirectConvData dcd = {in1_data,    in2_data,     bias_data,  out_data,  batch,
                                   in_channels, out_channels, in_h,       in_w,      out_h,
                                   out_w,       kernel_h,     kernel_w,   stride_h,  stride_w,
                                   pad_h,       pad_w,        dilation_h, dilation_w};
-            /* Parallelise over (batch, out_channel, out_row) — disjoint output
+            /* Parallelise over (batch, out_channel, out_row) - disjoint output
              * rows, so no synchronisation. threadpool_parallel_for runs inline
              * for a 1-thread pool; we additionally keep small convs inline so
              * they don't pay the fork/join cost. */
@@ -4900,11 +4936,11 @@ not_empty_reduction:;
     }
 
     case UOP_RESHAPE:
-        /* Reshape is a view — same data, different shape. Just copy. */
+        /* Reshape is a view - same data, different shape. Just copy. */
         if (!in1_data)
             return -1;
         if (out_data == in1_data) {
-            /* View shares data — data is already in place, nothing to do */
+            /* View shares data - data is already in place, nothing to do */
         } else if (in1_numel == out->numel) {
             memcpy(out_data, in1_data, out->numel * sizeof(float));
         } else {
@@ -4960,7 +4996,7 @@ not_empty_reduction:;
     }
 
     case UOP_STRIDE: {
-        /* View with different strides — copy with stride access.
+        /* View with different strides - copy with stride access.
          * params->new_strides holds new strides; fall back to identity copy. */
         if (!in1_data)
             return -1;
@@ -4995,7 +5031,7 @@ not_empty_reduction:;
             return -1;
         SliceParams* sp = node->params ? (SliceParams*)node->params : NULL;
         if (!sp || !sp->start || !sp->end) {
-            /* No params — identity copy */
+            /* No params - identity copy */
             size_t n = out->numel < in1_numel ? out->numel : in1_numel;
             memcpy(out_data, in1_data, n * sizeof(float));
             break;
@@ -5042,7 +5078,7 @@ not_empty_reduction:;
     }
 
     case UOP_MESHGRID: {
-        /* meshgrid of 1-D inputs — output is N-D grid for input[0] repeated along dim 0.
+        /* meshgrid of 1-D inputs - output is N-D grid for input[0] repeated along dim 0.
          * For CPU we only handle the first output (dim 0 grid). */
         if (!in1_data)
             return -1;
@@ -5102,7 +5138,7 @@ not_empty_reduction:;
     }
 
     case UOP_ALLOC: {
-        /* Buffer already allocated at the top of this function — nothing more
+        /* Buffer already allocated at the top of this function - nothing more
          * to compute; the output tensor is an uninitialized scratch buffer. */
         break;
     }
@@ -5179,7 +5215,7 @@ not_empty_reduction:;
 
     case UOP_FUSED_ELEMENTWISE: {
         /* Real kernel fusion: one loop evaluates the whole elementwise chain
-         * per output element, keeping intermediates in registers — no
+         * per output element, keeping intermediates in registers - no
          * intermediate tensor buffers are materialized. */
         FusedElementwiseParams* fp = (FusedElementwiseParams*)node->params;
         if (!fp || fp->num_steps <= 0 || fp->num_steps > 256)
@@ -5244,12 +5280,14 @@ static size_t g_total_nodes_executed = 0;
 static uint64_t g_cpu_exec_last_sig           = 0;
 static CMLExecutionPlan* g_cpu_exec_last_plan = NULL;
 
+/** Reset the cached last-graph signature and execution plan. */
 void cml_cpu_execute_cache_reset(void) {
     g_cpu_exec_last_sig  = 0;
     g_cpu_exec_last_plan = NULL;
 }
 
 // Non-static to allow use from dispatch layer
+/** CPU interpreter driver: decompose, reuse cached per-graph buffers, and execute every node. */
 int cpu_execute_ir(CMLGraph_t ir) {
     if (!ir)
         return -1;
@@ -5390,6 +5428,7 @@ int cpu_execute_ir(CMLGraph_t ir) {
 }
 
 // Print execution statistics
+/** Print cumulative execution counters (calls, nodes, average) to stdout. */
 void cml_print_exec_stats(void) {
     printf("Execution Stats:\n");
     printf("  cpu_execute_ir calls: %zu\n", g_cpu_exec_calls);
@@ -5399,6 +5438,7 @@ void cml_print_exec_stats(void) {
     }
 }
 
+/** Zero the execution counters. */
 void cml_reset_exec_stats(void) {
     g_cpu_exec_calls       = 0;
     g_total_nodes_executed = 0;
@@ -5410,7 +5450,7 @@ void cml_reset_exec_stats(void) {
 
 /* TinyJit capture/replay: the DEFAULT (opt out with TINYJIT=0). First time a
  * graph shape is seen, its execution is recorded into a trace; subsequent
- * identical graphs (same hash+shape — e.g. every training step) replay the trace
+ * identical graphs (same hash+shape - e.g. every training step) replay the trace
  * instead of re-walking the IR. Combined with the fusion scheduler above this
  * is the "build once → fuse → JIT → replay every step" persistent training step.
  * g_in_jit guards the re-entrancy (cml_tinyjit_execute calls cml_ir_execute
@@ -5427,6 +5467,7 @@ size_t cml_ir_tinyjit_replay_hits(void) {
 }
 static __thread int g_in_jit = 0;
 
+/** Whether TinyJit capture/replay is enabled (default on; TINYJIT=0 disables). */
 static int cml_tinyjit_active(void) {
     static int checked = 0, on = 0;
     if (!checked) {
@@ -5446,7 +5487,7 @@ void cml_ir_clear_executed(CMLGraph_t ir) {
         return;
     for (struct IRNode* p = ir->head; p; p = p->next) {
         if (p->num_inputs <= 0)
-            continue; /* leaf/input/weight — keep realized */
+            continue; /* leaf/input/weight - keep realized */
         p->is_executed = false;
         if (p->output)
             p->output->is_executed = false;
@@ -5455,12 +5496,12 @@ void cml_ir_clear_executed(CMLGraph_t ir) {
 }
 
 /* Re-run an already-built graph after its input/weight buffers were overwritten,
- * WITHOUT rebuilding it — the zero-rebuild static-graph step. Recomputes every op
+ * WITHOUT rebuilding it - the zero-rebuild static-graph step. Recomputes every op
  * node directly via cpu_execute_ir (the fusion path when enabled); does NOT go
  * through cml_ir_execute, whose TinyJit replay would return the values recorded on
  * the first run instead of recomputing from the updated buffers. The graph is
  * already decomposed + fused from the first execute, so this only re-runs kernels
- * — no decompose, no fusion pass, no node allocation. */
+ * - no decompose, no fusion pass, no node allocation. */
 int cml_ir_reexecute(CMLGraph_t ir) {
     if (!ir)
         return -1;
@@ -5470,6 +5511,7 @@ int cml_ir_reexecute(CMLGraph_t ir) {
     return cpu_execute_ir(ir);
 }
 
+/** Whole-graph CPU execute: decompose, run the fusion scheduler, then TinyJit or cpu_execute_ir. */
 int cml_ir_execute_cpu(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute_cpu");
@@ -5483,7 +5525,7 @@ int cml_ir_execute_cpu(CMLGraph_t ir) {
     }
 
     /* Real elementwise fusion on the whole-graph execute path (this is what
-     * backward/optimizer executes go through — cml_ir_execute → here). Without
+     * backward/optimizer executes go through - cml_ir_execute → here). Without
      * this, fusion only ran via cml_ir_execute_up_to (tensor realization /
      * inference) and never for the training step. The fuser has its own
      * is_executed / use_count / requires_grad guards, so it is safe and
@@ -5516,7 +5558,7 @@ int cml_ir_execute_cpu(CMLGraph_t ir) {
  * execution entry point honors the same backend set. Previously
  * cml_ir_execute only recognized "opencl" and cml_ir_execute_up_to only
  * metal/opencl, silently ignoring cuda/rocm/vulkan/nv/am/nir/webgpu. Returns
- * the requested backend (CML_BACKEND_CPU_FALLBACK when unset/unparseable —
+ * the requested backend (CML_BACKEND_CPU_FALLBACK when unset/unparseable -
  * never a GPU route) and the dispatch context to run it on. */
 static int ir_resolve_env_backend(CMLBackendType* out_backend, CMLDispatchContext** out_ctx) {
     static int resolved             = 0;
@@ -5536,6 +5578,7 @@ static int ir_resolve_env_backend(CMLBackendType* out_backend, CMLDispatchContex
     return backend != CML_BACKEND_CPU_FALLBACK && rctx != NULL;
 }
 
+/** Top-level execute: decompose, route to a BACKEND= GPU path when requested, else CPU. */
 int cml_ir_execute(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute");
@@ -5562,6 +5605,7 @@ int cml_ir_execute(CMLGraph_t ir) {
     return cml_ir_execute_cpu(ir);
 }
 
+/** Execute only the nodes needed to realize `target_node` (partial-graph materialization). */
 int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
     if (!ir || !target_node) {
         LOG_ERROR("Invalid arguments to cml_ir_execute_up_to");
@@ -5571,10 +5615,10 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
     /* NOTE: do NOT pre-mark target_node->is_used here. The partial-execution
      * DCE walk below seeds its stack with the target ONLY if it is not yet
      * marked; pre-marking it made the DFS push nothing, so no upstream node
-     * was ever marked or executed — the target then ran alone on unwritten
+     * was ever marked or executed - the target then ran alone on unwritten
      * inputs and its (zero-filled) output was reported as a valid result. */
 
-    /* Route through dispatch when BACKEND= requests a GPU/backend path —
+    /* Route through dispatch when BACKEND= requests a GPU/backend path -
      * same canonical parser as cml_ir_execute (was metal/opencl only). */
     CMLBackendType env_backend;
     CMLDispatchContext* s_dispatch_ctx;
@@ -5671,10 +5715,10 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
     }
 
     /* Partial (up-to-target) execution always uses this robust is_used-respecting
-     * loop below — including under FUSION_SCHEDULER=1. The fusion path only takes
+     * loop below - including under FUSION_SCHEDULER=1. The fusion path only takes
      * over full-graph (target==tail) execution, via cpu_execute_ir. Routing
      * partial execution through the fusion scheduler broke up-to-target
-     * semantics (downstream nodes got executed — test_lazy_eval) and buffer
+     * semantics (downstream nodes got executed - test_lazy_eval) and buffer
      * lifecycle (test_grad_check recip). */
     struct IRNode* node = ir->head;
     while (node) {

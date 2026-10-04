@@ -1,5 +1,5 @@
 /*
- * memory.h — User-provided memory arenas for embedded / edge deployment
+ * memory.h - User-provided memory arenas for embedded / edge deployment
  *
  * ExecuTorch MemoryManager analogue: all runtime allocations come from a
  * caller-supplied buffer, enabling placement in SRAM, DRAM, or mmap'd PTE segments.

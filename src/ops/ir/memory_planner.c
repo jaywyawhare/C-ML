@@ -15,6 +15,7 @@ typedef struct {
     size_t size;
 } BufferEntry;
 
+/** Order buffers by decreasing size (index tie-break) for greedy coloring. */
 static int cmp_by_size_desc(const void* a, const void* b) {
     const BufferEntry* ea = (const BufferEntry*)a;
     const BufferEntry* eb = (const BufferEntry*)b;
@@ -25,10 +26,13 @@ static int cmp_by_size_desc(const void* a, const void* b) {
     return ea->index - eb->index;
 }
 
+/** True if two [first_use, last_use] lifetimes intersect (so the buffers cannot share a slot). */
 static int lifetimes_overlap(int a_first, int a_last, int b_first, int b_last) {
     return !(a_last < b_first || b_last < a_first);
 }
 
+/* Plan buffer placement: greedily color buffers (largest first) into reusable slots whose
+ * lifetimes don't overlap, assign contiguous offsets, and compute total/peak/saved memory. */
 CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes, int* first_use,
                                       int* last_use) {
     if (num_buffers <= 0 || !sizes || !first_use || !last_use)
@@ -241,6 +245,7 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes, int* first
     return plan;
 }
 
+/** Free a memory plan and its per-buffer arrays. */
 void cml_memory_plan_free(CMLMemoryPlan* plan) {
     if (!plan)
         return;
@@ -252,6 +257,7 @@ void cml_memory_plan_free(CMLMemoryPlan* plan) {
     cml_free(plan);
 }
 
+/** Print the plan's totals and per-buffer sizes/offsets/lifetimes/reuse to stdout. */
 void cml_memory_plan_print(const CMLMemoryPlan* plan) {
     if (!plan) {
         printf("MemoryPlan: (null)\n");

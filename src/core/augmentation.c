@@ -11,6 +11,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+/** Allocate an augmentation config with all transforms disabled and default probs. */
 AugmentationConfig* augmentation_config_create(void) {
     AugmentationConfig* config = cml_malloc(sizeof(AugmentationConfig));
     if (!config)
@@ -43,6 +44,7 @@ AugmentationConfig* augmentation_config_create(void) {
     return config;
 }
 
+/** Free the config and its owned mean/std arrays. */
 void augmentation_config_free(AugmentationConfig* config) {
     if (!config)
         return;
@@ -62,6 +64,7 @@ static float rand_float(void) {
     return v;
 }
 
+/** Crop a random crop_height x crop_width window from each image of a 4D NCHW batch. */
 Tensor* augment_random_crop(Tensor* input, int crop_height, int crop_width) {
     if (!input || input->ndim != 4) {
         LOG_ERROR("Random crop requires 4D tensor [batch, channels, height, width]");
@@ -123,6 +126,8 @@ static Tensor* aug_alloc_like(Tensor* input, float** in_data, float** out_data) 
     return output;
 }
 
+/** Random 4D [N,C,H,W] flip with probability `prob`; `horizontal` mirrors width,
+ *  else height. Returns a clone when the flip doesn't fire. */
 static Tensor* augment_flip(Tensor* input, float prob, bool horizontal, const char* what) {
     if (!input || input->ndim != 4) {
         LOG_ERROR("%s requires 4D tensor [batch, channels, height, width]", what);
@@ -159,14 +164,18 @@ static Tensor* augment_flip(Tensor* input, float prob, bool horizontal, const ch
     return output;
 }
 
+/** Mirror each image horizontally with probability `prob`. */
 Tensor* augment_random_horizontal_flip(Tensor* input, float prob) {
     return augment_flip(input, prob, true, "Horizontal flip");
 }
 
+/** Mirror each image vertically with probability `prob`. */
 Tensor* augment_random_vertical_flip(Tensor* input, float prob) {
     return augment_flip(input, prob, false, "Vertical flip");
 }
 
+/** Rotate each image by a random angle in [angle_min, angle_max] degrees. Exact
+ *  90-degree multiples are handled by index remapping; others use bilinear sampling. */
 Tensor* augment_random_rotation(Tensor* input, float angle_min, float angle_max) {
     if (!input || input->ndim != 4) {
         LOG_ERROR("Rotation requires 4D tensor [batch, channels, height, width]");
@@ -275,6 +284,8 @@ Tensor* augment_random_rotation(Tensor* input, float angle_min, float angle_max)
     return output;
 }
 
+/** Apply random brightness/contrast scaling, plus saturation and hue shifts via an
+ *  RGB<->HSV round trip, to a 4D NCHW batch; output is clamped to [0,1]. */
 Tensor* augment_color_jitter(Tensor* input, float brightness, float contrast, float saturation,
                              float hue) {
     if (!input || input->ndim != 4) {
@@ -402,6 +413,7 @@ Tensor* augment_color_jitter(Tensor* input, float brightness, float contrast, fl
     return output;
 }
 
+/** Per-channel normalize (x - mean) / std; zero std is treated as 1 to avoid div-by-zero. */
 Tensor* augment_normalize(Tensor* input, float* mean, float* std, int num_channels) {
     if (!input || !mean || !std || input->ndim != 4) {
         LOG_ERROR("Normalize requires 4D tensor and valid mean/std arrays");
@@ -442,6 +454,8 @@ Tensor* augment_normalize(Tensor* input, float* mean, float* std, int num_channe
     return output;
 }
 
+/** Run every enabled transform in the config in sequence, freeing intermediates but
+ *  never the caller's `input`. Returns the final tensor (may be `input` if none ran). */
 Tensor* augment_apply(Tensor* input, AugmentationConfig* config) {
     if (!input || !config)
         return NULL;

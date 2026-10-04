@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include "alloc/cml_allocator.h"
 
+/** Create a CUDA queue wrapping a fresh CUstream. */
 CMLHCQQueue* cml_hcq_cuda_queue_create(void) {
     CMLCUDABackend* cuda = cml_dispatch_get_cuda_backend();
     if (!cuda) {
@@ -37,6 +38,7 @@ CMLHCQQueue* cml_hcq_cuda_queue_create(void) {
     return queue;
 }
 
+/** Destroy the stream and free the CUDA queue wrapper. */
 void cml_hcq_cuda_queue_destroy(CMLHCQQueue* queue) {
     if (!queue)
         return;
@@ -52,6 +54,7 @@ void cml_hcq_cuda_queue_destroy(CMLHCQQueue* queue) {
     cml_free(queue);
 }
 
+/** Launch a CUfunction on the queue's stream with the descriptor's geometry. */
 int cml_hcq_cuda_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     if (!queue || !desc)
         return -1;
@@ -79,6 +82,7 @@ int cml_hcq_cuda_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc)
     return 0;
 }
 
+/** Async host-to-device copy on the queue's stream. */
 int cml_hcq_cuda_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src)
         return -1;
@@ -99,6 +103,7 @@ int cml_hcq_cuda_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size
     return 0;
 }
 
+/** Async device-to-host copy on the queue's stream. */
 int cml_hcq_cuda_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src)
         return -1;
@@ -119,6 +124,7 @@ int cml_hcq_cuda_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size
     return 0;
 }
 
+/** Create a CUDA signal backed by a CUevent. */
 CMLHCQSignal* cml_hcq_cuda_signal_create(void) {
     CMLCUDABackend* cuda = cml_dispatch_get_cuda_backend();
     if (!cuda) {
@@ -147,6 +153,7 @@ CMLHCQSignal* cml_hcq_cuda_signal_create(void) {
     return signal;
 }
 
+/** Destroy the CUevent and free the signal wrapper. */
 void cml_hcq_cuda_signal_destroy(CMLHCQSignal* signal) {
     if (!signal)
         return;
@@ -162,6 +169,7 @@ void cml_hcq_cuda_signal_destroy(CMLHCQSignal* signal) {
     cml_free(signal);
 }
 
+/** Record the event into the queue's stream. */
 int cml_hcq_cuda_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal)
         return -1;
@@ -182,6 +190,7 @@ int cml_hcq_cuda_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return 0;
 }
 
+/** Make the queue's stream wait on the signal's event. */
 int cml_hcq_cuda_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal)
         return -1;
@@ -202,6 +211,7 @@ int cml_hcq_cuda_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return 0;
 }
 
+/** Block the host on the event (CUDA has no timeout on cuEventSynchronize). */
 int cml_hcq_cuda_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     if (!signal)
         return -1;
@@ -222,6 +232,7 @@ int cml_hcq_cuda_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     return 0;
 }
 
+/** Block until the queue's stream drains. */
 int cml_hcq_cuda_queue_synchronize(CMLHCQQueue* queue) {
     if (!queue)
         return -1;

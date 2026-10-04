@@ -9,21 +9,25 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** Config for GPT-2 small (124M): 12 layers, 12 heads, 768 embd, 1024 context. */
 GPT2Config cml_zoo_gpt2_config_small(void) {
     return (GPT2Config){
         .vocab_size = 50257, .n_layer = 12, .n_head = 12, .n_embd = 768, .block_size = 1024};
 }
 
+/** Config for GPT-2 medium (355M): 24 layers, 16 heads, 1024 embd, 1024 context. */
 GPT2Config cml_zoo_gpt2_config_medium(void) {
     return (GPT2Config){
         .vocab_size = 50257, .n_layer = 24, .n_head = 16, .n_embd = 1024, .block_size = 1024};
 }
 
+/** Config for GPT-2 large (774M): 36 layers, 20 heads, 1280 embd, 1024 context. */
 GPT2Config cml_zoo_gpt2_config_large(void) {
     return (GPT2Config){
         .vocab_size = 50257, .n_layer = 36, .n_head = 20, .n_embd = 1280, .block_size = 1024};
 }
 
+/** Config for GPT-2 XL (1.5B): 48 layers, 25 heads, 1600 embd, 1024 context. */
 GPT2Config cml_zoo_gpt2_config_xl(void) {
     return (GPT2Config){
         .vocab_size = 50257, .n_layer = 48, .n_head = 25, .n_embd = 1600, .block_size = 1024};
@@ -37,6 +41,7 @@ typedef struct {
     Sequential* mlp;
 } GPT2Block;
 
+/** Pre-norm transformer block forward: residual self-attention then residual MLP. */
 static Tensor* gpt2_block_forward(Module* module, Tensor* input) {
     GPT2Block* block = (GPT2Block*)module;
     if (!block || !input)
@@ -65,6 +70,7 @@ static Tensor* gpt2_block_forward(Module* module, Tensor* input) {
     return tensor_add(x, mlp_out);
 }
 
+/** Free a GPT-2 block's norms, attention and MLP submodules. */
 static void gpt2_block_free(Module* module) {
     GPT2Block* block = (GPT2Block*)module;
     if (!block)
@@ -80,6 +86,7 @@ static void gpt2_block_free(Module* module) {
     cml_free(block);
 }
 
+/** Build one GPT-2 block (causal MHA + 4x GELU MLP) with depth-scaled residual init. */
 static Module* create_gpt2_block(int n_embd, int n_head, int n_layer, DType dtype,
                                  DeviceType device) {
     GPT2Block* block = cml_malloc(sizeof(GPT2Block));
@@ -130,6 +137,7 @@ typedef struct {
     int block_size;
 } GPT2Model;
 
+/** Forward: token + positional embeddings, transformer stack, final norm, LM head logits. */
 static Tensor* gpt2_forward(Module* module, Tensor* input) {
     GPT2Model* gpt2 = (GPT2Model*)module;
     if (!gpt2 || !input)
@@ -173,6 +181,7 @@ static Tensor* gpt2_forward(Module* module, Tensor* input) {
     return module_forward((Module*)gpt2->lm_head, x);
 }
 
+/** Free the GPT-2 embeddings, block list, final norm and LM head. */
 static void gpt2_free(Module* module) {
     GPT2Model* gpt2 = (GPT2Model*)module;
     if (!gpt2)
@@ -190,6 +199,7 @@ static void gpt2_free(Module* module) {
     cml_free(gpt2);
 }
 
+/** Build a GPT-2 language model from @p config: embeddings, N blocks, final norm and LM head. */
 Module* cml_zoo_gpt2_create(GPT2Config* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;

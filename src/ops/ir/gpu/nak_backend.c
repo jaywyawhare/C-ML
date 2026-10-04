@@ -37,6 +37,7 @@ static bool g_nak_fns_loaded = false;
 
 static const char* nak_lib_names[] = {"libnak.so", "libnak.so.0", "libnak.so.1", NULL};
 
+/** dlopen Mesa's libnak by its known sonames, then the NAK_LIB override; NULL if none load. */
 static void* try_open_nak(void) {
     for (int i = 0; nak_lib_names[i]; i++) {
         void* lib = dlopen(nak_lib_names[i], RTLD_LAZY);
@@ -53,6 +54,7 @@ static void* try_open_nak(void) {
     return NULL;
 }
 
+/** Resolve the NAK entry points from `lib` into g_nak_fns; -1 if any symbol is missing. */
 static int load_nak_symbols(void* lib) {
     if (g_nak_fns_loaded)
         return 0;
@@ -76,6 +78,7 @@ static int load_nak_symbols(void* lib) {
     return 0;
 }
 
+/** True if libnak can be loaded and exposes nak_compile_shader. */
 bool cml_nak_available(void) {
     void* lib = try_open_nak();
     if (!lib)
@@ -85,6 +88,8 @@ bool cml_nak_available(void) {
     return ok;
 }
 
+/** Allocate a NAK backend for `gpu_arch`, loading libnak; a handle is returned even when
+ *  the library is absent (left non-functional) so callers can probe it uniformly. */
 CMLNAKBackend* cml_nak_create(int gpu_arch) {
     CMLNAKBackend* nak = cml_calloc(1, sizeof(CMLNAKBackend));
     if (!nak)
@@ -110,6 +115,7 @@ CMLNAKBackend* cml_nak_create(int gpu_arch) {
     return nak;
 }
 
+/** Close the loaded library and free the NAK backend. */
 void cml_nak_free(CMLNAKBackend* nak) {
     if (!nak)
         return;
@@ -118,6 +124,8 @@ void cml_nak_free(CMLNAKBackend* nak) {
     cml_free(nak);
 }
 
+/** Compile a NIR shader to native GPU code via NAK, copying the result into a fresh
+ *  heap buffer (`*binary`/`*binary_size`). Returns -1 on failure. */
 int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader, void** binary,
                     size_t* binary_size) {
     if (!nak || !nak->initialized)
@@ -159,6 +167,7 @@ int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader, void** binary,
     return 0;
 }
 
+/** Convert SPIR-V to NIR via NAK, then compile it to a native binary. Returns -1 on failure. */
 int cml_nak_compile_spirv(CMLNAKBackend* nak, const void* spirv, size_t spirv_size, void** binary,
                           size_t* binary_size) {
     if (!nak || !nak->initialized)
@@ -181,13 +190,17 @@ int cml_nak_compile_spirv(CMLNAKBackend* nak, const void* spirv, size_t spirv_si
 
 #else /* !CML_HAS_NAK */
 
+/** Stub when NAK is not compiled in: never available. */
 bool cml_nak_available(void) { return false; }
+/** Stub backend creation: returns NULL without NAK. */
 CMLNAKBackend* cml_nak_create(int gpu_arch) {
     (void)gpu_arch;
     return NULL;
 }
+/** Stub free: no-op without NAK. */
 void cml_nak_free(CMLNAKBackend* nak) { (void)nak; }
 
+/** Stub NIR compile: always fails (-1) without NAK. */
 int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader, void** binary,
                     size_t* binary_size) {
     (void)nak;
@@ -197,6 +210,7 @@ int cml_nak_compile(CMLNAKBackend* nak, const void* nir_shader, void** binary,
     return -1;
 }
 
+/** Stub SPIR-V compile: always fails (-1) without NAK. */
 int cml_nak_compile_spirv(CMLNAKBackend* nak, const void* spirv, size_t spirv_size, void** binary,
                           size_t* binary_size) {
     (void)nak;

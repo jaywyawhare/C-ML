@@ -80,7 +80,6 @@ graph between models. Training parity against PyTorch is pinned by
 | C API | `include/cml.h` |
 | Backend selection (CPU/OpenCL/Vulkan/CUDA/ROCm) | README backend table |
 | Quantized inference (int8/int4/NF4) | `tests/test_quant_matmul.c` |
-| Architecture notes & audit history | `docs/audits/AUDIT.md` |
 
 ## Environment knobs
 

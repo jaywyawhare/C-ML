@@ -7,6 +7,9 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** torch.nn.GroupNorm forward: split the C channels into num_groups, normalize each group over
+ *  its channels and spatial dims per sample, then apply the optional per-channel affine.
+ *  Expects >=2D [N,C,...]; NULL on rank or channel mismatch. */
 static Tensor* groupnorm_forward(Module* module, Tensor* input) {
     GroupNorm* gn = (GroupNorm*)module;
 
@@ -155,8 +158,11 @@ static Tensor* groupnorm_forward(Module* module, Tensor* input) {
     return output;
 }
 
+/** Free the GroupNorm module; affine parameters are released by module_free. */
 static void groupnorm_free(Module* module) { cml_free(module); }
 
+/** Construct a GroupNorm layer; num_channels must be divisible by num_groups. Allocates
+ *  weight/bias when affine, eps falls back to 1e-5 if non-positive. NULL on bad args/failure. */
 GroupNorm* nn_groupnorm(int num_groups, int num_channels, float eps, bool affine, DType dtype,
                         DeviceType device) {
     if (num_channels % num_groups != 0) {

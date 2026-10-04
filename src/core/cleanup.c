@@ -12,6 +12,7 @@
 
 #define INITIAL_CAPACITY 16
 
+/** Allocate an empty cleanup context and register it globally for teardown. */
 CleanupContext* cleanup_context_create(void) {
     CleanupContext* ctx = cml_malloc(sizeof(CleanupContext));
     if (!ctx)
@@ -38,6 +39,7 @@ CleanupContext* cleanup_context_create(void) {
     return ctx;
 }
 
+/** Grow the tensor array (doubling) to hold `needed` more entries; -1 on OOM. */
 static int ensure_tensor_capacity(CleanupContext* ctx, size_t needed) {
     if (ctx->num_tensors + needed <= ctx->tensor_capacity) {
         return 0;
@@ -60,6 +62,7 @@ static int ensure_tensor_capacity(CleanupContext* ctx, size_t needed) {
 /* ensure_dataset_capacity and ensure_memory_capacity will be added
    when cleanup_register_dataset/cleanup_register_memory are implemented. */
 
+/** Record a model to be freed on teardown; -1 on NULL args. */
 int cleanup_register_model(CleanupContext* ctx, Module* model) {
     if (!ctx || !model)
         return -1;
@@ -67,6 +70,7 @@ int cleanup_register_model(CleanupContext* ctx, Module* model) {
     return 0;
 }
 
+/** Record a parameter array to be freed on teardown; -1 on NULL args. */
 int cleanup_register_params(CleanupContext* ctx, Parameter** params) {
     if (!ctx || !params)
         return -1;
@@ -74,6 +78,7 @@ int cleanup_register_params(CleanupContext* ctx, Parameter** params) {
     return 0;
 }
 
+/** Record an optimizer to be freed on teardown; -1 on NULL args. */
 int cleanup_register_optimizer(CleanupContext* ctx, Optimizer* optimizer) {
     if (!ctx || !optimizer)
         return -1;
@@ -81,6 +86,10 @@ int cleanup_register_optimizer(CleanupContext* ctx, Optimizer* optimizer) {
     return 0;
 }
 
+/**
+ * Register a tensor for later freeing. Lazy tensors are realized first so the IR
+ * graph and the cleanup context don't both try to free them.
+ */
 int cleanup_register_tensor(CleanupContext* ctx, Tensor* tensor) {
     if (!ctx || !tensor)
         return -1;
@@ -101,6 +110,8 @@ int cleanup_register_tensor(CleanupContext* ctx, Tensor* tensor) {
     return 0;
 }
 
+/** Free every registered resource (model, params, optimizer, tensors, datasets,
+ *  memory) and reset the context's counters without freeing the context itself. */
 void cleanup_clear_all(CleanupContext* ctx) {
     if (!ctx)
         return;
@@ -157,6 +168,7 @@ void cleanup_clear_all(CleanupContext* ctx) {
     ctx->memory_capacity = 0;
 }
 
+/** Clear all registered resources, then free the context itself. */
 void cleanup_context_free(CleanupContext* ctx) {
     if (!ctx)
         return;

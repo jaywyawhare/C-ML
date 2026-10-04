@@ -71,6 +71,7 @@ typedef struct {
 
 static HipMockState g_mock;
 
+/** Append an ordered journal entry so tests can assert submission order. */
 static void journal(MockOpKind kind, size_t bytes, const char* name) {
     if (g_mock.journal_len >= MOCK_JOURNAL_CAP)
         return;
@@ -85,11 +86,13 @@ static void journal(MockOpKind kind, size_t bytes, const char* name) {
     }
 }
 
+/** Record a live allocation so tests can detect leaks. */
 static void track_alloc(void* p) {
     if (p && g_mock.num_allocs < MOCK_MAX_ALLOC_TRACKED)
         g_mock.allocs[g_mock.num_allocs++] = p;
 }
 
+/** Drop an allocation from the live set on free. */
 static void untrack_alloc(void* p) {
     for (int i = 0; i < g_mock.num_allocs; i++) {
         if (g_mock.allocs[i] == p) {
@@ -101,6 +104,7 @@ static void untrack_alloc(void* p) {
 
 /* --- implemented HIP surface -------------------------------------------- */
 
+/** Mock hipInit: mark the mock driver initialized. */
 static hipError_t m_hipInit(unsigned int flags) {
     (void)flags;
     journal(MOCK_OP_INIT, 0, NULL);
@@ -108,6 +112,7 @@ static hipError_t m_hipInit(unsigned int flags) {
     return HIP_SUCCESS;
 }
 
+/** Mock hipGetDeviceCount: always reports a single device. */
 static hipError_t m_hipGetDeviceCount(int* count) {
     if (!count || !g_mock.initialized)
         return HIP_ERROR_NOT_INITIALIZED;
@@ -115,12 +120,13 @@ static hipError_t m_hipGetDeviceCount(int* count) {
     return HIP_SUCCESS;
 }
 
+/** Mock hipSetDevice: succeeds once initialized. */
 static hipError_t m_hipSetDevice(int id) {
     (void)id;
     return g_mock.initialized ? HIP_SUCCESS : HIP_ERROR_NOT_INITIALIZED;
 }
 
-/* rocm_backend passes a pointer to its own properties struct layout; fill
+/** rocm_backend passes a pointer to its own properties struct layout; fill
  * conservatively through the documented leading fields only. */
 static hipError_t m_hipGetDeviceProperties(void* prop, int deviceId) {
     (void)prop; /* layout is opaque here; backend re-reads via its own copy */
@@ -128,6 +134,7 @@ static hipError_t m_hipGetDeviceProperties(void* prop, int deviceId) {
     return HIP_SUCCESS;
 }
 
+/** Mock hipMalloc: host-backed allocation tracked for leak detection. */
 static hipError_t m_hipMalloc(void** ptr, size_t size) {
     if (!ptr || !size)
         return HIP_ERROR_INVALID_VALUE;
@@ -140,6 +147,7 @@ static hipError_t m_hipMalloc(void** ptr, size_t size) {
     return HIP_SUCCESS;
 }
 
+/** Mock hipFree: release a tracked host-backed allocation. */
 static hipError_t m_hipFree(void* ptr) {
     if (!ptr)
         return HIP_ERROR_INVALID_VALUE;
@@ -149,7 +157,7 @@ static hipError_t m_hipFree(void* ptr) {
     return HIP_SUCCESS;
 }
 
-/* Device memory is host-backed, so both directions are plain copies. */
+/** Device memory is host-backed, so both directions are plain copies. */
 static hipError_t m_hipMemcpy(void* dst, const void* src, size_t bytes, int kind) {
     if (!dst || !src || !bytes)
         return HIP_ERROR_INVALID_VALUE;
@@ -165,6 +173,7 @@ static hipError_t m_hipMemcpy(void* dst, const void* src, size_t bytes, int kind
     return HIP_SUCCESS;
 }
 
+/** Mock hipStreamCreate: hand back a dummy stream handle. */
 static hipError_t m_hipStreamCreate(hipStream_t* s) {
     if (!s || !g_mock.initialized)
         return HIP_ERROR_NOT_INITIALIZED;
@@ -175,24 +184,27 @@ static hipError_t m_hipStreamCreate(hipStream_t* s) {
     return HIP_SUCCESS;
 }
 
+/** Mock hipStreamDestroy: clear the stream-created flag. */
 static hipError_t m_hipStreamDestroy(hipStream_t s) {
     (void)s;
     g_mock.stream_created = false;
     return HIP_SUCCESS;
 }
 
+/** Mock hipStreamSynchronize: completes immediately, journaled. */
 static hipError_t m_hipStreamSynchronize(hipStream_t s) {
     (void)s;
     journal(MOCK_OP_STREAM_SYNC, 0, NULL);
     return HIP_SUCCESS;
 }
 
+/** Mock hipDeviceSynchronize: completes immediately, journaled. */
 static hipError_t m_hipDeviceSynchronize(void) {
     journal(MOCK_OP_STREAM_SYNC, 0, "device");
     return HIP_SUCCESS;
 }
 
-/* Code objects: HSACO blobs cannot execute on a CPU, so load succeeds
+/** Code objects: HSACO blobs cannot execute on a CPU, so load succeeds
  * (validating the mapping/lifetime path) while launches are journaled with
  * their geometry instead of executed. */
 static hipError_t m_hipModuleLoadData(hipModule_t* module, const void* image) {
@@ -204,17 +216,20 @@ static hipError_t m_hipModuleLoadData(hipModule_t* module, const void* image) {
     return HIP_SUCCESS;
 }
 
+/** Mock hipModuleLoad: delegate to the data loader, treating fname as the blob. */
 static hipError_t m_hipModuleLoad(hipModule_t* module, const char* fname) {
     if (!module || !fname)
         return HIP_ERROR_INVALID_VALUE;
     return m_hipModuleLoadData(module, fname);
 }
 
+/** Mock hipModuleUnload: no-op success. */
 static hipError_t m_hipModuleUnload(hipModule_t module) {
     (void)module;
     return HIP_SUCCESS;
 }
 
+/** Mock hipModuleGetFunction: return the kernel name as the handle so launch can journal it. */
 static hipError_t m_hipModuleGetFunction(hipFunction_t* fn, hipModule_t module, const char* kname) {
     if (!fn || !kname)
         return HIP_ERROR_INVALID_VALUE;
@@ -227,6 +242,7 @@ static hipError_t m_hipModuleGetFunction(hipFunction_t* fn, hipModule_t module, 
     return HIP_SUCCESS;
 }
 
+/** Mock kernel launch: validate params and journal the grid/block geometry rather than execute. */
 static hipError_t m_hipModuleLaunchKernel(hipFunction_t f, unsigned gx, unsigned gy, unsigned gz,
                                           unsigned bx, unsigned by, unsigned bz, unsigned shared,
                                           hipStream_t stream, void** kernelParams, void** extra) {
@@ -256,6 +272,7 @@ static hipError_t m_hipModuleLaunchKernel(hipFunction_t f, unsigned gx, unsigned
     return HIP_SUCCESS;
 }
 
+/** Mock hipEventCreate: hand back a slot from a small static event pool. */
 static hipError_t m_hipEventCreate(void** event) {
     if (!event)
         return HIP_ERROR_INVALID_VALUE;
@@ -268,11 +285,13 @@ static hipError_t m_hipEventCreate(void** event) {
     return HIP_SUCCESS;
 }
 
+/** Mock hipEventDestroy: no-op success. */
 static hipError_t m_hipEventDestroy(void* event) {
     (void)event;
     return HIP_SUCCESS;
 }
 
+/** Mock hipEventRecord: journal the record, completes immediately. */
 static hipError_t m_hipEventRecord(void* event, hipStream_t stream) {
     (void)event;
     (void)stream;
@@ -280,6 +299,7 @@ static hipError_t m_hipEventRecord(void* event, hipStream_t stream) {
     return HIP_SUCCESS;
 }
 
+/** Mock hipEventSynchronize: completes immediately, journaled. */
 static hipError_t m_hipEventSynchronize(void* event) {
     (void)event;
     journal(MOCK_OP_EVENT_SYNC, 0, NULL);
@@ -288,8 +308,10 @@ static hipError_t m_hipEventSynchronize(void* event) {
 
 /* --- public mock API ----------------------------------------------------- */
 
+/** Clear all mock state (allocations, journal, counters). */
 void cml_hip_mock_reset(void) { memset(&g_mock, 0, sizeof(g_mock)); }
 
+/** Wire the mock HIP entry points into a ROCm backend and run its init sequence. */
 int cml_rocm_backend_init_mock(CMLROCmBackend* backend) {
     if (!backend)
         return -1;
@@ -340,13 +362,16 @@ int cml_rocm_backend_init_mock(CMLROCmBackend* backend) {
     return 0;
 }
 
+/** True when CML_HIP_MOCK=1 requests the mock driver. */
 bool cml_hip_mock_enabled_from_env(void) {
     const char* v = getenv("CML_HIP_MOCK");
     return v && v[0] == '1';
 }
 
+/** Number of journaled operations recorded so far. */
 int cml_hip_mock_journal_len(void) { return g_mock.journal_len; }
 
+/** Return journal entry `i` in the public struct form, or NULL if out of range. */
 const CMLHIPMockEntry* cml_hip_mock_journal_at(int i) {
     if (i < 0 || i >= g_mock.journal_len || i >= MOCK_JOURNAL_CAP)
         return NULL;
@@ -358,6 +383,8 @@ const CMLHIPMockEntry* cml_hip_mock_journal_at(int i) {
     return &out;
 }
 
+/** Count of allocations not yet freed, for leak assertions. */
 int cml_hip_mock_outstanding_allocs(void) { return g_mock.num_allocs; }
 
+/** Total number of kernel launches issued against the mock. */
 uint64_t cml_hip_mock_launches(void) { return g_mock.launches; }

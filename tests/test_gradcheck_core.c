@@ -5,7 +5,7 @@
  * must match x->grad[i] within tolerance.
  *
  * Deliberately covers only ops/shapes that don't hit the pre-existing
- * batchnorm2d graph-cache crash (see grad_check.c) — this is a stable gate.
+ * batchnorm2d graph-cache crash (see grad_check.c) - this is a stable gate.
  */
 #include <stdio.h>
 #include <stdlib.h>

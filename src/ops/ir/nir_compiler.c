@@ -31,6 +31,7 @@ static const char* nir_target_names[] = {
 static const char* mesa_lib_names[] = {"libmesa_nir.so", "libmesa-nir.so", "libmesa_nir.so.0",
                                        "libmesa-nir.so.0", NULL};
 
+/** Try each known Mesa NIR library name in turn; return the first that dlopens. */
 static void* try_open_mesa(void) {
     for (int i = 0; mesa_lib_names[i]; i++) {
         void* lib = dlopen(mesa_lib_names[i], RTLD_LAZY);
@@ -41,6 +42,7 @@ static void* try_open_mesa(void) {
     return NULL;
 }
 
+/** Thin dlsym wrapper returning the resolved symbol (or NULL). */
 static void* resolve(void* lib, const char* name) {
     void* sym = dlsym(lib, name);
     if (!sym) {
@@ -48,6 +50,7 @@ static void* resolve(void* lib, const char* name) {
     return sym;
 }
 
+/** Resolve all NIR builder/intrinsic entry points into the compiler; -1 if any is missing. */
 static int load_nir_symbols(CMLNIRCompiler* c) {
     void* lib = c->mesa_lib;
     if (!lib)
@@ -76,6 +79,7 @@ static int load_nir_symbols(CMLNIRCompiler* c) {
     return 0;
 }
 
+/** Probe whether a real Mesa NIR library (with a known key symbol) is loadable. */
 bool cml_nir_available(void) {
     void* lib = try_open_mesa();
     if (!lib)
@@ -88,6 +92,10 @@ bool cml_nir_available(void) {
     return ok;
 }
 
+/**
+ * Allocate a NIR compiler for the given target, loading Mesa and its symbols.
+ * Returns a valid-but-non-functional struct if Mesa is unavailable.
+ */
 CMLNIRCompiler* cml_nir_compiler_create(CMLNIRTarget target) {
     if (target < 0 || target >= NIR_TARGET_COUNT) {
         LOG_ERROR("NIR: invalid target %d", (int)target);
@@ -121,6 +129,7 @@ CMLNIRCompiler* cml_nir_compiler_create(CMLNIRTarget target) {
     return c;
 }
 
+/** Free the SPIR-V output, close the Mesa library, and free the compiler. */
 void cml_nir_compiler_free(CMLNIRCompiler* compiler) {
     if (!compiler)
         return;
@@ -142,6 +151,10 @@ void cml_nir_compiler_free(CMLNIRCompiler* compiler) {
     cml_free(compiler);
 }
 
+/**
+ * Translate a single UOp into the corresponding NIR builder call on the active
+ * shader (e.g. EXP lowered to exp2(x*log2 e)); -1 for unsupported ops.
+ */
 int cml_nir_emit_uop(CMLNIRCompiler* compiler, UOpType op, int num_inputs) {
     if (!compiler || !compiler->initialized)
         return -1;
@@ -210,6 +223,10 @@ int cml_nir_emit_uop(CMLNIRCompiler* compiler, UOpType op, int num_inputs) {
     }
 }
 
+/**
+ * Build a compute shader from the IR graph and lower it to SPIR-V, taking
+ * ownership of the resulting blob on the compiler.
+ */
 int cml_nir_compile(CMLNIRCompiler* compiler, CMLGraph_t ir) {
     if (!compiler)
         return -1;
@@ -263,18 +280,21 @@ int cml_nir_compile(CMLNIRCompiler* compiler, CMLGraph_t ir) {
     return 0;
 }
 
+/** Size in bytes of the last compiled SPIR-V blob. */
 size_t cml_nir_binary_size(const CMLNIRCompiler* compiler) {
     if (!compiler)
         return 0;
     return compiler->spirv_size;
 }
 
+/** Pointer to the last compiled SPIR-V blob (owned by the compiler). */
 const void* cml_nir_binary_data(const CMLNIRCompiler* compiler) {
     if (!compiler)
         return NULL;
     return compiler->spirv_output;
 }
 
+/** Human-readable name for a NIR target, or "unknown" if out of range. */
 const char* cml_nir_target_name(CMLNIRTarget target) {
     if (target < 0 || target >= NIR_TARGET_COUNT)
         return "unknown";

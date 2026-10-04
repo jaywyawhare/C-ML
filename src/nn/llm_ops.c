@@ -9,6 +9,7 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** Numerically stable row-wise softmax over a [rows, cols] array, in place. */
 void cml_softmax_rows_inplace(float* data, int rows, int cols) {
     for (int r = 0; r < rows; r++) {
         float* row    = data + (size_t)r * cols;
@@ -33,6 +34,7 @@ void cml_softmax_rows_inplace(float* data, int rows, int cols) {
 
 #define HASH_EMPTY (-1)
 
+/** FNV-1a hash of a NUL-terminated string, used for the tokenizer's vocab table. */
 static unsigned int fnv1a_hash(const char* str) {
     unsigned int hash = 2166136261u;
     while (*str) {
@@ -42,6 +44,7 @@ static unsigned int fnv1a_hash(const char* str) {
     return hash;
 }
 
+/** Insert key->value into the open-addressed vocab hash table; -1 if the table is full. */
 static int hash_insert(int* table, int table_size, char** vocab, const char* key, int value) {
     unsigned int h = fnv1a_hash(key) % (unsigned int)table_size;
     for (int probe = 0; probe < table_size; probe++) {
@@ -59,6 +62,7 @@ static int hash_insert(int* table, int table_size, char** vocab, const char* key
     return -1; /* table full */
 }
 
+/** Look up a token string in the vocab hash table; returns its id or -1 if absent. */
 static int hash_lookup(const int* table, int table_size, char** vocab, const char* key) {
     unsigned int h = fnv1a_hash(key) % (unsigned int)table_size;
     for (int probe = 0; probe < table_size; probe++) {
@@ -73,6 +77,7 @@ static int hash_lookup(const int* table, int table_size, char** vocab, const cha
     return -1;
 }
 
+/** Allocate a contiguous KV cache sized [max_seq_len, num_kv_heads, head_dim]. */
 CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim) {
     if (max_seq_len <= 0 || num_kv_heads <= 0 || head_dim <= 0) {
         LOG_ERROR("cml_kv_cache_create: invalid parameters (max_seq=%d, kv_heads=%d, head_dim=%d)",
@@ -110,6 +115,7 @@ CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim)
     return cache;
 }
 
+/** Free the key and value cache tensors and the cache struct. */
 void cml_kv_cache_free(CMLKVCache* cache) {
     if (!cache)
         return;
@@ -120,6 +126,7 @@ void cml_kv_cache_free(CMLKVCache* cache) {
     cml_free(cache);
 }
 
+/** Append new K/V rows at the current position; returns the new length or -1 on overflow. */
 int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value) {
     if (!cache || !new_key || !new_value) {
         LOG_ERROR("cml_kv_cache_append: NULL argument");
@@ -159,12 +166,14 @@ int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value) {
     return cache->current_len;
 }
 
+/** Reset the cache to empty by zeroing its length (buffers are not cleared). */
 void cml_kv_cache_reset(CMLKVCache* cache) {
     if (!cache)
         return;
     cache->current_len = 0;
 }
 
+/** View the populated keys as a [current_len, num_kv_heads, head_dim] tensor. */
 Tensor* cml_kv_cache_get_keys(CMLKVCache* cache) {
     if (!cache || cache->current_len == 0)
         return NULL;
@@ -183,6 +192,7 @@ Tensor* cml_kv_cache_get_keys(CMLKVCache* cache) {
     return result;
 }
 
+/** View the populated values as a [current_len, num_kv_heads, head_dim] tensor. */
 Tensor* cml_kv_cache_get_values(CMLKVCache* cache) {
     if (!cache || cache->current_len == 0)
         return NULL;
@@ -198,6 +208,10 @@ Tensor* cml_kv_cache_get_values(CMLKVCache* cache) {
     return tensor_from_data(v_data, shape, 3, &cfg);
 }
 
+/**
+ * Grouped-query attention over 3D [batch, seq, heads*dim] tensors, with optional
+ * causal, sliding-window and external masks. Multiple Q heads share each KV head.
+ */
 Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config, Tensor* mask) {
     if (!Q || !K || !V || !config) {
         LOG_ERROR("cml_gqa_forward: NULL argument");
@@ -405,6 +419,7 @@ static int kv_cache_append_step(CMLKVCache* kv_cache, float* k_data, float* v_da
     return new_len;
 }
 
+/** GQA for autoregressive decode: append new K/V to the cache, then attend over all cached KV. */
 Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_cache,
                                const CMLGQAConfig* config) {
     if (!Q || !K || !V || !kv_cache || !config) {
@@ -475,11 +490,16 @@ Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_c
     return result;
 }
 
+/** Default FlashAttention tiling config (64x64 tiles, enabled). */
 CMLFlashAttentionConfig cml_flash_attention_default_config(void) {
     CMLFlashAttentionConfig cfg = {.tile_size_q = 64, .tile_size_kv = 64, .enabled = true};
     return cfg;
 }
 
+/**
+ * Tiled FlashAttention GQA using online softmax, so the full [seq_q, kv_len] score
+ * matrix is never materialized. Same masking semantics as cml_gqa_forward.
+ */
 Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config,
                               const CMLFlashAttentionConfig* flash_config) {
     if (!Q || !K || !V || !config || !flash_config) {
@@ -677,6 +697,8 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfi
     return result;
 }
 
+/** FlashAttention decode variant: append new K/V to the cache, then flash-attend over all
+ * cached KV. */
 Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_cache,
                                      const CMLGQAConfig* config,
                                      const CMLFlashAttentionConfig* flash_config) {
@@ -737,6 +759,11 @@ Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache
     return result;
 }
 
+/**
+ * Apply rotary position embeddings in place, rotating pairs within the last dim by
+ * position-dependent angles. `start_pos` offsets positions for cached decoding.
+ * Handles 2D/3D/4D layouts; returns the same tensor for chaining.
+ */
 Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) {
     if (!x || !config) {
         LOG_ERROR("cml_rope_forward: NULL argument");
@@ -843,6 +870,8 @@ Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) 
     return x; /* modified in-place, return same tensor for chaining */
 }
 
+/** Build a mixture-of-experts layer: a gate plus `num_experts` two-matrix FFN experts,
+ * Xavier-init. */
 CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
     if (!config) {
         LOG_ERROR("cml_moe_create: NULL config");
@@ -916,6 +945,7 @@ CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
     return moe;
 }
 
+/** Free the gate weight and every expert's weight matrices. */
 void cml_moe_free(CMLMoELayer* moe) {
     if (!moe)
         return;
@@ -941,6 +971,10 @@ void cml_moe_free(CMLMoELayer* moe) {
     cml_free(moe);
 }
 
+/**
+ * MoE forward: softmax gate over experts, route each token to its top-k experts
+ * (ReLU FFN), and combine outputs weighted by the (optionally renormalized) gate probs.
+ */
 Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
     if (!moe || !input) {
         LOG_ERROR("cml_moe_forward: NULL argument");
@@ -1123,6 +1157,7 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
     return result;
 }
 
+/** Return the per-token gate probabilities [total_tokens, num_experts] without running experts. */
 Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input) {
     if (!moe || !input) {
         LOG_ERROR("cml_moe_get_routing: NULL argument");
@@ -1180,6 +1215,10 @@ Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input) {
     return result;
 }
 
+/**
+ * Build a BPE tokenizer: copy the vocab, index it in a hash table, and resolve each
+ * merge rule's string to its vocab id. Input arrays are copied, not retained.
+ */
 CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size, char** merge_pairs,
                                    int num_merges) {
     if (!vocab || vocab_size <= 0) {
@@ -1269,6 +1308,7 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size, char** merge_pa
     return tok;
 }
 
+/** Free the tokenizer's vocab strings, merge rules and hash table. */
 void cml_tokenizer_free(CMLTokenizer* tok) {
     if (!tok)
         return;
@@ -1291,6 +1331,10 @@ void cml_tokenizer_free(CMLTokenizer* tok) {
     cml_free(tok);
 }
 
+/**
+ * BPE-encode `text`: split into character tokens, greedily apply merge rules in
+ * priority order, then map to ids. Returns a malloc'd id array; count in `num_tokens`.
+ */
 int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) {
     if (!tok || !text || !num_tokens) {
         LOG_ERROR("cml_tokenizer_encode: NULL argument");
@@ -1401,6 +1445,7 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
     return ids;
 }
 
+/** Decode token ids back to a newly allocated string by concatenating their vocab strings. */
 char* cml_tokenizer_decode(CMLTokenizer* tok, const int* tokens, int num_tokens) {
     if (!tok || !tokens || num_tokens <= 0) {
         LOG_ERROR("cml_tokenizer_decode: invalid arguments");
@@ -1437,6 +1482,7 @@ char* cml_tokenizer_decode(CMLTokenizer* tok, const int* tokens, int num_tokens)
     return result;
 }
 
+/** Set the BOS/EOS/PAD/UNK special-token ids. */
 void cml_tokenizer_set_special(CMLTokenizer* tok, int bos, int eos, int pad, int unk) {
     if (!tok)
         return;
@@ -1446,6 +1492,7 @@ void cml_tokenizer_set_special(CMLTokenizer* tok, int bos, int eos, int pad, int
     tok->unk_token_id = unk;
 }
 
+/** Number of tokens in the tokenizer's vocabulary. */
 int cml_tokenizer_vocab_size(const CMLTokenizer* tok) {
     if (!tok)
         return 0;

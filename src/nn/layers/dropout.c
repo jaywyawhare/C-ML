@@ -7,6 +7,8 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** torch.nn.Dropout forward: in training, zero elements with probability p and scale the
+ *  survivors by 1/(1-p); in eval it is a no-op (identity copy). Returns NULL on failure. */
 static Tensor* dropout_forward(Module* module, Tensor* input) {
     Dropout* dropout = (Dropout*)module;
 
@@ -67,8 +69,10 @@ static Tensor* dropout_forward(Module* module, Tensor* input) {
     return out;
 }
 
+/** Free the Dropout module (no owned parameters). */
 static void dropout_free(Module* module) { cml_free(module); }
 
+/** Construct a Dropout layer with drop probability p. Returns NULL on failure. */
 Dropout* nn_dropout(float p, bool inplace) {
     Dropout* dropout = cml_malloc(sizeof(Dropout));
     if (!dropout)

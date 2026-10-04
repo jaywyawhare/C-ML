@@ -168,5 +168,5 @@ if __name__ == "__main__":
         print("  cml.cleanup()")
     else:
         print("CFFI bindings compiled successfully.")
-        print("(In-place import check was skipped/failed — expected during "
+        print("(In-place import check was skipped/failed - expected during "
               "an isolated wheel build.)")

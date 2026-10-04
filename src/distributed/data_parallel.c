@@ -9,6 +9,8 @@
 
 #define DEFAULT_BUCKET_SIZE (25 * 1024 * 1024) /* 25MB in bytes */
 
+/** Default DDP settings: 25MB gradient buckets, buffer broadcast on, no
+ * unused-parameter tracking, and copy (not view) gradient semantics. */
 DDPConfig cml_ddp_default_config(void) {
     DDPConfig config = {.bucket_size_bytes       = DEFAULT_BUCKET_SIZE,
                         .broadcast_buffers       = true,
@@ -17,6 +19,10 @@ DDPConfig cml_ddp_default_config(void) {
     return config;
 }
 
+/** Wrap @p module for data-parallel training: collect its parameters, broadcast
+ * them from rank 0 so every rank starts identical, and lay them out into flat
+ * gradient buckets for later all-reduce. Requires cml_dist_init first; returns
+ * NULL on error. */
 CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config) {
     if (!module) {
         LOG_ERROR("NULL module for DDP");
@@ -134,6 +140,8 @@ static void ddp_broadcast_buffers(CMLDataParallel* ddp) {
         LOG_DEBUG("DDP: broadcast %d buffers from rank 0", count);
 }
 
+/** Run the wrapped module's forward pass, first re-broadcasting buffers from
+ * rank 0 when broadcast_buffers is set so all ranks evaluate with equal state. */
 Tensor* cml_ddp_forward(CMLDataParallel* ddp, Tensor* input) {
     if (!ddp || !ddp->module || !input)
         return NULL;
@@ -144,6 +152,9 @@ Tensor* cml_ddp_forward(CMLDataParallel* ddp, Tensor* input) {
     return module_forward(ddp->module, input);
 }
 
+/** Return this rank's slice of @p full_batch along dim 0 as a freshly
+ * materialized, caller-owned tensor. Passes the batch through unchanged at
+ * world_size <= 1; returns NULL if this rank gets no rows. */
 Tensor* cml_ddp_shard_input(CMLDataParallel* ddp, Tensor* full_batch) {
     if (!ddp || !full_batch || full_batch->ndim < 1)
         return full_batch;
@@ -155,7 +166,7 @@ Tensor* cml_ddp_shard_input(CMLDataParallel* ddp, Tensor* full_batch) {
 
     /* Split the batch (dim 0) across ranks; the first `rem` ranks take one extra
      * row so all rows are covered when B isn't divisible by world_size. Returns
-     * a fresh materialized tensor holding just this rank's rows — the caller owns
+     * a fresh materialized tensor holding just this rank's rows - the caller owns
      * it and should free it. Without this every rank trained on the full batch. */
     int B     = full_batch->shape[0];
     int base  = B / ws;
@@ -245,6 +256,8 @@ static bool ddp_alias_grad_to_slot(Tensor* g, float* slot, size_t numel) {
     return true;
 }
 
+/** True if @p p points inside any of the DDP gradient buckets; used to guard
+ * against un-aliasing a gradient that was swapped out for a borrowed view. */
 static bool ddp_ptr_in_buckets(const CMLDataParallel* ddp, const void* p) {
     if (!ddp->buckets || !ddp->bucket_sizes)
         return false;
@@ -358,6 +371,10 @@ static size_t ddp_bucket_copy(CMLDataParallel* ddp, int b, bool pack) {
     return offset;
 }
 
+/** All-reduce-average the module's gradients across the process group: pack each
+ * bucket, reduce it, and scatter the averaged values back. A no-op at
+ * world_size 1 unless bucket-view aliasing still needs binding. Returns 0 on
+ * success, -1 if DDP is uninitialized. */
 int cml_ddp_sync_gradients(CMLDataParallel* ddp) {
     if (!ddp || !ddp->initialized) {
         LOG_ERROR("DDP not initialized");
@@ -414,6 +431,9 @@ int cml_ddp_sync_gradients(CMLDataParallel* ddp) {
     return 0;
 }
 
+/** Free the DDP wrapper. Un-aliases any bucket-view gradients first so the
+ * module's parameters keep valid gradient storage after the buckets are gone;
+ * does not free the wrapped module. */
 void cml_ddp_free(CMLDataParallel* ddp) {
     if (!ddp)
         return;

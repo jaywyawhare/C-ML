@@ -17,6 +17,7 @@
 
 static bool g_amdgpu_initialized = false;
 
+/** Register LLVM's AMDGPU target/MC/asm-printer once (idempotent). */
 static void ensure_amdgpu_targets(void) {
     if (g_amdgpu_initialized)
         return;
@@ -27,6 +28,8 @@ static void ensure_amdgpu_targets(void) {
     g_amdgpu_initialized = true;
 }
 
+/** Resolve the target gfx arch from $AMD_ARCH or the kfd topology sysfs node; NULL if
+ *  neither yields one. Returns a pointer to a static buffer. */
 static const char* detect_gpu_arch(void) {
     const char* env = getenv("AMD_ARCH");
     if (env && env[0])
@@ -61,6 +64,7 @@ static const char* detect_gpu_arch(void) {
     return arch_buf;
 }
 
+/** True when LLVM can resolve the amdgcn-amd-amdhsa target triple. */
 bool cml_amd_llvm_available(void) {
     ensure_amdgpu_targets();
 
@@ -73,6 +77,8 @@ bool cml_amd_llvm_available(void) {
     return true;
 }
 
+/** Create an AMDGPU LLVM compiler for `gpu_arch` (auto-detected if NULL/empty), choosing
+ *  the wavefront-size feature from the arch family. NULL on failure. */
 CMLAMDLLVMCompiler* cml_amd_llvm_create(const char* gpu_arch) {
     ensure_amdgpu_targets();
 
@@ -108,6 +114,7 @@ CMLAMDLLVMCompiler* cml_amd_llvm_create(const char* gpu_arch) {
     return comp;
 }
 
+/** Dispose the LLVM context and free the compiler. */
 void cml_amd_llvm_free(CMLAMDLLVMCompiler* comp) {
     if (!comp)
         return;
@@ -116,6 +123,7 @@ void cml_amd_llvm_free(CMLAMDLLVMCompiler* comp) {
     cml_free(comp);
 }
 
+/** Build an LLVM target machine for the compiler's triple/cpu/features and opt level. */
 static LLVMTargetMachineRef create_target_machine(CMLAMDLLVMCompiler* comp) {
     LLVMTargetRef target;
     char* err = NULL;
@@ -146,6 +154,7 @@ static LLVMTargetMachineRef create_target_machine(CMLAMDLLVMCompiler* comp) {
                                    opt, LLVMRelocDefault, LLVMCodeModelDefault);
 }
 
+/** Run the default<On> optimization pipeline on `mod`, enabling vectorization at O2+. */
 static int run_opt_passes(LLVMModuleRef mod, LLVMTargetMachineRef tm, int opt_level) {
     const char* passes;
     switch (opt_level) {
@@ -209,6 +218,8 @@ done:
     return rc;
 }
 
+/** Parse LLVM IR text, optimize, verify, and emit an AMDGPU code object into a fresh
+ *  buffer (`*code_object`/`*code_size`). Returns -1 on any failure. */
 int cml_amd_llvm_compile_ir(CMLAMDLLVMCompiler* comp, const char* ir_source, void** code_object,
                             size_t* code_size) {
     if (!comp || !ir_source || !code_object || !code_size)
@@ -264,6 +275,8 @@ int cml_amd_llvm_compile_ir(CMLAMDLLVMCompiler* comp, const char* ir_source, voi
     return 0;
 }
 
+/** Build a demo AMDGPU vector-add kernel via the LLVM C API (the `source` text is
+ *  currently ignored), optimize it, and emit a code object. Returns -1 on failure. */
 int cml_amd_llvm_compile_source(CMLAMDLLVMCompiler* comp, const char* source, void** code_object,
                                 size_t* code_size) {
     if (!comp || !source || !code_object || !code_size)
@@ -351,13 +364,17 @@ int cml_amd_llvm_compile_source(CMLAMDLLVMCompiler* comp, const char* source, vo
 #include <stddef.h>
 #include "alloc/cml_allocator.h"
 
+/** Stub when the LLVM backend is not compiled in: never available. */
 bool cml_amd_llvm_available(void) { return false; }
+/** Stub compiler creation: returns NULL without the LLVM backend. */
 CMLAMDLLVMCompiler* cml_amd_llvm_create(const char* gpu_arch) {
     (void)gpu_arch;
     return NULL;
 }
+/** Stub free: no-op without the LLVM backend. */
 void cml_amd_llvm_free(CMLAMDLLVMCompiler* comp) { (void)comp; }
 
+/** Stub IR compile: always fails (-1) without the LLVM backend. */
 int cml_amd_llvm_compile_ir(CMLAMDLLVMCompiler* comp, const char* ir_source, void** code_object,
                             size_t* code_size) {
     (void)comp;
@@ -367,6 +384,7 @@ int cml_amd_llvm_compile_ir(CMLAMDLLVMCompiler* comp, const char* ir_source, voi
     return -1;
 }
 
+/** Stub source compile: always fails (-1) without the LLVM backend. */
 int cml_amd_llvm_compile_source(CMLAMDLLVMCompiler* comp, const char* source, void** code_object,
                                 size_t* code_size) {
     (void)comp;

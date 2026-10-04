@@ -31,7 +31,7 @@ typedef struct Module {
 
     /* Non-trainable state tensors (e.g. BatchNorm running mean/var). Not
      * gradient-synced; DDP broadcasts them from rank 0 at forward time when
-     * config.broadcast_buffers is set. The Tensor* is NOT owned — the layer
+     * config.broadcast_buffers is set. The Tensor* is NOT owned - the layer
      * keeps its own pointer and frees it. */
     Tensor** buffers;
     char** buffer_names;
@@ -73,14 +73,14 @@ Parameter* nn_add_bias_param(Module* module, int size, DType dtype, DeviceType d
  * `return NULL` directly. Mirrors nn_add_bias_param. */
 Parameter* nn_add_weight_param(Module* module, Tensor* weight);
 
-/* Create a normalisation layer's affine pair — gamma "weight" (ones) and beta
+/* Create a normalisation layer's affine pair - gamma "weight" (ones) and beta
  * "bias" (zeros), both length `size`. Stores them into *weight_out and
  * *bias_out.
  * On failure, frees `module` and returns -1; returns 0 on success. */
 int nn_add_affine_params(Module* module, int size, DType dtype, DeviceType device,
                          Parameter** weight_out, Parameter** bias_out);
 
-/* Create a normalisation layer's running statistics buffers — running_mean
+/* Create a normalisation layer's running statistics buffers - running_mean
  * (zeros) and running_var (ones), both length `size`. On failure frees `module`
  * and returns -1; returns 0 on success. */
 int nn_add_running_stats(Module* module, int size, DType dtype, DeviceType device,

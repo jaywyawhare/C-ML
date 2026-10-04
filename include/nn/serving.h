@@ -1,7 +1,7 @@
 /*
  * Continuous batching / serving scheduler for LLM inference.
- * Handles request queuing, batch admission, lifecycle tracking, and — when a
- * model forward callback is attached via cml_serving_set_model — the actual
+ * Handles request queuing, batch admission, lifecycle tracking, and - when a
+ * model forward callback is attached via cml_serving_set_model - the actual
  * autoregressive token generation (forward -> sample -> append -> stop on EOS
  * or max_new_tokens). The model callback owns the forward pass and KV cache;
  * the scheduler owns batching, sampling, and bookkeeping.

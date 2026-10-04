@@ -1,5 +1,5 @@
 /*
- * torch_c_internal.h — Internal helpers for torch_c hot paths (not public API).
+ * torch_c_internal.h - Internal helpers for torch_c hot paths (not public API).
  */
 
 #ifndef CML_TORCH_C_INTERNAL_H
@@ -20,6 +20,7 @@ extern "C" {
 DType torch_default_dtype_cached(void);
 DeviceType torch_default_device_cached(void);
 
+/** Recompute the embedded TensorConfig from an options struct's dtype/device fields. */
 static inline void torch_opts_sync_config(TorchTensorOptions* opts) {
     opts->config.dtype      = opts->has_dtype ? opts->dtype : torch_default_dtype_cached();
     opts->config.device     = opts->has_device ? opts->device : torch_default_device_cached();
@@ -27,6 +28,7 @@ static inline void torch_opts_sync_config(TorchTensorOptions* opts) {
     opts->config.has_device = true;
 }
 
+/** Build a TensorConfig from the cached default dtype/device. */
 static inline TensorConfig torch_config_default(void) {
     TensorConfig cfg = {
         .dtype      = torch_default_dtype_cached(),
@@ -37,6 +39,7 @@ static inline TensorConfig torch_config_default(void) {
     return cfg;
 }
 
+/** Return the options' precomputed config, or fill `scratch` with defaults when opts is NULL. */
 static inline const TensorConfig* torch_resolve_config(const TorchTensorOptions* opts,
                                                        TensorConfig* scratch) {
     if (opts)
@@ -47,6 +50,7 @@ static inline const TensorConfig* torch_resolve_config(const TorchTensorOptions*
 
 typedef Tensor* (*TorchCreateFn)(int* shape, int ndim, const TensorConfig* config);
 
+/** Shared factory-tensor helper: resolve config, call `fn`, and apply requires_grad. */
 static inline Tensor* torch_create_tensor(TorchCreateFn fn, int* shape, int ndim,
                                           const TorchTensorOptions* opts) {
     TensorConfig scratch;

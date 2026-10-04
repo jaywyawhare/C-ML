@@ -753,7 +753,7 @@ static int test_adamax_optimizer(void) {
 }
 
 static int test_maxpool3d(void) {
-    // Input: [1, 1, 4, 4, 4] — fill with sequential values
+    // Input: [1, 1, 4, 4, 4] - fill with sequential values
     int shape[]   = {1, 1, 4, 4, 4};
     Tensor* input = tensor_empty(shape, 5, &cpu_f32);
     tensor_ensure_executed(input);

@@ -10,6 +10,7 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
+/** Derive a shape signature from the graph head's output shape for cache keying. */
 static void compute_shape_sig(CMLGraph_t ir, int* sig, int* sig_len, int max_len) {
     *sig_len            = 0;
     struct IRNode* node = ir->head;
@@ -22,17 +23,20 @@ static void compute_shape_sig(CMLGraph_t ir, int* sig, int* sig_len, int max_len
     }
 }
 
+/** True if a cache entry's stored shape signature matches the given one. */
 static bool shape_matches(const CMLJitEntry* entry, const int* sig, int sig_len) {
     if (entry->shape_len != sig_len)
         return false;
     return memcmp(entry->shape_sig, sig, sizeof(int) * (size_t)sig_len) == 0;
 }
 
+/** Allocate an empty JIT trace cache. */
 CMLTinyJit* cml_tinyjit_create(void) {
     CMLTinyJit* jit = (CMLTinyJit*)cml_calloc(1, sizeof(CMLTinyJit));
     return jit;
 }
 
+/** Free the JIT and every cached trace it holds. */
 void cml_tinyjit_free(CMLTinyJit* jit) {
     if (!jit)
         return;
@@ -63,6 +67,7 @@ static int cml_tinyjit_replay_enabled(void) {
     return v;
 }
 
+/** Execute the live graph by a plain head->next walk of the per-node CPU kernels. */
 static int cml_tinyjit_plain_walk(CMLGraph_t ir) {
     for (struct IRNode* node = ir->head; node; node = node->next) {
         if (!node->output)
@@ -151,6 +156,7 @@ static bool cml_tinyjit_verify(CMLGraph_t ir) {
     return verified;
 }
 
+/** Linear-probe the cache for an entry matching both graph hash and shape. */
 static CMLJitEntry* cml_tinyjit_find(CMLTinyJit* jit, uint64_t hash, const int* sig, int sig_len) {
     uint64_t idx = hash % CML_JIT_CACHE_SIZE;
     for (int probe = 0; probe < CML_JIT_CACHE_SIZE; probe++) {
@@ -163,6 +169,7 @@ static CMLJitEntry* cml_tinyjit_find(CMLTinyJit* jit, uint64_t hash, const int* 
     return NULL;
 }
 
+/** Claim the first free slot for (hash, shape), returning the new entry or NULL if full. */
 static CMLJitEntry* cml_tinyjit_insert(CMLTinyJit* jit, uint64_t hash, const int* sig,
                                        int sig_len) {
     if (jit->count >= CML_JIT_CACHE_SIZE)
@@ -184,6 +191,10 @@ static CMLJitEntry* cml_tinyjit_insert(CMLTinyJit* jit, uint64_t hash, const int
     return NULL;
 }
 
+/**
+ * CPU replay path: replay a verified shape via plain walk, otherwise execute
+ * normally and mark the entry replayable only after a bit-exact self-check.
+ */
 static int cml_tinyjit_cpu_replay(CMLTinyJit* jit, CMLGraph_t ir) {
     uint64_t hash = cml_ir_graph_hash(ir);
     int sig[32];
@@ -212,6 +223,11 @@ static int cml_tinyjit_cpu_replay(CMLTinyJit* jit, CMLGraph_t ir) {
     return 0;
 }
 
+/**
+ * Execute a graph through the JIT: replay a cached complete trace on a hit
+ * (or run directly for a known-empty graph), else record a trace during
+ * execution and cache it, negatively caching graphs that record nothing.
+ */
 int cml_tinyjit_execute(CMLTinyJit* jit, CMLGraph_t ir) {
     if (!jit || !ir)
         return -1;
@@ -350,6 +366,7 @@ int cml_tinyjit_execute(CMLTinyJit* jit, CMLGraph_t ir) {
     return 0;
 }
 
+/** Report cumulative hit/miss/invalidation counts (any out pointer may be NULL). */
 void cml_tinyjit_stats(const CMLTinyJit* jit, size_t* hits, size_t* misses, size_t* invalidations) {
     if (!jit)
         return;

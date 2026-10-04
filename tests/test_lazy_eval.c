@@ -517,8 +517,8 @@ static void test_midgraph_realization_executes_upstream(void) {
 
     /* Two matmul chains sharing inputs, realized mid-graph:
      *   p  = A @ B                       (shared intermediate)
-     *   s1 = p @ transpose(p)            (chain 1 — realized first)
-     *   s2 = p @ transpose2(p)           (chain 2 — still pending)
+     *   s1 = p @ transpose(p)            (chain 1 - realized first)
+     *   s2 = p @ transpose2(p)           (chain 2 - still pending)
      * Realizing s1 must run p and the first permute. The historical bug
      * pre-marked the target as used, which made the DCE seed nothing: only
      * the target executed, on unwritten inputs, and its zero-filled buffer

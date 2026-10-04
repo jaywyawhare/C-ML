@@ -39,7 +39,7 @@ int main(void) {
         buf[got]   = '\0';
         fclose(f);
         CHECK("JSON file is non-empty", sz > 0);
-        /* first epoch loss was 1.0 — the exported JSON should mention loss */
+        /* first epoch loss was 1.0 - the exported JSON should mention loss */
         CHECK("JSON contains a 'loss' field", strstr(buf, "loss") != NULL);
         free(buf);
         remove(path);

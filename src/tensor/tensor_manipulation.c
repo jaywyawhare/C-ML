@@ -9,14 +9,18 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** Concatenate tensors along existing dimension `dim` (lazy, via uop_cat). */
 Tensor* tensor_concat(Tensor** tensors, int num_tensors, int dim) {
     return uop_cat(tensors, num_tensors, dim);
 }
 
+/** Stack tensors along a new dimension `dim` (lazy, via uop_stack). */
 Tensor* tensor_stack(Tensor** tensors, int num_tensors, int dim) {
     return uop_stack(tensors, num_tensors, dim);
 }
 
+/** Split `tensor` along `dim` into `num_splits` slice views (explicit `split_sizes`
+ *  or near-equal chunks). Returns a newly allocated array of tensors, or NULL. */
 Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes) {
     if (!tensor || num_splits <= 0) {
         LOG_ERROR("tensor_split: invalid input");
@@ -103,6 +107,8 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
     return results;
 }
 
+/** Gather along `dim` by `indices`. 1-D indices use the lazy uop_gather; multi-dim
+ *  indices take an eager path and must match `input`'s rank. NULL on error. */
 Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     if (!input || !indices) {
         LOG_ERROR("tensor_gather: invalid input");
@@ -195,6 +201,7 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     return output;
 }
 
+/** Scatter `src` into a copy of `input` at `index` positions along `dim` (lazy). */
 Tensor* tensor_scatter(Tensor* input, int dim, Tensor* index, Tensor* src) {
     return uop_scatter(input, dim, index, src);
 }

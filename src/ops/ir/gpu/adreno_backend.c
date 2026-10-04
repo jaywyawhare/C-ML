@@ -84,6 +84,7 @@ static clGetProgramBuildInfo_fn fn_clGetProgramBuildInfo         = NULL;
 
 static char s_device_info_buf[512];
 
+/** dlopen the OpenCL ICD loader, trying both common soname variants. */
 static void* open_opencl_lib(void) {
     void* h = CML_DLOPEN("libOpenCL.so", RTLD_LAZY);
     if (!h) {
@@ -101,6 +102,7 @@ static void* open_opencl_lib(void) {
         }                                                                                          \
     } while (0)
 
+/** Resolve all required OpenCL entry points into the pointer table; -1 if any is missing. */
 static int load_opencl_symbols(void* lib) {
     LOAD_CL_SYM(clGetPlatformIDs);
     LOAD_CL_SYM(clGetDeviceIDs);
@@ -126,6 +128,7 @@ static int load_opencl_symbols(void* lib) {
     return 0;
 }
 
+/** Scan OpenCL platforms/devices for an Adreno/Qualcomm GPU, returning the first match. */
 static bool find_adreno_device(void** out_platform, void** out_device) {
     cl_uint num_platforms = 0;
     if (fn_clGetPlatformIDs(0, NULL, &num_platforms) != CL_SUCCESS || num_platforms == 0) {
@@ -182,6 +185,7 @@ static bool find_adreno_device(void** out_platform, void** out_device) {
     return false;
 }
 
+/** Probe for an Adreno GPU via a throwaway OpenCL load, without initializing the backend. */
 bool cml_adreno_available(void) {
     void* lib = open_opencl_lib();
     if (!lib)
@@ -246,6 +250,7 @@ bool cml_adreno_available(void) {
     return found;
 }
 
+/** Allocate a zeroed Adreno backend handle. */
 CMLAdrenoBackend* cml_adreno_backend_create(void) {
     CMLAdrenoBackend* b = (CMLAdrenoBackend*)cml_calloc(1, sizeof(CMLAdrenoBackend));
     if (!b) {
@@ -254,6 +259,7 @@ CMLAdrenoBackend* cml_adreno_backend_create(void) {
     return b;
 }
 
+/** Load OpenCL, select the Adreno device, query its properties, and create a context/queue. */
 int cml_adreno_backend_init(CMLAdrenoBackend* backend) {
     if (!backend)
         return -1;
@@ -340,6 +346,7 @@ fail:
     return -1;
 }
 
+/** Release the OpenCL queue/context, close the library, and free the backend. */
 void cml_adreno_backend_free(CMLAdrenoBackend* backend) {
     if (!backend)
         return;
@@ -361,7 +368,7 @@ void cml_adreno_backend_free(CMLAdrenoBackend* backend) {
     cml_free(backend);
 }
 
-/* OpenCL C expression for an elementwise unary op (operand `a`), or NULL. */
+/** OpenCL C expression for an elementwise unary op (operand `a`), or NULL. */
 static const char* adreno_unary_expr(UOpType t) {
     switch (t) {
     case UOP_NEG:
@@ -391,7 +398,7 @@ static const char* adreno_unary_expr(UOpType t) {
     }
 }
 
-/* OpenCL C expression for an elementwise binary op (operands `a`,`b`), or NULL. */
+/** OpenCL C expression for an elementwise binary op (operands `a`,`b`), or NULL. */
 static const char* adreno_binary_expr(UOpType t) {
     switch (t) {
     case UOP_ADD:
@@ -411,7 +418,7 @@ static const char* adreno_binary_expr(UOpType t) {
     }
 }
 
-/* Dispatch one same-shape elementwise node on the GPU. Returns 0 on success,
+/** Dispatch one same-shape elementwise node on the GPU. Returns 0 on success,
  * 1 if the op/shape isn't GPU-eligible (caller should fall back), -1 on error. */
 static int adreno_dispatch_elementwise(CMLAdrenoBackend* backend, struct IRNode* node, int idx) {
     Tensor* out = node->output;
@@ -542,6 +549,7 @@ cleanup:
     return rc;
 }
 
+/** Walk the IR graph, dispatching eligible elementwise nodes to the GPU and the rest to the CPU. */
 int cml_adreno_execute(CMLAdrenoBackend* backend, CMLGraph_t ir) {
     if (!backend || !backend->initialized) {
         LOG_ERROR("Adreno backend not initialized");
@@ -592,6 +600,7 @@ int cml_adreno_execute(CMLAdrenoBackend* backend, CMLGraph_t ir) {
     return status;
 }
 
+/** Return a human-readable device summary string (shared static buffer). */
 const char* cml_adreno_device_info(const CMLAdrenoBackend* backend) {
     if (!backend || !backend->initialized) {
         return "Adreno GPU (not available)";

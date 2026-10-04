@@ -97,7 +97,7 @@ static int test_dataset_bad_files(void) {
     if (img)
         cml_free(img);
 
-    /* IDX labels: header-only file (count reads as 0 at EOF) — must return
+    /* IDX labels: header-only file (count reads as 0 at EOF) - must return
      * cleanly either way, never crash */
     write_bytes("trunc.lbl", "\x00\x00\x08\x01", 4);
     int ln     = 0;
@@ -224,7 +224,7 @@ static int test_tensor_serialization_roundtrip_and_garbage(void) {
             if (n > 16)
                 write_bytes("trunc.bin", buf, n - 12);
             r = tensor_read_file(TMP_DIR "/trunc.bin");
-            /* may reject OR pad — but must not crash */
+            /* may reject OR pad - but must not crash */
             if (r)
                 tensor_free(r);
         }

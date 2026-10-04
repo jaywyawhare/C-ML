@@ -1,5 +1,5 @@
 /*
- * selective_build.c — Selective kernel build for embedded deployment
+ * selective_build.c - Selective kernel build for embedded deployment
  */
 
 #include "torch/selective_build.h"
@@ -40,6 +40,7 @@ static const struct {
     {NULL, UOP_COUNT},
 };
 
+/** Resolve a case-insensitive op name to its UOpType, or UOP_COUNT if unknown. */
 static UOpType selective_op_from_name(const char* name) {
     if (!name)
         return UOP_COUNT;
@@ -50,6 +51,8 @@ static UOpType selective_op_from_name(const char* name) {
     return UOP_COUNT;
 }
 
+/** Initialize the active-op/dtype tables once, honoring any compile-time
+ *  CML_TORCH_SELECTIVE_OPS allowlist. */
 static void selective_init_defaults(void) {
     if (g_initialized)
         return;
@@ -77,6 +80,7 @@ static void selective_init_defaults(void) {
     g_initialized = true;
 }
 
+/** Build a config with every op and dtype enabled. */
 TorchSelectiveBuildConfig torch_selective_build_all(void) {
     selective_init_defaults();
     TorchSelectiveBuildConfig cfg = {0};
@@ -88,6 +92,7 @@ TorchSelectiveBuildConfig torch_selective_build_all(void) {
     return cfg;
 }
 
+/** Build a config with all ops disabled (dtypes left enabled) to opt in explicitly. */
 TorchSelectiveBuildConfig torch_selective_build_none(void) {
     selective_init_defaults();
     TorchSelectiveBuildConfig cfg = {0};
@@ -98,12 +103,14 @@ TorchSelectiveBuildConfig torch_selective_build_none(void) {
     return cfg;
 }
 
+/** Enable a single op in the config (ignores out-of-range ops). */
 void torch_selective_build_enable_op(TorchSelectiveBuildConfig* cfg, UOpType op) {
     if (!cfg || op < 0 || op >= UOP_COUNT)
         return;
     cfg->enabled[op] = true;
 }
 
+/** Enable an array of ops in the config. */
 void torch_selective_build_enable_ops(TorchSelectiveBuildConfig* cfg, const UOpType* ops,
                                       int count) {
     if (!cfg || !ops)
@@ -112,6 +119,7 @@ void torch_selective_build_enable_ops(TorchSelectiveBuildConfig* cfg, const UOpT
         torch_selective_build_enable_op(cfg, ops[i]);
 }
 
+/** Make a config active: copy its enabled op/dtype sets into the global runtime tables. */
 void torch_selective_build_apply(const TorchSelectiveBuildConfig* cfg) {
     selective_init_defaults();
     if (!cfg)
@@ -127,12 +135,14 @@ void torch_selective_build_apply(const TorchSelectiveBuildConfig* cfg) {
         g_dtype_active[i] = cfg->dtype_enabled[i];
 }
 
+/** Re-enable every op in the global runtime tables (undo a selective apply). */
 void torch_selective_build_reset(void) {
     selective_init_defaults();
     for (int i = 0; i < UOP_COUNT; i++)
         g_active[i] = true;
 }
 
+/** Query whether an op kernel is currently linked/active in the runtime. */
 bool torch_selective_build_is_op_enabled(UOpType op) {
     selective_init_defaults();
     if (op < 0 || op >= UOP_COUNT)
@@ -140,6 +150,7 @@ bool torch_selective_build_is_op_enabled(UOpType op) {
     return g_active[op];
 }
 
+/** Query whether a dtype is currently active (out-of-range dtypes default to enabled). */
 bool torch_selective_build_is_dtype_enabled(DType dtype) {
     selective_init_defaults();
     if ((int)dtype < 0 || (int)dtype >= CML_TORCH_MAX_SELECTIVE_DTYPES)
@@ -147,6 +158,7 @@ bool torch_selective_build_is_dtype_enabled(DType dtype) {
     return g_dtype_active[(int)dtype];
 }
 
+/** Parse a comma-separated op-name spec into a config; returns 0, or -1 on null args. */
 int torch_selective_build_from_string(const char* spec, TorchSelectiveBuildConfig* out) {
     if (!spec || !out)
         return -1;
@@ -168,6 +180,7 @@ int torch_selective_build_from_string(const char* spec, TorchSelectiveBuildConfi
     return 0;
 }
 
+/** Derive the required-op config from the instructions of a loaded .cpte program. */
 int torch_selective_build_from_pte(const char* pte_path, TorchSelectiveBuildConfig* out) {
     if (!pte_path || !out)
         return -1;
@@ -183,6 +196,7 @@ int torch_selective_build_from_pte(const char* pte_path, TorchSelectiveBuildConf
     return 0;
 }
 
+/** Write a config to a newline-delimited kernel manifest file ("all" or op names). */
 int torch_selective_build_save(const TorchSelectiveBuildConfig* cfg, const char* path) {
     if (!cfg || !path)
         return -1;
@@ -201,6 +215,7 @@ int torch_selective_build_save(const TorchSelectiveBuildConfig* cfg, const char*
     return 0;
 }
 
+/** Load a config from a kernel manifest file written by torch_selective_build_save. */
 int torch_selective_build_load(const char* path, TorchSelectiveBuildConfig* out) {
     if (!path || !out)
         return -1;

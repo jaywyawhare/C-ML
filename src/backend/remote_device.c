@@ -37,6 +37,7 @@ typedef struct {
 
 /* Reliable send/recv helpers */
 
+/** Send exactly len bytes, retrying on partial sends and EINTR. */
 static int send_all(int fd, const void* buf, size_t len) {
     const uint8_t* p = (const uint8_t*)buf;
     size_t sent      = 0;
@@ -52,6 +53,7 @@ static int send_all(int fd, const void* buf, size_t len) {
     return 0;
 }
 
+/** Receive exactly len bytes, retrying on partial reads and EINTR. */
 static int recv_all(int fd, void* buf, size_t len) {
     uint8_t* p = (uint8_t*)buf;
     size_t got = 0;
@@ -67,6 +69,7 @@ static int recv_all(int fd, void* buf, size_t len) {
     return 0;
 }
 
+/** Send a request: opcode/size header (network byte order) then the payload. */
 static int send_msg(int fd, uint32_t opcode, const void* payload, uint32_t payload_size) {
     MsgHeader hdr = {.opcode = htonl(opcode), .payload_size = htonl(payload_size)};
     if (send_all(fd, &hdr, sizeof(hdr)) != 0)
@@ -78,6 +81,8 @@ static int send_msg(int fd, uint32_t opcode, const void* payload, uint32_t paylo
     return 0;
 }
 
+/** Receive a response header and payload, discarding any body the caller did
+ *  not provide a buffer for. */
 static int recv_resp(int fd, uint32_t* status, void* payload, uint32_t* payload_size) {
     RespHeader rhdr;
     if (recv_all(fd, &rhdr, sizeof(rhdr)) != 0)
@@ -102,6 +107,7 @@ static int recv_resp(int fd, uint32_t* status, void* payload, uint32_t* payload_
     return 0;
 }
 
+/** Send a response: status/size header (network byte order) then the payload. */
 static int send_resp(int fd, uint32_t status, const void* payload, uint32_t payload_size) {
     RespHeader rhdr = {.status = htonl(status), .payload_size = htonl(payload_size)};
     if (send_all(fd, &rhdr, sizeof(rhdr)) != 0)
@@ -115,6 +121,8 @@ static int send_resp(int fd, uint32_t status, const void* payload, uint32_t payl
 
 /* Client */
 
+/** Connect to a remote device server, handshake with a PING, and return the
+ *  session, or NULL on any resolution/connection/handshake failure. */
 CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
     if (!host || port <= 0)
         return NULL;
@@ -183,6 +191,7 @@ CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
     return dev;
 }
 
+/** Close the connection socket and free the remote device. */
 void cml_remote_disconnect(CMLRemoteDevice* dev) {
     if (!dev)
         return;
@@ -194,10 +203,12 @@ void cml_remote_disconnect(CMLRemoteDevice* dev) {
     cml_free(dev);
 }
 
+/** True if the device has a live, connected socket. */
 bool cml_remote_is_connected(CMLRemoteDevice* dev) {
     return dev && dev->connected && dev->sock_fd >= 0;
 }
 
+/** Request a remote allocation and return its handle, or 0 on failure. */
 uint64_t cml_remote_alloc(CMLRemoteDevice* dev, size_t size) {
     if (!cml_remote_is_connected(dev))
         return 0;
@@ -217,6 +228,7 @@ uint64_t cml_remote_alloc(CMLRemoteDevice* dev, size_t size) {
     return handle;
 }
 
+/** Free a remote allocation identified by handle. */
 void cml_remote_free(CMLRemoteDevice* dev, uint64_t handle) {
     if (!cml_remote_is_connected(dev))
         return;
@@ -228,6 +240,7 @@ void cml_remote_free(CMLRemoteDevice* dev, uint64_t handle) {
     recv_resp(dev->sock_fd, &status, NULL, &psize);
 }
 
+/** Upload n bytes into a remote allocation (handle + length + data payload). */
 int cml_remote_upload(CMLRemoteDevice* dev, uint64_t handle, const void* data, size_t n) {
     if (!cml_remote_is_connected(dev) || !data)
         return -1;
@@ -254,6 +267,7 @@ int cml_remote_upload(CMLRemoteDevice* dev, uint64_t handle, const void* data, s
     return (status == CML_REMOTE_STATUS_OK) ? 0 : -1;
 }
 
+/** Download up to n bytes from a remote allocation, discarding any excess. */
 int cml_remote_download(CMLRemoteDevice* dev, uint64_t handle, void* data, size_t n) {
     if (!cml_remote_is_connected(dev) || !data)
         return -1;
@@ -294,6 +308,8 @@ int cml_remote_download(CMLRemoteDevice* dev, uint64_t handle, void* data, size_
     return 0;
 }
 
+/** Send a kernel source plus buffer handles and launch dims to the server for
+ *  remote compilation and execution. */
 int cml_remote_execute(CMLRemoteDevice* dev, const char* kernel_source, uint64_t* buffer_handles,
                        int num_buffers, uint32_t grid[3], uint32_t block[3]) {
     if (!cml_remote_is_connected(dev) || !kernel_source)
@@ -348,6 +364,7 @@ static AllocEntry g_allocs[MAX_ALLOCS];
 static int g_num_allocs       = 0;
 static uint64_t g_next_handle = 1;
 
+/** Allocate on the best available device (host fallback) and register a handle. */
 static uint64_t server_alloc(size_t size) {
     if (g_num_allocs >= MAX_ALLOCS)
         return 0;
@@ -368,6 +385,7 @@ static uint64_t server_alloc(size_t size) {
     return h;
 }
 
+/** Look up a server allocation entry by handle, or NULL if absent. */
 static AllocEntry* server_find(uint64_t handle) {
     for (int i = 0; i < g_num_allocs; i++) {
         if (g_allocs[i].handle == handle)
@@ -376,6 +394,7 @@ static AllocEntry* server_find(uint64_t handle) {
     return NULL;
 }
 
+/** Free the allocation for a handle and compact the table (swap with last). */
 static void server_free_handle(uint64_t handle) {
     for (int i = 0; i < g_num_allocs; i++) {
         if (g_allocs[i].handle == handle) {
@@ -387,6 +406,7 @@ static void server_free_handle(uint64_t handle) {
     }
 }
 
+/** Free every server allocation and clear the table. */
 static void server_free_all(void) {
     for (int i = 0; i < g_num_allocs; i++) {
         cml_free(g_allocs[i].ptr);
@@ -396,6 +416,8 @@ static void server_free_all(void) {
 
 /* Server: handle one client */
 
+/** Serve one client connection: read requests and dispatch ping/alloc/free/
+ *  upload/download/execute until the client disconnects. */
 static void handle_client(int client_fd) {
     while (1) {
         MsgHeader hdr;
@@ -566,7 +588,7 @@ static void handle_client(int client_fd) {
             size_t slen       = strlen(so_path);
             so_path[slen - 2] = '.';
             so_path[slen - 1] = 's';
-            /* need one more char; so_path has room — adjust: use a local buf */
+            /* need one more char; so_path has room - adjust: use a local buf */
             char so_path2[64];
             snprintf(so_path2, sizeof(so_path2), "%.*s.so", (int)(slen - 2), so_path);
 
@@ -646,6 +668,7 @@ static void handle_client(int client_fd) {
 
 /* Server lifecycle */
 
+/** Create a listening server socket bound to the given port. */
 CMLRemoteServer* cml_remote_server_create(int port) {
     if (port <= 0)
         return NULL;
@@ -688,6 +711,7 @@ CMLRemoteServer* cml_remote_server_create(int port) {
     return srv;
 }
 
+/** Accept loop: serve each incoming client in turn until the server is stopped. */
 int cml_remote_server_run(CMLRemoteServer* srv) {
     if (!srv)
         return -1;
@@ -725,6 +749,7 @@ int cml_remote_server_run(CMLRemoteServer* srv) {
     return 0;
 }
 
+/** Stop the accept loop and shut down the listening socket. */
 void cml_remote_server_stop(CMLRemoteServer* srv) {
     if (!srv)
         return;
@@ -734,6 +759,7 @@ void cml_remote_server_stop(CMLRemoteServer* srv) {
     }
 }
 
+/** Stop the server, close its socket, free all allocations, and free the server. */
 void cml_remote_server_free(CMLRemoteServer* srv) {
     if (!srv)
         return;

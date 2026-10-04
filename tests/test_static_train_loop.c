@@ -16,7 +16,7 @@ static float g_first = -1.0f, g_last = 0.0f;
 static int on_batch(int epoch, int batch, float loss, void* ud) {
     (void)epoch;
     (void)ud;
-    /* Track batch 0 only (shuffle=false, so it's the same data every epoch) — a
+    /* Track batch 0 only (shuffle=false, so it's the same data every epoch) - a
      * clean convergence signal, unlike comparing losses of different batches. */
     if (batch == 0) {
         if (g_first < 0.0f)

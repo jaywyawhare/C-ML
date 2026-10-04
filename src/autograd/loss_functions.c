@@ -13,6 +13,8 @@
 #include <math.h>
 #include <string.h>
 
+/** Mean squared error, mean((input - target)^2), as a differentiable graph. Allows scalar
+ * broadcasting of either operand; errors on other shape mismatches. */
 Tensor* tensor_mse_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
         CML_ERR_NULL("MSE Loss: input or target is NULL");
@@ -37,6 +39,8 @@ Tensor* tensor_mse_loss(Tensor* input, Tensor* target) {
     return uop_mean(squared, &reduce_params);
 }
 
+/** Mean absolute error, mean(|input - target|), as a differentiable graph. Allows scalar
+ * broadcasting of either operand; errors on other shape mismatches. */
 Tensor* tensor_mae_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
         CML_ERR_NULL("MAE Loss: input or target is NULL");
@@ -61,6 +65,8 @@ Tensor* tensor_mae_loss(Tensor* input, Tensor* target) {
     return uop_mean(abs_diff, &reduce_params);
 }
 
+/** Binary cross-entropy, mean(-[t*log(p) + (1-t)*log(1-p)]), over probability inputs in
+ * (0,1). Also records the prediction for training metrics. Errors on shape mismatch. */
 Tensor* tensor_bce_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
         CML_ERR_NULL("BCE Loss: input or target is NULL");
@@ -120,6 +126,8 @@ Tensor* tensor_bce_loss(Tensor* input, Tensor* target) {
     return uop_mean(neg_combined, &reduce_params);
 }
 
+/** Softmax cross-entropy from raw logits [N, C] against 1-D integer class targets: mean of
+ * -log(softmax(input))[target]. Errors unless the batch sizes match. */
 Tensor* tensor_cross_entropy_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
         CML_ERR_NULL("Cross Entropy Loss: input or target is NULL");
@@ -166,6 +174,8 @@ Tensor* tensor_cross_entropy_loss(Tensor* input, Tensor* target) {
     return uop_mean(neg_gathered, &reduce_params);
 }
 
+/** Huber loss with threshold delta (non-positive delta defaults to 1), built in clamp form
+ * (not where/cmplt) for a correct, torch-verified gradient. Returns the mean over elements. */
 Tensor* tensor_huber_loss(Tensor* input, Tensor* target, float delta) {
     if (!input || !target) {
         CML_ERR_NULL("Huber Loss: input or target is NULL");
@@ -250,6 +260,7 @@ Tensor* tensor_huber_loss(Tensor* input, Tensor* target, float delta) {
     return uop_mean(loss_per_element, &reduce_params);
 }
 
+/** Hinge loss mean(max(0, 1 - target*input)) for ±1 targets. Errors on shape mismatch. */
 Tensor* tensor_hinge_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
         CML_ERR_NULL("Hinge Loss: input or target is NULL");
@@ -295,6 +306,8 @@ Tensor* tensor_hinge_loss(Tensor* input, Tensor* target) {
     return uop_mean(hinge, &reduce_params);
 }
 
+/** Focal loss mean(alpha * (1 - p_t)^gamma * -log(p_t)) over sigmoid inputs, down-weighting
+ * easy examples. Non-positive alpha/gamma fall back to 0.25/2.0. Errors on shape mismatch. */
 Tensor* tensor_focal_loss(Tensor* input, Tensor* target, float alpha, float gamma) {
     if (!input || !target) {
         CML_ERR_NULL("Focal Loss: input or target is NULL");
@@ -398,6 +411,8 @@ Tensor* tensor_focal_loss(Tensor* input, Tensor* target, float alpha, float gamm
     return uop_mean(loss, &reduce_params);
 }
 
+/** Smooth L1 loss: quadratic 0.5*d^2/beta where |d| < beta, else linear |d| - 0.5*beta,
+ * selected with where. Non-positive beta defaults to 1. Returns the mean over elements. */
 Tensor* tensor_smooth_l1_loss(Tensor* input, Tensor* target, float beta) {
     if (!input || !target) {
         CML_ERR_NULL("Smooth L1 Loss: input or target is NULL");
@@ -489,6 +504,8 @@ Tensor* tensor_smooth_l1_loss(Tensor* input, Tensor* target, float beta) {
     return uop_mean(loss_per_element, &reduce_params);
 }
 
+/** KL divergence sum(target * (log(target) - log(input))) between two distributions.
+ * Errors on shape mismatch. */
 Tensor* tensor_kl_div_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
         CML_ERR_NULL("KL Divergence Loss: input or target is NULL");
@@ -550,6 +567,8 @@ static Tensor* ce_loss_per_sample(Tensor* input, Tensor* target, Tensor** log_su
     return uop_add(uop_neg(target_logits), log_sum_exp);
 }
 
+/** Sparse cross-entropy from logits [N, C] and 1-D integer targets, computed via a numerically
+ * stable log-sum-exp (no explicit softmax). Returns the per-batch mean; errors on size mismatch. */
 Tensor* tensor_sparse_cross_entropy_loss(Tensor* input, Tensor* target) {
     if (!input || !target) {
         CML_ERR_NULL("Sparse Cross Entropy Loss: input or target is NULL");
@@ -583,6 +602,8 @@ Tensor* tensor_sparse_cross_entropy_loss(Tensor* input, Tensor* target) {
     return uop_mean(loss_per_sample, &mean_params);
 }
 
+/** Triplet margin loss max(0, ||a-p||^2 - ||a-n||^2 + margin), summed over the embedding.
+ * Non-positive margin defaults to 1. Errors on shape mismatch. */
 Tensor* tensor_triplet_margin_loss(Tensor* anchor, Tensor* positive, Tensor* negative,
                                    float margin) {
     if (!anchor || !positive || !negative) {
@@ -633,6 +654,8 @@ Tensor* tensor_triplet_margin_loss(Tensor* anchor, Tensor* positive, Tensor* neg
     return uop_clamp(with_margin, 0.0f, INFINITY);
 }
 
+/** Cosine embedding loss: for target=+1 use 1 - cos(x1, x2), for target=-1 use
+ * max(0, cos - margin); the two branches are blended by (1±target)/2 weights. */
 Tensor* tensor_cosine_embedding_loss(Tensor* x1, Tensor* x2, Tensor* target, float margin) {
     if (!x1 || !x2 || !target) {
         CML_ERR_NULL("Cosine Embedding Loss: x1, x2, or target is NULL");
@@ -718,6 +741,8 @@ static Tensor* blend_label_smoothing(Tensor* ce_loss, Tensor* uniform_loss, floa
     return uop_add(uop_mul(one_minus_eps, ce_loss), uop_mul(eps_t, uniform_loss));
 }
 
+/** Cross-entropy with label smoothing in [0,1]: blends the standard CE with a uniform-target
+ * term, (1-eps)*ce + eps*uniform. Delegates to plain CE when eps is 0; errors on bad args. */
 Tensor* tensor_cross_entropy_loss_smooth(Tensor* input, Tensor* target, float label_smoothing) {
     if (!input || !target) {
         CML_ERR_NULL("Cross Entropy Loss (smooth): input or target is NULL");
@@ -796,6 +821,9 @@ Tensor* tensor_cross_entropy_loss_smooth(Tensor* input, Tensor* target, float la
     return blend_label_smoothing(ce_loss, uniform_loss, label_smoothing);
 }
 
+/** Sparse cross-entropy with label smoothing in [0,1], reusing the log-sum-exp term to form
+ * the uniform-target loss and blending (1-eps)*ce + eps*uniform. Delegates to the plain
+ * sparse CE when eps is 0; errors on bad args. */
 Tensor* tensor_sparse_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
                                                 float label_smoothing) {
     if (!input || !target) {
@@ -879,6 +907,8 @@ Tensor* tensor_sparse_cross_entropy_loss_smooth(Tensor* input, Tensor* target,
     return blend_label_smoothing(ce_loss, uniform_loss, label_smoothing);
 }
 
+/** Negative log-likelihood over precomputed log-probabilities [N, C] and 1-D integer targets:
+ * mean of -log_probs[target]. Errors unless the batch sizes match. */
 Tensor* tensor_nll_loss(Tensor* log_probs, Tensor* targets) {
     if (!log_probs || !targets) {
         CML_ERR_NULL("NLL Loss: log_probs or targets is NULL");

@@ -61,7 +61,7 @@ typedef struct CMLGemmCacheEntry {
 
 typedef struct CMLOCLBufferEntry {
     Tensor* tensor; /* tensor pointer (for current graph) */
-    void* data_ptr; /* CPU data pointer — used as cache key for inputs */
+    void* data_ptr; /* CPU data pointer - used as cache key for inputs */
     cl_mem gpu_buf;
     size_t size;
     bool valid;    /* GPU data is up-to-date */
@@ -125,13 +125,18 @@ typedef struct CMLOpenCLIRBackend {
     bool initialized;
 } CMLOpenCLIRBackend;
 
+/** Stub for builds without OpenCL: the backend is never available. */
 static inline bool cml_opencl_ir_available(void) { return false; }
+/** Stub for builds without OpenCL: no backend can be created. */
 static inline CMLOpenCLIRBackend* cml_opencl_ir_backend_create(void) { return NULL; }
+/** Stub for builds without OpenCL: initialization always fails. */
 static inline int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
     (void)b;
     return -1;
 }
+/** Stub for builds without OpenCL: nothing to release. */
 static inline void cml_opencl_ir_backend_free(CMLOpenCLIRBackend* b) { (void)b; }
+/** Stub for builds without OpenCL: graph execution always fails. */
 static inline int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
     (void)b;
     (void)ir;

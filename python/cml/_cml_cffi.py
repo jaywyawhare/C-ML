@@ -917,7 +917,7 @@ ffi.cdef(
     int cml_dist_barrier(void);
 
 
-    // distributed/data_parallel.h — bucketed DDP
+    // distributed/data_parallel.h - bucketed DDP
     typedef struct {
         size_t bucket_size_bytes;
         bool broadcast_buffers;
@@ -935,7 +935,7 @@ ffi.cdef(
     void cml_ddp_free(CMLDataParallel* ddp);
 
 
-    // distributed/pipeline_parallel.h — GPipe / 1F1B pipeline
+    // distributed/pipeline_parallel.h - GPipe / 1F1B pipeline
     typedef struct PipelineStage {
         Module* module;
         int device_id;
@@ -968,7 +968,7 @@ ffi.cdef(
     void cml_pipeline_free(CMLPipelineParallel* pipeline);
 
 
-    // torch/torch_c.h — PyTorch-like C API
+    // torch/torch_c.h - PyTorch-like C API
     typedef struct TorchTensorOptions {
         DType dtype;
         DeviceType device;
@@ -1121,7 +1121,7 @@ ffi.cdef(
 
     bool torch_cuda_is_available(void);
 
-    // torch/torch_eager.h — zero-IR eager mode + fused linear + thread tuning
+    // torch/torch_eager.h - zero-IR eager mode + fused linear + thread tuning
     void torch_set_eager_mode(bool enabled);
     bool torch_is_eager_mode(void);
     void torch_inference_mode(bool enabled);

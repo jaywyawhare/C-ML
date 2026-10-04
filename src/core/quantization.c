@@ -8,6 +8,8 @@
 #include "ops/uops.h"
 #include "autograd/autograd.h"
 
+/** Derive int8 scale and zero-point from a tensor's value range: symmetric maps
+ * absmax to +/-127 (zero-point 0), affine maps [min,max] across the full grid. */
 QuantParams cml_quantize_compute_params(Tensor* tensor, bool symmetric) {
     QuantParams params = {.scale = 1.0f, .zero_point = 0};
 
@@ -46,6 +48,9 @@ QuantParams cml_quantize_compute_params(Tensor* tensor, bool symmetric) {
     return params;
 }
 
+/** Quantize a float tensor to int8 using `params` (or symmetric params computed
+ * from the tensor), clamping to [-128,127]. Writes the params used to
+ * `out_params` if given. Returns a new int8 tensor, or NULL on failure. */
 Tensor* cml_quantize_int8(Tensor* tensor, const QuantParams* params, QuantParams* out_params) {
     if (!tensor) {
         LOG_ERROR("cml_quantize_int8: NULL tensor");
@@ -93,6 +98,7 @@ Tensor* cml_quantize_int8(Tensor* tensor, const QuantParams* params, QuantParams
     return quantized;
 }
 
+/** Reconstruct a float tensor from int8 data: (q - zero_point) * scale. */
 Tensor* cml_dequantize_int8(Tensor* tensor, const QuantParams* params) {
     if (!tensor || !params) {
         LOG_ERROR("cml_dequantize_int8: NULL tensor or params");
@@ -125,6 +131,8 @@ Tensor* cml_dequantize_int8(Tensor* tensor, const QuantParams* params) {
     return dequantized;
 }
 
+/** Quantize a weight tensor to int8, stamping scale/zero-point/quant-type onto
+ * the result so the matmul executor can dispatch on it. */
 Tensor* cml_quantize_weight_int8(Tensor* weight, bool symmetric) {
     if (!weight) {
         LOG_ERROR("cml_quantize_weight_int8: NULL weight");
@@ -171,6 +179,8 @@ Tensor* cml_quantize_weight_int8(Tensor* weight, bool symmetric) {
     return q;
 }
 
+/** Compute y = x @ dequant(w) for an int8 affine weight (M x K times K x N),
+ * folding the zero-point correction via the per-row input sum. */
 int cml_qmatmul_affine_int8(const float* x, const int8_t* w, float scale, int32_t zero_point,
                             float* y, int M, int K, int N) {
     if (!x || !w || !y || M <= 0 || K <= 0 || N <= 0)
@@ -186,7 +196,7 @@ int cml_qmatmul_affine_int8(const float* x, const int8_t* w, float scale, int32_
             float xmk = xr[k];
             xsum += xmk;
             const int8_t* wr = w + (size_t)k * N;
-            /* contiguous in n — the compiler auto-vectorizes this */
+            /* contiguous in n - the compiler auto-vectorizes this */
             for (int n = 0; n < N; n++)
                 yr[n] += xmk * (float)wr[n];
         }
@@ -214,11 +224,14 @@ static inline int int4_unpack_signed(const uint8_t* p, size_t idx) {
     return (nib & 0x08) ? (int)nib - 16 : (int)nib;
 }
 
+/** Extract the raw 4-bit NF4 table index at flat position `idx`. */
 static inline int nf4_unpack_index(const uint8_t* p, size_t idx) {
     uint8_t b = p[idx >> 1];
     return (idx & 1) ? (int)(b & 0x0F) : (int)(b >> 4);
 }
 
+/** Symmetric 4-bit weight quantization: a single absmax/8 scale, two signed
+ * nibbles packed per byte, carried in quant_data on an f32-shaped tensor. */
 Tensor* cml_quantize_weight_int4(Tensor* weight) {
     if (!weight) {
         LOG_ERROR("cml_quantize_weight_int4: NULL weight");
@@ -285,6 +298,8 @@ Tensor* cml_quantize_weight_int4(Tensor* weight) {
     return q;
 }
 
+/** Block-wise NF4 weight quantization: per-block absmax scales followed by
+ * packed 4-bit code indices, all stored in the tensor's quant_data payload. */
 Tensor* cml_quantize_weight_nf4(Tensor* weight, int block_size) {
     if (!weight) {
         LOG_ERROR("cml_quantize_weight_nf4: NULL weight");
@@ -367,6 +382,8 @@ Tensor* cml_quantize_weight_nf4(Tensor* weight, int block_size) {
     return q;
 }
 
+/** Compute y = x @ dequant(w) for packed int4 affine weights, unpacking each
+ * signed nibble on the fly and applying the zero-point correction per row. */
 int cml_qmatmul_affine_int4(const float* x, const uint8_t* w_packed, float scale,
                             int32_t zero_point, float* y, int M, int K, int N) {
     if (!x || !w_packed || !y || M <= 0 || K <= 0 || N <= 0)
@@ -398,6 +415,8 @@ int cml_qmatmul_affine_int4(const float* x, const uint8_t* w_packed, float scale
     return 0;
 }
 
+/** Compute y = x @ dequant(w) for NF4 weights, looking each nibble up in the NF4
+ * table and scaling by its block's absmax. */
 int cml_qmatmul_nf4(const float* x, const uint8_t* w_packed, const float* scales, int num_scales,
                     int block_size, float* y, int M, int K, int N) {
     if (!x || !w_packed || !scales || !y || M <= 0 || K <= 0 || N <= 0 || num_scales <= 0 ||
@@ -424,6 +443,8 @@ int cml_qmatmul_nf4(const float* x, const uint8_t* w_packed, const float* scales
     return 0;
 }
 
+/** Derive uint8 affine scale and (non-negative) zero-point from a tensor's
+ * [min,max] range over the [0,255] grid. */
 QuantParams cml_quantize_compute_params_uint8(Tensor* tensor) {
     QuantParams qp = {.scale = 1.0f, .zero_point = 0};
     if (!tensor)
@@ -448,6 +469,8 @@ QuantParams cml_quantize_compute_params_uint8(Tensor* tensor) {
     return qp;
 }
 
+/** Quantize a float tensor to uint8, clamping to [0,255]. Rejects params whose
+ * zero-point is outside the uint8 grid (likely int8 params). */
 Tensor* cml_quantize_uint8(Tensor* tensor, const QuantParams* params, QuantParams* out_params) {
     if (!tensor) {
         LOG_ERROR("cml_quantize_uint8: NULL tensor");
@@ -506,6 +529,7 @@ Tensor* cml_quantize_uint8(Tensor* tensor, const QuantParams* params, QuantParam
     return quantized;
 }
 
+/** Reconstruct a float tensor from uint8 data: (q - zero_point) * scale. */
 Tensor* cml_dequantize_uint8(Tensor* tensor, const QuantParams* params) {
     if (!tensor || !params) {
         LOG_ERROR("cml_dequantize_uint8: NULL tensor or params");
@@ -542,6 +566,7 @@ const float CML_NF4_TABLE[16] = {-1.0f,    -0.6962f, -0.5251f, -0.3949f, -0.2844
                                  -0.0911f, 0.0f,     0.0796f,  0.1609f,  0.2461f,  0.3379f,
                                  0.4407f,  0.5626f,  0.7230f,  1.0f};
 
+/** Index of the NF4 table entry closest to a normalized value in [-1, 1]. */
 static int nf4_find_nearest(float normalized) {
     int best_idx    = 0;
     float best_dist = fabsf(normalized - CML_NF4_TABLE[0]);
@@ -555,6 +580,9 @@ static int nf4_find_nearest(float normalized) {
     return best_idx;
 }
 
+/** Quantize a tensor to packed NF4 codes with per-block absmax scales. Returns
+ * the packed uint8 tensor and writes the scales array and block count to the
+ * out-params (caller frees the scales). */
 Tensor* cml_quantize_nf4(Tensor* tensor, int block_size, float** out_scales, int* out_num_scales) {
     if (!tensor) {
         LOG_ERROR("cml_quantize_nf4: NULL tensor");
@@ -659,6 +687,8 @@ Tensor* cml_quantize_nf4(Tensor* tensor, int block_size, float** out_scales, int
     return packed;
 }
 
+/** Reconstruct a flat float tensor of `original_numel` elements from packed NF4
+ * codes and per-block scales. */
 Tensor* cml_dequantize_nf4(Tensor* nf4_tensor, const float* scales, int num_scales, int block_size,
                            size_t original_numel) {
     if (!nf4_tensor || !scales) {
@@ -723,6 +753,8 @@ Tensor* cml_dequantize_nf4(Tensor* nf4_tensor, const float* scales, int num_scal
 
 /* ---- quantization-aware training (QAT) ---- */
 
+/** Allocate a QAT activation-range observer in the given mode; `momentum` is
+ * only used (and must lie in (0,1]) for the moving-average mode. */
 QatObserver* cml_qat_observer_create(CmlQatObserverMode mode, float momentum) {
     if (mode != CML_QAT_OBS_MINMAX && mode != CML_QAT_OBS_MOVING_AVG_MINMAX) {
         LOG_ERROR("cml_qat_observer_create: unknown mode %d", (int)mode);
@@ -745,12 +777,14 @@ QatObserver* cml_qat_observer_create(CmlQatObserverMode mode, float momentum) {
     return obs;
 }
 
+/** Free a QAT observer. */
 void cml_qat_observer_free(QatObserver* obs) {
     if (!obs)
         return;
     cml_free(obs);
 }
 
+/** Clear an observer's accumulated range so calibration can start over. */
 void cml_qat_observer_reset(QatObserver* obs) {
     if (!obs)
         return;
@@ -760,6 +794,8 @@ void cml_qat_observer_reset(QatObserver* obs) {
     obs->num_updates = 0;
 }
 
+/** Fold a tensor's min/max into the observer's running range, either hard
+ * min/max or an exponential moving average per its mode. Returns 0 on success. */
 int cml_qat_observer_update(QatObserver* obs, Tensor* tensor) {
     if (!obs || !tensor) {
         LOG_ERROR("cml_qat_observer_update: NULL observer or tensor");
@@ -800,6 +836,8 @@ int cml_qat_observer_update(QatObserver* obs, Tensor* tensor) {
     return 0;
 }
 
+/** Symmetric int8 params from an observer's calibrated range; logs and returns a
+ * degenerate scale if no update has been seen. */
 QuantParams cml_qat_observer_params(const QatObserver* obs) {
     QuantParams params = {.scale = 1e-10f, .zero_point = 0};
     if (!obs || !obs->initialized) {
@@ -831,6 +869,9 @@ static Tensor* qat_fake_quant_composite(Tensor* t, float scale, int32_t zero_poi
     return fq;
 }
 
+/** Differentiable fake-quantization: rounds through the int8 grid for the
+ * forward value but uses a straight-through estimator so gradients pass to
+ * `tensor` unchanged. Returns a new tensor, or NULL on failure. */
 Tensor* cml_qat_fake_quant(Tensor* tensor, const QuantParams* params) {
     if (!tensor || !params) {
         LOG_ERROR("cml_qat_fake_quant: NULL tensor or params");
@@ -865,6 +906,7 @@ Tensor* cml_qat_fake_quant(Tensor* tensor, const QuantParams* params) {
     return uop_add(tensor, corr_leaf);
 }
 
+/** Update `obs` with `tensor`, then fake-quantize using the observed params. */
 Tensor* cml_qat_fake_quant_observed(Tensor* tensor, QatObserver* obs) {
     if (!tensor || !obs) {
         LOG_ERROR("cml_qat_fake_quant_observed: NULL tensor or observer");

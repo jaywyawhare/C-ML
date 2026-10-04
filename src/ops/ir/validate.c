@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include "alloc/cml_allocator.h"
 
+/** Default validation options: check shapes, dtypes, and cycles; skip dead-code. */
 CMLValidateOpts cml_validate_default_opts(void) {
     CMLValidateOpts o;
     o.check_shapes = true;
@@ -17,6 +18,10 @@ CMLValidateOpts cml_validate_default_opts(void) {
     return o;
 }
 
+/**
+ * Record a formatted diagnostic, always bumping the count but only writing into
+ * `diags` while there is room (respecting max_diags).
+ */
 static void push_diag(CMLValidateDiag* diags, int max_diags, int* count, CMLValidateCode code,
                       int node_idx, const char* fmt, ...) {
     (*count)++;
@@ -33,6 +38,7 @@ static void push_diag(CMLValidateDiag* diags, int max_diags, int* count, CMLVali
     va_end(ap);
 }
 
+/** Collect the graph's nodes into a flat array for indexed traversal (caller frees). */
 static struct IRNode** collect_nodes(CMLGraph_t ir, int* out_count) {
     *out_count = 0;
     if (!ir || ir->node_count == 0)
@@ -50,6 +56,7 @@ static struct IRNode** collect_nodes(CMLGraph_t ir, int* out_count) {
     return arr;
 }
 
+/** Expected input count for an op, or -1 if the op has no fixed arity. */
 static int expected_inputs(UOpType t) {
     switch (t) {
     case UOP_ADD:
@@ -112,8 +119,13 @@ static int expected_inputs(UOpType t) {
     }
 }
 
+/** True if the op takes exactly two inputs. */
 static bool is_binary(UOpType t) { return expected_inputs(t) == 2; }
 
+/**
+ * Three-color DFS over the data dependency edges; records a diagnostic and
+ * returns true if a back-edge (cycle) is found.
+ */
 static bool dfs_has_cycle(struct IRNode** arr, int n, uint8_t* color, int idx,
                           CMLValidateDiag* diags, int max_diags, int* ndiags) {
     if (color[idx] == 2)
@@ -141,6 +153,10 @@ static bool dfs_has_cycle(struct IRNode** arr, int n, uint8_t* color, int idx,
     return false;
 }
 
+/**
+ * Validate an IR graph (null/empty, node arity, cycles, dtype and shape checks
+ * per opts), filling `diags` and returning the first error code encountered.
+ */
 CMLValidateCode cml_validate_graph(CMLGraph_t ir, const CMLValidateOpts* opts,
                                    CMLValidateDiag* diags, int max_diag_count, int* num_diags_out) {
     int ndiags            = 0;
@@ -245,6 +261,7 @@ done:
 #undef RECORD
 }
 
+/** Validate with default options, printing diagnostics and returning false on failure. */
 bool cml_validate_graph_or_die(CMLGraph_t ir) {
     CMLValidateDiag diags[32];
     int ndiags         = 0;
@@ -257,6 +274,7 @@ bool cml_validate_graph_or_die(CMLGraph_t ir) {
     return true;
 }
 
+/** Print each diagnostic to stderr with its node index, code, and message. */
 void cml_validate_print_diags(const CMLValidateDiag* diags, int num_diags) {
     for (int i = 0; i < num_diags; ++i) {
         const CMLValidateDiag* d = &diags[i];
@@ -265,6 +283,7 @@ void cml_validate_print_diags(const CMLValidateDiag* diags, int num_diags) {
     }
 }
 
+/** Short string name for a validation result code. */
 const char* cml_validate_code_str(CMLValidateCode code) {
     switch (code) {
     case CML_VALID_OK:

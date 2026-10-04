@@ -58,7 +58,7 @@ int cml_ir_fusion_enabled(void);
  * decompose + autodiff. */
 int cml_ir_fuse_elementwise(CMLGraph_t ir);
 
-/* Allow the fuser to fuse requires_grad (forward) chains too — only safe when
+/* Allow the fuser to fuse requires_grad (forward) chains too - only safe when
  * the full fwd+bwd graph is present so use_count reflects backward refs.
  * tensor_backward sets it around the combined-graph execute; off by default. */
 void cml_ir_fuse_set_allow_grad(int on);
@@ -71,10 +71,10 @@ int cml_ir_fuse_matmul_epilogue(CMLGraph_t ir);
 
 /* Mark every computed (op) node in the graph as not-yet-executed so the next
  * cml_ir_execute re-runs it, WITHOUT rebuilding the graph. Leaf/data nodes
- * (num_inputs==0 — inputs, weights) keep their materialized buffers. This is the
+ * (num_inputs==0 - inputs, weights) keep their materialized buffers. This is the
  * primitive behind a zero-rebuild "static graph": build the graph once, then each
  * iteration overwrite the input buffers, cml_ir_clear_executed(ir), and
- * cml_ir_execute(ir) — no new IR nodes are allocated. */
+ * cml_ir_execute(ir) - no new IR nodes are allocated. */
 void cml_ir_clear_executed(CMLGraph_t ir);
 
 /* Zero-rebuild re-run of an already-built static graph after overwriting its

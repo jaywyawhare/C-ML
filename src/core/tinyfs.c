@@ -9,6 +9,7 @@
 #endif
 #include "alloc/cml_allocator.h"
 
+/** Create a sharded tensor store rooted at base_path; shard paths are precomputed. */
 CMLTinyFS* cml_tinyfs_create(const char* base_path, int num_shards, size_t shard_size) {
     if (!base_path || num_shards < 1 || num_shards > CML_TINYFS_MAX_SHARDS)
         return NULL;
@@ -32,8 +33,10 @@ CMLTinyFS* cml_tinyfs_create(const char* base_path, int num_shards, size_t shard
     return fs;
 }
 
+/** Free the filesystem handle (on-disk shard files are left untouched). */
 void cml_tinyfs_free(CMLTinyFS* fs) { cml_free(fs); }
 
+/** Serialize a tensor (ndim, shape, dtype, raw data) to a ".tfs" file; -1 on error. */
 int cml_tinyfs_store(CMLTinyFS* fs, const char* name, Tensor* tensor) {
     if (!fs || !fs->initialized || !name || !tensor)
         return -1;
@@ -70,6 +73,7 @@ int cml_tinyfs_store(CMLTinyFS* fs, const char* name, Tensor* tensor) {
     return 0;
 }
 
+/** Load a tensor previously stored under `name`; NULL on missing or malformed file. */
 Tensor* cml_tinyfs_load(CMLTinyFS* fs, const char* name) {
     if (!fs || !fs->initialized || !name)
         return NULL;
@@ -125,6 +129,7 @@ Tensor* cml_tinyfs_load(CMLTinyFS* fs, const char* name) {
     return t;
 }
 
+/** True if a tensor is stored under `name`. */
 bool cml_tinyfs_exists(CMLTinyFS* fs, const char* name) {
     if (!fs || !name)
         return false;
@@ -138,6 +143,7 @@ bool cml_tinyfs_exists(CMLTinyFS* fs, const char* name) {
     return false;
 }
 
+/** Remove the stored tensor's file; returns remove()'s status. */
 int cml_tinyfs_delete(CMLTinyFS* fs, const char* name) {
     if (!fs || !name)
         return -1;
@@ -214,6 +220,7 @@ fail:
     return NULL;
 }
 
+/** Total bytes accounted across all shards. */
 size_t cml_tinyfs_used_bytes(const CMLTinyFS* fs) {
     if (!fs)
         return 0;
@@ -223,6 +230,7 @@ size_t cml_tinyfs_used_bytes(const CMLTinyFS* fs) {
     return total;
 }
 
+/** Print a human-readable summary of the filesystem to stdout. */
 void cml_tinyfs_print(const CMLTinyFS* fs) {
     if (!fs) {
         printf("TinyFS: NULL\n");

@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
+/** True if the group marked this node's buffer as eliminated (fused away, no STORE). */
 static bool is_eliminated(const CMLFusionGroup* g, int node_idx) {
     if (!g)
         return false;
@@ -16,6 +17,7 @@ static bool is_eliminated(const CMLFusionGroup* g, int node_idx) {
     return false;
 }
 
+/** Allocate an empty linear program with default op/axis capacity and 1x1x1 dims. */
 LinearProgram* linear_program_create(void) {
     LinearProgram* prog = cml_calloc(1, sizeof(LinearProgram));
     if (!prog)
@@ -40,6 +42,7 @@ LinearProgram* linear_program_create(void) {
     return prog;
 }
 
+/** Free a linear program and its op and loop-axis arrays. */
 void linear_program_free(LinearProgram* prog) {
     if (!prog)
         return;
@@ -48,6 +51,7 @@ void linear_program_free(LinearProgram* prog) {
     cml_free(prog);
 }
 
+/** Append an op to the program, growing the op array as needed. */
 int linear_program_emit(LinearProgram* prog, LinearOp op) {
     if (!prog)
         return -1;
@@ -63,6 +67,7 @@ int linear_program_emit(LinearProgram* prog, LinearOp op) {
     return 0;
 }
 
+/** Hand out the next virtual register id, or -1 if the register file is exhausted. */
 int alloc_vreg(LinearProgram* prog) {
     if (!prog)
         return -1;
@@ -73,6 +78,11 @@ int alloc_vreg(LinearProgram* prog) {
     return prog->next_vreg++;
 }
 
+/**
+ * Lower a fusion group to a linear LOAD/COMPUTE/STORE program, reusing vregs
+ * for already-produced or already-loaded tensors and skipping STOREs for
+ * eliminated (fused-away) buffers.
+ */
 LinearProgram* linearize_group(const CMLFusionGroup* g) {
     if (!g || g->num_nodes == 0)
         return NULL;
@@ -172,6 +182,7 @@ LinearProgram* linearize_group(const CMLFusionGroup* g) {
     return prog;
 }
 
+/** Short mnemonic for a linear op kind, used when printing programs. */
 const char* linop_name(LinearOpKind k) {
     switch (k) {
     case LINOP_LOAD:
@@ -197,6 +208,7 @@ const char* linop_name(LinearOpKind k) {
     }
 }
 
+/** Pretty-print each op with its destination register, sources, and loop info. */
 void linear_program_print(const LinearProgram* prog) {
     if (!prog) {
         printf("LinearProgram: (null)\n");
@@ -227,6 +239,7 @@ void linear_program_print(const LinearProgram* prog) {
     }
 }
 
+/** Linearize a group and print the resulting program (debug helper). */
 void cml_linearize_group_print(const CMLFusionGroup* g) {
     if (!g)
         return;
@@ -237,6 +250,7 @@ void cml_linearize_group_print(const CMLFusionGroup* g) {
     }
 }
 
+/** Linearize a group and return its op count, or -1 on failure. */
 int cml_linearize_group_count(const CMLFusionGroup* g) {
     if (!g)
         return -1;

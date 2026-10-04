@@ -7,10 +7,12 @@
 #include "alloc/cml_allocator.h"
 
 static bool tensor_on_device(const Tensor* t, int device_id) __attribute__((unused));
+/** True when tensor `t` currently resides on `device_id`. */
 static bool tensor_on_device(const Tensor* t, int device_id) {
     return t && (int)t->device == device_id;
 }
 
+/** Return the index into `device_ids` of the tensor's device, or 0 if not found. */
 static int device_for_tensor(const Tensor* t, const int* device_ids, int n) {
     if (!t)
         return device_ids[0];
@@ -22,6 +24,7 @@ static int device_for_tensor(const Tensor* t, const int* device_ids, int n) {
 
 static CrossDeviceOp* xfer_create(XferDirection dir, int src, int dst, Tensor* t)
     __attribute__((unused));
+/** Allocate a cross-device transfer descriptor, sizing it from the tensor and probing P2P. */
 static CrossDeviceOp* xfer_create(XferDirection dir, int src, int dst, Tensor* t) {
     CrossDeviceOp* op = cml_calloc(1, sizeof(CrossDeviceOp));
     if (!op)
@@ -36,6 +39,7 @@ static CrossDeviceOp* xfer_create(XferDirection dir, int src, int dst, Tensor* t
     return op;
 }
 
+/** Whether two devices can peer-to-peer copy (currently always false: no P2P path). */
 bool devices_p2p_capable(int dev_a, int dev_b) {
 
     (void)dev_a;
@@ -43,6 +47,8 @@ bool devices_p2p_capable(int dev_a, int dev_b) {
     return false;
 }
 
+/** Partition a schedule across `num_devices` by output residency, inserting D2D transfer
+ *  and device-compute steps in dependency order. Returns NULL on bad args/alloc. */
 MultiDeviceSchedule* multi_schedule_build(CMLSchedule* sched, const int* device_ids,
                                           int num_devices) {
     if (!sched || !device_ids || num_devices <= 0)
@@ -131,6 +137,7 @@ fail:
     return NULL;
 }
 
+/** Free a multi-device schedule and all its per-device sub-schedules. */
 void multi_schedule_free(MultiDeviceSchedule* ms) {
     if (!ms)
         return;
@@ -149,6 +156,8 @@ void multi_schedule_free(MultiDeviceSchedule* ms) {
     cml_free(ms);
 }
 
+/** Walk the step list validating transfers/compute. Returns 0 if nothing to do, -2 when
+ *  device-compute steps remain (no schedule executor exists), -1 on a bad step. */
 int multi_schedule_run(MultiDeviceSchedule* ms) {
     if (!ms)
         return -1;
@@ -161,7 +170,7 @@ int multi_schedule_run(MultiDeviceSchedule* ms) {
 
             /* A cross-device relocation needs a destination buffer on the
              * target device. This single-buffer planner has none, so the old
-             * code did device_copy(data, data, ...) — a self-copy that moved
+             * code did device_copy(data, data, ...) - a self-copy that moved
              * nothing while pretending to. Perform a copy only when there is a
              * genuinely distinct destination (there isn't in-process); when
              * the device backends materialize separate buffers this becomes a
@@ -195,6 +204,7 @@ int multi_schedule_run(MultiDeviceSchedule* ms) {
     return 0;
 }
 
+/** Total bytes moved across all planned cross-device transfers. */
 size_t multi_schedule_xfer_bytes(const MultiDeviceSchedule* ms) {
     if (!ms)
         return 0;
@@ -204,6 +214,7 @@ size_t multi_schedule_xfer_bytes(const MultiDeviceSchedule* ms) {
     return total;
 }
 
+/** Sum of kernel (item) counts across every device sub-schedule. */
 int multi_schedule_total_kernels(const MultiDeviceSchedule* ms) {
     if (!ms)
         return 0;
@@ -214,6 +225,7 @@ int multi_schedule_total_kernels(const MultiDeviceSchedule* ms) {
     return total;
 }
 
+/** Debug-print the device partition and cross-device transfer summary to stderr. */
 void multi_schedule_print(const MultiDeviceSchedule* ms) {
     if (!ms) {
         fprintf(stderr, "MultiDeviceSchedule(NULL)\n");

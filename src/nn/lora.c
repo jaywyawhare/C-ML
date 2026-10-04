@@ -10,6 +10,10 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/**
+ * Wrap a frozen 2D `base_weight` with a rank-`r` LoRA adapter (A Gaussian-init,
+ * B zero so the initial delta is zero). The base weight is referenced, not owned.
+ */
 CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha) {
     if (!base_weight) {
         LOG_ERROR("base_weight is NULL");
@@ -78,6 +82,7 @@ CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha
     return lora;
 }
 
+/** Free the adapter and its A/B (and frozen base) tensors; the base weight is left intact. */
 void cml_lora_linear_free(CMLLoRALinear* lora) {
     if (!lora)
         return;
@@ -98,6 +103,10 @@ void cml_lora_linear_free(CMLLoRALinear* lora) {
     cml_free(lora);
 }
 
+/**
+ * Lazy LoRA forward: out = x·Wᵀ + scaling·((x·Aᵀ)·Bᵀ), autograd-differentiable.
+ * When already merged, only the base path is returned.
+ */
 Tensor* cml_lora_linear_forward(CMLLoRALinear* lora, Tensor* input) {
     if (!lora || !input) {
         LOG_ERROR("NULL argument to cml_lora_linear_forward");
@@ -145,6 +154,7 @@ Tensor* cml_lora_linear_forward(CMLLoRALinear* lora, Tensor* input) {
     return uop_add(base, scaled);
 }
 
+/** Fold scaling*(B@A) into the base weight in-place, saving a frozen copy for unmerge. */
 int cml_lora_linear_merge(CMLLoRALinear* lora) {
     if (!lora) {
         LOG_ERROR("NULL LoRA layer");
@@ -203,6 +213,7 @@ int cml_lora_linear_merge(CMLLoRALinear* lora) {
     return 0;
 }
 
+/** Restore the pre-merge base weight from the frozen copy, undoing cml_lora_linear_merge. */
 int cml_lora_linear_unmerge(CMLLoRALinear* lora) {
     if (!lora) {
         LOG_ERROR("NULL LoRA layer");
@@ -243,6 +254,7 @@ int cml_lora_linear_unmerge(CMLLoRALinear* lora) {
     return 0;
 }
 
+/** Create a named, empty adapter grouping several LoRA layers under one rank/alpha. */
 CMLLoRAAdapter* cml_lora_adapter_create(const char* name, int rank, float alpha) {
     if (!name) {
         LOG_ERROR("Adapter name is NULL");
@@ -270,6 +282,7 @@ CMLLoRAAdapter* cml_lora_adapter_create(const char* name, int rank, float alpha)
     return adapter;
 }
 
+/** Free the adapter and every LoRA layer it owns. */
 void cml_lora_adapter_free(CMLLoRAAdapter* adapter) {
     if (!adapter)
         return;
@@ -283,6 +296,7 @@ void cml_lora_adapter_free(CMLLoRAAdapter* adapter) {
     cml_free(adapter);
 }
 
+/** Append a LoRA layer to the adapter, taking ownership of it. */
 int cml_lora_adapter_add_layer(CMLLoRAAdapter* adapter, CMLLoRALinear* layer) {
     if (!adapter || !layer) {
         LOG_ERROR("NULL argument to cml_lora_adapter_add_layer");
@@ -303,6 +317,7 @@ int cml_lora_adapter_add_layer(CMLLoRAAdapter* adapter, CMLLoRALinear* layer) {
     return 0;
 }
 
+/** Merge every layer in the adapter; rolls back already-merged layers on any failure. */
 int cml_lora_adapter_merge_all(CMLLoRAAdapter* adapter) {
     if (!adapter) {
         LOG_ERROR("NULL adapter");
@@ -329,6 +344,7 @@ int cml_lora_adapter_merge_all(CMLLoRAAdapter* adapter) {
     return 0;
 }
 
+/** Unmerge every layer in the adapter, restoring all base weights. */
 int cml_lora_adapter_unmerge_all(CMLLoRAAdapter* adapter) {
     if (!adapter) {
         LOG_ERROR("NULL adapter");

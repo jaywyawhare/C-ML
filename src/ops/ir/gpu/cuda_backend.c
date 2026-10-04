@@ -30,6 +30,7 @@
 #define CUDA_SUCCESS 0
 
 #ifdef __linux__
+/** dlopen a shared library by name; logs and returns NULL on failure. */
 static void* load_library(const char* name) {
     void* lib = dlopen(name, RTLD_LAZY | RTLD_LOCAL);
     if (!lib) {
@@ -38,13 +39,16 @@ static void* load_library(const char* name) {
     return lib;
 }
 
+/** Resolve a symbol from a loaded library handle. */
 static void* get_symbol(void* lib, const char* name) { return dlsym(lib, name); }
 
+/** dlclose a library handle if non-NULL. */
 static void unload_library(void* lib) {
     if (lib)
         dlclose(lib);
 }
 #elif defined(_WIN32)
+/** LoadLibrary a DLL by name; logs and returns NULL on failure. */
 static void* load_library(const char* name) {
     HMODULE lib = LoadLibraryA(name);
     if (!lib) {
@@ -53,27 +57,33 @@ static void* load_library(const char* name) {
     return lib;
 }
 
+/** Resolve a symbol from a loaded DLL handle. */
 static void* get_symbol(void* lib, const char* name) {
     return (void*)GetProcAddress((HMODULE)lib, name);
 }
 
+/** FreeLibrary a DLL handle if non-NULL. */
 static void unload_library(void* lib) {
     if (lib)
         FreeLibrary((HMODULE)lib);
 }
 #else
+/** Stub loader for platforms without CUDA: always fails. */
 static void* load_library(const char* name) {
     (void)name;
     return NULL;
 }
+/** Stub symbol resolver for unsupported platforms. */
 static void* get_symbol(void* lib, const char* name) {
     (void)lib;
     (void)name;
     return NULL;
 }
+/** Stub unloader for unsupported platforms. */
 static void unload_library(void* lib) { (void)lib; }
 #endif
 
+/** Probe whether the CUDA driver is present by loading it and checking for cuInit. */
 bool cml_cuda_available(void) {
 #if defined(__APPLE__)
     return false; // CUDA not supported on modern macOS
@@ -92,6 +102,7 @@ bool cml_cuda_available(void) {
 #endif
 }
 
+/** Allocate a zeroed CUDA backend context (not yet initialized). */
 CMLCUDABackend* cml_cuda_backend_create(void) {
     CMLCUDABackend* backend = cml_calloc(1, sizeof(CMLCUDABackend));
     if (!backend) {
@@ -101,6 +112,8 @@ CMLCUDABackend* cml_cuda_backend_create(void) {
     return backend;
 }
 
+/** Load the CUDA driver (and optional NVRTC) libraries and bind their entry points.
+ * Core driver symbols are required; event/async and NVRTC symbols are best-effort. */
 static int load_cuda_functions(CMLCUDABackend* backend) {
     if (!CUDA_LIB_NAME) {
         LOG_ERROR("CUDA not supported on this platform");
@@ -177,6 +190,8 @@ static int load_cuda_functions(CMLCUDABackend* backend) {
     return 0;
 }
 
+/** Load CUDA, initialize the driver, select the device, query its properties, and
+ * create a context and stream. */
 int cml_cuda_backend_init(CMLCUDABackend* backend, int device_ordinal) {
     if (!backend)
         return -1;
@@ -245,6 +260,8 @@ int cml_cuda_backend_init(CMLCUDABackend* backend, int device_ordinal) {
     return 0;
 }
 
+/** Destroy the stream and context, unload the CUDA/NVRTC libraries, and free the
+ * backend context. */
 void cml_cuda_backend_free(CMLCUDABackend* backend) {
     if (!backend)
         return;
@@ -268,6 +285,7 @@ void cml_cuda_backend_free(CMLCUDABackend* backend) {
     cml_free(backend);
 }
 
+/** Return the number of CUDA devices, or -1 on error. */
 int cml_cuda_get_device_count(CMLCUDABackend* backend) {
     if (!backend || !backend->cuDeviceGetCount)
         return -1;
@@ -277,6 +295,8 @@ int cml_cuda_get_device_count(CMLCUDABackend* backend) {
     return (err == CUDA_SUCCESS) ? count : -1;
 }
 
+/** Load a PTX module and look up the named kernel function, returning a kernel with
+ * default launch dims (1x1x1 grid, 256-thread block). */
 CMLCUDAKernel* cml_cuda_compile_ptx(CMLCUDABackend* backend, const char* ptx_code,
                                     const char* kernel_name) {
     if (!backend || !backend->initialized || !ptx_code || !kernel_name) {
@@ -317,6 +337,8 @@ CMLCUDAKernel* cml_cuda_compile_ptx(CMLCUDABackend* backend, const char* ptx_cod
     return kernel;
 }
 
+/** Compile CUDA C source to PTX with NVRTC (targeting the device's arch), record it
+ * for process replay, then load it via cml_cuda_compile_ptx. */
 CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda_code,
                                        const char* kernel_name) {
     if (!backend || !backend->initialized || !cuda_code || !kernel_name) {
@@ -374,6 +396,7 @@ CMLCUDAKernel* cml_cuda_compile_source(CMLCUDABackend* backend, const char* cuda
     return kernel;
 }
 
+/** Unload the kernel's module and free the kernel handle. */
 void cml_cuda_kernel_free(CMLCUDABackend* backend, CMLCUDAKernel* kernel) {
     if (!backend || !kernel)
         return;
@@ -385,6 +408,7 @@ void cml_cuda_kernel_free(CMLCUDABackend* backend, CMLCUDAKernel* kernel) {
     cml_free(kernel);
 }
 
+/** Set the kernel's grid and block dimensions for subsequent launches. */
 void cml_cuda_kernel_set_launch_config(CMLCUDAKernel* kernel, int grid_x, int grid_y, int grid_z,
                                        int block_x, int block_y, int block_z) {
     if (!kernel)
@@ -398,6 +422,8 @@ void cml_cuda_kernel_set_launch_config(CMLCUDAKernel* kernel, int grid_x, int gr
     kernel->block_dim[2] = block_z;
 }
 
+/** Launch the kernel on the backend stream with its configured launch config; args
+ * are passed through as kernel parameters. */
 int cml_cuda_launch_kernel(CMLCUDABackend* backend, CMLCUDAKernel* kernel, void** args,
                            int num_args) {
     if (!backend || !backend->initialized || !kernel || !kernel->function) {
@@ -420,6 +446,7 @@ int cml_cuda_launch_kernel(CMLCUDABackend* backend, CMLCUDAKernel* kernel, void*
     return 0;
 }
 
+/** Block until the backend stream (or whole context) finishes outstanding work. */
 int cml_cuda_synchronize(CMLCUDABackend* backend) {
     if (!backend || !backend->initialized)
         return -1;
@@ -434,6 +461,7 @@ int cml_cuda_synchronize(CMLCUDABackend* backend) {
     return (err == CUDA_SUCCESS) ? 0 : -1;
 }
 
+/** Allocate device memory via cuMemAlloc; returns 0 on failure. */
 CUdeviceptr cml_cuda_malloc(CMLCUDABackend* backend, size_t size) {
     if (!backend || !backend->initialized || size == 0)
         return 0;
@@ -449,12 +477,14 @@ CUdeviceptr cml_cuda_malloc(CMLCUDABackend* backend, size_t size) {
     return ptr;
 }
 
+/** Free device memory previously returned by cml_cuda_malloc. */
 void cml_cuda_free(CMLCUDABackend* backend, CUdeviceptr ptr) {
     if (!backend || !backend->initialized || !ptr)
         return;
     backend->cuMemFree(ptr);
 }
 
+/** Copy host memory to device. */
 int cml_cuda_memcpy_h2d(CMLCUDABackend* backend, CUdeviceptr dst, const void* src, size_t size) {
     if (!backend || !backend->initialized || !dst || !src || size == 0)
         return -1;
@@ -463,6 +493,7 @@ int cml_cuda_memcpy_h2d(CMLCUDABackend* backend, CUdeviceptr dst, const void* sr
     return (err == CUDA_SUCCESS) ? 0 : -1;
 }
 
+/** Copy device memory back to host. */
 int cml_cuda_memcpy_d2h(CMLCUDABackend* backend, void* dst, CUdeviceptr src, size_t size) {
     if (!backend || !backend->initialized || !dst || !src || size == 0)
         return -1;
@@ -471,6 +502,7 @@ int cml_cuda_memcpy_d2h(CMLCUDABackend* backend, void* dst, CUdeviceptr src, siz
     return (err == CUDA_SUCCESS) ? 0 : -1;
 }
 
+/** Upload a tensor's host data to the device, lazily allocating its buffer handle. */
 int cml_cuda_upload_tensor(CMLCUDABackend* backend, Tensor* tensor) {
     if (!backend || !backend->initialized || !tensor || !tensor->data) {
         return -1;
@@ -488,6 +520,7 @@ int cml_cuda_upload_tensor(CMLCUDABackend* backend, Tensor* tensor) {
     return cml_cuda_memcpy_h2d(backend, (CUdeviceptr)tensor->buffer_handle, tensor->data, size);
 }
 
+/** Download a tensor's device buffer into host memory, lazily allocating host data. */
 int cml_cuda_download_tensor(CMLCUDABackend* backend, Tensor* tensor) {
     if (!backend || !backend->initialized || !tensor || !tensor->buffer_handle) {
         return -1;

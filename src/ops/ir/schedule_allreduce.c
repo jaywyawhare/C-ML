@@ -7,6 +7,7 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** Heuristic algorithm pick: ring for large buffers, tree for many small-buffer devices. */
 static AllReduceAlgo choose_algo(size_t bytes, int ndevices) {
 
     if (bytes >= 1024 * 1024)
@@ -17,6 +18,7 @@ static AllReduceAlgo choose_algo(size_t bytes, int ndevices) {
     return AR_ALGO_RING;
 }
 
+/** Build ring steps: n-1 reduce-scatter rounds then n-1 all-gather rounds over chunks. */
 static int build_ring_steps(ScheduleAllReduce* ar) {
     int n            = ar->num_devices;
     size_t buf_bytes = ar->buffer_bytes;
@@ -65,6 +67,7 @@ static int build_ring_steps(ScheduleAllReduce* ar) {
     return 0;
 }
 
+/** Build flat (star) steps: every rank reduces into rank 0, then rank 0 broadcasts back. */
 static int build_flat_steps(ScheduleAllReduce* ar) {
     int n     = ar->num_devices;
     int ns    = 2 * (n - 1);
@@ -131,6 +134,7 @@ static int build_tree_steps(ScheduleAllReduce* ar) {
     return 0;
 }
 
+/** Build recursive-halving/doubling steps (power-of-two ranks only; else fall back to ring). */
 static int build_recursive_halving_steps(ScheduleAllReduce* ar) {
 
     int n = ar->num_devices;
@@ -183,6 +187,7 @@ static int build_recursive_halving_steps(ScheduleAllReduce* ar) {
     return 0;
 }
 
+/** Plan an all-reduce over `device_ids`, auto-selecting the algorithm when AR_ALGO_AUTO. */
 ScheduleAllReduce* schedule_allreduce_build(Tensor* t, AllReduceOp op, AllReduceAlgo algo,
                                             const int* device_ids, int num_devices) {
     if (!t || !device_ids || num_devices <= 0)
@@ -234,6 +239,7 @@ ScheduleAllReduce* schedule_allreduce_build(Tensor* t, AllReduceOp op, AllReduce
     return ar;
 }
 
+/** Free an all-reduce schedule and its step/device/overlap buffers. */
 void schedule_allreduce_free(ScheduleAllReduce* ar) {
     if (!ar)
         return;
@@ -243,6 +249,7 @@ void schedule_allreduce_free(ScheduleAllReduce* ar) {
     cml_free(ar);
 }
 
+/** Single-process simulation of the all-reduce applied in place to the one shared f32 buffer. */
 int schedule_allreduce_run(ScheduleAllReduce* ar) {
     if (!ar || !ar->input || !ar->input->data)
         return -1;
@@ -321,7 +328,7 @@ int schedule_allreduce_inject(CMLSchedule* sched, ScheduleAllReduce* ar) {
         item->device_id    = (ar->steps[s].dst_rank >= 0 && ar->steps[s].dst_rank < ar->num_devices)
                                  ? ar->device_ids[ar->steps[s].dst_rank]
                                  : 0;
-        /* ops / inputs / outputs stay NULL — sched_item_free frees NULLs safely. */
+        /* ops / inputs / outputs stay NULL - sched_item_free frees NULLs safely. */
 
         int idx           = sched->num_items;
         sched->items[idx] = item;
@@ -337,6 +344,7 @@ int schedule_allreduce_inject(CMLSchedule* sched, ScheduleAllReduce* ar) {
     return 0;
 }
 
+/** Total bytes communicated across all planned steps. */
 size_t schedule_allreduce_comm_bytes(const ScheduleAllReduce* ar) {
     if (!ar)
         return 0;
@@ -346,6 +354,7 @@ size_t schedule_allreduce_comm_bytes(const ScheduleAllReduce* ar) {
     return total;
 }
 
+/** Model end-to-end latency from per-step latency and comm bytes over the given bandwidth. */
 double schedule_allreduce_latency_us(const ScheduleAllReduce* ar, double bandwidth_gbps,
                                      double latency_us) {
     if (!ar || bandwidth_gbps <= 0)
@@ -355,6 +364,7 @@ double schedule_allreduce_latency_us(const ScheduleAllReduce* ar, double bandwid
     return latency_us * ar->num_steps + comm / bw_bytes_us;
 }
 
+/** Debug-print the all-reduce op, algorithm, device count and step/chunk/buffer sizes. */
 void schedule_allreduce_print(const ScheduleAllReduce* ar) {
     if (!ar) {
         fprintf(stderr, "ScheduleAllReduce(NULL)\n");

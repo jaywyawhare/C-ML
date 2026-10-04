@@ -15,6 +15,10 @@ DIST_REDUCE_AVG = 4
 
 
 def init_process_group(backend="gloo", world_size=-1, rank=-1):
+    """Initialize the process group, mirroring ``torch.distributed.init_process_group``.
+
+    ``world_size`` and ``rank`` default to ``-1``, letting the C backend read them from
+    the environment. Unknown backend names fall back to Gloo."""
     backend_map = {"nccl": DIST_BACKEND_NCCL, "mpi": DIST_BACKEND_MPI, "gloo": DIST_BACKEND_GLOO}
     backend_id = backend_map.get(backend.lower(), DIST_BACKEND_GLOO)
 
@@ -24,22 +28,27 @@ def init_process_group(backend="gloo", world_size=-1, rank=-1):
 
 
 def get_rank():
+    """This process's rank in the group, like ``torch.distributed.get_rank``."""
     return lib.cml_dist_get_rank()
 
 
 def get_world_size():
+    """Number of processes in the group, like ``torch.distributed.get_world_size``."""
     return lib.cml_dist_get_world_size()
 
 
 def is_initialized():
+    """Whether a process group has been initialized, like ``torch.distributed.is_initialized``."""
     return lib.cml_dist_is_initialized()
 
 
 def destroy_process_group():
+    """Tear down the process group, like ``torch.distributed.destroy_process_group``."""
     lib.cml_dist_destroy()
 
 
 def barrier():
+    """Block until every process reaches this point, like ``torch.distributed.barrier``."""
     if lib.cml_dist_barrier() != 0:
         raise RuntimeError("Barrier failed")
 
@@ -58,6 +67,10 @@ class DistributedDataParallel:
 
     def __init__(self, module, bucket_size_mb=25, broadcast_buffers=True,
                  find_unused_parameters=False, gradient_as_bucket_view=False):
+        """Wrap ``module`` for data-parallel training, broadcasting its parameters from rank 0.
+
+        Requires an initialized process group; the keyword arguments mirror
+        ``torch.nn.parallel.DistributedDataParallel`` and are forwarded to the C engine."""
         if not is_initialized():
             raise RuntimeError("Distributed not initialized. Call init_process_group() first.")
 
@@ -77,6 +90,7 @@ class DistributedDataParallel:
         self._ddp = handle
 
     def __call__(self, input_tensor):
+        """Run the wrapped module's forward pass through the DDP engine."""
         out = lib.cml_ddp_forward(self._ddp, input_tensor._tensor)
         if out == ffi.NULL:
             raise RuntimeError("DDP forward failed")
@@ -100,9 +114,11 @@ class DistributedDataParallel:
             raise RuntimeError("DDP gradient sync failed")
 
     def parameters(self):
+        """The wrapped module's parameters, or an empty list if it exposes none."""
         return self.module.parameters() if hasattr(self.module, "parameters") else []
 
     def __del__(self):
+        """Free the C DDP handle; the wrapped module is left untouched."""
         d = getattr(self, "_ddp", None)
         if d is not None and d != ffi.NULL:
             lib.cml_ddp_free(d)  # does not free the wrapped module
@@ -141,6 +157,10 @@ class PipelineParallel:
     """
 
     def __init__(self, modules, num_micro_batches=4, interleaved=False):
+        """Assemble ``modules`` as ordered pipeline stages in the C pipeline engine.
+
+        ``interleaved`` selects the 1F1B schedule; the default is GPipe (see
+        :func:`build_pipeline_schedule`)."""
         self.modules = list(modules)
         self.num_micro_batches = num_micro_batches
         self.interleaved = interleaved
@@ -171,6 +191,7 @@ class PipelineParallel:
         self._stages_keepalive = stages
 
     def __call__(self, input_tensor):
+        """Forward ``input_tensor`` through all stages, splitting it into micro-batches."""
         out = lib.cml_pipeline_forward(self._pipeline, input_tensor._tensor)
         if out == ffi.NULL:
             raise RuntimeError("Pipeline forward failed")
@@ -184,9 +205,11 @@ class PipelineParallel:
             raise RuntimeError("Pipeline backward failed")
 
     def schedule(self):
+        """This pipeline's execution order as ``(stage, micro_batch, kind)`` tuples."""
         return build_pipeline_schedule(len(self.modules), self.num_micro_batches, self.interleaved)
 
     def __del__(self):
+        """Free the C pipeline handle; the stage modules are left untouched."""
         p = getattr(self, "_pipeline", None)
         if p is not None and p != ffi.NULL:
             lib.cml_pipeline_free(p)  # does not free the stage modules

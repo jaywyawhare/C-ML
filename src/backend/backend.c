@@ -17,12 +17,15 @@
 static pthread_mutex_t g_backend_lock;
 static pthread_once_t g_backend_lock_once = PTHREAD_ONCE_INIT;
 
+/** One-time initializer for the global backend mutex (via pthread_once). */
 static void backend_lock_init(void) { pthread_mutex_init(&g_backend_lock, NULL); }
 
+/** Acquire the global backend lock, lazily initializing the mutex on first use. */
 static inline void backend_lock(void) {
     pthread_once(&g_backend_lock_once, backend_lock_init);
     pthread_mutex_lock(&g_backend_lock);
 }
+/** Release the global backend lock. */
 static inline void backend_unlock(void) {
     pthread_once(&g_backend_lock_once, backend_lock_init);
     pthread_mutex_unlock(&g_backend_lock);
@@ -30,6 +33,7 @@ static inline void backend_unlock(void) {
 
 static Backend* g_current_backend = NULL;
 
+/** Portable reference matmul out[m,n] = a[m,k] * b[k,n]; float32 only. */
 static void scalar_matmul(const void* a, const void* b, void* out, int m, int n, int k,
                           DType dtype) {
     if (!a || !b || !out || m <= 0 || n <= 0 || k <= 0) {
@@ -56,6 +60,7 @@ static void scalar_matmul(const void* a, const void* b, void* out, int m, int n,
     }
 }
 
+/** Portable element-wise add out = a + b; float32 only. */
 static void scalar_add(const void* a, const void* b, void* out, size_t n, DType dtype) {
     if (!a || !b || !out || n == 0) {
         LOG_ERROR("Invalid parameters for scalar_add");
@@ -75,6 +80,7 @@ static void scalar_add(const void* a, const void* b, void* out, size_t n, DType 
     }
 }
 
+/** Portable element-wise multiply out = a * b; float32 only. */
 static void scalar_mul(const void* a, const void* b, void* out, size_t n, DType dtype) {
     if (!a || !b || !out || n == 0) {
         LOG_ERROR("Invalid parameters for scalar_mul");
@@ -94,6 +100,7 @@ static void scalar_mul(const void* a, const void* b, void* out, size_t n, DType 
     }
 }
 
+/** Portable ReLU out = max(a, 0); float32 only. */
 static void scalar_relu(const void* a, void* out, size_t n, DType dtype) {
     if (!a || !out || n == 0) {
         LOG_ERROR("Invalid parameters for scalar_relu");
@@ -112,6 +119,7 @@ static void scalar_relu(const void* a, void* out, size_t n, DType dtype) {
     }
 }
 
+/** Portable logistic sigmoid out = 1/(1+exp(-a)); float32 only. */
 static void scalar_sigmoid(const void* a, void* out, size_t n, DType dtype) {
     if (!a || !out || n == 0) {
         LOG_ERROR("Invalid parameters for scalar_sigmoid");
@@ -131,6 +139,7 @@ static void scalar_sigmoid(const void* a, void* out, size_t n, DType dtype) {
     }
 }
 
+/** Portable reduction writing the sum of all elements to *out; float32 only. */
 static void scalar_sum(const void* a, void* out, size_t n, DType dtype) {
     if (!a || !out || n == 0) {
         LOG_ERROR("Invalid parameters for scalar_sum");
@@ -151,6 +160,7 @@ static void scalar_sum(const void* a, void* out, size_t n, DType dtype) {
     }
 }
 
+/** Portable reduction writing the mean of all elements to *out; float32 only. */
 static void scalar_mean(const void* a, void* out, size_t n, DType dtype) {
     if (!a || !out || n == 0) {
         LOG_ERROR("Invalid parameters for scalar_mean");
@@ -171,6 +181,7 @@ static void scalar_mean(const void* a, void* out, size_t n, DType dtype) {
     }
 }
 
+/** Fused matmul then bias add: out = a*b + c, delegating to scalar_matmul. */
 static void scalar_matmul_add(const void* a, const void* b, const void* c, void* out, int m, int n,
                               int k, DType dtype) {
     if (!a || !b || !c || !out || m <= 0 || n <= 0 || k <= 0) {
@@ -214,6 +225,7 @@ static BackendOps simd_ops = {.matmul     = scalar_matmul,
 
 #endif // __SSE__
 
+/** Return the active backend, lazily initializing the scalar backend if none is set. */
 Backend* backend_get_current(void) {
     backend_lock();
     if (!g_current_backend) {
@@ -226,8 +238,11 @@ Backend* backend_get_current(void) {
     return result;
 }
 
+/** Select the active backend by type; alias for backend_init. */
 int backend_set(BackendType type) { return backend_init(type); }
 
+/** Install the ops table for the requested backend, detecting accelerator and
+ *  BLAS/MPS/rocBLAS availability and falling back to scalar ops when absent. */
 int backend_init(BackendType type) {
     backend_lock();
     if (g_current_backend && g_current_backend->type == type) {
@@ -331,7 +346,7 @@ int backend_init(BackendType type) {
         g_current_backend->ops = scalar_ops;
         break;
     case BACKEND_CUDA:
-        /* The legacy backend API has no CUDA compute path — this selects host
+        /* The legacy backend API has no CUDA compute path - this selects host
          * scalar ops only. Fail loudly instead of lending the label false
          * credibility; GPU execution goes through dispatch/IR (cml_dispatch_*,
          * cml_ir_execute) or HCQ. */
@@ -384,6 +399,7 @@ int backend_init(BackendType type) {
     return 0;
 }
 
+/** Free the active backend and its context under the backend lock. */
 void backend_cleanup(void) {
     backend_lock();
     if (g_current_backend) {
@@ -396,6 +412,7 @@ void backend_cleanup(void) {
     backend_unlock();
 }
 
+/** Probe CPUID for SSE support (EDX bit 25); false on non-x86. */
 static bool check_cpu_feature_sse(void) {
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
     unsigned int eax, ebx, ecx, edx;
@@ -407,6 +424,7 @@ static bool check_cpu_feature_sse(void) {
     return false;
 }
 
+/** Probe CPUID plus XGETBV for OS-enabled AVX support; false on non-x86. */
 static bool check_cpu_feature_avx(void) {
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
     unsigned int eax, ebx, ecx, edx;
@@ -429,6 +447,7 @@ static bool check_cpu_feature_avx(void) {
     return false;
 }
 
+/** Dynamically probe common BLAS libraries for a gemm symbol to confirm availability. */
 static bool check_blas_available(void) {
     const char* blas_symbols[] = {"cblas_sgemm", "cblas_dgemm", "sgemm_", "dgemm_", NULL};
 
@@ -464,6 +483,8 @@ static bool check_blas_available(void) {
     return false;
 }
 
+/** Report whether a backend can run here, dispatching to the matching CPU
+ *  feature, BLAS, or device-availability probe. */
 bool backend_is_available(BackendType type) {
     switch (type) {
     case BACKEND_SCALAR:

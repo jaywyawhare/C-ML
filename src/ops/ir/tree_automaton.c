@@ -42,8 +42,10 @@ struct CMLAutomaton {
     int wildcard_state;
 };
 
+/** Seed an FNV-1a hash. */
 static uint64_t fnv1a_init(void) { return FNV_OFFSET_BASIS; }
 
+/** Fold one int into an FNV-1a running hash. */
 static uint64_t fnv1a_int(uint64_t hash, int value) {
     const uint8_t* bytes = (const uint8_t*)&value;
     for (size_t i = 0; i < sizeof(int); i++) {
@@ -53,6 +55,7 @@ static uint64_t fnv1a_int(uint64_t hash, int value) {
     return hash;
 }
 
+/** Hash an (op, arity, child-states) tuple into a transition-table key. */
 static uint64_t transition_key(int op_type, const int* child_states, int arity) {
     uint64_t h = fnv1a_init();
     h          = fnv1a_int(h, op_type);
@@ -62,6 +65,7 @@ static uint64_t transition_key(int op_type, const int* child_states, int arity) 
     return h;
 }
 
+/** Look up a transition's result state by key, returning the dead state on a miss. */
 static int transition_lookup(const CMLAutomaton* aut, uint64_t key) {
     if (aut->table_capacity == 0)
         return AUTOMATON_DEAD_STATE;
@@ -78,6 +82,7 @@ static int transition_lookup(const CMLAutomaton* aut, uint64_t key) {
 
 static void transition_grow(CMLAutomaton* aut);
 
+/** Insert or overwrite a transition, growing the open-addressed table when it fills. */
 static void transition_insert(CMLAutomaton* aut, uint64_t key, int result_state) {
     if (aut->num_transitions * 2 >= aut->table_capacity)
         transition_grow(aut);
@@ -99,6 +104,7 @@ static void transition_insert(CMLAutomaton* aut, uint64_t key, int result_state)
     }
 }
 
+/** Double the transition table capacity and rehash all existing entries. */
 static void transition_grow(CMLAutomaton* aut) {
     int old_cap        = aut->table_capacity;
     CMLTransition* old = aut->transitions;
@@ -115,6 +121,7 @@ static void transition_grow(CMLAutomaton* aut) {
     cml_free(old);
 }
 
+/** Append a new empty automaton state and return its id (-1 on OOM). */
 static int automaton_add_state(CMLAutomaton* aut) {
     if (aut->num_states >= aut->states_capacity) {
         int new_cap = aut->states_capacity * 2;
@@ -136,6 +143,7 @@ static int automaton_add_state(CMLAutomaton* aut) {
     return id;
 }
 
+/** Record that `rule_idx` accepts at `state_id` (deduplicated). */
 static void state_add_rule(CMLAutomaton* aut, int state_id, int rule_idx) {
     if (state_id < 0 || state_id >= aut->num_states)
         return;
@@ -217,6 +225,7 @@ typedef struct {
     bool is_root;
 } PendingWildcard;
 
+/** Iterate to a fixpoint, adding transitions that substitute each concrete state for a wildcard. */
 static void expand_wildcard_transitions(CMLAutomaton* aut, PendingWildcard* pending,
                                         int num_pending) {
     if (num_pending == 0)
@@ -263,6 +272,8 @@ static void expand_wildcard_transitions(CMLAutomaton* aut, PendingWildcard* pend
     }
 }
 
+/* Compile a rewrite registry's patterns into a bottom-up tree automaton, building the state
+ * table and expanding wildcard transitions. */
 CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
     if (!registry || registry->num_rules == 0)
         return NULL;
@@ -319,6 +330,7 @@ CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
     return aut;
 }
 
+/** Free an automaton, its states' rule lists, and the transition table. */
 void cml_automaton_free(CMLAutomaton* automaton) {
     if (!automaton)
         return;
@@ -366,6 +378,7 @@ static int compute_node_state(const CMLAutomaton* aut, struct IRNode* node, cons
 
 static atomic_int g_rewrite_counter = 0;
 
+/** Generate a fresh unique output name for a rewrite-emitted node (`_rwN`). */
 static char* rewrite_unique_name(void) {
     int id     = atomic_fetch_add(&g_rewrite_counter, 1);
     char* name = cml_malloc(32);
@@ -374,6 +387,7 @@ static char* rewrite_unique_name(void) {
     return name;
 }
 
+/** Free a node already removed from the graph, clearing its output tensor back-pointers. */
 static void free_unlinked_node(struct IRNode* node) {
     if (!node)
         return;
@@ -394,6 +408,7 @@ static void free_unlinked_node(struct IRNode* node) {
     cml_free(node);
 }
 
+/** Verify a pattern against an IR subtree, binding captures (with consistency checks). */
 static bool match_node_recursive(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNode* node,
                                  CMLMatchResult* result) {
     if (!pattern || !node)
@@ -438,6 +453,8 @@ static bool match_node_recursive(CMLGraph_t ir, const CMLPatternNode* pattern, s
     }
 }
 
+/* Drive rewriting to a fixpoint: bottom-up assign automaton states, then for accepting
+ * states confirm the match and splice in each rule's replacement. Returns total rewrites. */
 int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
     if (!automaton || !graph)
         return -1;
@@ -586,10 +603,12 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
     return total_rewrites;
 }
 
+/** Return the automaton's state count. */
 int cml_automaton_num_states(const CMLAutomaton* automaton) {
     return automaton ? automaton->num_states : 0;
 }
 
+/** Return the automaton's transition count. */
 int cml_automaton_num_transitions(const CMLAutomaton* automaton) {
     return automaton ? automaton->num_transitions : 0;
 }

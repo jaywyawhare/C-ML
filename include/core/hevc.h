@@ -70,7 +70,7 @@ void cml_hevc_frame_free(CMLHEVCFrame* frame);
  * constants (facts, not external reference data) and are self-verifiable: the
  * DCT matrices are exactly orthogonal and forward→inverse round-trips the block.
  * Larger (16/32) transforms and the CABAC/prediction stages still need verified
- * tables and reference streams — see docs/REMAINING_WORK.md. */
+ * tables and reference streams (not yet wired up). */
 
 /* Returns the size x size transform matrix (row-major), or NULL if unsupported.
  * dst=0 => DCT-II (size 4 or 8); dst=1 => DST-VII (size 4 only). */

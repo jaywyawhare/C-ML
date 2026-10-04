@@ -25,30 +25,37 @@
 #define hipMemcpyDeviceToHost 2
 
 #ifdef __linux__
+/** dlopen a shared library by name; logs and returns NULL on failure. */
 static void* load_library(const char* name) {
     void* lib = dlopen(name, RTLD_LAZY | RTLD_LOCAL);
     if (!lib)
         LOG_DEBUG("Failed to load %s: %s", name, dlerror());
     return lib;
 }
+/** Resolve a symbol from a loaded library handle. */
 static void* get_symbol(void* lib, const char* name) { return dlsym(lib, name); }
+/** dlclose a library handle if non-NULL. */
 static void unload_library(void* lib) {
     if (lib)
         dlclose(lib);
 }
 #else
+/** Stub loader for platforms without HIP: always fails. */
 static void* load_library(const char* name) {
     (void)name;
     return NULL;
 }
+/** Stub symbol resolver for unsupported platforms. */
 static void* get_symbol(void* lib, const char* name) {
     (void)lib;
     (void)name;
     return NULL;
 }
+/** Stub unloader for unsupported platforms. */
 static void unload_library(void* lib) { (void)lib; }
 #endif
 
+/** Probe whether a usable HIP runtime is present by loading it and checking hipInit. */
 bool cml_rocm_available(void) {
 #ifdef __linux__
     if (!HIP_LIB_NAME)
@@ -64,6 +71,7 @@ bool cml_rocm_available(void) {
 #endif
 }
 
+/** Allocate a zeroed ROCm backend context (not yet initialized). */
 CMLROCmBackend* cml_rocm_backend_create(void) {
     CMLROCmBackend* backend = cml_calloc(1, sizeof(CMLROCmBackend));
     if (!backend)
@@ -71,6 +79,8 @@ CMLROCmBackend* cml_rocm_backend_create(void) {
     return backend;
 }
 
+/** Load the HIP driver library and bind the runtime entry points used by the
+ * backend. Fails if the required launch/init symbols are missing. */
 static int load_hip_functions(CMLROCmBackend* backend) {
     if (!HIP_LIB_NAME)
         return -1;
@@ -98,7 +108,7 @@ static int load_hip_functions(CMLROCmBackend* backend) {
     LOAD_FUNC(hipStreamSynchronize);
     LOAD_FUNC(hipDeviceSynchronize);
 
-    /* Optional: HCQ signal support. Absence is not fatal — the HCQ adapter
+    /* Optional: HCQ signal support. Absence is not fatal - the HCQ adapter
      * falls back to stream-synchronize semantics. */
     LOAD_FUNC(hipEventCreate);
     LOAD_FUNC(hipEventDestroy);
@@ -115,6 +125,8 @@ static int load_hip_functions(CMLROCmBackend* backend) {
     return 0;
 }
 
+/** Initialize HIP, select the device, and create a stream. Uses the mock driver
+ * when built with HIP mock support and enabled via env. */
 int cml_rocm_backend_init(CMLROCmBackend* backend, int device_ordinal) {
     if (!backend)
         return -1;
@@ -153,6 +165,7 @@ int cml_rocm_backend_init(CMLROCmBackend* backend, int device_ordinal) {
     return 0;
 }
 
+/** Destroy the stream, unload the HIP libraries, and free the backend context. */
 void cml_rocm_backend_free(CMLROCmBackend* backend) {
     if (!backend)
         return;
@@ -167,6 +180,8 @@ void cml_rocm_backend_free(CMLROCmBackend* backend) {
     cml_free(backend);
 }
 
+/** Load a precompiled HSACO module and look up the named kernel function, returning
+ * a kernel handle with default 1x1x1 grid / 256-thread block. */
 CMLROCmKernel* cml_rocm_compile_hsaco(CMLROCmBackend* backend, const char* hsaco_code,
                                       const char* kernel_name) {
     if (!backend || !backend->initialized || !hsaco_code || !kernel_name)
@@ -197,6 +212,7 @@ CMLROCmKernel* cml_rocm_compile_hsaco(CMLROCmBackend* backend, const char* hsaco
     return kernel;
 }
 
+/** Unload the kernel's module and free the kernel handle. */
 void cml_rocm_kernel_free(CMLROCmBackend* backend, CMLROCmKernel* kernel) {
     if (!backend || !kernel)
         return;
@@ -206,6 +222,7 @@ void cml_rocm_kernel_free(CMLROCmBackend* backend, CMLROCmKernel* kernel) {
     cml_free(kernel);
 }
 
+/** Launch the kernel on the backend stream with its configured grid/block dims. */
 int cml_rocm_launch_kernel(CMLROCmBackend* backend, CMLROCmKernel* kernel, void** args,
                            int num_args) {
     if (!backend || !backend->initialized || !kernel)
@@ -220,6 +237,7 @@ int cml_rocm_launch_kernel(CMLROCmBackend* backend, CMLROCmKernel* kernel, void*
     return (err == HIP_SUCCESS) ? 0 : -1;
 }
 
+/** Block until the backend stream (or whole device) finishes outstanding work. */
 int cml_rocm_synchronize(CMLROCmBackend* backend) {
     if (!backend || !backend->initialized)
         return -1;
@@ -230,6 +248,7 @@ int cml_rocm_synchronize(CMLROCmBackend* backend) {
     return (err == HIP_SUCCESS) ? 0 : -1;
 }
 
+/** Allocate device memory via hipMalloc; returns NULL on failure. */
 hipDeviceptr_t cml_rocm_malloc(CMLROCmBackend* backend, size_t size) {
     if (!backend || !backend->initialized || size == 0)
         return NULL;
@@ -238,11 +257,13 @@ hipDeviceptr_t cml_rocm_malloc(CMLROCmBackend* backend, size_t size) {
     return (err == HIP_SUCCESS) ? ptr : NULL;
 }
 
+/** Free device memory previously returned by cml_rocm_malloc. */
 void cml_rocm_free(CMLROCmBackend* backend, hipDeviceptr_t ptr) {
     if (backend && backend->initialized && ptr)
         backend->hipFree(ptr);
 }
 
+/** Copy host memory to device. */
 int cml_rocm_memcpy_h2d(CMLROCmBackend* backend, hipDeviceptr_t dst, const void* src, size_t size) {
     if (!backend || !backend->initialized)
         return -1;
@@ -250,6 +271,7 @@ int cml_rocm_memcpy_h2d(CMLROCmBackend* backend, hipDeviceptr_t dst, const void*
     return (err == HIP_SUCCESS) ? 0 : -1;
 }
 
+/** Copy device memory back to host. */
 int cml_rocm_memcpy_d2h(CMLROCmBackend* backend, void* dst, hipDeviceptr_t src, size_t size) {
     if (!backend || !backend->initialized)
         return -1;
@@ -257,6 +279,7 @@ int cml_rocm_memcpy_d2h(CMLROCmBackend* backend, void* dst, hipDeviceptr_t src, 
     return (err == HIP_SUCCESS) ? 0 : -1;
 }
 
+/** Upload a tensor's host data to the device, lazily allocating its buffer. */
 int cml_rocm_upload_tensor(CMLROCmBackend* backend, Tensor* tensor) {
     if (!backend || !tensor || !tensor->data)
         return -1;
@@ -269,6 +292,7 @@ int cml_rocm_upload_tensor(CMLROCmBackend* backend, Tensor* tensor) {
     return cml_rocm_memcpy_h2d(backend, tensor->buffer_handle, tensor->data, size);
 }
 
+/** Download a tensor's device buffer into host memory, lazily allocating host data. */
 int cml_rocm_download_tensor(CMLROCmBackend* backend, Tensor* tensor) {
     if (!backend || !tensor || !tensor->buffer_handle)
         return -1;

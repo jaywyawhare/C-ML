@@ -39,7 +39,7 @@ char* cml_strdup(const char* s);
  * with cml_free() (or cml_realloc(ptr, 0)), never cml_aligned_free().
  *
  * Also never mix system malloc/calloc/aligned_alloc/posix_memalign pointers
- * with cml_free() or cml_aligned_free() — those must go through the matching
+ * with cml_free() or cml_aligned_free() - those must go through the matching
  * system free() (or cml_malloc/cml_aligned_alloc equivalents end-to-end).
  */
 void* cml_aligned_alloc(size_t size, size_t alignment);
@@ -60,7 +60,7 @@ void cml_allocator_flush_thread_cache(void);
  * cml_malloc_fault_reset(): disable fault injection (default state).
  *
  * cml_malloc_alloc_index(): returns how many allocations have been made since
- *   the last reset — useful to binary-search for the failing site.
+ *   the last reset - useful to binary-search for the failing site.
  */
 void cml_malloc_fault_after(int n);
 void cml_malloc_fault_reset(void);

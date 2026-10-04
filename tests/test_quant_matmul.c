@@ -3,7 +3,7 @@
  * follow-up (affine int4 and block-wise NF4).
  *
  * Verifies (a) each GEMM primitive against an exact hand computation, and
- * (b) the end-to-end paths — quantize an f32 weight, matmul through the tensor
+ * (b) the end-to-end paths - quantize an f32 weight, matmul through the tensor
  * API, and check the result against the f32 reference within the rigorous
  * quantization-error bound.
  */

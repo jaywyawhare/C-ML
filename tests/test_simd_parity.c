@@ -2,17 +2,17 @@
  * Numerical parity gate for the shape-specialized LLVM SIMD emission.
  *
  * For every op it compares THREE producers of the same result:
- *   (ref)  a naive scalar C loop           — the ground truth
- *   (jit)  the executed tensor-op path      — shape-specialized JIT kernels
+ *   (ref)  a naive scalar C loop           - the ground truth
+ *   (jit)  the executed tensor-op path      - shape-specialized JIT kernels
  *          (llvm_backend.c) when the LLVM backend is enabled, else the CPU path
- *   (simd) the hand-rolled simd_* functions — validated before they are removed
+ *   (simd) the hand-rolled simd_* functions - validated before they are removed
  *
  * The size matrix deliberately straddles SSE/AVX2/AVX-512 vector-width
  * boundaries (…7,8,15,16,17,63,64,255,256…) so remainder handling and
  * alignment edge cases are exercised.  Binary ops additionally cover the
  * broadcast cases (equal / lhs-scalar / rhs-scalar).
  *
- * This is the correctness gate referenced by docs/shape_specific_simd_plan.md:
+ * This is the correctness gate for shape-specialized SIMD/JIT emission:
  * it must pass before the hand-rolled SIMD library is deleted.
  */
 #include <stdio.h>

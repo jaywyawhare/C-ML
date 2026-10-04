@@ -43,6 +43,7 @@ typedef struct {
 static CMLNVMockGPU g_mock;
 static bool g_mock_active = false;
 
+/** Record a mock mmap allocation, growing the tracking table as needed. */
 static void mock_track_alloc(void* ptr) {
     if (g_mock.num_allocs >= g_mock.alloc_capacity) {
         int new_cap      = g_mock.alloc_capacity * 2;
@@ -55,6 +56,7 @@ static void mock_track_alloc(void* ptr) {
     g_mock.alloc_table[g_mock.num_allocs++] = ptr;
 }
 
+/** Drop a pointer from the allocation table; returns false if it was not tracked. */
 static bool mock_untrack_alloc(void* ptr) {
     for (int i = 0; i < g_mock.num_allocs; i++) {
         if (g_mock.alloc_table[i] == ptr) {
@@ -65,6 +67,7 @@ static bool mock_untrack_alloc(void* ptr) {
     return false;
 }
 
+/** Install the mock GPU, filling any unset config fields with Turing-class defaults. */
 void cml_nv_mock_init(CMLNVMockGPU* config) {
     memset(&g_mock, 0, sizeof(g_mock));
 
@@ -98,20 +101,23 @@ void cml_nv_mock_init(CMLNVMockGPU* config) {
     g_mock_active = true;
 }
 
+/** Free any outstanding mock allocations and deactivate the mock. */
 void cml_nv_mock_shutdown(void) {
     if (!g_mock_active)
         return;
 
     for (int i = 0; i < g_mock.num_allocs; i++)
-        free(g_mock.alloc_table[i]); /* aligned_alloc'd in cml_nv_mock_mmap — not cml_malloc */
+        free(g_mock.alloc_table[i]); /* aligned_alloc'd in cml_nv_mock_mmap - not cml_malloc */
 
     cml_free(g_mock.alloc_table);
     memset(&g_mock, 0, sizeof(g_mock));
     g_mock_active = false;
 }
 
+/** Return the active mock GPU state, or NULL when the mock is inactive. */
 CMLNVMockGPU* cml_nv_mock_get(void) { return g_mock_active ? &g_mock : NULL; }
 
+/** Signal the last-recorded semaphore to simulate kernel completion. */
 void cml_nv_mock_complete_kernel(void) {
     if (!g_mock_active)
         return;
@@ -121,10 +127,12 @@ void cml_nv_mock_complete_kernel(void) {
     }
 }
 
+/** True if the fd is one of the synthetic control/device/UVM descriptors. */
 static bool is_mock_fd(int fd) {
     return fd == MOCK_FD_CTL || fd == MOCK_FD_DEV || fd == MOCK_FD_UVM;
 }
 
+/** Intercept opens of nvidia device nodes, returning fixed mock descriptors. */
 int cml_nv_mock_open(const char* path, int flags, ...) {
     if (!g_mock_active || !path)
         goto real_open;
@@ -146,12 +154,14 @@ real_open:;
     return open(path, flags, mode);
 }
 
+/** Swallow closes of mock descriptors; forward real ones to close(). */
 int cml_nv_mock_close(int fd) {
     if (g_mock_active && is_mock_fd(fd))
         return 0;
     return close(fd);
 }
 
+/** Map an RM object class to a stable fake handle for deterministic tests. */
 static uint32_t mock_handle_for_class(uint32_t nv_class) {
     switch (nv_class) {
     case NV01_ROOT_CLIENT:
@@ -182,12 +192,14 @@ static uint32_t mock_handle_for_class(uint32_t nv_class) {
     }
 }
 
+/** Service an RM_ALLOC ioctl by assigning a class-based handle. */
 static int mock_ioctl_rm_alloc(NV_RM_ALLOC_PARAMS* p) {
     p->hObjectNew = mock_handle_for_class(p->hClass);
     p->status     = 0;
     return 0;
 }
 
+/** Answer RM_CONTROL queries for GPU arch and name from the mock config. */
 static int mock_ioctl_rm_control(NV_RM_CONTROL_PARAMS* p) {
     p->status = 0;
 
@@ -218,11 +230,13 @@ static int mock_ioctl_rm_control(NV_RM_CONTROL_PARAMS* p) {
     return 0;
 }
 
+/** Service an RM_FREE ioctl as a no-op success. */
 static int mock_ioctl_rm_free(NV_RM_FREE_PARAMS* p) {
     p->status = 0;
     return 0;
 }
 
+/** Dispatch intercepted RM ioctls to the mock handlers; forward unknown fds. */
 int cml_nv_mock_ioctl(int fd, unsigned long request, void* arg) {
     if (!g_mock_active || !is_mock_fd(fd))
         return ioctl(fd, request, arg);
@@ -240,6 +254,7 @@ int cml_nv_mock_ioctl(int fd, unsigned long request, void* arg) {
     return 0;
 }
 
+/** Back mock mappings with page-aligned host memory tracked for cleanup. */
 void* cml_nv_mock_mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {
     (void)addr;
     (void)prot;
@@ -259,12 +274,13 @@ void* cml_nv_mock_mmap(void* addr, size_t length, int prot, int flags, int fd, o
     return ptr;
 }
 
+/** Free a tracked mock mapping, or forward to the real munmap. */
 int cml_nv_mock_munmap(void* addr, size_t length) {
     if (!g_mock_active)
         return munmap(addr, length);
 
     if (mock_untrack_alloc(addr)) {
-        free(addr); /* aligned_alloc'd in cml_nv_mock_mmap — must not go through cml_free */
+        free(addr); /* aligned_alloc'd in cml_nv_mock_mmap - must not go through cml_free */
         return 0;
     }
 

@@ -34,7 +34,7 @@ static TensorConfig i32cfg = {
 #define N 2
 #define NNZ 6
 
-/* A = [[0,2,0],[1,0,0],[0,0,-3],[1,1,0]] — entry 3 duplicates row 0's col 1 */
+/* A = [[0,2,0],[1,0,0],[0,0,-3],[1,1,0]] - entry 3 duplicates row 0's col 1 */
 static const int32_t g_rows[NNZ] = {0, 1, 2, 3, 3, 0};
 static const int32_t g_cols[NNZ] = {1, 0, 2, 0, 1, 1};
 
@@ -65,7 +65,7 @@ static void fixture_free(SpmmFixture* fx) {
 
 /* Build A(indices, values) @ B and run backward on sum(C). Values and B are
  * marked requires_grad. Returns 0 on any failure. Grads are left LAZY under
- * the graph engine — realize them with tensor_ensure_executed before reading. */
+ * the graph engine - realize them with tensor_ensure_executed before reading. */
 static int run_spmm_backward(SpmmFixture* fx, const float* xs, const float* bs, bool create_graph) {
     memset(fx, 0, sizeof(*fx));
     int idx_shape[2] = {NNZ, 2};

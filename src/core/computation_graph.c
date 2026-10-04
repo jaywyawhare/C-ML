@@ -36,6 +36,7 @@ static int graph_execute_node(CMLGraphNode_t node, CMLGraphExecParams* params);
 static void graph_topo_sort(CMLComputationGraph_t graph);
 static void graph_mark_reachable(CMLGraphNode_t node);
 
+/** Allocate an empty computation graph, or NULL on allocation failure. */
 CMLComputationGraph_t cml_graph_new(void) {
     CMLComputationGraph_t graph = cml_malloc(sizeof(struct CMLComputationGraph));
     if (!graph)
@@ -64,6 +65,7 @@ static void graph_release_nodes(CMLComputationGraph_t graph) {
         cml_free(graph->leaf_nodes);
 }
 
+/** Free the graph and every node it owns. */
 void cml_graph_free(CMLComputationGraph_t graph) {
     if (!graph)
         return;
@@ -73,6 +75,7 @@ void cml_graph_free(CMLComputationGraph_t graph) {
     cml_free(graph);
 }
 
+/** Drop all nodes and reset the graph to the empty, unbuilt state. */
 void cml_graph_clear(CMLComputationGraph_t graph) {
     if (!graph)
         return;
@@ -88,24 +91,28 @@ void cml_graph_clear(CMLComputationGraph_t graph) {
     graph->built         = false;
 }
 
+/** Number of nodes currently in the graph. */
 size_t cml_graph_get_node_count(CMLComputationGraph_t graph) {
     if (!graph)
         return 0;
     return graph->num_nodes;
 }
 
+/** Number of leaf (input/parameter) nodes in the graph. */
 size_t cml_graph_get_leaf_count(CMLComputationGraph_t graph) {
     if (!graph)
         return 0;
     return graph->num_leaves;
 }
 
+/** Node at position `index`, or NULL when out of range. */
 CMLGraphNode_t cml_graph_get_node_by_index(CMLComputationGraph_t graph, size_t index) {
     if (!graph || index >= graph->num_nodes)
         return NULL;
     return graph->nodes[index];
 }
 
+/** Allocate a graph node for `op_type` wrapping `tensor`, all flags cleared. */
 static CMLGraphNode_t graph_node_create(CMLOpType op_type, Tensor* tensor) {
     CMLGraphNode_t node = cml_malloc(sizeof(struct CMLGraphNode));
     if (!node)
@@ -124,6 +131,7 @@ static CMLGraphNode_t graph_node_create(CMLOpType op_type, Tensor* tensor) {
     return node;
 }
 
+/** Free a node and its input and op-param arrays. */
 static void graph_node_free(CMLGraphNode_t node) {
     if (!node)
         return;
@@ -139,6 +147,7 @@ static void graph_node_free(CMLGraphNode_t node) {
     cml_free(node);
 }
 
+/** Append `node` to the graph, growing the node array as needed. */
 static void graph_add_node(CMLComputationGraph_t graph, CMLGraphNode_t node) {
     if (!graph || !node)
         return;
@@ -158,6 +167,7 @@ static void graph_add_node(CMLComputationGraph_t graph, CMLGraphNode_t node) {
     graph->nodes[graph->num_nodes++] = node;
 }
 
+/** Add `tensor` as a leaf input node and register it in the leaf list. */
 CMLGraphNode_t cml_graph_node_input(CMLComputationGraph_t graph, Tensor* tensor) {
     if (!graph || !tensor)
         return NULL;
@@ -186,6 +196,7 @@ CMLGraphNode_t cml_graph_node_input(CMLComputationGraph_t graph, Tensor* tensor)
     return node;
 }
 
+/** Add `tensor` as a leaf node flagged as a trainable parameter. */
 CMLGraphNode_t cml_graph_node_param(CMLComputationGraph_t graph, Tensor* tensor) {
     if (!graph || !tensor)
         return NULL;
@@ -197,6 +208,8 @@ CMLGraphNode_t cml_graph_node_param(CMLComputationGraph_t graph, Tensor* tensor)
     return node;
 }
 
+/** Add an op node of `op_type` over `num_inputs` operand nodes, taking ownership
+ * of `op_params`. Returns NULL on bad args or allocation failure. */
 CMLGraphNode_t cml_graph_node_op(CMLComputationGraph_t graph, CMLOpType op_type,
                                  CMLGraphNode_t* inputs, int num_inputs, void* op_params) {
     if (!graph || !inputs || num_inputs <= 0)
@@ -224,6 +237,7 @@ CMLGraphNode_t cml_graph_node_op(CMLComputationGraph_t graph, CMLOpType op_type,
     return node;
 }
 
+/** Convenience wrapper for a single-input op node. */
 CMLGraphNode_t cml_graph_node_unary(CMLComputationGraph_t graph, CMLOpType op_type,
                                     CMLGraphNode_t input) {
     if (!graph || !input)
@@ -231,6 +245,7 @@ CMLGraphNode_t cml_graph_node_unary(CMLComputationGraph_t graph, CMLOpType op_ty
     return cml_graph_node_op(graph, op_type, &input, 1, NULL);
 }
 
+/** Convenience wrapper for a two-input op node. */
 CMLGraphNode_t cml_graph_node_binary(CMLComputationGraph_t graph, CMLOpType op_type,
                                      CMLGraphNode_t a, CMLGraphNode_t b) {
     if (!graph || !a || !b)
@@ -239,6 +254,7 @@ CMLGraphNode_t cml_graph_node_binary(CMLComputationGraph_t graph, CMLOpType op_t
     return cml_graph_node_op(graph, op_type, inputs, 2, NULL);
 }
 
+/** Add a matmul op node over operands `a` and `b`. */
 CMLGraphNode_t cml_graph_node_matmul(CMLComputationGraph_t graph, CMLGraphNode_t a,
                                      CMLGraphNode_t b) {
     if (!graph || !a || !b)
@@ -247,6 +263,7 @@ CMLGraphNode_t cml_graph_node_matmul(CMLComputationGraph_t graph, CMLGraphNode_t
     return cml_graph_node_op(graph, CML_OP_MATMUL, inputs, 2, NULL);
 }
 
+/** Mark the graph built and clear every node's visited flag. */
 void cml_graph_build_forward(CMLComputationGraph_t graph, CMLGraphNode_t output) {
     if (!graph || !output)
         return;
@@ -258,10 +275,13 @@ void cml_graph_build_forward(CMLComputationGraph_t graph, CMLGraphNode_t output)
     graph->built = true;
 }
 
+/** Alias for cml_graph_build_forward (no extra expansion pass). */
 void cml_graph_build_forward_expand(CMLComputationGraph_t graph, CMLGraphNode_t output) {
     cml_graph_build_forward(graph, output);
 }
 
+/** Build a mirror backward graph by walking back from `output`, mapping each
+ * forward node to its gradient op. Returns a new graph, or NULL on failure. */
 CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_graph,
                                                CMLGraphNode_t output) {
     if (!forward_graph || !output)
@@ -399,6 +419,8 @@ CMLComputationGraph_t cml_graph_build_backward(CMLComputationGraph_t forward_gra
     return backward_graph;
 }
 
+/** Recursively ensure a node's inputs are realized; actual execution is handled
+ * by the IR, so this is a visualization-only placeholder. */
 static int graph_execute_node(CMLGraphNode_t node, CMLGraphExecParams* params) {
     if (!node)
         return -1;
@@ -420,6 +442,7 @@ static int graph_execute_node(CMLGraphNode_t node, CMLGraphExecParams* params) {
     return 0;
 }
 
+/** Assign execution_order to every node so inputs precede their consumers. */
 static void graph_topo_sort(CMLComputationGraph_t graph) {
     if (!graph)
         return;
@@ -455,6 +478,7 @@ static void graph_topo_sort(CMLComputationGraph_t graph) {
     }
 }
 
+/** Topologically sort then visit every node in order. Returns 0 on success. */
 int cml_graph_compute(CMLComputationGraph_t graph, CMLGraphExecParams* params) {
     if (!graph)
         return -1;
@@ -480,53 +504,62 @@ int cml_graph_compute(CMLComputationGraph_t graph, CMLGraphExecParams* params) {
     return 0;
 }
 
+/** Compute the graph with default CPU execution parameters. */
 int cml_graph_compute_default(CMLComputationGraph_t graph) {
     CMLGraphExecParams params = {.n_threads = 4, .sync = true, .device = DEVICE_CPU};
     return cml_graph_compute(graph, &params);
 }
 
+/** Compute the graph, ignoring the (currently unused) context argument. */
 int cml_graph_compute_with_context(CMLComputationGraph_t graph, void* context,
                                    CMLGraphExecParams* params) {
     (void)context;
     return cml_graph_compute(graph, params);
 }
 
+/** The tensor a node wraps, or NULL. */
 Tensor* cml_graph_node_get_tensor(CMLGraphNode_t node) {
     if (!node)
         return NULL;
     return node->tensor;
 }
 
+/** The op type of a node, or CML_OP_NONE. */
 CMLOpType cml_graph_node_get_op_type(CMLGraphNode_t node) {
     if (!node)
         return CML_OP_NONE;
     return node->op_type;
 }
 
+/** Number of input operands of a node. */
 int cml_graph_node_get_num_inputs(CMLGraphNode_t node) {
     if (!node)
         return 0;
     return node->num_inputs;
 }
 
+/** Input operand `index` of a node, or NULL when out of range. */
 CMLGraphNode_t cml_graph_node_get_input(CMLGraphNode_t node, int index) {
     if (!node || index < 0 || index >= node->num_inputs)
         return NULL;
     return node->inputs[index];
 }
 
+/** Whether a node is a leaf (input or parameter). */
 bool cml_graph_node_is_leaf(CMLGraphNode_t node) {
     if (!node)
         return false;
     return node->is_leaf;
 }
 
+/** Whether a node is a trainable parameter. */
 bool cml_graph_node_is_param(CMLGraphNode_t node) {
     if (!node)
         return false;
     return node->is_param;
 }
 
+/** Run the dead-node elimination and op-fusion passes over the graph. */
 int cml_graph_optimize(CMLComputationGraph_t graph) {
     if (!graph)
         return -1;
@@ -537,6 +570,8 @@ int cml_graph_optimize(CMLComputationGraph_t graph) {
     return 0;
 }
 
+/** Fuse each singly-consumed producer into its consumer for a few known op pairs
+ * (add+relu, mul+add, exp/log chains). Returns 0 on success. */
 int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
     if (!graph || graph->num_nodes < 2)
         return 0;
@@ -618,6 +653,8 @@ int cml_graph_fuse_ops(CMLComputationGraph_t graph) {
     return 0;
 }
 
+/** Compact the graph down to nodes reachable from outputs or leaves, freeing the
+ * rest. Returns 0 on success. */
 int cml_graph_remove_dead_nodes(CMLComputationGraph_t graph) {
     if (!graph)
         return -1;
@@ -668,6 +705,7 @@ int cml_graph_remove_dead_nodes(CMLComputationGraph_t graph) {
     return 0;
 }
 
+/** Depth-first mark a node and all its transitive inputs as visited. */
 static void graph_mark_reachable(CMLGraphNode_t node) {
     if (!node || node->visited)
         return;
@@ -679,14 +717,19 @@ static void graph_mark_reachable(CMLGraphNode_t node) {
     }
 }
 
+/** Set the global eager/lazy graph mode. */
 void cml_set_graph_mode(CMLGraphMode mode) { g_graph_mode = mode; }
 
+/** The current global graph mode. */
 CMLGraphMode cml_get_graph_mode(void) { return g_graph_mode; }
 
+/** Switch the global graph mode to lazy. */
 void cml_enable_lazy_mode(void) { g_graph_mode = CML_GRAPH_MODE_LAZY; }
 
+/** Switch the global graph mode back to eager. */
 void cml_disable_lazy_mode(void) { g_graph_mode = CML_GRAPH_MODE_EAGER; }
 
+/** Write the graph to `filename` in Graphviz DOT format. Returns 0 on success. */
 int cml_graph_export_dot(CMLComputationGraph_t graph, const char* filename) {
     if (!graph || !filename)
         return -1;
@@ -721,6 +764,7 @@ int cml_graph_export_dot(CMLComputationGraph_t graph, const char* filename) {
     return 0;
 }
 
+/** Print a one-line-per-node summary of the graph to stdout. */
 void cml_graph_print(CMLComputationGraph_t graph) {
     if (!graph) {
         printf("Graph: NULL\n");

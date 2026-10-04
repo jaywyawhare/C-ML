@@ -8,6 +8,8 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** torch.nn.Conv3d forward: cross-correlate a 5D input [N, C_in, D, H, W] with the weight via
+ *  uop_conv3d. Returns NULL on non-5D input. */
 static Tensor* conv3d_forward(Module* module, Tensor* input) {
     Conv3d* conv = (Conv3d*)module;
     if (!conv || !input)
@@ -29,6 +31,7 @@ static Tensor* conv3d_forward(Module* module, Tensor* input) {
     return uop_conv3d(input, conv->weight->tensor, bias, &params);
 }
 
+/** Free the Conv3d module; owned parameters are released by module_free. */
 static void conv3d_free(Module* module) {
     Conv3d* conv3d = (Conv3d*)module;
     if (!conv3d)
@@ -37,10 +40,13 @@ static void conv3d_free(Module* module) {
     cml_free(conv3d);
 }
 
+/** Default weight initializer: Kaiming/He with fan-in over in_channels * kernel volume. */
 static void kaiming_init_3d(Tensor* tensor, int in_channels, int kernel_size) {
     nn_init_kaiming(tensor, in_channels, kernel_size * kernel_size * kernel_size);
 }
 
+/** Construct a cubic-kernel Conv3d (groups=1); weight is Kaiming-init, bias (zeros) added when
+ *  use_bias. Returns NULL on failure. */
 Conv3d* nn_conv3d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
                   int dilation, bool use_bias, DType dtype, DeviceType device) {
     Conv3d* conv3d = cml_malloc(sizeof(Conv3d));

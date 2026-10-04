@@ -6,15 +6,18 @@
 #ifdef _POSIX_C_SOURCE
 #include <time.h>
 #include "alloc/cml_allocator.h"
+/** Monotonic timestamp in milliseconds for event ordering. */
 static double viz_get_time_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
 }
 #else
+/** Fallback timestamp (no monotonic clock available). */
 static double viz_get_time_ms(void) { return 0.0; }
 #endif
 
+/** Allocate an enabled compiler-viz recorder writing to `output_path`. */
 CMLCompilerViz* cml_compiler_viz_create(const char* output_path) {
     CMLCompilerViz* viz = (CMLCompilerViz*)cml_calloc(1, sizeof(CMLCompilerViz));
     if (!viz)
@@ -27,6 +30,7 @@ CMLCompilerViz* cml_compiler_viz_create(const char* output_path) {
     return viz;
 }
 
+/** Free the recorder and its event list (including IR snapshots). */
 void cml_compiler_viz_free(CMLCompilerViz* viz) {
     if (!viz)
         return;
@@ -40,11 +44,13 @@ void cml_compiler_viz_free(CMLCompilerViz* viz) {
     cml_free(viz);
 }
 
+/** Toggle whether subsequent events are recorded. */
 void cml_compiler_viz_enable(CMLCompilerViz* viz, bool enable) {
     if (viz)
         viz->enabled = enable;
 }
 
+/** Append a timestamped compiler-stage event, snapshotting the IR to text if given. */
 int cml_compiler_viz_record(CMLCompilerViz* viz, CMLVizEventType type, const char* description,
                             CMLGraph_t ir) {
     if (!viz || !viz->enabled)
@@ -74,6 +80,7 @@ int cml_compiler_viz_record(CMLCompilerViz* viz, CMLVizEventType type, const cha
     return 0;
 }
 
+/** Write the recorded events to the output path as a JSON timeline. */
 int cml_compiler_viz_export(CMLCompilerViz* viz) {
     if (!viz || viz->output_path[0] == '\0')
         return -1;
@@ -133,8 +140,10 @@ int cml_compiler_viz_export(CMLCompilerViz* viz) {
     return 0;
 }
 
+/** Number of events recorded so far. */
 int cml_compiler_viz_num_events(const CMLCompilerViz* viz) { return viz ? viz->num_events : 0; }
 
+/** Drop all recorded events (freeing their snapshots) but keep the recorder. */
 void cml_compiler_viz_clear(CMLCompilerViz* viz) {
     if (!viz)
         return;

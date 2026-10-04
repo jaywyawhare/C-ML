@@ -26,10 +26,12 @@ static bool io_write(FILE* f, const void* buf, size_t n) {
     return n == 0 || (fwrite(buf, 1, n, f) == n && !ferror(f));
 }
 
+/** Checked read: true only if all `n` bytes were read without a stream error. */
 static bool io_read(FILE* f, void* buf, size_t n) {
     return n == 0 || (fread(buf, 1, n, f) == n && !ferror(f));
 }
 
+/** Advance the stream by `n` bytes, refusing to seek past end-of-file. */
 static bool io_skip(FILE* f, uint64_t n) {
     /* Bounded skip: refuse to seek past what could plausibly be in the file
      * (a corrupt size field would otherwise "skip" into next century). */
@@ -83,6 +85,7 @@ static bool write_model_params(FILE* f, Module* model) {
     return true;
 }
 
+/** Write the model's magic, version and parameters to a .cml file at `filepath`. */
 int model_save(Module* model, const char* filepath) {
     if (!model || !filepath)
         return -1;
@@ -126,6 +129,10 @@ static char* read_param_header(FILE* f, int32_t* dtype, int32_t* ndim) {
     return name;
 }
 
+/**
+ * Load parameters from a .cml file into `model`, matching tensors by name.
+ * Unknown or size-mismatched params are skipped; truncation past EOF fails (-1).
+ */
 int model_load(Module* model, const char* filepath) {
     if (!model || !filepath)
         return -1;
@@ -219,6 +226,11 @@ int model_load(Module* model, const char* filepath) {
     return 0;
 }
 
+/**
+ * Save a training checkpoint: model params plus epoch, loss and (if given) the
+ * optimizer's per-group hyperparameters and moment buffers, so training resumes
+ * on the same trajectory.
+ */
 int model_save_checkpoint(Module* model, Optimizer* optimizer, int epoch, float loss,
                           const char* filepath) {
     if (!model || !filepath)
@@ -263,6 +275,10 @@ int model_save_checkpoint(Module* model, Optimizer* optimizer, int epoch, float 
     return 0;
 }
 
+/**
+ * Restore a checkpoint written by model_save_checkpoint: model params, epoch and
+ * loss (via out-params), and optimizer state when the group count matches.
+ */
 int model_load_checkpoint(Module* model, Optimizer* optimizer, int* epoch, float* loss,
                           const char* filepath) {
     if (!model || !filepath)

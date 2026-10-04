@@ -10,6 +10,7 @@
 
 #define FNV_OFFSET_BASIS CML_FNV_OFFSET_BASIS
 
+/** Fold @p len bytes into an FNV-1a hash. */
 uint64_t cml_fnv1a_bytes(uint64_t h, const void* data, size_t len) {
     const uint8_t* p = (const uint8_t*)data;
     for (size_t i = 0; i < len; i++) {
@@ -37,6 +38,7 @@ uint64_t cml_ir_graph_hash(CMLGraph_t ir) {
     return hash;
 }
 
+/** Collect up to @p max node output data pointers into @p ptrs; returns the count. */
 int cml_ir_output_slots(CMLGraph_t ir, void** ptrs, int max) {
     int n = 0;
     for (struct IRNode* node = ir ? ir->head : NULL; node && n < max; node = node->next)
@@ -44,10 +46,13 @@ int cml_ir_output_slots(CMLGraph_t ir, void** ptrs, int max) {
     return n;
 }
 
+/** Fold a uint64 into an FNV-1a hash. */
 static uint64_t fnv1a_u64(uint64_t h, uint64_t v) { return cml_fnv1a_bytes(h, &v, sizeof(v)); }
 
+/** Fold an int into an FNV-1a hash. */
 static uint64_t fnv1a_i32(uint64_t h, int v) { return cml_fnv1a_bytes(h, &v, sizeof(v)); }
 
+/** Hash a node's op/dtype/input hashes (+optional arg bytes) for hash-consing. */
 uint64_t cml_intern_hash_node(int op_type, int dtype, struct IRNode** inputs, int num_inputs,
                               const void* arg_bytes, size_t arg_len) {
     uint64_t h = FNV_OFFSET_BASIS;
@@ -66,6 +71,7 @@ uint64_t cml_intern_hash_node(int op_type, int dtype, struct IRNode** inputs, in
 #include "tensor/tensor.h"
 #include "alloc/cml_allocator.h"
 
+/** Like cml_intern_hash_node but distinguishes leaf tensors by pointer identity. */
 uint64_t cml_intern_hash_node_ex(int op_type, int dtype, struct IRNode** inputs,
                                  Tensor** raw_inputs, int num_inputs, const void* arg_bytes,
                                  size_t arg_len) {
@@ -88,6 +94,7 @@ uint64_t cml_intern_hash_node_ex(int op_type, int dtype, struct IRNode** inputs,
     return h;
 }
 
+/** Structural equality of an interned node against a candidate key. */
 static int entries_match(struct IRNode* node, uint64_t hash, int op_type, int dtype,
                          struct IRNode** inputs, int num_inputs, const void* arg_bytes,
                          size_t arg_len) {
@@ -111,6 +118,7 @@ static int entries_match(struct IRNode* node, uint64_t hash, int op_type, int dt
     return 1;
 }
 
+/** entries_match variant that also compares leaf tensor identity. */
 static int entries_match_ex(struct IRNode* node, uint64_t hash, int op_type, int dtype,
                             struct IRNode** inputs, Tensor** raw_inputs, int num_inputs,
                             const void* arg_bytes, size_t arg_len) {
@@ -141,6 +149,7 @@ static int entries_match_ex(struct IRNode* node, uint64_t hash, int op_type, int
     return 1;
 }
 
+/** Allocate an empty open-addressed interning table. */
 CMLInternTable* cml_intern_table_create(void) {
     CMLInternTable* table = cml_calloc(1, sizeof(CMLInternTable));
     if (!table)
@@ -156,6 +165,7 @@ CMLInternTable* cml_intern_table_create(void) {
     return table;
 }
 
+/** Free an interning table (the nodes it references are owned elsewhere). */
 void cml_intern_table_free(CMLInternTable* table) {
     if (!table)
         return;
@@ -163,10 +173,12 @@ void cml_intern_table_free(CMLInternTable* table) {
     cml_free(table);
 }
 
+/** Initial probe slot for @p hash (capacity is a power of two). */
 static size_t probe_index(uint64_t hash, size_t capacity) {
     return (size_t)(hash & (uint64_t)(capacity - 1));
 }
 
+/** Double the table capacity and rehash existing entries. */
 static int intern_resize(CMLInternTable* table) {
     size_t new_cap              = table->capacity * 2;
     CMLInternEntry* new_entries = cml_calloc(new_cap, sizeof(CMLInternEntry));
@@ -188,6 +200,7 @@ static int intern_resize(CMLInternTable* table) {
     return 0;
 }
 
+/** Find an interned node matching the key by linear probing, or NULL. */
 struct IRNode* cml_intern_lookup(CMLInternTable* table, uint64_t hash, int op_type, int dtype,
                                  struct IRNode** inputs, int num_inputs, const void* arg_bytes,
                                  size_t arg_len) {
@@ -207,6 +220,7 @@ struct IRNode* cml_intern_lookup(CMLInternTable* table, uint64_t hash, int op_ty
     return NULL;
 }
 
+/** Find an interned node matching the key including leaf identity, or NULL. */
 struct IRNode* cml_intern_lookup_ex(CMLInternTable* table, uint64_t hash, int op_type, int dtype,
                                     struct IRNode** inputs, Tensor** raw_inputs, int num_inputs,
                                     const void* arg_bytes, size_t arg_len) {
@@ -226,6 +240,7 @@ struct IRNode* cml_intern_lookup_ex(CMLInternTable* table, uint64_t hash, int op
     return NULL;
 }
 
+/** Insert @p node, resizing when the load factor is exceeded. */
 int cml_intern_insert(CMLInternTable* table, struct IRNode* node) {
     if (!table || !node)
         return -1;
@@ -246,6 +261,7 @@ int cml_intern_insert(CMLInternTable* table, struct IRNode* node) {
     return 0;
 }
 
+/** Remove @p node, back-shifting displaced entries to keep probe chains intact. */
 void cml_intern_remove(CMLInternTable* table, struct IRNode* node) {
     if (!table || !node || table->count == 0)
         return;

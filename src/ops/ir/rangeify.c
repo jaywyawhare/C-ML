@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
+/** Allocate an empty range program (linked list of RANGE/INDEX nodes). */
 RangeProgram* range_program_create(void) {
     RangeProgram* prog = cml_calloc(1, sizeof(RangeProgram));
     if (!prog)
@@ -15,6 +16,7 @@ RangeProgram* range_program_create(void) {
     return prog;
 }
 
+/** Free a range program and all its nodes. */
 void range_program_free(RangeProgram* prog) {
     if (!prog)
         return;
@@ -27,6 +29,7 @@ void range_program_free(RangeProgram* prog) {
     cml_free(prog);
 }
 
+/** Allocate a node of the given type, assign its id, and append it to the list. */
 static RangeNode* alloc_node(RangeProgram* prog, RangeUOpType type) {
     RangeNode* node = cml_calloc(1, sizeof(RangeNode));
     if (!node)
@@ -45,6 +48,7 @@ static RangeNode* alloc_node(RangeProgram* prog, RangeUOpType type) {
     return node;
 }
 
+/** Add a RANGE loop node over [start, end) with the given step and dim; returns its id. */
 int range_program_add_range(RangeProgram* prog, int start, int end, int step, int dim) {
     if (!prog || end <= start || step <= 0)
         return -1;
@@ -58,6 +62,7 @@ int range_program_add_range(RangeProgram* prog, int start, int end, int step, in
     return node->id;
 }
 
+/** Add an INDEX node combining range ids with their strides into a flat offset. */
 int range_program_add_index(RangeProgram* prog, int* range_ids, size_t* strides, int num_ranges) {
     if (!prog || !range_ids || !strides || num_ranges <= 0 || num_ranges > 8)
         return -1;
@@ -70,6 +75,7 @@ int range_program_add_index(RangeProgram* prog, int* range_ids, size_t* strides,
     return node->id;
 }
 
+/** Print each RANGE/INDEX node for debugging. */
 void range_program_print(const RangeProgram* prog) {
     if (!prog) {
         printf("RangeProgram: (null)\n");
@@ -92,6 +98,7 @@ void range_program_print(const RangeProgram* prog) {
     }
 }
 
+/** Compute contiguous (row-major) strides for a shape (caller frees). */
 static size_t* compute_strides_for_shape(const int* shape, int ndim) {
     if (!shape || ndim <= 0)
         return NULL;
@@ -104,6 +111,10 @@ static size_t* compute_strides_for_shape(const int* shape, int ndim) {
     return strides;
 }
 
+/**
+ * Build a range program for one node: a RANGE per output dimension, the output
+ * INDEX, and a broadcast-aware INDEX per input (stride 0 on broadcast axes).
+ */
 static RangeProgram* rangeify_node(struct IRNode* node) {
     if (!node || !node->output_shape || node->output_ndim <= 0)
         return NULL;
@@ -179,6 +190,10 @@ static RangeProgram* rangeify_node(struct IRNode* node) {
     return prog;
 }
 
+/**
+ * Rangeify pass: build range programs for each elementwise/reduction node to
+ * expose explicit loop structure. Returns the number of nodes converted.
+ */
 int cml_rangeify(CMLGraph_t graph) {
     if (!graph)
         return -1;

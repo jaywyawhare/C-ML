@@ -71,6 +71,7 @@ static libusb_get_bus_number_fn fn_libusb_get_bus_number                        
 static libusb_get_port_number_fn fn_libusb_get_port_number                         = NULL;
 static libusb_get_string_descriptor_ascii_fn fn_libusb_get_string_descriptor_ascii = NULL;
 
+/** Dynamically load libusb-1.0, trying both common sonames; NULL if absent. */
 static void* open_libusb(void) {
     void* h = CML_DLOPEN("libusb-1.0.so", RTLD_LAZY);
     if (!h) {
@@ -88,6 +89,7 @@ static void* open_libusb(void) {
         }                                                                                          \
     } while (0)
 
+/** Resolve all required libusb entry points into the static fn pointers. */
 static int load_libusb_symbols(void* lib) {
     LOAD_USB_SYM(libusb_init);
     LOAD_USB_SYM(libusb_exit);
@@ -105,6 +107,7 @@ static int load_libusb_symbols(void* lib) {
     return 0;
 }
 
+/** True if the vendor/product IDs match a known ML accelerator (Coral, NCS2). */
 static bool is_known_ml_accelerator(uint16_t vendor_id, uint16_t product_id) {
     if ((vendor_id == CORAL_VENDOR_1 || vendor_id == CORAL_VENDOR_2) &&
         product_id == CORAL_PRODUCT) {
@@ -116,6 +119,7 @@ static bool is_known_ml_accelerator(uint16_t vendor_id, uint16_t product_id) {
     return false;
 }
 
+/** Human-readable name for a known ML accelerator by vendor/product ID. */
 static const char* identify_device(uint16_t vendor_id, uint16_t product_id) {
     if ((vendor_id == CORAL_VENDOR_1 || vendor_id == CORAL_VENDOR_2) &&
         product_id == CORAL_PRODUCT) {
@@ -127,6 +131,7 @@ static const char* identify_device(uint16_t vendor_id, uint16_t product_id) {
     return "Unknown ML Accelerator";
 }
 
+/** True if libusb can be loaded on this system. */
 bool cml_usb_available(void) {
     void* h = open_libusb();
     if (h) {
@@ -136,6 +141,8 @@ bool cml_usb_available(void) {
     return false;
 }
 
+/** Enumerate attached ML accelerators via libusb, allocating and populating an
+ *  array of device structs (with product name and serial where readable). */
 int cml_usb_enumerate(CMLUSBDevice** devices, int* num_devices) {
     if (!devices || !num_devices)
         return -1;
@@ -261,6 +268,8 @@ int cml_usb_enumerate(CMLUSBDevice** devices, int* num_devices) {
     return 0;
 }
 
+/** Open a device by re-enumerating and matching vid/pid plus bus/port, then
+ *  claiming its interface. */
 int cml_usb_open(CMLUSBDevice* device) {
     if (!device)
         return -1;
@@ -357,6 +366,7 @@ int cml_usb_open(CMLUSBDevice* device) {
     return 0;
 }
 
+/** Release the interface and close an open USB device handle. */
 void cml_usb_close(CMLUSBDevice* device) {
     if (!device || !device->is_open)
         return;
@@ -372,6 +382,7 @@ void cml_usb_close(CMLUSBDevice* device) {
     LOG_DEBUG("USB device closed: %s", device->product_name);
 }
 
+/** Bulk-send data to the device's OUT endpoint; returns bytes transferred. */
 int cml_usb_send(CMLUSBDevice* device, const void* data, size_t size) {
     if (!device || !device->is_open || !device->handle) {
         LOG_ERROR("USB send: device not open");
@@ -398,6 +409,7 @@ int cml_usb_send(CMLUSBDevice* device, const void* data, size_t size) {
     return transferred;
 }
 
+/** Bulk-receive data from the device's IN endpoint; returns bytes transferred. */
 int cml_usb_recv(CMLUSBDevice* device, void* buffer, size_t size, int timeout_ms) {
     if (!device || !device->is_open || !device->handle) {
         LOG_ERROR("USB recv: device not open");
@@ -426,6 +438,7 @@ int cml_usb_recv(CMLUSBDevice* device, void* buffer, size_t size, int timeout_ms
     return transferred;
 }
 
+/** Close any open devices in the array and free it. */
 void cml_usb_free_devices(CMLUSBDevice* devices, int num_devices) {
     if (!devices)
         return;

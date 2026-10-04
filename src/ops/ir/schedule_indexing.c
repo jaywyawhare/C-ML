@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
+/** Create an IndexMap holding a (retained) flat-index expression and optional validity mask. */
 IndexMap* index_map_create(SymExpr* flat_index, SymExpr* valid, int num_vars) {
     if (!flat_index)
         return NULL;
@@ -21,6 +22,7 @@ IndexMap* index_map_create(SymExpr* flat_index, SymExpr* valid, int num_vars) {
     return im;
 }
 
+/** Release the index/validity expressions and free the IndexMap. */
 void index_map_free(IndexMap* im) {
     if (!im)
         return;
@@ -30,12 +32,14 @@ void index_map_free(IndexMap* im) {
     cml_free(im);
 }
 
+/** Shallow copy that re-retains the shared symbolic expressions. */
 IndexMap* index_map_copy(const IndexMap* im) {
     if (!im)
         return NULL;
     return index_map_create(im->flat_index, im->valid, im->num_vars);
 }
 
+/** Build `n` loop variables idx0..idx(n-1), each ranging over its axis extent. */
 LoopVar* loop_vars_create(const int* shape, int n) {
     if (!shape || n <= 0)
         return NULL;
@@ -58,6 +62,7 @@ LoopVar* loop_vars_create(const int* shape, int n) {
     return vars;
 }
 
+/** Release each loop variable's symbolic expression and free the array. */
 void loop_vars_free(LoopVar* vars, int n) {
     if (!vars)
         return;
@@ -66,6 +71,7 @@ void loop_vars_free(LoopVar* vars, int n) {
     cml_free(vars);
 }
 
+/** Symbolic flat offset for a view: offset + sum(idx_i * stride_i) over its dims. */
 static SymExpr* view_flat_index(const STView* v, const LoopVar* vars, int nvars) {
     SymExpr* acc = sym_const((int64_t)v->offset);
     for (int i = 0; i < v->ndim && i < nvars; ++i) {
@@ -82,6 +88,7 @@ static SymExpr* view_flat_index(const STView* v, const LoopVar* vars, int nvars)
     return acc;
 }
 
+/** Symbolic validity mask for a masked view: min of per-axis in-bounds guards, or NULL. */
 static SymExpr* view_valid_expr(const STView* v, const LoopVar* vars, int nvars) {
     if (!v->has_mask)
         return NULL;
@@ -129,6 +136,7 @@ static SymExpr* view_valid_expr(const STView* v, const LoopVar* vars, int nvars)
     return acc;
 }
 
+/** Build the index map for a ShapeTracker's final view from the given loop vars. */
 IndexMap* schedule_build_index_map(const ShapeTracker* st, const LoopVar* loop_vars, int num_vars) {
     if (!st || !loop_vars || num_vars <= 0)
         return NULL;
@@ -145,6 +153,7 @@ IndexMap* schedule_build_index_map(const ShapeTracker* st, const LoopVar* loop_v
     return im;
 }
 
+/** Like schedule_build_index_map but algebraically simplifies the flat/valid expressions. */
 IndexMap* schedule_build_index_map_simplified(const ShapeTracker* st, const LoopVar* loop_vars,
                                               int num_vars) {
     IndexMap* im = schedule_build_index_map(st, loop_vars, num_vars);
@@ -161,6 +170,7 @@ IndexMap* schedule_build_index_map_simplified(const ShapeTracker* st, const Loop
     return im;
 }
 
+/** Render the flat-index and validity (default "1") expressions as C strings; 0 on success. */
 int index_map_to_c(const IndexMap* im, const char* const* var_names, int num_vars, char* index_buf,
                    size_t index_buf_size, char* valid_buf, size_t valid_buf_size) {
     if (!im || !var_names || !index_buf || index_buf_size == 0)
@@ -183,6 +193,7 @@ int index_map_to_c(const IndexMap* im, const char* const* var_names, int num_var
     return 0;
 }
 
+/** Compose two index maps by adding their offsets and anding their validity masks. */
 IndexMap* index_map_compose(const IndexMap* outer, const IndexMap* inner) {
     if (!outer || !inner)
         return NULL;
@@ -204,6 +215,7 @@ IndexMap* index_map_compose(const IndexMap* outer, const IndexMap* inner) {
     return im;
 }
 
+/** Debug-print an IndexMap's flat/valid expressions and variable count to stderr. */
 void index_map_print(const IndexMap* im) {
     if (!im) {
         fprintf(stderr, "IndexMap(NULL)\n");
