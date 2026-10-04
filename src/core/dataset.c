@@ -38,6 +38,8 @@ typedef struct WorkerContext {
     ThreadPool* thread_pool;
 } WorkerContext;
 
+/** Allocate a bounded prefetch queue of `capacity` batches with its mutex and
+ * condition variables, or NULL on failure. */
 static PrefetchQueue* prefetch_queue_create(int capacity) {
     PrefetchQueue* queue = cml_malloc(sizeof(PrefetchQueue));
     if (!queue)
@@ -67,6 +69,7 @@ static PrefetchQueue* prefetch_queue_create(int capacity) {
     return queue;
 }
 
+/** Signal shutdown, free any batches still queued, and destroy the queue. */
 static void prefetch_queue_free(PrefetchQueue* queue) {
     if (!queue)
         return;
@@ -101,6 +104,7 @@ static void prefetch_queue_free(PrefetchQueue* queue) {
     cml_free(queue);
 }
 
+/** Block until there is room, then push a batch; returns -1 if shutting down. */
 static int prefetch_queue_enqueue(PrefetchQueue* queue, Batch* batch, int batch_idx) {
     if (!queue || !batch)
         return -1;
@@ -127,6 +131,8 @@ static int prefetch_queue_enqueue(PrefetchQueue* queue, Batch* batch, int batch_
     return 0;
 }
 
+/** Block until a batch is available, then pop it (writing its index to
+ * `batch_idx`); returns NULL once drained and shutting down. */
 static Batch* prefetch_queue_dequeue(PrefetchQueue* queue, int* batch_idx) {
     if (!queue)
         return NULL;
@@ -155,6 +161,9 @@ static Batch* prefetch_queue_dequeue(PrefetchQueue* queue, int* batch_idx) {
     return batch;
 }
 
+/** Materialize batch number `batch_idx` by gathering its shuffled sample rows
+ * into fresh X/y tensors; returns NULL past the end or when dropping a short
+ * final batch. */
 static Batch* load_batch_at_index(DataLoader* loader, int batch_idx) {
     if (!loader || !loader->dataset || batch_idx >= loader->total_batches) {
         return NULL;
@@ -216,6 +225,8 @@ static Batch* load_batch_at_index(DataLoader* loader, int batch_idx) {
 
     return batch;
 }
+/** Worker thread body: pull batch indices off the shared atomic cursor, load
+ * each batch, and enqueue it until the epoch's batches are exhausted. */
 static void* worker_prefetch_batches(void* arg) {
     WorkerContext* ctx   = (WorkerContext*)arg;
     DataLoader* loader   = ctx->loader;
@@ -247,6 +258,7 @@ static void* worker_prefetch_batches(void* arg) {
     return NULL;
 }
 
+/** Allocate an empty dataset with all fields defaulted, or NULL on failure. */
 Dataset* dataset_create(void) {
     Dataset* dataset = cml_malloc(sizeof(Dataset));
     if (!dataset) {
@@ -283,6 +295,7 @@ Dataset* dataset_create(void) {
     return dataset;
 }
 
+/** Build a dataset from raw X/y arrays and register it for auto-cleanup. */
 Dataset* dataset_from_arrays(float* X, float* y, int num_samples, int input_size, int output_size) {
     Dataset* dataset = dataset_create();
     if (!dataset)
@@ -300,6 +313,8 @@ Dataset* dataset_from_arrays(float* X, float* y, int num_samples, int input_size
     return dataset;
 }
 
+/** Copy X/y arrays into realized dataset tensors and initialize the identity
+ * index array. Tensors are realized so they survive IR graph resets. */
 int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, int input_size,
                         int output_size) {
     if (!dataset || !X || !y) {
@@ -345,6 +360,8 @@ int dataset_load_arrays(Dataset* dataset, float* X, float* y, int num_samples, i
     return 0;
 }
 
+/** Load a dataset from a file; only CSV is supported, which also records class
+ * names, filepath, and computed feature statistics. */
 int dataset_load_file(Dataset* dataset, const char* filepath, const char* format) {
     if (!dataset || !filepath || !format) {
         LOG_ERROR("Invalid parameters for dataset_load_file");
@@ -391,6 +408,8 @@ int dataset_load_file(Dataset* dataset, const char* filepath, const char* format
     return -1;
 }
 
+/** Ensure feature statistics exist and, if `stats` is given, copy them out as
+ * float[4][input_size] = {means, stds, mins, maxs}. */
 int dataset_get_statistics(Dataset* dataset, void* stats) {
     if (!dataset) {
         LOG_ERROR("Invalid dataset for dataset_get_statistics");
@@ -423,6 +442,7 @@ int dataset_get_statistics(Dataset* dataset, void* stats) {
     return 0;
 }
 
+/** Untrack and free a dataset along with its tensors, stats, and name arrays. */
 void dataset_free(Dataset* dataset) {
     if (!dataset)
         return;
@@ -471,6 +491,8 @@ void dataset_free(Dataset* dataset) {
     cml_free(dataset);
 }
 
+/** Split a dataset sequentially into train/val subsets by `train_ratio`, copying
+ * data and normalization stats into two freshly created datasets. */
 int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
                   Dataset** val_dataset) {
     if (!dataset || !train_dataset || !val_dataset) {
@@ -660,6 +682,8 @@ int dataset_split(Dataset* dataset, float train_ratio, Dataset** train_dataset,
     return 0;
 }
 
+/** Split a dataset sequentially into train/val/test subsets by the two ratios
+ * (test takes the remainder), copying each slice into a new dataset. */
 int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
                         Dataset** train_dataset, Dataset** val_dataset, Dataset** test_dataset) {
     if (!dataset || !train_dataset || !val_dataset || !test_dataset) {
@@ -854,6 +878,8 @@ static float* dataset_feature_data(const Dataset* dataset) {
     return data;
 }
 
+/** Normalize features in place by "zscore" or "minmax", using the dataset's
+ * precomputed statistics and guarding against division by zero. */
 int dataset_normalize(Dataset* dataset, const char* method) {
     if (!dataset || !method) {
         LOG_ERROR("Invalid parameters for dataset_normalize");
@@ -915,6 +941,7 @@ int dataset_normalize(Dataset* dataset, const char* method) {
     return 0;
 }
 
+/** Fisher-Yates shuffle of the dataset's index array using `seed`. */
 int dataset_shuffle(Dataset* dataset, unsigned int seed) {
     if (!dataset || !dataset->indices) {
         LOG_ERROR("Invalid dataset or indices not available for shuffling");
@@ -933,6 +960,7 @@ int dataset_shuffle(Dataset* dataset, unsigned int seed) {
     return 0;
 }
 
+/** Print a human-readable overview of the dataset to stdout. */
 void dataset_print_summary(Dataset* dataset) {
     if (!dataset)
         return;
@@ -956,6 +984,8 @@ void dataset_print_summary(Dataset* dataset) {
     printf("\n");
 }
 
+/** Approximate heap footprint of the dataset: struct plus tensors, indices, and
+ * statistics arrays. */
 size_t dataset_get_memory_usage(Dataset* dataset) {
     if (!dataset)
         return 0;
@@ -987,6 +1017,8 @@ size_t dataset_get_memory_usage(Dataset* dataset) {
     return usage;
 }
 
+/** Whether the dataset has positive dimensions and 2-D X/y tensors whose shapes
+ * match its sample/feature counts. */
 bool dataset_is_valid(Dataset* dataset) {
     if (!dataset)
         return false;
@@ -1014,6 +1046,7 @@ bool dataset_is_valid(Dataset* dataset) {
     return true;
 }
 
+/** Deep-copy a dataset, cloning its tensors and index array. */
 Dataset* dataset_copy(Dataset* dataset) {
     if (!dataset)
         return NULL;
@@ -1062,6 +1095,8 @@ Dataset* dataset_copy(Dataset* dataset) {
     return copy;
 }
 
+/** Create a single-threaded data loader over `dataset`, seeding the shuffled
+ * index order when `shuffle` is set. */
 DataLoader* dataloader_create(Dataset* dataset, int batch_size, bool shuffle) {
     if (!dataset || batch_size <= 0) {
         LOG_ERROR("Invalid parameters for dataloader_create");
@@ -1111,6 +1146,7 @@ DataLoader* dataloader_create(Dataset* dataset, int batch_size, bool shuffle) {
     return loader;
 }
 
+/** Stop any prefetch workers, join them, and free the loader and its buffers. */
 void dataloader_free(DataLoader* loader) {
     if (!loader)
         return;
@@ -1140,6 +1176,7 @@ void dataloader_free(DataLoader* loader) {
     cml_free(loader);
 }
 
+/** Rewind the loader for a new epoch: reset cursors and reshuffle if enabled. */
 int dataloader_reset(DataLoader* loader) {
     if (!loader)
         return -1;
@@ -1158,6 +1195,8 @@ int dataloader_reset(DataLoader* loader) {
     return 0;
 }
 
+/** Return the next batch, taking it from the prefetch queue when workers are
+ * active and otherwise loading it synchronously; NULL when the epoch is done. */
 Batch* dataloader_next_batch(DataLoader* loader) {
     if (!loader || !loader->dataset)
         return NULL;
@@ -1199,24 +1238,28 @@ Batch* dataloader_next_batch(DataLoader* loader) {
     return batch;
 }
 
+/** Whether more batches remain in the current epoch. */
 bool dataloader_has_next(DataLoader* loader) {
     if (!loader)
         return false;
     return loader->current_batch < loader->total_batches;
 }
 
+/** Total number of batches per epoch. */
 int dataloader_get_batch_count(DataLoader* loader) {
     if (!loader)
         return 0;
     return loader->total_batches;
 }
 
+/** Index of the next batch to be served, or -1 for a NULL loader. */
 int dataloader_get_current_batch(DataLoader* loader) {
     if (!loader)
         return -1;
     return loader->current_batch;
 }
 
+/** Free a batch and its X/y tensors. */
 void batch_free(Batch* batch) {
     if (!batch)
         return;
@@ -1229,24 +1272,28 @@ void batch_free(Batch* batch) {
     cml_free(batch);
 }
 
+/** The batch's input tensor. */
 Tensor* batch_get_input(Batch* batch) {
     if (!batch)
         return NULL;
     return batch->X;
 }
 
+/** The batch's target tensor. */
 Tensor* batch_get_targets(Batch* batch) {
     if (!batch)
         return NULL;
     return batch->y;
 }
 
+/** Number of samples in the batch. */
 int batch_get_size(Batch* batch) {
     if (!batch)
         return 0;
     return batch->batch_size;
 }
 
+/** Print the batch's index, size, epoch, and tensor shapes to stdout. */
 void batch_print_summary(Batch* batch) {
     if (!batch)
         return;
@@ -1273,6 +1320,8 @@ void batch_print_summary(Batch* batch) {
     printf("\n");
 }
 
+/** Create a data loader backed by `num_workers` prefetch threads, falling back
+ * to single-threaded loading if the queue or threads cannot be set up. */
 DataLoader* dataloader_create_with_workers(Dataset* dataset, int batch_size, bool shuffle,
                                            int num_workers) {
     if (!dataset || batch_size <= 0) {
@@ -1339,6 +1388,8 @@ DataLoader* dataloader_create_with_workers(Dataset* dataset, int batch_size, boo
     return loader;
 }
 
+/** Fetch the next batch and return clones of its tensors (so they outlive the
+ * batch) via the out-params; returns the batch size, or 0 when exhausted. */
 int dataloader_get_batch_tensors(DataLoader* loader, Tensor*** batch_inputs,
                                  Tensor*** batch_targets) {
     if (!loader || !batch_inputs || !batch_targets) {
@@ -1380,6 +1431,8 @@ int dataloader_get_batch_tensors(DataLoader* loader, Tensor*** batch_inputs,
     return batch_size;
 }
 
+/** Reset the loader and invoke `callback` for every batch, freeing each batch's
+ * tensors afterward; stops early and returns -1 if the callback returns nonzero. */
 int dataloader_for_each(DataLoader* loader, BatchCallback callback, void* user_data) {
     if (!loader || !callback) {
         return -1;
@@ -1416,6 +1469,7 @@ int dataloader_for_each(DataLoader* loader, BatchCallback callback, void* user_d
     return 0;
 }
 
+/** Build the 4-sample XOR dataset. */
 Dataset* dataset_xor(void) {
     float X[4][2] = {{0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}};
     float y[4]    = {0.0f, 1.0f, 1.0f, 0.0f};
@@ -1444,6 +1498,7 @@ Dataset* dataset_xor(void) {
     return dataset;
 }
 
+/** Generate a dataset of uniformly random features with random class labels. */
 Dataset* dataset_random_classification(int num_samples, int num_features, int num_classes) {
     if (num_samples <= 0 || num_features <= 0 || num_classes <= 0) {
         return NULL;
@@ -1475,6 +1530,8 @@ Dataset* dataset_random_classification(int num_samples, int num_features, int nu
     return dataset;
 }
 
+/** Z-score normalize features in place using the supplied per-feature mean/std
+ * (falling back to dataset-computed stats when either is NULL) and cache them. */
 int transform_normalize(Dataset* dataset, float* mean, float* std) {
     if (!dataset || !dataset->X) {
         LOG_ERROR("Invalid dataset for transform_normalize");

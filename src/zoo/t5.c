@@ -8,7 +8,7 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/* T5 relative-position bucketing (Raffel et al.; mirrors the HF reference). */
+/** T5 relative-position bucketing (Raffel et al.; mirrors the HF reference). */
 static int t5_rel_bucket(int rel, bool bidirectional, int num_buckets, int max_distance) {
     int bucket = 0;
     int n;
@@ -34,7 +34,7 @@ static int t5_rel_bucket(int rel, bool bidirectional, int num_buckets, int max_d
     return bucket;
 }
 
-/* Build the [1, H, Sq, Sk] additive attention bias by gathering from the
+/** Build the [1, H, Sq, Sk] additive attention bias by gathering from the
  * flattened [H*num_buckets] parameter with precomputed bucket indices — the
  * gather keeps the graph differentiable so rel_bias trains. */
 static Tensor* t5_build_rel_bias(Parameter* rel_bias, int n_head, int num_buckets, int seq_q,
@@ -77,7 +77,7 @@ static Tensor* t5_build_rel_bias(Parameter* rel_bias, int n_head, int num_bucket
     return uop_reshape(gathered, &orp);
 }
 
-/* Expand the [1, H, Sq, Sk] bias across the batch to match score shape. */
+/** Expand the [1, H, Sq, Sk] bias across the batch to match score shape. */
 static Tensor* t5_batch_bias(Tensor* bias, int batch) {
     if (!bias || batch <= 1)
         return bias;
@@ -86,6 +86,7 @@ static Tensor* t5_batch_bias(Tensor* bias, int batch) {
     return uop_expand(bias, &ep);
 }
 
+/** T5-Small config: 6 layers, 8 heads, d_model 512, d_ff 2048. */
 T5Config cml_zoo_t5_config_small(void) {
     return (T5Config){.vocab_size   = 32128,
                       .n_layer      = 6,
@@ -96,6 +97,7 @@ T5Config cml_zoo_t5_config_small(void) {
                       .num_buckets  = 32};
 }
 
+/** T5-Base config: 12 layers, 12 heads, d_model 768, d_ff 3072. */
 T5Config cml_zoo_t5_config_base(void) {
     return (T5Config){.vocab_size   = 32128,
                       .n_layer      = 12,
@@ -106,6 +108,7 @@ T5Config cml_zoo_t5_config_base(void) {
                       .num_buckets  = 32};
 }
 
+/** T5-Large config: 24 layers, 16 heads, d_model 1024, d_ff 4096. */
 T5Config cml_zoo_t5_config_large(void) {
     return (T5Config){.vocab_size   = 32128,
                       .n_layer      = 24,
@@ -129,6 +132,7 @@ typedef struct {
     int num_buckets;
 } T5EncoderBlock;
 
+/** T5 encoder block forward: pre-norm self-attention with relative bias, then residual ReLU MLP. */
 static Tensor* t5_enc_block_forward(Module* module, Tensor* input) {
     T5EncoderBlock* block = (T5EncoderBlock*)module;
     if (!block || !input)
@@ -164,6 +168,7 @@ static Tensor* t5_enc_block_forward(Module* module, Tensor* input) {
     return tensor_add(x, mlp_out);
 }
 
+/** Free a T5 encoder block's norms, self-attention and MLP. */
 static void t5_enc_block_free(Module* module) {
     T5EncoderBlock* block = (T5EncoderBlock*)module;
     if (!block)
@@ -179,6 +184,7 @@ static void t5_enc_block_free(Module* module) {
     cml_free(block);
 }
 
+/** Build a T5 encoder block (self-attn + ReLU MLP) with a relative-bias param and residual init. */
 static Module* create_t5_enc_block(int d_model, int n_head, int d_ff, int num_buckets, int n_layer,
                                    DType dtype, DeviceType device) {
     T5EncoderBlock* block = cml_malloc(sizeof(T5EncoderBlock));
@@ -236,6 +242,7 @@ typedef struct {
     int num_buckets;
 } T5DecoderBlock;
 
+/** Decoder self-attention sublayer: pre-norm causal self-attn with relative bias + residual. */
 static Tensor* t5_dec_self_attn(T5DecoderBlock* block, Tensor* input) {
     Tensor* normed = module_forward((Module*)block->norm1, input);
     if (!normed)
@@ -256,6 +263,7 @@ static Tensor* t5_dec_self_attn(T5DecoderBlock* block, Tensor* input) {
     return tensor_add(input, self_out);
 }
 
+/** Module forward hook for a decoder block: runs self-attention only (no cross-attn memory). */
 static Tensor* t5_dec_block_forward(Module* module, Tensor* input) {
     T5DecoderBlock* block = (T5DecoderBlock*)module;
     if (!block || !input)
@@ -264,6 +272,7 @@ static Tensor* t5_dec_block_forward(Module* module, Tensor* input) {
     return t5_dec_self_attn(block, input);
 }
 
+/** Full decoder block: self-attention, cross-attention over encoder @p memory, then ReLU MLP. */
 static Tensor* t5_dec_block_forward_with_memory(T5DecoderBlock* block, Tensor* input,
                                                 Tensor* memory) {
     if (!block || !input)
@@ -297,6 +306,7 @@ static Tensor* t5_dec_block_forward_with_memory(T5DecoderBlock* block, Tensor* i
     return tensor_add(x, mlp_out);
 }
 
+/** Free a T5 decoder block's norms, self-attention, cross-attention and MLP. */
 static void t5_dec_block_free(Module* module) {
     T5DecoderBlock* block = (T5DecoderBlock*)module;
     if (!block)
@@ -316,6 +326,7 @@ static void t5_dec_block_free(Module* module) {
     cml_free(block);
 }
 
+/** Build a T5 decoder block (causal self-attn + cross-attn + ReLU MLP) with residual init. */
 static Module* create_t5_dec_block(int d_model, int n_head, int d_ff, int num_buckets, int n_layer,
                                    DType dtype, DeviceType device) {
     T5DecoderBlock* block = cml_malloc(sizeof(T5DecoderBlock));
@@ -379,8 +390,10 @@ typedef struct {
     int vocab_size;
 } T5Model;
 
+/** Module forward hook: runs the T5 encoder over @p input. */
 static Tensor* t5_forward(Module* module, Tensor* input) { return t5_encode(module, input); }
 
+/** Free the T5 shared embedding, encoder/decoder block lists, norms and LM head. */
 static void t5_free(Module* module) {
     T5Model* t5 = (T5Model*)module;
     if (!t5)
@@ -400,6 +413,7 @@ static void t5_free(Module* module) {
     cml_free(t5);
 }
 
+/** Encode @p input token ids: shared embedding, the encoder block stack, then the final norm. */
 Tensor* t5_encode(Module* module, Tensor* input) {
     T5Model* t5 = (T5Model*)module;
     if (!t5 || !input)
@@ -421,6 +435,7 @@ Tensor* t5_encode(Module* module, Tensor* input) {
     return module_forward((Module*)t5->enc_norm, x);
 }
 
+/** Decode @p tgt against encoder @p memory: embed, run decoder blocks, final norm and LM head. */
 Tensor* t5_decode(Module* module, Tensor* tgt, Tensor* memory) {
     T5Model* t5 = (T5Model*)module;
     if (!t5 || !tgt || !memory)
@@ -446,6 +461,7 @@ Tensor* t5_decode(Module* module, Tensor* tgt, Tensor* memory) {
     return module_forward((Module*)t5->lm_head, x);
 }
 
+/** Build a T5 encoder-decoder from @p config: shared embedding, N enc/dec blocks and LM head. */
 Module* cml_zoo_t5_create(T5Config* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;

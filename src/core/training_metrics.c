@@ -35,6 +35,8 @@ static __thread bool g_manual_epoch_control       = false;
 static __thread Tensor* g_acc_pred   = NULL;
 static __thread Tensor* g_acc_target = NULL;
 
+/** Stash the latest prediction/target pair for the next loss auto-capture to
+ * derive classification accuracy from. */
 void training_metrics_note_prediction(Tensor* prediction, Tensor* target) {
     g_acc_pred   = prediction;
     g_acc_target = target;
@@ -91,13 +93,17 @@ static float compute_classification_accuracy(Tensor* pred, Tensor* target) {
     }
     return (float)correct / (float)N;
 }
+/** Monotonic wall-clock time in seconds, for epoch duration measurement. */
 static double get_time_sec(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
 }
 
+/** The thread-local global metrics object, or NULL if none is active. */
 TrainingMetrics* training_metrics_get_global(void) { return g_global_metrics; }
+/** Grow every per-epoch array to hold `num_epochs`, zero/INFINITY-filling the new
+ * slots; no-op when already large enough. Returns 0 on success, -1 on failure. */
 static int training_metrics_ensure_capacity(TrainingMetrics* metrics, size_t num_epochs) {
     if (!metrics)
         return -1;
@@ -168,6 +174,8 @@ static int training_metrics_ensure_capacity(TrainingMetrics* metrics, size_t num
     return 0;
 }
 
+/** Allocate a metrics object sized for `num_epochs`, or NULL on allocation
+ * failure. Validation/testing arrays stay NULL until first recorded. */
 TrainingMetrics* training_metrics_create(size_t num_epochs) {
     TrainingMetrics* metrics = cml_malloc(sizeof(TrainingMetrics));
     if (!metrics)
@@ -228,6 +236,7 @@ TrainingMetrics* training_metrics_create(size_t num_epochs) {
     return metrics;
 }
 
+/** Mark the wall-clock start of an epoch so record_epoch can time it. */
 void training_metrics_start_epoch(TrainingMetrics* metrics) {
     if (!metrics)
         return;
@@ -260,6 +269,8 @@ static void capture_distributions_for_epoch(TrainingMetrics* metrics, size_t epo
     cml_free(params);
 }
 
+/** Store training loss/accuracy for `epoch`, folding in elapsed time and
+ * updating the best-so-far loss and accuracy. */
 void training_metrics_record_epoch(TrainingMetrics* metrics, size_t epoch, float loss,
                                    float accuracy) {
     if (!metrics || epoch >= metrics->num_epochs)
@@ -281,6 +292,8 @@ void training_metrics_record_epoch(TrainingMetrics* metrics, size_t epoch, float
     }
 }
 
+/** Record train plus optional validation/testing loss and accuracy for `epoch`,
+ * lazily allocating the val/test arrays and ignoring inf/nan/negative splits. */
 void training_metrics_record_epoch_full(TrainingMetrics* metrics, size_t epoch, float train_loss,
                                         float train_accuracy, float test_loss, float test_accuracy,
                                         float val_loss, float val_accuracy) {
@@ -333,6 +346,7 @@ void training_metrics_record_epoch_full(TrainingMetrics* metrics, size_t epoch, 
     }
 }
 
+/** Replace the stored model summary string with a copy of `summary` (or NULL). */
 void training_metrics_set_summary(TrainingMetrics* metrics, const char* summary) {
     if (!metrics)
         return;
@@ -353,6 +367,7 @@ void training_metrics_set_summary(TrainingMetrics* metrics, const char* summary)
     }
 }
 
+/** Record total and trainable parameter counts for the dashboard. */
 void training_metrics_set_params(TrainingMetrics* metrics, int total, int trainable) {
     if (!metrics)
         return;
@@ -360,6 +375,7 @@ void training_metrics_set_params(TrainingMetrics* metrics, int total, int traina
     metrics->trainable_params = trainable;
 }
 
+/** Set the measured duration of `epoch` and add it to the running total. */
 void training_metrics_record_epoch_time(TrainingMetrics* metrics, size_t epoch,
                                         float time_seconds) {
     if (!metrics || epoch >= metrics->num_epochs)
@@ -368,6 +384,7 @@ void training_metrics_record_epoch_time(TrainingMetrics* metrics, size_t epoch,
     metrics->total_time += time_seconds;
 }
 
+/** Record the current learning rate and a copy of the scheduler name (or NULL). */
 void training_metrics_set_learning_rate(TrainingMetrics* metrics, float lr, const char* scheduler) {
     if (!metrics)
         return;
@@ -389,6 +406,7 @@ void training_metrics_set_learning_rate(TrainingMetrics* metrics, float lr, cons
     }
 }
 
+/** Store a copy of the scheduler's parameter description string (or NULL). */
 void training_metrics_set_lr_schedule_params(TrainingMetrics* metrics, const char* params) {
     if (!metrics)
         return;
@@ -409,12 +427,15 @@ void training_metrics_set_lr_schedule_params(TrainingMetrics* metrics, const cha
     }
 }
 
+/** Record the most recent global gradient norm. */
 void training_metrics_set_gradient_norm(TrainingMetrics* metrics, float grad_norm) {
     if (!metrics)
         return;
     metrics->gradient_norm = grad_norm;
 }
 
+/** L2 norm across every parameter's gradient; also caches it on `metrics`.
+ * Returns 0 when no parameter carries a gradient. */
 float training_metrics_calculate_gradient_norm(TrainingMetrics* metrics, void** parameters,
                                                int num_parameters) {
     if (!metrics || !parameters || num_parameters == 0)
@@ -459,6 +480,8 @@ float training_metrics_calculate_gradient_norm(TrainingMetrics* metrics, void** 
     return grad_norm;
 }
 
+/** Raw float data pointer of `t` with its element count written to
+ * `num_elements`, or NULL when the tensor has no backing data. */
 float* cml_tensor_float_buffer(Tensor* t, size_t* num_elements) {
     float* data = (float*)tensor_data_ptr(t);
     if (!data)
@@ -503,6 +526,7 @@ typedef struct {
     size_t count, zeros;
 } DistPass1;
 
+/** Accumulate min/max/sum/sumsq and zero counts over one parameter's values. */
 static void dist_pass1(const float* data, size_t n, void* ctx) {
     DistPass1* a = (DistPass1*)ctx;
     for (size_t i = 0; i < n; i++) {
@@ -524,6 +548,7 @@ typedef struct {
     float lo, scale; /* bin index = (v - lo) * scale */
 } DistPass2;
 
+/** Tally one parameter's values into the quantile histogram bins. */
 static void dist_pass2(const float* data, size_t n, void* ctx) {
     DistPass2* h = (DistPass2*)ctx;
     for (size_t i = 0; i < n; i++) {
@@ -548,6 +573,8 @@ static float dist_quantile(const int* bins, size_t total, double q, float lo, fl
     return lo + (float)DIST_BINS * bin_width;
 }
 
+/** Two-pass summary (moments then histogram quartiles) of all parameters'
+ * weights or gradients into `out`; leaves `out` untouched when empty. */
 static void summarize_population(void** parameters, int num_parameters, bool want_grad,
                                  DistributionSummary* out) {
     DistPass1 a = {.min = INFINITY, .max = -INFINITY, .sum = 0, .sumsq = 0, .count = 0, .zeros = 0};
@@ -584,6 +611,8 @@ static void summarize_population(void** parameters, int num_parameters, bool wan
     cml_free(bins);
 }
 
+/** Capture weight and gradient distribution summaries for `epoch` and flag the
+ * metrics object as carrying distribution data. */
 void training_metrics_record_distributions(TrainingMetrics* metrics, size_t epoch,
                                            void** parameters, int num_parameters) {
     if (!metrics || !parameters || num_parameters <= 0 || epoch >= metrics->num_epochs)
@@ -636,6 +665,8 @@ static void export_distribution_series(FILE* f, const char* name, const Distribu
     fputs("},\n", f);
 }
 
+/** Write the metrics object as JSON to `path` via a temp-file rename.
+ * `incremental` marks the run as still training. Returns 0 on success. */
 int training_metrics_export_json(const TrainingMetrics* metrics, const char* path,
                                  bool incremental) {
     /* NO_EXPORT: every metrics file goes through here, so one guard covers the
@@ -925,6 +956,8 @@ int training_metrics_export_json(const TrainingMetrics* metrics, const char* pat
     return 0;
 }
 
+/** Incremental JSON export after `epoch`; validates the epoch then delegates to
+ * training_metrics_export_json. */
 int training_metrics_export_epoch_update(const TrainingMetrics* metrics, size_t epoch,
                                          const char* path) {
     if (!metrics || !path || epoch >= metrics->num_epochs)
@@ -932,6 +965,7 @@ int training_metrics_export_epoch_update(const TrainingMetrics* metrics, size_t 
     return training_metrics_export_json(metrics, path, true);
 }
 
+/** Extract `module`'s architecture and write it as JSON to `path`. */
 int training_metrics_export_architecture(Module* module, const char* path) {
     if (!module || !path)
         return -1;
@@ -951,6 +985,8 @@ int training_metrics_export_architecture(Module* module, const char* path) {
     return result;
 }
 
+/** Print a human-readable progress report for `epoch` (timings, LR, gradient
+ * norm, loss reduction rate and stability) to stdout. */
 void training_metrics_log(TrainingMetrics* metrics, size_t epoch) {
     if (!metrics)
         return;
@@ -1046,6 +1082,7 @@ void training_metrics_log(TrainingMetrics* metrics, size_t epoch) {
     printf("\n");
 }
 
+/** Free the metrics object and every array it owns. */
 void training_metrics_free(TrainingMetrics* metrics) {
     if (!metrics)
         return;
@@ -1082,6 +1119,9 @@ void training_metrics_free(TrainingMetrics* metrics) {
     cml_free(metrics);
 }
 
+/** Run one forward/backward/optimizer step, writing loss and accuracy to the
+ * out-params and recording them (plus LR and gradient norm) on the optimizer's
+ * metrics. Returns 0 on success, -1 on any failure. */
 int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn)(Tensor*, Tensor*),
                           Optimizer* optimizer, size_t epoch, float* loss_out,
                           float* accuracy_out) {
@@ -1158,13 +1198,18 @@ int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn
 
     return 0;
 }
+/** Whether live metric export is on: the VIZ env var is truthy and export is not
+ * globally disabled. */
 bool cml_viz_enabled(void) {
     if (cml_flag_enabled(CML_FLAG_NO_EXPORT))
         return false;
     const char* v = getenv("VIZ");
     return v && v[0] != '\0' && strcmp(v, "0") != 0 && strcmp(v, "false") != 0;
 }
+/** Note that zero_grad ran, the signal the epoch auto-detector keys off. */
 void training_metrics_mark_zero_grad(void) { g_zero_grad_called = true; }
+/** Infer epoch boundaries from the zero_grad/step rhythm when the caller does not
+ * drive epochs manually, timing and exporting each completed epoch. */
 static void training_metrics_auto_detect_epoch(Optimizer* optimizer) {
     if (!g_global_metrics || !optimizer)
         return;
@@ -1196,6 +1241,8 @@ static void training_metrics_auto_detect_epoch(Optimizer* optimizer) {
         g_zero_grad_called  = false;
     }
 }
+/** Switch the global metrics to manual epoch control and resize it to
+ * `num_epochs`, then export. */
 void training_metrics_set_expected_epochs(size_t num_epochs) {
     if (!g_global_metrics)
         return;
@@ -1213,6 +1260,8 @@ void training_metrics_set_expected_epochs(size_t num_epochs) {
     training_metrics_export_json(g_global_metrics, metrics_path, true);
 }
 
+/** Flag the run as early-stopped at `actual_epochs`, trim the epoch count, and
+ * write a final export. */
 void training_metrics_mark_early_stop(size_t actual_epochs) {
     if (!g_global_metrics)
         return;
@@ -1225,6 +1274,8 @@ void training_metrics_mark_early_stop(size_t actual_epochs) {
     training_metrics_export_json(g_global_metrics, metrics_path, false); // Final export
 }
 
+/** Track `model` as the current one and derive its parameter counts, exporting
+ * its architecture on first registration. */
 void training_metrics_register_model(Module* model) {
     if (!model)
         return;
@@ -1257,6 +1308,8 @@ void training_metrics_register_model(Module* model) {
         training_metrics_auto_export_architecture(model);
     }
 }
+/** Export `model`'s architecture once per run and fold it into the metrics
+ * summary; keeps tracking but writes nothing when export is disabled. */
 void training_metrics_auto_export_architecture(Module* model) {
     if (!model)
         return;
@@ -1300,6 +1353,8 @@ void training_metrics_auto_export_architecture(Module* model) {
         }
     }
 }
+/** Hook: record a scalar loss tensor (and any noted accuracy) for the current
+ * epoch and export. Ignores non-scalar losses. */
 void training_metrics_auto_capture_loss(Tensor* loss_tensor) {
     if (!g_global_metrics || !loss_tensor)
         return;
@@ -1342,6 +1397,8 @@ void training_metrics_auto_capture_loss(Tensor* loss_tensor) {
     g_acc_pred   = NULL;
     g_acc_target = NULL;
 }
+/** Hook fired each optimizer step: snapshot distributions while grads are live,
+ * advance epoch detection, and capture LR and gradient norm. */
 void training_metrics_auto_capture_optimizer(Optimizer* optimizer) {
     if (!g_global_metrics || !optimizer)
         return;
@@ -1376,6 +1433,8 @@ void training_metrics_auto_capture_optimizer(Optimizer* optimizer) {
     const char* metrics_path = "training.json";
     training_metrics_export_json(g_global_metrics, metrics_path, true);
 }
+/** Create the thread-local global metrics object (default 100 epochs) and reset
+ * all auto-capture state; no-op if already initialized. */
 void training_metrics_init_global(void) {
     if (g_global_metrics)
         return; // Already initialized
@@ -1391,6 +1450,7 @@ void training_metrics_init_global(void) {
         g_architecture_exported = false;
     }
 }
+/** Hook: record training accuracy for the current epoch and export. */
 void training_metrics_auto_capture_train_accuracy(float train_accuracy) {
     if (!g_global_metrics)
         return;
@@ -1406,6 +1466,8 @@ void training_metrics_auto_capture_train_accuracy(float train_accuracy) {
         training_metrics_export_json(g_global_metrics, metrics_path, true);
     }
 }
+/** Hook: record validation loss/accuracy against the just-finished epoch, lazily
+ * allocating the validation arrays. */
 void training_metrics_auto_capture_validation(float val_loss, float val_accuracy) {
     if (!g_global_metrics)
         return;
@@ -1432,6 +1494,7 @@ void training_metrics_auto_capture_validation(float val_loss, float val_accuracy
         training_metrics_export_json(g_global_metrics, metrics_path, true);
     }
 }
+/** Hook: record final test loss/accuracy against the last epoch slot. */
 void training_metrics_auto_capture_test(float test_loss, float test_accuracy) {
     if (!g_global_metrics)
         return;
@@ -1461,6 +1524,8 @@ void training_metrics_auto_capture_test(float test_loss, float test_accuracy) {
     }
 }
 
+/** Run `model` over a whole dataset in eval mode and auto-capture the resulting
+ * loss/accuracy as validation or test metrics. Returns 0 on success. */
 int training_metrics_evaluate_dataset(Module* model, Dataset* dataset,
                                       Tensor* (*loss_fn)(Tensor*, Tensor*), bool is_validation) {
     if (!model || !dataset || !loss_fn || !dataset->X || !dataset->y) {
@@ -1510,6 +1575,7 @@ int training_metrics_evaluate_dataset(Module* model, Dataset* dataset,
 
     return 0;
 }
+/** Mark the current epoch finished, growing the metrics if needed, and export. */
 void training_metrics_complete_epoch(void) {
     if (!g_global_metrics)
         return;
@@ -1526,6 +1592,8 @@ void training_metrics_complete_epoch(void) {
     training_metrics_export_json(g_global_metrics, metrics_path, false);
 }
 
+/** Final export, then free the global metrics object and reset auto-capture
+ * state. */
 void training_metrics_cleanup_global(void) {
     if (g_global_metrics) {
         const char* metrics_path = "training.json";

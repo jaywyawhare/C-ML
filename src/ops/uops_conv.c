@@ -17,6 +17,7 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** Free a Conv2DParams and its owned kernel_size/stride/padding/dilation arrays. */
 static void conv2d_params_free_local(Conv2DParams* p) {
     if (!p)
         return;
@@ -31,6 +32,8 @@ static void conv2d_params_free_local(Conv2DParams* p) {
     cml_free(p);
 }
 
+/** Shared builder for max/avg pool2d UOPs: validates the 4D input, computes the output
+ *  spatial size (honoring ceil_mode), copies params, and emits a lazy node of `type`. */
 static Tensor* uop_pool2d(Tensor* input, Pool2DParams* params, UOpType type) {
     if (!input || !params) {
         CML_ERR_NULL("NULL input to uop_pool2d");
@@ -109,6 +112,8 @@ static Tensor* uop_pool2d(Tensor* input, Pool2DParams* params, UOpType type) {
     return tensor_from_ir_node(node, ir);
 }
 
+/** Build a lazy UOP_CONV3D node from [N,C,D,H,W] input and [O,C,Kd,Kh,Kw] weight,
+ *  defaulting stride/dilation to 1 when params is NULL; bias input is optional. */
 static Tensor* uop_conv3d_like(Tensor* input, Tensor* weight, Tensor* bias,
                                const Conv3DParams* params) {
     if (!input || !weight) {
@@ -185,6 +190,8 @@ static Tensor* uop_conv3d_like(Tensor* input, Tensor* weight, Tensor* bias,
     return tensor_from_ir_node(node, ir);
 }
 
+/** Build a lazy UOP_CONV_TRANSPOSE2D node; output size uses the transposed-conv formula
+ *  with stride, padding, dilation, and output_padding. Weight is [Cin,Cout,Kh,Kw]. */
 static Tensor* uop_conv_transpose2d_like(Tensor* input, Tensor* weight, Tensor* bias,
                                          const ConvTranspose2DParams* params) {
     if (!input || !weight || !params) {
@@ -238,6 +245,7 @@ static Tensor* uop_conv_transpose2d_like(Tensor* input, Tensor* weight, Tensor* 
     return tensor_from_ir_node(node, ir);
 }
 
+/** Build a lazy UOP_CONV_TRANSPOSE3D node; 3D analogue of uop_conv_transpose2d_like. */
 static Tensor* uop_conv_transpose3d_like(Tensor* input, Tensor* weight, Tensor* bias,
                                          const ConvTranspose3DParams* params) {
     if (!input || !weight || !params) {
@@ -296,6 +304,8 @@ static Tensor* uop_conv_transpose3d_like(Tensor* input, Tensor* weight, Tensor* 
     return tensor_from_ir_node(node, ir);
 }
 
+/** Build a lazy UOP_CONV2D node: validates shapes/channels/bias, deep-copies params with
+ *  defaults, flags Winograd eligibility, and records the computed output shape. */
 Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* params) {
     if (!input || !weight) {
         LOG_ERROR("NULL tensor input to uop_conv2d");
@@ -429,23 +439,28 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
     return tensor_from_ir_node(node, ir);
 }
 
+/** Lazy 2D max pooling (public wrapper over uop_pool2d). */
 Tensor* uop_maxpool2d(Tensor* input, Pool2DParams* params) {
     return uop_pool2d(input, params, UOP_MAXPOOL2D);
 }
 
+/** Lazy 2D average pooling (public wrapper over uop_pool2d). */
 Tensor* uop_avgpool2d(Tensor* input, Pool2DParams* params) {
     return uop_pool2d(input, params, UOP_AVGPOOL2D);
 }
 
+/** Lazy 3D convolution (public wrapper over uop_conv3d_like). */
 Tensor* uop_conv3d(Tensor* input, Tensor* weight, Tensor* bias, Conv3DParams* params) {
     return uop_conv3d_like(input, weight, bias, params);
 }
 
+/** Lazy 2D transposed convolution (public wrapper over uop_conv_transpose2d_like). */
 Tensor* uop_conv_transpose2d(Tensor* input, Tensor* weight, Tensor* bias,
                              ConvTranspose2DParams* params) {
     return uop_conv_transpose2d_like(input, weight, bias, params);
 }
 
+/** Lazy 3D transposed convolution (public wrapper over uop_conv_transpose3d_like). */
 Tensor* uop_conv_transpose3d(Tensor* input, Tensor* weight, Tensor* bias,
                              ConvTranspose3DParams* params) {
     return uop_conv_transpose3d_like(input, weight, bias, params);

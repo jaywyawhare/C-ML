@@ -7,6 +7,7 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** Config for BERT-Tiny: 4 layers, 2 heads, hidden 128, intermediate 512. */
 BERTConfig cml_zoo_bert_config_tiny(void) {
     return (BERTConfig){.vocab_size        = 30522,
                         .n_layer           = 4,
@@ -16,6 +17,7 @@ BERTConfig cml_zoo_bert_config_tiny(void) {
                         .max_position      = 512};
 }
 
+/** Config for BERT-Mini: 4 layers, 4 heads, hidden 256, intermediate 1024. */
 BERTConfig cml_zoo_bert_config_mini(void) {
     return (BERTConfig){.vocab_size        = 30522,
                         .n_layer           = 4,
@@ -25,6 +27,7 @@ BERTConfig cml_zoo_bert_config_mini(void) {
                         .max_position      = 512};
 }
 
+/** Config for BERT-Small: 4 layers, 8 heads, hidden 512, intermediate 2048. */
 BERTConfig cml_zoo_bert_config_small(void) {
     return (BERTConfig){.vocab_size        = 30522,
                         .n_layer           = 4,
@@ -34,6 +37,7 @@ BERTConfig cml_zoo_bert_config_small(void) {
                         .max_position      = 512};
 }
 
+/** Config for BERT-Base: 12 layers, 12 heads, hidden 768, intermediate 3072. */
 BERTConfig cml_zoo_bert_config_base(void) {
     return (BERTConfig){.vocab_size        = 30522,
                         .n_layer           = 12,
@@ -43,6 +47,7 @@ BERTConfig cml_zoo_bert_config_base(void) {
                         .max_position      = 512};
 }
 
+/** Config for BERT-Large: 24 layers, 16 heads, hidden 1024, intermediate 4096. */
 BERTConfig cml_zoo_bert_config_large(void) {
     return (BERTConfig){.vocab_size        = 30522,
                         .n_layer           = 24,
@@ -60,6 +65,7 @@ typedef struct {
     LayerNorm* mlp_norm;
 } BERTEncoderBlock;
 
+/** Post-norm encoder block forward: self-attention + residual + LN, then MLP + residual + LN. */
 static Tensor* bert_block_forward(Module* module, Tensor* input) {
     BERTEncoderBlock* block = (BERTEncoderBlock*)module;
     if (!block || !input)
@@ -88,6 +94,7 @@ static Tensor* bert_block_forward(Module* module, Tensor* input) {
     return module_forward((Module*)block->mlp_norm, y);
 }
 
+/** Free a BERT encoder block's attention, MLP and layer norms. */
 static void bert_block_free(Module* module) {
     BERTEncoderBlock* block = (BERTEncoderBlock*)module;
     if (!block)
@@ -103,6 +110,7 @@ static void bert_block_free(Module* module) {
     cml_free(block);
 }
 
+/** Build one BERT encoder block (MHA + GELU MLP, post-norm) with depth-scaled residual init. */
 static Module* create_bert_block(int hidden_size, int n_head, int intermediate_size, int n_layer,
                                  DType dtype, DeviceType device) {
     BERTEncoderBlock* block = cml_malloc(sizeof(BERTEncoderBlock));
@@ -147,6 +155,7 @@ typedef struct {
     int hidden_size;
 } BERTModel;
 
+/** Forward: token embeddings + norm, run the encoder stack, then the pooler projection. */
 static Tensor* bert_forward(Module* module, Tensor* input) {
     BERTModel* bert = (BERTModel*)module;
     if (!bert || !input)
@@ -172,6 +181,7 @@ static Tensor* bert_forward(Module* module, Tensor* input) {
     return module_forward((Module*)bert->pooler, x);
 }
 
+/** Free the BERT embeddings, embedding norm, encoder layers and pooler. */
 static void bert_free(Module* module) {
     BERTModel* bert = (BERTModel*)module;
     if (!bert)
@@ -191,6 +201,7 @@ static void bert_free(Module* module) {
     cml_free(bert);
 }
 
+/** Build a BERT encoder from @p config: token/pos/segment embeddings, N blocks and pooler. */
 Module* cml_zoo_bert_create(BERTConfig* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;

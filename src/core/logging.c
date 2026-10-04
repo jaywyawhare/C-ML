@@ -10,8 +10,14 @@
 
 LogLevel g_log_level = LOG_LEVEL_ERROR;
 
+/** Set the minimum severity that cml_log_message will print to stderr. */
 void cml_set_log_level(LogLevel level) { g_log_level = level; }
 
+/**
+ * Format and emit a log record. Every ERROR is also pushed onto the thread-local
+ * error stack so it stays queryable; records below the active level are suppressed
+ * from stderr but errors are still recorded.
+ */
 void cml_log_message(LogLevel level, const char* file, int line, const char* func,
                      const char* format, ...) {
     char msg[512];
@@ -57,6 +63,7 @@ void cml_log_message(LogLevel level, const char* file, int line, const char* fun
     }
 }
 
+/** Write a JSON string literal (quoted, with control chars escaped), or `null` for NULL. */
 void cml_json_write_escaped(FILE* f, const char* s) {
     if (!s) {
         fputs("null", f);

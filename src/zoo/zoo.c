@@ -63,6 +63,7 @@ static const char* zoo_model_names[] = {
     [CML_ZOO_RNNT]           = "rnnt",
 };
 
+/** Default zoo config: no pretrained weights, default classes, FP32 on CPU. */
 CMLZooConfig cml_zoo_default_config(void) {
     CMLZooConfig cfg = {.pretrained  = false,
                         .num_classes = 0,
@@ -72,12 +73,14 @@ CMLZooConfig cml_zoo_default_config(void) {
     return cfg;
 }
 
+/** Return the registry slug for @p model (e.g. "resnet50"), or "unknown" if out of range. */
 const char* cml_zoo_model_name(CMLZooModel model) {
     if (model >= CML_ZOO_MODEL_COUNT)
         return "unknown";
     return zoo_model_names[model];
 }
 
+/** Return the cached weights directory ($HOME/.cml/weights), initializing it on first call. */
 const char* cml_zoo_get_weights_dir(void) {
     if (g_weights_dir[0] == '\0') {
         const char* home = getenv("HOME");
@@ -88,11 +91,13 @@ const char* cml_zoo_get_weights_dir(void) {
     return g_weights_dir;
 }
 
+/** Override the base URL that pretrained weights are downloaded from. */
 void cml_zoo_set_weights_url(const char* base_url) {
     if (base_url)
         g_weights_base_url = base_url;
 }
 
+/** Create directory @p path (via mkdir -p) if it does not already exist. */
 static int ensure_dir_exists(const char* path) {
     struct stat st;
     if (stat(path, &st) == 0)
@@ -103,6 +108,7 @@ static int ensure_dir_exists(const char* path) {
     return system(cmd);
 }
 
+/** Fetch @p model's weights into @p weights_dir (curl/wget), using the cache if present. */
 const char* cml_zoo_download_weights(CMLZooModel model, const char* weights_dir) {
     if (model >= CML_ZOO_MODEL_COUNT)
         return NULL;
@@ -142,6 +148,7 @@ const char* cml_zoo_download_weights(CMLZooModel model, const char* weights_dir)
     return path;
 }
 
+/** Load serialized weights from @p weights_path into @p module; 0 on success, -1 on error. */
 int cml_zoo_load_weights(Module* module, const char* weights_path) {
     if (!module || !weights_path) {
         LOG_ERROR("Invalid arguments to cml_zoo_load_weights");
@@ -151,6 +158,7 @@ int cml_zoo_load_weights(Module* module, const char* weights_path) {
     return model_load(module, weights_path);
 }
 
+/** Build a 784->256->128->classes MLP for MNIST, optionally loading pretrained weights. */
 Module* cml_zoo_mlp_mnist(const CMLZooConfig* config) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
     int num_classes  = cfg.num_classes > 0 ? cfg.num_classes : 10;
@@ -172,6 +180,7 @@ Module* cml_zoo_mlp_mnist(const CMLZooConfig* config) {
     return (Module*)model;
 }
 
+/** Build a 3072->512->256->classes MLP for CIFAR-10, optionally loading pretrained weights. */
 Module* cml_zoo_mlp_cifar10(const CMLZooConfig* config) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
     int num_classes  = cfg.num_classes > 0 ? cfg.num_classes : 10;
@@ -193,6 +202,7 @@ Module* cml_zoo_mlp_cifar10(const CMLZooConfig* config) {
     return (Module*)model;
 }
 
+/** Build a simplified ResNet basic block (two 3x3 conv+BN layers) as a Sequential. */
 static Module* create_resnet_block(int in_channels, int out_channels, int stride, DType dtype,
                                    DeviceType device) {
     /* ResNet basic block uses 2 conv layers with skip connection */
@@ -215,6 +225,7 @@ static Module* create_resnet_block(int in_channels, int out_channels, int stride
 
 static Module* create_resnet(const int* layers, int num_layers, const CMLZooConfig* cfg_ptr)
     __attribute__((unused));
+/** Assemble a generic ResNet from per-stage block counts: stem, residual stages, pool and FC. */
 static Module* create_resnet(const int* layers, int num_layers, const CMLZooConfig* cfg_ptr) {
     CMLZooConfig cfg = cfg_ptr ? *cfg_ptr : cml_zoo_default_config();
     int num_classes  = cfg.num_classes > 0 ? cfg.num_classes : 1000;
@@ -250,6 +261,7 @@ static Module* create_resnet(const int* layers, int num_layers, const CMLZooConf
     return (Module*)model;
 }
 
+/** Zoo entry for ResNet-18: build via the resnet module, optionally loading pretrained weights. */
 Module* cml_zoo_resnet18(const CMLZooConfig* config) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
     int num_classes  = cfg.num_classes > 0 ? cfg.num_classes : 1000;
@@ -267,6 +279,7 @@ Module* cml_zoo_resnet18(const CMLZooConfig* config) {
     return model;
 }
 
+/** Zoo entry for ResNet-34: build via the resnet module, optionally loading pretrained weights. */
 Module* cml_zoo_resnet34(const CMLZooConfig* config) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
     int num_classes  = cfg.num_classes > 0 ? cfg.num_classes : 1000;
@@ -284,6 +297,7 @@ Module* cml_zoo_resnet34(const CMLZooConfig* config) {
     return model;
 }
 
+/** Zoo entry for ResNet-50: build via the resnet module, optionally loading pretrained weights. */
 Module* cml_zoo_resnet50(const CMLZooConfig* config) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
     int num_classes  = cfg.num_classes > 0 ? cfg.num_classes : 1000;
@@ -299,6 +313,7 @@ Module* cml_zoo_resnet50(const CMLZooConfig* config) {
     return model;
 }
 
+/** Build a VGG network from a layer spec (0 marks a maxpool) plus the standard FC classifier. */
 static Module* create_vgg(const int* layer_cfg, int num_blocks, const CMLZooConfig* cfg_ptr) {
     CMLZooConfig cfg = cfg_ptr ? *cfg_ptr : cml_zoo_default_config();
     int num_classes  = cfg.num_classes > 0 ? cfg.num_classes : 1000;
@@ -328,6 +343,7 @@ static Module* create_vgg(const int* layer_cfg, int num_blocks, const CMLZooConf
     return (Module*)model;
 }
 
+/** Zoo entry for VGG-11, optionally loading pretrained weights. */
 Module* cml_zoo_vgg11(const CMLZooConfig* config) {
     /* VGG-11 config: 64, M, 128, M, 256, 256, M, 512, 512, M, 512, 512, M */
     int layer_cfg[] = {64, 0, 128, 0, 256, 256, 0, 512, 512, 0, 512, 512, 0};
@@ -343,6 +359,7 @@ Module* cml_zoo_vgg11(const CMLZooConfig* config) {
     return model;
 }
 
+/** Zoo entry for VGG-16, optionally loading pretrained weights. */
 Module* cml_zoo_vgg16(const CMLZooConfig* config) {
     /* VGG-16 config */
     int layer_cfg[] = {64, 64,  0,   128, 128, 0,   256, 256, 256,
@@ -359,6 +376,7 @@ Module* cml_zoo_vgg16(const CMLZooConfig* config) {
     return model;
 }
 
+/** Shared helper: build a GPT-2 from @p gpt2_cfg and optionally load @p zoo_model weights. */
 static Module* create_gpt2_from_config(GPT2Config gpt2_cfg, const CMLZooConfig* config,
                                        CMLZooModel zoo_model) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
@@ -376,22 +394,27 @@ static Module* create_gpt2_from_config(GPT2Config gpt2_cfg, const CMLZooConfig* 
     return model;
 }
 
+/** Zoo entry for GPT-2 small. */
 Module* cml_zoo_gpt2_small(const CMLZooConfig* config) {
     return create_gpt2_from_config(cml_zoo_gpt2_config_small(), config, CML_ZOO_GPT2_SMALL);
 }
 
+/** Zoo entry for GPT-2 medium. */
 Module* cml_zoo_gpt2_medium(const CMLZooConfig* config) {
     return create_gpt2_from_config(cml_zoo_gpt2_config_medium(), config, CML_ZOO_GPT2_MEDIUM);
 }
 
+/** Zoo entry for GPT-2 large. */
 Module* cml_zoo_gpt2_large(const CMLZooConfig* config) {
     return create_gpt2_from_config(cml_zoo_gpt2_config_large(), config, CML_ZOO_GPT2_LARGE);
 }
 
+/** Zoo entry for GPT-2 XL. */
 Module* cml_zoo_gpt2_xl(const CMLZooConfig* config) {
     return create_gpt2_from_config(cml_zoo_gpt2_config_xl(), config, CML_ZOO_GPT2_XL);
 }
 
+/** Shared helper: build a BERT from @p bert_cfg and optionally load @p zoo_model weights. */
 static Module* create_bert_from_config(BERTConfig bert_cfg, const CMLZooConfig* config,
                                        CMLZooModel zoo_model) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
@@ -409,26 +432,32 @@ static Module* create_bert_from_config(BERTConfig bert_cfg, const CMLZooConfig* 
     return model;
 }
 
+/** Zoo entry for BERT-Tiny. */
 Module* cml_zoo_bert_tiny(const CMLZooConfig* config) {
     return create_bert_from_config(cml_zoo_bert_config_tiny(), config, CML_ZOO_BERT_TINY);
 }
 
+/** Zoo entry for BERT-Mini. */
 Module* cml_zoo_bert_mini(const CMLZooConfig* config) {
     return create_bert_from_config(cml_zoo_bert_config_mini(), config, CML_ZOO_BERT_MINI);
 }
 
+/** Zoo entry for BERT-Small. */
 Module* cml_zoo_bert_small(const CMLZooConfig* config) {
     return create_bert_from_config(cml_zoo_bert_config_small(), config, CML_ZOO_BERT_SMALL);
 }
 
+/** Zoo entry for BERT-Base. */
 Module* cml_zoo_bert_base(const CMLZooConfig* config) {
     return create_bert_from_config(cml_zoo_bert_config_base(), config, CML_ZOO_BERT_BASE);
 }
 
+/** Zoo entry for BERT-Large. */
 Module* cml_zoo_bert_large(const CMLZooConfig* config) {
     return create_bert_from_config(cml_zoo_bert_config_large(), config, CML_ZOO_BERT_LARGE);
 }
 
+/** Shared helper: build a ViT from @p vit_cfg (honoring num_classes override) and load weights. */
 static Module* create_vit_from_config(ViTConfig vit_cfg, const CMLZooConfig* config,
                                       CMLZooModel zoo_model) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
@@ -448,22 +477,27 @@ static Module* create_vit_from_config(ViTConfig vit_cfg, const CMLZooConfig* con
     return model;
 }
 
+/** Zoo entry for ViT-Tiny/16. */
 Module* cml_zoo_vit_tiny(const CMLZooConfig* config) {
     return create_vit_from_config(cml_zoo_vit_config_tiny(), config, CML_ZOO_VIT_TINY);
 }
 
+/** Zoo entry for ViT-Small/16. */
 Module* cml_zoo_vit_small(const CMLZooConfig* config) {
     return create_vit_from_config(cml_zoo_vit_config_small(), config, CML_ZOO_VIT_SMALL);
 }
 
+/** Zoo entry for ViT-Base/16. */
 Module* cml_zoo_vit_base(const CMLZooConfig* config) {
     return create_vit_from_config(cml_zoo_vit_config_base(), config, CML_ZOO_VIT_BASE);
 }
 
+/** Zoo entry for ViT-Large/16. */
 Module* cml_zoo_vit_large(const CMLZooConfig* config) {
     return create_vit_from_config(cml_zoo_vit_config_large(), config, CML_ZOO_VIT_LARGE);
 }
 
+/** Shared helper: build a CLIP from @p clip_cfg and optionally load @p zoo_model weights. */
 static Module* create_clip_from_config(CMLCLIPConfig clip_cfg, const CMLZooConfig* config,
                                        CMLZooModel zoo_model) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
@@ -481,18 +515,22 @@ static Module* create_clip_from_config(CMLCLIPConfig clip_cfg, const CMLZooConfi
     return model;
 }
 
+/** Zoo entry for CLIP ViT-B/32. */
 Module* cml_zoo_clip_vit_b32(const CMLZooConfig* config) {
     return create_clip_from_config(cml_zoo_clip_config_vit_b32(), config, CML_ZOO_CLIP_VIT_B32);
 }
 
+/** Zoo entry for CLIP ViT-B/16. */
 Module* cml_zoo_clip_vit_b16(const CMLZooConfig* config) {
     return create_clip_from_config(cml_zoo_clip_config_vit_b16(), config, CML_ZOO_CLIP_VIT_B16);
 }
 
+/** Zoo entry for CLIP ViT-L/14. */
 Module* cml_zoo_clip_vit_l14(const CMLZooConfig* config) {
     return create_clip_from_config(cml_zoo_clip_config_vit_l14(), config, CML_ZOO_CLIP_VIT_L14);
 }
 
+/** Shared helper: build a T5 from @p t5_cfg and optionally load @p zoo_model weights. */
 static Module* create_t5_from_config(T5Config t5_cfg, const CMLZooConfig* config,
                                      CMLZooModel zoo_model) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
@@ -510,18 +548,22 @@ static Module* create_t5_from_config(T5Config t5_cfg, const CMLZooConfig* config
     return model;
 }
 
+/** Zoo entry for T5-Small. */
 Module* cml_zoo_t5_small(const CMLZooConfig* config) {
     return create_t5_from_config(cml_zoo_t5_config_small(), config, CML_ZOO_T5_SMALL);
 }
 
+/** Zoo entry for T5-Base. */
 Module* cml_zoo_t5_base(const CMLZooConfig* config) {
     return create_t5_from_config(cml_zoo_t5_config_base(), config, CML_ZOO_T5_BASE);
 }
 
+/** Zoo entry for T5-Large. */
 Module* cml_zoo_t5_large(const CMLZooConfig* config) {
     return create_t5_from_config(cml_zoo_t5_config_large(), config, CML_ZOO_T5_LARGE);
 }
 
+/** Zoo entry for the default 2D U-Net, honoring num_classes and optional pretrained weights. */
 Module* cml_zoo_unet_default(const CMLZooConfig* config) {
     CMLZooConfig cfg       = config ? *config : cml_zoo_default_config();
     CMLUNetConfig unet_cfg = cml_zoo_unet_config_default();
@@ -541,6 +583,7 @@ Module* cml_zoo_unet_default(const CMLZooConfig* config) {
     return model;
 }
 
+/** Shared helper: build a ConvNeXt from @p cnx_cfg and optionally load @p zoo_model weights. */
 static Module* create_convnext(ConvNeXtConfig cnx_cfg, const CMLZooConfig* config,
                                CMLZooModel zoo_model) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
@@ -559,22 +602,27 @@ static Module* create_convnext(ConvNeXtConfig cnx_cfg, const CMLZooConfig* confi
     return model;
 }
 
+/** Zoo entry for ConvNeXt-Tiny. */
 Module* cml_zoo_convnext_tiny(const CMLZooConfig* config) {
     return create_convnext(cml_zoo_convnext_config_tiny(), config, CML_ZOO_CONVNEXT_TINY);
 }
 
+/** Zoo entry for ConvNeXt-Small. */
 Module* cml_zoo_convnext_small(const CMLZooConfig* config) {
     return create_convnext(cml_zoo_convnext_config_small(), config, CML_ZOO_CONVNEXT_SMALL);
 }
 
+/** Zoo entry for ConvNeXt-Base. */
 Module* cml_zoo_convnext_base(const CMLZooConfig* config) {
     return create_convnext(cml_zoo_convnext_config_base(), config, CML_ZOO_CONVNEXT_BASE);
 }
 
+/** Zoo entry for ConvNeXt-Large. */
 Module* cml_zoo_convnext_large(const CMLZooConfig* config) {
     return create_convnext(cml_zoo_convnext_config_large(), config, CML_ZOO_CONVNEXT_LARGE);
 }
 
+/** Zoo entry for Inception-v3, honoring num_classes and optional pretrained weights. */
 Module* cml_zoo_inception_v3(const CMLZooConfig* config) {
     CMLZooConfig cfg = config ? *config : cml_zoo_default_config();
     int num_classes  = cfg.num_classes > 0 ? cfg.num_classes : 1000;
@@ -592,6 +640,7 @@ Module* cml_zoo_inception_v3(const CMLZooConfig* config) {
     return model;
 }
 
+/** Zoo entry for RetinaNet, honoring num_classes and optional pretrained weights. */
 Module* cml_zoo_retinanet(const CMLZooConfig* config) {
     CMLZooConfig cfg       = config ? *config : cml_zoo_default_config();
     RetinaNetConfig rt_cfg = cml_zoo_retinanet_default_config();
@@ -611,6 +660,7 @@ Module* cml_zoo_retinanet(const CMLZooConfig* config) {
     return model;
 }
 
+/** Zoo entry for Mask R-CNN, honoring num_classes and optional pretrained weights. */
 Module* cml_zoo_mask_rcnn(const CMLZooConfig* config) {
     CMLZooConfig cfg      = config ? *config : cml_zoo_default_config();
     MaskRCNNConfig mr_cfg = cml_zoo_mask_rcnn_default_config();
@@ -630,6 +680,7 @@ Module* cml_zoo_mask_rcnn(const CMLZooConfig* config) {
     return model;
 }
 
+/** Zoo entry for the default 3D U-Net, honoring num_classes and optional pretrained weights. */
 Module* cml_zoo_unet3d(const CMLZooConfig* config) {
     CMLZooConfig cfg       = config ? *config : cml_zoo_default_config();
     CMLUNet3DConfig u3_cfg = cml_zoo_unet3d_config_default();
@@ -649,6 +700,7 @@ Module* cml_zoo_unet3d(const CMLZooConfig* config) {
     return model;
 }
 
+/** Zoo entry for the default RNN-T, optionally loading pretrained weights. */
 Module* cml_zoo_rnnt(const CMLZooConfig* config) {
     CMLZooConfig cfg     = config ? *config : cml_zoo_default_config();
     CMLRNNTConfig rt_cfg = cml_zoo_rnnt_config_default();
@@ -666,6 +718,7 @@ Module* cml_zoo_rnnt(const CMLZooConfig* config) {
     return model;
 }
 
+/** Dispatch to the appropriate builder for @p model; returns NULL for an unknown id. */
 Module* cml_zoo_create(CMLZooModel model, const CMLZooConfig* config) {
     switch (model) {
     case CML_ZOO_MLP_MNIST:
@@ -746,6 +799,7 @@ Module* cml_zoo_create(CMLZooModel model, const CMLZooConfig* config) {
     }
 }
 
+/** Pre-norm transformer block forward: residual self-attention then residual GELU MLP. */
 static Tensor* zoo_prenorm_block_forward(Module* module, Tensor* input) {
     ZooPreNormBlock* block = (ZooPreNormBlock*)module;
     if (!block || !input)
@@ -774,6 +828,7 @@ static Tensor* zoo_prenorm_block_forward(Module* module, Tensor* input) {
     return tensor_add(x, mlp_out);
 }
 
+/** Free a shared pre-norm block's two norms, attention and MLP. */
 static void zoo_prenorm_block_free(Module* module) {
     ZooPreNormBlock* block = (ZooPreNormBlock*)module;
     if (!block)
@@ -789,6 +844,7 @@ static void zoo_prenorm_block_free(Module* module) {
     cml_free(block);
 }
 
+/** Build a reusable pre-norm transformer block (LN+MHA+LN+GELU MLP) shared by ViT/CLIP/etc. */
 ZooPreNormBlock* zoo_prenorm_block(const char* name, int dim, int n_head, int mlp_dim,
                                    float norm_eps, DType dtype, DeviceType device) {
     ZooPreNormBlock* block = cml_malloc(sizeof(ZooPreNormBlock));
@@ -812,10 +868,12 @@ ZooPreNormBlock* zoo_prenorm_block(const char* name, int dim, int n_head, int ml
     return block;
 }
 
+/** GPT-2-style residual init scale 1/sqrt(2*n_layer) to keep deep stacks from exploding. */
 float zoo_residual_scale(int n_layer) {
     return n_layer > 1 ? 1.0f / sqrtf(2.0f * (float)n_layer) : 1.0f;
 }
 
+/** Multiply every element of @p param's tensor by @p scale in place (no-op if scale == 1). */
 void zoo_scale_param(Parameter* param, float scale) {
     if (!param || !param->tensor || scale == 1.0f)
         return;
@@ -826,6 +884,7 @@ void zoo_scale_param(Parameter* param, float scale) {
         w[i] *= scale;
 }
 
+/** FPN top-down merge: project @p c through @p lateral and add the upsampled coarser level. */
 Tensor* zoo_fpn_topdown_add(Module* lateral, Tensor* c, Tensor* p_coarser) {
     Tensor* lat = module_forward(lateral, c);
     if (!lat)

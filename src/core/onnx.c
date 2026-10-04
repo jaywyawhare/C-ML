@@ -6,6 +6,7 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
+/** Copy a protobuf string field into a fixed buffer, truncating and NUL-terminating. */
 static void copy_pb_string(char* dst, size_t dst_size, const PBField* field) {
     size_t len      = 0;
     const char* src = pb_field_string(field, &len);
@@ -19,6 +20,7 @@ static void copy_pb_string(char* dst, size_t dst_size, const PBField* field) {
     dst[len] = '\0';
 }
 
+/** Heap-duplicate a protobuf string field as a C string; NULL when empty/absent. */
 static char* dup_pb_string(const PBField* field) {
     size_t len      = 0;
     const char* src = pb_field_string(field, &len);
@@ -33,6 +35,7 @@ static char* dup_pb_string(const PBField* field) {
     return s;
 }
 
+/** Map an ONNX TensorProto.DataType enum to the CML DType; defaults to FLOAT32. */
 static DType onnx_dtype_to_cml(int onnx_dtype) {
     switch (onnx_dtype) {
     case 1:
@@ -367,6 +370,7 @@ static void parse_tensor_shape_dim(PBReader* rd, int* dim_out) {
     }
 }
 
+/** Collect each TensorShapeProto dimension into @p info (capped at 8 dims). */
 static void parse_tensor_shape(PBReader* rd, CMLONNXTensorInfo* info) {
     PBField f;
     while (pb_read_field(rd, &f)) {
@@ -380,6 +384,7 @@ static void parse_tensor_shape(PBReader* rd, CMLONNXTensorInfo* info) {
     }
 }
 
+/** Parse a TypeProto.Tensor: element dtype and nested shape into @p info. */
 static void parse_tensor_type(PBReader* rd, CMLONNXTensorInfo* info) {
     PBField f;
     while (pb_read_field(rd, &f)) {
@@ -399,6 +404,7 @@ static void parse_tensor_type(PBReader* rd, CMLONNXTensorInfo* info) {
     }
 }
 
+/** Descend a TypeProto into its tensor_type branch (the only kind handled). */
 static void parse_type_proto(PBReader* rd, CMLONNXTensorInfo* info) {
     PBField f;
     while (pb_read_field(rd, &f)) {
@@ -409,6 +415,7 @@ static void parse_type_proto(PBReader* rd, CMLONNXTensorInfo* info) {
     }
 }
 
+/** Parse a ValueInfoProto (graph input/output): name plus its tensor type/shape. */
 static void parse_value_info(PBReader* rd, CMLONNXTensorInfo* info) {
     memset(info, 0, sizeof(*info));
     info->dtype = DTYPE_FLOAT32;
@@ -610,6 +617,7 @@ CMLONNXModel* cml_onnx_load_buffer(const uint8_t* data, size_t length) {
     return model;
 }
 
+/** Read an .onnx file fully into memory and parse it; NULL on any I/O or parse error. */
 CMLONNXModel* cml_onnx_load(const char* filepath) {
     if (!filepath)
         return NULL;
@@ -650,6 +658,7 @@ CMLONNXModel* cml_onnx_load(const char* filepath) {
     return model;
 }
 
+/** Free a model and everything it owns: node strings, attribute/initializer tensors. */
 void cml_onnx_free(CMLONNXModel* model) {
     if (!model)
         return;

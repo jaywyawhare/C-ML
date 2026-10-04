@@ -11,6 +11,7 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
+/** Allocate an empty model-architecture descriptor with no layers. */
 ModelArchitecture* model_architecture_create(void) {
     ModelArchitecture* arch = cml_malloc(sizeof(ModelArchitecture));
     if (!arch)
@@ -25,6 +26,7 @@ ModelArchitecture* model_architecture_create(void) {
     return arch;
 }
 
+/** Write a minimally-escaped JSON string literal (quotes and backslashes). */
 static void write_json_string(FILE* f, const char* str) {
     fputc('"', f);
     for (const char* p = str; *p; p++) {
@@ -35,6 +37,8 @@ static void write_json_string(FILE* f, const char* str) {
     fputc('"', f);
 }
 
+/** Populate a LayerInfo from a module, special-casing Linear/Conv2d/activations
+ *  for shapes and parameter counts. */
 static int extract_layer_info(Module* module, int layer_idx, LayerInfo* info) {
     if (!module || !info)
         return -1;
@@ -72,6 +76,7 @@ static int extract_layer_info(Module* module, int layer_idx, LayerInfo* info) {
     return 0;
 }
 
+/** Append one LayerInfo per child of a Sequential, growing the layer array as needed. */
 static int extract_from_sequential(Sequential* seq, ModelArchitecture* arch) {
     if (!seq || !arch)
         return -1;
@@ -106,6 +111,8 @@ static int extract_from_sequential(Sequential* seq, ModelArchitecture* arch) {
     return 0;
 }
 
+/** Build the architecture descriptor from a module (flattening Sequential) and
+ *  tally total/trainable parameter counts. */
 int model_architecture_extract(Module* module, ModelArchitecture* arch) {
     if (!module || !arch)
         return -1;
@@ -152,6 +159,7 @@ int model_architecture_extract(Module* module, ModelArchitecture* arch) {
     return 0;
 }
 
+/** Write the architecture (per-layer fields and parameter totals) as JSON to `path`. */
 int model_architecture_export_json(const ModelArchitecture* arch, const char* path) {
     if (!arch || !path)
         return -1;
@@ -208,6 +216,7 @@ int model_architecture_export_json(const ModelArchitecture* arch, const char* pa
     return 0;
 }
 
+/** Free the layer array (and per-layer details) and the descriptor itself. */
 void model_architecture_free(ModelArchitecture* arch) {
     if (!arch)
         return;

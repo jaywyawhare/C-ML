@@ -6,6 +6,8 @@
 
 static const uint64_t SKEIN_KS_PARITY = 0x1BD11BDAA9FC1A22ULL;
 
+/** Threefry-2x64-20 counter-based PRF: 20 rounds mixing the 128-bit counter
+ *  under the key, with the Skein key schedule injected every fourth round. */
 static void threefry2x64(const uint64_t key[2], uint64_t ctr[2], uint64_t out[2]) {
     uint64_t ks[3] = {key[0], key[1], SKEIN_KS_PARITY ^ key[0] ^ key[1]};
 
@@ -29,12 +31,14 @@ static void threefry2x64(const uint64_t key[2], uint64_t ctr[2], uint64_t out[2]
     out[1] = x1;
 }
 
+/** Initialize an RNG state from a seed (counter reset to 0). */
 void cml_rng_init(CMLRNGState* state, uint64_t seed) {
     state->key[0]  = seed;
     state->key[1]  = seed ^ 0x0123456789ABCDEFULL;
     state->counter = 0;
 }
 
+/** Fill `out` with `n` uniform 32-bit words, advancing the counter per block. */
 void cml_rng_uint32(CMLRNGState* state, uint32_t* out, size_t n) {
     size_t i = 0;
     while (i < n) {
@@ -53,6 +57,7 @@ void cml_rng_uint32(CMLRNGState* state, uint32_t* out, size_t n) {
     }
 }
 
+/** Fill `out` with `n` floats uniform in [0,1) using the top 24 bits per draw. */
 void cml_rng_uniform(CMLRNGState* state, float* out, size_t n) {
     static const float SCALE = 1.0f / (float)(1ULL << 24);
     size_t i                 = 0;
@@ -68,6 +73,7 @@ void cml_rng_uniform(CMLRNGState* state, float* out, size_t n) {
     }
 }
 
+/** Fill `out` with `n` standard-normal floats via the Box-Muller transform. */
 void cml_rng_normal(CMLRNGState* state, float* out, size_t n) {
     static const float TWO_PI = 6.283185307179586f;
     static const float SCALE  = 1.0f / (float)(1ULL << 24);
@@ -96,11 +102,13 @@ void cml_rng_normal(CMLRNGState* state, float* out, size_t n) {
 static __thread CMLRNGState g_rng     = {{0x12345678DEADBEEFULL, 0xFEDCBA9876543210ULL}, 0};
 static __thread int g_rng_initialized = 0;
 
+/** Seed the thread-local global RNG. */
 void cml_rng_set_global_seed(uint64_t seed) {
     cml_rng_init(&g_rng, seed);
     g_rng_initialized = 1;
 }
 
+/** Return the thread-local global RNG, lazily seeding it from its address if needed. */
 CMLRNGState* cml_rng_get_global(void) {
     if (!g_rng_initialized) {
         uint64_t seed = (uint64_t)(uintptr_t)&g_rng ^ 0xDEADBEEFCAFEBABEULL;
@@ -110,6 +118,7 @@ CMLRNGState* cml_rng_get_global(void) {
     return &g_rng;
 }
 
+/** Derive an independent child stream from `state`, advancing the parent's counter. */
 CMLRNGState cml_rng_fork(CMLRNGState* state) {
     CMLRNGState forked;
     forked.key[0]  = state->key[0] ^ (state->counter * 0x9E3779B97F4A7C15ULL);

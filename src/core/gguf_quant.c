@@ -162,6 +162,7 @@ static void unpack_k_scales(const uint8_t* sc_raw, uint8_t* sc, uint8_t* mn) {
     }
 }
 
+/** Dequantize Q4_K super-blocks to float32 (see the format note above unpack_k_scales). */
 static void dequantize_q4_k(const void* src, float* dst, size_t num_blocks) {
     const BlockQ4_K* blocks = (const BlockQ4_K*)src;
 
@@ -306,6 +307,7 @@ static void dequantize_q6_k(const void* src, float* dst, size_t num_blocks) {
     }
 }
 
+/** True if the tensor type is one of the supported quantized block formats. */
 bool gguf_type_is_quantized(GGUFTensorType type) {
     switch ((int)type) {
     case GGUF_TENSOR_TYPE_Q4_0:
@@ -320,6 +322,7 @@ bool gguf_type_is_quantized(GGUFTensorType type) {
     }
 }
 
+/** Number of elements per quantization block (32 for Q*_0/1, 256 for K-quants); 0 if unknown. */
 int gguf_quant_block_size(GGUFTensorType type) {
     switch ((int)type) {
     case GGUF_TENSOR_TYPE_Q4_0:
@@ -339,6 +342,7 @@ int gguf_quant_block_size(GGUFTensorType type) {
     }
 }
 
+/** On-disk byte size of one quantization block for the given type; 0 if unknown. */
 size_t gguf_quant_type_size(GGUFTensorType type) {
     switch ((int)type) {
     case GGUF_TENSOR_TYPE_Q4_0:
@@ -358,6 +362,8 @@ size_t gguf_quant_type_size(GGUFTensorType type) {
     }
 }
 
+/** Dispatch to the per-type dequantizer; numel must be a multiple of the block size.
+ *  Returns -1 for unsupported types or a mis-sized element count. */
 int gguf_dequantize(GGUFTensorType type, const void* src, float* dst, size_t numel) {
     if (!src || !dst || numel == 0) {
         return -1;
@@ -400,6 +406,8 @@ int gguf_dequantize(GGUFTensorType type, const void* src, float* dst, size_t num
     return 0;
 }
 
+/** y[m,n] = x[m,k] * W^T where W is Q8_0-quantized (dequantized on the fly per block),
+ *  avoiding a full dense expansion of the weights; -1 on bad dims. */
 int gguf_q8_0_matmul(const float* x, const void* w_q8, float* y, int m, int k, int n) {
     if (!x || !w_q8 || !y || m <= 0 || k <= 0 || n <= 0 || (k % QK8_0) != 0)
         return -1;
@@ -425,6 +433,8 @@ int gguf_q8_0_matmul(const float* x, const void* w_q8, float* y, int m, int k, i
     return 0;
 }
 
+/** y[m,n] = x[m,k] * W^T where W is Q4_0-quantized (nibbles dequantized on the fly
+ *  as (q-8)*d); -1 on bad dims. */
 int gguf_q4_0_matmul(const float* x, const void* w_q4, float* y, int m, int k, int n) {
     if (!x || !w_q4 || !y || m <= 0 || k <= 0 || n <= 0 || (k % QK4_0) != 0)
         return -1;

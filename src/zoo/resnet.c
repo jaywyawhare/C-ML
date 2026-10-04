@@ -14,6 +14,7 @@ typedef struct {
     Sequential* downsample;
 } ResidualBlock;
 
+/** Forward for a residual block: relu(conv(x) + shortcut), with optional downsample. */
 static Tensor* residual_block_forward(Module* module, Tensor* input) {
     ResidualBlock* block = (ResidualBlock*)module;
     if (!block || !input)
@@ -34,6 +35,7 @@ static Tensor* residual_block_forward(Module* module, Tensor* input) {
     return f_relu(result);
 }
 
+/** Free a residual block's conv stack and optional downsample shortcut. */
 static void residual_block_free(Module* module) {
     ResidualBlock* block = (ResidualBlock*)module;
     if (!block)
@@ -45,7 +47,7 @@ static void residual_block_free(Module* module) {
     cml_free(block);
 }
 
-/* Allocate a residual block named `name` with an empty conv stack, plus the
+/** Allocate a residual block named @p name with an empty conv stack, plus the
  * 1x1 projection shortcut when the shape changes. */
 static ResidualBlock* residual_block_new(const char* name, int in_channels, int out_channels,
                                          int stride, DType dtype, DeviceType device) {
@@ -76,6 +78,7 @@ static ResidualBlock* residual_block_new(const char* name, int in_channels, int 
     return block;
 }
 
+/** Build a bottleneck residual block: 1x1 reduce -> 3x3 -> 1x1 expand with BN/ReLU. */
 static Module* create_bottleneck(int in_channels, int mid_channels, int out_channels, int stride,
                                  DType dtype, DeviceType device) {
     ResidualBlock* block =
@@ -103,6 +106,7 @@ static Module* create_bottleneck(int in_channels, int mid_channels, int out_chan
     return (Module*)block;
 }
 
+/** Build a basic residual block: two 3x3 convs with BN, ReLU between them. */
 static Module* create_basic_block(int in_channels, int out_channels, int stride, DType dtype,
                                   DeviceType device) {
     ResidualBlock* block =
@@ -123,6 +127,7 @@ static Module* create_basic_block(int in_channels, int out_channels, int stride,
     return (Module*)block;
 }
 
+/** Stack @p num_blocks bottleneck blocks; only the first applies the stride/projection. */
 static Module* build_bottleneck_stage(int num_blocks, int in_channels, int mid_channels,
                                       int out_channels, int stride, DType dtype,
                                       DeviceType device) {
@@ -139,6 +144,7 @@ static Module* build_bottleneck_stage(int num_blocks, int in_channels, int mid_c
     return (Module*)stage;
 }
 
+/** Stack @p num_blocks basic blocks; only the first applies the stride/projection. */
 static Module* build_basic_stage(int num_blocks, int in_channels, int out_channels, int stride,
                                  DType dtype, DeviceType device) {
     Sequential* stage = nn_sequential();
@@ -152,6 +158,7 @@ static Module* build_basic_stage(int num_blocks, int in_channels, int out_channe
     return (Module*)stage;
 }
 
+/** Build ResNet-50: 7x7 stem then bottleneck stages (3,4,6,3), global pool and linear head. */
 Module* cml_zoo_resnet50_create(int num_classes, DType dtype, DeviceType device) {
     if (num_classes <= 0)
         num_classes = 1000;
@@ -178,6 +185,7 @@ Module* cml_zoo_resnet50_create(int num_classes, DType dtype, DeviceType device)
     return (Module*)model;
 }
 
+/** Build ResNet-34: 7x7 stem then basic-block stages (3,4,6,3), global pool and linear head. */
 Module* cml_zoo_resnet34_create(int num_classes, DType dtype, DeviceType device) {
     if (num_classes <= 0)
         num_classes = 1000;
@@ -204,6 +212,7 @@ Module* cml_zoo_resnet34_create(int num_classes, DType dtype, DeviceType device)
     return (Module*)model;
 }
 
+/** Build ResNet-18: 7x7 stem then basic-block stages (2,2,2,2), global pool and linear head. */
 Module* cml_zoo_resnet18_create(int num_classes, DType dtype, DeviceType device) {
     if (num_classes <= 0)
         num_classes = 1000;

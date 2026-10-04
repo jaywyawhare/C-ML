@@ -11,6 +11,7 @@
 
 /* --- DDIM scheduler ------------------------------------------------------ */
 
+/** Create a DDIM scheduler; precomputes alphas_cumprod from the SD v1 scaled-linear betas. */
 CMLSDScheduler* cml_sd_scheduler_create(int num_timesteps, float beta_start, float beta_end) {
     if (num_timesteps <= 0)
         return NULL;
@@ -38,6 +39,7 @@ CMLSDScheduler* cml_sd_scheduler_create(int num_timesteps, float beta_start, flo
     return s;
 }
 
+/** Free a DDIM scheduler and its alphas_cumprod / timesteps buffers. */
 void cml_sd_scheduler_free(CMLSDScheduler* sched) {
     if (!sched)
         return;
@@ -46,6 +48,7 @@ void cml_sd_scheduler_free(CMLSDScheduler* sched) {
     cml_free(sched);
 }
 
+/** Select @p num_inference_steps evenly-strided descending timesteps; returns 0 on success. */
 int cml_sd_scheduler_set_steps(CMLSDScheduler* sched, int num_inference_steps) {
     if (!sched || num_inference_steps <= 0 || num_inference_steps > sched->num_train_timesteps)
         return -1;
@@ -60,6 +63,7 @@ int cml_sd_scheduler_set_steps(CMLSDScheduler* sched, int num_inference_steps) {
     return 0;
 }
 
+/** Apply one in-place DDIM update of @p latent from predicted noise @p eps at @p step_index. */
 int cml_sd_scheduler_step(CMLSDScheduler* sched, const float* eps, float* latent, size_t numel,
                           int step_index) {
     if (!sched || !eps || !latent || !sched->timesteps || step_index < 0 ||
@@ -82,6 +86,7 @@ int cml_sd_scheduler_step(CMLSDScheduler* sched, const float* eps, float* latent
     return 0;
 }
 
+/** Run the full DDIM sampling loop: iteratively denoise @p initial_latent with @p unet. */
 Tensor* cml_sd_generate(Module* unet, CMLSDScheduler* sched, Tensor* initial_latent,
                         int num_inference_steps) {
     if (!unet || !sched || !initial_latent)
@@ -121,6 +126,7 @@ Tensor* cml_sd_generate(Module* unet, CMLSDScheduler* sched, Tensor* initial_lat
     return latent;
 }
 
+/** Default Stable Diffusion v1 config bundling the VAE, UNet, CLIP and DDIM beta schedule. */
 StableDiffusionConfig stable_diffusion_v1_config(void) {
     StableDiffusionConfig cfg = {.vae           = {.latent_channels           = 4,
                                                    .image_channels            = 3,
@@ -157,6 +163,7 @@ StableDiffusionConfig stable_diffusion_v1_config(void) {
     return cfg;
 }
 
+/** Append a ResNet block (GroupNorm-SiLU-Conv twice, with 1x1 shortcut when channels change). */
 static void add_resblock(Sequential* seq, int in_ch, int out_ch, int groups, DType dtype,
                          DeviceType device) {
     sequential_add(seq, (Module*)nn_groupnorm(groups, in_ch, 1e-6f, true, dtype, device));
@@ -170,12 +177,14 @@ static void add_resblock(Sequential* seq, int in_ch, int out_ch, int groups, DTy
         sequential_add(seq, (Module*)nn_conv2d(in_ch, out_ch, 1, 1, 0, 1, true, dtype, device));
 }
 
+/** Append a self-attention block (GroupNorm then multi-head attention over spatial positions). */
 static void add_spatial_attention(Sequential* seq, int channels, int num_heads, DType dtype,
                                   DeviceType device) {
     sequential_add(seq, (Module*)nn_groupnorm(32, channels, 1e-6f, true, dtype, device));
     sequential_add(seq, (Module*)nn_multihead_attention(channels, num_heads, 0.0f, dtype, device));
 }
 
+/** Append a transformer block: self-attention, text cross-attention and a GELU feed-forward. */
 static void add_cross_attention(Sequential* seq, int channels, int context_dim, int num_heads,
                                 DType dtype, DeviceType device) {
     sequential_add(seq, (Module*)nn_layernorm(channels, 1e-5f, true, dtype, device));
@@ -192,6 +201,7 @@ static void add_cross_attention(Sequential* seq, int channels, int context_dim, 
     sequential_add(seq, (Module*)nn_linear(channels * 4, channels, dtype, device, true));
 }
 
+/** Build the SD VAE autoencoder: downsampling encoder to latent moments, upsampling decoder. */
 Module* cml_zoo_stable_diffusion_vae(const VAEConfig* config) {
     VAEConfig cfg  = config ? *config : stable_diffusion_v1_config().vae;
     DType dt       = cfg.dtype;
@@ -256,6 +266,7 @@ Module* cml_zoo_stable_diffusion_vae(const VAEConfig* config) {
     return (Module*)model;
 }
 
+/** Build the SD denoising UNet: time embedding, down/mid/up blocks with text cross-attention. */
 Module* cml_zoo_stable_diffusion_unet(const UNetConfig* config) {
     UNetConfig cfg = config ? *config : stable_diffusion_v1_config().unet;
     DType dt       = cfg.dtype;
@@ -337,6 +348,7 @@ Module* cml_zoo_stable_diffusion_unet(const UNetConfig* config) {
     return (Module*)model;
 }
 
+/** Build the SD CLIP text encoder: token+position embeddings, transformer stack, optional proj. */
 Module* cml_zoo_stable_diffusion_clip(const CLIPConfig* config) {
     CLIPConfig cfg = config ? *config : stable_diffusion_v1_config().clip;
     DType dt       = cfg.dtype;
@@ -368,6 +380,7 @@ Module* cml_zoo_stable_diffusion_clip(const CLIPConfig* config) {
     return (Module*)model;
 }
 
+/** Build the full Stable Diffusion v1 pipeline bundling the CLIP, UNet and VAE submodules. */
 Module* cml_zoo_stable_diffusion(const StableDiffusionConfig* config) {
     StableDiffusionConfig cfg = config ? *config : stable_diffusion_v1_config();
 

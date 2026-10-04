@@ -31,14 +31,18 @@ static _Atomic bool g_torch_eager        = false;
 static _Atomic int g_inference_depth     = 0;
 static _Atomic bool g_saved_grad_enabled = true;
 
+/** Enable or disable process-global zero-IR eager execution of hot ops. */
 void torch_set_eager_mode(bool enabled) {
     atomic_store_explicit(&g_torch_eager, enabled, memory_order_relaxed);
 }
 
+/** Query whether zero-IR eager execution is currently enabled. */
 bool torch_is_eager_mode(void) {
     return atomic_load_explicit(&g_torch_eager, memory_order_relaxed);
 }
 
+/** torch.inference_mode(): depth-tracked toggle of eager + no_grad, restoring the
+ *  prior grad state when the outermost scope exits. */
 void torch_inference_mode(bool enabled) {
     if (enabled) {
         int prev = atomic_fetch_add_explicit(&g_inference_depth, 1, memory_order_acq_rel);
@@ -67,9 +71,12 @@ void torch_inference_mode(bool enabled) {
     }
 }
 
+/** torch.set_num_threads(): set the GEMM backend thread count (process-global). */
 void torch_set_num_threads(int n) { cml_blas_set_num_threads(n); }
+/** torch.get_num_threads(): current GEMM backend thread count. */
 int torch_get_num_threads(void) { return cml_blas_get_num_threads(); }
 
+/** Materialize a lazy tensor, detaching it from the IR graph; 0 on success, -1 on error. */
 int torch_realize(Tensor* t) {
     if (!t)
         return -1;
@@ -80,11 +87,12 @@ int torch_realize(Tensor* t) {
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
+/** True if a tensor is a float32 CPU tensor eligible for the eager fast path. */
 static inline bool eager_cpu_f32(const Tensor* t) {
     return t && t->dtype == DTYPE_FLOAT32 && (t->device == DEVICE_CPU || t->device == DEVICE_AUTO);
 }
 
-/* Skip eager when an input still needs autograd tracking. */
+/** True unless an input still needs autograd tracking (then eager must be skipped). */
 static inline bool eager_grad_safe(Tensor* const* ins, int n) {
     if (!torch_is_grad_enabled())
         return true;
@@ -94,6 +102,7 @@ static inline bool eager_grad_safe(Tensor* const* ins, int n) {
     return true;
 }
 
+/** True if two tensors have identical rank and dimensions. */
 static inline bool same_shape(const Tensor* a, const Tensor* b) {
     if (a->ndim != b->ndim)
         return false;
@@ -103,10 +112,12 @@ static inline bool same_shape(const Tensor* a, const Tensor* b) {
     return true;
 }
 
+/** Allocate a fresh materialized float32 output tensor shaped like `ref`. */
 static Tensor* eager_alloc_like(const Tensor* ref) {
     return tensor_create(DTYPE_FLOAT32, ref->device, ref->ndim, ref->shape, false);
 }
 
+/** In-place ReLU over a float buffer (auto-vectorizes; no inline asm). */
 static inline void relu_inplace(float* x, size_t n) {
     /* Auto-vectorizes to vmaxps under -O3 -march=native (no inline asm). */
     for (size_t i = 0; i < n; i++) {
@@ -119,6 +130,8 @@ static inline void relu_inplace(float* x, size_t n) {
 /* Eager binary / unary                                                */
 /* ------------------------------------------------------------------ */
 
+/** Attempt eager compute of a binary op (matmul via BLAS, elementwise via SIMD);
+ *  returns NULL to signal the caller should fall back to the lazy IR path. */
 Tensor* torch_eager_binary(int uop, Tensor* a, Tensor* b) {
     if (!g_torch_eager || !a || !b)
         return NULL;
@@ -199,6 +212,7 @@ Tensor* torch_eager_binary(int uop, Tensor* a, Tensor* b) {
     return out;
 }
 
+/** Attempt eager compute of a unary op (relu/sigmoid/tanh); NULL to use the lazy path. */
 Tensor* torch_eager_unary(int uop, Tensor* a) {
     if (!g_torch_eager || !a)
         return NULL;
@@ -239,6 +253,8 @@ Tensor* torch_eager_unary(int uop, Tensor* a) {
 /* Fused linear (matmul + bias [+ relu]) — single GEMM + one epilogue  */
 /* ------------------------------------------------------------------ */
 
+/** Eager fused linear: one BLAS GEMM (input @ weight^T) plus a fused bias/relu
+ *  epilogue; NULL if inputs are ineligible so the caller uses the lazy path. */
 static Tensor* eager_linear(Tensor* input, Tensor* weight, Tensor* bias, bool fuse_relu) {
     if (!input || !weight)
         return NULL;
@@ -310,7 +326,7 @@ static Tensor* eager_linear(Tensor* input, Tensor* weight, Tensor* bias, bool fu
     return out;
 }
 
-/* Lazy fallback: build matmul(+transpose) + add + relu in the IR graph. */
+/** Lazy linear fallback: build matmul(+transpose) + add + relu in the IR graph. */
 static Tensor* lazy_linear(Tensor* input, Tensor* weight, Tensor* bias, bool fuse_relu) {
     if (!input || !weight)
         return NULL;
@@ -325,11 +341,13 @@ static Tensor* lazy_linear(Tensor* input, Tensor* weight, Tensor* bias, bool fus
     return out;
 }
 
+/** nn.functional.linear(): out = input @ weight^T (+ bias), eager with lazy fallback. */
 Tensor* torch_linear(Tensor* input, Tensor* weight, Tensor* bias) {
     Tensor* e = eager_linear(input, weight, bias, false);
     return e ? e : lazy_linear(input, weight, bias, false);
 }
 
+/** Fused linear + ReLU: out = relu(input @ weight^T + bias), eager with lazy fallback. */
 Tensor* torch_linear_relu(Tensor* input, Tensor* weight, Tensor* bias) {
     Tensor* e = eager_linear(input, weight, bias, true);
     return e ? e : lazy_linear(input, weight, bias, true);

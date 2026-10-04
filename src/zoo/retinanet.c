@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
+/** Default RetinaNet config: 80 classes, 9 anchors per location, 256 FPN channels. */
 RetinaNetConfig cml_zoo_retinanet_default_config(void) {
     RetinaNetConfig cfg = {.num_classes = 80, .num_anchors = 9, .fpn_channels = 256};
     return cfg;
@@ -23,6 +24,7 @@ typedef struct {
     Sequential* layer5;
 } ResNet50Backbone;
 
+/** Run the ResNet-50 backbone stem and layers 2-5 in sequence, returning the C5 feature map. */
 static Tensor* backbone_forward(Module* module, Tensor* input) {
     ResNet50Backbone* bb = (ResNet50Backbone*)module;
     if (!bb || !input)
@@ -43,6 +45,7 @@ static Tensor* backbone_forward(Module* module, Tensor* input) {
     return module_forward((Module*)bb->layer5, x);
 }
 
+/** Free the ResNet-50 backbone stem and all residual stage sequentials. */
 static void backbone_free(Module* module) {
     ResNet50Backbone* bb = (ResNet50Backbone*)module;
     if (!bb)
@@ -72,7 +75,7 @@ typedef struct {
     Module* extra_p7;
 } FPN;
 
-/* Standalone module interface takes a single tensor, so it maps C5 -> P5.
+/** Standalone module interface takes a single tensor, so it maps C5 -> P5.
  * The full top-down pyramid runs in retinanet_forward, which can see the
  * intermediate backbone stages. */
 static Tensor* fpn_forward(Module* module, Tensor* input) {
@@ -85,6 +88,7 @@ static Tensor* fpn_forward(Module* module, Tensor* input) {
     return module_forward(fpn->smooth5, p5);
 }
 
+/** Free all FPN lateral, smoothing and extra-level (P6/P7) convolutions. */
 static void fpn_free(Module* module) {
     FPN* fpn = (FPN*)module;
     if (!fpn)
@@ -108,6 +112,7 @@ static void fpn_free(Module* module) {
     cml_free(fpn);
 }
 
+/** Build a feature pyramid network: 1x1 laterals for C3-C5, 3x3 smoothers and extra P6/P7 convs. */
 static Module* create_fpn(int fpn_ch, DType dtype, DeviceType device) {
     FPN* fpn = cml_malloc(sizeof(FPN));
     if (!fpn)
@@ -132,6 +137,7 @@ static Module* create_fpn(int fpn_ch, DType dtype, DeviceType device) {
     return (Module*)fpn;
 }
 
+/** Build a shared detection subnet: @p num_convs 3x3 conv+ReLU layers then a final conv. */
 static Module* create_subnet(int fpn_ch, int num_convs, int out_ch, DType dtype,
                              DeviceType device) {
     Sequential* net = nn_sequential();
@@ -157,6 +163,7 @@ typedef struct {
     int num_anchors;
 } RetinaNet;
 
+/** Forward: backbone C2-C5, top-down FPN (P3-P5), then the shared cls subnet over all levels. */
 static Tensor* retinanet_forward(Module* module, Tensor* input) {
     RetinaNet* net = (RetinaNet*)module;
     if (!net || !input)
@@ -219,6 +226,7 @@ static Tensor* retinanet_forward(Module* module, Tensor* input) {
     return uop_cat(flat, 3, 2);
 }
 
+/** Free the RetinaNet backbone, FPN and classification/box subnets. */
 static void retinanet_free(Module* module) {
     RetinaNet* net = (RetinaNet*)module;
     if (!net)
@@ -234,6 +242,7 @@ static void retinanet_free(Module* module) {
     cml_free(net);
 }
 
+/** Build RetinaNet from @p cfg: ResNet-50 backbone, FPN neck, and shared cls/box subnets. */
 Module* cml_zoo_retinanet_create(const RetinaNetConfig* cfg, DType dtype, DeviceType device) {
     RetinaNetConfig c = cfg ? *cfg : cml_zoo_retinanet_default_config();
     if (c.num_classes <= 0)

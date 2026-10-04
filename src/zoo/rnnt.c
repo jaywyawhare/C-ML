@@ -8,6 +8,7 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
+/** Default RNN-T config: 80-dim features, 5-layer 1024 encoder, 2-layer 320 pred, 29 vocab. */
 CMLRNNTConfig cml_zoo_rnnt_config_default(void) {
     return (CMLRNNTConfig){
         .input_features   = 80,
@@ -22,7 +23,7 @@ CMLRNNTConfig cml_zoo_rnnt_config_default(void) {
     };
 }
 
-/* Single-tensor forward: encode the audio, run the prediction network on a
+/** Single-tensor forward: encode the audio, run the prediction network on a
  * blank start token, and evaluate the joint at every encoder frame — returns
  * [frames, vocab] first-step logits. Streaming decode drives
  * cml_rnnt_encode/predict/joint directly instead. */
@@ -83,6 +84,7 @@ static Tensor* rnnt_forward(Module* module, Tensor* input) {
     return cml_rnnt_joint(module, enc2d, pred_bcast);
 }
 
+/** Free the RNN-T subsample conv, encoder/prediction LSTM+norm stacks and joint network. */
 static void rnnt_free(Module* module) {
     CMLRNNT* net = (CMLRNNT*)module;
     if (!net)
@@ -121,6 +123,7 @@ static void rnnt_free(Module* module) {
     cml_free(net);
 }
 
+/** Encoder: subsample conv then the LSTM+LayerNorm stack over audio features. */
 Tensor* cml_rnnt_encode(Module* module, Tensor* audio_features) {
     CMLRNNT* net = (CMLRNNT*)module;
     if (!net || !audio_features)
@@ -146,6 +149,7 @@ Tensor* cml_rnnt_encode(Module* module, Tensor* audio_features) {
     return x;
 }
 
+/** Prediction network: embed previous tokens then the LSTM+LayerNorm stack. */
 Tensor* cml_rnnt_predict(Module* module, Tensor* prev_tokens) {
     CMLRNNT* net = (CMLRNNT*)module;
     if (!net || !prev_tokens)
@@ -171,6 +175,7 @@ Tensor* cml_rnnt_predict(Module* module, Tensor* prev_tokens) {
     return x;
 }
 
+/** Joint network: concat encoder and prediction outputs, then Linear-ReLU-Linear to vocab. */
 Tensor* cml_rnnt_joint(Module* module, Tensor* enc_out, Tensor* pred_out) {
     CMLRNNT* net = (CMLRNNT*)module;
     if (!net || !enc_out || !pred_out)
@@ -190,6 +195,7 @@ Tensor* cml_rnnt_joint(Module* module, Tensor* enc_out, Tensor* pred_out) {
     return module_forward(net->joint_linear2, x);
 }
 
+/** Build an RNN-Transducer from @p config: subsample conv, LSTM encoder/predictor, joint net. */
 Module* cml_zoo_rnnt_create(const CMLRNNTConfig* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;

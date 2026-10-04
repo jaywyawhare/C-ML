@@ -12,6 +12,8 @@
 #include <stdint.h>
 #include "alloc/cml_allocator.h"
 
+/** Build a name->parameter list for a module, using layer-aware naming for Sequential
+ *  ("i.Type.j") and Linear ("weight"/"bias") and "param_i" otherwise; caller frees. */
 int module_named_parameters(Module* module, NamedParameter** named_params, int* num_params) {
     if (!module || !named_params || !num_params) {
         return -1;
@@ -79,6 +81,7 @@ int module_named_parameters(Module* module, NamedParameter** named_params, int* 
     return 0;
 }
 
+/** Free a named-parameter list and its copied name strings (parameters are borrowed). */
 void module_named_parameters_free(NamedParameter* named_params, int num_params) {
     if (!named_params) {
         return;
@@ -150,6 +153,7 @@ int module_named_buffers(Module* module, NamedBuffer** out, int* count) {
     return 0;
 }
 
+/** Free a named-buffer list and its copied name strings (tensors are borrowed). */
 void module_named_buffers_free(NamedBuffer* nb, int count) {
     if (!nb)
         return;
@@ -211,6 +215,8 @@ static bool copy_into_tensor(Tensor* dst, Tensor* src, const char* what) {
     return true;
 }
 
+/** Write a module to a stream in the "CMLM" v2 format: magic, version, the valid
+ *  parameter records, then the buffer section (running stats etc.). */
 int module_save_stream(Module* module, FILE* file) {
     if (!module || !file) {
         LOG_ERROR("Invalid arguments to module_save_stream");
@@ -305,6 +311,7 @@ int module_save_stream(Module* module, FILE* file) {
     return 0;
 }
 
+/** Save a module to a file via module_save_stream. */
 int module_save(Module* module, const char* filepath) {
     if (!module || !filepath) {
         LOG_ERROR("Invalid arguments to module_save");
@@ -326,6 +333,8 @@ int module_save(Module* module, const char* filepath) {
     return result;
 }
 
+/** Load a module from a "CMLM" stream, matching records to parameters by name (then
+ *  index) and copying only on shape/dtype agreement; v1 files (no buffers) are accepted. */
 int module_load_stream(Module* module, FILE* file) {
     if (!module || !file) {
         LOG_ERROR("Invalid arguments to module_load_stream");
@@ -533,6 +542,7 @@ int module_load_stream(Module* module, FILE* file) {
     return rc;
 }
 
+/** Load a module from a file via module_load_stream. */
 int module_load(Module* module, const char* filepath) {
     if (!module || !filepath) {
         LOG_ERROR("Invalid arguments to module_load");
@@ -567,6 +577,8 @@ int module_load(Module* module, const char* filepath) {
 #define TENSOR_MAGIC "CMLT"
 #define TENSOR_VERSION 1
 
+/** Write a tensor in the "CMLT" format (header + raw data), making it contiguous and
+ *  staging device memory through a CPU buffer first. */
 int tensor_write_stream(Tensor* tensor, FILE* file) {
     if (!tensor || !file) {
         LOG_ERROR("Invalid arguments to tensor_write_stream");
@@ -657,6 +669,7 @@ int tensor_write_stream(Tensor* tensor, FILE* file) {
     return 0;
 }
 
+/** Save a tensor to a file via tensor_write_stream. */
 int tensor_write_file(Tensor* tensor, const char* filepath) {
     if (!tensor || !filepath) {
         LOG_ERROR("Invalid arguments to tensor_write_file");
@@ -678,6 +691,8 @@ int tensor_write_file(Tensor* tensor, const char* filepath) {
     return result;
 }
 
+/** Read a tensor from a "CMLT" stream, allocating it and copying data to its device;
+ *  NULL on bad magic/version or I/O failure. */
 Tensor* tensor_read_stream(FILE* file) {
     if (!file) {
         LOG_ERROR("Invalid arguments to tensor_read_stream");
@@ -782,6 +797,7 @@ Tensor* tensor_read_stream(FILE* file) {
     return tensor;
 }
 
+/** Load a tensor from a file via tensor_read_stream. */
 Tensor* tensor_read_file(const char* filepath) {
     if (!filepath) {
         LOG_ERROR("Invalid arguments to tensor_read_file");
@@ -855,6 +871,9 @@ typedef enum {
     OPTIMIZER_STATE_ADAGRAD = 4
 } OptimizerStateType;
 
+/** Write an optimizer to a "CMLO" stream: name, per-group hyperparameters and step
+ *  count, and each parameter's per-optimizer state (SGD/Adam/RMSprop/Adagrad). A state
+ *  marker is written only when its full payload follows, else NONE, so reads stay in sync. */
 int optimizer_save_stream(Optimizer* optimizer, FILE* file) {
     if (!optimizer || !file) {
         LOG_ERROR("Invalid arguments to optimizer_save_stream");
@@ -977,6 +996,7 @@ int optimizer_save_stream(Optimizer* optimizer, FILE* file) {
     return 0;
 }
 
+/** Save an optimizer to a file via optimizer_save_stream. */
 int optimizer_save(Optimizer* optimizer, const char* filepath) {
     if (!optimizer || !filepath) {
         LOG_ERROR("Invalid arguments to optimizer_save");
@@ -998,6 +1018,8 @@ int optimizer_save(Optimizer* optimizer, const char* filepath) {
     return result;
 }
 
+/** Restore optimizer hyperparameters, step counts, and per-parameter state from a
+ *  "CMLO" stream, lazily allocating the state arrays and warning on name/count mismatches. */
 int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
     if (!optimizer || !file) {
         LOG_ERROR("Invalid arguments to optimizer_load_stream");
@@ -1265,6 +1287,7 @@ int optimizer_load_stream(Optimizer* optimizer, FILE* file) {
     return 0;
 }
 
+/** Load an optimizer from a file via optimizer_load_stream. */
 int optimizer_load(Optimizer* optimizer, const char* filepath) {
     if (!optimizer || !filepath) {
         LOG_ERROR("Invalid arguments to optimizer_load");

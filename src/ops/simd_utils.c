@@ -40,18 +40,21 @@ static float sum_pairwise(const float* data, size_t count, size_t stride) {
            sum_pairwise(data + half * stride, count - half, stride);
 }
 
+/** Pairwise sum of a contiguous float buffer; returns 0 for NULL/empty input. */
 float simd_sum_float(const float* data, size_t count) {
     if (!data || count == 0)
         return 0.0f;
     return sum_pairwise(data, count, 1);
 }
 
+/** Pairwise sum over every `stride`-th element; returns 0 for NULL/empty input. */
 float simd_sum_float_strided(const float* data, size_t count, size_t stride) {
     if (!data || count == 0)
         return 0.0f;
     return sum_pairwise(data, count, stride);
 }
 
+/** Maximum element of a contiguous float buffer; returns 0 for NULL/empty input. */
 float simd_max_float(const float* data, size_t count) {
     if (!data || count == 0)
         return 0.0f;
@@ -62,6 +65,7 @@ float simd_max_float(const float* data, size_t count) {
     return max_val;
 }
 
+/** Minimum element of a contiguous float buffer; returns 0 for NULL/empty input. */
 float simd_min_float(const float* data, size_t count) {
     if (!data || count == 0)
         return 0.0f;

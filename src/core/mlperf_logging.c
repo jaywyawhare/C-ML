@@ -6,12 +6,14 @@
 #include <time.h>
 #include <string.h>
 
+/** Monotonic clock reading in milliseconds, used for MLLOG timestamps. */
 static double get_time_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
 }
 
+/** Emit a timestamped MLPerf :::MLLOG line with a string value (or null). */
 void mlperf_log_event(const char* key, const char* value) {
     if (!key)
         return;
@@ -23,6 +25,7 @@ void mlperf_log_event(const char* key, const char* value) {
     fflush(stdout);
 }
 
+/** Emit a timestamped MLPerf :::MLLOG line with a numeric value. */
 void mlperf_log_metric(const char* key, double value) {
     if (!key)
         return;
@@ -31,6 +34,7 @@ void mlperf_log_metric(const char* key, double value) {
     fflush(stdout);
 }
 
+/** Emit the MLPerf run_start marker for a benchmark. */
 void mlperf_log_start(const char* benchmark) {
     if (!benchmark)
         return;
@@ -40,6 +44,7 @@ void mlperf_log_start(const char* benchmark) {
     fflush(stdout);
 }
 
+/** Emit the MLPerf run_stop marker; status defaults to "success" when NULL. */
 void mlperf_log_end(const char* benchmark, const char* status) {
     if (!benchmark)
         return;

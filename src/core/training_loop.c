@@ -18,6 +18,7 @@
 #include <float.h>
 #include "alloc/cml_allocator.h"
 
+/** Create a step scheduler that multiplies the LR by `gamma` every `step_size` epochs. */
 LRScheduler* lr_scheduler_step(Optimizer* optimizer, int step_size, float gamma) {
     if (!optimizer) {
         return NULL;
@@ -37,6 +38,8 @@ LRScheduler* lr_scheduler_step(Optimizer* optimizer, int step_size, float gamma)
     return scheduler;
 }
 
+/** Create a scheduler that scales the LR by `factor` after `patience` epochs without
+ *  metric improvement, down to `min_lr`. */
 LRScheduler* lr_scheduler_reduce_on_plateau(Optimizer* optimizer, float factor, int patience,
                                             float min_lr) {
     if (!optimizer) {
@@ -58,6 +61,7 @@ LRScheduler* lr_scheduler_reduce_on_plateau(Optimizer* optimizer, float factor, 
     return scheduler;
 }
 
+/** Create a scheduler that multiplies the LR by `gamma` every epoch. */
 LRScheduler* lr_scheduler_exponential(Optimizer* optimizer, float gamma) {
     if (!optimizer) {
         return NULL;
@@ -76,6 +80,8 @@ LRScheduler* lr_scheduler_exponential(Optimizer* optimizer, float gamma) {
     return scheduler;
 }
 
+/** Create a cosine-annealing scheduler decaying from the initial LR to `eta_min`
+ *  over `T_max` epochs. */
 LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min) {
     if (!optimizer || T_max <= 0) {
         return NULL;
@@ -101,6 +107,8 @@ LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min)
     return scheduler;
 }
 
+/** Create a polynomial-decay scheduler from the initial LR to `min_lr` over
+ *  `total_iters`, shaped by `power`. */
 LRScheduler* lr_scheduler_polynomial(Optimizer* optimizer, int total_iters, float power,
                                      float min_lr) {
     if (!optimizer || total_iters <= 0) {
@@ -127,6 +135,8 @@ LRScheduler* lr_scheduler_polynomial(Optimizer* optimizer, int total_iters, floa
     return scheduler;
 }
 
+/** Wrap another scheduler with a linear warmup: the LR ramps from
+ *  initial_lr*warmup_start_factor up to initial_lr over `warmup_steps`, then `inner` takes over. */
 LRScheduler* lr_scheduler_warmup(LRScheduler* inner, int warmup_steps, float warmup_start_factor) {
     if (!inner || warmup_steps <= 0) {
         return NULL;
@@ -155,6 +165,8 @@ LRScheduler* lr_scheduler_warmup(LRScheduler* inner, int warmup_steps, float war
     return scheduler;
 }
 
+/** Advance the scheduler one epoch, applying its policy to every optimizer param group
+ *  (using `metric` for plateau-style schedules); returns the new learning rate. */
 float lr_scheduler_update(LRScheduler* scheduler, float metric) {
     if (!scheduler || !scheduler->optimizer) {
         return 0.0f;
@@ -294,6 +306,7 @@ float lr_scheduler_update(LRScheduler* scheduler, float metric) {
     return scheduler->current_lr;
 }
 
+/** Return the current learning rate of the optimizer's first param group. */
 float lr_scheduler_get_lr(LRScheduler* scheduler) {
     if (!scheduler || !scheduler->optimizer) {
         return 0.0f;
@@ -306,6 +319,7 @@ float lr_scheduler_get_lr(LRScheduler* scheduler) {
     return 0.0f;
 }
 
+/** Free a scheduler, its milestone array, and any wrapped inner scheduler. */
 void lr_scheduler_free(LRScheduler* scheduler) {
     if (!scheduler) {
         return;
@@ -319,12 +333,14 @@ void lr_scheduler_free(LRScheduler* scheduler) {
     cml_free(scheduler);
 }
 
+/** Zero-initialize a callbacks struct (all hooks disabled). */
 void training_callbacks_create(TrainingCallbacks* callbacks) {
     if (!callbacks)
         return;
     *callbacks = (TrainingCallbacks){0};
 }
 
+/** Fill a training config with sensible defaults (10 epochs, verbose, no clipping). */
 void training_config_default(TrainingConfig* config) {
     if (!config)
         return;
@@ -344,11 +360,13 @@ void training_config_default(TrainingConfig* config) {
 static ProgressCallback g_progress_callback = NULL;
 static void* g_progress_user_data           = NULL;
 
+/** Install a global callback invoked with each progress-bar update. */
 void cml_set_progress_callback(ProgressCallback callback, void* user_data) {
     g_progress_callback  = callback;
     g_progress_user_data = user_data;
 }
 
+/** Render a 50-char progress bar with an optional message, and fire the global callback. */
 void cml_print_progress_bar(float percent, const char* message) {
     if (percent < 0.0f)
         percent = 0.0f;
@@ -447,6 +465,11 @@ static void clip_gradients_by_norm(Module* model, float max_norm) {
     cml_free(params);
 }
 
+/**
+ * Train a model over the loader for config->epochs: forward, loss, backward, optional
+ * gradient clipping, optimizer step, with scheduler and callback hooks. Supports a
+ * static-graph fast path that builds the fwd+bwd graph once and reexecutes it per batch.
+ */
 int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
               Tensor* (*loss_fn)(Tensor*, Tensor*), TrainingConfig* config) {
     if (!model || !train_loader || !optimizer || !loss_fn) {
@@ -647,6 +670,11 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
     return 0;
 }
 
+/**
+ * Train with a per-epoch validation pass. Validation runs in eval mode with a graph
+ * reset per batch so no training state leaks, and optional early stopping halts when the
+ * validation loss stops improving by more than min_delta for `patience` epochs.
+ */
 int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoader* val_loader,
                               Optimizer* optimizer, Tensor* (*loss_fn)(Tensor*, Tensor*),
                               TrainingConfig* config) {
