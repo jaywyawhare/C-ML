@@ -64,6 +64,7 @@ static const ThunderOpMapping op_table[] = {
     {"torch.maximum", UOP_MAX},
     {NULL, 0}};
 
+/** Map a Thunder torch.* op name to a UOpType, or (UOpType)-1 if unsupported. */
 static UOpType thunder_lookup_op(const char* name) {
     for (int i = 0; op_table[i].thunder_name; i++) {
         if (strcmp(op_table[i].thunder_name, name) == 0)
@@ -72,6 +73,7 @@ static UOpType thunder_lookup_op(const char* name) {
     return (UOpType)-1;
 }
 
+/** Map a backend name ("cml_cuda", etc.) to a CMLBackendType; CPU fallback default. */
 static CMLBackendType parse_backend(const char* name) {
     if (!name)
         return CML_BACKEND_CPU_FALLBACK;
@@ -86,6 +88,7 @@ static CMLBackendType parse_backend(const char* name) {
     return CML_BACKEND_CPU_FALLBACK;
 }
 
+/** Create a Thunder executor with a dispatch context targeting the named backend. */
 CMLThunderExecutor* cml_thunder_create(const char* backend) {
     CMLThunderExecutor* exec = cml_calloc(1, sizeof(CMLThunderExecutor));
     if (!exec)
@@ -113,6 +116,7 @@ CMLThunderExecutor* cml_thunder_create(const char* backend) {
     return exec;
 }
 
+/** Free a Thunder executor and its dispatch context. */
 void cml_thunder_free(CMLThunderExecutor* exec) {
     if (!exec)
         return;
@@ -121,6 +125,8 @@ void cml_thunder_free(CMLThunderExecutor* exec) {
     cml_free(exec);
 }
 
+/** Execute a sequence of Thunder ops by resolving each to a uop and dispatching
+ *  it, writing results into the provided output tensors. */
 int cml_thunder_execute(CMLThunderExecutor* exec, CMLThunderOp* ops, int num_ops) {
     if (!exec || !exec->initialized || !ops)
         return -1;
@@ -318,6 +324,7 @@ int cml_thunder_execute(CMLThunderExecutor* exec, CMLThunderOp* ops, int num_ops
     return 0;
 }
 
+/** Register C-ML as a Thunder executor backend. */
 int cml_thunder_register(void) {
     LOG_INFO("[thunder] C-ML registered as Thunder executor");
     return 0;

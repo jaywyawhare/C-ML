@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
+/** torch.nn.Flatten forward: collapse dims [start_dim, end_dim] into one via reshape.
+ *  Negative dims count from the end. Returns NULL on bad module/input or dim range. */
 static Tensor* flatten_forward(Module* module, Tensor* input) {
     Flatten* fl = (Flatten*)module;
     if (!fl || !input)
@@ -43,8 +45,10 @@ static Tensor* flatten_forward(Module* module, Tensor* input) {
     return uop_reshape(input, &params);
 }
 
+/** Free the Flatten module (no owned parameters). */
 static void flatten_free(Module* module) { cml_free(module); }
 
+/** Construct a Flatten layer flattening dims [start_dim, end_dim]. NULL on failure. */
 Flatten* nn_flatten(int start_dim, int end_dim) {
     Flatten* fl = cml_malloc(sizeof(Flatten));
     if (!fl)

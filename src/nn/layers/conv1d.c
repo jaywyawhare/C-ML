@@ -8,6 +8,8 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** torch.nn.Conv1d forward: cross-correlate a 3D input [N, C_in, L] with the weight, lowered to
+ *  a 2D conv over a singleton height. Validates rank/channels; returns NULL on mismatch. */
 static Tensor* conv1d_forward(Module* module, Tensor* input) {
     Conv1d* conv = (Conv1d*)module;
 
@@ -90,6 +92,7 @@ static Tensor* conv1d_forward(Module* module, Tensor* input) {
     return uop_reshape(out4, &rp_out);
 }
 
+/** Free the Conv1d module; owned parameters are released by module_free. */
 static void conv1d_free(Module* module) {
     Conv1d* conv = (Conv1d*)module;
     if (!conv)
@@ -98,10 +101,13 @@ static void conv1d_free(Module* module) {
     cml_free(conv);
 }
 
+/** Default weight initializer: Kaiming/He for the conv kernel. */
 static void kaiming_init_1d(Tensor* tensor, int in_channels, int kernel_size) {
     nn_init_kaiming(tensor, in_channels, kernel_size);
 }
 
+/** Construct a Conv1d layer; weight [out_channels, in_channels, kernel_size] is Kaiming-init,
+ *  bias (zeros) added when use_bias. Returns NULL on failure. */
 Conv1d* nn_conv1d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
                   int dilation, bool use_bias, DType dtype, DeviceType device) {
     Conv1d* conv = cml_malloc(sizeof(Conv1d));

@@ -13,6 +13,8 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** torch.nn.Linear forward: output = input @ weight^T + bias as a single fused IR node.
+ *  Returns NULL on NULL args or a missing weight parameter. */
 Tensor* linear_forward(Module* module, Tensor* input) {
     Linear* linear = (Linear*)module;
 
@@ -42,6 +44,7 @@ Tensor* linear_forward(Module* module, Tensor* input) {
     return output;
 }
 
+/** Free the Linear module; owned parameters are released by module_free. */
 static void linear_free_fn(Module* module) {
     Linear* linear = (Linear*)module;
     if (!linear)
@@ -50,10 +53,12 @@ static void linear_free_fn(Module* module) {
     cml_free(linear);
 }
 
+/** Default weight initializer: Xavier/Glorot uniform. */
 static void xavier_init(Tensor* tensor, int in_features, int out_features) {
     nn_init_xavier(tensor, in_features, out_features);
 }
 
+/** Default bias initializer: fill with zeros. */
 static void zeros_init(Tensor* tensor, int out_features) {
     (void)out_features;
     if (!tensor)
@@ -69,6 +74,7 @@ static void zeros_init(Tensor* tensor, int out_features) {
     }
 }
 
+/** Construct a Linear layer with default init (Xavier weight, zero bias). NULL on failure. */
 Linear* nn_linear(int in_features, int out_features, DType dtype, DeviceType device,
                   bool use_bias) {
     return nn_linear_with_init(in_features, out_features, dtype, device, use_bias,
@@ -76,6 +82,8 @@ Linear* nn_linear(int in_features, int out_features, DType dtype, DeviceType dev
                                (void (*)(Tensor*, int))zeros_init);
 }
 
+/** Construct a Linear layer with caller-supplied weight/bias initializers (NULL falls
+ *  back to Xavier/zeros). Weight has shape [out_features, in_features]. NULL on failure. */
 Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, DeviceType device,
                             bool use_bias, void (*weight_init)(Tensor*, int, int),
                             void (*bias_init)(Tensor*, int)) {
@@ -128,14 +136,19 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
     return linear;
 }
 
+/** Number of input features, or 0 if linear is NULL. */
 int linear_get_in_features(Linear* linear) { return linear ? linear->in_features : 0; }
 
+/** Number of output features, or 0 if linear is NULL. */
 int linear_get_out_features(Linear* linear) { return linear ? linear->out_features : 0; }
 
+/** Weight parameter, or NULL if linear is NULL. */
 Parameter* linear_get_weight(Linear* linear) { return linear ? linear->weight : NULL; }
 
+/** Bias parameter, or NULL if unused or linear is NULL. */
 Parameter* linear_get_bias(Linear* linear) { return linear ? linear->bias : NULL; }
 
+/** Replace the weight parameter tensor. Returns -1 on NULL args or set failure. */
 int linear_set_weight(Linear* linear, Tensor* weight) {
     if (!linear || !weight)
         return -1;
@@ -148,6 +161,8 @@ int linear_set_weight(Linear* linear, Tensor* weight) {
     return 0;
 }
 
+/** Replace the bias parameter tensor. Returns -1 on NULL args, if bias is disabled,
+ *  or on set failure. */
 int linear_set_bias(Linear* linear, Tensor* bias) {
     if (!linear || !bias)
         return -1;
@@ -165,10 +180,12 @@ int linear_set_bias(Linear* linear, Tensor* bias) {
     return 0;
 }
 
+/** Toggle whether the layer applies its bias term. No-op if linear is NULL. */
 void linear_set_use_bias(Linear* linear, bool use_bias) {
     if (linear) {
         linear->use_bias = use_bias;
     }
 }
 
+/** Whether the bias term is active, or false if linear is NULL. */
 bool linear_get_use_bias(Linear* linear) { return linear ? linear->use_bias : false; }

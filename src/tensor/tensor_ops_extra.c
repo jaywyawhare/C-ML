@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include "alloc/cml_allocator.h"
 
+/** Element-wise select: `condition` ? `x` : `y` (lazy, via uop_where). */
 Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y) {
     if (!condition || !x || !y)
         return NULL;
@@ -15,36 +16,44 @@ Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y) {
     return uop_where(&params);
 }
 
+/** One-hot encode integer `indices` into a trailing `num_classes` dimension (lazy). */
 Tensor* tensor_one_hot(Tensor* indices, int num_classes) {
     if (!indices)
         return NULL;
     return uop_one_hot(indices, num_classes);
 }
 
+/** Circularly shift elements by `shift` along `axis` (lazy, via uop_roll). */
 Tensor* tensor_roll(Tensor* t, int shift, int axis) {
     if (!t)
         return NULL;
     return uop_roll(t, shift, axis);
 }
 
+/** Return the coordinates of the non-zero elements of `t` (lazy, via uop_nonzero). */
 Tensor* tensor_nonzero(Tensor* t) {
     if (!t)
         return NULL;
     return uop_nonzero(t);
 }
 
+/** Element-wise copysign: magnitude of `a` with the sign of `b` (lazy). */
 Tensor* tensor_copysign(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
     return uop_copysign(a, b);
 }
 
+/** Element-wise log(exp(a) + exp(b)), computed stably (lazy, via uop_logaddexp). */
 Tensor* tensor_logaddexp(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
     return uop_logaddexp(a, b);
 }
 
+/** Draw `num_samples` category indices from 1-D or batched 2-D `probs` (eager,
+ *  INT32 output). Without replacement requires num_samples <= categories.
+ *  Returns NULL on bad args or zero-sum probabilities. */
 Tensor* tensor_multinomial(Tensor* probs, int num_samples, bool replacement) {
     if (!probs)
         return NULL;
@@ -169,6 +178,8 @@ typedef struct {
     int num_labels;
 } EinsumSide;
 
+/** Parse one einsum subscript (alphabetic labels only) into `side`. -1 on a bad
+ *  character or more than 64 labels. */
 static int parse_einsum_side(const char* str, int len, EinsumSide* side) {
     side->num_labels = 0;
     for (int i = 0; i < len; i++) {
@@ -181,6 +192,9 @@ static int parse_einsum_side(const char* str, int len, EinsumSide* side) {
     return 0;
 }
 
+/** Evaluate an explicit einsum `equation` ("ij,jk->ik") over the operands by brute
+ *  force over all label combinations (eager). Returns NULL on a malformed equation,
+ *  operand/label mismatch, or inconsistent label sizes. */
 Tensor* tensor_einsum(const char* equation, Tensor** tensors, int num_tensors) {
     if (!equation || !tensors || num_tensors <= 0)
         return NULL;
@@ -371,6 +385,8 @@ Tensor* tensor_einsum(const char* equation, Tensor** tensors, int num_tensors) {
 
 typedef enum { CML_IP_ADD, CML_IP_SUB, CML_IP_MUL, CML_IP_DIV } CMLInplaceKind;
 
+/** Shared implementation of the in-place binary ops (see the block above): realize
+ *  both operands, then apply `k` to `a`'s f32 buffer. Returns `a`, or NULL on error. */
 static Tensor* cml_inplace_binary(Tensor* a, Tensor* b, CMLInplaceKind k) {
     if (!a || !b)
         return NULL;
@@ -442,9 +458,13 @@ static Tensor* cml_inplace_binary(Tensor* a, Tensor* b, CMLInplaceKind k) {
     return a;
 }
 
+/** In-place `a += b`, mutating `a`'s buffer; returns `a`. Not differentiable. */
 Tensor* tensor_add_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_IP_ADD); }
+/** In-place `a -= b`, mutating `a`'s buffer; returns `a`. Not differentiable. */
 Tensor* tensor_sub_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_IP_SUB); }
+/** In-place `a *= b`, mutating `a`'s buffer; returns `a`. Not differentiable. */
 Tensor* tensor_mul_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_IP_MUL); }
+/** In-place `a /= b`, mutating `a`'s buffer; returns `a`. Not differentiable. */
 Tensor* tensor_div_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_IP_DIV); }
 
 /* ── FFT (1-D discrete Fourier transform) ───────────────────────────────────
@@ -453,6 +473,8 @@ Tensor* tensor_div_(Tensor* a, Tensor* b) { return cml_inplace_binary(a, b, CML_
  * the inverse transform (1/n normalized). */
 #include <math.h>
 
+/** In-place 1-D FFT on split real/imag buffers (see the block above): radix-2 for
+ *  power-of-two `n`, else an O(n^2) DFT. Returns 0 on success, -1 on error. */
 int cml_fft_1d(float* re, float* im, int n, int inverse) {
     if (n <= 0 || !re || !im)
         return -1;

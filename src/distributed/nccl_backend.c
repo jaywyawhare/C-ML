@@ -60,6 +60,8 @@ typedef struct {
 /* Static context pointer (same pattern as MPI backend) */
 static NCCLContext* g_nccl_ctx = NULL;
 
+/** Send exactly @p len bytes on @p fd, looping over short writes and retrying on
+ * EINTR. Used by the TCP unique-id bootstrap. Returns 0 on success, -1 on error. */
 static int send_all_bytes(int fd, const void* buf, size_t len) {
     const char* p    = (const char*)buf;
     size_t remaining = len;
@@ -77,6 +79,9 @@ static int send_all_bytes(int fd, const void* buf, size_t len) {
     return 0;
 }
 
+/** Receive exactly @p len bytes from @p fd, looping over short reads and retrying
+ * on EINTR. Used by the TCP unique-id bootstrap. Returns 0 on success, -1 on
+ * error. */
 static int recv_all_bytes(int fd, void* buf, size_t len) {
     char* p          = (char*)buf;
     size_t remaining = len;
@@ -94,6 +99,9 @@ static int recv_all_bytes(int fd, void* buf, size_t len) {
     return 0;
 }
 
+/** Distribute NCCL's 128-byte unique ID to all ranks over a TCP side-channel:
+ * rank 0 generates it and serves it on MASTER_ADDR:NCCL_PORT, other ranks
+ * connect and fetch it. World size 1 just generates it locally. */
 static int nccl_exchange_unique_id(NCCLContext* nccl, int world_size, int rank, void* unique_id) {
     if (!nccl || !unique_id || world_size <= 0 || rank < 0 || rank >= world_size) {
         return -1;
@@ -217,6 +225,8 @@ static void nccl_stream_sync(NCCLContext* nccl) {
         nccl->cudaStreamSynchronize(nccl->stream);
 }
 
+/** Map a DistReduceOp to the ncclRedOp_t enum value; AVG maps to ncclSum and is
+ * scaled by the caller afterward. */
 static int nccl_map_reduce_op(DistReduceOp op) {
     switch (op) {
     case DIST_REDUCE_SUM:
@@ -232,6 +242,8 @@ static int nccl_map_reduce_op(DistReduceOp op) {
     return 0;
 }
 
+/** In-place all-reduce of @p tensor via ncclAllReduce on the context's stream.
+ * For AVG, syncs the stream before scaling so stale data isn't divided. */
 static int nccl_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
     if (!nccl)
@@ -257,6 +269,7 @@ static int nccl_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     return result;
 }
 
+/** Broadcast @p tensor in place from @p src_rank via ncclBroadcast. */
 static int nccl_broadcast(Tensor* tensor, int src_rank, void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
     if (!nccl)
@@ -268,6 +281,8 @@ static int nccl_broadcast(Tensor* tensor, int src_rank, void* ctx) {
                                nccl->comm, nccl->stream);
 }
 
+/** All-gather each rank's @p input via ncclAllGather into a flat scratch buffer,
+ * then copy the per-rank blocks into the @p output tensors. */
 static int nccl_allgather(Tensor** output, Tensor* input, void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
     if (!nccl)
@@ -307,6 +322,8 @@ static int nccl_allgather(Tensor** output, Tensor* input, void* ctx) {
     return 0;
 }
 
+/** Reduce-scatter @p input into @p output via ncclReduceScatter, applying AVG
+ * scaling afterward if requested. */
 static int nccl_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
     if (!nccl)
@@ -330,6 +347,8 @@ static int nccl_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, v
     return result;
 }
 
+/** Barrier emulated by all-reducing a single dummy element (the standard NCCL
+ * barrier pattern). */
 static int nccl_barrier(void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
     if (!nccl)
@@ -343,6 +362,8 @@ static int nccl_barrier(void* ctx) {
                                nccl->stream);
 }
 
+/** Point-to-point send of @p tensor to @p dst_rank, wrapped in a NCCL group so
+ * it can pair with a matching recv. @p tag is ignored (NCCL has no tags). */
 static int nccl_send(Tensor* tensor, int dst_rank, int tag, void* ctx) {
     (void)tag; /* NCCL does not support message tags */
     NCCLContext* nccl = (NCCLContext*)ctx;
@@ -366,6 +387,8 @@ static int nccl_send(Tensor* tensor, int dst_rank, int tag, void* ctx) {
     return nccl->ncclGroupEnd();
 }
 
+/** Point-to-point receive into @p tensor from @p src_rank, wrapped in a NCCL
+ * group. @p tag is ignored (NCCL has no tags). */
 static int nccl_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
     (void)tag; /* NCCL does not support message tags */
     NCCLContext* nccl = (NCCLContext*)ctx;
@@ -398,6 +421,9 @@ typedef struct NCCLPendingWork {
     DistReduceOp op;
 } NCCLPendingWork;
 
+/** Launch an all-reduce without syncing the stream and return a pending work so
+ * compute can overlap; nccl_wait() later syncs and applies AVG scaling. Falls
+ * back to synchronous behavior if the pending state can't be allocated. */
 static DistWork* nccl_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
     if (!nccl)
@@ -447,6 +473,8 @@ static DistWork* nccl_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx
     return work;
 }
 
+/** Complete a pending async all-reduce: sync the stream, apply any AVG scaling,
+ * and free the pending state. Returns immediately for an already-done work. */
 static int nccl_wait(DistWork* work) {
     if (!work)
         return -1;
@@ -470,6 +498,8 @@ static int nccl_wait(DistWork* work) {
     return work->error_code;
 }
 
+/** Bootstrap the shared unique ID across ranks, then create the communicator via
+ * ncclCommInitRank. Publishes the context as the file-static fallback on success. */
 static int nccl_init(void* ctx, int world_size, int rank) {
     NCCLContext* nccl = (NCCLContext*)ctx;
     if (!nccl)
@@ -493,6 +523,8 @@ static int nccl_init(void* ctx, int world_size, int rank) {
     return -1;
 }
 
+/** Destroy the communicator, close the NCCL and cudart handles, and free the
+ * context, clearing the file-static pointer. */
 static void nccl_destroy(void* ctx) {
     NCCLContext* nccl = (NCCLContext*)ctx;
     if (!nccl)
@@ -512,6 +544,9 @@ static void nccl_destroy(void* ctx) {
     cml_free(nccl);
 }
 
+/** Dynamically load libnccl (and optionally libcudart for real stream sync),
+ * resolve the symbols, and build the ops table. Returns NULL if NCCL is absent
+ * or ncclAllReduce is missing; the communicator is created later by the init op. */
 DistCommOps* cml_dist_create_nccl_backend(void) {
     /* Try to load NCCL dynamically */
     void* handle = dlopen("libnccl.so", RTLD_NOW | RTLD_LOCAL);

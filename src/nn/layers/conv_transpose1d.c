@@ -9,6 +9,8 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** torch.nn.ConvTranspose1d forward: fractionally-strided conv of a 3D input [N, C_in, L],
+ *  lowered to a height-1 ConvTranspose2d. NULL on rank/channel mismatch or non-positive output. */
 static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
     ConvTranspose1d* layer = (ConvTranspose1d*)module;
 
@@ -85,6 +87,7 @@ static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
     return uop_reshape(y4, &ro);
 }
 
+/** Free the ConvTranspose1d module; owned parameters are released by module_free. */
 static void conv_transpose1d_free(Module* module) {
     ConvTranspose1d* layer = (ConvTranspose1d*)module;
     if (!layer)
@@ -92,6 +95,8 @@ static void conv_transpose1d_free(Module* module) {
     cml_free(layer);
 }
 
+/** Construct a ConvTranspose1d; weight [in_channels, out_channels, kernel_size] is Kaiming-init,
+ *  bias (zeros) added when use_bias. Returns NULL on failure. */
 ConvTranspose1d* nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size, int stride,
                                      int padding, int output_padding, bool use_bias, DType dtype,
                                      DeviceType device) {

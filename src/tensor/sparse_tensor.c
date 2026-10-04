@@ -10,6 +10,9 @@
 #include "ops/ir/internal.h"
 #include "ops/uops.h"
 
+/** Build a COO sparse tensor from 2-D `indices` [nnz, ndim] and 1-D `values`
+ *  [nnz]; both are cloned so the result owns its data. Returns NULL on a shape
+ *  mismatch or OOM. */
 SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values, const int* dense_shape,
                                  int dense_ndim) {
     if (!indices || !values || !dense_shape || dense_ndim <= 0) {
@@ -80,6 +83,8 @@ SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values, const int* den
     return sparse;
 }
 
+/** Convert a dense tensor to COO by collecting its non-zero elements (INT32
+ *  coordinates, values in the source dtype). Returns NULL on OOM. */
 SparseCOOData* sparse_from_dense(Tensor* dense) {
     if (!dense) {
         LOG_ERROR("sparse_from_dense: NULL input");
@@ -197,6 +202,8 @@ SparseCOOData* sparse_from_dense(Tensor* dense) {
     return sparse;
 }
 
+/** Scatter the COO entries into a freshly-zeroed dense tensor, summing duplicate
+ *  coordinates. Out-of-range flat indices are skipped. Returns NULL on error. */
 Tensor* sparse_to_dense(SparseCOOData* sparse, const TensorConfig* config) {
     if (!sparse) {
         LOG_ERROR("sparse_to_dense: NULL input");
@@ -272,6 +279,9 @@ static Tensor* spmm_split_coords(SparseCOOData* sparse, int column) {
     return out;
 }
 
+/** Sparse-dense matmul: [M,K] COO times [K,N] dense -> [M,N] dense, computed
+ *  eagerly. When either operand requires grad, records a pre-executed SPMM IR
+ *  node for autograd. Out-of-range coordinates are dropped. NULL on error. */
 Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
     if (!sparse || !dense) {
         LOG_ERROR("sparse_matmul: NULL argument");
@@ -435,6 +445,8 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
     return output;
 }
 
+/** Merge duplicate coordinates and sort entries via a dense round-trip, returning
+ *  a new coalesced sparse tensor. Returns NULL on error. */
 SparseCOOData* sparse_coalesce(SparseCOOData* sparse) {
     if (!sparse) {
         LOG_ERROR("sparse_coalesce: NULL input");
@@ -469,6 +481,7 @@ SparseCOOData* sparse_coalesce(SparseCOOData* sparse) {
     return coalesced;
 }
 
+/** Free a sparse tensor: its owned indices/values tensors and the dense_shape array. */
 void sparse_free(SparseCOOData* sparse) {
     if (!sparse)
         return;

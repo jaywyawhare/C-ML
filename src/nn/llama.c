@@ -13,6 +13,7 @@
 #include <time.h>
 #include "alloc/cml_allocator.h"
 
+/** Standard hyperparameters for LLaMA-7B (32 layers, hidden 4096, MHA). */
 CMLLLaMAConfig cml_llama_config_7b(void) {
     CMLLLaMAConfig config = {.vocab_size        = 32000,
                              .hidden_size       = 4096,
@@ -26,6 +27,7 @@ CMLLLaMAConfig cml_llama_config_7b(void) {
     return config;
 }
 
+/** Standard hyperparameters for LLaMA-13B (40 layers, hidden 5120, MHA). */
 CMLLLaMAConfig cml_llama_config_13b(void) {
     CMLLLaMAConfig config = {.vocab_size        = 32000,
                              .hidden_size       = 5120,
@@ -39,6 +41,7 @@ CMLLLaMAConfig cml_llama_config_13b(void) {
     return config;
 }
 
+/** Standard hyperparameters for LLaMA-70B (80 layers, hidden 8192, GQA with 8 KV heads). */
 CMLLLaMAConfig cml_llama_config_70b(void) {
     CMLLLaMAConfig config = {.vocab_size        = 32000,
                              .hidden_size       = 8192,
@@ -52,6 +55,7 @@ CMLLLaMAConfig cml_llama_config_70b(void) {
     return config;
 }
 
+/** Default sampling config for generation (temp 0.8, top-p 0.9, top-k 40). */
 CMLGenerationConfig cml_generation_default_config(void) {
     CMLGenerationConfig config = {.temperature    = 0.8f,
                                   .top_p          = 0.9f,
@@ -62,6 +66,7 @@ CMLGenerationConfig cml_generation_default_config(void) {
     return config;
 }
 
+/** RMSNorm over the last dim: x * rsqrt(mean(x^2) + eps), scaled by `weight`. */
 static Tensor* rms_norm(Tensor* x, Tensor* weight, float eps) {
     if (!x || !weight)
         return NULL;
@@ -115,6 +120,7 @@ static Tensor* rms_norm(Tensor* x, Tensor* weight, float eps) {
     return result;
 }
 
+/** SwiGLU feed-forward block: down_proj(silu(x·gate_proj) * (x·up_proj)). */
 static Tensor* swiglu_ffn(Tensor* x, Tensor* gate_proj, Tensor* up_proj, Tensor* down_proj) {
     if (!x || !gate_proj || !up_proj || !down_proj)
         return NULL;
@@ -151,6 +157,7 @@ static Tensor* swiglu_ffn(Tensor* x, Tensor* gate_proj, Tensor* up_proj, Tensor*
     return output;
 }
 
+/** Allocate one transformer layer with its own KV cache; weight tensors start NULL. */
 static CMLLLaMALayer* llama_layer_create(const CMLLLaMAConfig* config) {
     CMLLLaMALayer* layer = (CMLLLaMALayer*)cml_calloc(1, sizeof(CMLLLaMALayer));
     if (!layer)
@@ -171,6 +178,7 @@ static CMLLLaMALayer* llama_layer_create(const CMLLLaMAConfig* config) {
     return layer;
 }
 
+/** Free a layer's weight tensors and KV cache. */
 static void llama_layer_free(CMLLLaMALayer* layer) {
     if (!layer)
         return;
@@ -199,6 +207,7 @@ static void llama_layer_free(CMLLLaMALayer* layer) {
     cml_free(layer);
 }
 
+/** Allocate a LLaMA model and all its layers from `config`; weights loaded separately. */
 CMLLLaMAModel* cml_llama_create(const CMLLLaMAConfig* config) {
     if (!config) {
         LOG_ERROR("cml_llama_create: NULL config");
@@ -245,6 +254,7 @@ CMLLLaMAModel* cml_llama_create(const CMLLLaMAConfig* config) {
     return model;
 }
 
+/** Free the model: all layers, embedding/norm/head weights and the tokenizer. */
 void cml_llama_free(CMLLLaMAModel* model) {
     if (!model)
         return;
@@ -272,6 +282,10 @@ void cml_llama_free(CMLLLaMAModel* model) {
     cml_free(model);
 }
 
+/**
+ * Read one GGUF tensor and bind it to the matching model/layer weight slot,
+ * accepting both HF (model.layers.N.*) and llama.cpp (blk.N.*) naming.
+ */
 static int load_tensor_by_name(CMLLLaMAModel* model, GGUFContext* ctx, const char* name) {
     Tensor* t = gguf_read_tensor(ctx, name);
     if (!t) {
@@ -393,6 +407,10 @@ static int load_tensor_by_name(CMLLLaMAModel* model, GGUFContext* ctx, const cha
     return 0;
 }
 
+/**
+ * Load all weights and tokenizer metadata from a GGUF file into `model`, tying
+ * lm_head to the embeddings when the file omits an output projection.
+ */
 int cml_llama_load_gguf(CMLLLaMAModel* model, const char* filepath) {
     if (!model || !filepath) {
         LOG_ERROR("cml_llama_load_gguf: NULL argument");
@@ -456,6 +474,7 @@ int cml_llama_load_gguf(CMLLLaMAModel* model, const char* filepath) {
     return 0;
 }
 
+/** Gather embedding rows for `token_ids` into a [seq_len, hidden_size] tensor. */
 static Tensor* embed_tokens_lookup(Tensor* embed, const int* token_ids, int seq_len) {
     if (!embed || !token_ids || seq_len <= 0)
         return NULL;
@@ -490,6 +509,10 @@ static Tensor* embed_tokens_lookup(Tensor* embed, const int* token_ids, int seq_
     return output;
 }
 
+/**
+ * One decoder layer: RMSNorm -> RoPE'd QKV -> cached causal GQA -> output proj with
+ * residual, then RMSNorm -> SwiGLU FFN with residual. `start_pos` indexes the KV cache.
+ */
 Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer, Tensor* hidden,
                                 int start_pos) {
     if (!model || !layer || !hidden)
@@ -589,6 +612,10 @@ Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer, Tens
     return output;
 }
 
+/**
+ * Full forward pass over `token_ids`: embed, run every layer, final norm and
+ * lm_head projection to logits. Advances current_seq_len for KV-cached decoding.
+ */
 Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_len) {
     if (!model || !token_ids || seq_len <= 0) {
         LOG_ERROR("cml_llama_forward: invalid arguments");
@@ -657,6 +684,7 @@ typedef struct {
     int index;
 } LogitEntry;
 
+/** qsort comparator ordering LogitEntry by value, descending. */
 static int logit_entry_cmp_desc(const void* a, const void* b) {
     float va = ((const LogitEntry*)a)->value;
     float vb = ((const LogitEntry*)b)->value;
@@ -667,6 +695,10 @@ static int logit_entry_cmp_desc(const void* a, const void* b) {
     return 0;
 }
 
+/**
+ * Pick the next token from the last position's logits: greedy argmax, or
+ * temperature scaling followed by top-k then top-p (nucleus) sampling.
+ */
 int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
     if (!logits || !config)
         return -1;
@@ -790,6 +822,10 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
     return sampled_id;
 }
 
+/**
+ * Tokenize `prompt`, prefill, then autoregressively decode up to max_new_tokens
+ * (stopping on EOS or context limit), returning the token ids, decoded text and timing.
+ */
 CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt,
                                         const CMLGenerationConfig* config) {
     if (!model || !prompt || !config) {
@@ -909,6 +945,7 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
     return result;
 }
 
+/** Free a generation result's token array and decoded text. */
 void cml_generation_result_free(CMLGenerationResult* result) {
     if (!result)
         return;
@@ -919,6 +956,7 @@ void cml_generation_result_free(CMLGenerationResult* result) {
     cml_free(result);
 }
 
+/** Clear every layer's KV cache and reset the current sequence position to 0. */
 void cml_llama_reset(CMLLLaMAModel* model) {
     if (!model)
         return;
@@ -932,6 +970,7 @@ void cml_llama_reset(CMLLLaMAModel* model) {
     model->current_seq_len = 0;
 }
 
+/** Print the config fields and an estimated parameter count to stdout. */
 void cml_llama_print_config(const CMLLLaMAConfig* config) {
     if (!config)
         return;

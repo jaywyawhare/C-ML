@@ -10,6 +10,8 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** RMSNorm forward: divide by the root-mean-square over the last dim (with eps), then apply the
+ *  optional learnable weight (no mean subtraction, no bias). NULL on rank or last-dim mismatch. */
 static Tensor* rmsnorm_forward(Module* module, Tensor* input) {
     RMSNorm* rn = (RMSNorm*)module;
 
@@ -81,6 +83,7 @@ static Tensor* rmsnorm_forward(Module* module, Tensor* input) {
     return output;
 }
 
+/** Free the RMSNorm module; the weight parameter is released by module_free. */
 static void rmsnorm_free(Module* module) {
     RMSNorm* rn = (RMSNorm*)module;
     if (!rn)
@@ -88,6 +91,8 @@ static void rmsnorm_free(Module* module) {
     module_free(module);
 }
 
+/** Construct an RMSNorm over a last dim of size normalized_shape; weight is initialized to ones.
+ *  eps falls back to 1e-5 if non-positive. NULL on bad shape or failure. */
 RMSNorm* nn_rmsnorm(int normalized_shape, float eps, DType dtype, DeviceType device) {
     if (normalized_shape <= 0) {
         LOG_ERROR("RMSNorm: normalized_shape must be positive, got %d", normalized_shape);

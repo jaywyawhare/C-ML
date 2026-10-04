@@ -22,6 +22,7 @@
 
 /* Minimal JSON helpers */
 
+/** Point just past "key": in a flat JSON string, at the start of its value; NULL if absent. */
 static const char* json_find_key(const char* json, const char* key) {
     char pattern[256];
     snprintf(pattern, sizeof(pattern), "\"%s\"", key);
@@ -34,6 +35,7 @@ static const char* json_find_key(const char* json, const char* key) {
     return p;
 }
 
+/** Read a quoted JSON string at `p` into `out`, decoding common backslash escapes. */
 static int json_read_string(const char* p, char* out, size_t out_size) {
     if (!p || *p != '"')
         return -1;
@@ -68,6 +70,7 @@ static int json_read_string(const char* p, char* out, size_t out_size) {
     return 0;
 }
 
+/** Parse a float at `p`, falling back to `def` if `p` is NULL or non-numeric. */
 static float json_read_float(const char* p, float def) {
     if (!p)
         return def;
@@ -76,6 +79,7 @@ static float json_read_float(const char* p, float def) {
     return (end != p) ? v : def;
 }
 
+/** Parse an int at `p`, falling back to `def` if `p` is NULL or non-numeric. */
 static int json_read_int(const char* p, int def) {
     if (!p)
         return def;
@@ -84,6 +88,7 @@ static int json_read_int(const char* p, int def) {
     return (end != p) ? (int)v : def;
 }
 
+/** Parse a JSON true/false at `p`, falling back to `def` otherwise. */
 static bool json_read_bool(const char* p, bool def) {
     if (!p)
         return def;
@@ -99,6 +104,7 @@ typedef struct {
     char content[8192];
 } ChatMessage;
 
+/** Parse the "messages" array into `msgs` (role/content per object); returns the count. */
 static int parse_messages(const char* json, ChatMessage* msgs, int max_msgs) {
     const char* arr = json_find_key(json, "messages");
     if (!arr || *arr != '[')
@@ -137,6 +143,7 @@ static int parse_messages(const char* json, ChatMessage* msgs, int max_msgs) {
 
 /* HTTP helpers */
 
+/** Read an HTTP request into `buf`, continuing until the body satisfies Content-Length. */
 static int recv_http_request(int fd, char* buf, size_t buf_size) {
     size_t total = 0;
     while (total < buf_size - 1) {
@@ -168,6 +175,7 @@ static int recv_http_request(int fd, char* buf, size_t buf_size) {
     return (int)total;
 }
 
+/** Send a complete HTTP response (status line, CORS headers and body) on `fd`. */
 static void send_http_response(int fd, int status_code, const char* status_text,
                                const char* content_type, const char* body) {
     char header[1024];
@@ -186,6 +194,7 @@ static void send_http_response(int fd, int status_code, const char* status_text,
     }
 }
 
+/** Write one server-sent-events "data:" frame for streaming responses. */
 static void send_sse_chunk(int fd, const char* data) {
     char buf[16384];
     int n = snprintf(buf, sizeof(buf), "data: %s\n\n", data);
@@ -194,6 +203,7 @@ static void send_sse_chunk(int fd, const char* data) {
 
 /* Chat completion ID generator */
 
+/** Format a unique "chatcmpl-<time>-<counter>" completion id into `buf`. */
 static void generate_id(char* buf, size_t size) {
     static int counter = 0;
     snprintf(buf, size, "chatcmpl-%ld-%d", (long)time(NULL), counter++);
@@ -201,10 +211,12 @@ static void generate_id(char* buf, size_t size) {
 
 /* Route handlers */
 
+/** GET /health: respond with a small JSON ok status. */
 static void handle_health(int fd) {
     send_http_response(fd, 200, "OK", "application/json", "{\"status\":\"ok\"}");
 }
 
+/** GET /v1/models: respond with the single loaded model in OpenAI list format. */
 static void handle_models(int fd, CMLOpenAIServer* srv) {
     char body[1024];
     snprintf(body, sizeof(body),
@@ -214,6 +226,10 @@ static void handle_models(int fd, CMLOpenAIServer* srv) {
     send_http_response(fd, 200, "OK", "application/json", body);
 }
 
+/**
+ * Core chat-completions handler: build a prompt from the messages, generate with
+ * the model, and reply either as SSE token chunks (stream) or one JSON completion.
+ */
 static void chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json,
                              const ChatMessage* msgs, int num_msgs) {
     CMLLLaMAModel* model    = (CMLLLaMAModel*)srv->model;
@@ -396,6 +412,7 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
 
 /* Request dispatch */
 
+/** Route a raw HTTP request to the health, models, chat-completions or CORS/404 handler. */
 static void handle_request(int fd, CMLOpenAIServer* srv, const char* request) {
     const char* body = strstr(request, "\r\n\r\n");
     if (body)
@@ -431,6 +448,7 @@ static void handle_request(int fd, CMLOpenAIServer* srv, const char* request) {
 
 /* Server lifecycle */
 
+/** Allocate an OpenAI-compatible server bound to `port` with default sampling settings. */
 CMLOpenAIServer* cml_openai_server_create(int port) {
     if (port <= 0)
         return NULL;
@@ -448,6 +466,7 @@ CMLOpenAIServer* cml_openai_server_create(int port) {
     return srv;
 }
 
+/** Load a GGUF LLaMA model from `model_path` and wire up the serving scheduler and KV cache. */
 int cml_openai_server_load_model(CMLOpenAIServer* srv, const char* model_path) {
     if (!srv || !model_path)
         return -1;
@@ -490,6 +509,10 @@ int cml_openai_server_load_model(CMLOpenAIServer* srv, const char* model_path) {
     return 0;
 }
 
+/**
+ * Bind, listen and serve requests until stopped. Uses poll() with a timeout so
+ * cml_openai_server_stop reliably wakes the accept loop on all platforms.
+ */
 int cml_openai_server_run(CMLOpenAIServer* srv) {
     if (!srv)
         return -1;
@@ -574,6 +597,7 @@ int cml_openai_server_run(CMLOpenAIServer* srv) {
     return 0;
 }
 
+/** Signal the run loop to exit and shut down the listening socket. */
 void cml_openai_server_stop(CMLOpenAIServer* srv) {
     if (!srv)
         return;
@@ -583,6 +607,7 @@ void cml_openai_server_stop(CMLOpenAIServer* srv) {
     }
 }
 
+/** Stop the server and free the model, serving context, KV cache and socket. */
 void cml_openai_server_free(CMLOpenAIServer* srv) {
     if (!srv)
         return;

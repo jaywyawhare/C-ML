@@ -8,6 +8,7 @@
 
 #define SD_INIT_CAP 32
 
+/** Allocate an empty state dict with an initial entry capacity; NULL on OOM. */
 StateDict* nn_state_dict_create(void) {
     StateDict* sd = cml_calloc(1, sizeof(StateDict));
     if (!sd)
@@ -22,6 +23,7 @@ StateDict* nn_state_dict_create(void) {
     return sd;
 }
 
+/** Free the dict and its owned key strings; the tensor values are not owned. */
 void nn_state_dict_free(StateDict* sd) {
     if (!sd)
         return;
@@ -32,6 +34,7 @@ void nn_state_dict_free(StateDict* sd) {
     cml_free(sd);
 }
 
+/** Insert or overwrite the entry for `key`, growing the backing array as needed. */
 int nn_state_dict_set(StateDict* sd, const char* key, Tensor* value) {
     if (!sd || !key)
         return -1;
@@ -57,6 +60,7 @@ int nn_state_dict_set(StateDict* sd, const char* key, Tensor* value) {
     return 0;
 }
 
+/** Look up the tensor stored under `key`, or NULL if absent. */
 Tensor* nn_state_dict_get(const StateDict* sd, const char* key) {
     if (!sd || !key)
         return NULL;
@@ -66,6 +70,7 @@ Tensor* nn_state_dict_get(const StateDict* sd, const char* key) {
     return NULL;
 }
 
+/** Remove the entry for `key` (swap-with-last); returns 1 if removed, 0 if not found. */
 int nn_state_dict_remove(StateDict* sd, const char* key) {
     if (!sd || !key)
         return 0;
@@ -80,6 +85,7 @@ int nn_state_dict_remove(StateDict* sd, const char* key) {
     return 0;
 }
 
+/** Recursively flatten a module tree's parameters into `sd` under dotted `prefix` keys. */
 static int collect_params(const Module* module, StateDict* sd, const char* prefix) {
     if (!module || !sd)
         return -1;
@@ -112,6 +118,7 @@ static int collect_params(const Module* module, StateDict* sd, const char* prefi
     return 0;
 }
 
+/** Build a state dict of all parameters in `module`, keyed by optional `prefix`. */
 StateDict* nn_get_state_dict(const Module* module, const char* prefix) {
     StateDict* sd = nn_state_dict_create();
     if (!sd)
@@ -123,6 +130,10 @@ StateDict* nn_get_state_dict(const Module* module, const char* prefix) {
     return sd;
 }
 
+/**
+ * Copy matching tensors from `sd` into `module`'s parameters by key. Mismatched
+ * sizes are skipped; with `strict`, missing keys also make the call fail (-1).
+ */
 int nn_load_state_dict(Module* module, const StateDict* sd, bool strict) {
     if (!module || !sd)
         return -1;
@@ -159,6 +170,7 @@ int nn_load_state_dict(Module* module, const StateDict* sd, bool strict) {
     return rc;
 }
 
+/** Serialize every tensor in `sd` to a safetensors file at `path`. */
 int nn_save(const StateDict* sd, const char* path) {
     if (!sd || !path)
         return -1;
@@ -176,6 +188,7 @@ int nn_save(const StateDict* sd, const char* path) {
     return rc;
 }
 
+/** Load a safetensors file into a fresh state dict; NULL on failure. */
 StateDict* nn_load(const char* path) {
     if (!path)
         return NULL;
@@ -201,6 +214,7 @@ StateDict* nn_load(const char* path) {
     return sd;
 }
 
+/** Total element count summed across all tensors in the dict. */
 size_t nn_state_dict_num_params(const StateDict* sd) {
     if (!sd)
         return 0;
@@ -211,6 +225,7 @@ size_t nn_state_dict_num_params(const StateDict* sd) {
     return total;
 }
 
+/** Total byte footprint of all tensors in the dict (numel * dtype size). */
 size_t nn_state_dict_bytes(const StateDict* sd) {
     if (!sd)
         return 0;
@@ -223,6 +238,7 @@ size_t nn_state_dict_bytes(const StateDict* sd) {
     return total;
 }
 
+/** Print a human-readable summary of each entry's key, shape and element count. */
 void nn_state_dict_print(const StateDict* sd) {
     if (!sd) {
         printf("StateDict(NULL)\n");
@@ -246,6 +262,7 @@ void nn_state_dict_print(const StateDict* sd) {
     }
 }
 
+/** In-place linear interpolation of matching tensors: dst = alpha*src + (1-alpha)*dst. */
 int nn_state_dict_lerp(StateDict* dst, const StateDict* src, float alpha) {
     if (!dst || !src)
         return -1;

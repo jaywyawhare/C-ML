@@ -10,7 +10,9 @@
 
 typedef struct DistCommOps DistCommOps;
 
+/** Windows stub: the NCCL backend is POSIX-only, so report it unavailable. */
 DistCommOps* cml_dist_create_nccl_backend(void) { return (DistCommOps*)0; }
+/** Windows stub: the Gloo backend is POSIX-only, so report it unavailable. */
 DistCommOps* cml_dist_create_gloo_backend(void) { return (DistCommOps*)0; }
 
 #endif /* _WIN32 */

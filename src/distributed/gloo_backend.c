@@ -34,8 +34,12 @@ typedef struct GlooContext {
  */
 static GlooContext* g_gloo_ctx = NULL;
 
+/** Resolve the context to use: the passed @p ctx, or the file-static fallback
+ * when distributed.c calls ops with a NULL ctx. */
 static GlooContext* get_gloo_ctx(void* ctx) { return ctx ? (GlooContext*)ctx : g_gloo_ctx; }
 
+/** Send exactly @p len bytes on @p fd, looping over short writes and retrying on
+ * EINTR. Returns 0 on success, -1 on error or peer close. */
 static int send_all(int fd, const void* buf, size_t len) {
     const char* p    = (const char*)buf;
     size_t remaining = len;
@@ -52,6 +56,8 @@ static int send_all(int fd, const void* buf, size_t len) {
     return 0;
 }
 
+/** Receive exactly @p len bytes from @p fd, looping over short reads and
+ * retrying on EINTR. Returns 0 on success, -1 on error or peer close. */
 static int recv_all(int fd, void* buf, size_t len) {
     char* p          = (char*)buf;
     size_t remaining = len;
@@ -181,6 +187,8 @@ static DistWork* gloo_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx
     return work;
 }
 
+/** Wait on a Gloo work handle. Since every Gloo collective runs synchronously,
+ * the work is already complete; returns its error code, or -1 if not. */
 static int gloo_wait(DistWork* work) {
     if (!work)
         return -1;
@@ -192,6 +200,8 @@ static int gloo_wait(DistWork* work) {
     return -1;
 }
 
+/** All-reduce @p tensor in place over the TCP peer mesh via ring all-reduce; a
+ * no-op (apart from optional averaging) at world_size <= 1. */
 static int gloo_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     (void)ctx;
     if (!tensor || !tensor->data)
@@ -227,6 +237,8 @@ static int gloo_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
 #define GLOO_TAG_BCAST 1000001
 #define GLOO_TAG_GATHER 1000002
 
+/** Broadcast @p tensor from @p src_rank: root sends to each peer in turn,
+ * everyone else receives from root. Sequential, so deadlock-free. */
 static int gloo_broadcast(Tensor* tensor, int src_rank, void* ctx) {
     GlooContext* gctx = get_gloo_ctx(ctx);
     if (!tensor || !tensor->data)
@@ -260,6 +272,8 @@ static int gloo_broadcast(Tensor* tensor, int src_rank, void* ctx) {
     return 0;
 }
 
+/** All-gather: place this rank's @p input at output[rank], then exchange with
+ * every peer (lower rank sends first) so each output slot holds its rank's data. */
 static int gloo_allgather(Tensor** output, Tensor* input, void* ctx) {
     GlooContext* gctx = get_gloo_ctx(ctx);
     if (!output || !input || !input->data)
@@ -299,6 +313,8 @@ static int gloo_allgather(Tensor** output, Tensor* input, void* ctx) {
     return 0;
 }
 
+/** Reduce-scatter: ring-all-reduce the full @p input, then copy this rank's
+ * contiguous slice into @p output. */
 static int gloo_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, void* ctx) {
     GlooContext* gctx = get_gloo_ctx(ctx);
     if (!output || !input || !output->data || !input->data)
@@ -342,6 +358,8 @@ static int gloo_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, v
     return 0;
 }
 
+/** Barrier via a one-byte token handshake: rank 0 collects a token from every
+ * peer then releases them all. No-op at world_size <= 1. */
 static int gloo_barrier(void* ctx) {
     GlooContext* gctx = get_gloo_ctx(ctx);
     if (!gctx || gctx->world_size <= 1)
@@ -367,6 +385,9 @@ static int gloo_barrier(void* ctx) {
     return 0;
 }
 
+/** Bring up the peer mesh: read MASTER_ADDR/GLOO_PORT, listen on port_base+rank,
+ * then connect to higher ranks and accept from lower ones for a deadlock-free,
+ * deterministic full-mesh. Single-process mode skips all socket setup. */
 static int gloo_init(void* ctx, int world_size, int rank) {
     (void)ctx;
 
@@ -536,6 +557,7 @@ cleanup_error:
     return -1;
 }
 
+/** Close all peer/listen sockets and free the Gloo context. */
 static void gloo_destroy(void* ctx) {
     (void)ctx;
     GlooContext* gctx = g_gloo_ctx;
@@ -563,6 +585,9 @@ static void gloo_destroy(void* ctx) {
     LOG_INFO("Gloo backend destroyed");
 }
 
+/** Allocate the Gloo ops table and its context and wire up the op pointers. The
+ * pure-CPU/socket backend always succeeds unless allocation fails (returns
+ * NULL). Sockets are not opened until the init op runs. */
 DistCommOps* cml_dist_create_gloo_backend(void) {
     DistCommOps* ops = cml_calloc(1, sizeof(DistCommOps));
     if (!ops)

@@ -43,7 +43,9 @@
 
 static pthread_mutex_t g_blas_lock = PTHREAD_MUTEX_INITIALIZER;
 
+/** Acquire the global BLAS context lock. */
 static inline void blas_lock(void) { pthread_mutex_lock(&g_blas_lock); }
+/** Release the global BLAS context lock. */
 static inline void blas_unlock(void) { pthread_mutex_unlock(&g_blas_lock); }
 
 static CMLBlasContext* g_blas_ctx = NULL;
@@ -80,6 +82,7 @@ static const char* blas_library_paths[] = {
 #endif
     NULL};
 
+/** True if any known BLAS library exposing an sgemm symbol can be loaded. */
 bool cml_blas_available(void) {
     for (int i = 0; blas_library_paths[i] != NULL; i++) {
         void* lib = LIB_LOAD(blas_library_paths[i]);
@@ -96,6 +99,8 @@ bool cml_blas_available(void) {
     return false;
 }
 
+/** Resolve the LP64 CBLAS entry points into the context, falling back to the
+ *  Fortran sgemm_ symbol when cblas_sgemm is absent. */
 static void load_cblas_functions(CMLBlasContext* ctx) {
     if (!ctx || !ctx->lib_handle)
         return;
@@ -112,6 +117,7 @@ static void load_cblas_functions(CMLBlasContext* ctx) {
         ctx->sgemm_ = LIB_SYM(ctx->lib_handle, "sgemm_");
 }
 
+/** Resolve the ILP64 scipy_openblas64 entry points; returns true if sgemm loaded. */
 static bool load_ilp64_functions(CMLBlasContext* ctx) {
     if (!ctx || !ctx->lib_handle)
         return false;
@@ -127,6 +133,7 @@ static bool load_ilp64_functions(CMLBlasContext* ctx) {
     return ctx->ilp64_sgemm != NULL;
 }
 
+/** Number of online CPU cores to use as the default BLAS thread count. */
 static int default_thread_count(void) {
     int ncores = 1;
 #ifdef __linux__
@@ -137,6 +144,8 @@ static int default_thread_count(void) {
     return ncores;
 }
 
+/** Detect the loaded BLAS vendor (MKL/OpenBLAS/BLIS) and wire up its
+ *  set-threads function, honoring any pre-set thread-count env vars. */
 static void tune_blas_threading(CMLBlasContext* ctx) {
     if (!ctx || !ctx->lib_handle)
         return;
@@ -181,6 +190,8 @@ static void tune_blas_threading(CMLBlasContext* ctx) {
     }
 }
 
+/** Probe BLAS_LIB, then ILP64, then LP64 library paths and return an
+ *  initialized context for the first one found, or NULL for scalar fallback. */
 CMLBlasContext* cml_blas_init(void) {
     CMLBlasContext* ctx = cml_calloc(1, sizeof(CMLBlasContext));
     if (!ctx) {
@@ -256,6 +267,8 @@ CMLBlasContext* cml_blas_init(void) {
     return NULL;
 }
 
+/** Close the BLAS library, clear the global context if it matches, and free
+ *  the context along with its packing scratch buffers. */
 void cml_blas_free(CMLBlasContext* ctx) {
     if (!ctx)
         return;
@@ -275,6 +288,7 @@ void cml_blas_free(CMLBlasContext* ctx) {
     cml_free(ctx);
 }
 
+/** Set the BLAS worker thread count via the vendor's set-threads hook. */
 void cml_blas_set_num_threads(int n) {
     if (n < 1)
         n = 1;
@@ -295,6 +309,7 @@ void cml_blas_set_num_threads(int n) {
         ctx->cur_threads = n;
 }
 
+/** Current BLAS worker thread count (at least 1). */
 int cml_blas_get_num_threads(void) {
     CMLBlasContext* ctx = cml_blas_get_context();
     if (!ctx)
@@ -302,6 +317,7 @@ int cml_blas_get_num_threads(void) {
     return ctx->cur_threads > 0 ? ctx->cur_threads : 1;
 }
 
+/** Return the lazily-initialized global BLAS context (double-checked under lock). */
 CMLBlasContext* cml_blas_get_context(void) {
     /* Fast path: context already initialized — no lock needed */
     CMLBlasContext* ctx =
@@ -619,12 +635,14 @@ static int g_at_count            = 0;
 static pthread_mutex_t g_at_lock = PTHREAD_MUTEX_INITIALIZER;
 static bool g_at_loaded          = false;
 
+/** Monotonic wall-clock reading in milliseconds for autotune timing. */
 static double now_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1e3 + (double)ts.tv_nsec / 1e6;
 }
 
+/** Path to ~/.cml/autotune.json, creating the ~/.cml directory; NULL without $HOME. */
 static const char* autotune_path(void) {
     static char path[512];
     const char* home = getenv("HOME");
@@ -636,6 +654,7 @@ static const char* autotune_path(void) {
     return path;
 }
 
+/** Load cached autotune entries from disk into g_at_cache, once per process. */
 static void autotune_load(void) {
     if (g_at_loaded)
         return;
@@ -655,6 +674,7 @@ static void autotune_load(void) {
     fclose(f);
 }
 
+/** Append a tuned (shape -> MC/KC/NC) entry to the autotune cache file. */
 static void autotune_save(int M, int N, int K, int mc, int kc, int nc) {
     const char* path = autotune_path();
     if (!path)
@@ -666,6 +686,7 @@ static void autotune_save(int M, int N, int K, int mc, int kc, int nc) {
     fclose(f);
 }
 
+/** Find cached blocking parameters for a (M,N,K) shape; true on a hit. */
 static bool autotune_lookup(int M, int N, int K, int* mc, int* kc, int* nc) {
     autotune_load();
     for (int i = 0; i < g_at_count; i++) {
@@ -679,6 +700,8 @@ static bool autotune_lookup(int M, int N, int K, int* mc, int* kc, int* nc) {
     return false;
 }
 
+/** Benchmark a small set of MC/KC/NC candidates for this shape, cache and
+ *  return the fastest. C is used as scratch during timing. */
 static void autotune_run(const float* A, const float* B, float* C, int M, int N, int K, float alpha,
                          float beta, float* a_pack, float* b_pack, int* out_mc, int* out_kc,
                          int* out_nc) {
@@ -723,6 +746,8 @@ static void autotune_run(const float* A, const float* B, float* C, int M, int N,
 #endif /* __FMA__ */
 #endif /* __AVX2__ || __AVX__ */
 
+/** Row-major single-precision GEMM C = alpha*A*B + beta*C. Routes small/medium
+ *  shapes through the in-house AVX/packed kernels and larger ones to BLAS. */
 int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
                    int K, float alpha, float beta) {
     if (!ctx)
@@ -827,6 +852,8 @@ int cml_blas_dgemm(CMLBlasContext* ctx, const double* A, const double* B, double
     return 0;
 }
 
+/** GEMM with optional transposed operands. Small shapes materialise any
+ *  transposed input into scratch and delegate to the row-major NN fast paths. */
 int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
                       int K, float alpha, float beta, bool transA, bool transB) {
     if (!ctx)
@@ -913,6 +940,7 @@ int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float
     return -1;
 }
 
+/** Matrix-vector product y = alpha*A*x + beta*y, with a scalar fallback. */
 int cml_blas_sgemv(CMLBlasContext* ctx, const float* A, const float* x, float* y, int M, int N,
                    float alpha, float beta) {
     if (!ctx)
@@ -944,6 +972,7 @@ int cml_blas_sgemv(CMLBlasContext* ctx, const float* A, const float* x, float* y
     return 0;
 }
 
+/** AXPY y += alpha*x, with a scalar fallback. */
 int cml_blas_saxpy(CMLBlasContext* ctx, const float* x, float* y, int n, float alpha) {
     if (!ctx)
         ctx = cml_blas_get_context();
@@ -968,6 +997,7 @@ int cml_blas_saxpy(CMLBlasContext* ctx, const float* x, float* y, int n, float a
     return 0;
 }
 
+/** Scale x *= alpha in place, with a scalar fallback. */
 int cml_blas_sscal(CMLBlasContext* ctx, float* x, int n, float alpha) {
     if (!ctx)
         ctx = cml_blas_get_context();
@@ -992,6 +1022,7 @@ int cml_blas_sscal(CMLBlasContext* ctx, float* x, int n, float alpha) {
     return 0;
 }
 
+/** Dot product of x and y, with a scalar fallback. */
 float cml_blas_sdot(CMLBlasContext* ctx, const float* x, const float* y, int n) {
     if (!x || !y || n <= 0)
         return 0.0f;
@@ -1013,6 +1044,7 @@ float cml_blas_sdot(CMLBlasContext* ctx, const float* x, const float* y, int n) 
     return sum;
 }
 
+/** Euclidean (L2) norm of x, with a scalar fallback. */
 float cml_blas_snrm2(CMLBlasContext* ctx, const float* x, int n) {
     if (!x || n <= 0)
         return 0.0f;
@@ -1034,6 +1066,7 @@ float cml_blas_snrm2(CMLBlasContext* ctx, const float* x, int n) {
     return sqrtf(sum);
 }
 
+/** Path of the loaded BLAS library, or "None" if unavailable. */
 const char* cml_blas_get_library_name(CMLBlasContext* ctx) {
     if (!ctx || !ctx->initialized) {
         return "None";

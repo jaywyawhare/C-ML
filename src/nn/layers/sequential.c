@@ -69,6 +69,8 @@ typedef struct SequentialFastPath {
     bool valid;
 } SequentialFastPath;
 
+/** Free a zero-IR fast path: its reusable output tensor, per-op transposed weights, and the
+ *  distinct aligned output buffers (in-place ops share a buffer and are freed once). */
 static void fast_path_free(SequentialFastPath* fp) {
     if (!fp)
         return;
@@ -89,8 +91,9 @@ static void fast_path_free(SequentialFastPath* fp) {
     cml_free(fp);
 }
 
-/* Build a SequentialFastPath from the module list and a sample input tensor.
- * Returns NULL if any module type is unsupported (falls back to IR path). */
+/** Build a SequentialFastPath from the module list and a sample input tensor. Supports only
+ *  Linear/ReLU/Sigmoid/Tanh chains in eval mode; pre-transposes Linear weights and pre-allocates
+ *  buffers. Returns NULL if any module type is unsupported (falls back to the IR path). */
 static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
     if (!seq || !input || seq->num_modules == 0)
         return NULL;
@@ -223,6 +226,8 @@ static SequentialFastPath* fast_path_build(Sequential* seq, Tensor* input) {
     return fp;
 }
 
+/** Replay a built fast path: pure BLAS GEMM + bias and SIMD activations into pre-allocated
+ *  buffers, no IR/alloc per call. Returns the reused output tensor (ref-count bumped) or NULL. */
 static Tensor* fast_path_run(SequentialFastPath* fp, Tensor* input) {
     if (!fp || !fp->valid || !input)
         return NULL;
@@ -310,10 +315,12 @@ static Tensor* fast_path_run(SequentialFastPath* fp, Tensor* input) {
     return fp->output_tensor;
 }
 
+/** Round `size` up to the next multiple of `alignment` (a power of two). */
 static size_t alloc_size_aligned(size_t size, size_t alignment) {
     return (size + alignment - 1) & ~(alignment - 1);
 }
 
+/** Free a cached execution graph and its plan, shape, and input/output buffers. */
 static void free_cached_graph(CachedModelGraph* cache) {
     if (!cache)
         return;
@@ -333,6 +340,7 @@ static void free_cached_graph(CachedModelGraph* cache) {
     cml_free(cache);
 }
 
+/** True if the cached graph is valid and its recorded input shape matches `input`. */
 static bool shapes_match(CachedModelGraph* cache, Tensor* input) {
     if (!cache || !cache->valid || !input)
         return false;
@@ -346,6 +354,8 @@ static bool shapes_match(CachedModelGraph* cache, Tensor* input) {
     return true;
 }
 
+/** Build a CachedModelGraph from an IR graph plus sample input/output tensors, allocating the
+ *  reusable input/output buffers and the execution plan. Returns NULL on failure. */
 static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLGraph_t ir) {
     if (!input || !output || !ir)
         return NULL;
@@ -395,6 +405,8 @@ static CachedModelGraph* create_cached_graph(Tensor* input, Tensor* output, CMLG
     return cache;
 }
 
+/** Run the cached execution plan node-by-node over `input`, wiring each node's inputs to the
+ *  cached input buffer or an earlier node's output buffer. Returns the output tensor or NULL. */
 static Tensor* execute_cached_forward(Sequential* seq, Tensor* input) {
     if (!seq || !seq->cached_graph || !seq->cached_graph->plan) {
         return NULL;
@@ -472,6 +484,7 @@ static Tensor* execute_cached_forward(Sequential* seq, Tensor* input) {
 
 static int g_sequential_depth = 0;
 
+/** True if the fast path is valid and its recorded input shape matches `input`. */
 static bool fast_path_shapes_match(SequentialFastPath* fp, Tensor* input) {
     if (!fp || !fp->valid || !input)
         return false;
@@ -483,6 +496,9 @@ static bool fast_path_shapes_match(SequentialFastPath* fp, Tensor* input) {
     return true;
 }
 
+/** torch.nn.Sequential forward: chain the child modules. When autograd is off and the model is in
+ *  eval mode, it uses the zero-IR fast path or cached graph if shapes match; otherwise it runs the
+ *  modules through the IR and (lazily) builds those caches. Returns NULL on any child failure. */
 static Tensor* sequential_forward(Module* module, Tensor* input) {
     Sequential* seq = (Sequential*)module;
 
@@ -559,6 +575,7 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
     return output;
 }
 
+/** Free the Sequential module: its fast path, cached graph, and every child module it owns. */
 static void sequential_free(Module* module) {
     Sequential* seq = (Sequential*)module;
     if (!seq)
@@ -583,6 +600,7 @@ static void sequential_free(Module* module) {
     cml_free(seq);
 }
 
+/** Construct an empty Sequential (tracked for global cleanup and metrics). NULL on failure. */
 Sequential* nn_sequential(void) {
     Sequential* seq = cml_malloc(sizeof(Sequential));
     if (!seq) {
@@ -613,6 +631,8 @@ Sequential* nn_sequential(void) {
     return seq;
 }
 
+/** Append a module, taking ownership and re-exporting its parameters under
+ *  "<index>.<name>.<param>" names. Returns -1 on NULL args or allocation failure. */
 int sequential_add(Sequential* seq, Module* module) {
     if (!seq || !module)
         return -1;
@@ -662,6 +682,7 @@ int sequential_add(Sequential* seq, Module* module) {
     return 0;
 }
 
+/** Child module at index, or NULL if seq is NULL or the index is out of range. */
 Module* sequential_get(Sequential* seq, int index) {
     if (!seq || index < 0 || index >= seq->num_modules) {
         return NULL;
@@ -670,8 +691,10 @@ Module* sequential_get(Sequential* seq, int index) {
     return seq->modules[index];
 }
 
+/** Number of child modules, or 0 if seq is NULL. */
 int sequential_get_length(Sequential* seq) { return seq ? seq->num_modules : 0; }
 
+/** Append a module and return seq, for fluent chaining; a NULL arg is a no-op. */
 Sequential* sequential_add_chain(Sequential* seq, Module* module) {
     if (!seq || !module) {
         return seq;
@@ -680,6 +703,8 @@ Sequential* sequential_add_chain(Sequential* seq, Module* module) {
     return seq;
 }
 
+/** Construct a Sequential from num_layers Module* variadic arguments (NULL entries skipped).
+ *  Returns NULL on failure. */
 Sequential* nn_sequentialv(int num_layers, ...) {
     Sequential* seq = nn_sequential();
     if (!seq) {
@@ -700,6 +725,7 @@ Sequential* nn_sequentialv(int num_layers, ...) {
     return seq;
 }
 
+/** Enable or disable IR graph caching for inference; disabling invalidates any existing cache. */
 void sequential_enable_graph_cache(Sequential* seq, bool enable) {
     if (!seq)
         return;
@@ -710,6 +736,7 @@ void sequential_enable_graph_cache(Sequential* seq, bool enable) {
     LOG_DEBUG("Graph caching %s for Sequential model", enable ? "enabled" : "disabled");
 }
 
+/** Drop the cached graph so the next forward rebuilds it (e.g. after weights or shapes change). */
 void sequential_invalidate_cache(Sequential* seq) {
     if (!seq || !seq->cached_graph)
         return;

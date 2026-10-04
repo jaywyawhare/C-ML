@@ -34,12 +34,16 @@ typedef struct {
 
 static MPIContext* g_mpi_ctx = NULL;
 
+/** Resolve the MPI context: the passed @p ctx, or the file-static fallback when
+ * distributed.c calls ops with a NULL ctx. */
 static MPIContext* mpi_get_ctx(void* ctx) {
     if (ctx)
         return (MPIContext*)ctx;
     return g_mpi_ctx;
 }
 
+/** Map a DistReduceOp to the MPICH integer op handle; AVG maps to SUM and is
+ * scaled by the caller afterward. */
 static int mpi_op_to_const(DistReduceOp op) {
     switch (op) {
     case DIST_REDUCE_SUM:
@@ -55,6 +59,8 @@ static int mpi_op_to_const(DistReduceOp op) {
     return CML_MPI_SUM;
 }
 
+/** All-reduce @p tensor via MPI_Allreduce through a scratch buffer (MPICH
+ * forbids in-place aliasing here), then apply AVG scaling if requested. */
 static int mpi_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     MPIContext* mpi = mpi_get_ctx(ctx);
     if (!mpi || !mpi->MPI_Allreduce || !tensor || !tensor->data)
@@ -85,6 +91,7 @@ static int mpi_allreduce(Tensor* tensor, DistReduceOp op, void* ctx) {
     return result;
 }
 
+/** Broadcast @p tensor from @p src_rank via MPI_Bcast. */
 static int mpi_broadcast(Tensor* tensor, int src_rank, void* ctx) {
     MPIContext* mpi = mpi_get_ctx(ctx);
     if (!mpi || !mpi->MPI_Bcast || !tensor || !tensor->data)
@@ -94,6 +101,7 @@ static int mpi_broadcast(Tensor* tensor, int src_rank, void* ctx) {
                           CML_MPI_COMM_WORLD);
 }
 
+/** Barrier across the communicator via MPI_Barrier. */
 static int mpi_barrier(void* ctx) {
     MPIContext* mpi = mpi_get_ctx(ctx);
     if (!mpi || !mpi->MPI_Barrier)
@@ -102,6 +110,8 @@ static int mpi_barrier(void* ctx) {
     return mpi->MPI_Barrier(CML_MPI_COMM_WORLD);
 }
 
+/** All-gather each rank's @p input via MPI_Allgather into a scratch buffer, then
+ * scatter the per-rank blocks into the @p output tensors. */
 static int mpi_allgather(Tensor** output, Tensor* input, void* ctx) {
     MPIContext* mpi = mpi_get_ctx(ctx);
     if (!mpi || !mpi->MPI_Allgather || !output || !input || !input->data)
@@ -129,6 +139,8 @@ static int mpi_allgather(Tensor** output, Tensor* input, void* ctx) {
     return result;
 }
 
+/** Reduce-scatter @p input via MPI_Reduce_scatter with equal per-rank counts,
+ * applying AVG scaling to @p output afterward if requested. */
 static int mpi_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, void* ctx) {
     MPIContext* mpi = mpi_get_ctx(ctx);
     if (!mpi || !mpi->MPI_Reduce_scatter || !output || !input || !output->data || !input->data)
@@ -160,6 +172,7 @@ static int mpi_reduce_scatter(Tensor* output, Tensor* input, DistReduceOp op, vo
     return result;
 }
 
+/** Blocking point-to-point send of @p tensor to @p dst_rank via MPI_Send. */
 static int mpi_send(Tensor* tensor, int dst_rank, int tag, void* ctx) {
     MPIContext* mpi = mpi_get_ctx(ctx);
     if (!mpi || !mpi->MPI_Send || !tensor || !tensor->data)
@@ -169,6 +182,8 @@ static int mpi_send(Tensor* tensor, int dst_rank, int tag, void* ctx) {
                          CML_MPI_COMM_WORLD);
 }
 
+/** Blocking point-to-point receive into @p tensor from @p src_rank via MPI_Recv
+ * (status ignored). */
 static int mpi_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
     MPIContext* mpi = mpi_get_ctx(ctx);
     if (!mpi || !mpi->MPI_Recv || !tensor || !tensor->data)
@@ -191,6 +206,9 @@ typedef struct MPIAsyncWork {
     int scale_ws; /* >0 → this was an AVG: divide by scale_ws after wait */
 } MPIAsyncWork;
 
+/** Start a non-blocking all-reduce via MPI_Iallreduce, stashing the request and
+ * out-of-place result buffer in the work's MPIAsyncWork. Falls back to a
+ * synchronous, already-completed work if MPI_Iallreduce is unavailable. */
 static DistWork* mpi_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx) {
     MPIContext* mpi = mpi_get_ctx(ctx);
     if (!mpi || !tensor || !tensor->data)
@@ -245,6 +263,9 @@ static DistWork* mpi_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx)
     return work;
 }
 
+/** Wait on an async all-reduce: MPI_Wait the request, copy the result back into
+ * the tensor (applying AVG scaling if needed), and release the sub-allocations.
+ * The work's MPIAsyncWork struct itself is freed later by cml_dist_work_free. */
 static int mpi_wait(DistWork* work) {
     if (!work)
         return -1;
@@ -279,6 +300,8 @@ static int mpi_wait(DistWork* work) {
     return result;
 }
 
+/** Call MPI_Init once, then validate the launcher-provided @p rank/@p world_size
+ * against what MPI_Comm_rank/size actually report, erroring on a mismatch. */
 static int mpi_init(void* ctx, int world_size, int rank) {
     MPIContext* mpi = mpi_get_ctx(ctx);
     if (!mpi)
@@ -311,6 +334,8 @@ static int mpi_init(void* ctx, int world_size, int rank) {
     return 0;
 }
 
+/** Finalize MPI (if we initialized it), close the dlopen handle, and free the
+ * context, clearing the file-static pointer. */
 static void mpi_destroy(void* ctx) {
     MPIContext* mpi = mpi_get_ctx(ctx);
     if (!mpi)
@@ -328,6 +353,10 @@ static void mpi_destroy(void* ctx) {
     cml_free(mpi);
 }
 
+/** Dynamically load libmpi, resolve the needed symbols, and build the ops table.
+ * Returns NULL if MPI is absent, if Open MPI is detected (its pointer-handle ABI
+ * is incompatible with this integer-handle binding), or if MPI_Allreduce is
+ * missing — the caller then falls back to another backend. */
 DistCommOps* cml_dist_create_mpi_backend(void) {
     void* handle = CML_DLOPEN("libmpi.so", RTLD_NOW | RTLD_LOCAL);
     if (!handle) {

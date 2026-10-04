@@ -7,8 +7,12 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
+/** True once `t` holds materialized data (non-NULL ->data). */
 bool tensor_is_realized(const Tensor* t) { return t != NULL && t->data != NULL; }
 
+/** Execute the IR graph up to `t`, copy any borrowed plan buffer into owned
+ *  storage, and detach `t` from the graph so it survives graph teardown (the
+ *  linkage is saved for tensor_unrealize). Returns 0 on success, nonzero on error. */
 int tensor_realize(Tensor* t) {
     if (!t)
         return -1;
@@ -51,6 +55,7 @@ int tensor_realize(Tensor* t) {
     return 0;
 }
 
+/** Execute every unrealized tensor in the array; returns the last error code, or 0. */
 int tensor_realize_all(Tensor** tensors, int num_tensors) {
     if (!tensors || num_tensors <= 0)
         return -1;
@@ -65,6 +70,8 @@ int tensor_realize_all(Tensor** tensors, int num_tensors) {
     return rc;
 }
 
+/** Free `t`'s materialized data and reconnect it to its saved IR node so it can
+ *  be recomputed on demand (gradient checkpointing / re-materialization). */
 void tensor_unrealize(Tensor* t) {
     if (!t || !t->data)
         return;
@@ -93,6 +100,7 @@ void tensor_unrealize(Tensor* t) {
     }
 }
 
+/** Realize `t` and, if present, its gradient tensor. Returns 0 on success. */
 int tensor_realize_with_grads(Tensor* t) {
     if (!t)
         return -1;
@@ -104,8 +112,10 @@ int tensor_realize_with_grads(Tensor* t) {
     return rc;
 }
 
+/** Alias for tensor_realize; present for API symmetry with lazy frameworks. */
 int tensor_schedule(Tensor* t) { return tensor_realize(t); }
 
+/** Block until `t`'s device work completes. No-op on the CPU backend. */
 int tensor_sync(Tensor* t) {
     (void)t;
     return 0;

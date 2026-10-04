@@ -9,6 +9,8 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
+/** torch.nn.ConvTranspose2d forward: fractionally-strided conv of a 4D input [N, C_in, H, W] via
+ *  uop_conv_transpose2d. NULL on rank/channel mismatch or a missing weight. */
 static Tensor* conv_transpose2d_forward(Module* module, Tensor* input) {
     ConvTranspose2d* layer = (ConvTranspose2d*)module;
 
@@ -45,6 +47,7 @@ static Tensor* conv_transpose2d_forward(Module* module, Tensor* input) {
     return uop_conv_transpose2d(input, layer->weight->tensor, bias, &params);
 }
 
+/** Free the ConvTranspose2d module; owned parameters are released by module_free. */
 static void conv_transpose2d_free(Module* module) {
     ConvTranspose2d* layer = (ConvTranspose2d*)module;
     if (!layer)
@@ -52,10 +55,13 @@ static void conv_transpose2d_free(Module* module) {
     cml_free(layer);
 }
 
+/** Default weight initializer: Kaiming/He with fan-in over in_channels * kernel area. */
 static void kaiming_init_transpose(Tensor* tensor, int in_channels, int kernel_size) {
     nn_init_kaiming(tensor, in_channels, kernel_size * kernel_size);
 }
 
+/** Construct a square-kernel ConvTranspose2d; weight [in_channels, out_channels, k, k] is
+ *  Kaiming-init, bias (zeros) added when use_bias. Returns NULL on failure. */
 ConvTranspose2d* nn_conv_transpose2d(int in_channels, int out_channels, int kernel_size, int stride,
                                      int padding, int output_padding, bool use_bias, DType dtype,
                                      DeviceType device) {
