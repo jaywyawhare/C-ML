@@ -546,15 +546,73 @@ static void* alloc_from_class(int cls, size_t user_size) {
     return user_from_header(hdr);
 }
 
+/* Large-block cache. Large allocations otherwise hit the system allocator on
+ * every alloc and free; ML workloads re-allocate the same big activation and
+ * gradient buffers every step, so that round-trip is pure overhead. Keep a small
+ * bounded LIFO of freed large blocks and reuse one whose backing is big enough
+ * (but not wildly oversized, to limit waste). Overflow goes back to the system.
+ * Entries stay reachable through this global, so they are not leaks at exit. */
+#define CML_LARGE_CACHE_MAX 64
+#define CML_LARGE_CACHE_BUDGET ((size_t)256 * 1024 * 1024)
+
+typedef struct {
+    void* raw;    /* header start, as returned by the system allocator */
+    size_t total; /* CML_HEADER_SIZE + requested bytes when it was cached */
+} LargeCacheEntry;
+
+static LargeCacheEntry g_large_cache[CML_LARGE_CACHE_MAX];
+static int g_large_cache_count            = 0;
+static size_t g_large_cache_bytes         = 0;
+static pthread_mutex_t g_large_cache_lock = PTHREAD_MUTEX_INITIALIZER;
+
+/** Take a cached block with `need <= total <= 2*need` (tightest fit), or NULL.
+ *  The 2x cap keeps a large block from being wasted on a much smaller request. */
+static void* large_cache_take(size_t need) {
+    void* found = NULL;
+    pthread_mutex_lock(&g_large_cache_lock);
+    int best = -1;
+    for (int i = 0; i < g_large_cache_count; i++) {
+        size_t t = g_large_cache[i].total;
+        if (t >= need && t <= need * 2 && (best < 0 || t < g_large_cache[best].total))
+            best = i;
+    }
+    if (best >= 0) {
+        found = g_large_cache[best].raw;
+        g_large_cache_bytes -= g_large_cache[best].total;
+        g_large_cache[best] = g_large_cache[--g_large_cache_count]; /* swap-remove */
+    }
+    pthread_mutex_unlock(&g_large_cache_lock);
+    return found;
+}
+
+/** Keep a freed large block for reuse; returns false (caller frees it) when the
+ *  cache is at its count or byte budget. */
+static bool large_cache_put(void* raw, size_t total) {
+    bool kept = false;
+    pthread_mutex_lock(&g_large_cache_lock);
+    if (g_large_cache_count < CML_LARGE_CACHE_MAX &&
+        g_large_cache_bytes + total <= CML_LARGE_CACHE_BUDGET) {
+        g_large_cache[g_large_cache_count].raw   = raw;
+        g_large_cache[g_large_cache_count].total = total;
+        g_large_cache_count++;
+        g_large_cache_bytes += total;
+        kept = true;
+    }
+    pthread_mutex_unlock(&g_large_cache_lock);
+    return kept;
+}
+
 /** Direct path for large requests: a single 64-byte-aligned system allocation carrying the
  *  header, tagged with class_idx 0xffff so cml_free routes it back to free_large. */
 static void* alloc_large(size_t size) {
     ensure_init();
     /* Large: allocate with extra header using system backing (never our cml_*) */
     size_t total = CML_HEADER_SIZE + size;
+    /* Reuse a cached block before touching the system allocator. A cached block
+     * is at least `total` bytes and keeps its original >=16B alignment. */
+    void* raw = large_cache_take(total);
     /* Force good alignment for large data (64B) */
-    void* raw = NULL;
-    if (system_posix_memalign(&raw, 64, total) != 0) {
+    if (!raw && system_posix_memalign(&raw, 64, total) != 0) {
         raw = system_malloc(total);
         if (!raw)
             return NULL;
@@ -690,8 +748,10 @@ static void free_large(void* ptr) {
 
     atomic_fetch_sub_explicit(&g_total_allocated_bytes, sz, memory_order_relaxed);
 
-    /* Use system free on the raw header start (we used posix_memalign or system_malloc) */
-    system_free(hdr);
+    /* Offer the block to the cache for reuse; only truly free it when the cache
+     * is full. The raw header start is what the system allocator handed out. */
+    if (!large_cache_put(hdr, CML_HEADER_SIZE + sz))
+        system_free(hdr);
 }
 
 /** Free a cml_* allocation, dispatching to the large or size-class path by its header.
