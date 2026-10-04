@@ -26,6 +26,7 @@ typedef struct {
     void* event;             /* HIP event, or NULL under sync semantics */
 } ROCmSignalData;
 
+/** Unwrap the ROCm backend stored in a queue's native handle (NULL-safe). */
 static CMLROCmBackend* rocm_backend_of(CMLHCQQueue* queue) {
     ROCmQueueData* qd = (ROCmQueueData*)(queue ? queue->native_handle : NULL);
     return qd ? qd->backend : NULL;
@@ -35,6 +36,7 @@ static CMLROCmBackend* rocm_backend_of(CMLHCQQueue* queue) {
  * HIP mock driver's journal checks). */
 CMLROCmBackend* cml_hcq_rocm_queue_backend(CMLHCQQueue* queue) { return rocm_backend_of(queue); }
 
+/** Create and init a ROCm backend and wrap it in a queue (NULL if HIP is absent). */
 CMLHCQQueue* cml_hcq_rocm_queue_create(void) {
     CMLROCmBackend* backend = cml_rocm_backend_create();
     if (!backend)
@@ -60,6 +62,7 @@ CMLHCQQueue* cml_hcq_rocm_queue_create(void) {
     return queue;
 }
 
+/** Free the ROCm backend behind the queue, then the queue wrapper. */
 void cml_hcq_rocm_queue_destroy(CMLHCQQueue* queue) {
     if (!queue)
         return;
@@ -73,6 +76,7 @@ void cml_hcq_rocm_queue_destroy(CMLHCQQueue* queue) {
     cml_free(queue);
 }
 
+/** Copy the descriptor's geometry into the ROCm kernel and launch it. */
 int cml_hcq_rocm_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     if (!queue || !desc || !desc->compiled_kernel)
         return -1;
@@ -94,12 +98,14 @@ int cml_hcq_rocm_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc)
     return rc;
 }
 
+/** Host-to-device copy delegated to the ROCm backend. */
 int cml_hcq_rocm_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src || bytes == 0)
         return -1;
     return cml_rocm_memcpy_h2d(rocm_backend_of(queue), dst, src, bytes);
 }
 
+/** Device-to-host copy delegated to the ROCm backend. */
 int cml_hcq_rocm_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src || bytes == 0)
         return -1;
@@ -107,10 +113,12 @@ int cml_hcq_rocm_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size
     return cml_rocm_memcpy_d2h(rocm_backend_of(queue), dst, (void*)(uintptr_t)src, bytes);
 }
 
+/** Block until the ROCm stream drains. */
 int cml_hcq_rocm_queue_synchronize(CMLHCQQueue* queue) {
     return cml_rocm_synchronize(rocm_backend_of(queue));
 }
 
+/** Allocate a ROCm signal; the HIP event is created lazily on first record. */
 CMLHCQSignal* cml_hcq_rocm_signal_create(void) {
     /* Must use the CML allocator: hcq.c frees signal wrappers with cml_free,
      * so system calloc here would corrupt the heap (see the Vulkan adapter). */
@@ -127,6 +135,7 @@ CMLHCQSignal* cml_hcq_rocm_signal_create(void) {
     return signal;
 }
 
+/** Destroy the HIP event (if any) and free the signal wrapper. */
 void cml_hcq_rocm_signal_destroy(CMLHCQSignal* signal) {
     if (!signal)
         return;
@@ -140,6 +149,7 @@ void cml_hcq_rocm_signal_destroy(CMLHCQSignal* signal) {
     cml_free(signal);
 }
 
+/** Record a HIP event into the stream, or synchronize if events are unavailable. */
 int cml_hcq_rocm_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal)
         return -1;
@@ -171,6 +181,7 @@ int cml_hcq_rocm_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return 0;
 }
 
+/** No-op: the single in-order ROCm stream already orders prior submissions. */
 int cml_hcq_rocm_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     /* A single in-order stream observes prior submissions by construction, so
      * a cross-queue wait has nothing to enqueue; the dependency is already
@@ -180,6 +191,7 @@ int cml_hcq_rocm_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return 0;
 }
 
+/** Block the host on the recorded HIP event (no timeout support in HIP). */
 int cml_hcq_rocm_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     (void)timeout_ms; /* hipEventSynchronize blocks without a timeout knob */
     if (!signal)
@@ -200,15 +212,19 @@ int cml_hcq_rocm_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
 
 #else /* !__linux__ */
 
+/** Stub: ROCm is Linux-only, so no queue can be created. */
 CMLHCQQueue* cml_hcq_rocm_queue_create(void) { return NULL; }
+/** Stub: nothing to tear down off Linux. */
 void cml_hcq_rocm_queue_destroy(CMLHCQQueue* q) { (void)q; }
 
+/** Stub: kernel submission unavailable off Linux. */
 int cml_hcq_rocm_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* d) {
     (void)q;
     (void)d;
     return -1;
 }
 
+/** Stub: H2D copy unavailable off Linux. */
 int cml_hcq_rocm_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -217,6 +233,7 @@ int cml_hcq_rocm_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     return -1;
 }
 
+/** Stub: D2H copy unavailable off Linux. */
 int cml_hcq_rocm_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -225,27 +242,33 @@ int cml_hcq_rocm_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     return -1;
 }
 
+/** Stub: no ROCm off Linux, so no signal can be created. */
 CMLHCQSignal* cml_hcq_rocm_signal_create(void) { return NULL; }
+/** Stub: nothing to free off Linux. */
 void cml_hcq_rocm_signal_destroy(CMLHCQSignal* s) { (void)s; }
 
+/** Stub: signal recording unavailable off Linux. */
 int cml_hcq_rocm_signal_record(CMLHCQQueue* q, CMLHCQSignal* s) {
     (void)q;
     (void)s;
     return -1;
 }
 
+/** Stub: queue wait unavailable off Linux. */
 int cml_hcq_rocm_queue_wait(CMLHCQQueue* q, CMLHCQSignal* s) {
     (void)q;
     (void)s;
     return -1;
 }
 
+/** Stub: host wait unavailable off Linux. */
 int cml_hcq_rocm_signal_wait_cpu(CMLHCQSignal* s, uint64_t t) {
     (void)s;
     (void)t;
     return -1;
 }
 
+/** Stub: nothing to synchronize off Linux. */
 int cml_hcq_rocm_queue_synchronize(CMLHCQQueue* q) {
     (void)q;
     return -1;

@@ -62,6 +62,10 @@ struct CMLDiskCache {
     sqlite3_stmt* stmt_count;
 };
 
+/**
+ * Lazily dlopen libsqlite3 and resolve the entry points the cache uses.
+ * Returns 0 on success, -1 if the library or a required symbol is missing.
+ */
 static int load_sqlite(void) {
     if (sql.loaded)
         return 0;
@@ -110,6 +114,7 @@ static int load_sqlite(void) {
     return 0;
 }
 
+/** Create every parent directory of the given file path (mkdir -p on the dirname). */
 static int mkdirs(const char* path) {
     char tmp[4096];
     size_t len = strlen(path);
@@ -128,6 +133,7 @@ static int mkdirs(const char* path) {
     return 0;
 }
 
+/** Build the default cache DB path from $CACHE_DIR or $HOME/.cache/cml (caller frees). */
 static char* default_path(void) {
     const char* cache_dir = getenv("CACHE_DIR");
     if (cache_dir) {
@@ -151,6 +157,7 @@ static char* default_path(void) {
     return buf;
 }
 
+/** True only when CACHELEVEL >= 2 and the DISK_CACHE env flag opts in. */
 bool cml_disk_cache_enabled(void) {
     /* CACHELEVEL < 2 disables the on-disk cache (0 none, 1 memory only). */
     if (cml_flag(CML_FLAG_CACHELEVEL) < 2)
@@ -161,6 +168,10 @@ bool cml_disk_cache_enabled(void) {
     return env[0] == '1' || env[0] == 'y' || env[0] == 'Y';
 }
 
+/**
+ * Open (creating if needed) the kernel cache DB at `path` or the default path,
+ * set up the schema in WAL mode, and prepare the reusable statements.
+ */
 CMLDiskCache* cml_disk_cache_open(const char* path) {
     if (load_sqlite() != 0)
         return NULL;
@@ -231,6 +242,7 @@ CMLDiskCache* cml_disk_cache_open(const char* path) {
     return cache;
 }
 
+/** Finalize all prepared statements, close the DB, and free the cache handle. */
 void cml_disk_cache_close(CMLDiskCache* cache) {
     if (!cache)
         return;
@@ -252,6 +264,7 @@ void cml_disk_cache_close(CMLDiskCache* cache) {
 typedef int (*fn_sqlite3_reset)(sqlite3_stmt*);
 typedef int (*fn_sqlite3_clear_bindings)(sqlite3_stmt*);
 
+/** Lazily resolve and cache sqlite3_reset (not in the fixed symbol set). */
 static fn_sqlite3_reset get_reset(void) {
     static fn_sqlite3_reset fn = NULL;
     if (!fn && sql.handle)
@@ -259,6 +272,7 @@ static fn_sqlite3_reset get_reset(void) {
     return fn;
 }
 
+/** Lazily resolve and cache sqlite3_clear_bindings. */
 static fn_sqlite3_clear_bindings get_clear_bindings(void) {
     static fn_sqlite3_clear_bindings fn = NULL;
     if (!fn && sql.handle)
@@ -266,6 +280,7 @@ static fn_sqlite3_clear_bindings get_clear_bindings(void) {
     return fn;
 }
 
+/** Reset a prepared statement and clear its bindings for reuse. */
 static void reset_stmt(sqlite3_stmt* stmt) {
     fn_sqlite3_reset rst          = get_reset();
     fn_sqlite3_clear_bindings clr = get_clear_bindings();
@@ -275,6 +290,7 @@ static void reset_stmt(sqlite3_stmt* stmt) {
         clr(stmt);
 }
 
+/** Insert or replace the blob for `hash`, stamping the current time. */
 int cml_disk_cache_put(CMLDiskCache* cache, uint64_t hash, const void* data, size_t size) {
     if (!cache || !data || size == 0)
         return -1;
@@ -292,6 +308,7 @@ int cml_disk_cache_put(CMLDiskCache* cache, uint64_t hash, const void* data, siz
     return (rc == SQLITE_DONE) ? 0 : -1;
 }
 
+/** Fetch the blob for `hash` into a freshly allocated buffer (caller frees); -1 if absent. */
 int cml_disk_cache_get(CMLDiskCache* cache, uint64_t hash, void** out_data, size_t* out_size) {
     if (!cache || !out_data || !out_size)
         return -1;
@@ -330,6 +347,7 @@ int cml_disk_cache_get(CMLDiskCache* cache, uint64_t hash, void** out_data, size
     return 0;
 }
 
+/** Report whether an entry exists for `hash` without copying its data. */
 bool cml_disk_cache_has(CMLDiskCache* cache, uint64_t hash) {
     if (!cache)
         return false;
@@ -343,6 +361,7 @@ bool cml_disk_cache_has(CMLDiskCache* cache, uint64_t hash) {
     return rc == SQLITE_ROW;
 }
 
+/** Return the number of cached kernels. */
 int cml_disk_cache_count(CMLDiskCache* cache) {
     if (!cache)
         return 0;
@@ -358,6 +377,7 @@ int cml_disk_cache_count(CMLDiskCache* cache) {
     return count;
 }
 
+/** Delete every row from the cache table. */
 int cml_disk_cache_clear(CMLDiskCache* cache) {
     if (!cache)
         return -1;

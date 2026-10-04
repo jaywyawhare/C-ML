@@ -7,6 +7,7 @@
  * AMX-TILE tiles fall back to the generic matmul. */
 bool cml_amx_available(void) { return false; }
 
+/** Stub f32 AMX matmul: always fails (-1) so callers use the generic path. */
 int cml_amx_matmul_f32(const float* A, const float* B, float* C, int M, int N, int K, int lda,
                        int ldb, int ldc) {
     (void)A;
@@ -21,6 +22,7 @@ int cml_amx_matmul_f32(const float* A, const float* B, float* C, int M, int N, i
     return -1;
 }
 
+/** Stub f16 AMX matmul: always fails (-1) so callers use the generic path. */
 int cml_amx_matmul_f16(const void* A, const void* B, float* C, int M, int N, int K, int lda,
                        int ldb, int ldc) {
     (void)A;

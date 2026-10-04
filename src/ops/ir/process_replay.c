@@ -25,6 +25,7 @@ static pthread_mutex_t g_replay_lock = PTHREAD_MUTEX_INITIALIZER;
 static bool g_replay_enabled         = false;
 static char g_output_dir[4096];
 
+/** 64-bit FNV-1a hash of a byte range, used to key kernels by source. */
 static uint64_t fnv1a(const void* data, size_t len) {
     uint64_t hash        = FNV_OFFSET_BASIS;
     const uint8_t* bytes = (const uint8_t*)data;
@@ -35,6 +36,7 @@ static uint64_t fnv1a(const void* data, size_t len) {
     return hash;
 }
 
+/** Create the directory if it does not already exist. */
 static void ensure_dir(const char* path) {
     struct stat st;
     if (stat(path, &st) != 0) {
@@ -42,6 +44,7 @@ static void ensure_dir(const char* path) {
     }
 }
 
+/** Enable kernel-source recording into `output_dir` (created if needed). */
 void cml_process_replay_enable(const char* output_dir) {
     pthread_mutex_lock(&g_replay_lock);
 
@@ -58,12 +61,14 @@ void cml_process_replay_enable(const char* output_dir) {
     pthread_mutex_unlock(&g_replay_lock);
 }
 
+/** Disable kernel-source recording. */
 void cml_process_replay_disable(void) {
     pthread_mutex_lock(&g_replay_lock);
     g_replay_enabled = false;
     pthread_mutex_unlock(&g_replay_lock);
 }
 
+/** One-time lazy init: enable replay from PROCESS_REPLAY[_DIR] env vars. */
 static void check_env_init(void) {
     static bool checked = false;
     if (checked)
@@ -81,6 +86,7 @@ static void check_env_init(void) {
     cml_process_replay_enable(dir);
 }
 
+/** Write a kernel's source (with a metadata header) to a file keyed by its source hash. */
 void cml_process_replay_record(const char* kernel_name, const char* source, size_t source_len) {
     check_env_init();
 
@@ -116,6 +122,7 @@ void cml_process_replay_record(const char* kernel_name, const char* source, size
     pthread_mutex_unlock(&g_replay_lock);
 }
 
+/** Read a recorded kernel file and return just the source body past the header (caller frees). */
 static int read_kernel_file(const char* path, char** out_source, size_t* out_len) {
     FILE* f = fopen(path, "rb");
     if (!f)
@@ -162,6 +169,10 @@ static int read_kernel_file(const char* path, char** out_source, size_t* out_len
     return 0;
 }
 
+/**
+ * Compare recorded kernels in two directories by source body; returns the
+ * number of mismatches (or -1 on error), for detecting codegen regressions.
+ */
 int cml_process_replay_compare(const char* output_dir, const char* baseline_dir) {
     if (!output_dir || !baseline_dir)
         return -1;

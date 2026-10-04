@@ -9,15 +9,18 @@
 #ifdef _POSIX_C_SOURCE
 #include <time.h>
 #include "alloc/cml_allocator.h"
+/** Monotonic wall-clock reading in milliseconds. */
 static double get_time_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
 }
 #else
+/** Stub used when CLOCK_MONOTONIC is unavailable; always returns 0. */
 static double get_time_ms(void) { return 0.0; }
 #endif
 
+/** Allocate an idle captured graph with an initial node buffer. */
 CMLCapturedGraph* cml_graph_capture_create(void) {
     CMLCapturedGraph* g = (CMLCapturedGraph*)cml_calloc(1, sizeof(CMLCapturedGraph));
     if (!g)
@@ -34,6 +37,7 @@ CMLCapturedGraph* cml_graph_capture_create(void) {
     return g;
 }
 
+/** Free a captured graph and all per-node and binding storage. */
 void cml_graph_capture_free(CMLCapturedGraph* graph) {
     if (!graph)
         return;
@@ -47,6 +51,7 @@ void cml_graph_capture_free(CMLCapturedGraph* graph) {
     cml_free(graph);
 }
 
+/** Start recording, discarding any previously captured nodes. */
 int cml_graph_capture_begin(CMLCapturedGraph* graph) {
     if (!graph)
         return -1;
@@ -62,6 +67,8 @@ int cml_graph_capture_begin(CMLCapturedGraph* graph) {
     return 0;
 }
 
+/** Append a kernel launch (grid/block/args) to the recording, growing capacity
+ *  up to the node cap. */
 int cml_graph_capture_record(CMLCapturedGraph* graph, UOpType op, void* kernel_handle,
                              const size_t grid[3], const size_t block[3], void** args, int num_args,
                              size_t shared_mem) {
@@ -108,6 +115,7 @@ int cml_graph_capture_record(CMLCapturedGraph* graph, UOpType op, void* kernel_h
     return 0;
 }
 
+/** Finish recording and mark the graph ready for replay. */
 int cml_graph_capture_end(CMLCapturedGraph* graph) {
     if (!graph || graph->state != CML_CAPTURE_RECORDING)
         return -1;
@@ -120,6 +128,7 @@ int cml_graph_capture_end(CMLCapturedGraph* graph) {
     return 0;
 }
 
+/** Replay a ready graph, dispatching each captured node and accumulating timing. */
 int cml_graph_capture_replay(CMLCapturedGraph* graph) {
     if (!graph || graph->state != CML_CAPTURE_READY)
         return -1;
@@ -146,6 +155,7 @@ int cml_graph_capture_replay(CMLCapturedGraph* graph) {
     return 0;
 }
 
+/** Bind @p tensor as input @p index, growing the binding array as needed. */
 int cml_graph_capture_bind_input(CMLCapturedGraph* graph, int index, Tensor* tensor) {
     if (!graph || index < 0)
         return -1;
@@ -165,6 +175,7 @@ int cml_graph_capture_bind_input(CMLCapturedGraph* graph, int index, Tensor* ten
     return 0;
 }
 
+/** Bind @p tensor as output @p index, growing the binding array as needed. */
 int cml_graph_capture_bind_output(CMLCapturedGraph* graph, int index, Tensor* tensor) {
     if (!graph || index < 0)
         return -1;
@@ -184,6 +195,7 @@ int cml_graph_capture_bind_output(CMLCapturedGraph* graph, int index, Tensor* te
     return 0;
 }
 
+/** Discard captured nodes and timing, returning the graph to idle. */
 int cml_graph_capture_reset(CMLCapturedGraph* graph) {
     if (!graph)
         return -1;
@@ -198,14 +210,17 @@ int cml_graph_capture_reset(CMLCapturedGraph* graph) {
     return 0;
 }
 
+/** Current capture state (IDLE when @p graph is NULL). */
 CMLCaptureState cml_graph_capture_state(const CMLCapturedGraph* graph) {
     return graph ? graph->state : CML_CAPTURE_IDLE;
 }
 
+/** Number of captured nodes. */
 int cml_graph_capture_num_nodes(const CMLCapturedGraph* graph) {
     return graph ? graph->num_nodes : 0;
 }
 
+/** Report replay count and average replay time (out-params may be NULL). */
 void cml_graph_capture_stats(const CMLCapturedGraph* graph, int* replay_count,
                              double* avg_replay_ms) {
     if (!graph)
@@ -218,6 +233,7 @@ void cml_graph_capture_stats(const CMLCapturedGraph* graph, int* replay_count,
     }
 }
 
+/** Print a human-readable summary of the captured graph. */
 void cml_graph_capture_print(const CMLCapturedGraph* graph) {
     if (!graph) {
         printf("CapturedGraph: NULL\n");

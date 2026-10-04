@@ -42,12 +42,15 @@ typedef struct __attribute__((packed)) AMDGPUKernelDescriptor {
 #define AMDGPU_VGPR_GRANULARITY_GFX10 8
 #define AMDGPU_SGPR_GRANULARITY 8
 
+/** Decode the allocated VGPR count from rsrc1, scaling by the arch's allocation
+ *  granularity (GFX10+ uses a coarser block than GFX9). */
 static inline uint32_t amdgpu_vgpr_count(uint32_t rsrc1, bool is_gfx10_plus) {
     uint32_t granularity =
         is_gfx10_plus ? AMDGPU_VGPR_GRANULARITY_GFX10 : AMDGPU_VGPR_GRANULARITY_GFX9;
     return AMDGPU_RSRC1_VGPRS(rsrc1) * granularity;
 }
 
+/** Decode the allocated SGPR count from rsrc1, scaling by the SGPR granularity. */
 static inline uint32_t amdgpu_sgpr_count(uint32_t rsrc1) {
     return AMDGPU_RSRC1_SGPRS(rsrc1) * AMDGPU_SGPR_GRANULARITY;
 }

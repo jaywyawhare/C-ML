@@ -72,6 +72,7 @@ __attribute__((unused)) static struct IRNode* get_capture(const CMLMatchResult* 
     return NULL;
 }
 
+/** Recursively test whether @p pattern matches @p node, recording captures into @p result. */
 static bool match_node(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNode* node,
                        CMLMatchResult* result) {
     if (!pattern || !node)
@@ -152,6 +153,7 @@ static void free_unlinked_node(CMLGraph_t ir, struct IRNode* node) {
     cml_free(node);
 }
 
+/** Build an OP pattern node matching @p type with @p num_inputs sub-patterns. */
 CMLPatternNode* cml_pattern_op(UOpType type, CMLPatternNode** inputs, int num_inputs) {
     if (num_inputs < 0 || num_inputs > CML_PATTERN_MAX_INPUTS)
         return NULL;
@@ -170,6 +172,7 @@ CMLPatternNode* cml_pattern_op(UOpType type, CMLPatternNode** inputs, int num_in
     return p;
 }
 
+/** Build a capture pattern that matches any node and binds it to @p name. */
 CMLPatternNode* cml_pattern_capture(const char* name) {
     if (!name)
         return NULL;
@@ -185,6 +188,7 @@ CMLPatternNode* cml_pattern_capture(const char* name) {
     return p;
 }
 
+/** Build a wildcard pattern that matches any node. */
 CMLPatternNode* cml_pattern_any(void) {
     CMLPatternNode* p = cml_calloc(1, sizeof(CMLPatternNode));
     if (!p)
@@ -195,6 +199,7 @@ CMLPatternNode* cml_pattern_any(void) {
     return p;
 }
 
+/** Recursively free a pattern tree. */
 void cml_pattern_free(CMLPatternNode* node) {
     if (!node)
         return;
@@ -205,11 +210,13 @@ void cml_pattern_free(CMLPatternNode* node) {
     cml_free(node);
 }
 
+/** Allocate an empty rewrite-rule registry. */
 CMLRewriteRegistry* cml_rewrite_registry_create(void) {
     CMLRewriteRegistry* reg = cml_calloc(1, sizeof(CMLRewriteRegistry));
     return reg; /* num_rules is 0 thanks to calloc */
 }
 
+/** Free a registry and the patterns it owns (emit fns and names are borrowed). */
 void cml_rewrite_registry_free(CMLRewriteRegistry* reg) {
     if (!reg)
         return;
@@ -221,6 +228,7 @@ void cml_rewrite_registry_free(CMLRewriteRegistry* reg) {
     cml_free(reg);
 }
 
+/** Register a rewrite rule, keeping rules sorted by descending priority. */
 int cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pattern, CMLEmitFn emit,
                          int priority, const char* name) {
     if (!reg || !pattern)
@@ -253,6 +261,8 @@ int cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pattern, CMLEm
     return 0;
 }
 
+/** Apply registered rules to @p ir (automaton-accelerated when possible, else
+ *  iterative linear matching); returns the total number of rewrites performed. */
 int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations) {
     if (!reg || !ir)
         return -1;
@@ -369,6 +379,7 @@ static bool is_fill_const(struct IRNode* node, float value) {
     return diff < 1e-7f;
 }
 
+/** Create a standalone UOP_FILL node of @p value, taking its shape from @p shape_donor. */
 static struct IRNode* make_fill_node(CMLGraph_t ir, float value, struct IRNode* shape_donor) {
     (void)ir;
     struct IRNode* node = cml_calloc(1, sizeof(struct IRNode));
@@ -418,6 +429,7 @@ static struct IRNode* make_fill_node(CMLGraph_t ir, float value, struct IRNode* 
     return node;
 }
 
+/** x * 1 -> x: return the non-constant operand. */
 static struct IRNode* emit_mul_one(CMLGraph_t ir, const CMLMatchResult* m) {
     (void)ir;
     struct IRNode* root = m->matched_root;
@@ -437,6 +449,7 @@ static struct IRNode* emit_mul_one(CMLGraph_t ir, const CMLMatchResult* m) {
     return NULL;
 }
 
+/** x + 0 -> x: return the non-zero operand. */
 static struct IRNode* emit_add_zero(CMLGraph_t ir, const CMLMatchResult* m) {
     (void)ir;
     struct IRNode* root = m->matched_root;
@@ -455,6 +468,7 @@ static struct IRNode* emit_add_zero(CMLGraph_t ir, const CMLMatchResult* m) {
     return NULL;
 }
 
+/** x - x -> FILL(0). */
 static struct IRNode* emit_sub_self(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_SUB || root->num_inputs != 2)
@@ -469,6 +483,7 @@ static struct IRNode* emit_sub_self(CMLGraph_t ir, const CMLMatchResult* m) {
     return make_fill_node(ir, 0.0f, root);
 }
 
+/** exp(log(x)) -> x. */
 static struct IRNode* emit_exp_log(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_EXP || root->num_inputs != 1)
@@ -483,6 +498,7 @@ static struct IRNode* emit_exp_log(CMLGraph_t ir, const CMLMatchResult* m) {
     return x;
 }
 
+/** neg(neg(x)) -> x. */
 static struct IRNode* emit_neg_neg(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_NEG || root->num_inputs != 1)
@@ -524,6 +540,7 @@ static bool get_fill_value(struct IRNode* node, float* out) {
     return true;
 }
 
+/** Constant-fold FILL(a) + FILL(b) -> FILL(a+b). */
 static struct IRNode* emit_fold_add(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_ADD || root->num_inputs != 2)
@@ -536,6 +553,7 @@ static struct IRNode* emit_fold_add(CMLGraph_t ir, const CMLMatchResult* m) {
     return make_fill_node(ir, a + b, root);
 }
 
+/** Constant-fold FILL(a) - FILL(b) -> FILL(a-b). */
 static struct IRNode* emit_fold_sub(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_SUB || root->num_inputs != 2)
@@ -548,6 +566,7 @@ static struct IRNode* emit_fold_sub(CMLGraph_t ir, const CMLMatchResult* m) {
     return make_fill_node(ir, a - b, root);
 }
 
+/** Constant-fold FILL(a) * FILL(b) -> FILL(a*b). */
 static struct IRNode* emit_fold_mul(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_MUL || root->num_inputs != 2)
@@ -560,6 +579,7 @@ static struct IRNode* emit_fold_mul(CMLGraph_t ir, const CMLMatchResult* m) {
     return make_fill_node(ir, a * b, root);
 }
 
+/** Constant-fold FILL(a) / FILL(b) -> FILL(a/b), skipping div-by-zero. */
 static struct IRNode* emit_fold_div(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_DIV || root->num_inputs != 2)
@@ -574,6 +594,7 @@ static struct IRNode* emit_fold_div(CMLGraph_t ir, const CMLMatchResult* m) {
     return make_fill_node(ir, a / b, root);
 }
 
+/** Constant-fold NEG(FILL(a)) -> FILL(-a). */
 static struct IRNode* emit_fold_neg(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_NEG || root->num_inputs != 1)
@@ -585,6 +606,7 @@ static struct IRNode* emit_fold_neg(CMLGraph_t ir, const CMLMatchResult* m) {
     return make_fill_node(ir, -a, root);
 }
 
+/** x * 2 -> x + x. */
 static struct IRNode* emit_mul_two(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_MUL || root->num_inputs != 2)
@@ -626,6 +648,7 @@ static struct IRNode* emit_mul_two(CMLGraph_t ir, const CMLMatchResult* m) {
     return node;
 }
 
+/** x * 0 -> FILL(0). */
 static struct IRNode* emit_mul_zero(CMLGraph_t ir, const CMLMatchResult* m) {
     (void)ir;
     struct IRNode* root = m->matched_root;
@@ -640,6 +663,7 @@ static struct IRNode* emit_mul_zero(CMLGraph_t ir, const CMLMatchResult* m) {
     return make_fill_node(ir, 0.0f, root);
 }
 
+/** x / c -> x * (1/c) for constant c, skipping c in {0, 1}. */
 static struct IRNode* emit_div_const(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_DIV || root->num_inputs != 2)
@@ -682,6 +706,7 @@ static struct IRNode* emit_div_const(CMLGraph_t ir, const CMLMatchResult* m) {
     return mul_node;
 }
 
+/** log(exp(x)) -> x. */
 static struct IRNode* emit_log_exp(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_LOG || root->num_inputs != 1)
@@ -692,6 +717,7 @@ static struct IRNode* emit_log_exp(CMLGraph_t ir, const CMLMatchResult* m) {
     return cml_ir_find_by_output(ir, inner->input_names[0]);
 }
 
+/** sqrt(x) * sqrt(x) -> x. */
 static struct IRNode* emit_sqrt_sq(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* root = m->matched_root;
     if (!root || root->type != UOP_MUL || root->num_inputs != 2)
@@ -741,6 +767,8 @@ static CMLPatternNode* make_unary_chain_pattern(UOpType outer, UOpType inner) {
     return cml_pattern_op(outer, outer_inputs, 1);
 }
 
+/** Build a registry preloaded with the built-in algebraic simplification and
+ *  constant-folding rewrite rules. */
 CMLRewriteRegistry* cml_rewrite_builtin_rules(void) {
     CMLRewriteRegistry* reg = cml_rewrite_registry_create();
     if (!reg)

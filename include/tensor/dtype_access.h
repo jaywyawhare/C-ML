@@ -18,6 +18,8 @@
 #include <math.h>
 #include "tensor/tensor.h"
 
+/** Narrow a float32 to IEEE fp16 bits: underflow flushes to signed zero and
+ *  overflow saturates to signed infinity. */
 static inline uint16_t float_to_fp16(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
@@ -31,6 +33,7 @@ static inline uint16_t float_to_fp16(float f) {
     return (uint16_t)(sign | ((uint32_t)exp << 10) | mant);
 }
 
+/** Widen IEEE fp16 bits to float32; subnormals are flushed to signed zero. */
 static inline float fp16_to_float(uint16_t h) {
     uint32_t sign = ((uint32_t)h & 0x8000) << 16;
     uint32_t exp  = (h >> 10) & 0x1F;
@@ -48,12 +51,14 @@ static inline float fp16_to_float(uint16_t h) {
     return f;
 }
 
+/** Narrow a float32 to bfloat16 by truncating the low 16 mantissa bits. */
 static inline uint16_t float_to_bf16(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
     return (uint16_t)(x >> 16);
 }
 
+/** Widen bfloat16 bits to float32 by zero-extending the mantissa. */
 static inline float bf16_to_float(uint16_t h) {
     uint32_t x = (uint32_t)h << 16;
     float f;
@@ -62,6 +67,8 @@ static inline float bf16_to_float(uint16_t h) {
 }
 
 // FP8 E4M3: 1 sign, 4 exponent, 3 mantissa, bias=7, no inf, NaN=0x7F
+/** Narrow a float32 to FP8 E4M3 bits; underflow flushes to signed zero and
+ *  overflow saturates to the max finite value. */
 static inline uint8_t float_to_fp8_e4m3(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
@@ -75,6 +82,7 @@ static inline uint8_t float_to_fp8_e4m3(float f) {
     return sign | ((uint8_t)exp << 3) | (uint8_t)mant;
 }
 
+/** Widen FP8 E4M3 bits to float32; subnormals are flushed to signed zero. */
 static inline float fp8_e4m3_to_float(uint8_t h) {
     uint32_t sign = ((uint32_t)(h & 0x80)) << 24;
     uint32_t exp  = (h >> 3) & 0x0F;
@@ -92,6 +100,8 @@ static inline float fp8_e4m3_to_float(uint8_t h) {
 }
 
 // FP8 E5M2: 1 sign, 5 exponent, 2 mantissa, bias=15 (like IEEE fp8)
+/** Narrow a float32 to FP8 E5M2 bits; underflow flushes to signed zero and
+ *  overflow saturates to signed infinity. */
 static inline uint8_t float_to_fp8_e5m2(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
@@ -105,6 +115,7 @@ static inline uint8_t float_to_fp8_e5m2(float f) {
     return sign | ((uint8_t)exp << 2) | (uint8_t)mant;
 }
 
+/** Widen FP8 E5M2 bits to float32, decoding inf/NaN like IEEE fp8. */
 static inline float fp8_e5m2_to_float(uint8_t h) {
     uint32_t sign = ((uint32_t)(h & 0x80)) << 24;
     uint32_t exp  = (h >> 2) & 0x1F;
@@ -127,6 +138,8 @@ static inline float fp8_e5m2_to_float(uint8_t h) {
     return f;
 }
 
+/** Narrow a float32 to FP8 E4M3 FNUZ (bias 8, no infinities); non-finite and
+ *  zero inputs map to 0x00, overflow saturates to the max finite value. */
 static inline uint8_t float_to_fp8e4m3fnuz(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
@@ -150,6 +163,7 @@ static inline uint8_t float_to_fp8e4m3fnuz(float f) {
     return (uint8_t)((sign_bit << 7) | ((uint8_t)exp << 3) | (uint8_t)mant);
 }
 
+/** Widen FP8 E4M3 FNUZ bits to float32; 0x80 is the sole NaN and 0x00 is zero. */
 static inline float fp8e4m3fnuz_to_float(uint8_t h) {
     if (h == 0x80)
         return NAN;
@@ -170,6 +184,8 @@ static inline float fp8e4m3fnuz_to_float(uint8_t h) {
     return f;
 }
 
+/** Narrow a float32 to FP8 E5M2 FNUZ (bias 16, no infinities); non-finite and
+ *  zero inputs map to 0x00, overflow saturates to the max finite value. */
 static inline uint8_t float_to_fp8e5m2fnuz(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
@@ -193,6 +209,7 @@ static inline uint8_t float_to_fp8e5m2fnuz(float f) {
     return (uint8_t)((sign_bit << 7) | ((uint8_t)exp << 2) | (uint8_t)mant);
 }
 
+/** Widen FP8 E5M2 FNUZ bits to float32; 0x80 is the sole NaN and 0x00 is zero. */
 static inline float fp8e5m2fnuz_to_float(uint8_t h) {
     if (h == 0x80)
         return NAN;
@@ -213,23 +230,28 @@ static inline float fp8e5m2fnuz_to_float(uint8_t h) {
     return f;
 }
 
+/** True when `d` is an integer or boolean dtype. */
 static inline bool cml_dtype_is_int(DType d) {
     return d == DTYPE_INT8 || d == DTYPE_INT16 || d == DTYPE_INT32 || d == DTYPE_INT64 ||
            d == DTYPE_UINT8 || d == DTYPE_UINT16 || d == DTYPE_UINT32 || d == DTYPE_UINT64 ||
            d == DTYPE_BOOL;
 }
 
+/** True when `d` is any supported floating-point dtype (incl. fp16/bf16/fp8). */
 static inline bool cml_dtype_is_float(DType d) {
     return d == DTYPE_FLOAT32 || d == DTYPE_FLOAT64 || d == DTYPE_FLOAT16 || d == DTYPE_BFLOAT16 ||
            d == DTYPE_FLOAT8_E4M3 || d == DTYPE_FLOAT8_E5M2 || d == DTYPE_FLOAT8_E4M3_FNUZ ||
            d == DTYPE_FLOAT8_E5M2_FNUZ;
 }
 
+/** True for every dtype except the FP8 variants (f32/f64/f16/bf16 and ints). */
 static inline bool cml_dtype_direct(DType d) {
     return d == DTYPE_FLOAT32 || d == DTYPE_FLOAT64 || d == DTYPE_FLOAT16 || d == DTYPE_BFLOAT16 ||
            cml_dtype_is_int(d);
 }
 
+/** Load element `i` of buffer `p` typed as `d` as an int64, widening any integer
+ *  width exactly; non-integer dtypes yield 0. */
 static inline int64_t cml_load_i64(const void* p, size_t i, DType d) {
     switch (d) {
     case DTYPE_INT8:
@@ -254,6 +276,8 @@ static inline int64_t cml_load_i64(const void* p, size_t i, DType d) {
     }
 }
 
+/** Store int64 `v` into element `i` of buffer `p` typed as `d`, truncating to the
+ *  target width (bool stores truthiness); non-integer dtypes are ignored. */
 static inline void cml_store_i64(void* p, size_t i, DType d, int64_t v) {
     switch (d) {
     case DTYPE_INT8:
@@ -288,6 +312,8 @@ static inline void cml_store_i64(void* p, size_t i, DType d, int64_t v) {
     }
 }
 
+/** Load element `i` of buffer `p` typed as `d` as a double, converting from any
+ *  float representation; integer dtypes fall back to the i64 path. */
 static inline double cml_load_f64(const void* p, size_t i, DType d) {
     switch (d) {
     case DTYPE_FLOAT32:

@@ -19,6 +19,7 @@
  * synchronously. */
 typedef void (*cml_cpu_kernel_fn)(void** args, int num_args);
 
+/** Allocate a CPU queue (host==device, always active). */
 static CMLHCQQueue* hcq_cpu_queue_create(void) {
     CMLHCQQueue* q = (CMLHCQQueue*)cml_calloc(1, sizeof(CMLHCQQueue));
     if (!q) {
@@ -30,6 +31,7 @@ static CMLHCQQueue* hcq_cpu_queue_create(void) {
     return q;
 }
 
+/** Free a CPU queue wrapper. */
 static void hcq_cpu_queue_destroy(CMLHCQQueue* q) {
     if (!q)
         return;
@@ -37,6 +39,7 @@ static void hcq_cpu_queue_destroy(CMLHCQQueue* q) {
     cml_free(q);
 }
 
+/** Run the compiled kernel synchronously as a cml_cpu_kernel_fn. */
 static int hcq_cpu_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* desc) {
     (void)q;
     if (!desc->compiled_kernel) {
@@ -47,6 +50,7 @@ static int hcq_cpu_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* desc) {
     return 0;
 }
 
+/** Host-to-device copy — a plain memcpy in the shared CPU address space. */
 static int hcq_cpu_memcpy_h2d(CMLHCQQueue* q, void* dst, const void* src, size_t bytes) {
     (void)q;
     if (!dst || !src) {
@@ -57,6 +61,7 @@ static int hcq_cpu_memcpy_h2d(CMLHCQQueue* q, void* dst, const void* src, size_t
     return 0;
 }
 
+/** Device-to-host copy — a plain memcpy in the shared CPU address space. */
 static int hcq_cpu_memcpy_d2h(CMLHCQQueue* q, void* dst, const void* src, size_t bytes) {
     (void)q;
     if (!dst || !src) {
@@ -67,12 +72,14 @@ static int hcq_cpu_memcpy_d2h(CMLHCQQueue* q, void* dst, const void* src, size_t
     return 0;
 }
 
+/** No-op on the synchronous CPU backend; just clears pending wait signals. */
 static int hcq_cpu_queue_synchronize(CMLHCQQueue* q) {
     if (q)
         q->num_wait_signals = 0; /* synchronous — nothing to wait for */
     return 0;
 }
 
+/** Allocate a CPU signal. */
 static CMLHCQSignal* hcq_cpu_signal_create(void) {
     CMLHCQSignal* s = (CMLHCQSignal*)cml_calloc(1, sizeof(CMLHCQSignal));
     if (!s) {
@@ -83,11 +90,13 @@ static CMLHCQSignal* hcq_cpu_signal_create(void) {
     return s;
 }
 
+/** Free a CPU signal. */
 static void hcq_cpu_signal_destroy(CMLHCQSignal* s) {
     if (s)
         cml_free(s);
 }
 
+/** Mark the signal ready immediately and bump its timeline (synchronous). */
 static int hcq_cpu_signal_record(CMLHCQQueue* q, CMLHCQSignal* s) {
     (void)q;
     s->signaled = true; /* synchronous — immediately ready */
@@ -95,6 +104,7 @@ static int hcq_cpu_signal_record(CMLHCQQueue* q, CMLHCQSignal* s) {
     return 0;
 }
 
+/** Record a wait dependency; warns if the signal was never recorded. */
 static int hcq_cpu_queue_wait(CMLHCQQueue* q, CMLHCQSignal* s) {
     if (!s->signaled)
         LOG_WARNING("CPU HCQ: queue_wait on unsignaled signal %p (synchronous mode)", (void*)s);
@@ -103,6 +113,7 @@ static int hcq_cpu_queue_wait(CMLHCQQueue* q, CMLHCQSignal* s) {
     return 0;
 }
 
+/** Succeed if the signal is already recorded; fail otherwise (no real blocking). */
 static int hcq_cpu_signal_wait_cpu(CMLHCQSignal* s, uint64_t timeout_ms) {
     (void)timeout_ms;
     if (!s->signaled) {
@@ -247,6 +258,7 @@ static const CMLHCQBackendOps g_hcq_webgpu_ops = {
     .signal_wait_cpu   = cml_hcq_webgpu_signal_wait_cpu,
 };
 
+/** Allocate a queue wrapper and init the native Vulkan handle. */
 static CMLHCQQueue* hcq_vulkan_queue_create(void) {
     CMLHCQQueue* q = calloc(1, sizeof(CMLHCQQueue));
     if (!q)
@@ -259,6 +271,7 @@ static CMLHCQQueue* hcq_vulkan_queue_create(void) {
     return q;
 }
 
+/** Allocate a queue wrapper and init the native AM handle. */
 static CMLHCQQueue* hcq_am_queue_create(void) {
     CMLHCQQueue* q = calloc(1, sizeof(CMLHCQQueue));
     if (!q)
@@ -271,18 +284,21 @@ static CMLHCQQueue* hcq_am_queue_create(void) {
     return q;
 }
 
+/** No-op: the Vulkan path signals via fences recorded at submit time. */
 static int hcq_vulkan_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     (void)queue;
     (void)signal;
     return 0;
 }
 
+/** No-op: Vulkan submits already serialize on the single compute queue. */
 static int hcq_vulkan_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     (void)queue;
     (void)signal;
     return 0;
 }
 
+/** Allocate a signal wrapper (CML allocator) and init the native Vulkan fence. */
 static CMLHCQSignal* hcq_vulkan_signal_create(void) {
     /* Must use the CML allocator: hcq.c frees this wrapper with cml_free for the
      * VULKAN/AM backends, so system calloc here would corrupt the heap. */
@@ -297,6 +313,7 @@ static CMLHCQSignal* hcq_vulkan_signal_create(void) {
     return s;
 }
 
+/** Allocate a signal wrapper (CML allocator) and init the native AM signal. */
 static CMLHCQSignal* hcq_am_signal_create(void) {
     CMLHCQSignal* s = cml_calloc(1, sizeof(CMLHCQSignal));
     if (!s)
@@ -388,6 +405,7 @@ static const CMLHCQBackendOps g_hcq_am_ops = {
     .signal_wait_cpu   = cml_hcq_am_signal_wait,
 };
 
+/** Return the ops table for @p backend, or NULL if it is not compiled in. */
 const CMLHCQBackendOps* cml_hcq_backend_ops(CMLHCQBackendType backend) {
     switch (backend) {
     case CML_HCQ_CPU:

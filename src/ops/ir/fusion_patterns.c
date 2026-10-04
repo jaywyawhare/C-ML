@@ -5,6 +5,7 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
+/** Match a MatMul -> bias Add -> activation (MAX/SIGMOID) chain starting at `start`. */
 static FusionMatch* match_matmul_bias_relu(struct IRNode* start, struct CMLGraph* ir) {
     (void)ir;
     if (!start || start->type != UOP_MATMUL)
@@ -49,6 +50,7 @@ static FusionMatch* match_matmul_bias_relu(struct IRNode* start, struct CMLGraph
     return match;
 }
 
+/** Tag the matched MatMul+bias+activation nodes as a single FMA-fused kernel. */
 static int emit_matmul_bias_relu(FusionMatch* match, struct CMLGraph* ir) {
     if (!match || !ir || match->num_matched < 3)
         return -1;
@@ -62,6 +64,7 @@ static int emit_matmul_bias_relu(FusionMatch* match, struct CMLGraph* ir) {
     return 0;
 }
 
+/** Walk a maximal single-use chain of elementwise ops (>=2) from `start`. */
 static FusionMatch* match_elementwise_chain(struct IRNode* start, struct CMLGraph* ir) {
     (void)ir;
     if (!start)
@@ -148,6 +151,7 @@ static FusionMatch* match_elementwise_chain(struct IRNode* start, struct CMLGrap
     return match;
 }
 
+/** Tag the matched chain as one FUSION_CHAIN_ELEMENTWISE kernel sharing a chain id. */
 static int emit_elementwise_chain(FusionMatch* match, struct CMLGraph* ir) {
     if (!match || !ir)
         return -1;
@@ -162,6 +166,7 @@ static int emit_elementwise_chain(FusionMatch* match, struct CMLGraph* ir) {
     return 0;
 }
 
+/** Match the EXP->SUM->RECIP->MUL->SUB softmax + cross-entropy backward pattern. */
 static FusionMatch* match_softmax_ce_bwd(struct IRNode* start, struct CMLGraph* ir) {
     (void)ir;
     if (!start || start->type != UOP_EXP)
@@ -212,6 +217,7 @@ static FusionMatch* match_softmax_ce_bwd(struct IRNode* start, struct CMLGraph* 
     return match;
 }
 
+/** Fuse the softmax+CE nodes and cross-link the forward/backward endpoints. */
 static int emit_softmax_ce_bwd(FusionMatch* match, struct CMLGraph* ir) {
     if (!match || !ir || match->num_matched < 5)
         return -1;
@@ -230,6 +236,7 @@ static int emit_softmax_ce_bwd(FusionMatch* match, struct CMLGraph* ir) {
     return 0;
 }
 
+/** Match the MEAN->SUB->SQUARE->MEAN->RSQRT layernorm forward/backward pattern. */
 static FusionMatch* match_layernorm_bwd(struct IRNode* start, struct CMLGraph* ir) {
     (void)ir;
     if (!start || start->type != UOP_MEAN)
@@ -292,6 +299,7 @@ static FusionMatch* match_layernorm_bwd(struct IRNode* start, struct CMLGraph* i
     return match;
 }
 
+/** Fuse the layernorm nodes so mean/variance stay in registers across the chain. */
 static int emit_layernorm_bwd(FusionMatch* match, struct CMLGraph* ir) {
     if (!match || !ir || match->num_matched < 5)
         return -1;
@@ -305,6 +313,7 @@ static int emit_layernorm_bwd(FusionMatch* match, struct CMLGraph* ir) {
     return 0;
 }
 
+/** Match a GELU/SiLU node that has a backward or consumer, enabling sigmoid reuse. */
 static FusionMatch* match_gelu_bwd(struct IRNode* start, struct CMLGraph* ir) {
     (void)ir;
     if (!start)
@@ -332,6 +341,7 @@ static FusionMatch* match_gelu_bwd(struct IRNode* start, struct CMLGraph* ir) {
     return NULL;
 }
 
+/** Tag the GELU/SiLU node as fused so the backward reuses the forward sigmoid. */
 static int emit_gelu_bwd(FusionMatch* match, struct CMLGraph* ir) {
     if (!match || !ir || match->num_matched < 1)
         return -1;
@@ -345,6 +355,7 @@ static int emit_gelu_bwd(FusionMatch* match, struct CMLGraph* ir) {
 
 static FusionPatternRegistry* g_default_registry = NULL;
 
+/** Create a registry pre-populated with all built-in fusion patterns for every target. */
 FusionPatternRegistry* cml_fusion_registry_create(void) {
     FusionPatternRegistry* reg = cml_calloc(1, sizeof(FusionPatternRegistry));
     if (!reg)
@@ -372,6 +383,7 @@ FusionPatternRegistry* cml_fusion_registry_create(void) {
     return reg;
 }
 
+/** Free a fusion registry and all pattern entries across every target list. */
 void cml_fusion_registry_free(FusionPatternRegistry* registry) {
     if (!registry)
         return;
@@ -387,12 +399,14 @@ void cml_fusion_registry_free(FusionPatternRegistry* registry) {
     cml_free(registry);
 }
 
+/** Return the lazily-created process-wide default fusion registry. */
 FusionPatternRegistry* cml_fusion_registry_get_default(void) {
     if (!g_default_registry)
         g_default_registry = cml_fusion_registry_create();
     return g_default_registry;
 }
 
+/** Register a match/emit pattern for a target, kept ordered by descending priority. */
 int cml_fusion_register_pattern(FusionPatternRegistry* registry, const char* name,
                                 FusionPatternKind kind, FusionTarget target, int priority,
                                 FusionMatchFn match, FusionEmitFn emit) {
@@ -420,6 +434,7 @@ int cml_fusion_register_pattern(FusionPatternRegistry* registry, const char* nam
     return 0;
 }
 
+/** Run every pattern for `target` over the graph; returns the number applied. */
 int cml_fusion_apply_patterns(FusionPatternRegistry* registry, struct CMLGraph* ir,
                               FusionTarget target) {
     if (!registry || !ir || target >= FUSION_TARGET_COUNT)
@@ -452,6 +467,7 @@ int cml_fusion_apply_patterns(FusionPatternRegistry* registry, struct CMLGraph* 
     return applied;
 }
 
+/** Free a FusionMatch and its matched-node and match-data buffers. */
 void cml_fusion_match_free(FusionMatch* match) {
     if (!match)
         return;

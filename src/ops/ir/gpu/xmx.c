@@ -7,6 +7,8 @@
 #include <dlfcn.h>
 #endif
 
+/** Probe OpenCL for an Intel GPU advertising the subgroup matrix-multiply (XMX/DPAS)
+ *  extension; false when OpenCL or the extension is absent. */
 bool cml_xmx_available(void) {
 #ifdef __linux__
     void* ocl = dlopen("libOpenCL.so.1", RTLD_LAZY | RTLD_LOCAL);
@@ -54,6 +56,7 @@ bool cml_xmx_available(void) {
 #endif
 }
 
+/** Return the default Intel XMX/DPAS tiling parameters (depth, exec size, ops/channel). */
 CMLXMXConfig cml_xmx_get_config(void) {
     CMLXMXConfig cfg;
     cfg.dpas_depth   = 8;

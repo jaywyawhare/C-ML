@@ -142,6 +142,7 @@ CMLLLVMBackend* cml_llvm_backend_init(void) {
     return b;
 }
 
+/** Dispose the LLJIT and target machine and free the backend. */
 void cml_llvm_backend_destroy(CMLLLVMBackend* backend) {
     if (!backend)
         return;
@@ -208,6 +209,7 @@ static LoopInfo emit_loop(LLVMBuilderRef bld, LLVMContextRef ctx, LLVMValueRef f
     return info;
 }
 
+/** Close a counted loop: emit i++ and wire the header phi's incoming edges. */
 static void close_loop(LLVMBuilderRef bld, LoopInfo* info, LLVMBasicBlockRef entry_bb) {
     LLVMTypeRef i64     = LLVMInt64TypeInContext(LLVMGetTypeContext(LLVMTypeOf(info->i)));
     LLVMValueRef one    = LLVMConstInt(i64, 1, 0);
@@ -232,6 +234,7 @@ static LLVMTypeRef elem_type(LLVMContextRef ctx, DType dt) {
         return LLVMFloatTypeInContext(ctx);
     }
 }
+/** True if the dtype is an integer type the JIT emits integer ops for. */
 static int dtype_is_int_jit(DType dt) { return dt == DTYPE_INT32 || dt == DTYPE_INT64; }
 
 /* Resolve an input's element index at loop position i for a shape known at
@@ -280,6 +283,7 @@ static bool jit_bcast_is_exact(const Tensor* in, const Tensor* out) {
 #define INTR1(mod, name, name_len, f32)                                                            \
     LLVMGetIntrinsicDeclaration(mod, LLVMLookupIntrinsicID(name, name_len), (LLVMTypeRef[]){f32}, 1)
 
+/** Emit a call to a single-argument float intrinsic (e.g. llvm.exp.f32). */
 static LLVMValueRef call1(LLVMBuilderRef bld, LLVMTypeRef f32, LLVMValueRef intr, LLVMValueRef arg,
                           const char* res) {
     LLVMTypeRef ft = LLVMFunctionType(f32, (LLVMTypeRef[]){f32}, 1, 0);
@@ -714,6 +718,7 @@ typedef struct {
     LLVMTypeRef f32, ptr, i64, void_t;
 } LLVMKernel;
 
+/** Start a new module with the standard `void(in, out, n)` kernel skeleton. */
 static LLVMKernel begin_unary_kernel(LLVMContextRef ctx, const char* fn_name) {
     LLVMKernel k;
     k.mod    = LLVMModuleCreateWithNameInContext(fn_name, ctx);
@@ -731,6 +736,7 @@ static LLVMKernel begin_unary_kernel(LLVMContextRef ctx, const char* fn_name) {
     return k;
 }
 
+/** Build a module computing a full-tensor reduction (SUM/MEAN/MAX) into out[0]. */
 static LLVMModuleRef build_reduction(LLVMContextRef ctx, UOpType type, const char* fn_name,
                                      int64_t n_elems) {
     LLVMKernel k       = begin_unary_kernel(ctx, fn_name);
@@ -1332,6 +1338,10 @@ static void dispose_kernel_ctx(LLVMContextRef ctx, LLVMOrcThreadSafeContextRef t
 #endif
 }
 
+/**
+ * Verify and O3-optimize a module, add it to the JIT, and resolve `fn_name` to
+ * a callable function pointer (NULL on any failure, disposing the module).
+ */
 static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend, LLVMModuleRef mod,
                                       LLVMOrcThreadSafeContextRef tsc, const char* fn_name) {
     char* err = NULL;
@@ -1493,6 +1503,10 @@ static LLVMValueRef fe_emit_op(LLVMBuilderRef bld, LLVMModuleRef mod, LLVMTypeRe
     }
 }
 
+/**
+ * Build a single kernel that evaluates a whole fused elementwise chain in one
+ * loop over the output, broadcast-indexing each input per its element count.
+ */
 static LLVMModuleRef build_fused_elementwise(LLVMContextRef ctx, const char* fn_name,
                                              const FusedElementwiseParams* fp, int64_t out_numel,
                                              const int64_t* in_numel, int num_inputs) {
@@ -1573,6 +1587,7 @@ static bool is_binary_op(UOpType t) {
            t == UOP_CMPLT || t == UOP_POW;
 }
 
+/** True for unary ops the JIT has an elementwise kernel for. */
 static bool is_unary_op(UOpType t) {
     switch (t) {
     case UOP_NEG:
@@ -1608,6 +1623,7 @@ static bool is_unary_op(UOpType t) {
     }
 }
 
+/** True for the full-tensor reductions the JIT can build. */
 static bool is_reduction(UOpType t) { return t == UOP_SUM || t == UOP_MEAN || t == UOP_MAX_REDUCE; }
 
 /* -------------------------------------------------------------------------
@@ -1629,11 +1645,13 @@ typedef struct {
     int64_t n, na, nb;
 } JBTaskCtx;
 
+/** Threadpool worker: run a binary kernel over the [start, end) slice. */
 static void jb_task(void* d, size_t start, size_t end) {
     JBTaskCtx* t = (JBTaskCtx*)d;
     t->fn(t->a, t->b, t->out, t->n, t->na, t->nb, (int64_t)start, (int64_t)end);
 }
 
+/** Dispatch a binary JIT kernel, parallelizing over elements past a threshold. */
 static void jb_run(void* fnv, float* a, float* b, float* out, int64_t n, int64_t na, int64_t nb) {
     if (n >= JIT_PARALLEL_MIN_ELEMS) {
         JBTaskCtx ctx = {(void (*)(const float*, const float*, float*, int64_t, int64_t, int64_t,
@@ -1658,11 +1676,13 @@ typedef struct {
     int64_t n, na;
 } JUTaskCtx;
 
+/** Threadpool worker: run a unary kernel over the [start, end) slice. */
 static void ju_task(void* d, size_t start, size_t end) {
     JUTaskCtx* t = (JUTaskCtx*)d;
     t->fn(t->a, t->out, t->n, t->na, (int64_t)start, (int64_t)end);
 }
 
+/** Dispatch a unary JIT kernel, parallelizing over elements past a threshold. */
 static void ju_run(void* fnv, float* a, float* out, int64_t n, int64_t na) {
     if (n >= JIT_PARALLEL_MIN_ELEMS) {
         JUTaskCtx ctx = {(void (*)(const float*, float*, int64_t, int64_t, int64_t, int64_t))fnv, a,
@@ -1679,11 +1699,13 @@ typedef struct {
     float* out;
 } JFTaskCtx;
 
+/** Threadpool worker: run a fill/no-input kernel over the [start, end) slice. */
 static void jf_task(void* d, size_t start, size_t end) {
     JFTaskCtx* t = (JFTaskCtx*)d;
     t->fn(t->out + start, (int64_t)(end - start));
 }
 
+/** Dispatch a no-input (fill-style) JIT kernel, parallelizing past a threshold. */
 __attribute__((unused)) static void jf_run(void* fnv, float* out, int64_t n) {
     if (n >= JIT_PARALLEL_MIN_ELEMS) {
         JFTaskCtx ctx = {*(void (**)(float*, int64_t))&fnv, out};
@@ -1700,11 +1722,13 @@ typedef struct {
     float v;
 } JVTaskCtx;
 
+/** Threadpool worker: run a scalar-valued kernel over the [start, end) slice. */
 static void jv_task(void* d, size_t start, size_t end) {
     JVTaskCtx* t = (JVTaskCtx*)d;
     t->fn(t->out + start, (int64_t)(end - start), t->v);
 }
 
+/** Dispatch a scalar-valued JIT kernel, parallelizing over elements past a threshold. */
 static void jv_run(void* fnv, float* out, int64_t n, float v) {
     if (n >= JIT_PARALLEL_MIN_ELEMS) {
         JVTaskCtx ctx = {*(void (**)(float*, int64_t, float))&fnv, out, n, v};
@@ -1724,11 +1748,13 @@ typedef struct {
     int64_t n, nc, na, nb;
 } JWTaskCtx;
 
+/** Threadpool worker: run a where/select kernel over the [start, end) slice. */
 static void jw_task(void* d, size_t start, size_t end) {
     JWTaskCtx* t = (JWTaskCtx*)d;
     t->fn(t->c, t->a, t->b, t->out, t->n, t->nc, t->na, t->nb, (int64_t)start, (int64_t)end);
 }
 
+/** Dispatch a where/select JIT kernel, parallelizing over elements past a threshold. */
 static void jw_run(void* fnv, float* cond, float* a, float* b, float* out, int64_t n, int64_t nc,
                    int64_t na, int64_t nb) {
     if (n >= JIT_PARALLEL_MIN_ELEMS) {
@@ -1749,6 +1775,11 @@ static void jw_run(void* fnv, float* cond, float* a, float* b, float* out, int64
                int64_t, int64_t))(void*)fnv)(cond, a, b, out, n, nc, na, nb, 0, n);
 }
 
+/**
+ * JIT-compile and run a single node: allocate its output, build/cache the
+ * matching kernel, and dispatch it. Returns -1 for ops it cannot JIT so the
+ * caller can fall back to the interpreter.
+ */
 static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     if (!node || !node->output)
         return -1;
@@ -2163,6 +2194,7 @@ int cml_llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     return llvm_execute_node(backend, node);
 }
 
+/** Execute the whole graph node-by-node via the JIT, falling back to the CPU interpreter. */
 int cml_llvm_execute(CMLLLVMBackend* backend, CMLGraph_t ir) {
     if (!backend || !ir)
         return -1;
@@ -2182,6 +2214,7 @@ int cml_llvm_execute(CMLLLVMBackend* backend, CMLGraph_t ir) {
     return 0;
 }
 
+/** Execute graph nodes via the JIT up to and including `target_node`. */
 int cml_llvm_execute_up_to(CMLLLVMBackend* backend, CMLGraph_t ir, struct IRNode* target_node) {
     if (!backend || !ir || !target_node)
         return -1;

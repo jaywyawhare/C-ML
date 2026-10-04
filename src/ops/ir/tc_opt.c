@@ -23,6 +23,7 @@ static CMLTCConfig g_tc_config = {
 
 static atomic_int g_tc_counter = 0;
 
+/** Generate a fresh unique name for a tensor-core-inserted node (`_tcN`). */
 static char* tc_unique_name(void) {
     int id     = atomic_fetch_add(&g_tc_counter, 1);
     char* name = cml_malloc(32);
@@ -31,14 +32,17 @@ static char* tc_unique_name(void) {
     return name;
 }
 
+/** Install the global tensor-core eligibility/tiling configuration. */
 void cml_tc_set_config(CMLTCConfig* config) {
     if (!config)
         return;
     g_tc_config = *config;
 }
 
+/** Return the current global tensor-core configuration. */
 CMLTCConfig cml_tc_get_config(void) { return g_tc_config; }
 
+/** True when tensor cores are enabled and at least one backend (WMMA/AMX/XMX) is present. */
 bool cml_tc_available(void) {
     /* TC=0 disables tensor-core usage entirely (default TC=1). */
     if (!cml_flag_enabled(CML_FLAG_TC))
@@ -53,6 +57,7 @@ typedef enum {
     TC_HW_XMX,
 } CMLTCHardware;
 
+/** Pick the tensor-core backend, honouring the TC_SELECT override before auto-detection. */
 static CMLTCHardware tc_detect_hardware(void) {
     /* TC_SELECT forces a specific backend (-1 auto): 1 WMMA, 2 AMX, 3 XMX. */
     int sel = cml_flag(CML_FLAG_TC_SELECT);
@@ -67,6 +72,7 @@ static CMLTCHardware tc_detect_hardware(void) {
     return TC_HW_NONE;
 }
 
+/** Report the native M/N/K tile dimensions for the given tensor-core hardware. */
 static void tc_get_tile_size(CMLTCHardware hw, int* tile_m, int* tile_n, int* tile_k) {
     switch (hw) {
     case TC_HW_WMMA:
@@ -92,8 +98,10 @@ static void tc_get_tile_size(CMLTCHardware hw, int* tile_m, int* tile_n, int* ti
     }
 }
 
+/** Round `val` up to the next multiple of `multiple`. */
 static int round_up(int val, int multiple) { return ((val + multiple - 1) / multiple) * multiple; }
 
+/** Check M/N/K against the minimums and 16-alignment (or padding) required for tensor cores. */
 static bool dims_tc_compatible(int m, int n, int k, const CMLTCConfig* cfg) {
     if (m < cfg->min_m || n < cfg->min_n || k < cfg->min_k)
         return false;
@@ -102,6 +110,7 @@ static bool dims_tc_compatible(int m, int n, int k, const CMLTCConfig* cfg) {
     return cfg->allow_padding;
 }
 
+/** Derive the M/N/K dimensions of a matmul node from its two input shapes (0 if unavailable). */
 static void extract_matmul_dims(struct IRNode* node, int* m, int* n, int* k) {
     *m = 0;
     *n = 0;
@@ -126,6 +135,7 @@ static void extract_matmul_dims(struct IRNode* node, int* m, int* n, int* k) {
     *n = shape_b[ndim_b - 1];
 }
 
+/** Build a UOP_PAD node that widens `src_name` to `padded_shape` for tile alignment. */
 static struct IRNode* create_pad_node(struct IRNode* src_node, const char* src_name,
                                       int* padded_shape, int ndim) {
     struct IRNode* pad = cml_calloc(1, sizeof(struct IRNode));
@@ -150,6 +160,7 @@ static struct IRNode* create_pad_node(struct IRNode* src_node, const char* src_n
     return pad;
 }
 
+/** Build a fused tensor-core matmul node with a backend-selected WMMA config attached. */
 static struct IRNode* create_wmma_node(const char* a_name, const char* b_name, int m, int n, int k,
                                        int* output_shape, int output_ndim) {
     struct IRNode* wmma = cml_calloc(1, sizeof(struct IRNode));
@@ -182,6 +193,7 @@ static struct IRNode* create_wmma_node(const char* a_name, const char* b_name, i
     return wmma;
 }
 
+/** Free an IR node and all its owned storage, clearing any output tensor back-pointers. */
 static void free_node(struct IRNode* node) {
     if (!node)
         return;
@@ -201,6 +213,8 @@ static void free_node(struct IRNode* node) {
     cml_free(node);
 }
 
+/* Replace a plain MATMUL with a padded WMMA node (plus pad/shrink nodes when the dims
+ * are not 16-aligned), rewiring downstream refs. Returns 1 if rewritten, 0 otherwise. */
 static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
     int m, n, k;
     extract_matmul_dims(node, &m, &n, &k);
@@ -325,6 +339,8 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
     return 1;
 }
 
+/* Recognize the SUM(MUL(EXPAND a, EXPAND b)) decomposition of a matmul and return its
+ * two source operands via out_a/out_b. */
 static bool is_fused_matmul_pattern(CMLGraph_t ir, struct IRNode* reduce_node,
                                     struct IRNode** out_a, struct IRNode** out_b) {
     if (!reduce_node || reduce_node->type != UOP_SUM || reduce_node->num_inputs != 1)
@@ -356,6 +372,7 @@ static bool is_fused_matmul_pattern(CMLGraph_t ir, struct IRNode* reduce_node,
     return true;
 }
 
+/* Replace a recognized SUM(MUL(EXPAND,EXPAND)) matmul decomposition with a WMMA node. */
 static int rewrite_fused_matmul(CMLGraph_t ir, struct IRNode* reduce_node, struct IRNode* src_a,
                                 struct IRNode* src_b) {
     int ndim_a = src_a->output_ndim;
@@ -402,6 +419,8 @@ static int rewrite_fused_matmul(CMLGraph_t ir, struct IRNode* reduce_node, struc
     return 1;
 }
 
+/* Rewrite eligible matmuls (direct and decomposed) in the graph onto tensor cores,
+ * applying the TC_OPT aggressiveness level. Returns the number of matmuls rewritten. */
 int cml_tc_optimize(CMLGraph_t graph) {
     if (!graph || !graph->head)
         return 0;

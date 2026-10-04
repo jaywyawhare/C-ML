@@ -24,6 +24,11 @@
 /* Access the shared BLAS context from execution.c */
 extern CMLBlasContext* get_blas_context(void);
 
+/**
+ * Forward-scan from head to output_node, propagating requires_grad and setting
+ * each node's needs_input_grad flags so the reverse pass can skip gradient-free
+ * nodes (backward DCE).
+ */
 int cml_ir_build_backward(CMLGraph_t ir, struct IRNode* output_node) {
     if (!ir || !output_node) {
         LOG_ERROR("Invalid arguments to cml_ir_build_backward");
@@ -56,6 +61,10 @@ int cml_ir_build_backward(CMLGraph_t ir, struct IRNode* output_node) {
     return 0;
 }
 
+/**
+ * Return `t`'s gradient tensor, eagerly allocating and zeroing it on first use.
+ * Deliberately avoids lazy tensor_zeros to not re-trigger the forward graph.
+ */
 static Tensor* ensure_grad(Tensor* t) {
     if (!t)
         return NULL;
@@ -75,6 +84,10 @@ static Tensor* ensure_grad(Tensor* t) {
     return t->grad;
 }
 
+/**
+ * Add `grad_data` into `t`'s gradient, handling the equal-size (SIMD), scalar
+ * (sum-reduce), and broadcast (modulo accumulate) cases.
+ */
 static void accumulate_grad(Tensor* t, float* grad_data, size_t numel) {
     if (!t || !grad_data)
         return;
@@ -3633,6 +3646,11 @@ static int cpu_backward_node(struct IRNode* node) {
     return 0;
 }
 
+/**
+ * Run the reverse pass on the CPU: compute reachability of the loss-rooted
+ * subgraph, then walk nodes in reverse applying each per-op VJP rule, skipping
+ * unreachable or gradient-free nodes.
+ */
 static int cpu_execute_backward(CMLGraph_t ir, struct IRNode* loss_node) {
     if (!ir || !loss_node)
         return -1;
@@ -3751,6 +3769,7 @@ static int cpu_execute_backward(CMLGraph_t ir, struct IRNode* loss_node) {
     return 0;
 }
 
+/** Run the backward pass rooted at the graph tail. */
 int cml_ir_execute_backward(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute_backward");
@@ -3759,6 +3778,10 @@ int cml_ir_execute_backward(CMLGraph_t ir) {
     return cml_ir_execute_backward_from(ir, ir->tail);
 }
 
+/**
+ * Populate backward DCE flags, seed the loss node's gradient with 1.0 (eagerly
+ * allocated), and execute the reverse pass from that loss node.
+ */
 int cml_ir_execute_backward_from(CMLGraph_t ir, struct IRNode* loss_node) {
     if (!ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute_backward_from");

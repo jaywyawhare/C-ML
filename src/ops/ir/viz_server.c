@@ -112,6 +112,7 @@ static const char VIZ_HTML_POST[] =
     "});\n"
     "</script></body></html>\n";
 
+/** Short human-readable name for a dtype, used in the JSON node payload. */
 static const char* dtype_name(DType d) {
     switch (d) {
     case DTYPE_FLOAT32:
@@ -135,6 +136,7 @@ static const char* dtype_name(DType d) {
     }
 }
 
+/** Group an op into a coarse class (elemwise/reduce/movement/matmul) for coloring. */
 static const char* op_class(UOpType op) {
     switch (op) {
     case UOP_ADD:
@@ -169,6 +171,10 @@ static const char* op_class(UOpType op) {
     }
 }
 
+/**
+ * Serialize the IR graph to a JSON object with node and edge arrays for the
+ * browser visualizer (caller frees the returned buffer).
+ */
 char* viz_graph_to_json(CMLGraph_t ir) {
     if (!ir)
         return NULL;
@@ -246,6 +252,7 @@ char* viz_graph_to_json(CMLGraph_t ir) {
     return buf;
 }
 
+/** Write a self-contained HTML page embedding the graph JSON to `path`. */
 int viz_export_html(CMLGraph_t ir, const char* path) {
     if (!path)
         return -1;
@@ -273,6 +280,7 @@ struct VizServer {
     char* json_cache;
 };
 
+/** Put a socket into non-blocking mode (platform-specific). */
 static void set_nonblocking(sock_t fd) {
 #ifdef _WIN32
     u_long m = 1;
@@ -283,6 +291,10 @@ static void set_nonblocking(sock_t fd) {
 #endif
 }
 
+/**
+ * Start a non-blocking HTTP server serving the graph viz on the given port
+ * (0 picks a free port), caching the graph's JSON.
+ */
 VizServer* viz_server_start(CMLGraph_t ir, int port) {
 #ifdef _WIN32
     WSADATA wd;
@@ -326,6 +338,7 @@ VizServer* viz_server_start(CMLGraph_t ir, int port) {
     return srv;
 }
 
+/** Point the server at a new graph and rebuild its cached JSON. */
 void viz_server_update(VizServer* srv, CMLGraph_t ir) {
     if (!srv)
         return;
@@ -334,6 +347,7 @@ void viz_server_update(VizServer* srv, CMLGraph_t ir) {
     srv->json_cache = ir ? viz_graph_to_json(ir) : NULL;
 }
 
+/** Read and discard the request, then send the cached HTML page and close. */
 static void handle_request(VizServer* srv, sock_t cfd) {
     char req[1024];
     recv(cfd, req, sizeof(req) - 1, 0);
@@ -354,6 +368,7 @@ static void handle_request(VizServer* srv, sock_t cfd) {
     sock_close(cfd);
 }
 
+/** Accept and serve all pending connections; returns how many were handled. */
 int viz_server_poll(VizServer* srv) {
     if (!srv)
         return 0;
@@ -368,6 +383,7 @@ int viz_server_poll(VizServer* srv) {
     return handled;
 }
 
+/** Close the listening socket, free cached JSON, and tear down the server. */
 void viz_server_stop(VizServer* srv) {
     if (!srv)
         return;
@@ -379,4 +395,5 @@ void viz_server_stop(VizServer* srv) {
 #endif
 }
 
+/** Return the port the server is listening on, or -1 if none. */
 int viz_server_port(const VizServer* srv) { return srv ? srv->port : -1; }

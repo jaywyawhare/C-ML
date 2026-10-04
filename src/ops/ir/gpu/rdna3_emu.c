@@ -124,24 +124,28 @@ enum {
 
 /* ── Helpers ───────────────────────────────────────────────────────────── */
 
+/** Reinterpret a 32-bit word's bits as a float. */
 static inline float u2f(uint32_t u) {
     float f;
     memcpy(&f, &u, sizeof(f));
     return f;
 }
 
+/** Reinterpret a float's bits as a 32-bit word. */
 static inline uint32_t f2u(float f) {
     uint32_t u;
     memcpy(&u, &f, sizeof(u));
     return u;
 }
 
+/** Return 0 if [addr, addr+size) fits in global memory, -1 otherwise. */
 static int mem_check(CMLRDNA3Emu* emu, uint64_t addr, size_t size) {
     if (addr + size > emu->mem_size)
         return -1;
     return 0;
 }
 
+/** Read a 32-bit word from global memory, 0 on out-of-bounds. */
 static uint32_t mem_read32(CMLRDNA3Emu* emu, uint64_t addr) {
     if (addr + 4 > emu->mem_size)
         return 0;
@@ -150,12 +154,14 @@ static uint32_t mem_read32(CMLRDNA3Emu* emu, uint64_t addr) {
     return v;
 }
 
+/** Write a 32-bit word to global memory, silently ignored on out-of-bounds. */
 static void mem_write32(CMLRDNA3Emu* emu, uint64_t addr, uint32_t val) {
     if (addr + 4 > emu->mem_size)
         return;
     memcpy(emu->memory + addr, &val, 4);
 }
 
+/** Read a 32-bit word from LDS (shared memory), 0 on out-of-bounds. */
 static uint32_t lds_read32(CMLRDNA3Emu* emu, uint32_t offset) {
     if (offset + 4 > emu->lds_size)
         return 0;
@@ -164,18 +170,21 @@ static uint32_t lds_read32(CMLRDNA3Emu* emu, uint32_t offset) {
     return v;
 }
 
+/** Write a 32-bit word to LDS (shared memory), ignored on out-of-bounds. */
 static void lds_write32(CMLRDNA3Emu* emu, uint32_t offset, uint32_t val) {
     if (offset + 4 > emu->lds_size)
         return;
     memcpy(emu->lds + offset, &val, 4);
 }
 
+/** Read scalar GPR `idx`, 0 if out of range. */
 static uint32_t read_sgpr(CMLRDNA3Wave* w, int idx) {
     if (idx < 0 || idx >= RDNA3_NUM_SGPR)
         return 0;
     return w->sgpr[idx];
 }
 
+/** Read a 64-bit value from the SGPR pair [idx, idx+1] (little-endian). */
 static uint64_t read_sgpr_pair(CMLRDNA3Wave* w, int idx) {
     uint64_t lo = read_sgpr(w, idx);
     uint64_t hi = read_sgpr(w, idx + 1);
@@ -184,6 +193,7 @@ static uint64_t read_sgpr_pair(CMLRDNA3Wave* w, int idx) {
 
 /* ── Create / Free ─────────────────────────────────────────────────────── */
 
+/** Allocate an RDNA3 emulator with global memory, LDS, and an initial wave pool. */
 CMLRDNA3Emu* cml_rdna3_emu_create(size_t mem_size) {
     CMLRDNA3Emu* emu = cml_calloc(1, sizeof(CMLRDNA3Emu));
     if (!emu)
@@ -219,6 +229,7 @@ CMLRDNA3Emu* cml_rdna3_emu_create(size_t mem_size) {
     return emu;
 }
 
+/** Free the emulator and all of its buffers. */
 void cml_rdna3_emu_free(CMLRDNA3Emu* emu) {
     if (!emu)
         return;
@@ -228,6 +239,7 @@ void cml_rdna3_emu_free(CMLRDNA3Emu* emu) {
     cml_free(emu);
 }
 
+/** Copy a shader binary into global memory at `addr`. */
 int cml_rdna3_emu_load(CMLRDNA3Emu* emu, const void* binary, size_t size, uint64_t addr) {
     if (!emu || !binary)
         return -1;
@@ -237,6 +249,7 @@ int cml_rdna3_emu_load(CMLRDNA3Emu* emu, const void* binary, size_t size, uint64
     return 0;
 }
 
+/** Host-side write of a buffer into global memory (bounds-checked). */
 int cml_rdna3_emu_write(CMLRDNA3Emu* emu, uint64_t addr, const void* data, size_t size) {
     if (!emu || !data)
         return -1;
@@ -246,6 +259,7 @@ int cml_rdna3_emu_write(CMLRDNA3Emu* emu, uint64_t addr, const void* data, size_
     return 0;
 }
 
+/** Host-side read from global memory into a buffer (bounds-checked). */
 int cml_rdna3_emu_read(CMLRDNA3Emu* emu, uint64_t addr, void* data, size_t size) {
     if (!emu || !data)
         return -1;
@@ -257,6 +271,7 @@ int cml_rdna3_emu_read(CMLRDNA3Emu* emu, uint64_t addr, void* data, size_t size)
 
 /* ── Dispatch ──────────────────────────────────────────────────────────── */
 
+/** Spawn one wave per wavefront across the grid, seeding SGPRs/VGPRs with IDs and kernargs. */
 int cml_rdna3_emu_dispatch(CMLRDNA3Emu* emu, uint32_t grid[3], uint32_t block[3],
                            uint64_t program_addr, uint64_t kernarg_addr) {
     if (!emu)
@@ -320,6 +335,7 @@ int cml_rdna3_emu_dispatch(CMLRDNA3Emu* emu, uint32_t grid[3], uint32_t block[3]
 
 /* ── Instruction execution for a single wave ───────────────────────────── */
 
+/** Execute a scalar SOP2 (two-source) ALU instruction, updating SCC. */
 static int exec_sop2(CMLRDNA3Wave* w, uint32_t inst) {
     int opcode = (inst >> 23) & 0x7F;
     int sdst   = (inst >> 16) & 0x7F;
@@ -371,6 +387,7 @@ static int exec_sop2(CMLRDNA3Wave* w, uint32_t inst) {
     return 0;
 }
 
+/** Execute a scalar SOP1 (one-source) instruction (32/64-bit move). */
 static int exec_sop1(CMLRDNA3Wave* w, uint32_t inst) {
     int sdst   = (inst >> 16) & 0x7F;
     int opcode = (inst >> 8) & 0xFF;
@@ -395,6 +412,7 @@ static int exec_sop1(CMLRDNA3Wave* w, uint32_t inst) {
     return 0;
 }
 
+/** Execute a scalar SOPC compare, setting SCC. */
 static int exec_sopc(CMLRDNA3Wave* w, uint32_t inst) {
     int opcode = (inst >> 16) & 0x7F;
     int ssrc1  = (inst >> 8) & 0xFF;
@@ -419,6 +437,7 @@ static int exec_sopc(CMLRDNA3Wave* w, uint32_t inst) {
     return 0;
 }
 
+/** Execute a scalar SOPP control-flow op (endpgm/branch); returns 1 if the PC was redirected. */
 static int exec_sopp(CMLRDNA3Wave* w, uint32_t inst) {
     int opcode  = (inst >> 16) & 0x7F;
     int16_t imm = (int16_t)(inst & 0xFFFF);
@@ -454,6 +473,7 @@ static int exec_sopp(CMLRDNA3Wave* w, uint32_t inst) {
     return 0;
 }
 
+/** Execute a vector VOP2 instruction across all active lanes. */
 static int exec_vop2(CMLRDNA3Wave* w, uint32_t inst) {
     int opcode = (inst >> 25) & 0x3F;
     int vdst   = (inst >> 17) & 0xFF;
@@ -505,6 +525,7 @@ static int exec_vop2(CMLRDNA3Wave* w, uint32_t inst) {
     return 0;
 }
 
+/** Execute a vector VOP1 instruction (move/convert) across all active lanes. */
 static int exec_vop1(CMLRDNA3Wave* w, uint32_t inst) {
     int vdst   = (inst >> 17) & 0xFF;
     int opcode = (inst >> 9) & 0xFF;
@@ -542,6 +563,7 @@ static int exec_vop1(CMLRDNA3Wave* w, uint32_t inst) {
     return 0;
 }
 
+/** Execute a 64-bit three-source VOP3 instruction (FMA, mul) across active lanes. */
 static int exec_vop3(CMLRDNA3Wave* w, CMLRDNA3Emu* emu, uint32_t hi, uint32_t lo) {
     (void)emu;
     int opcode = (hi >> 16) & 0x3FF;
@@ -576,6 +598,7 @@ static int exec_vop3(CMLRDNA3Wave* w, CMLRDNA3Emu* emu, uint32_t hi, uint32_t lo
     return 0;
 }
 
+/** Execute a scalar memory (SMEM) load of 1/2/4 dwords into SGPRs. */
 static int exec_smem(CMLRDNA3Wave* w, CMLRDNA3Emu* emu, uint32_t hi, uint32_t lo) {
     int opcode      = (hi >> 18) & 0xFF;
     int sdata       = (hi >> 6) & 0x7F;
@@ -604,6 +627,7 @@ static int exec_smem(CMLRDNA3Wave* w, CMLRDNA3Emu* emu, uint32_t hi, uint32_t lo
     return 0;
 }
 
+/** Execute a FLAT/GLOBAL per-lane load or store against global memory. */
 static int exec_flat_global(CMLRDNA3Wave* w, CMLRDNA3Emu* emu, uint32_t hi, uint32_t lo) {
     int opcode     = (hi >> 18) & 0xFF;
     int vdst       = lo & 0xFF;
@@ -648,6 +672,7 @@ static int exec_flat_global(CMLRDNA3Wave* w, CMLRDNA3Emu* emu, uint32_t hi, uint
     return 0;
 }
 
+/** Execute a DS (LDS) per-lane read or write against shared memory. */
 static int exec_ds(CMLRDNA3Wave* w, CMLRDNA3Emu* emu, uint32_t hi, uint32_t lo) {
     int opcode      = (hi >> 18) & 0xFF;
     int vdst        = lo & 0xFF;
@@ -679,6 +704,7 @@ static int exec_ds(CMLRDNA3Wave* w, CMLRDNA3Emu* emu, uint32_t hi, uint32_t lo) 
     return 0;
 }
 
+/** Fetch one instruction for a wave, decode its encoding, dispatch, and advance the PC. */
 static int exec_wave_instruction(CMLRDNA3Wave* w, CMLRDNA3Emu* emu) {
     if (w->halted)
         return 0;
@@ -752,6 +778,7 @@ static int exec_wave_instruction(CMLRDNA3Wave* w, CMLRDNA3Emu* emu) {
 
 /* ── Step / Run ────────────────────────────────────────────────────────── */
 
+/** Advance every non-halted wave by one instruction; returns the active wave count. */
 int cml_rdna3_emu_step(CMLRDNA3Emu* emu) {
     if (!emu)
         return -1;
@@ -768,6 +795,7 @@ int cml_rdna3_emu_step(CMLRDNA3Emu* emu) {
     return active;
 }
 
+/** Step until all waves halt or `max_cycles` elapse; returns 1 if the budget ran out. */
 int cml_rdna3_emu_run(CMLRDNA3Emu* emu, int max_cycles) {
     if (!emu)
         return -1;

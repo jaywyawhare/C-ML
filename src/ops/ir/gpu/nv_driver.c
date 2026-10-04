@@ -119,6 +119,8 @@ typedef struct {
 #define NV2080_GPU_INFO_INDEX_MINOR_REVISION_EXT 38
 #define NV2080_GPU_INFO_INDEX_GPU_ARCH 52
 
+/** Allocate an NVIDIA RM object of the given class under a parent, via the RM_ALLOC
+ * ioctl. Returns the assigned handle in *out_handle. */
 static int nv_rm_alloc(int fd, uint32_t client, uint32_t parent, uint32_t* out_handle,
                        uint32_t nv_class, void* alloc_params) {
     NV_RM_ALLOC_PARAMS p;
@@ -142,6 +144,7 @@ static int nv_rm_alloc(int fd, uint32_t client, uint32_t parent, uint32_t* out_h
     return 0;
 }
 
+/** Issue an NVIDIA RM control command against an object via the RM_CONTROL ioctl. */
 static int nv_rm_control(int fd, uint32_t client, uint32_t object, uint32_t cmd, void* params,
                          uint32_t params_size) {
     NV_RM_CONTROL_PARAMS p;
@@ -164,6 +167,7 @@ static int nv_rm_control(int fd, uint32_t client, uint32_t object, uint32_t cmd,
     return 0;
 }
 
+/** Free an NVIDIA RM object by handle via the RM_FREE ioctl. */
 static int nv_rm_free(int fd, uint32_t client, uint32_t parent, uint32_t handle) {
     NV_RM_FREE_PARAMS p;
     memset(&p, 0, sizeof(p));
@@ -179,12 +183,15 @@ static int nv_rm_free(int fd, uint32_t client, uint32_t parent, uint32_t handle)
     return 0;
 }
 
+/** Monotonic clock reading in milliseconds, used for synchronization timeouts. */
 static uint64_t now_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
 }
 
+/** Bump-allocate a GPU virtual address range from the driver's VA space. Returns 0
+ * if the space is exhausted. */
 static uint64_t nv_va_alloc(CMLNVDriver* drv, size_t size, size_t align) {
     uint64_t aligned_size = NV_ALIGN(size, align > 0 ? align : 4096);
     uint64_t va           = NV_ALIGN(drv->va_current, align > 0 ? align : 4096);
@@ -196,6 +203,7 @@ static uint64_t nv_va_alloc(CMLNVDriver* drv, size_t size, size_t align) {
     return va;
 }
 
+/** Pick the GPFIFO channel class matching the GPU architecture generation. */
 static uint32_t nv_gpfifo_class_for_arch(uint32_t arch) {
     if (arch >= NV_GPU_ARCH_BLACKWELL)
         return BLACKWELL_CHANNEL_GPFIFO_A;
@@ -206,6 +214,7 @@ static uint32_t nv_gpfifo_class_for_arch(uint32_t arch) {
     return TURING_CHANNEL_GPFIFO_A;
 }
 
+/** Pick the compute-engine object class matching the GPU architecture generation. */
 static uint32_t nv_compute_class_for_arch(uint32_t arch) {
     if (arch >= NV_GPU_ARCH_BLACKWELL)
         return BLACKWELL_COMPUTE_A;
@@ -216,6 +225,7 @@ static uint32_t nv_compute_class_for_arch(uint32_t arch) {
     return TURING_COMPUTE_A;
 }
 
+/** Pick the DMA copy-engine object class matching the GPU architecture generation. */
 static uint32_t nv_copy_class_for_arch(uint32_t arch) {
     if (arch >= NV_GPU_ARCH_BLACKWELL)
         return BLACKWELL_DMA_COPY_A;
@@ -226,6 +236,8 @@ static uint32_t nv_copy_class_for_arch(uint32_t arch) {
     return TURING_DMA_COPY_A;
 }
 
+/** Query device name and architecture via RM control, then derive compute capability,
+ * defaulting to Turing/sm_75 if the queries fail. */
 static int nv_query_gpu_info(CMLNVDriver* drv) {
     NV2080_CTRL_GPU_GET_NAME_STRING_PARAMS name_params;
     memset(&name_params, 0, sizeof(name_params));
@@ -277,6 +289,8 @@ static int nv_query_gpu_info(CMLNVDriver* drv) {
     return 0;
 }
 
+/** Allocate a FERMI_VASPACE_A object spanning the driver's VA range; falls back to the
+ * device default VA space on failure. */
 static int nv_setup_vaspace(CMLNVDriver* drv) {
     NV_VASPACE_ALLOC_PARAMS va_params;
     memset(&va_params, 0, sizeof(va_params));
@@ -296,6 +310,8 @@ static int nv_setup_vaspace(CMLNVDriver* drv) {
     return 0;
 }
 
+/** Allocate a GPU buffer (system or video memory), assign it a GPU VA, and mmap a CPU
+ * view when host-visible. Falls back to an anonymous host mapping if RM alloc fails. */
 static CMLNVBuffer* nv_alloc_gpu_buffer(CMLNVDriver* drv, size_t size, bool host_visible) {
     CMLNVBuffer* buf = (CMLNVBuffer*)cml_calloc(1, sizeof(CMLNVBuffer));
     if (!buf)
@@ -381,6 +397,8 @@ fallback_mmap:
     return buf;
 }
 
+/** Create the GPFIFO channel: allocate GPFIFO and USERD buffers, a channel group and
+ * channel, bind compute and copy engine objects, and wire up the doorbell. */
 static int nv_setup_channel(CMLNVDriver* drv) {
     drv->gpfifo_buf =
         nv_alloc_gpu_buffer(drv, (size_t)NV_GPFIFO_DEFAULT_ENTRIES * NV_GPFIFO_ENTRY_BYTES, true);
@@ -460,6 +478,8 @@ static int nv_setup_channel(CMLNVDriver* drv) {
     return 0;
 }
 
+/** Allocate the host-visible pushbuffer that method streams are built into before
+ * submission through the GPFIFO. */
 static int nv_setup_pushbuf(CMLNVDriver* drv) {
     drv->pushbuf.backing = nv_alloc_gpu_buffer(drv, NV_PUSHBUF_DWORDS * sizeof(uint32_t), true);
     if (!drv->pushbuf.backing || !drv->pushbuf.backing->cpu_addr) {
@@ -475,6 +495,8 @@ static int nv_setup_pushbuf(CMLNVDriver* drv) {
     return 0;
 }
 
+/** Allocate the completion semaphore used to track GPU progress, falling back to an
+ * anonymous host mapping if the GPU buffer alloc fails. */
 static int nv_setup_semaphore(CMLNVDriver* drv) {
     drv->semaphore_buf = nv_alloc_gpu_buffer(drv, 4096, true);
     if (!drv->semaphore_buf || !drv->semaphore_buf->cpu_addr) {
@@ -499,23 +521,30 @@ static int nv_setup_semaphore(CMLNVDriver* drv) {
     return 0;
 }
 
+/** Rewind the pushbuffer write position to the start. */
 static void pushbuf_reset(CMLNVPushbuf* pb) { pb->pos = 0; }
 
+/** Append one dword to the pushbuffer (dropped if at capacity). */
 static void pushbuf_emit(CMLNVPushbuf* pb, uint32_t val) {
     if (pb->pos < pb->capacity)
         pb->buf[pb->pos++] = val;
 }
 
+/** Emit a FIFO method header that begins an incrementing method write of `count`
+ * dwords to `reg` on the given subchannel. */
 static void pushbuf_emit_method(CMLNVPushbuf* pb, int subchan, uint32_t reg, uint32_t count) {
     pushbuf_emit(pb, NV_FIFO_INCR(subchan, reg, count));
 }
 
+/** Append a block of raw dwords to the pushbuffer. */
 static void pushbuf_emit_data(CMLNVPushbuf* pb, const void* data, uint32_t dwords) {
     const uint32_t* src = (const uint32_t*)data;
     for (uint32_t i = 0; i < dwords; i++)
         pushbuf_emit(pb, src[i]);
 }
 
+/** Push a GPFIFO entry pointing at the pushbuffer range, advance PUT, and ring the
+ * channel doorbell to kick off GPU execution. */
 static void nv_gpfifo_submit(CMLNVDriver* drv, uint64_t pb_gpu_va, uint32_t len_dwords) {
     if (!drv->gpfifo.entries)
         return;
@@ -535,6 +564,8 @@ static void nv_gpfifo_submit(CMLNVDriver* drv, uint64_t pb_gpu_va, uint32_t len_
     }
 }
 
+/** Emit methods that make the compute engine write `value` to the semaphore (with WFI)
+ * once prior work completes. */
 static void nv_push_semaphore_release(CMLNVPushbuf* pb, uint64_t sem_va, uint32_t value) {
     pushbuf_emit_method(pb, NVC0_SUBCHANNEL_COMPUTE, NVC3C0_SET_REPORT_SEMAPHORE_A, 4);
     pushbuf_emit(pb, (uint32_t)(sem_va >> 32));
@@ -543,6 +574,7 @@ static void nv_push_semaphore_release(CMLNVPushbuf* pb, uint64_t sem_va, uint32_
     pushbuf_emit(pb, NV_SEMAPHORE_RELEASE_WFI);
 }
 
+/** Emit methods that stall the channel until the semaphore reaches `value` (>=). */
 static void nv_push_semaphore_acquire(CMLNVPushbuf* pb, uint64_t sem_va, uint32_t value) {
     pushbuf_emit_method(pb, NVC0_SUBCHANNEL_COMPUTE, NVC3C0_SET_REPORT_SEMAPHORE_A, 4);
     pushbuf_emit(pb, (uint32_t)(sem_va >> 32));
@@ -551,6 +583,7 @@ static void nv_push_semaphore_acquire(CMLNVPushbuf* pb, uint64_t sem_va, uint32_
     pushbuf_emit(pb, NV_SEMAPHORE_ACQUIRE_GEQ);
 }
 
+/** Emit a method to invalidate the shader caches before a kernel launch. */
 static void nv_push_invalidate_caches(CMLNVPushbuf* pb) {
     pushbuf_emit_method(pb, NVC0_SUBCHANNEL_COMPUTE, NVC3C0_INVALIDATE_SHADER_CACHES, 1);
     pushbuf_emit(pb, 0x12);
@@ -558,6 +591,7 @@ static void nv_push_invalidate_caches(CMLNVPushbuf* pb) {
 
 #endif /* __linux__ */
 
+/** Check for a usable NVIDIA GPU by opening /dev/nvidia0 (or querying the mock). */
 bool cml_nv_driver_available(void) {
 #ifdef CML_NV_MOCK_GPU
     return cml_nv_mock_get() != NULL;
@@ -575,6 +609,7 @@ bool cml_nv_driver_available(void) {
 #endif
 }
 
+/** Allocate an NV driver context with default fds (-1) and the initial GPU VA range. */
 CMLNVDriver* cml_nv_driver_create(void) {
     CMLNVDriver* drv = (CMLNVDriver*)cml_calloc(1, sizeof(CMLNVDriver));
     if (!drv) {
@@ -590,6 +625,9 @@ CMLNVDriver* cml_nv_driver_create(void) {
     return drv;
 }
 
+/** Bring up the NV driver: open the nvidiactl/nvidia0/uvm devices, build the RM
+ * client/device/subdevice hierarchy, query the GPU, and set up VA space, channel,
+ * pushbuffer, and semaphore. */
 int cml_nv_driver_init(CMLNVDriver* drv) {
     if (!drv)
         return -1;
@@ -676,6 +714,8 @@ fail:
 #endif
 }
 
+/** Tear down the NV driver: free buffers and RM objects in reverse order of creation,
+ * close the device fds, and free the context. */
 void cml_nv_driver_free(CMLNVDriver* drv) {
     if (!drv)
         return;
@@ -748,6 +788,7 @@ void cml_nv_driver_free(CMLNVDriver* drv) {
     cml_free(drv);
 }
 
+/** Allocate a GPU buffer, host-visible or device-local per `host_visible`. */
 CMLNVBuffer* cml_nv_buffer_create(CMLNVDriver* drv, size_t size, bool host_visible) {
     if (!drv || !drv->initialized || size == 0)
         return NULL;
@@ -760,6 +801,7 @@ CMLNVBuffer* cml_nv_buffer_create(CMLNVDriver* drv, size_t size, bool host_visib
 #endif
 }
 
+/** Allocate a device-local (VRAM) GPU buffer. */
 CMLNVBuffer* cml_nv_buffer_create_vram(CMLNVDriver* drv, size_t size) {
     if (!drv || !drv->initialized || size == 0)
         return NULL;
@@ -771,6 +813,7 @@ CMLNVBuffer* cml_nv_buffer_create_vram(CMLNVDriver* drv, size_t size) {
 #endif
 }
 
+/** Unmap any CPU view and free the buffer's RM objects and struct. */
 void cml_nv_buffer_free(CMLNVDriver* drv, CMLNVBuffer* buf) {
     if (!drv || !buf)
         return;
@@ -792,6 +835,8 @@ void cml_nv_buffer_free(CMLNVDriver* drv, CMLNVBuffer* buf) {
     cml_free(buf);
 }
 
+/** Copy host data into a device buffer: directly if host-mapped, else via a staging
+ * buffer and a copy-engine transfer. */
 int cml_nv_buffer_upload(CMLNVDriver* drv, CMLNVBuffer* dst, const void* src, size_t n) {
     if (!drv || !dst || !src || n == 0)
         return -1;
@@ -817,6 +862,8 @@ int cml_nv_buffer_upload(CMLNVDriver* drv, CMLNVBuffer* dst, const void* src, si
     return ret;
 }
 
+/** Copy a device buffer back to host: directly if host-mapped, else via a staging
+ * buffer and a copy-engine transfer (after synchronizing). */
 int cml_nv_buffer_download(CMLNVDriver* drv, CMLNVBuffer* src, void* dst, size_t n) {
     if (!drv || !src || !dst || n == 0)
         return -1;
@@ -849,6 +896,8 @@ int cml_nv_buffer_download(CMLNVDriver* drv, CMLNVBuffer* src, void* dst, size_t
     return ret;
 }
 
+/** Copy device-to-device by emitting a copy-engine (CE) DMA in the pushbuffer and
+ * submitting it with a semaphore release; falls back to memcpy if both are host-mapped. */
 int cml_nv_buffer_copy(CMLNVDriver* drv, CMLNVBuffer* dst, CMLNVBuffer* src, size_t n) {
     if (!drv || !dst || !src || n == 0)
         return -1;
@@ -893,6 +942,8 @@ int cml_nv_buffer_copy(CMLNVDriver* drv, CMLNVBuffer* dst, CMLNVBuffer* src, siz
 #endif
 }
 
+/** Assemble PTX to a CUBIN with external ptxas (via temp files), parse its kernel
+ * metadata, and upload the code into a GPU buffer. */
 CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver* drv, const char* ptx_code,
                                        const char* kernel_name) {
     if (!ptx_code || !kernel_name)
@@ -1032,6 +1083,8 @@ CMLNVKernel* cml_nv_kernel_compile_ptx(CMLNVDriver* drv, const char* ptx_code,
     return kernel;
 }
 
+/** Load a prebuilt CUBIN: copy it, parse kernel metadata, and upload the code into a
+ * GPU buffer. */
 CMLNVKernel* cml_nv_kernel_load_cubin(CMLNVDriver* drv, const void* cubin, size_t size,
                                       const char* kernel_name) {
     if (!cubin || size == 0 || !kernel_name)
@@ -1083,6 +1136,7 @@ CMLNVKernel* cml_nv_kernel_load_cubin(CMLNVDriver* drv, const void* cubin, size_
     return kernel;
 }
 
+/** Free a kernel's GPU code buffer, host CUBIN copy, name, and struct. */
 void cml_nv_kernel_free(CMLNVDriver* drv, CMLNVKernel* kernel) {
     if (!kernel)
         return;
@@ -1104,6 +1158,9 @@ void cml_nv_kernel_free(CMLNVDriver* drv, CMLNVKernel* kernel) {
     cml_free(kernel);
 }
 
+/** Launch a kernel: build its QMD, pack arguments into constant buffer 0, emit the
+ * dispatch methods into the pushbuffer, and submit via the GPFIFO with a semaphore
+ * release. */
 int cml_nv_kernel_launch(CMLNVDriver* drv, CMLNVKernel* kernel, uint32_t grid[3], uint32_t block[3],
                          void** args, int num_args) {
     if (!drv || !drv->initialized || !kernel)
@@ -1194,6 +1251,8 @@ int cml_nv_kernel_launch(CMLNVDriver* drv, CMLNVKernel* kernel, uint32_t grid[3]
 #endif
 }
 
+/** Block until the semaphore reaches the last released value (polling with a short
+ * sleep) or the timeout expires. */
 int cml_nv_synchronize(CMLNVDriver* drv) {
     if (!drv || !drv->initialized)
         return -1;
@@ -1226,6 +1285,8 @@ int cml_nv_synchronize(CMLNVDriver* drv) {
 #endif
 }
 
+/** Generate a standalone PTX elementwise kernel (unary or binary) for an IR node's op,
+ * targeting sm_<sm>. Returns NULL for unsupported ops. Caller frees the string. */
 char* cml_nv_gen_ptx_for_node(struct IRNode* node, int sm) {
     char* ptx         = NULL;
     const char* kname = "nv_auto_kernel";
@@ -1415,6 +1476,7 @@ char* cml_nv_gen_ptx_for_node(struct IRNode* node, int sm) {
     return ptx;
 }
 
+/** Submit a GPU-side wait that stalls the channel until a semaphore reaches `value`. */
 int cml_nv_gpu_wait_semaphore(CMLNVDriver* drv, uint64_t sem_va, uint32_t value) {
 #ifdef __linux__
     if (!drv || !drv->initialized)
@@ -1436,6 +1498,7 @@ int cml_nv_gpu_wait_semaphore(CMLNVDriver* drv, uint64_t sem_va, uint32_t value)
 #endif
 }
 
+/** Lazily create and cache a shared HCQ queue used by the graph-execution helpers. */
 static CMLHCQQueue* nv_exec_hcq_queue(void) {
     static CMLHCQQueue* queue;
     if (!queue)
@@ -1443,6 +1506,7 @@ static CMLHCQQueue* nv_exec_hcq_queue(void) {
     return queue;
 }
 
+/** Upload host data to a buffer via the HCQ queue when available, else the direct path. */
 static int nv_exec_upload(CMLNVDriver* drv, CMLNVBuffer* buf, const void* src, size_t bytes) {
     CMLHCQQueue* q = nv_exec_hcq_queue();
     if (q)
@@ -1450,6 +1514,7 @@ static int nv_exec_upload(CMLNVDriver* drv, CMLNVBuffer* buf, const void* src, s
     return cml_nv_buffer_upload(drv, buf, src, bytes);
 }
 
+/** Download a buffer to host via the HCQ queue when available, else the direct path. */
 static int nv_exec_download(CMLNVDriver* drv, CMLNVBuffer* buf, void* dst, size_t bytes) {
     CMLHCQQueue* q = nv_exec_hcq_queue();
     if (q)
@@ -1457,6 +1522,7 @@ static int nv_exec_download(CMLNVDriver* drv, CMLNVBuffer* buf, void* dst, size_
     return cml_nv_buffer_download(drv, buf, dst, bytes);
 }
 
+/** Synchronize via the HCQ queue when available, else the direct driver sync. */
 static int nv_exec_sync(CMLNVDriver* drv) {
     CMLHCQQueue* q = nv_exec_hcq_queue();
     if (q)
@@ -1464,6 +1530,8 @@ static int nv_exec_sync(CMLNVDriver* drv) {
     return cml_nv_synchronize(drv);
 }
 
+/** Launch a kernel via the HCQ queue (packing a kernel descriptor) when available,
+ * else the direct driver launch. */
 static int nv_exec_launch(CMLNVDriver* drv, CMLNVKernel* kernel, uint32_t grid[3],
                           uint32_t block[3], void** kargs, int num_args) {
     CMLHCQQueue* q = nv_exec_hcq_queue();
@@ -1483,6 +1551,8 @@ static int nv_exec_launch(CMLNVDriver* drv, CMLNVKernel* kernel, uint32_t grid[3
     return cml_nv_kernel_launch(drv, kernel, grid, block, kargs, num_args);
 }
 
+/** Execute an IR graph node by node: generate and compile PTX for supported elementwise
+ * ops, run them through the GPU upload/launch/download path, else CPU fallback. */
 int cml_nv_execute_graph(CMLNVDriver* drv, CMLGraph_t ir) {
     if (!drv || !ir)
         return -1;

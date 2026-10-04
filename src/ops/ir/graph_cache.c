@@ -18,18 +18,22 @@
 #define FNV_OFFSET 0xcbf29ce484222325ULL
 #define FNV_PRIME 0x100000001b3ULL
 
+/** Round @p size up to a multiple of @p alignment. */
 static size_t cml_alloc_size_aligned(size_t size, size_t alignment) {
     return (size + alignment - 1) & ~(alignment - 1);
 }
 
 static CMLGraphCache* g_graph_cache = NULL;
 
+/** Fold @p val into an FNV-style running hash. */
 static uint64_t hash_combine(uint64_t h, uint64_t val) {
     h ^= val;
     h *= FNV_PRIME;
     return h;
 }
 
+/** Cache signature keyed on the graph's tail node (its output), so it stays
+ *  stable as further nodes are appended between forward passes. */
 uint64_t cml_graph_compute_signature(CMLGraph_t ir) {
     if (!ir)
         return 0;
@@ -57,6 +61,7 @@ uint64_t cml_graph_compute_signature(CMLGraph_t ir) {
     return hash;
 }
 
+/** Allocate a graph execution-plan cache holding up to @p max_entries plans. */
 CMLGraphCache* cml_graph_cache_create(size_t max_entries) {
     CMLGraphCache* cache = cml_calloc(1, sizeof(CMLGraphCache));
     if (!cache)
@@ -80,6 +85,7 @@ CMLGraphCache* cml_graph_cache_create(size_t max_entries) {
 
 static void free_execution_plan_impl(CMLExecutionPlan* plan, bool detach_tensor_buffers);
 
+/** Free the cache and every cached execution plan. */
 void cml_graph_cache_destroy(CMLGraphCache* cache) {
     if (!cache)
         return;
@@ -98,6 +104,7 @@ void cml_graph_cache_destroy(CMLGraphCache* cache) {
     cml_free(cache);
 }
 
+/** Return the cached valid plan for @p signature, updating LRU/stats, or NULL. */
 CMLExecutionPlan* cml_graph_cache_lookup(CMLGraphCache* cache, uint64_t signature) {
     if (!cache)
         return NULL;
@@ -118,6 +125,7 @@ CMLExecutionPlan* cml_graph_cache_lookup(CMLGraphCache* cache, uint64_t signatur
     return NULL;
 }
 
+/** Evict the least-recently-used plan, detaching its tensor buffers. */
 static void evict_lru_entry(CMLGraphCache* cache) {
     if (!cache || cache->count == 0)
         return;
@@ -155,6 +163,7 @@ static void evict_lru_entry(CMLGraphCache* cache) {
     }
 }
 
+/** Insert @p plan under @p signature, evicting LRU first when at capacity. */
 int cml_graph_cache_insert(CMLGraphCache* cache, uint64_t signature, CMLExecutionPlan* plan) {
     if (!cache || !plan)
         return -1;
@@ -179,6 +188,7 @@ int cml_graph_cache_insert(CMLGraphCache* cache, uint64_t signature, CMLExecutio
     return 0;
 }
 
+/** Number of nodes in the graph's forward list. */
 static size_t count_nodes(CMLGraph_t ir) {
     size_t count        = 0;
     struct IRNode* node = ir->head;
@@ -189,6 +199,8 @@ static size_t count_nodes(CMLGraph_t ir) {
     return count;
 }
 
+/** Build a reusable execution plan, preallocating an output buffer for each node
+ *  that owns a full buffer and skipping aliasing movement ops. */
 CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
     if (!ir)
         return NULL;
@@ -249,6 +261,8 @@ CMLExecutionPlan* cml_create_execution_plan(CMLGraph_t ir) {
     return plan;
 }
 
+/** Free a plan; when @p detach_tensor_buffers, also unbind buffers still owned
+ *  by their output tensors before releasing them. */
 static void free_execution_plan_impl(CMLExecutionPlan* plan, bool detach_tensor_buffers) {
     if (!plan)
         return;
@@ -275,8 +289,11 @@ static void free_execution_plan_impl(CMLExecutionPlan* plan, bool detach_tensor_
     cml_free(plan);
 }
 
+/** Free an execution plan, detaching its buffers from output tensors. */
 void cml_free_execution_plan(CMLExecutionPlan* plan) { free_execution_plan_impl(plan, true); }
 
+/** Fast-path CPU execution of a single supported node into @p out_buf;
+ *  returns -1 for unhandled op types. */
 int cml_execute_node_fast(struct IRNode* node, float* out_buf) {
     if (!node || !out_buf)
         return -1;
@@ -596,6 +613,7 @@ int cml_execute_node_fast(struct IRNode* node, float* out_buf) {
     return 0;
 }
 
+/** Execute every node of a cached plan into its preallocated buffers. */
 int cml_execute_plan(CMLExecutionPlan* plan, Tensor** inputs, size_t num_inputs) {
     if (!plan || !plan->valid)
         return -1;
@@ -622,6 +640,7 @@ int cml_execute_plan(CMLExecutionPlan* plan, Tensor** inputs, size_t num_inputs)
     return 0;
 }
 
+/** Lazily-created process-wide default graph cache. */
 CMLGraphCache* cml_get_graph_cache(void) {
     if (!g_graph_cache) {
         g_graph_cache = cml_graph_cache_create(32);
@@ -629,6 +648,7 @@ CMLGraphCache* cml_get_graph_cache(void) {
     return g_graph_cache;
 }
 
+/** Print graph-cache hit/miss statistics (defaults to the global cache). */
 void cml_graph_cache_print_stats(CMLGraphCache* cache) {
     if (!cache) {
         cache = g_graph_cache;
@@ -647,6 +667,8 @@ void cml_graph_cache_print_stats(CMLGraphCache* cache) {
     }
 }
 
+/** Drop all cached plans (whose tensor pointers would dangle after an IR free)
+ *  while keeping the cache struct and hit/miss counters alive. */
 void cml_graph_cache_reset_global(void) {
     /* Clear all cached entries whose tensor pointers would become dangling
      * after the IR graph is freed.  Keep the cache struct and hit/miss
@@ -667,6 +689,7 @@ void cml_graph_cache_reset_global(void) {
     g_graph_cache->count = 0;
 }
 
+/** Null out references to @p t in every cached plan so it is not later dereferenced. */
 void cml_graph_cache_forget_tensor(Tensor* t) {
     if (!g_graph_cache || !t)
         return;

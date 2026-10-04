@@ -23,8 +23,10 @@ static const int VEC_WIDTHS[]     = {1, 2, 4};
  */
 static int cache_slot(uint64_t hash) { return (int)(hash % 256); }
 
+/** True when the BEAM autotuning flag is set to a positive width. */
 bool cml_beam_search_enabled(void) { return cml_flag(CML_FLAG_BEAM) > 0; }
 
+/** Allocate a beam-search context, taking beam width from the BEAM flag and clearing the cache. */
 CMLBeamSearchCtx* cml_beam_search_create(void) {
     CMLBeamSearchCtx* ctx = (CMLBeamSearchCtx*)cml_calloc(1, sizeof(CMLBeamSearchCtx));
     if (!ctx) {
@@ -51,12 +53,14 @@ CMLBeamSearchCtx* cml_beam_search_create(void) {
     return ctx;
 }
 
+/** Free a beam-search context. */
 void cml_beam_search_free(CMLBeamSearchCtx* ctx) {
     if (!ctx)
         return;
     cml_free(ctx);
 }
 
+/** Probe the cache for a tuned config by kernel hash; returns 0 on hit, -1 on miss. */
 int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, CMLBeamConfig* best_out) {
     if (!ctx || !best_out)
         return -1;
@@ -88,6 +92,7 @@ int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, CMLBeamC
     return -1; /* Cache full and key not found. */
 }
 
+/** Cache a tuned config for a kernel hash, overwriting an existing entry only if faster. */
 int cml_beam_search_store(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, const CMLBeamConfig* config,
                           double time_us) {
     if (!ctx || !config)
@@ -229,6 +234,8 @@ static int generate_candidates(CMLBeamResult* out, size_t total_elements) {
     return num;
 }
 
+/* Tune a kernel using the CPU cost model: check cache, generate candidates, keep the top
+ * beam_width by heuristic, pick the lowest estimated time, and cache the winner. */
 int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, size_t total_elements,
                          int ndim, const int* shape, CMLBeamConfig* best_out) {
     if (!ctx || !best_out) {
@@ -301,6 +308,8 @@ int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, size_t tot
     return 0;
 }
 
+/* Tune a kernel by measuring on real hardware: heuristic pre-filter to 2*beam_width, then
+ * time each survivor via `timing_fn` and cache the fastest. */
 int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, size_t total_elements,
                             CMLBeamTimingFn timing_fn, void* user_data, CMLBeamConfig* best_out) {
     if (!ctx || !timing_fn || !best_out) {
@@ -366,6 +375,7 @@ int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, size_t 
     return 0;
 }
 
+/** Serialize the tuning cache (magic header + occupied entries) to `path`. */
 int cml_beam_cache_save(CMLBeamSearchCtx* ctx, const char* path) {
     if (!ctx || !path)
         return -1;
@@ -395,6 +405,7 @@ int cml_beam_cache_save(CMLBeamSearchCtx* ctx, const char* path) {
     return 0;
 }
 
+/** Load a previously saved tuning cache from `path`, validating the magic header. */
 int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path) {
     if (!ctx || !path)
         return -1;
@@ -441,6 +452,8 @@ int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path) {
     return 0;
 }
 
+/* Tune over enumerated opt lists for a linear program: turn each into a beam config, score
+ * it (hardware `timing_fn` or a throughput model), and cache the best. */
 int cml_beam_search_tune_opt(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
                              struct LinearProgram* prog, CMLBeamTimingFn timing_fn, void* user_data,
                              CMLBeamConfig* best_out) {

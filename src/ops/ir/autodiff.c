@@ -60,12 +60,14 @@ typedef struct {
     int count, cap;
 } GradMap;
 
+/** Look up the accumulated gradient for a value tensor, or NULL if none. */
 static Tensor* gm_get(GradMap* m, Tensor* v) {
     for (int i = 0; i < m->count; i++)
         if (m->items[i].val == v)
             return m->items[i].grad;
     return NULL;
 }
+/** Set (or insert) the gradient for a value tensor, growing the map as needed. */
 static void gm_put(GradMap* m, Tensor* v, Tensor* g) {
     for (int i = 0; i < m->count; i++)
         if (m->items[i].val == v) {
@@ -92,6 +94,7 @@ static void gm_accum(GradMap* m, Tensor* v, Tensor* contrib) {
 /* A constant shaped like `t`, for gradient expressions that need one. */
 static Tensor* ad_k(Tensor* t, float v) { return uop_fill(t->shape, t->ndim, v); }
 
+/** Reshape helper that packs shape into ReshapeParams and emits a RESHAPE uop. */
 static Tensor* ad_reshape(Tensor* x, const int* shape, int ndim) {
     ReshapeParams p;
     int buf[16];
@@ -100,6 +103,7 @@ static Tensor* ad_reshape(Tensor* x, const int* shape, int ndim) {
     p.new_ndim  = ndim;
     return uop_reshape(x, &p);
 }
+/** Expand (broadcast) helper that packs shape into ExpandParams and emits EXPAND. */
 static Tensor* ad_expand(Tensor* x, const int* shape, int ndim) {
     ExpandParams p;
     int buf[16];
@@ -128,6 +132,7 @@ static Tensor* ad_revcumsum(Tensor* x, int dim) {
     return uop_add(uop_sub(tot_b, cum), x);
 }
 
+/** Permute helper that packs perm into PermuteParams and emits a PERMUTE uop. */
 static Tensor* ad_permute(Tensor* x, const int* perm, int ndim) {
     PermuteParams p;
     int buf[16];
@@ -136,6 +141,7 @@ static Tensor* ad_permute(Tensor* x, const int* perm, int ndim) {
     p.num_dims = ndim;
     return uop_permute(x, &p);
 }
+/** Sum helper that packs dims/keepdim into ReduceParams and emits a SUM uop. */
 static Tensor* ad_sum(Tensor* x, const int* dims, int ndims, bool keepdim) {
     ReduceParams p;
     int buf[16];
@@ -174,6 +180,7 @@ static Tensor* ad_sum_axes(Tensor* x, int* axes, int n) {
     return r;
 }
 
+/** Transpose the last two axes of an ndim tensor (identity perm for ndim < 2). */
 static Tensor* ad_transpose(Tensor* x, int ndim) {
     int perm[16];
     for (int i = 0; i < ndim; i++)

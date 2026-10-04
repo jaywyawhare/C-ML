@@ -22,6 +22,7 @@ static const int PAD_MULTIPLES[]  = {16, 32, 64};
 #define NUM_VEC_WIDTHS (int)(sizeof(VEC_WIDTHS) / sizeof(VEC_WIDTHS[0]))
 #define NUM_PAD_MULTIPLES (int)(sizeof(PAD_MULTIPLES) / sizeof(PAD_MULTIPLES[0]))
 
+/** Return a display name for an optimization transform type. */
 const char* cml_opt_type_name(CMLOptType type) {
     switch (type) {
     case OPT_LOCAL:
@@ -40,6 +41,7 @@ const char* cml_opt_type_name(CMLOptType type) {
     return "???";
 }
 
+/** Allocate an empty, growable optimization list. */
 CMLOptList* cml_opt_list_create(void) {
     CMLOptList* list = cml_calloc(1, sizeof(CMLOptList));
     if (!list)
@@ -53,6 +55,7 @@ CMLOptList* cml_opt_list_create(void) {
     return list;
 }
 
+/** Free an optimization list and its backing array. */
 void cml_opt_list_free(CMLOptList* list) {
     if (!list)
         return;
@@ -60,6 +63,7 @@ void cml_opt_list_free(CMLOptList* list) {
     cml_free(list);
 }
 
+/** Append a (type, axis, amount) transform to the list, growing it as needed. */
 void cml_opt_list_add(CMLOptList* list, CMLOptType type, int axis, int amount) {
     if (!list)
         return;
@@ -75,6 +79,7 @@ void cml_opt_list_add(CMLOptList* list, CMLOptType type, int axis, int amount) {
     list->opts[list->num_opts++] = opt;
 }
 
+/** Deep-copy an optimization list. */
 static CMLOptList* opt_list_clone(const CMLOptList* src) {
     if (!src)
         return NULL;
@@ -88,6 +93,7 @@ static CMLOptList* opt_list_clone(const CMLOptList* src) {
 
 /* ── Axis helpers ── */
 
+/** Append a new loop axis of the given extent; returns its index or -1. */
 static int prog_add_axis(LinearProgram* prog, int extent) {
     if (!prog)
         return -1;
@@ -104,6 +110,7 @@ static int prog_add_axis(LinearProgram* prog, int extent) {
     return idx;
 }
 
+/** Return the extent of a loop axis, or -1 if the axis is out of range. */
 static int prog_get_axis_extent(const LinearProgram* prog, int axis) {
     if (!prog || axis < 0 || axis >= prog->num_axes)
         return -1;
@@ -112,6 +119,8 @@ static int prog_get_axis_extent(const LinearProgram* prog, int axis) {
 
 /* ── Individual transform implementations ── */
 
+/* Tile `axis` into local/shared memory: split the axis and emit the alloc + barrier,
+ * honouring NOLOCALS and the shared-memory budget. */
 static int apply_local(int axis, int amount, LinearProgram* prog) {
     /* NOLOCALS suppresses all local/shared-memory tiling. */
     if (cml_flag_enabled(CML_FLAG_NOLOCALS))
@@ -158,6 +167,7 @@ static int apply_local(int axis, int amount, LinearProgram* prog) {
     return 0;
 }
 
+/* Split `axis` into a global/local pair and bind the local part to a free workgroup dim. */
 static int apply_group(int axis, int amount, LinearProgram* prog) {
     int extent = prog_get_axis_extent(prog, axis);
     if (extent <= 0) {
@@ -201,6 +211,7 @@ static int apply_group(int axis, int amount, LinearProgram* prog) {
     return 0;
 }
 
+/* Unroll `axis` by `amount`: shrink its extent and replicate the loop body with fresh vregs. */
 static int apply_unroll(int axis, int amount, LinearProgram* prog) {
     int extent = prog_get_axis_extent(prog, axis);
     if (extent <= 0) {
@@ -264,6 +275,7 @@ static int apply_unroll(int axis, int amount, LinearProgram* prog) {
     return 0;
 }
 
+/* Vectorize `axis` by a power-of-two width, tagging loads/stores/computes with vec_width. */
 static int apply_upcast(int axis, int amount, LinearProgram* prog) {
     int extent = prog_get_axis_extent(prog, axis);
     if (extent <= 0) {
@@ -294,6 +306,7 @@ static int apply_upcast(int axis, int amount, LinearProgram* prog) {
     return 0;
 }
 
+/** Round an axis extent up to a multiple of `amount` for alignment. */
 static int apply_padto(int axis, int amount, LinearProgram* prog) {
     int extent = prog_get_axis_extent(prog, axis);
     if (extent <= 0) {
@@ -315,6 +328,7 @@ static int apply_padto(int axis, int amount, LinearProgram* prog) {
     return 0;
 }
 
+/** Strip all local-memory ops (alloc/load/store/barrier) from the program. */
 static int apply_nolocals(LinearProgram* prog) {
     int dst = 0;
     for (int i = 0; i < prog->num_ops; i++) {
@@ -337,6 +351,7 @@ static int apply_nolocals(LinearProgram* prog) {
 
 /* ── Public apply ── */
 
+/** Apply each transform in `opts` to `prog` in order, aborting on the first failure. */
 int cml_opt_apply(CMLOptList* opts, struct LinearProgram* prog) {
     if (!opts || !prog)
         return -1;
@@ -375,6 +390,8 @@ int cml_opt_apply(CMLOptList* opts, struct LinearProgram* prog) {
 
 /* ── Enumeration ── */
 
+/* Enumerate candidate opt lists (baseline, per-axis single transforms, selected two-opt
+ * pairs, and a NOLOCALS variant) up to max_combinations, for the autotuner to search. */
 int cml_opt_enumerate(struct LinearProgram* prog, CMLOptList*** out_lists, int* out_count,
                       int max_combinations) {
     if (!prog || !out_lists || !out_count || max_combinations <= 0)

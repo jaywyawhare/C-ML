@@ -15,6 +15,7 @@
 #define FNV_OFFSET 0xcbf29ce484222325ULL
 #define FNV_PRIME 0x100000001b3ULL
 
+/** Fold `len` bytes into an FNV-1a running hash. */
 static uint64_t hash_bytes(uint64_t h, const void* data, size_t len) {
     const uint8_t* bytes = (const uint8_t*)data;
     for (size_t i = 0; i < len; i++) {
@@ -24,6 +25,7 @@ static uint64_t hash_bytes(uint64_t h, const void* data, size_t len) {
     return h;
 }
 
+/** Compute a content hash over a linear program's ops for cache keying. */
 static uint64_t hash_linear_program(const CMLLinearProgram* prog) {
     uint64_t h = FNV_OFFSET;
     h          = hash_bytes(h, &prog->num_ops, sizeof(prog->num_ops));
@@ -42,6 +44,7 @@ static uint64_t hash_linear_program(const CMLLinearProgram* prog) {
     return h;
 }
 
+/** Create a runtime compiler with the C backend and caching enabled by default. */
 CMLRuntimeCompiler* cml_runtime_compiler_create(void) {
     CMLRuntimeCompiler* rc = cml_calloc(1, sizeof(CMLRuntimeCompiler));
     if (!rc)
@@ -52,6 +55,7 @@ CMLRuntimeCompiler* cml_runtime_compiler_create(void) {
     return rc;
 }
 
+/** Free the compiler and every cached kernel's source/binary/op storage. */
 void cml_runtime_compiler_free(CMLRuntimeCompiler* rc) {
     if (!rc)
         return;
@@ -66,6 +70,7 @@ void cml_runtime_compiler_free(CMLRuntimeCompiler* rc) {
     cml_free(rc);
 }
 
+/** Linear-probe the compiled-kernel cache for a matching hash. */
 static CMLCompiledKernel* cache_lookup(CMLRuntimeCompiler* rc, uint64_t hash) {
     uint64_t idx = hash % CML_COMPILED_CACHE_SIZE;
     for (int probe = 0; probe < CML_COMPILED_CACHE_SIZE; probe++) {
@@ -79,6 +84,7 @@ static CMLCompiledKernel* cache_lookup(CMLRuntimeCompiler* rc, uint64_t hash) {
     return NULL;
 }
 
+/** Reserve a cache slot for `hash`, evicting the home slot if the table is full. */
 static CMLCompiledKernel* cache_insert(CMLRuntimeCompiler* rc, uint64_t hash) {
     uint64_t idx = hash % CML_COMPILED_CACHE_SIZE;
     for (int probe = 0; probe < CML_COMPILED_CACHE_SIZE; probe++) {
@@ -101,6 +107,8 @@ static CMLCompiledKernel* cache_insert(CMLRuntimeCompiler* rc, uint64_t hash) {
     return k;
 }
 
+/* Compile (or return cached) a linear program: codegen for the preferred backend and move
+ * the resulting source/binary and op copy into a cache entry. */
 const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
                                                      const CMLLinearProgram* prog,
                                                      size_t work_size) {
@@ -163,6 +171,7 @@ const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
     return entry;
 }
 
+/** Linearize a fusion group and compile it, deriving work size from the first node's output. */
 const CMLCompiledKernel* cml_runtime_compile_group(CMLRuntimeCompiler* rc,
                                                    const CMLFusionGroup* group) {
     if (!rc || !group)
@@ -186,6 +195,8 @@ const CMLCompiledKernel* cml_runtime_compile_group(CMLRuntimeCompiler* rc,
     return result;
 }
 
+/* Interpret a compiled C-backend kernel on the CPU: run its LOAD/COMPUTE/STORE ops over
+ * every element with a small per-element vreg file. */
 int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel, Tensor** inputs, int num_inputs,
                                  Tensor** outputs, int num_outputs) {
     if (!kernel || !inputs || !outputs)
@@ -330,6 +341,8 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel, Tensor** input
     return 0;
 }
 
+/* Schedule the graph into fusion groups and execute each, trying fused compilation first
+ * and falling back to per-node CPU execution. */
 int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
     if (!rc || !ir)
         return -1;
@@ -420,6 +433,7 @@ int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
     return rc_val;
 }
 
+/** Report cumulative cache hit/miss and compilation counts via the out-params. */
 void cml_runtime_compiler_stats(const CMLRuntimeCompiler* rc, size_t* hits, size_t* misses,
                                 size_t* compilations) {
     if (!rc)
@@ -432,6 +446,7 @@ void cml_runtime_compiler_stats(const CMLRuntimeCompiler* rc, size_t* hits, size
         *compilations = rc->total_compilations;
 }
 
+/** Free all cached kernels and reset the cache to empty. */
 void cml_runtime_compiler_clear_cache(CMLRuntimeCompiler* rc) {
     if (!rc)
         return;
@@ -447,6 +462,7 @@ void cml_runtime_compiler_clear_cache(CMLRuntimeCompiler* rc) {
     rc->num_cached = 0;
 }
 
+/** Set the backend used for subsequent compilations. */
 void cml_runtime_compiler_set_backend(CMLRuntimeCompiler* rc, CMLFusedBackend backend) {
     if (!rc)
         return;

@@ -13,6 +13,7 @@
  * special-cases here anymore.
  */
 
+/** Create a command queue for @p backend via its ops table (NULL if unsupported). */
 CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(backend);
     if (ops && ops->queue_create)
@@ -21,6 +22,7 @@ CMLHCQQueue* cml_hcq_queue_create(CMLHCQBackendType backend) {
     return NULL;
 }
 
+/** Destroy a queue, dispatching to its backend's destructor. */
 void cml_hcq_queue_destroy(CMLHCQQueue* queue) {
     if (!queue)
         return;
@@ -40,6 +42,7 @@ void cml_hcq_queue_destroy(CMLHCQQueue* queue) {
     cml_free(queue);
 }
 
+/** Enqueue a compiled kernel described by @p desc onto the queue. */
 int cml_hcq_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     if (!queue || !desc) {
         LOG_ERROR("NULL queue or descriptor in submit_kernel");
@@ -52,6 +55,7 @@ int cml_hcq_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     return -1;
 }
 
+/** Copy host memory to a device allocation on the queue. */
 int cml_hcq_memcpy_h2d(CMLHCQQueue* queue, void* dst_device, const void* src_host, size_t bytes) {
     if (!queue) {
         LOG_ERROR("NULL queue in memcpy_h2d");
@@ -64,6 +68,7 @@ int cml_hcq_memcpy_h2d(CMLHCQQueue* queue, void* dst_device, const void* src_hos
     return -1;
 }
 
+/** Copy a device allocation back to host memory on the queue. */
 int cml_hcq_memcpy_d2h(CMLHCQQueue* queue, void* dst_host, const void* src_device, size_t bytes) {
     if (!queue) {
         LOG_ERROR("NULL queue in memcpy_d2h");
@@ -76,6 +81,7 @@ int cml_hcq_memcpy_d2h(CMLHCQQueue* queue, void* dst_host, const void* src_devic
     return -1;
 }
 
+/** Create a synchronization signal for @p backend (NULL if unsupported). */
 CMLHCQSignal* cml_hcq_signal_create(CMLHCQBackendType backend) {
     const CMLHCQBackendOps* ops = cml_hcq_backend_ops(backend);
     if (ops && ops->signal_create)
@@ -84,6 +90,7 @@ CMLHCQSignal* cml_hcq_signal_create(CMLHCQBackendType backend) {
     return NULL;
 }
 
+/** Destroy a signal, dispatching to its backend's destructor. */
 void cml_hcq_signal_destroy(CMLHCQSignal* signal) {
     if (!signal)
         return;
@@ -100,6 +107,7 @@ void cml_hcq_signal_destroy(CMLHCQSignal* signal) {
     cml_free(signal);
 }
 
+/** Record @p signal so later waiters can observe this point in the queue. */
 int cml_hcq_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal) {
         LOG_ERROR("NULL queue or signal in signal_record");
@@ -112,6 +120,7 @@ int cml_hcq_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return -1;
 }
 
+/** Make the queue wait on @p signal before executing subsequent work. */
 int cml_hcq_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal) {
         LOG_ERROR("NULL queue or signal in queue_wait");
@@ -124,6 +133,7 @@ int cml_hcq_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return -1;
 }
 
+/** Block the host until @p signal fires or @p timeout_ms elapses. */
 int cml_hcq_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     if (!signal) {
         LOG_ERROR("NULL signal in signal_wait_cpu");
@@ -136,6 +146,7 @@ int cml_hcq_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     return -1;
 }
 
+/** Block until all work submitted to the queue has completed. */
 int cml_hcq_queue_synchronize(CMLHCQQueue* queue) {
     if (!queue) {
         LOG_ERROR("NULL queue in queue_synchronize");
@@ -148,6 +159,7 @@ int cml_hcq_queue_synchronize(CMLHCQQueue* queue) {
     return -1;
 }
 
+/** Allocate an empty multi-stage HCQ pipeline. */
 CMLHCQPipeline* cml_hcq_pipeline_create(void) {
     CMLHCQPipeline* pipeline = (CMLHCQPipeline*)cml_calloc(1, sizeof(CMLHCQPipeline));
     if (!pipeline) {
@@ -159,6 +171,7 @@ CMLHCQPipeline* cml_hcq_pipeline_create(void) {
     return pipeline;
 }
 
+/** Destroy a pipeline along with the inter-stage signals it owns. */
 void cml_hcq_pipeline_destroy(CMLHCQPipeline* pipeline) {
     if (!pipeline)
         return;
@@ -175,6 +188,7 @@ void cml_hcq_pipeline_destroy(CMLHCQPipeline* pipeline) {
     cml_free(pipeline);
 }
 
+/** Append @p queue as a pipeline stage, creating its inter-stage signal. */
 int cml_hcq_pipeline_add_stage(CMLHCQPipeline* pipeline, CMLHCQQueue* queue) {
     if (!pipeline || !queue) {
         LOG_ERROR("NULL pipeline or queue in pipeline_add_stage");
@@ -202,6 +216,7 @@ int cml_hcq_pipeline_add_stage(CMLHCQPipeline* pipeline, CMLHCQQueue* queue) {
     return 0;
 }
 
+/** Run every stage, chaining each on the previous stage's recorded signal. */
 int cml_hcq_pipeline_execute(CMLHCQPipeline* pipeline) {
     if (!pipeline) {
         LOG_ERROR("NULL pipeline in pipeline_execute");
@@ -237,6 +252,7 @@ int cml_hcq_pipeline_execute(CMLHCQPipeline* pipeline) {
     return 0;
 }
 
+/** Block until the last stage's signal fires and every stage queue has drained. */
 int cml_hcq_pipeline_synchronize(CMLHCQPipeline* pipeline) {
     if (!pipeline) {
         LOG_ERROR("NULL pipeline in pipeline_synchronize");

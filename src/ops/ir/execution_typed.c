@@ -38,8 +38,10 @@
 static bool cml_exec_out_dtype_is_role(UOpType t);
 static size_t bcast_idx(const Tensor* inp, const Tensor* out, size_t flat_i);
 
+/** Broadcast an index into an operand of `n` elements (0 when the operand is scalar/empty). */
 static inline size_t bidx(size_t i, size_t n) { return n ? i % n : 0; }
 
+/** Return input `i` of a node, or NULL if out of range. */
 static Tensor* in_at(struct IRNode* node, int i) {
     if (!node->inputs || node->num_inputs <= i || !node->inputs[i])
         return NULL;
@@ -71,6 +73,7 @@ void cml_lanes_of(const Tensor* t, int dim, size_t* outer, size_t* count, size_t
  * shadow working code, so they stay on their own path. */
 static bool handles_own_dtype(UOpType t) { return t == UOP_MATMUL || t == UOP_CONV2D; }
 
+/** Decide whether a node must take the dtype-generic typed path instead of the f32 fast path. */
 bool cml_exec_needs_typed(struct IRNode* node, Tensor* out) {
     if (!node)
         return false;
@@ -310,6 +313,7 @@ static int unary_f64(UOpType type, double x, double* r, struct IRNode* node) {
     }
 }
 
+/** Evaluate one binary op in double precision; returns 0 on success, -1 if unsupported. */
 static int binary_f64(UOpType type, double x, double y, double* r) {
     switch (type) {
     case UOP_ADD:
@@ -420,6 +424,7 @@ static int binary_i64(UOpType type, int64_t x, int64_t y, int64_t* r) {
     }
 }
 
+/** True for the integer bitwise/shift UOps. */
 static int is_bitwise_op(UOpType t) {
     return t == UOP_BITWISE_AND || t == UOP_BITWISE_OR || t == UOP_BITWISE_XOR ||
            t == UOP_BITWISE_NOT || t == UOP_LSHIFT || t == UOP_RSHIFT;
@@ -561,6 +566,7 @@ static void strides_nd(const int* shape, int ndim, size_t* st) {
     }
 }
 
+/** Dtype-generic N-D pad kernel copying the input into the (zero-filled) padded output. */
 static void pad_nd_typed(const void* ad, const Tensor* a, const Tensor* out, void* od,
                          const PadParams* p, size_t esz) {
     int nd = a->ndim;
@@ -599,6 +605,7 @@ static void pad_nd_typed(const void* ad, const Tensor* a, const Tensor* out, voi
     }
 }
 
+/** Dtype-generic N-D scatter writing source values into the base tensor at index positions. */
 static void scatter_nd_typed(struct IRNode* node, const void* ad, const Tensor* idx_t,
                              const void* src, const Tensor* out, void* od, int dim, size_t esz) {
     int nd = out->ndim;
@@ -632,6 +639,7 @@ static void scatter_nd_typed(struct IRNode* node, const void* ad, const Tensor* 
     }
 }
 
+/** Dtype-generic N-D diagonal extraction along two axes at the given offset; 0 on success. */
 static int diagonal_nd_typed(const void* ad, const Tensor* a, const Tensor* out, void* od,
                              int offset, int dim1, int dim2, size_t esz) {
     int nd = a->ndim;
@@ -1150,6 +1158,7 @@ static int layout_kernel(struct IRNode* node, Tensor* out, void* od) {
     }
 }
 
+/** Typed dispatch for movement/layout ops (reshape/permute/slice/pad/...). */
 static int exec_layout(struct IRNode* node, Tensor* out) {
     return layout_kernel(node, out, out->data);
 }
@@ -1169,6 +1178,7 @@ static int reduce_dim_of(struct IRNode* node, const Tensor* a) {
     return axis_of(rp->dims[0], a->ndim);
 }
 
+/** Typed dispatch for reduction ops, resolving the reduced axis and output dtype. */
 static int exec_reduce_like(struct IRNode* node, Tensor* out) {
     Tensor* a = in_at(node, 0);
     if (!a || !a->data || !out->data)
@@ -1285,6 +1295,7 @@ static int exec_reduce_like(struct IRNode* node, Tensor* out) {
     return 0;
 }
 
+/** Typed dispatch for cumulative ops (cumsum/cumprod) along an axis. */
 static int exec_cumulative(struct IRNode* node, Tensor* out) {
     Tensor* a = in_at(node, 0);
     if (!a || !a->data || !out->data)
@@ -1368,6 +1379,7 @@ void cml_lane_order(const void* src, DType dt, size_t base, size_t inner, size_t
     }
 }
 
+/** Typed dispatch for ordering ops (sort/argsort/topk) along an axis. */
 static int exec_order(struct IRNode* node, Tensor* out) {
     Tensor* a = in_at(node, 0);
     if (!a || !a->data || !out->data)
@@ -1984,6 +1996,8 @@ static bool writes_may_clobber_reads(struct IRNode* node) {
     }
 }
 
+/** Entry point for dtype-generic node execution: route to the matching typed kernel group,
+ *  buffering through a temp when the output aliases an input the kernel may clobber. */
 int cml_exec_typed(struct IRNode* node, Tensor* out) {
     if (!node || !out || !out->data)
         return -1;

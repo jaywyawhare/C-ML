@@ -14,6 +14,8 @@
 
 #define FUSED_BUF_SIZE 16384
 
+/* Lower a fusion group into a flat LOAD/COMPUTE/STORE program, assigning vregs and
+ * skipping stores for buffers the group marked eliminated (kept in registers). */
 CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
     if (!g || g->num_nodes == 0)
         return NULL;
@@ -167,6 +169,7 @@ oom:
     return NULL;
 }
 
+/** Free a linear program and its op array. */
 void cml_linear_program_free(CMLLinearProgram* prog) {
     if (!prog)
         return;
@@ -174,6 +177,7 @@ void cml_linear_program_free(CMLLinearProgram* prog) {
     cml_free(prog);
 }
 
+/** Return a short display string for a linear-op kind. */
 static const char* linop_kind_str(CMLLinearOpKind k) {
     switch (k) {
     case LINOP_LOAD:
@@ -187,6 +191,7 @@ static const char* linop_kind_str(CMLLinearOpKind k) {
     }
 }
 
+/** Dump a linear program's ops and vregs to stdout for debugging. */
 void cml_linear_program_print(const CMLLinearProgram* prog) {
     if (!prog) {
         printf("LinearProgram: (null)\n");
@@ -211,6 +216,7 @@ void cml_linear_program_print(const CMLLinearProgram* prog) {
     }
 }
 
+/** Map a binary UOp to its C infix operator token. */
 static const char* uop_to_c_binary(UOpType uop) {
     switch (uop) {
     case UOP_ADD:
@@ -226,17 +232,20 @@ static const char* uop_to_c_binary(UOpType uop) {
     }
 }
 
+/** True if the UOp takes two operands in the fused codegen backends. */
 static bool uop_is_binary(UOpType uop) {
     return uop == UOP_ADD || uop == UOP_SUB || uop == UOP_MUL || uop == UOP_DIV || uop == UOP_MAX ||
            uop == UOP_POW;
 }
 
+/** True if the UOp takes one operand in the fused codegen backends. */
 static bool uop_is_unary(UOpType uop) {
     return uop == UOP_NEG || uop == UOP_EXP || uop == UOP_LOG || uop == UOP_SQRT ||
            uop == UOP_ABS || uop == UOP_SIN || uop == UOP_COS || uop == UOP_TANH ||
            uop == UOP_SIGMOID || uop == UOP_RECIP || uop == UOP_SILU;
 }
 
+/** Emit a scalar C source string implementing the fused kernel as a per-element loop. */
 static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = cml_malloc(FUSED_BUF_SIZE);
     if (!buf)
@@ -364,6 +373,8 @@ static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
     return buf;
 }
 
+/* Emit NVIDIA PTX for the fused kernel (one thread per element). Returns NULL for any op
+ * that cannot be lowered, so the caller falls back to a backend that can run it. */
 char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = cml_malloc(FUSED_BUF_SIZE);
     if (!buf)
@@ -683,11 +694,15 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
 
 #define SpvOpExtInst 12
 
+/** Append one SPIR-V word to the output stream and advance the cursor. */
 static void emit(uint32_t** ptr, uint32_t word) {
     **ptr = word;
     (*ptr)++;
 }
 
+/* Emit a self-contained SPIR-V 1.3 compute shader for the fused kernel, one storage
+ * buffer per LOAD/STORE. Returns the word array (length in out_num_words) or NULL if an
+ * op cannot be lowered. */
 uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size,
                                      int* out_num_words) {
     if (!prog || !out_num_words)
@@ -1154,6 +1169,7 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_s
     return words;
 }
 
+/** Emit a WGSL compute shader implementing the fused kernel over storage buffers. */
 static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = cml_malloc(FUSED_BUF_SIZE);
     if (!buf)
@@ -1291,6 +1307,8 @@ static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) 
     return buf;
 }
 
+/* Generate a fused kernel for the requested backend, counting I/O buffers and falling
+ * back to the C backend for unsupported targets. */
 CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog, CMLFusedBackend backend,
                                   size_t work_size) {
     if (!prog || prog->num_ops == 0)
@@ -1359,6 +1377,7 @@ CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog, CMLFusedBackend 
     return kernel;
 }
 
+/** Linearize a fusion group and codegen it, deriving work size from the first node's output. */
 CMLFusedKernel* cml_fused_codegen_group(const CMLFusionGroup* group, CMLFusedBackend backend) {
     if (!group)
         return NULL;
@@ -1382,6 +1401,7 @@ CMLFusedKernel* cml_fused_codegen_group(const CMLFusionGroup* group, CMLFusedBac
     return kernel;
 }
 
+/** Free a fused kernel and its source/SPIR-V buffers. */
 void cml_fused_kernel_free(CMLFusedKernel* kernel) {
     if (!kernel)
         return;
@@ -1390,6 +1410,7 @@ void cml_fused_kernel_free(CMLFusedKernel* kernel) {
     cml_free(kernel);
 }
 
+/** Print a fused kernel's metadata and generated source to stdout. */
 void cml_fused_kernel_print(const CMLFusedKernel* kernel) {
     if (!kernel) {
         printf("FusedKernel: (null)\n");

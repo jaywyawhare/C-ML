@@ -92,12 +92,14 @@ static int g_scap         = 0;
 static int g_dropped      = 0;
 static double g_t_origin  = -1.0;
 
+/** Current monotonic clock reading in milliseconds. */
 double cml_flame_now_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1e6;
 }
 
+/** Whether flamegraph capture is active, honoring FLAMEGRAPH/PROFILE/VIZ and NO_EXPORT. */
 int cml_flame_enabled(void) {
     static int checked = 0, on = 0;
     /* Not cached: NO_EXPORT is checked every call so it still holds if capture
@@ -311,6 +313,7 @@ static const char* flame_phase(const struct IRNode* n) {
     return n->forward_node ? "backward" : "forward";
 }
 
+/** Element count of a node's output, from the tensor or its output shape. */
 static long long flame_numel(const struct IRNode* n) {
     if (n->output && n->output->numel > 0)
         return (long long)n->output->numel;
@@ -323,6 +326,7 @@ static long long flame_numel(const struct IRNode* n) {
     return 0;
 }
 
+/** Clear all accumulated flamegraph entries and spans, freeing their storage. */
 void cml_flame_reset(void) {
     for (int i = 0; i < g_nentries; i++) {
         cml_free(g_entries[i].scope);
@@ -388,6 +392,10 @@ static FlameEntry* flame_find_or_add(const char* op, const char* kind, const cha
     return e;
 }
 
+/**
+ * Record one node execution of duration `ms`: accumulate into its signature
+ * entry and append a timeline span (registering the atexit flush on first use).
+ */
 void cml_flame_record(const struct IRNode* node, double ms) {
     if (!cml_flame_enabled() || !node)
         return;
@@ -444,8 +452,10 @@ void cml_flame_record(const struct IRNode* node, double ms) {
     g_total += ms;
 }
 
+/** Total number of recorded node executions. */
 int cml_flame_num_spans(void) { return g_count; }
 
+/** Write the captured spans and per-signature aggregates to `path` as JSON. */
 int cml_flame_export(const char* path) {
     if (!cml_flame_enabled() || g_count == 0 || !path)
         return -1;

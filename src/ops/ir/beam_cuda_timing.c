@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Beam-search timing callback: compile a variant's source, warm up, then time repeated
+ * launches with CUDA events and return the average microseconds per launch (-1 on failure). */
 double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data) {
     (void)user_data;
 
@@ -98,6 +100,7 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data) {
 
 #include "ops/ir/beam_search.h"
 
+/** Stub timing callback when CUDA is unavailable; always reports failure. */
 double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data) {
     (void)variant;
     (void)user_data;

@@ -77,6 +77,7 @@ static int fe_supported(UOpType t) {
     }
 }
 
+/** Return the index of node `p` in the array, or -1 if absent. */
 static int find_idx(struct IRNode** nodes, int n, struct IRNode* p) {
     for (int i = 0; i < n; i++)
         if (nodes[i] == p)
@@ -87,6 +88,7 @@ static int find_idx(struct IRNode** nodes, int n, struct IRNode* p) {
 /* The fused executor is float32-only. Only fuse nodes whose output tensor is f32. */
 static int node_is_f32(struct IRNode* n) { return n->output && n->output->dtype == DTYPE_FLOAT32; }
 
+/** Element count of a node's output, from the tensor or its recorded output shape. */
 static size_t node_numel(struct IRNode* n) {
     if (n->output && n->output->numel)
         return n->output->numel;
@@ -123,8 +125,11 @@ static int is_trailing_bcast(struct IRNode* rootnode, Tensor* in) {
  * combined-graph execute; it is 0 (conservative) everywhere else — a lone
  * forward realization must never fuse differentiable nodes. */
 static __thread int g_fe_allow_grad = 0;
+/** Toggle whether requires_grad forward chains may be fused (set only around fwd+bwd execute). */
 void cml_ir_fuse_set_allow_grad(int on) { g_fe_allow_grad = on ? 1 : 0; }
 
+/* Collapse maximal single-use, same-shape f32 elementwise trees into UOP_FUSED_ELEMENTWISE
+ * nodes (intermediates kept in registers), restarting until fixpoint. Returns #fusions. */
 int cml_ir_fuse_elementwise(CMLGraph_t ir) {
     if (!ir || !ir->head || !cml_ir_fusion_enabled())
         return 0;
