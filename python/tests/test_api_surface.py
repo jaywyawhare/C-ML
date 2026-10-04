@@ -247,3 +247,110 @@ def test_stepped_slice_correct():
     assert np.allclose(a[0:4:2, 0:6:2].numpy(), A[0:4:2, 0:6:2])
     assert np.allclose(a[::2].numpy(), A[::2])
     assert np.allclose(a[:, 1::3].numpy(), A[:, 1::3])
+
+
+def test_comparisons_stay_lazy_and_match_numpy():
+    import operator as op
+    rs = np.random.RandomState(0)
+    A = rs.randn(3, 4).astype(np.float32)
+    B = rs.randn(3, 4).astype(np.float32)
+    R = rs.randn(4).astype(np.float32)
+    a, b, r = _t(A), _t(B), _t(R)
+    for o in (op.lt, op.gt, op.le, op.ge, op.ne):
+        for x, y, X, Y in ((a, b, A, B), (a, r, A, R), (a, 0.25, A, 0.25)):
+            res = o(x, y)
+            assert not res._tensor.is_executed, f"{o.__name__} realized eagerly"
+            got = res.numpy()
+            assert got.dtype == np.float32
+            assert np.array_equal(got, o(X, Y).astype(np.float32)), o.__name__
+    assert np.allclose(cml.where(a < b, a, b).numpy(), np.minimum(A, B))
+
+
+def test_bool_tensor_numpy_readback():
+    from cml.core import lib
+    A = np.array([1, 5, 3, -2], dtype=np.float32)
+    B = np.array([2, 4, 3, -1], dtype=np.float32)
+    a, b = _t(A), _t(B)
+    mask = cml.Tensor(lib.uop_cmplt(a._tensor, b._tensor))
+    got = mask.numpy()
+    assert got.dtype == np.bool_
+    assert np.array_equal(got, A < B)
+
+
+_SLICES = [np.s_[::2], np.s_[:, 1::3], np.s_[1:4:2, 2:6], np.s_[::3, 1::2, ::2],
+           np.s_[1::2, ..., ::4], np.s_[0:4:5], np.s_[3:1], np.s_[2, ::2], np.s_[::-1],
+           np.s_[1:3, ::-2], np.s_[::-3, 1::2, ::-1], np.s_[-1:-4:-1]]
+
+
+@pytest.mark.parametrize("idx", _SLICES, ids=[str(s) for s in _SLICES])
+def test_stepped_slicing_lazy_values_and_grad(idx):
+    A = np.arange(4 * 6 * 5, dtype=np.float32).reshape(4, 6, 5)
+    r = _t(A)[idx]
+    assert r.numel == 0 or not r._tensor.is_executed, "slice realized eagerly"
+    got = r.numpy()
+    assert got.shape == A[idx].shape and np.array_equal(got, A[idx])
+    if A[idx].size:
+        x = _t(A.copy())
+        x.requires_grad_(True)
+        x[idx].sum().backward()
+        want = np.zeros_like(A)
+        want[idx] = 1.0
+        assert np.array_equal(x.grad.numpy().reshape(A.shape), want)
+    cml.reset_graph()
+
+
+def test_repeated_chained_slices_do_not_corrupt_base():
+    A = np.arange(4 * 6 * 5, dtype=np.float32).reshape(4, 6, 5)
+    a = _t(A)
+    idx = np.s_[::3, 1::2, ::2]
+    first, second = a[idx].numpy(), a[idx].numpy()
+    assert np.array_equal(first, A[idx]) and np.array_equal(second, A[idx])
+    assert np.array_equal(a.numpy(), A)
+
+
+def test_more_activations_and_lerp_vs_torch():
+    import torch
+    import torch.nn.functional as F
+    X = (np.random.RandomState(1).randn(3, 8) * 2).astype(np.float32)
+    x, T = _t(X), torch.from_numpy(X)
+    for got, ref in [(x.silu(), F.silu(T)), (x.mish(), F.mish(T)), (x.selu(), F.selu(T)),
+                     (x.hardswish(), F.hardswish(T)), (x.elu(0.5), F.elu(T, 0.5)),
+                     (x.leaky_relu(0.1), F.leaky_relu(T, 0.1))]:
+        assert np.allclose(got.numpy(), ref.numpy(), atol=1e-4)
+    Y = np.random.RandomState(2).randn(3, 8).astype(np.float32)
+    assert np.allclose(x.lerp(_t(Y), 0.25).numpy(), torch.lerp(T, torch.from_numpy(Y), 0.25).numpy())
+
+
+@pytest.mark.parametrize("shp,ishp,dim", [((5,), (6,), 0), ((3, 4), (2, 4), 0), ((3, 4), (3, 2), 1),
+                                          ((2, 3, 4), (2, 2, 3), 2), ((3, 2, 4), (2, 2, 4), 0)])
+@pytest.mark.parametrize("reduce", ["sum", "prod", "mean", "amax", "amin"])
+def test_scatter_reduce_vs_torch(shp, ishp, dim, reduce):
+    import torch
+    rs = np.random.RandomState(0)
+    B = rs.rand(*shp).astype(np.float32) + 0.5
+    I = rs.randint(0, shp[dim], size=ishp).astype(np.float32)
+    S = rs.rand(*ishp).astype(np.float32) + 0.5
+    ref = torch.from_numpy(B).scatter_reduce(dim, torch.from_numpy(I).long(), torch.from_numpy(S),
+                                             reduce=reduce, include_self=True)
+    got = _t(B).scatter_reduce(dim, _t(I), _t(S), reduce)
+    assert np.allclose(got.numpy(), ref.numpy(), atol=1e-5)
+
+
+@pytest.mark.parametrize("dim,size,step", [(-1, 2, 1), (2, 3, 2), (1, 3, 2), (0, 1, 1)])
+def test_unfold_vs_torch(dim, size, step):
+    import torch
+    A = np.arange(2 * 7 * 5, dtype=np.float32).reshape(2, 7, 5)
+    assert np.array_equal(_t(A).unfold(dim, size, step).numpy(),
+                          torch.from_numpy(A).unfold(dim, size, step).numpy())
+
+
+def test_dtype_shorthands():
+    Z = np.array([[0.0, 1.5, -2.7], [3.2, 0.0, -0.4]], dtype=np.float32)
+    z = _t(Z)
+    for name, np_dt in [("float", np.float32), ("double", np.float64), ("half", np.float16),
+                        ("int", np.int32), ("long", np.int64), ("bool", np.bool_)]:
+        got = getattr(z, name)().numpy()
+        assert got.dtype == np_dt
+        assert np.array_equal(got, Z.astype(np_dt)), name
+    N = np.array([np.nan, 0.0, -0.0, 1e-30], dtype=np.float32)
+    assert np.array_equal(_t(N).bool().numpy(), N.astype(bool))

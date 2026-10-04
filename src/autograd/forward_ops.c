@@ -11,34 +11,6 @@
 #include <float.h>
 #include "alloc/cml_allocator.h"
 
-/* Elementwise binary op recorded into the lazy graph: broadcast the operand
- * shapes and propagate the gradient flags. The tensor_* wrappers differ only
- * in which uop they emit. */
-static Tensor* forward_binary(Tensor* a, Tensor* b, UOpType type) {
-    if (!a || !b)
-        return NULL;
-
-    CMLGraph_t ir = cml_ir_get_or_create_context();
-    if (!ir)
-        return NULL;
-
-    Tensor* inputs[] = {a, b};
-    if (cml_ir_add_uop(ir, type, inputs, 2, NULL) != 0)
-        return NULL;
-
-    struct IRNode* node = cml_ir_get_tail(ir);
-    if (cml_ir_compute_broadcast_shape(node) != 0)
-        return NULL;
-
-    if (a->requires_grad || b->requires_grad) {
-        node->requires_grad       = true;
-        node->needs_input_grad[0] = a->requires_grad;
-        node->needs_input_grad[1] = b->requires_grad;
-    }
-
-    return tensor_from_ir_node(node, ir);
-}
-
 /* Same-shape unary op recorded into the lazy graph. */
 static Tensor* forward_unary(Tensor* a, UOpType type) {
     if (!a)
@@ -63,13 +35,13 @@ static Tensor* forward_unary(Tensor* a, UOpType type) {
     return tensor_from_ir_node(node, ir);
 }
 
-Tensor* tensor_add(Tensor* a, Tensor* b) { return forward_binary(a, b, UOP_ADD); }
+Tensor* tensor_add(Tensor* a, Tensor* b) { return uop_add(a, b); }
 
-Tensor* tensor_sub(Tensor* a, Tensor* b) { return forward_binary(a, b, UOP_SUB); }
+Tensor* tensor_sub(Tensor* a, Tensor* b) { return uop_sub(a, b); }
 
-Tensor* tensor_mul(Tensor* a, Tensor* b) { return forward_binary(a, b, UOP_MUL); }
+Tensor* tensor_mul(Tensor* a, Tensor* b) { return uop_mul(a, b); }
 
-Tensor* tensor_div(Tensor* a, Tensor* b) { return forward_binary(a, b, UOP_DIV); }
+Tensor* tensor_div(Tensor* a, Tensor* b) { return uop_div(a, b); }
 
 Tensor* tensor_pow(Tensor* a, Tensor* b) {
     if (!a || !b)

@@ -798,25 +798,10 @@ static int layout_kernel(struct IRNode* node, Tensor* out, void* od) {
             memcpy(od, ad, n * esz);
             return 0;
         }
-        int nd = a->ndim;
         memset(od, 0, out->numel * esz);
         for (size_t i = 0; i < out->numel; i++) {
-            size_t src = 0, rem = i;
-            bool valid = true;
-            for (int d = nd - 1; d >= 0; d--) {
-                size_t coord = rem % (size_t)out->shape[d];
-                rem /= (size_t)out->shape[d];
-                int sc = p->start[d] + (int)coord * (p->step ? p->step[d] : 1);
-                if (sc < 0 || sc >= a->shape[d]) {
-                    valid = false;
-                    break;
-                }
-                size_t str = 1;
-                for (int dd = d + 1; dd < nd; dd++)
-                    str *= (size_t)a->shape[dd];
-                src += (size_t)sc * str;
-            }
-            if (valid && src < an)
+            size_t src;
+            if (cml_slice_src(a, a, out, p, i, &src))
                 ELEM_COPY(od, i, ad, src, esz);
         }
         return 0;

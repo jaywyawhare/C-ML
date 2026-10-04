@@ -500,10 +500,17 @@ ffi.cdef(
     typedef ShapeParams ExpandParams;
     typedef struct { int* perm; int num_dims; } PermuteParams;
     typedef struct { int* dims; int num_dims; bool keepdim; } ReduceParams;
+    typedef struct { int* start; int* end; int* step; int num_dims; } SliceParams;
+    Tensor* uop_slice(Tensor* a, SliceParams* params);
     Tensor* uop_any(Tensor* a, ReduceParams* params);
     Tensor* uop_all(Tensor* a, ReduceParams* params);
     Tensor* uop_logsumexp(Tensor* a, ReduceParams* params);
     Tensor* uop_unflatten(Tensor* a, int dim, int* sizes, int num_sizes);
+    Tensor* uop_cmplt(Tensor* a, Tensor* b);
+    Tensor* uop_cmpgt(Tensor* a, Tensor* b);
+    Tensor* uop_cmple(Tensor* a, Tensor* b);
+    Tensor* uop_cmpge(Tensor* a, Tensor* b);
+    Tensor* uop_cmpne(Tensor* a, Tensor* b);
     Tensor* cml_fft2(Tensor* x, int inverse);
     Tensor* uop_log10(Tensor* a);
     Tensor* uop_scatter_add(Tensor* index, Tensor* src, int dim, int dim_size);
