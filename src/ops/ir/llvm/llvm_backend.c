@@ -431,9 +431,10 @@ static LLVMModuleRef build_binary_op(LLVMContextRef ctx, UOpType type, const cha
             return NULL;
         }
 
-    /* out[i - start]: the chunk-local index for output storage */
-    LLVMValueRef rel_idx = LLVMBuildSub(bld, loop.i, start, "rel");
-    LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &rel_idx, 1, "pout");
+    /* out is the full base pointer (jb_task does not offset it) and the inputs are
+     * read at absolute index i, so the result is written at i too. Using i - start
+     * would make every parallel chunk overwrite out[0..) and scramble the result. */
+    LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout");
     LLVMBuildStore(bld, result, gep_out);
     close_loop(bld, &loop, entry);
 
@@ -694,8 +695,10 @@ static LLVMModuleRef build_unary_op(LLVMContextRef ctx, UOpType type, const char
     }
 
 store_result:;
-    LLVMValueRef rel_idx = LLVMBuildSub(bld, loop.i, start, "rel");
-    LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &rel_idx, 1, "pout");
+    /* out is the full base pointer (ju_task does not offset it) and the input is
+     * read at absolute index i, so the result is written at i too. Using i - start
+     * would make every parallel chunk overwrite out[0..) and scramble the result. */
+    LLVMValueRef gep_out = LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout");
     LLVMBuildStore(bld, result, gep_out);
     close_loop(bld, &loop, entry);
 
@@ -916,8 +919,14 @@ static LLVMModuleRef build_reduction_axis(LLVMContextRef ctx, UOpType type, cons
 /* -------------------------------------------------------------------------
  * Fill: out[i] = val  (val passed at runtime - allows caching)
  * Signature: void(ptr out, i64 n, float val)
+ *
+ * The loop bound is the runtime n argument, NOT a baked element count: jv_run
+ * parallelizes by invoking this kernel on sub-ranges (out + start, chunk), so a
+ * kernel that looped over a compile-time total would write the whole tensor from
+ * each worker's offset and overrun the buffer. n makes it size-agnostic, so one
+ * cached kernel serves every fill.
  * ---------------------------------------------------------------------- */
-static LLVMModuleRef build_fill_op(LLVMContextRef ctx, const char* fn_name, int64_t out_numel) {
+static LLVMModuleRef build_fill_op(LLVMContextRef ctx, const char* fn_name) {
     LLVMModuleRef mod  = LLVMModuleCreateWithNameInContext(fn_name, ctx);
     LLVMTypeRef f32    = LLVMFloatTypeInContext(ctx);
     LLVMTypeRef ptr    = LLVMPointerTypeInContext(ctx, 0);
@@ -930,7 +939,7 @@ static LLVMModuleRef build_fill_op(LLVMContextRef ctx, const char* fn_name, int6
     add_noalias(ctx, fn, 1); /* out is noalias */
 
     LLVMValueRef out   = LLVMGetParam(fn, 0);
-    LLVMValueRef out_n = LLVMConstInt(i64, (unsigned long long)out_numel, 0);
+    LLVMValueRef out_n = LLVMGetParam(fn, 1);
     LLVMValueRef fval  = LLVMGetParam(fn, 2);
 
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(ctx, fn, "entry");
@@ -990,8 +999,10 @@ static LLVMModuleRef build_where_op(LLVMContextRef ctx, const char* fn_name, int
     LLVMValueRef is_true = LLVMBuildFCmp(bld, LLVMRealONE, vc, zf, "it");
     LLVMValueRef result  = LLVMBuildSelect(bld, is_true, va, vb, "r");
 
-    LLVMValueRef rel_idx = LLVMBuildSub(bld, loop.i, start, "rel");
-    LLVMBuildStore(bld, result, LLVMBuildGEP2(bld, f32, out, &rel_idx, 1, "pout"));
+    /* out is the full base pointer (jw_task does not offset it) and the inputs are
+     * read at absolute index i, so the result is written at i too. Using i - start
+     * would make every parallel chunk overwrite out[0..) and scramble the result. */
+    LLVMBuildStore(bld, result, LLVMBuildGEP2(bld, f32, out, &loop.i, 1, "pout"));
     close_loop(bld, &loop, entry);
 
     LLVMPositionBuilderAtEnd(bld, loop.exit);
@@ -1992,7 +2003,7 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         s1 = (int64_t)b->shape[b->ndim - 1];
         s2 = (int64_t)a->shape[a->ndim - 1];
     } else if (type == UOP_FILL) {
-        s0 = (int64_t)out->numel;
+        s0 = 0; /* kernel is size-agnostic (loops runtime n), so one cached kernel serves all */
     } else if (type == UOP_WHERE) {
         if (node->num_inputs < 3 || !node->inputs[0]->data || !node->inputs[1]->data ||
             !node->inputs[2]->data)
@@ -2065,7 +2076,7 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
         } else if (type == UOP_MATMUL) {
             mod = build_matmul_kernel(kern_ctx, fn_name, s0, s1, s2);
         } else if (type == UOP_FILL) {
-            mod = build_fill_op(kern_ctx, fn_name, s0);
+            mod = build_fill_op(kern_ctx, fn_name);
         } else if (type == UOP_WHERE) {
             mod = build_where_op(kern_ctx, fn_name, s0, s1, s2, s3);
         } else if (type == UOP_GATHER) {
