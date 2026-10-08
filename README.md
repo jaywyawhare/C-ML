@@ -115,27 +115,14 @@ hardware        CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL, Adreno, Hexagon, CPU
 
 ---
 
-## Testing & coverage
+## Testing
 
-180 C test programs (plus Python pytest) run in CI. The suite includes
-cross-dtype conformance (77 ops x 8 dtypes against f32 references), a VJP
-sweep that checks every eager-backward rule against central finite
-differences, an API contract sweep (bad arguments on every public surface),
-and HCQ/quantization/matmul exactness tests.
-
-Branch coverage is measured with union semantics - a branch counts as covered
-when ANY test binary takes it:
-
-```sh
-cmake -S . -B build-coverage -DCMAKE_C_FLAGS="--coverage -O0"
-cmake --build build-coverage -j
-cmake --build build-coverage --target coverage   # runs ctest serially + report
-```
-
-Serial execution is required: all binaries update one shared set of `.gcda`
-counters. Current baseline: ~58% line / ~38% branch outcomes; the largest
-remaining gaps are the hardware-gated `gpu/*` backends and the f32 SIMD fast
-paths.
+180 C test programs plus Python pytest run in CI: cross-dtype conformance
+(77 ops x 8 dtypes vs f32 references), a VJP sweep against finite differences,
+an API-contract sweep over every public surface, and HCQ/quantization/matmul
+exactness tests. Coverage baseline is ~58% line / ~38% branch; the gaps are the
+hardware-gated `gpu/*` backends and the f32 SIMD paths. See the coverage build
+in `tools/coverage_report.sh`.
 
 ---
 
