@@ -271,6 +271,61 @@ bool sym_divmod_exact(const SymExpr* expr, int64_t divisor) {
  * Rebuild the expression bottom-up, routing DIV/MOD nodes through sym_floordiv and
  * sym_mod_pos so divisibility rules apply; other ops are reconstructed unchanged.
  */
+/** True if two expressions render identically (cheap structural equality). */
+static bool exprs_equal(const SymExpr* a, const SymExpr* b) {
+    char ba[256] = {0}, bb[256] = {0};
+    sym_expr_to_string(a, ba, sizeof(ba));
+    sym_expr_to_string(b, bb, sizeof(bb));
+    return strcmp(ba, bb) == 0;
+}
+
+/** If `mul` is `(X // c) * c` or `c * (X // c)` for a constant c, return (X, c). */
+static bool match_quotient_times_divisor(const SymExpr* mul, const SymExpr** x_out,
+                                         int64_t* c_out) {
+    if (!mul || mul->type != SYM_MUL)
+        return false;
+    const SymExpr* ops[2] = {mul->binop.left, mul->binop.right};
+    for (int i = 0; i < 2; i++) {
+        int64_t c;
+        const SymExpr* other = ops[1 - i];
+        if (!is_const_any(ops[i], &c) || c == 0)
+            continue;
+        if (other && other->type == SYM_DIV && is_const(other->binop.right, c)) {
+            *x_out = other->binop.left;
+            *c_out = c;
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Recover a flattened index: `(X % c) + (X // c) * c` is just `X` for c != 0.
+ * Returns X retained on a match, NULL otherwise. Either addend order is handled.
+ */
+static SymExpr* try_divmod_recombine(SymExpr* l, SymExpr* r) {
+    SymExpr* sides[2] = {l, r};
+    for (int i = 0; i < 2; i++) {
+        SymExpr* mod_side = sides[i];
+        SymExpr* mul_side = sides[1 - i];
+        if (!mod_side || mod_side->type != SYM_MOD)
+            continue;
+        int64_t mc;
+        if (!is_const_any(mod_side->binop.right, &mc) || mc == 0)
+            continue;
+        const SymExpr* qx = NULL;
+        int64_t qc        = 0;
+        if (!match_quotient_times_divisor(mul_side, &qx, &qc))
+            continue;
+        if (qc == mc && exprs_equal(mod_side->binop.left, qx)) {
+            SymExpr* x = mod_side->binop.left;
+            sym_expr_retain(x);
+            return x;
+        }
+    }
+    return NULL;
+}
+
 SymExpr* sym_simplify_divmod(SymExpr* e) {
     if (!e)
         return NULL;
@@ -282,9 +337,16 @@ SymExpr* sym_simplify_divmod(SymExpr* e) {
 
         SymExpr* rebuilt = NULL;
         switch (e->type) {
-        case SYM_ADD:
+        case SYM_ADD: {
+            SymExpr* recombined = try_divmod_recombine(sl, sr);
+            if (recombined) {
+                sym_expr_release(sl);
+                sym_expr_release(sr);
+                return recombined;
+            }
             rebuilt = sym_add(sl, sr);
             break;
+        }
         case SYM_MUL:
             rebuilt = sym_mul(sl, sr);
             break;
