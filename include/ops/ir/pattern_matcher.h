@@ -23,12 +23,14 @@ typedef enum {
     CML_PAT_OP,      /* match a specific UOpType */
     CML_PAT_CAPTURE, /* capture any single node by name */
     CML_PAT_ANY,     /* match anything (wildcard) */
+    CML_PAT_CONST,   /* match a UOP_FILL whose value equals const_val */
 } CMLPatternKind;
 
 typedef struct CMLPatternNode {
     CMLPatternKind kind;
     UOpType op_type;       /* for CML_PAT_OP */
     char capture_name[32]; /* for CML_PAT_CAPTURE */
+    float const_val;       /* for CML_PAT_CONST */
     struct CMLPatternNode* inputs[CML_PATTERN_MAX_INPUTS];
     int num_inputs;
 } CMLPatternNode;
@@ -61,6 +63,10 @@ typedef struct {
 CMLPatternNode* cml_pattern_op(UOpType type, CMLPatternNode** inputs, int num_inputs);
 CMLPatternNode* cml_pattern_capture(const char* name);
 CMLPatternNode* cml_pattern_any(void);
+/* Match a UOP_FILL node whose constant value equals @p value. */
+CMLPatternNode* cml_pattern_const(float value);
+/* True if @p node is a UOP_FILL whose value equals @p value (shared by both matchers). */
+bool cml_pattern_match_const(const struct IRNode* node, float value);
 void cml_pattern_free(CMLPatternNode* node);
 
 CMLRewriteRegistry* cml_rewrite_registry_create(void);
