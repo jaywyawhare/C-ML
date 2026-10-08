@@ -2539,10 +2539,10 @@ not_empty_reduction:;
             /* compute in f32: convert input, reduce, convert output back to half */
             float* fin  = cml_malloc(in1_numel * sizeof(float));
             float* fout = cml_malloc(out->numel * sizeof(float));
-            rc = (fin && fout &&
+            rc          = (fin && fout &&
                   cml_cast_buffer(node->inputs[0]->data, odt, fin, DTYPE_FLOAT32, in1_numel) == 0)
-                     ? cpu_reduce_generic(node, fin, fout, DTYPE_FLOAT32)
-                     : -1;
+                              ? cpu_reduce_generic(node, fin, fout, DTYPE_FLOAT32)
+                              : -1;
             if (rc == 0)
                 rc = cml_cast_buffer(fout, DTYPE_FLOAT32, out->data, odt, out->numel);
             cml_free(fin);
