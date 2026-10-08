@@ -743,13 +743,37 @@ static void fast_broadcast_f32(float* out, const float* in, Tensor* inp, Tensor*
             (inp_d >= 0 && inp_d < inp_ndim && inp->shape[inp_d] > 1) ? inp_strides[inp_d] : 0;
     }
 
+    /* Largest trailing run of output axes that is copied verbatim from the input
+     * (not broadcast and contiguous): those map to a contiguous source block, so
+     * the inner loop becomes a memcpy instead of an element-at-a-time gather. The
+     * common "broadcast the leading dims" case copies one big block per outer step. */
+    size_t block   = 1;
+    int block_dims = 0;
+    size_t expect  = 1;
+    for (int d = ndim - 1; d >= 0; d--) {
+        if (src_stride[d] != expect)
+            break;
+        block *= (size_t)out_t->shape[d];
+        expect *= (size_t)out_t->shape[d];
+        block_dims++;
+    }
+
+    int outer = ndim - block_dims;
+    if (outer == 0) {
+        /* Whole thing is one contiguous copy (no broadcast axis). */
+        memcpy(out, in, n * sizeof(float));
+        return;
+    }
+
     size_t coord[8] = {0};
     size_t src      = 0;
-    for (size_t i = 0; i < n; i++) {
-        out[i] = in[src];
-        /* Increment the odometer from the last axis; carry resets that axis and
-         * subtracts its full contribution from src. */
-        for (int d = ndim - 1; d >= 0; d--) {
+    for (size_t off = 0; off < n; off += block) {
+        if (block == 1)
+            out[off] = in[src];
+        else
+            memcpy(out + off, in + src, block * sizeof(float));
+        /* Advance the odometer over the OUTER axes only. */
+        for (int d = outer - 1; d >= 0; d--) {
             coord[d]++;
             src += src_stride[d];
             if (coord[d] < (size_t)out_t->shape[d])
