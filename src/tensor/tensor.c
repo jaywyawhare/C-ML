@@ -841,11 +841,14 @@ void tensor_storage_release(Tensor* t) {
  * aliased. Without this, tensor_free releases only the shared block and leaks
  * the private buffer a kernel materialized the view onto. */
 void tensor_storage_drop_if_detached(Tensor* t) {
-    if (!t || !t->storage || !t->data)
+    if (!t || !t->storage || !t->storage->data || !t->data)
         return;
-    const char* block = (const char*)t->storage->data;
-    const char* p     = (const char*)t->data;
-    if (block && p >= block && (p < block + t->storage->nbytes || p == block))
+    /* Integer compare, not pointer relational: p and the block may be separate
+     * allocations once the view is materialized, where C11 leaves < / >=
+     * undefined. In range means data still aliases the block (a true view). */
+    uintptr_t block = (uintptr_t)t->storage->data;
+    uintptr_t p     = (uintptr_t)t->data;
+    if (p >= block && p < block + t->storage->nbytes)
         return;
     tensor_storage_release(t);
 }
