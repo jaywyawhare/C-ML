@@ -96,7 +96,9 @@ static int test_pipeline_reuse(void) {
     return ok;
 }
 
-/* All buffers alive simultaneously: no reuse possible. */
+/* All buffers alive simultaneously: no reuse possible. Slots are 256-byte
+ * aligned and placed largest-first (300,200,100 at offsets 0,512,768), so the
+ * padded total is 768+100=868 while peak (raw live bytes) stays 600. */
 static int test_all_alive(void) {
     size_t sizes[]  = {100, 200, 300};
     int first_use[] = {0, 0, 0};
@@ -106,9 +108,12 @@ static int test_all_alive(void) {
     if (!plan)
         return 0;
 
-    int ok = (plan->total_memory == 600);
+    int ok = (plan->total_memory == 868);
     ok     = ok && (plan->saved_memory == 0);
     ok     = ok && (plan->peak_memory == 600);
+    ok     = ok && (plan->buffer_offsets[0] % 256 == 0);
+    ok     = ok && (plan->buffer_offsets[1] % 256 == 0);
+    ok     = ok && (plan->buffer_offsets[2] % 256 == 0);
 
     cml_memory_plan_free(plan);
     return ok;
