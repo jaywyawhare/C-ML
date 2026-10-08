@@ -1,5 +1,5 @@
 /*
- * bench_torch_eager.c — Eager (zero-IR) vs lazy-IR overhead for hot ops.
+ * bench_torch_eager.c - Eager (zero-IR) vs lazy-IR overhead for hot ops.
  *
  * Runs a small MLP-style inference forward many times and compares:
  *   1. Lazy IR path (matmul+add+relu) with full context reset per iteration

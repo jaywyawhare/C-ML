@@ -2,9 +2,9 @@
 """CML half of the fair benchmark (same workloads as bench_tinygrad.py).
 
 Tests:
-  1. GEMM throughput  — square NxN matmul (N=512, 1024, 2048, 4096)
-  2. Fused op         — matmul + bias_add + relu (same sizes)
-  3. MLP forward pass — batch=64, 784->128->ReLU->10, 100 iters
+  1. GEMM throughput - square NxN matmul (N=512, 1024, 2048, 4096)
+  2. Fused op - matmul + bias_add + relu (same sizes)
+  3. MLP forward pass - batch=64, 784->128->ReLU->10, 100 iters
 
 Run:  python3 bench_cml.py   (from the repo root)
 """

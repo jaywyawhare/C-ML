@@ -12,7 +12,7 @@ int main(void) {
     if (!model) { printf("Failed to create Inception V3\n"); return 1; }
 
     printf("Inception V3 (%d classes) created successfully.\n", num_classes);
-    printf("(Forward pass requires 299x299 input — skipped for speed.)\n");
+    printf("(Forward pass requires 299x299 input - skipped for speed.)\n");
 
     module_free(model);
     printf("\nDone.\n");

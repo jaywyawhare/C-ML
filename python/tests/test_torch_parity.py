@@ -99,7 +99,7 @@ def test_training_loss_curve_parity():
         opt_t.step()
         losses_torch.append(float(loss_t.item()))
 
-        # cml step — same lifecycle as the C training loop: realize inputs,
+        # cml step - same lifecycle as the C training loop: realize inputs,
         # build a fresh graph per step (reset after the update), because
         # backward #N re-executes every prior step's VJP nodes otherwise
         pred_c = m_cml(cml.Tensor(X.copy()))
@@ -187,8 +187,8 @@ def test_transformer_block_training_loss_curve_parity():
 
     Attention is composed from primitives (linear projections, matmul,
     scaled softmax) on BOTH sides with identical weights, so this pins the
-    full composition path — including softmax and per-step gradient flow
-    through attention — not just individual ops."""
+    full composition path - including softmax and per-step gradient flow
+    through attention - not just individual ops."""
     d, seq, batch = 8, 6, 4
 
     def mirror(torch_mod, cml_lin):

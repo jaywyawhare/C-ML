@@ -1,5 +1,5 @@
 /*
- * torch_c_example.c — PyTorch-like C API training demo
+ * torch_c_example.c - PyTorch-like C API training demo
  *
  * Mirrors the linear_regression.c tutorial but uses the torch_c façade
  * inspired by ExecuTorch's eager-mode Module API (Section 5.2).

@@ -20,7 +20,7 @@ export function useLossLandscape() {
     camera.position.set(0, 15, 20)
     camera.lookAt(0, 0, 0)
 
-    // ── Loss function — smooth with a bit of character ──
+    // ── Loss function - smooth with a bit of character ──
     const SIZE = 24
     const SEG = 160
 
@@ -154,7 +154,7 @@ export function useLossLandscape() {
     const surface = new THREE.Mesh(geo, surfaceMat)
     scene.add(surface)
 
-    // ── Gradient descent path — multiple restarts to keep it moving ──
+    // ── Gradient descent path - multiple restarts to keep it moving ──
     const rawPath = []
     // Run several descents from different starting points, stitch them together
     const starts = [
@@ -225,7 +225,7 @@ export function useLossLandscape() {
 
     let trailMesh = null
 
-    // ── Ball — chrome metallic sphere ──
+    // ── Ball - chrome metallic sphere ──
     const ballGeo = new THREE.SphereGeometry(0.4, 48, 48)
     const ballMat = new THREE.ShaderMaterial({
       uniforms: { uTime: { value: 0 }, uCamPos: { value: new THREE.Vector3() } },
@@ -251,7 +251,7 @@ export function useLossLandscape() {
         uniform float uTime;
         uniform vec3 uCamPos;
 
-        // Same heatmap as surface — ball reflects landscape
+        // Same heatmap as surface - ball reflects landscape
         vec3 heatmap(float t) {
           vec3 a = vec3(0.02, 0.01, 0.01);
           vec3 b = vec3(0.45, 0.04, 0.02);
@@ -268,14 +268,14 @@ export function useLossLandscape() {
           vec3 viewDir = normalize(uCamPos - vWorldPos);
           vec3 n = normalize(vNorm);
 
-          // Fake environment reflection — map reflect direction to heatmap
+          // Fake environment reflection - map reflect direction to heatmap
           float envT = clamp(vReflect.y * 0.5 + 0.5, 0.0, 1.0);
           vec3 envColor = heatmap(envT) * 0.6;
 
-          // Chrome base — dark silver tinted by environment
+          // Chrome base - dark silver tinted by environment
           vec3 chrome = vec3(0.6, 0.6, 0.65);
 
-          // Fresnel — edges reflect more (like real metal)
+          // Fresnel - edges reflect more (like real metal)
           float fresnel = pow(1.0 - max(dot(n, viewDir), 0.0), 4.0);
 
           // Strong dual specular highlights
@@ -286,7 +286,7 @@ export function useLossLandscape() {
           vec3 specular = vec3(1.0, 0.95, 0.85) * spec1 * 1.2
                         + vec3(0.8, 0.85, 1.0) * spec2 * 0.4;
 
-          // Compose — metal = chrome tinted by environment + fresnel + specular
+          // Compose - metal = chrome tinted by environment + fresnel + specular
           vec3 color = mix(chrome * 0.3, envColor + chrome * 0.2, fresnel * 0.7 + 0.3)
                      + specular;
 
@@ -374,7 +374,7 @@ export function useLossLandscape() {
       ballMat.uniforms.uCamPos.value.copy(camera.position)
       particleMat.uniforms.uTime.value = t
 
-      // Camera — nearly static with tiny sway
+      // Camera - nearly static with tiny sway
       const sway = t * 0.012
       const tx = Math.sin(sway) * 1.5 + mouseX * 0.8
       const tz = 20 + Math.cos(sway * 0.7) * 1.0 + mouseY * 0.5

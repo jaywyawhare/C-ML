@@ -1,4 +1,4 @@
-/* viz-charts.js — D3-based chart rendering for C-ML Training View */
+/* viz-charts.js - D3-based chart rendering for C-ML Training View */
 /* global d3 */
 
 "use strict";

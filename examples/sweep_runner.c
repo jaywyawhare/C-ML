@@ -1,9 +1,9 @@
 /*
- * sweep_runner.c — a real hyperparameter *sweep controller* (grid search).
+ * sweep_runner.c - a real hyperparameter *sweep controller* (grid search).
  *
  * Unlike experiment_demo (which logs a fixed 3-run sweep), this orchestrates a
  * full grid over {lr} x {batch_size} x {optimizer}, launches a run per cell,
- * fires alerts on unstable configs, and reports the best cell — i.e. the "agent"
+ * fires alerts on unstable configs, and reports the best cell - i.e. the "agent"
  * half of W&B Sweeps, not just the visualization.
  */
 #include "core/experiment.h"
@@ -71,7 +71,7 @@ int main(void) {
                 if (e % 10 == 0) { cml_exp_log_histogram(run, "weights/layer0", e, w, W, 32); cml_exp_log_system(run, e); }
             }
 
-            if (unstable) cml_exp_alert(run, "warn", "High learning rate — unstable/spiky training detected");
+            if (unstable) cml_exp_alert(run, "warn", "High learning rate - unstable/spiky training detected");
             if (final_loss > 0.3f) cml_exp_alert(run, "error", "Run did not converge (final loss > 0.3)");
 
             cml_exp_summary_set(run, "best_val_accuracy", best);

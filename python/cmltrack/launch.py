@@ -1,5 +1,5 @@
 """
-cmltrack.launch — job orchestration (prototype, W&B Launch-style).
+cmltrack.launch - job orchestration (prototype, W&B Launch-style).
 
 Submit job specs to a file-based queue; an agent polls the queue and runs each
 job as a subprocess (with CML_EXP_DIR set so the job's run is tracked), updating

@@ -1,5 +1,5 @@
 """
-cmltrack — a wandb-style experiment-tracking SDK for C-ML (prototype).
+cmltrack - a wandb-style experiment-tracking SDK for C-ML (prototype).
 
 Pure stdlib. Writes the same append-only run format the C logger and
 viz/exp_server.py already understand, so Python and C runs show up side by side.

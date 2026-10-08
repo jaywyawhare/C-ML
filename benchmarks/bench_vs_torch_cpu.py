@@ -3,7 +3,7 @@
 
 Forces materialization each iteration (C-ML is lazy; .numpy() realizes it, and
 torch eager is realized on .numpy() too), warms up, and reports the median of N
-runs. GPU numbers are out of scope here (no device in this environment) — this is
+runs. GPU numbers are out of scope here (no device in this environment) - this is
 the CPU credibility baseline (a Tier-1 item).
 
 Run:  cd python && ../benchmarks/.venv/bin/python ../benchmarks/bench_vs_torch_cpu.py
@@ -40,7 +40,7 @@ def bench_matmul(n):
 
 
 def bench_elementwise(n):
-    # ((a*b)+a).relu() — a fusible chain where C-ML's fuser should shine.
+    # ((a*b)+a).relu() - a fusible chain where C-ML's fuser should shine.
     a = np.random.rand(n).astype(np.float32)
     b = np.random.rand(n).astype(np.float32)
     ca, cb = cml.Tensor(a), cml.Tensor(b)

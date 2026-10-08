@@ -1,5 +1,5 @@
 :root {
-  /* Core Colors — mapped onto the instrument palette (theme.css) */
+  /* Core Colors - mapped onto the instrument palette (theme.css) */
   --bg-dark: #0a0e14;
   --bg-card: #0f141d;
   --bg-card-hover: #151b26;
@@ -12,7 +12,7 @@
   --text: var(--text-primary);
   --muted: var(--text-secondary);
 
-  /* Accents — amber signal + cyan trace */
+  /* Accents - amber signal + cyan trace */
   --accent-primary: #ffb454;
   --accent-secondary: #4ecdc4;
   --accent-success: #57d69a;

@@ -1,5 +1,5 @@
 /*
- * hyperband_sweep.c — random search + successive-halving (Hyperband-lite).
+ * hyperband_sweep.c - random search + successive-halving (Hyperband-lite).
  *
  * Samples N random hyperparameter configs, then runs them through rungs of
  * increasing budget, keeping only the top half each round and *early-stopping*

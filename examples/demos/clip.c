@@ -20,7 +20,7 @@ int main(void) {
     if (!clip) { printf("Failed to create CLIP\n"); return 1; }
 
     printf("\nCLIP ViT-B/32 created successfully.\n");
-    printf("(Forward pass requires 224x224 image — skipped for speed.)\n");
+    printf("(Forward pass requires 224x224 image - skipped for speed.)\n");
 
     module_free(clip);
     printf("\nDone.\n");

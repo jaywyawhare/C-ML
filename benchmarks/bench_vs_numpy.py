@@ -34,7 +34,7 @@ def bench_matmul(n, iters):
 
 
 def bench_fused(n, iters):
-    """relu(A@B + bias) — C-ML fuses the epilogue; NumPy does 3 passes."""
+    """relu(A@B + bias) - C-ML fuses the epilogue; NumPy does 3 passes."""
     a = np.random.randn(n, n).astype(np.float32)
     b = np.random.randn(n, n).astype(np.float32)
     bias = np.random.randn(n, n).astype(np.float32)

@@ -184,7 +184,8 @@ Feature demonstrations and advanced usage patterns.
 | `dead_code_example` | Dead code elimination optimization |
 | `early_stopping_lr_scheduler` | Early stopping with learning rate scheduling |
 | `export_graph` | Export computation graph to DOT format |
-| `mnist_example` | MNIST digit classification |
+| `mnist_example` | MNIST digit classification (MLP) |
+| `mnist_cnn` | CNN trained on full MNIST via the dataloader (~98.6% test accuracy) |
 | `print_kernels` | Print generated IR kernels |
 | `training_loop_example` | Complete training loop with metrics |
 

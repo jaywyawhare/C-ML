@@ -115,7 +115,7 @@ def test_nn_forward_and_optimizer_construct():
 
 
 def test_single_model_training_converges():
-    """A hand-written training loop must converge — previously the autograd graph
+    """A hand-written training loop must converge - previously the autograd graph
     accumulated on the reused parameters and the loss diverged/hung. backward()
     now detaches the loss and step() resets the per-step graph automatically."""
     import cml.nn as nn

@@ -93,7 +93,7 @@ static void training_example(void) {
 
     /* Also record this as a tracked run. training.json drives the Training and
      * Kernel Studio tabs, but the Experiments tab reads per-run event logs under
-     * .cml/experiments/runs/ — without a run there, every one of its sub-tabs
+     * .cml/experiments/runs/ - without a run there, every one of its sub-tabs
      * renders "Select one or more runs" and looks inert. */
     char exp_cfg[192];
     snprintf(exp_cfg, sizeof(exp_cfg),

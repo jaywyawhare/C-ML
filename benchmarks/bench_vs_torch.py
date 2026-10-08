@@ -2,7 +2,7 @@
 """C-ML vs PyTorch across available devices (CPU always; CUDA when present).
 
 GPU is the number that decides a framework claim. This box has
-no device, so the CUDA section skips here — but the code runs unchanged on a
+no device, so the CUDA section skips here - but the code runs unchanged on a
 machine with a GPU, which is exactly the artifact the roadmap asks for.
 
 Run:  cd python && PYTHONPATH=. ../benchmarks/.venv/bin/python \
@@ -73,4 +73,4 @@ torch_cuda = torch.cuda.is_available()
 if cml_cuda and torch_cuda:
     run_device("cuda", cml.DEVICE_CUDA, "cuda")
 else:
-    print(f"\n[cuda skipped: cml_cuda={cml_cuda} torch_cuda={torch_cuda} — no device here]")
+    print(f"\n[cuda skipped: cml_cuda={cml_cuda} torch_cuda={torch_cuda} - no device here]")

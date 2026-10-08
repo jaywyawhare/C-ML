@@ -68,7 +68,7 @@ for step in range(100):
 
 Gradients land on `param.grad`; `cml.reset_graph()` fully clears the global
 graph between models. Training parity against PyTorch is pinned by
-`python/tests/test_torch_parity.py` — MLP **and** CNN loss curves match to
+`python/tests/test_torch_parity.py` - MLP **and** CNN loss curves match to
 ~1e-06 per step.
 
 ## Where to go next

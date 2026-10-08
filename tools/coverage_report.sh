@@ -25,7 +25,7 @@ find . -name '*.gcda' | while read -r gcda; do
     mkdir -p "$out"
     # Run gcov from a unique output dir (--object-dir points back at the
     # build tree) so concurrent .gcov names across binaries don't overwrite
-    # each other — the merge needs one listing PER BINARY per source.
+    # each other - the merge needs one listing PER BINARY per source.
     gcov -b -c -o "$PWD/$d" "$gcda" > /dev/null 2>&1 || true
     if ls ./*.gcov >/dev/null 2>&1; then
         mv ./*.gcov "$out/" 2>/dev/null || true

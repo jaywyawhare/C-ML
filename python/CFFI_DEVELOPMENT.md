@@ -25,7 +25,7 @@ include/*.h  →  _cml_cffi.py (cdef)  →  _cml_lib.so  →  Python wrappers  �
 2. Add the Python wrapper in the appropriate module
 3. Rebuild: `python3 cml/build_cffi.py`
 
-Example — wrapping `cml_nn_my_layer`:
+Example - wrapping `cml_nn_my_layer`:
 
 ```python
 # _cml_cffi.py
@@ -62,6 +62,6 @@ python3 build_cffi.py                                          # rebuild binding
 
 - Every C function in `cml.h` should have a declaration in `_cml_cffi.py`
 - Python wrappers should match C signatures exactly (don't invent parameters)
-- One `Tensor` class in `core.py` — no subclasses
+- One `Tensor` class in `core.py` - no subclasses
 - Submodules own their domain: `nn.py` for layers, `optim.py` for optimizers, etc.
 - Top-level `cml.*` only re-exports the most common functions

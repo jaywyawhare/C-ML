@@ -235,7 +235,7 @@ typedef struct {
 } DistributionSummary;
 ```
 
-A norm averages away the failure modes that matter — a few exploding channels, a
+A norm averages away the failure modes that matter - a few exploding channels, a
 layer that stopped moving, units that died. The bands show them directly.
 Percentiles come from a fixed-bin histogram over `[min, max]` rather than a sort,
 which would mean ordering every parameter in the model once per epoch.
@@ -280,7 +280,7 @@ cml_register_cleanup_context(cleanup);
   host memory and build tensors from it per iteration:
 
 ```c
-/* Dataset owned by the caller — unaffected by graph resets. */
+/* Dataset owned by the caller - unaffected by graph resets. */
 float* inputs = malloc((size_t)n * dim * sizeof(float));
 
 for (int step = 0; step < steps; step++) {
@@ -291,6 +291,10 @@ for (int step = 0; step < steps; step++) {
     cml_reset_ir_context();
 }
 ```
+- For a fixed-shape training loop, prefer `cml_reset_ir_graph_only()` over
+  `cml_reset_ir_context()`: it frees the step's IR but keeps the plan and kernel
+  caches warm, so each step reuses the compiled plan instead of re-planning
+  (about 2x faster here) while memory stays bounded.
 - Use `CleanupContext` for centralized resource management
 - Don't manually free a cleanup context registered with `cml_register_cleanup_context()`
 

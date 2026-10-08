@@ -3,7 +3,7 @@
 It previously looked for a `.bin` and called a non-existent `model_load`, so it
 silently loaded nothing. It now goes through the real safetensors loader. This
 saves a model's parameters, then builds a fresh model with `pretrained=True` and
-requires every parameter to come back bit-identical — proving the load happened
+requires every parameter to come back bit-identical - proving the load happened
 and matched by name/shape.
 """
 import os

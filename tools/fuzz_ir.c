@@ -1,5 +1,5 @@
 /*
- * fuzz_ir.c — Structure-aware libFuzzer / AFL entry point for the C-ML IR.
+ * fuzz_ir.c - Structure-aware libFuzzer / AFL entry point for the C-ML IR.
  *
  * Build with:  cmake -DBUILD_FUZZ=ON -DCMAKE_C_COMPILER=clang ..
  *              make fuzz_ir

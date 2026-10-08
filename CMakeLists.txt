@@ -29,7 +29,7 @@ if(CML_LINK_GC_SECTIONS AND NOT MSVC)
 endif()
 
 # Host-native codegen is a local-build convenience, not something a
-# distributed binary should ship with — turn off for packaging/CI.
+# distributed binary should ship with - turn off for packaging/CI.
 option(CML_NATIVE_OPTIMIZATIONS "Optimize for the build host CPU (-march=native)" ON)
 if(CML_NATIVE_OPTIMIZATIONS)
     # Probe with -Werror so a flag that is merely accepted-with-a-warning
@@ -155,7 +155,7 @@ if(ENABLE_LLVM_BACKEND)
             set(LLVM_BACKEND_FOUND FALSE)
         endif()
     else()
-        message(STATUS "LLVM CMake package not found — LLVM backend disabled")
+        message(STATUS "LLVM CMake package not found - LLVM backend disabled")
         set(LLVM_BACKEND_FOUND FALSE)
     endif()
 else()
@@ -1041,7 +1041,7 @@ if(BUILD_FUZZ)
                     > ${CMAKE_BINARY_DIR}/corpus/fuzz_ir/seed0
         )
 
-        message(STATUS "  fuzz_ir built — run: ./build/bin/fuzz_ir build/corpus/fuzz_ir/")
+        message(STATUS "  fuzz_ir built - run: ./build/bin/fuzz_ir build/corpus/fuzz_ir/")
     endif()
 endif()
 

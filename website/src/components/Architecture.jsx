@@ -81,7 +81,7 @@ const layers = [
       { label: 'AM Driver', sub: 'KFD ioctl, AQL dispatch' },
     ],
   },
-  // Layer 8: Hardware backends (two rows — nine equal columns overflow 640px layout)
+  // Layer 8: Hardware backends (two rows - nine equal columns overflow 640px layout)
   {
     label: null,
     sub: null,

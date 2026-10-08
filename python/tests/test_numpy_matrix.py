@@ -42,7 +42,7 @@ def check(name, x, fn_cml, fn_np=None, shape_exact=True, equal_nan=False):
     gs, ws = got.shape, want.shape
     if shape_exact and gs != ws:
         # reductions returning [1] instead of scalar () are a convention
-        # difference, not a value error — compare raveled values
+        # difference, not a value error - compare raveled values
         if got.size == want.size:
             if not np.allclose(got.ravel(), want.ravel(), rtol=RTOL, atol=1e-5,
                                equal_nan=equal_nan):

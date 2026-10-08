@@ -116,7 +116,7 @@ bool ok = numerical_grad_check(param_tensor, loss_fn, /*eps=*/1e-3, /*tol=*/1e-2
 
 1. **Fork** the repository and create a feature branch from `master`
 2. **Implement** your changes following the code style guide
-3. **Test** thoroughly — all existing tests must pass
+3. **Test** thoroughly - all existing tests must pass
 4. **Document** new public APIs in the appropriate header files
 5. **Submit** a pull request with a clear description
 
@@ -142,7 +142,7 @@ Examples:
 ```
 C-ML/
 ├── include/           # Public headers
-│   ├── cml.h         # Main entry point — includes everything
+│   ├── cml.h         # Main entry point - includes everything
 │   ├── core/         # Config, logging, training, serialization
 │   ├── tensor/       # Tensor struct and operations
 │   ├── autograd/     # Automatic differentiation
