@@ -27,13 +27,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# ccache gives incremental compilation across runs. Pin its dir to the path the
-# cache action stores (ccache 4.x otherwise defaults to ~/.cache/ccache and the
-# cache would never populate), and cap each cache so the ~8 build jobs fit under
-# GitHub's 10GB per-repo cache budget instead of thrashing LRU.
-env:
-  CCACHE_DIR: ${{ github.workspace }}/.ccache
-  CCACHE_MAXSIZE: "600M"
+# ccache-action installs ccache, sets its cache dir, restores/saves the GitHub
+# cache, and prints stats. Each job keys its own cache; 500M each keeps the
+# build jobs under GitHub's 10GB per-repo budget.
 
 jobs:
   build-and-test:
@@ -55,20 +51,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install ccache (Linux)
-        run: sudo apt-get install -y ccache
-        if: runner.os == 'Linux'
-
-      - name: Install ccache (macOS)
-        run: brew install ccache
-        if: runner.os == 'macOS'
-
-      - name: Cache ccache
-        uses: actions/cache@v4
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2
         with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache-${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}-${{ hashFiles('src/**', 'include/**') }}
-          restore-keys: ccache-${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}-
+          key: ${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}
+          max-size: 500M
 
       - name: Configure CMake
         run: |
@@ -84,10 +71,7 @@ jobs:
           CC: ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
 
       - name: Build
-        run: |
-          ccache -z
-          cmake --build build -j$(getconf _NPROCESSORS_ONLN)
-          ccache -s
+        run: cmake --build build -j$(getconf _NPROCESSORS_ONLN)
 
       - name: Run tests
         run: cd build && ctest --output-on-failure --timeout 240
@@ -109,15 +93,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install ccache
-        run: sudo apt-get install -y ccache
-
-      - name: Cache ccache
-        uses: actions/cache@v4
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2
         with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache-examples-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'examples/**') }}
-          restore-keys: ccache-examples-${{ runner.os }}-
+          key: examples-${{ runner.os }}
+          max-size: 500M
 
       - name: Configure CMake (Release + examples)
         run: |
@@ -129,10 +109,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache
 
       - name: Build examples
-        run: |
-          ccache -z
-          cmake --build build -j$(nproc)
-          ccache -s
+        run: cmake --build build -j$(nproc)
 
   sanitizers:
     # AddressSanitizer + UndefinedBehaviorSanitizer build - catches heap
@@ -142,15 +119,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install ccache
-        run: sudo apt-get install -y ccache
-
-      - name: Cache ccache
-        uses: actions/cache@v4
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2
         with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache-asan-${{ runner.os }}-${{ hashFiles('src/**', 'include/**') }}
-          restore-keys: ccache-asan-${{ runner.os }}-
+          key: asan-${{ runner.os }}
+          max-size: 500M
 
       - name: Configure CMake (ASan + UBSan)
         run: |
@@ -163,10 +136,7 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache
 
       - name: Build
-        run: |
-          ccache -z
-          cmake --build build-asan -j$(nproc)
-          ccache -s
+        run: cmake --build build-asan -j$(nproc)
 
       - name: Run tests (sanitized)
         run: cd build-asan && ctest --output-on-failure
