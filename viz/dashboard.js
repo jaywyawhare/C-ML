@@ -11,9 +11,10 @@
     graph:       { frame: "viz", src: "viz.html?embed=1", vizTab: "graph" },
     training:    { frame: "viz", src: "viz.html?embed=1", vizTab: "training" },
     kernels:     { frame: "viz", src: "viz.html?embed=1", vizTab: "codegen" },
+    rewrites:    { frame: "viz", src: "viz.html?embed=1", vizTab: "rewrites" },
     profile:     { frame: "viz", src: "viz.html?embed=1", vizTab: "flamegraph" },
   };
-  var ORDER = ["experiments", "graph", "training", "kernels", "profile"];
+  var ORDER = ["experiments", "graph", "training", "kernels", "rewrites", "profile"];
 
   var frameExp = document.getElementById("frame-experiments");
   var frameViz = document.getElementById("frame-viz");

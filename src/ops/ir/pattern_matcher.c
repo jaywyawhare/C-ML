@@ -2,6 +2,7 @@
 #include "ops/ir/tree_automaton.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/intern.h"
+#include "ops/ir/rewrite_trace.h"
 #include "ops/uops.h"
 #include "core/logging.h"
 
@@ -9,6 +10,14 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdatomic.h>
+#include <time.h>
+
+/** Monotonic microsecond clock for per-match rewrite timing. */
+static double rw_now_us(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec * 1e6 + (double)ts.tv_nsec / 1e3;
+}
 #include "alloc/cml_allocator.h"
 
 /** Counter for generating unique output names for replacement nodes. */
@@ -325,6 +334,10 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
 
                 if (match_node(ir, rule->pattern, node, &result)) {
                     /* Pattern matched -- invoke emit to produce a replacement. */
+                    bool trace                 = cml_rewrite_trace_enabled();
+                    const char* from_name      = trace ? node->output_name : NULL;
+                    const char* op_name        = trace ? uop_type_to_string(node->type) : NULL;
+                    double t0                  = trace ? rw_now_us() : 0.0;
                     struct IRNode* replacement = rule->emit(ir, &result);
 
                     if (replacement && replacement != node) {
@@ -333,6 +346,10 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
                         if (!replacement->output_name) {
                             replacement->output_name = rewrite_unique_name();
                         }
+
+                        if (trace)
+                            cml_rewrite_trace_record(rule->name, op_name, from_name,
+                                                     replacement->output_name, rw_now_us() - t0);
 
                         /* If the replacement node is not already in the
                          * graph, insert it just before the matched node. */

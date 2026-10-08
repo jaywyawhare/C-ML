@@ -2,6 +2,7 @@
 #include "ops/ir/optimization.h"
 #include "ops/ir/pattern_matcher.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/rewrite_trace.h"
 #include "ops/ir/intern.h"
 #include "core/logging.h"
 #include "core/cml_flags.h"
@@ -737,6 +738,7 @@ int cml_ir_optimize(CMLGraph_t ir) {
     {
         CMLRewriteRegistry* builtin = cml_rewrite_builtin_rules();
         if (builtin) {
+            cml_rewrite_trace_begin_pass("builtin rewrite rules");
             int rewrites = cml_rewrite_apply(builtin, ir, 0);
             if (rewrites > 0) {
                 build_dependency_graph(ir);

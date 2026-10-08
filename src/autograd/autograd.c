@@ -6,6 +6,7 @@
 #include "nn.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/rewrite_trace.h"
 #include "ops/uops.h"
 #include <stdlib.h>
 #include <string.h>
@@ -523,6 +524,9 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
                  * optimizer removes dead code and folds fusion groups. */
                 char* kernel_json_raw = cml_ir_export_kernel_analysis(viz_ir, false);
 
+                /* Capture every rule firing during optimize for the rewrite
+                 * stepper, fresh per exported graph. */
+                cml_rewrite_trace_reset();
                 cml_ir_optimize(viz_ir);
 
                 /* Post-optimization: dead/fused flags are now populated, which
@@ -554,6 +558,17 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
                     cml_free(kernel_json_raw);
                 }
                 cml_free(kernel_json_opt);
+
+                char* rewrites_json = cml_rewrite_trace_export_json();
+                if (rewrites_json) {
+                    FILE* rf = fopen("rewrites.json", "w");
+                    if (rf) {
+                        fputs(rewrites_json, rf);
+                        fclose(rf);
+                        LOG_INFO("VIZ exported rewrites to rewrites.json");
+                    }
+                    cml_free(rewrites_json);
+                }
             } else {
                 /* Same graph as last time: skip the export but keep the
                  * optimization, so execution below behaves identically whether

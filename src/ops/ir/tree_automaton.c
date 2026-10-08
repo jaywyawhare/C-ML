@@ -1,6 +1,7 @@
 #include "ops/ir/tree_automaton.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/pattern_matcher.h"
+#include "ops/ir/rewrite_trace.h"
 #include "ops/uops.h"
 #include "core/logging.h"
 
@@ -8,7 +9,15 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdatomic.h>
+#include <time.h>
 #include "alloc/cml_allocator.h"
+
+/** Monotonic microsecond clock for per-match rewrite timing. */
+static double aut_now_us(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec * 1e6 + (double)ts.tv_nsec / 1e3;
+}
 
 #define AUTOMATON_INITIAL_TABLE_CAP 256
 #define AUTOMATON_MAX_ARITY CML_PATTERN_MAX_INPUTS
@@ -556,12 +565,20 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
                 if (!match_node_recursive(graph, rule->pattern, node, &result))
                     continue;
 
+                bool trace                 = cml_rewrite_trace_enabled();
+                const char* from_name      = trace ? node->output_name : NULL;
+                const char* op_name        = trace ? uop_type_to_string(node->type) : NULL;
+                double t0                  = trace ? aut_now_us() : 0.0;
                 struct IRNode* replacement = rule->emit(graph, &result);
                 if (!replacement || replacement == node)
                     continue;
 
                 if (!replacement->output_name)
                     replacement->output_name = rewrite_unique_name();
+
+                if (trace)
+                    cml_rewrite_trace_record(rule->name, op_name, from_name,
+                                             replacement->output_name, aut_now_us() - t0);
 
                 bool already_in_graph = false;
                 {
