@@ -833,11 +833,11 @@ static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
             return m->ids[i];
     if (m->size >= m->cap) {
         int ncap           = m->cap ? m->cap * 2 : 64;
-        const void** nkeys = realloc(m->keys, (size_t)ncap * sizeof(const void*));
+        const void** nkeys = cml_realloc(m->keys, (size_t)ncap * sizeof(const void*));
         if (!nkeys)
             return -1;
         m->keys   = nkeys;
-        int* nids = realloc(m->ids, (size_t)ncap * sizeof(int));
+        int* nids = cml_realloc(m->ids, (size_t)ncap * sizeof(int));
         if (!nids)
             return -1;
         m->ids = nids;
