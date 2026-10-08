@@ -8,6 +8,8 @@
 // ═══════════════════════════════════════════════════════════════
 const State = {
   activeTab: "graph",
+  rewrites: null,
+  _rewriteIdx: 0,
   graph: null,
   training: null,
   modelArch: null,
@@ -238,6 +240,7 @@ function renderActiveTab() {
   else if (State.activeTab === "training") renderTrainingView();
   else if (State.activeTab === "codegen") renderCodeGenView();
   else if (State.activeTab === "flamegraph") renderFlamegraphView();
+  else if (State.activeTab === "rewrites") renderRewritesView();
 }
 
 function connectDataForTab(tabId) {
@@ -247,6 +250,7 @@ function connectDataForTab(tabId) {
   /* The flamegraph is a one-shot artifact written at process exit, so it is
    * fetched on demand rather than streamed. */
   if (tabId === "flamegraph") loadFlamegraph();
+  if (tabId === "rewrites") loadRewrites();
 
   // Start the loading-skeleton grace window for this tab, then re-render once
   // it lapses so a skeleton flips to the empty/marketing state if no data came.
@@ -1636,6 +1640,139 @@ function flameMatchedMs(node, match) {
  * -- from the code panes, which show what was generated for one accelerator.
  * Sharing a tab also cost the code panes ~200px of vertical space on every
  * view, for a chart most visits weren't there to read. */
+// ═══════════════════════════════════════════════════════════════
+// REWRITES VIEW — step through each IR graph-rewrite rule firing
+// ═══════════════════════════════════════════════════════════════
+
+/* rewrites.json is written once at export time (not streamed), so fetch it on
+   demand like the flamegraph. */
+function loadRewrites() {
+  fetch("/rewrites", { cache: "no-store" })
+    .then(r => (r.ok ? r.json() : null))
+    .then(d => {
+      State.rewrites = (d && Array.isArray(d.passes) && d.passes.length) ? d : null;
+      State._rewriteIdx = 0;
+      if (State.activeTab === "rewrites") renderRewritesView();
+    })
+    .catch(() => { State.rewrites = null; if (State.activeTab === "rewrites") renderRewritesView(); });
+}
+
+/* Flatten every pass's matches into one ordered list so prev/next walks the
+   whole optimize run, while keeping each match's pass for the section label. */
+function rewriteFlatList() {
+  const out = [];
+  const passes = (State.rewrites && State.rewrites.passes) || [];
+  passes.forEach((p, pi) => (p.matches || []).forEach(m => out.push({ ...m, pass: pi, passName: p.name })));
+  return out;
+}
+
+function renderRewritesView() {
+  const container = document.getElementById("tab-rewrites");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (!State.rewrites) {
+    container.appendChild(emptyState("No rewrites captured",
+      "Each IR rewrite-rule firing is recorded here when you run with VIZ=1. Run an example to populate it.",
+      "VIZ=1 ./build/bin/autograd_example"));
+    return;
+  }
+
+  const list = rewriteFlatList();
+  if (list.length === 0) {
+    container.appendChild(emptyState("No rewrites fired",
+      "The graph optimized without any rule matching — nothing to step through.", null));
+    return;
+  }
+  if (State._rewriteIdx >= list.length) State._rewriteIdx = list.length - 1;
+  if (State._rewriteIdx < 0) State._rewriteIdx = 0;
+
+  const layout = el("div", { className: "rw-layout" });
+
+  // ── Left rail: ordered match list, grouped by pass ──
+  const rail = el("div", { className: "rw-rail" });
+  let lastPass = -1;
+  list.forEach((m, i) => {
+    if (m.pass !== lastPass) {
+      lastPass = m.pass;
+      rail.appendChild(el("div", { className: "rw-pass-head" }, m.passName || "rewrite"));
+    }
+    const row = el("div", { className: "rw-row" + (i === State._rewriteIdx ? " active" : "") });
+    row.appendChild(el("span", { className: "rw-row-idx readout" }, String(i + 1)));
+    row.appendChild(el("span", { className: "rw-row-rule" }, m.rule));
+    row.appendChild(el("span", { className: "rw-row-op" }, m.op));
+    row.addEventListener("click", () => { State._rewriteIdx = i; renderRewritesView(); });
+    rail.appendChild(row);
+  });
+  layout.appendChild(rail);
+
+  // ── Main: the current match ──
+  const main = el("div", { className: "rw-main" });
+
+  const head = el("div", { className: "rw-head" });
+  head.appendChild(el("h3", {}, "Graph rewrites"));
+  head.appendChild(el("span", { className: "rw-count readout" },
+    `${State._rewriteIdx + 1} / ${list.length}`));
+  main.appendChild(head);
+
+  const m = list[State._rewriteIdx];
+
+  const card = el("div", { className: "rw-card" });
+  const ruleRow = el("div", { className: "rw-rule-row" });
+  ruleRow.appendChild(el("span", { className: "rw-rule-name" }, m.rule));
+  ruleRow.appendChild(el("span", { className: "rw-pass-tag" }, m.passName || "rewrite"));
+  ruleRow.appendChild(el("span", { className: "rw-dur readout" }, `${(m.us || 0).toFixed(2)} us`));
+  card.appendChild(ruleRow);
+
+  // before → after, the one node this rule replaced
+  const diff = el("div", { className: "rw-diff" });
+  const before = el("div", { className: "rw-node rw-before" });
+  before.appendChild(el("span", { className: "rw-node-tag" }, "matched"));
+  before.appendChild(el("span", { className: "rw-node-op" }, m.op));
+  before.appendChild(el("span", { className: "rw-node-name readout" }, m.from || "(unnamed)"));
+  diff.appendChild(before);
+  diff.appendChild(el("span", { className: "rw-arrow" }, "→"));
+  const after = el("div", { className: "rw-node rw-after" });
+  after.appendChild(el("span", { className: "rw-node-tag" }, "produced"));
+  after.appendChild(el("span", { className: "rw-node-name readout" }, m.to || "(unnamed)"));
+  diff.appendChild(after);
+  card.appendChild(diff);
+  main.appendChild(card);
+
+  // ── Controls ──
+  const ctrl = el("div", { className: "rw-controls" });
+  const mk = (label, dir) => {
+    const b = el("button", { className: "rw-btn" }, label);
+    b.addEventListener("click", () => {
+      State._rewriteIdx = Math.min(list.length - 1, Math.max(0, State._rewriteIdx + dir));
+      renderRewritesView();
+    });
+    return b;
+  };
+  ctrl.appendChild(mk("← Prev", -1));
+  ctrl.appendChild(mk("Next →", 1));
+  ctrl.appendChild(el("span", { className: "rw-hint" }, "use ← / → to step"));
+  main.appendChild(ctrl);
+
+  layout.appendChild(main);
+  container.appendChild(layout);
+
+  // Keyboard stepping, installed once.
+  if (!State._rwKeys) {
+    State._rwKeys = true;
+    document.addEventListener("keydown", (e) => {
+      if (State.activeTab !== "rewrites" || !State.rewrites) return;
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        const n = rewriteFlatList().length;
+        State._rewriteIdx = Math.min(n - 1, Math.max(0,
+          State._rewriteIdx + (e.key === "ArrowRight" ? 1 : -1)));
+        renderRewritesView();
+        e.preventDefault();
+      }
+    });
+  }
+}
+
 function renderFlamegraphView() {
   const container = $("#tab-flamegraph");
   if (!container) return;

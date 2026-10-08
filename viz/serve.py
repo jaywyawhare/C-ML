@@ -37,6 +37,7 @@ DATA_FILES = {
     "model_architecture": "model_architecture.json",
     "kernels": "kernels.json",
     "flamegraph": "flamegraph.json",
+    "rewrites": "rewrites.json",
 }
 
 # In-memory cache: {path_str: (mtime, raw_bytes, parsed_json, etag)}
@@ -150,6 +151,8 @@ class VizHandler(SimpleHTTPRequestHandler):
             self._handle_data("kernels")
         elif path == "/flamegraph":
             self._handle_data("flamegraph")
+        elif path == "/rewrites":
+            self._handle_data("rewrites")
         elif path == "/graph/stream":
             self._handle_sse("graph")
         elif path == "/training/stream":
