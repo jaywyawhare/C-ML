@@ -1055,9 +1055,12 @@ void cml_ir_free(CMLGraph_t ir) {
             Tensor* out = node->output;
             freed_set_add(&freed, out);
             if (out->external_refs > 0) {
-                /* An external owner (language binding) still holds this
-                 * output: detach it (copying borrowed plan data) instead of
-                 * destroying it under them. */
+                /* Pinned output (external owner, or a value holding its
+                 * published grad): detach and keep it. Match ref_count to the
+                 * pin count so each owner's tensor_release lands at zero; this
+                 * graph's own consumer refs (cml_ir_add_uop) are not returned in
+                 * teardown and would otherwise leak a parameter grad per step. */
+                out->ref_count = out->external_refs;
                 tensor_detach_keep(out);
             } else {
                 out->ref_count = 1;
@@ -1081,6 +1084,7 @@ void cml_ir_free(CMLGraph_t ir) {
             Tensor* out = node->output;
             freed_set_add(&freed, out);
             if (out->external_refs > 0) {
+                out->ref_count = out->external_refs; /* match pin count, as above */
                 tensor_detach_keep(out);
             } else {
                 out->ref_count = 1;

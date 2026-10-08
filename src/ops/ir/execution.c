@@ -2478,6 +2478,7 @@ not_empty_reduction:;
      * an unhandled op must fail here instead. */
     if (cml_exec_needs_typed(node, out)) {
         if (cml_exec_typed(node, out) == 0) {
+            tensor_storage_drop_if_detached(out);
             node->is_executed = true;
             out->is_executed  = true;
             return 0;
@@ -5265,6 +5266,7 @@ not_empty_reduction:;
         cml_apply_matmul_epilogue(node, out_data, out->numel);
     }
 
+    tensor_storage_drop_if_detached(out); /* a materialized view now owns its buffer */
     node->is_executed = true;
     out->is_executed  = true;
 
