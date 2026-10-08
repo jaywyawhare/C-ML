@@ -354,6 +354,7 @@ set(OPS_SOURCES
     src/ops/ir/autodiff.c
     src/ops/ir/pattern_matcher.c
     src/ops/ir/parallel_compile.c
+    src/ops/ir/rewrite_trace.c
     src/ops/ir/tree_automaton.c
     src/ops/ir/hcq.c
     src/ops/ir/hcq_backend.c

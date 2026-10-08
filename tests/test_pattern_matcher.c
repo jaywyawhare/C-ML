@@ -4,6 +4,8 @@
 #include "test_require.h"
 
 #include "ops/ir/pattern_matcher.h"
+#include "ops/ir/internal.h"
+#include "ops/uops.h"
 
 static void test_pattern_builder_op(void) {
     printf("  test_pattern_builder_op...");
@@ -39,6 +41,44 @@ static void test_pattern_builder_any(void) {
     REQUIRE(any->kind == CML_PAT_ANY);
 
     cml_pattern_free(any);
+    printf(" PASS\n");
+}
+
+static void test_pattern_builder_const(void) {
+    printf("  test_pattern_builder_const...");
+
+    CMLPatternNode* pc = cml_pattern_const(0.0f);
+    REQUIRE(pc != NULL);
+    REQUIRE(pc->kind == CML_PAT_CONST);
+    REQUIRE(pc->const_val == 0.0f);
+
+    /* The shared predicate matches a FILL of the value and nothing else. */
+    struct IRNode fill0;
+    memset(&fill0, 0, sizeof(fill0));
+    fill0.type = UOP_FILL;
+    FillParams f0;
+    memset(&f0, 0, sizeof(f0));
+    f0.value     = 0.0f;
+    fill0.params = &f0;
+
+    struct IRNode fill5;
+    memset(&fill5, 0, sizeof(fill5));
+    fill5.type = UOP_FILL;
+    FillParams f5;
+    memset(&f5, 0, sizeof(f5));
+    f5.value     = 5.0f;
+    fill5.params = &f5;
+
+    struct IRNode add;
+    memset(&add, 0, sizeof(add));
+    add.type = UOP_ADD;
+
+    REQUIRE(cml_pattern_match_const(&fill0, 0.0f) == true);
+    REQUIRE(cml_pattern_match_const(&fill5, 0.0f) == false);
+    REQUIRE(cml_pattern_match_const(&fill5, 5.0f) == true);
+    REQUIRE(cml_pattern_match_const(&add, 0.0f) == false);
+
+    cml_pattern_free(pc);
     printf(" PASS\n");
 }
 
@@ -124,6 +164,7 @@ int main(void) {
     test_pattern_builder_op();
     test_pattern_builder_capture();
     test_pattern_builder_any();
+    test_pattern_builder_const();
     test_pattern_with_inputs();
     test_registry_create_free();
     test_builtin_rules();

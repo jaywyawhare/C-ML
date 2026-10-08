@@ -2,6 +2,7 @@
 #include "ops/ir/tree_automaton.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/intern.h"
+#include "ops/ir/rewrite_trace.h"
 #include "ops/uops.h"
 #include "core/logging.h"
 
@@ -9,6 +10,14 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdatomic.h>
+#include <time.h>
+
+/** Monotonic microsecond clock for per-match rewrite timing. */
+static double rw_now_us(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec * 1e6 + (double)ts.tv_nsec / 1e3;
+}
 #include "alloc/cml_allocator.h"
 
 /** Counter for generating unique output names for replacement nodes. */
@@ -86,6 +95,10 @@ static bool match_node(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNo
     case CML_PAT_CAPTURE:
         /* Capture -- matches any node and records it by name. */
         return record_capture(result, pattern->capture_name, node) == 0;
+
+    case CML_PAT_CONST:
+        /* Constant -- matches a FILL whose value equals const_val. */
+        return cml_pattern_match_const(node, pattern->const_val);
 
     case CML_PAT_OP: {
         /* Must match the UOpType. */
@@ -199,6 +212,27 @@ CMLPatternNode* cml_pattern_any(void) {
     return p;
 }
 
+/** Build a pattern that matches a UOP_FILL node of a specific constant value. */
+CMLPatternNode* cml_pattern_const(float value) {
+    CMLPatternNode* p = cml_calloc(1, sizeof(CMLPatternNode));
+    if (!p)
+        return NULL;
+    p->kind      = CML_PAT_CONST;
+    p->const_val = value;
+    return p;
+}
+
+/** True if @p node is a UOP_FILL whose value equals @p value (within epsilon). */
+bool cml_pattern_match_const(const struct IRNode* node, float value) {
+    if (!node || node->type != UOP_FILL || !node->params)
+        return false;
+    const FillParams* fp = (const FillParams*)node->params;
+    float diff           = fp->value - value;
+    if (diff < 0)
+        diff = -diff;
+    return diff < 1e-7f;
+}
+
 /** Recursively free a pattern tree. */
 void cml_pattern_free(CMLPatternNode* node) {
     if (!node)
@@ -300,6 +334,10 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
 
                 if (match_node(ir, rule->pattern, node, &result)) {
                     /* Pattern matched -- invoke emit to produce a replacement. */
+                    bool trace                 = cml_rewrite_trace_enabled();
+                    const char* from_name      = trace ? node->output_name : NULL;
+                    const char* op_name        = trace ? uop_type_to_string(node->type) : NULL;
+                    double t0                  = trace ? rw_now_us() : 0.0;
                     struct IRNode* replacement = rule->emit(ir, &result);
 
                     if (replacement && replacement != node) {
@@ -308,6 +346,10 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
                         if (!replacement->output_name) {
                             replacement->output_name = rewrite_unique_name();
                         }
+
+                        if (trace)
+                            cml_rewrite_trace_record(rule->name, op_name, from_name,
+                                                     replacement->output_name, rw_now_us() - t0);
 
                         /* If the replacement node is not already in the
                          * graph, insert it just before the matched node. */

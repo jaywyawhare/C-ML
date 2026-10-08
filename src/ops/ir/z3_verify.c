@@ -52,6 +52,8 @@ typedef Z3_ast (*z3_mk_not_fn)(Z3_context, Z3_ast);
 typedef Z3_ast (*z3_mk_lt_fn)(Z3_context, Z3_ast, Z3_ast);
 typedef Z3_ast (*z3_mk_le_fn)(Z3_context, Z3_ast, Z3_ast);
 typedef Z3_ast (*z3_mk_ge_fn)(Z3_context, Z3_ast, Z3_ast);
+typedef Z3_ast (*z3_mk_gt_fn)(Z3_context, Z3_ast, Z3_ast);
+typedef Z3_ast (*z3_mk_ite_fn)(Z3_context, Z3_ast, Z3_ast, Z3_ast);
 typedef Z3_ast (*z3_mk_and_fn)(Z3_context, unsigned, Z3_ast*);
 typedef Z3_ast (*z3_mk_const_fn)(Z3_context, void*, Z3_sort);
 typedef void* (*z3_mk_string_symbol_fn)(Z3_context, const char*);
@@ -82,6 +84,8 @@ static struct {
     z3_mk_lt_fn mk_lt;
     z3_mk_le_fn mk_le;
     z3_mk_ge_fn mk_ge;
+    z3_mk_gt_fn mk_gt;
+    z3_mk_ite_fn mk_ite;
     z3_mk_and_fn mk_and;
     z3_mk_const_fn mk_const;
     z3_mk_string_symbol_fn mk_string_symbol;
@@ -146,6 +150,8 @@ static bool z3_try_load(void) {
     LOAD(mk_lt, "Z3_mk_lt");
     LOAD(mk_le, "Z3_mk_le");
     LOAD(mk_ge, "Z3_mk_ge");
+    LOAD(mk_gt, "Z3_mk_gt");
+    LOAD(mk_ite, "Z3_mk_ite");
     LOAD(mk_and, "Z3_mk_and");
     LOAD(mk_const, "Z3_mk_const");
     LOAD(mk_string_symbol, "Z3_mk_string_symbol");
@@ -250,6 +256,40 @@ static Z3_ast z3_build_node_expr(Z3_context ctx, struct IRNode* node, Z3_ast* in
         Z3_ast zero    = z3.mk_int(ctx, 0, rs);
         Z3_ast args[2] = {zero, a};
         return z3.mk_sub(ctx, 2, args);
+    }
+    /* Selection/compare ops over reals, via if-then-else. These appear in real
+     * graphs (relu as max, masks as where) and were previously unmodeled, so
+     * any rewrite touching them fell back to "unsupported". */
+    case UOP_MAX:
+        return (b && z3.mk_ite && z3.mk_ge) ? z3.mk_ite(ctx, z3.mk_ge(ctx, a, b), a, b) : NULL;
+    case UOP_MINIMUM:
+        return (b && z3.mk_ite && z3.mk_le) ? z3.mk_ite(ctx, z3.mk_le(ctx, a, b), a, b) : NULL;
+    case UOP_CMPLT: {
+        if (!b || !z3.mk_ite || !z3.mk_lt)
+            return NULL;
+        Z3_sort rs  = z3.mk_real_sort(ctx);
+        Z3_ast one  = z3.mk_int(ctx, 1, rs);
+        Z3_ast zero = z3.mk_int(ctx, 0, rs);
+        return z3.mk_ite(ctx, z3.mk_lt(ctx, a, b), one, zero);
+    }
+    case UOP_CMPGE: {
+        if (!b || !z3.mk_ite || !z3.mk_ge)
+            return NULL;
+        Z3_sort rs  = z3.mk_real_sort(ctx);
+        Z3_ast one  = z3.mk_int(ctx, 1, rs);
+        Z3_ast zero = z3.mk_int(ctx, 0, rs);
+        return z3.mk_ite(ctx, z3.mk_ge(ctx, a, b), one, zero);
+    }
+    case UOP_WHERE: {
+        /* where(cond, x, y) = ite(cond != 0, x, y). */
+        if (num_inputs < 3 || !z3.mk_ite || !z3.mk_eq || !z3.mk_not)
+            return NULL;
+        Z3_ast cond = input_exprs[0];
+        Z3_ast x    = input_exprs[1];
+        Z3_ast y    = input_exprs[2];
+        Z3_sort rs  = z3.mk_real_sort(ctx);
+        Z3_ast zero = z3.mk_int(ctx, 0, rs);
+        return z3.mk_ite(ctx, z3.mk_not(ctx, z3.mk_eq(ctx, cond, zero)), x, y);
     }
     default:
         return NULL; /* Op not modeled symbolically */

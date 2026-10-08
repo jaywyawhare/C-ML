@@ -48,6 +48,9 @@ void cml_graph_capture_free(CMLCapturedGraph* graph) {
     cml_free(graph->nodes);
     cml_free(graph->input_bindings);
     cml_free(graph->output_bindings);
+    cml_free(graph->sub_node);
+    cml_free(graph->sub_arg);
+    cml_free(graph->sub_in);
     cml_free(graph);
 }
 
@@ -143,9 +146,28 @@ int cml_graph_capture_replay(CMLCapturedGraph* graph) {
      * For CPU fallback, we iterate and "execute" each node.
      * The actual kernel dispatch is handled by the backend.
      */
+    /* Substitute freshly-bound input buffers into the captured argument lists,
+     * so one capture replays against new inputs rather than the ones it recorded. */
+    for (int k = 0; k < graph->num_subs; k++) {
+        int ni = graph->sub_node[k], ai = graph->sub_arg[k], ii = graph->sub_in[k];
+        if (ni < 0 || ni >= graph->num_nodes)
+            continue;
+        CMLCapturedNode* node = &graph->nodes[ni];
+        if (ai < 0 || ai >= node->num_args || !node->kernel_args)
+            continue;
+        if (ii >= 0 && ii < graph->num_input_bindings && graph->input_bindings[ii])
+            node->kernel_args[ai] = graph->input_bindings[ii]->data;
+    }
+
     for (int i = 0; i < graph->num_nodes; i++) {
         CMLCapturedNode* node = &graph->nodes[i];
-        (void)node; /* Backend would dispatch node->kernel_handle here */
+        if (graph->dispatch_fn) {
+            int rc = graph->dispatch_fn(node, graph->dispatch_user);
+            if (rc != 0) {
+                graph->state = CML_CAPTURE_ERROR;
+                return -1;
+            }
+        }
     }
 
     double end                 = get_time_ms();
@@ -195,6 +217,45 @@ int cml_graph_capture_bind_output(CMLCapturedGraph* graph, int index, Tensor* te
     return 0;
 }
 
+/** Install the per-node dispatch callback replay invokes. */
+int cml_graph_capture_set_dispatch(CMLCapturedGraph* graph,
+                                   int (*dispatch_fn)(const struct CMLCapturedNode*, void*),
+                                   void* user) {
+    if (!graph)
+        return -1;
+    graph->dispatch_fn   = dispatch_fn;
+    graph->dispatch_user = user;
+    return 0;
+}
+
+/** Map a captured argument to an input binding so replay substitutes its buffer. */
+int cml_graph_capture_map_input_arg(CMLCapturedGraph* graph, int node_index, int arg_index,
+                                    int input_index) {
+    if (!graph || node_index < 0 || arg_index < 0 || input_index < 0)
+        return -1;
+    if (graph->num_subs >= graph->sub_capacity) {
+        int nc   = graph->sub_capacity ? graph->sub_capacity * 2 : 8;
+        int* nn  = (int*)cml_realloc(graph->sub_node, (size_t)nc * sizeof(int));
+        int* na  = (int*)cml_realloc(graph->sub_arg, (size_t)nc * sizeof(int));
+        int* nin = (int*)cml_realloc(graph->sub_in, (size_t)nc * sizeof(int));
+        if (!nn || !na || !nin) {
+            cml_free(nn);
+            cml_free(na);
+            cml_free(nin);
+            return -1;
+        }
+        graph->sub_node     = nn;
+        graph->sub_arg      = na;
+        graph->sub_in       = nin;
+        graph->sub_capacity = nc;
+    }
+    graph->sub_node[graph->num_subs] = node_index;
+    graph->sub_arg[graph->num_subs]  = arg_index;
+    graph->sub_in[graph->num_subs]   = input_index;
+    graph->num_subs++;
+    return 0;
+}
+
 /** Discard captured nodes and timing, returning the graph to idle. */
 int cml_graph_capture_reset(CMLCapturedGraph* graph) {
     if (!graph)
@@ -203,6 +264,7 @@ int cml_graph_capture_reset(CMLCapturedGraph* graph) {
     for (int i = 0; i < graph->num_nodes; i++)
         cml_free(graph->nodes[i].kernel_args);
     graph->num_nodes            = 0;
+    graph->num_subs             = 0;
     graph->state                = CML_CAPTURE_IDLE;
     graph->replay_count         = 0;
     graph->total_replay_time_ms = 0;

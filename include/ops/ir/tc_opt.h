@@ -12,6 +12,9 @@ extern "C" {
 
 typedef struct CMLTCConfig {
     int min_m, min_n, min_k;
+    /* Native tensor-core tile in each dimension; dims are padded up to these.
+     * Populated per detected hardware (WMMA 16, AMX 32, XMX 8x16x8). */
+    int tile_m, tile_n, tile_k;
     bool allow_padding;
     bool prefer_fp16;
 } CMLTCConfig;

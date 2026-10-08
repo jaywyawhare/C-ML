@@ -58,6 +58,21 @@ typedef struct CMLCapturedGraph {
     int (*backend_destroy_instance)(void* instance); /* e.g. cuGraphExecDestroy */
     int (*backend_destroy_graph)(void* graph);       /* e.g. cuGraphDestroy     */
 
+    /* Per-node dispatch, set by the backend. Replay calls this for each node
+     * after input substitution; NULL means replay is a timing-only no-op (the
+     * previous behaviour). */
+    int (*dispatch_fn)(const struct CMLCapturedNode* node, void* user);
+    void* dispatch_user;
+
+    /* Input-argument substitution map: entry k says node[sub_node[k]]'s argument
+     * sub_arg[k] should be replaced at replay time with input_bindings[sub_in[k]]'s
+     * data buffer. This is what lets one capture replay against new input tensors. */
+    int* sub_node;
+    int* sub_arg;
+    int* sub_in;
+    int num_subs;
+    int sub_capacity;
+
     double capture_time_ms;
     double last_replay_time_ms;
     double total_replay_time_ms;
@@ -73,6 +88,17 @@ int cml_graph_capture_end(CMLCapturedGraph* graph);
 int cml_graph_capture_replay(CMLCapturedGraph* graph);
 int cml_graph_capture_bind_input(CMLCapturedGraph* graph, int index, Tensor* tensor);
 int cml_graph_capture_bind_output(CMLCapturedGraph* graph, int index, Tensor* tensor);
+
+/* Install the backend's per-node dispatch callback used by replay. */
+int cml_graph_capture_set_dispatch(CMLCapturedGraph* graph,
+                                   int (*dispatch_fn)(const struct CMLCapturedNode*, void*),
+                                   void* user);
+
+/* Record that argument @p arg_index of node @p node_index is the input bound at
+ * @p input_index, so replay substitutes that input's current data buffer. This
+ * is how one captured graph runs against fresh input tensors. */
+int cml_graph_capture_map_input_arg(CMLCapturedGraph* graph, int node_index, int arg_index,
+                                    int input_index);
 int cml_graph_capture_reset(CMLCapturedGraph* graph);
 CMLCaptureState cml_graph_capture_state(const CMLCapturedGraph* graph);
 int cml_graph_capture_num_nodes(const CMLCapturedGraph* graph);

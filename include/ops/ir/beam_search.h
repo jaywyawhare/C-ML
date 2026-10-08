@@ -16,6 +16,8 @@ extern "C" {
 #endif
 
 #define CML_BEAM_MAX_CANDIDATES 64
+/* Cap on per-thread upcast (unroll * vec) before a config is pruned as register-heavy. */
+#define CML_BEAM_MAX_UPCAST 8
 #define CML_BEAM_DEFAULT_WIDTH 4
 #define CML_BEAM_DEFAULT_WARMUP 2
 #define CML_BEAM_DEFAULT_TIMING 5

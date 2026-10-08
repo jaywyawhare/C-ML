@@ -124,6 +124,9 @@ static void test_tune(void) {
     /* The best config should have reasonable block sizes (> 0) */
     REQUIRE(best.block_size_x > 0);
 
+    /* Register-heavy configs are pruned, so the winner stays within the cap. */
+    REQUIRE(best.unroll_factor * best.vec_width <= CML_BEAM_MAX_UPCAST);
+
     /* After tuning, the result should be cached */
     CMLBeamConfig cached;
     memset(&cached, 0, sizeof(cached));

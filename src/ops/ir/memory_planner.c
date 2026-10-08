@@ -15,6 +15,13 @@ typedef struct {
     size_t size;
 } BufferEntry;
 
+/* Byte alignment for each buffer slot's base offset. 256 covers 128-bit vector
+ * loads on every backend and keeps unrelated slots off a shared cache line. */
+#define CML_MEM_SLOT_ALIGN 256
+
+/** Round `v` up to the next multiple of `a` (a must be non-zero). */
+static size_t mem_align_up(size_t v, size_t a) { return (v + a - 1) / a * a; }
+
 /** Order buffers by decreasing size (index tie-break) for greedy coloring. */
 static int cmp_by_size_desc(const void* a, const void* b) {
     const BufferEntry* ea = (const BufferEntry*)a;
@@ -196,9 +203,12 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes, int* first
         }
     }
 
-    /* Compute offsets: pack slots contiguously */
+    /* Compute offsets: pack slots contiguously, each slot start aligned so a
+     * buffer's base is suitable for 128-bit/vector loads and two slots never
+     * share a cache line (false sharing across unrelated buffers). */
     size_t offset = 0;
     for (int s = 0; s < num_slots; s++) {
+        offset = mem_align_up(offset, CML_MEM_SLOT_ALIGN);
         for (int i = 0; i < num_buffers; i++) {
             if (buf_slot[i] == s)
                 plan->buffer_offsets[i] = offset;

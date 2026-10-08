@@ -344,6 +344,13 @@ SymExpr* sym_simplify(SymExpr* e) {
             sym_expr_release(right);
             return left; // already 0
         }
+        // Bound fold: 0 <= x < b  =>  x / b == 0 (b a positive constant).
+        if (right->type == SYM_CONST && right->const_val > 0 && sym_expr_min(left) >= 0 &&
+            sym_expr_max(left) < right->const_val) {
+            sym_expr_release(left);
+            sym_expr_release(right);
+            return sym_const(0);
+        }
         break;
     case SYM_MOD:
         // x % 1 -> 0
@@ -351,6 +358,12 @@ SymExpr* sym_simplify(SymExpr* e) {
             sym_expr_release(left);
             sym_expr_release(right);
             return sym_const(0);
+        }
+        // Bound fold: 0 <= x < b  =>  x % b == x (b a positive constant).
+        if (right->type == SYM_CONST && right->const_val > 0 && sym_expr_min(left) >= 0 &&
+            sym_expr_max(left) < right->const_val) {
+            sym_expr_release(right);
+            return left;
         }
         break;
     default:
