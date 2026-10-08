@@ -114,6 +114,8 @@ typedef struct Tensor {
 } Tensor;
 
 size_t cml_dtype_size(DType dtype);
+/* Human-readable dtype name (e.g. "float32"); "unknown" if unrecognized. */
+const char* cml_dtype_to_string(DType dtype);
 DType cml_promote_dtype(DType dtype1, DType dtype2);
 
 /* Overflow-checked shape product: returns false if any dim is negative or

@@ -1,5 +1,6 @@
 #include "ops/ir/viz_server.h"
 #include "ops/ir/internal.h"
+#include "tensor/tensor.h"
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
@@ -113,29 +114,6 @@ static const char VIZ_HTML_POST[] =
     "</script></body></html>\n";
 
 /** Short human-readable name for a dtype, used in the JSON node payload. */
-static const char* dtype_name(DType d) {
-    switch (d) {
-    case DTYPE_FLOAT32:
-        return "float32";
-    case DTYPE_FLOAT16:
-        return "float16";
-    case DTYPE_BFLOAT16:
-        return "bfloat16";
-    case DTYPE_INT32:
-        return "int32";
-    case DTYPE_INT64:
-        return "int64";
-    case DTYPE_INT8:
-        return "int8";
-    case DTYPE_UINT8:
-        return "uint8";
-    case DTYPE_BOOL:
-        return "bool";
-    default:
-        return "unknown";
-    }
-}
-
 /** Group an op into a coarse class (elemwise/reduce/movement/matmul) for coloring. */
 static const char* op_class(UOpType op) {
     switch (op) {
@@ -211,7 +189,7 @@ char* viz_graph_to_json(CMLGraph_t ir) {
         A("{\"id\":%d,\"op\":\"%s\",\"cls\":\"%s\"", i, uop_type_to_string(node->type),
           op_class(node->type));
         if (node->output) {
-            A(",\"dtype\":\"%s\"", dtype_name(node->output->dtype));
+            A(",\"dtype\":\"%s\"", cml_dtype_to_string(node->output->dtype));
             if (node->output->ndim > 0) {
                 A(",\"shape\":[");
                 for (int d = 0; d < node->output->ndim; ++d) {

@@ -7,15 +7,13 @@ const VizCharts = (() => {
 
   // ── Shared config ──────────────────────────────────────────
   const MARGIN = { top: 10, right: 15, left: 50, bottom: 30 };
-  const COLORS = {
-    training:   "#4a90e2",
-    testing:    "#f59e0b",
-    validation: "#ef4444",
-    trainAcc:   "#10b981",
-    testAcc:    "#f59e0b",
-    valAcc:     "#ef4444",
-    grid:       "#374151",
-    axis:       "#6b7280",
+
+  /* Colour by ENTITY (not by chart or rank), so a series keeps one colour
+     across loss and accuracy. Read live so the light and dark sets both apply. */
+  const SERIES = {
+    get training()   { return tok("--series-train"); },
+    get testing()    { return tok("--series-test"); },
+    get validation() { return tok("--series-val"); },
   };
 
 
@@ -102,7 +100,7 @@ const VizCharts = (() => {
     g.append("g").attr("class", "axis")
       .call(d3.axisLeft(y).ticks(6).tickFormat(d3.format(".2~e")));
 
-    const color = o.color || "#4a90e2";
+    const color = o.color || SERIES.training;
     const band = (loArr, hiArr, opacity) => {
       const area = d3.area()
         .x((d, k) => x(idx[k] + 1))
@@ -154,8 +152,9 @@ const VizCharts = (() => {
     const rect = container.getBoundingClientRect();
     const W = rect.width || 400;
     const H = rect.height || 280;
-    const w = W - MARGIN.left - MARGIN.right;
-    const h = H - MARGIN.top - MARGIN.bottom;
+    const M = Object.assign({}, MARGIN, { right: 72 });
+    const w = W - M.left - M.right;
+    const h = H - M.top - M.bottom;
 
     if (w <= 0 || h <= 0) return;
 
@@ -165,7 +164,7 @@ const VizCharts = (() => {
       .attr("height", H);
 
     const g = svg.append("g")
-      .attr("transform", `translate(${MARGIN.left},${MARGIN.top})`);
+      .attr("transform", `translate(${M.left},${M.top})`);
 
     // Data keys
     const trainKey = isAccuracy ? "trainingAccuracy" : "trainingLoss";
@@ -214,8 +213,10 @@ const VizCharts = (() => {
       .attr("transform", `translate(0,${h})`)
       .call(d3.axisBottom(x).ticks(Math.min(chartData.length, 10)).tickFormat(d3.format("d")));
 
+    const yTicks = y.ticks(6);
+    const pctFmt = d3.format(`.${d3.precisionFixed(yTicks.length > 1 ? yTicks[1] - yTicks[0] : 1)}f`);
     const yAxis = isAccuracy
-      ? d3.axisLeft(y).ticks(6).tickFormat(v => `${v.toFixed(1)}%`)
+      ? d3.axisLeft(y).ticks(6).tickFormat(v => `${pctFmt(v)}%`)
       : logScale
         ? d3.axisLeft(y).ticks(6, "~g")
         : d3.axisLeft(y).ticks(6);
@@ -231,8 +232,9 @@ const VizCharts = (() => {
       .x((d, i) => x(chartData[i].epoch))
       .y(d => y(d));
 
-    // Helper to draw a series
-    function drawSeries(key, color, isDashed, showDots) {
+    // Helper to draw a series as a thin 2px line; points are read on hover
+    // rather than marked on every sample.
+    function drawSeries(key, color, isDashed) {
       const vals = chartData.map(d => d[key]);
       const defined = vals.map((v, i) => ({ v, i })).filter(d => d.v != null);
       if (defined.length === 0) return;
@@ -241,33 +243,57 @@ const VizCharts = (() => {
         .datum(vals)
         .attr("fill", "none")
         .attr("stroke", color)
-        .attr("stroke-width", 2.5)
+        .attr("stroke-width", 2)
+        .attr("stroke-linejoin", "round")
+        .attr("stroke-linecap", "round")
         .attr("d", line);
 
-      if (isDashed) path.attr("stroke-dasharray", "4 4");
-
-      if (showDots) {
-        g.selectAll(null)
-          .data(defined)
-          .enter()
-          .append("circle")
-          .attr("cx", d => x(chartData[d.i].epoch))
-          .attr("cy", d => y(d.v))
-          .attr("r", 5)
-          .attr("fill", color)
-          .attr("stroke", "#111827")
-          .attr("stroke-width", 1);
-      }
+      if (isDashed) path.attr("stroke-dasharray", "6 4");
     }
 
-    // Draw visible series
-    const trainColor = isAccuracy ? COLORS.trainAcc : COLORS.training;
-    const testColor  = isAccuracy ? COLORS.testAcc  : COLORS.testing;
-    const valColor   = isAccuracy ? COLORS.valAcc   : COLORS.validation;
+    // Draw visible series. Colour follows the entity, so a series reads the
+    // same in the loss and accuracy charts; testing stays dashed as a print and
+    // colour-vision cue alongside the hue.
+    const trainColor = SERIES.training;
+    const testColor  = SERIES.testing;
+    const valColor   = SERIES.validation;
 
-    if (visible.training)   drawSeries(trainKey, trainColor, false, false);
-    if (visible.testing)    drawSeries(testKey,  testColor,  true,  true);
-    if (visible.validation) drawSeries(valKey,   valColor,   false, false);
+    if (visible.training)   drawSeries(trainKey, trainColor, false);
+    if (visible.testing)    drawSeries(testKey,  testColor,  true);
+    if (visible.validation) drawSeries(valKey,   valColor,   false);
+
+    // Label each curve's latest measured value at the point where it ends.
+    // Labels that would overlap are pushed apart vertically, keeping order.
+    const ends = [];
+    [[visible.training, trainKey, trainColor],
+     [visible.testing, testKey, testColor],
+     [visible.validation, valKey, valColor]].forEach(([on, key, color]) => {
+      if (!on) return;
+      for (let i = chartData.length - 1; i >= 0; i--) {
+        const v = chartData[i][key];
+        if (v == null || !isFinite(v)) continue;
+        const raw = chartData[i]["raw_" + key];
+        const shown = raw != null && isFinite(raw) ? raw : v;
+        ends.push({ color, px: x(chartData[i].epoch), py: y(v), ly: y(v),
+                    text: isAccuracy ? `${shown.toFixed(1)}%` : shown.toPrecision(4) });
+        break;
+      }
+    });
+    ends.sort((a, b) => a.ly - b.ly);
+    for (let k = 1; k < ends.length; k++) {
+      ends[k].ly = Math.max(ends[k].ly, ends[k - 1].ly + 15);
+    }
+    const overflow = ends.length ? ends[ends.length - 1].ly - h : 0;
+    if (overflow > 0) ends.forEach(e => { e.ly -= overflow; });
+    // A leader in the series colour ties a displaced label back to its curve.
+    ends.forEach(e => {
+      g.append("path").attr("fill", "none").attr("stroke", e.color).attr("stroke-width", 1)
+        .attr("d", `M${e.px + 4},${e.py} L${e.px + 10},${e.ly} L${e.px + 13},${e.ly}`);
+      g.append("circle").attr("cx", e.px).attr("cy", e.py).attr("r", 3.5)
+        .attr("fill", e.color);
+      g.append("text").attr("class", "end-label")
+        .attr("x", e.px + 16).attr("y", e.ly).text(e.text);
+    });
 
     // ── Tooltip ──────────────────────────────────────────────
     const tooltipClass = isAccuracy ? "accuracy" : "loss";
@@ -289,11 +315,12 @@ const VizCharts = (() => {
 
     // Active dots
     const activeDots = [];
+    const surfaceRing = tok("--bg-elev");
     function addActiveDot(color) {
       const dot = g.append("circle")
         .attr("r", 5)
         .attr("fill", color)
-        .attr("stroke", "white")
+        .attr("stroke", surfaceRing)
         .attr("stroke-width", 2)
         .style("display", "none");
       activeDots.push(dot);
@@ -335,9 +362,9 @@ const VizCharts = (() => {
         // Position tooltip near cursor
         const tipW = tooltip.offsetWidth;
         const tipH = tooltip.offsetHeight;
-        let tx = mx + MARGIN.left + 12;
+        let tx = mx + M.left + 12;
         let ty = event.offsetY - tipH / 2;
-        if (tx + tipW > W) tx = mx + MARGIN.left - tipW - 12;
+        if (tx + tipW > W) tx = mx + M.left - tipW - 12;
         if (ty < 0) ty = 4;
         if (ty + tipH > H) ty = H - tipH - 4;
         tooltip.style.left = tx + "px";
@@ -357,5 +384,5 @@ const VizCharts = (() => {
   }
 
   return { createChart, createDistributionChart, smoothSeries, downsample,
-           positiveFloor, observeResize };
+           positiveFloor, observeResize, SERIES };
 })();

@@ -1,7 +1,6 @@
 "use strict";
 // C-ML Experiments - W&B-style tracker UI (prototype). Layers 3-10 live here.
 
-const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#38bdf8", "#a855f7", "#ec4899", "#14b8a6", "#eab308", "#f97316"];
 
 /* Navigation is two levels, because nineteen equal-weight tabs in one row give
  * the reader no hierarchy to scan by - everything looks equally important, so
@@ -108,7 +107,7 @@ async function boot() {
   if (!window._wired) {
     window._wired = true;
     const tb = el("div", { class: "theme-toggle", title: "Toggle theme (t)",
-      onclick: () => { S.theme = S.theme === "dark" ? "light" : "dark"; boot(); } }, "◐");
+      onclick: () => { S.theme = S.theme === "dark" ? "light" : "dark"; boot(); } }, "Theme");
     $("#conn").before(tb);
     document.addEventListener("keydown", e => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) return;
@@ -132,7 +131,8 @@ async function boot() {
 async function loadRuns() {
   const runs = await api("/api/runs");
   S.runs = runs;
-  runs.forEach((r, i) => { if (!S.color[r.id]) S.color[r.id] = PALETTE[i % PALETTE.length]; });
+  // Re-resolved on every boot so a theme switch picks up that set's steps.
+  runs.forEach((r, i) => { S.color[r.id] = seriesColor(i); });
   if (S.selected.size === 0) runs.forEach(r => S.selected.add(r.id));
   renderSidebar();
 }
@@ -170,7 +170,7 @@ function renderSidebar() {
     const item = el("div", { class: "run-item" + (on ? " on" : "") + (hidden ? " hidden-run" : ""), "data-id": r.id, onclick: () => {
       on ? S.selected.delete(r.id) : S.selected.add(r.id); renderSidebar(); render();
     } },
-      el("div", { class: "run-swatch", style: { background: on && !hidden ? S.color[r.id] : "#3a3f52" } }),
+      el("div", { class: "run-swatch", style: { background: on && !hidden ? S.color[r.id] : "var(--border-2)" } }),
       el("div", { class: "run-meta" },
         el("div", { class: "run-name" }, star ? "★ " : "", r.name),
         el("div", { class: "run-sub" }, `lr=${r.config.lr ?? "?"}  ${acc != null ? "acc " + (acc * 100).toFixed(1) + "%" : ""}`),
@@ -249,7 +249,7 @@ async function renderCharts(c) {
       const plot = el("div"); card.append(plot); grid.append(card);
       const gd = await api(`/api/group?key=${encodeURIComponent(k)}&groupby=${encodeURIComponent(S.groupBy)}`);
       const gnames = Object.keys(gd.groups);
-      gnames.forEach((g, i) => { if (!groupColors[g]) groupColors[g] = PALETTE[i % PALETTE.length]; });
+      gnames.forEach((g, i) => { if (!groupColors[g]) groupColors[g] = seriesColor(i); });
       bandChart(plot, gd.groups, groupColors, { logY: S.logY });
       card.append(el("div", { class: "legend" }, ...gnames.map(g => el("span", {}, el("i", { style: { background: groupColors[g] } }), `${S.groupBy}=${g}`))));
     }
@@ -344,7 +344,7 @@ function renderConfig(c) {
     const tr = el("tr", {}, el("td", { style: { color: "var(--muted)" } }, k));
     const vals = runs.map(r => r.config[k]);
     const differ = new Set(vals.map(v => JSON.stringify(v))).size > 1;
-    runs.forEach((r, i) => tr.append(el("td", { style: differ ? { color: "#f59e0b" } : {} },
+    runs.forEach((r, i) => tr.append(el("td", { style: differ ? { color: "var(--warn)" } : {} },
       r.config[k] != null ? String(r.config[k]) : " - ")));
     body.append(tr);
   });
@@ -378,7 +378,8 @@ async function renderHistograms(c) {
     const globalMin = d3.min(data, d => d.mn), globalMax = d3.max(data, d => d.mx);
     const y = d3.scaleLinear().domain([globalMin, globalMax]).range([H - m.b, m.t]);
     const maxCount = d3.max(data, d => d3.max(d.counts));
-    const color = d3.scaleSequential(d3.interpolateInferno).domain([0, Math.log(1 + maxCount)]);
+    // One hue, light to dark: magnitude, not a rainbow.
+    const color = d3.scaleSequential(d3.interpolateRgb(tok("--bg-elev2"), tok("--cat-1"))).domain([0, Math.log(1 + maxCount)]);
     data.forEach(d => {
       const cw = x.bandwidth();
       const step = (d.mx - d.mn) / bins;
@@ -386,13 +387,13 @@ async function renderHistograms(c) {
         const y0 = d.mn + bi * step, y1 = y0 + step;
         svg.append("rect").attr("x", x(d.step)).attr("width", cw)
           .attr("y", y(y1)).attr("height", Math.max(1, y(y0) - y(y1)))
-          .attr("fill", cnt > 0 ? color(Math.log(1 + cnt)) : "#0e1017");
+          .attr("fill", cnt > 0 ? color(Math.log(1 + cnt)) : tok("--bg-elev2"));
       });
     });
     svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`)
       .call(d3.axisBottom(x).tickValues(x.domain().filter((_, i) => i % Math.ceil(data.length / 8) === 0)).tickSizeOuter(0));
     svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(6).tickFormat(d3.format("~g")));
-    host.append(el("div", { class: "legend" }, el("span", {}, "x = training step · y = value · brightness = count (log)")));
+    host.append(el("div", { class: "legend" }, el("span", {}, "x = training step, y = value, brightness = count (log)")));
   };
   draw(keys[0]);
 }
@@ -425,7 +426,7 @@ async function renderMedia(c) {
   for (const r of runs) {
     const items = await api(`/api/media?run=${r.id}`);
     for (const it of items) {
-      const card = el("div", { class: "card" }, el("h4", {}, el("span", { class: "accent" }), `${it.name} · ${r.name}`));
+      const card = el("div", { class: "card" }, el("h4", {}, el("span", { class: "accent" }), `${it.name}, ${r.name}`));
       if (it.kind === "image") {
         const cv = el("canvas", { width: it.w, height: it.h, class: "media-img",
           style: { width: Math.min(260, it.w * 3) + "px", height: "auto" } });
@@ -476,7 +477,7 @@ async function renderSweep(c) {
     });
     const line = d3.line();
     runs.forEach(r => {
-      svg.append("path").attr("fill", "none").attr("stroke", S.color[r.id] || "#6366f1")
+      svg.append("path").attr("fill", "none").attr("stroke", S.color[r.id] || seriesColor(0))
         .attr("stroke-width", 2).attr("opacity", 0.85)
         .attr("d", line(dims.map(k => [xs(k), ys[k](+r.config[k])])));
     });
@@ -495,7 +496,7 @@ async function renderSweep(c) {
         const bar = el("div", { class: "imp-row" },
           el("span", { class: "imp-name" }, row.param),
           el("div", { class: "imp-track" }, el("div", { class: "imp-fill", style: {
-            width: (mag * 100).toFixed(0) + "%", background: row.correlation >= 0 ? "#10b981" : "#ef4444" } })),
+            width: (mag * 100).toFixed(0) + "%", background: row.correlation >= 0 ? "var(--ok)" : "var(--err)" } })),
           el("span", { class: "imp-val" }, row.correlation.toFixed(3)));
         ic.append(bar);
       });
@@ -573,7 +574,7 @@ async function renderTable(c) {
   });
   table.append(body);
   c.append(el("div", { class: "card" },
-    el("h4", {}, el("span", { class: "accent" }), "Runs", el("span", { class: "badge", style: { marginLeft: "auto" } }, `${runs.length} runs · click a header to sort`)),
+    el("h4", {}, el("span", { class: "accent" }), "Runs", el("span", { class: "badge", style: { marginLeft: "auto" } }, `${runs.length} runs, click a header to sort`)),
     el("div", { style: { overflowX: "auto" } }, table)));
 }
 
@@ -603,7 +604,7 @@ async function renderOverview(c) {
       kv("State", r.status || "?"), kv("Started", started), kv("Duration", dur),
       kv("Host", r.host || " - "), kv("OS", r.os || " - "), kv("Git", r.git || " - "),
       kv("Command", r.cmd || " - "),
-      kv("Metrics", `${r.n_metrics} keys · ${r.n_scalars} points`),
+      kv("Metrics", `${r.n_metrics} keys, ${r.n_scalars} points`),
       el("div", { class: "sub-h" }, "Summary"),
       ...Object.entries(r.summary).map(([k, v]) => kv(k, typeof v === "number" ? (+v).toFixed(4) : v)),
       el("div", { class: "sub-h" }, "Edit"),
@@ -645,13 +646,13 @@ async function renderRegistry(c) {
       el("span", { class: "alias" + (x === "best" ? " best" : "") }, x));
     body.append(el("tr", {},
       el("td", {}, a.name), el("td", {}, ...aliases),
-      el("td", {}, el("span", { style: { color: S.color[a.run] || "#888" } }, "● "), a.run_name),
+      el("td", {}, el("span", { style: { color: S.color[a.run] || "var(--muted-2)" } }, "● "), a.run_name),
       el("td", {}, (a.size / 1024).toFixed(1) + " KB"),
       el("td", { style: { color: "var(--muted)" } }, (a.hash || "").slice(0, 12))));
   });
   table.append(body);
   c.append(el("div", { class: "card" },
-    el("h4", {}, el("span", { class: "accent" }), "Model Registry", el("span", { class: "badge", style: { marginLeft: "auto" } }, `${reg.length} versioned artifact(s)`)),
+    el("h4", {}, el("span", { class: "accent" }), "Model registry", el("span", { class: "badge", style: { marginLeft: "auto" } }, `${reg.length} versioned artifact(s)`)),
     reg.length ? table : el("div", { class: "empty" }, "No aliased artifacts.")));
 }
 
@@ -718,10 +719,10 @@ async function renderDiff(c) {
     const table = el("table", { class: "grid" });
     table.append(el("thead", {}, el("tr", {}, el("th", {}, title), el("th", {}, d.a.name), el("th", {}, d.b.name))));
     const body = el("tbody", {});
-    rows.forEach(x => body.append(el("tr", { style: x.same ? {} : { background: "rgba(245,158,11,.07)" } },
+    rows.forEach(x => body.append(el("tr", { style: x.same ? {} : { background: "color-mix(in srgb, var(--warn) 7%, transparent)" } },
       el("td", { style: { color: "var(--muted)" } }, x.key),
-      el("td", { style: x.same ? {} : { color: "#f59e0b" } }, fmt(x.a)),
-      el("td", { style: x.same ? {} : { color: "#f59e0b" } }, fmt(x.b)))));
+      el("td", { style: x.same ? {} : { color: "var(--warn)" } }, fmt(x.a)),
+      el("td", { style: x.same ? {} : { color: "var(--warn)" } }, fmt(x.b)))));
     table.append(body);
     return el("div", { class: "card" }, el("h4", {}, el("span", { class: "accent" }), title), table);
   };
@@ -739,7 +740,7 @@ async function renderAlerts(c) {
   alerts.forEach(a => {
     wrap.append(el("div", { class: "alert alert-" + (a.level || "info") },
       el("span", { class: "alert-lvl" }, (a.level || "info").toUpperCase()),
-      el("span", { class: "alert-run", style: { color: S.color[a.run] || "#aaa" } }, a.run_name || ""),
+      el("span", { class: "alert-run" }, a.run_name || ""),
       el("span", { class: "alert-msg" }, a.message)));
   });
   c.append(wrap);
@@ -771,7 +772,7 @@ function barChart(container, data) {
   const x = d3.scaleLinear().domain([0, d3.max(data, d => d.v) || 1]).range([m.l, W - m.r]);
   data.forEach(d => {
     svg.append("rect").attr("x", m.l).attr("y", y(d.name)).attr("height", y.bandwidth())
-      .attr("width", Math.max(0, x(d.v) - m.l)).attr("fill", S.color[d.id] || "#6366f1").attr("rx", 3);
+      .attr("width", Math.max(0, x(d.v) - m.l)).attr("fill", S.color[d.id] || seriesColor(0)).attr("rx", 3);
     svg.append("text").attr("x", m.l - 8).attr("y", y(d.name) + y.bandwidth() / 2 + 4)
       .attr("text-anchor", "end").attr("fill", "var(--muted)").attr("font-size", "11").text(d.name);
     svg.append("text").attr("x", x(d.v) + 6).attr("y", y(d.name) + y.bandwidth() / 2 + 4)
@@ -807,7 +808,7 @@ async function renderDashboard(c) {
   const ctrl = el("div", { class: "controls" },
     el("label", {}, "Add panel", addSel),
     el("button", { class: "btn", onclick: () => { const p = dashPanels(); if (!p.includes(addSel.value)) { p.push(addSel.value); saveDash(p); render(); } } }, "+ Add"),
-    el("span", { class: "badge" }, "drag panels to rearrange · saved to your browser"));
+    el("span", { class: "badge" }, "drag panels to rearrange, saved to your browser"));
   c.append(ctrl);
 
   const grid = el("div", { class: "panel-grid dash-grid" });
@@ -866,18 +867,18 @@ async function renderWeave(c) {
     detail.innerHTML = "";
     const t = await api(`/api/trace?id=${tid}`);
     detail.append(el("h4", {}, el("span", { class: "accent" }), t.name,
-      el("span", { class: "badge", style: { marginLeft: "auto" } }, `${t.tokens_in}→${t.tokens_out} tok · $${t.total_cost} · ${t.latency_ms}ms`)));
+      el("span", { class: "badge", style: { marginLeft: "auto" } }, `${t.tokens_in}→${t.tokens_out} tok, $${t.total_cost}, ${t.latency_ms}ms`)));
     // build tree by parent
     const byId = {}; t.spans.forEach(s => byId[s.id] = { ...s, kids: [] });
     const roots = [];
     t.spans.forEach(s => (s.parent && byId[s.parent] ? byId[s.parent].kids : roots).push(byId[s.id]));
-    const kindColor = { chain: "#6366f1", llm: "#10b981", tool: "#f59e0b", retriever: "#38bdf8" };
+    const kindColor = { chain: "var(--cat-1)", llm: "var(--cat-2)", tool: "var(--cat-3)", retriever: "var(--cat-4)" };
     const walk = (s, depth) => {
       const row = el("div", { class: "span-row", style: { paddingLeft: (depth * 18 + 4) + "px" } },
-        el("span", { class: "span-kind", style: { background: (kindColor[s.kind] || "#888") + "33", color: kindColor[s.kind] || "#aaa" } }, s.kind),
+        el("span", { class: "span-kind", style: { background: `color-mix(in srgb, ${kindColor[s.kind] || "var(--muted)"} 16%, transparent)`, color: "var(--text)" } }, s.kind),
         el("span", { class: "span-name" }, s.name),
         s.model ? el("span", { class: "badge" }, s.model) : null,
-        s.tokens_in ? el("span", { class: "span-meta" }, `${s.tokens_in}→${s.tokens_out} tok · $${s.cost}`) : null,
+        s.tokens_in ? el("span", { class: "span-meta" }, `${s.tokens_in}→${s.tokens_out} tok, $${s.cost}`) : null,
         el("span", { class: "span-meta", style: { marginLeft: "auto" } }, `${s.latency_ms}ms`));
       detail.append(row);
       s.kids.forEach(k => walk(k, depth + 1));
@@ -886,7 +887,7 @@ async function renderWeave(c) {
   };
   traces.forEach((t, i) => list.append(el("div", { class: "trace-item", onclick: () => { [...list.querySelectorAll(".trace-item")].forEach(x => x.classList.remove("on")); event.currentTarget.classList.add("on"); draw(t.id); } },
     el("div", { class: "run-name" }, t.name),
-    el("div", { class: "run-sub" }, `${t.spans} spans · $${t.total_cost} · ${t.tokens_in + t.tokens_out} tok`))));
+    el("div", { class: "run-sub" }, `${t.spans} spans, $${t.total_cost}, ${t.tokens_in + t.tokens_out} tok`))));
   c.append(el("div", { style: { display: "flex", gap: "14px", alignItems: "flex-start" } }, list, detail));
   draw(traces[0].id);
 }
@@ -901,7 +902,7 @@ async function renderTables(c) {
     for (const name of names) {
       any = true;
       const t = await api(`/api/richtable?run=${r.id}&name=${encodeURIComponent(name)}`);
-      const card = el("div", { class: "card" }, el("h4", {}, el("span", { class: "accent" }), `${name} · ${r.name}`));
+      const card = el("div", { class: "card" }, el("h4", {}, el("span", { class: "accent" }), `${name}, ${r.name}`));
       const table = el("table", { class: "grid" });
       let sortCol = null, sortDir = 1;
       const rebuild = () => {
@@ -943,13 +944,13 @@ async function renderLineage(c) {
   if (!g.nodes.length) return c.append(el("div", { class: "empty" }, "No lineage yet - run examples/launch_demo.py (dataset → run → model)."));
   const nRun = g.nodes.filter(n => n.type === "run").length;
   const nArt = g.nodes.filter(n => n.type === "artifact").length;
-  const cyDiv = el("div", { style: { width: "100%", height: "72vh", background: "var(--bg)", borderRadius: "8px" } });
+  const cyDiv = el("div", { style: { width: "100%", height: "72vh", background: "var(--bg-inset)", borderRadius: "var(--radius)" } });
   c.append(el("div", { class: "card", style: { padding: "10px" } },
     el("h4", { style: { padding: "2px 4px 8px" } }, el("span", { class: "accent" }), "Artifact lineage",
       el("span", { class: "legend", style: { marginLeft: "12px", gap: "14px" } },
-        el("span", {}, el("i", { style: { background: "#10b981", width: "10px", height: "10px", borderRadius: "50%" } }), "artifact"),
-        el("span", {}, el("i", { style: { background: "#6366f1", width: "10px", height: "10px", borderRadius: "3px" } }), "run")),
-      el("span", { class: "badge", style: { marginLeft: "auto" } }, `${nArt} artifacts · ${nRun} runs · ${g.edges.length} edges`)),
+        el("span", {}, el("i", { style: { background: "var(--cat-3)", width: "10px", height: "10px", borderRadius: "50%" } }), "artifact"),
+        el("span", {}, el("i", { style: { background: "var(--cat-1)", width: "10px", height: "10px", borderRadius: "2px" } }), "run")),
+      el("span", { class: "badge", style: { marginLeft: "auto" } }, `${nArt} artifacts, ${nRun} runs, ${g.edges.length} edges`)),
     cyDiv));
   requestAnimationFrame(() => {
     if (typeof cytoscape === "undefined") { cyDiv.append(el("div", { class: "empty" }, "cytoscape not loaded")); return; }
@@ -961,25 +962,24 @@ async function renderLineage(c) {
       ],
       layout: { name: "dagre", rankDir: "LR", nodeSep: 22, rankSep: 120, edgeSep: 12, ranker: "network-simplex" },
       minZoom: 0.2, maxZoom: 2.5, wheelSensitivity: 0.25,
-      style: [
+      style: resolveTokens([
         { selector: "node", style: {
             label: "data(label)", "text-wrap": "wrap", "text-max-width": "150px", "text-valign": "center",
-            "text-halign": "center", "font-size": "11px", "font-weight": 600, padding: "10px",
-            "border-width": 1, "transition-property": "background-color", } },
+            "text-halign": "center", "font-family": "IBM Plex Mono, ui-monospace, monospace",
+            "font-size": "11px", "font-weight": 500, padding: "10px", color: "var(--text)",
+            "background-color": "var(--bg-elev)", "border-width": 1.5 } },
         { selector: 'node[type="run"]', style: {
-            "background-color": "#20243a", "border-color": "#6366f1", color: "#c7ccf5",
-            shape: "round-rectangle", width: "label", height: "26px" } },
+            "border-color": "var(--cat-1)", shape: "round-rectangle", width: "label", height: "26px" } },
         { selector: 'node[type="artifact"]', style: {
-            "background-color": "#0e2a20", "border-color": "#10b981", color: "#5eead4",
-            shape: "round-rectangle", width: "label", height: "34px", "border-width": 2, "font-size": "12px" } },
+            "border-color": "var(--cat-3)", shape: "ellipse", width: "label", height: "34px", "font-size": "12px" } },
         { selector: "edge", style: {
-            width: 1.6, "line-color": "#39405c", "target-arrow-color": "#39405c", "target-arrow-shape": "triangle",
-            "arrow-scale": 0.9, "curve-style": "bezier", "font-size": "9px", label: "data(label)",
-            color: "#8b90a5", "text-background-color": "#0a0b0f", "text-background-opacity": 1,
+            width: 1.25, "line-color": "var(--muted-2)", "target-arrow-color": "var(--muted-2)", "target-arrow-shape": "triangle",
+            "arrow-scale": 0.8, "curve-style": "bezier", "font-size": "9px", label: "data(label)",
+            color: "var(--muted)", "text-background-color": "var(--bg)", "text-background-opacity": 1,
             "text-background-padding": "2px", "control-point-step-size": 30 } },
-        { selector: 'edge[label *= "uses"]', style: { "line-color": "#f59e0b", "target-arrow-color": "#f59e0b", "line-style": "dashed" } },
-        { selector: "node:selected", style: { "border-color": "#fff", "border-width": 2 } },
-      ],
+        { selector: 'edge[label *= "uses"]', style: { "line-color": "var(--flow-in)", "target-arrow-color": "var(--flow-in)", "line-style": "dashed" } },
+        { selector: "node:selected", style: { "border-color": "var(--accent)", "border-width": 2.5 } },
+      ]),
     });
     cy.on("layoutstop", () => cy.fit(cy.elements(), 40));
     setTimeout(() => cy.fit(cy.elements(), 40), 250);

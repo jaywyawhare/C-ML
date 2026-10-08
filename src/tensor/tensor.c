@@ -228,6 +228,49 @@ size_t cml_dtype_size(DType dtype) {
     }
 }
 
+/** Human-readable name for a dtype (e.g. "float32", "bfloat16"), for diagnostics
+ *  and graph/kernel export. Returns "unknown" for an unrecognized value. */
+const char* cml_dtype_to_string(DType dtype) {
+    switch (dtype) {
+    case DTYPE_FLOAT32:
+        return "float32";
+    case DTYPE_FLOAT64:
+        return "float64";
+    case DTYPE_FLOAT16:
+        return "float16";
+    case DTYPE_BFLOAT16:
+        return "bfloat16";
+    case DTYPE_INT8:
+        return "int8";
+    case DTYPE_INT16:
+        return "int16";
+    case DTYPE_INT32:
+        return "int32";
+    case DTYPE_INT64:
+        return "int64";
+    case DTYPE_UINT8:
+        return "uint8";
+    case DTYPE_UINT16:
+        return "uint16";
+    case DTYPE_UINT32:
+        return "uint32";
+    case DTYPE_UINT64:
+        return "uint64";
+    case DTYPE_BOOL:
+        return "bool";
+    case DTYPE_FLOAT8_E4M3:
+        return "float8_e4m3";
+    case DTYPE_FLOAT8_E5M2:
+        return "float8_e5m2";
+    case DTYPE_FLOAT8_E4M3_FNUZ:
+        return "float8_e4m3fnuz";
+    case DTYPE_FLOAT8_E5M2_FNUZ:
+        return "float8_e5m2fnuz";
+    default:
+        return "unknown";
+    }
+}
+
 /** Type-promotion result for a binary op: the higher-ranked of the two dtypes
  *  along the bool < uint < int < float hierarchy. */
 DType cml_promote_dtype(DType dtype1, DType dtype2) {

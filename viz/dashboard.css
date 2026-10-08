@@ -1,167 +1,113 @@
-/* ============================================================================
- * Shell chrome - the instrument's header rail + framed content bay.
- * One topbar (brand · view nav · signal readout) over two isolated iframes.
- * All hooks used by dashboard.js are preserved: .shell-nav-item[.active],
- * #frame-experiments/#frame-viz[.active], #shell-conn[.live/.down] + .shell-conn-label.
- * ========================================================================== */
+/* Shell: one top bar over two isolated iframes. dashboard.js relies on
+ * .shell-nav-item[.active], #frame-experiments / #frame-viz[.active],
+ * #shell-conn[.live/.down], .shell-conn-label and #shell-view. */
 
 html, body {
   margin: 0;
   height: 100%;
-  color: var(--text);
-  font-family: var(--font);
-  font-size: var(--fs-400);
-  line-height: var(--lh-body);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
 }
 body { display: flex; flex-direction: column; }
 
-/* ── Header rail ──────────────────────────────────────────────────────────── */
 .shell-topbar {
-  position: relative;
   height: var(--topbar-h);
   flex: 0 0 var(--topbar-h);
   display: flex;
-  align-items: center;
-  gap: var(--sp-5);
+  align-items: stretch;
+  gap: var(--sp-6);
   padding: 0 var(--sp-4);
-  background: linear-gradient(180deg, rgba(17, 22, 31, 0.92), rgba(11, 15, 21, 0.88));
-  backdrop-filter: blur(12px) saturate(1.2);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px -16px rgba(0, 0, 0, 0.9);
   z-index: 10;
 }
-/* faint amber signal line seated on the rail's lower edge */
-.shell-topbar::after {
-  content: "";
-  position: absolute;
-  left: 0; right: 0; top: var(--topbar-h);
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent-line) 20%, var(--accent-line) 80%, transparent);
-  opacity: 0.5;
-  pointer-events: none;
-}
 
+/* The brand doubles as the location: a brand mark, the binary's name, then the
+ * open view. The mark is a small green tile, the one spot of brand in the bar. */
 .shell-brand {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
   color: var(--text);
   text-decoration: none;
-  font-family: var(--font);
-  font-weight: 700;
-  font-size: var(--fs-500);
-  letter-spacing: 0.02em;
-}
-.shell-brand svg { flex: 0 0 auto; filter: drop-shadow(0 0 8px rgba(255, 180, 84, 0.4)); }
-.shell-brand span::after {
-  content: "// viz";
-  margin-left: 8px;
   font-family: var(--mono);
-  font-size: var(--fs-100);
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  color: var(--muted-2);
+  font-size: var(--fs-300);
 }
+.shell-brand::before {
+  content: "";
+  width: 20px; height: 20px;
+  border-radius: 5px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, white) 0%, var(--accent) 100%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.shell-brand-name { font-weight: 500; }
+.shell-brand-sep { color: var(--muted-2); }
+.shell-brand-view { color: var(--muted); }
 
-/* ── View nav ─────────────────────────────────────────────────────────────── */
-.shell-nav { display: flex; align-items: center; gap: 2px; }
+.shell-nav { display: flex; align-items: stretch; gap: 2px; }
 .shell-nav-item {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2);
-  height: 36px;
   padding: 0 var(--sp-3);
+  margin: 7px 0;
   background: transparent;
   color: var(--muted);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border: 0;
+  border-radius: var(--radius);
   font-family: var(--font);
   font-size: var(--fs-300);
   font-weight: 500;
-  letter-spacing: 0.01em;
   cursor: pointer;
   transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
-.shell-nav-item svg { width: 16px; height: 16px; flex: 0 0 auto; opacity: 0.85; }
-.shell-nav-item:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
-.shell-nav-item.active {
-  color: var(--text);
-  background: var(--accent-soft);
-}
-.shell-nav-item.active svg { opacity: 1; color: var(--accent); }
-/* amber trace under the active view */
+.shell-nav-item:hover { color: var(--text); background: var(--bg-elev2); }
+.shell-nav-item.active { color: var(--text); }
 .shell-nav-item.active::after {
   content: "";
   position: absolute;
-  left: var(--sp-3); right: var(--sp-3); bottom: -1px;
+  left: var(--sp-3); right: var(--sp-3); bottom: -7px;
   height: 2px;
-  border-radius: var(--radius-pill);
   background: var(--accent);
-  box-shadow: 0 0 10px -1px rgba(255, 180, 84, 0.7);
+  border-radius: 2px;
 }
 
-/* ── Signal / connection readout ─────────────────────────────────────────── */
 .shell-conn {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: 5px 11px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: rgba(0, 0, 0, 0.25);
-  font-family: var(--mono);
-  font-size: var(--fs-100);
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--fs-200);
   color: var(--muted);
 }
 .shell-conn-dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--muted-2);
-  transition: background var(--dur-2) var(--ease);
 }
-.shell-conn.live { color: var(--text-dim); border-color: color-mix(in srgb, var(--ok) 30%, var(--border)); }
-.shell-conn.live  .shell-conn-dot { background: var(--ok); animation: shell-pulse 2.2s infinite; }
-.shell-conn.down { color: var(--muted); }
+.shell-conn.live  .shell-conn-dot { background: var(--ok); }
+.shell-conn.down  { color: var(--err); }
 .shell-conn.down  .shell-conn-dot { background: var(--err); }
-@keyframes shell-pulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); }
-  70%  { box-shadow: 0 0 0 6px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
 
-/* ── Content bay ──────────────────────────────────────────────────────────── */
 .shell-body { position: relative; flex: 1 1 auto; min-height: 0; }
 .shell-frame {
   position: absolute; inset: 0;
   width: 100%; height: 100%; border: 0;
   background: var(--bg);
   display: none;
-  animation: frame-in var(--dur-3) var(--ease-out);
 }
 .shell-frame.active { display: block; }
-@keyframes frame-in { from { opacity: 0; } to { opacity: 1; } }
 
 .shell-empty {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   color: var(--muted);
-  font-family: var(--mono);
   font-size: var(--fs-300);
 }
 
-/* ── Responsive: collapse labels to glyphs, readout to a bare dot ─────────── */
 @media (max-width: 760px) {
   .shell-topbar { gap: var(--sp-3); padding: 0 var(--sp-3); }
-  .shell-brand span::after { display: none; }
-  .shell-nav-item span { display: none; }
-  .shell-nav-item { padding: 0 var(--sp-2); }
+  .shell-brand-sep, .shell-brand-view { display: none; }
+  .shell-nav { overflow-x: auto; }
+  .shell-nav-item { padding: 0 var(--sp-2); white-space: nowrap; }
   .shell-nav-item.active::after { left: var(--sp-2); right: var(--sp-2); }
   .shell-conn-label { display: none; }
-  .shell-conn { padding: 6px; }
 }
