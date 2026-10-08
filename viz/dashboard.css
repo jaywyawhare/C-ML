@@ -20,43 +20,55 @@ body { display: flex; flex-direction: column; }
   z-index: 10;
 }
 
-/* The brand doubles as the location: the binary's name, then the open view. */
+/* The brand doubles as the location: a brand mark, the binary's name, then the
+ * open view. The mark is a small green tile, the one spot of brand in the bar. */
 .shell-brand {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-2);
   color: var(--text);
   text-decoration: none;
   font-family: var(--mono);
-  font-size: var(--fs-400);
+  font-size: var(--fs-300);
+}
+.shell-brand::before {
+  content: "";
+  width: 20px; height: 20px;
+  border-radius: 5px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, white) 0%, var(--accent) 100%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 .shell-brand-name { font-weight: 500; }
 .shell-brand-sep { color: var(--muted-2); }
 .shell-brand-view { color: var(--muted); }
 
-.shell-nav { display: flex; align-items: stretch; gap: var(--sp-1); }
+.shell-nav { display: flex; align-items: stretch; gap: 2px; }
 .shell-nav-item {
   position: relative;
   display: inline-flex;
   align-items: center;
   padding: 0 var(--sp-3);
+  margin: 7px 0;
   background: transparent;
   color: var(--muted);
   border: 0;
+  border-radius: var(--radius);
   font-family: var(--font);
   font-size: var(--fs-300);
   font-weight: 500;
   cursor: pointer;
-  transition: color var(--dur-1) var(--ease);
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
-.shell-nav-item:hover { color: var(--text); }
+.shell-nav-item:hover { color: var(--text); background: var(--bg-elev2); }
 .shell-nav-item.active { color: var(--text); }
 .shell-nav-item.active::after {
   content: "";
   position: absolute;
-  left: var(--sp-3); right: var(--sp-3); bottom: -1px;
+  left: var(--sp-3); right: var(--sp-3); bottom: -7px;
   height: 2px;
-  background: var(--text);
+  background: var(--accent);
+  border-radius: 2px;
 }
 
 .shell-conn {

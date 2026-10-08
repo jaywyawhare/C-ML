@@ -78,9 +78,10 @@ body.embed .topbar { padding-left: var(--sp-4); }
 .run-list { overflow-y: auto; padding: var(--sp-2); }
 .sidebar input[type=text], .sidebar input[type=search], .sidebar input:not([type]) {
   font: inherit; font-size: var(--fs-200); color: var(--text);
-  background: var(--bg-elev); border: 1px solid var(--border-2); border-radius: var(--radius);
-  padding: 5px 8px;
+  background: var(--control-bg); border: 1px solid var(--control-border); border-radius: var(--radius);
+  height: var(--control-h); padding: 0 10px; box-shadow: var(--shadow-1);
 }
+.sidebar input:focus { outline: none; border-color: var(--accent); }
 
 .run-item {
   display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3);
@@ -114,13 +115,13 @@ body.embed .topbar { padding-left: var(--sp-4); }
 .controls { display: flex; gap: var(--sp-5); align-items: center; margin-bottom: var(--sp-4); flex-wrap: wrap; }
 .controls label { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-dim); font-size: var(--fs-200); }
 .controls input { accent-color: var(--accent); }
-.seg { display: flex; border: 1px solid var(--border-2); border-radius: var(--radius); overflow: hidden; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius); }
 .seg button {
-  background: var(--bg-elev); border: none; border-left: 1px solid var(--border-2); color: var(--text-dim);
-  padding: 4px 11px; cursor: pointer; font: inherit; font-size: var(--fs-200);
+  background: transparent; border: none; border-radius: var(--radius-sm); color: var(--muted);
+  height: 24px; padding: 0 10px; cursor: pointer; font: inherit; font-size: var(--fs-200); font-weight: 500;
 }
-.seg button:first-child { border-left: 0; }
-.seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.seg button:hover { color: var(--text-dim); }
+.seg button.on { background: var(--bg-elev2); color: var(--text); box-shadow: var(--shadow-1); }
 .toggle { cursor: pointer; }
 
 table.grid { width: 100%; border-collapse: collapse; font-size: var(--fs-200); }
@@ -138,9 +139,11 @@ table.grid tr:hover td { background: var(--bg-elev2); }
 
 .empty { color: var(--muted); text-align: center; padding: 60px 20px; }
 .select {
-  background: var(--bg-elev); color: var(--text); border: 1px solid var(--border-2);
-  border-radius: var(--radius); padding: 4px 8px; font: inherit; font-size: var(--fs-200);
+  background: var(--control-bg); color: var(--text); border: 1px solid var(--control-border);
+  border-radius: var(--radius); height: var(--control-h); padding: 0 10px; font: inherit; font-size: var(--fs-200);
+  box-shadow: var(--shadow-1);
 }
+.select:hover { border-color: var(--control-border-hover); }
 .media-img { image-rendering: pixelated; border: 1px solid var(--border); border-radius: var(--radius); }
 .badge { font-variant-numeric: tabular-nums; color: var(--muted); font-size: var(--fs-200); }
 
@@ -186,10 +189,12 @@ pre.logs {
 
 /* buttons + edit */
 .btn {
-  background: var(--accent); color: var(--on-accent); border: none; border-radius: var(--radius);
-  padding: 6px 14px; font: inherit; font-size: var(--fs-200); font-weight: 500; cursor: pointer;
+  background: var(--accent); color: var(--on-accent); border: 1px solid color-mix(in srgb, var(--accent) 70%, black);
+  border-radius: var(--radius); height: var(--control-h); padding: 0 14px;
+  font: inherit; font-size: var(--fs-200); font-weight: 600; cursor: pointer;
+  box-shadow: var(--shadow-1), inset 0 1px 0 rgba(255,255,255,0.15);
 }
-.btn:hover { background: color-mix(in srgb, var(--accent) 88%, var(--text)); }
+.btn:hover { background: var(--accent-hover); }
 .edit-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
 .edit-row .kvk { width: 60px; flex-shrink: 0; }
 

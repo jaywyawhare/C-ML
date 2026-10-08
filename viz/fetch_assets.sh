@@ -27,7 +27,7 @@ curl -sL "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.m
 # IBM Plex Sans + Mono, latin subset, so the tool renders the same offline
 mkdir -p "$DIR/fonts"
 for w in 400 500 600; do
-  curl -sL "https://unpkg.com/@fontsource/ibm-plex-sans@5.1.1/files/ibm-plex-sans-latin-$w-normal.woff2" -o "$DIR/fonts/ibm-plex-sans-$w.woff2"
+  curl -sL "https://unpkg.com/@fontsource/inter@5.1.0/files/inter-latin-$w-normal.woff2" -o "$DIR/fonts/inter-$w.woff2"
 done
 for w in 400 500; do
   curl -sL "https://unpkg.com/@fontsource/ibm-plex-mono@5.1.1/files/ibm-plex-mono-latin-$w-normal.woff2" -o "$DIR/fonts/ibm-plex-mono-$w.woff2"

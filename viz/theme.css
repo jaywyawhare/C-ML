@@ -1,11 +1,12 @@
 /* C-ML design tokens, shared by the shell, the Visualizer and the Experiment
- * tracker. Chrome is neutral tone and hairlines; colour is reserved for data,
- * state and the one interaction accent. Variable names are part of the contract
- * with the sub-apps; change values here, not names. */
+ * tracker. Modelled on the Supabase dashboard: neutral near-black surfaces that
+ * layer by tone, visible hairline borders, controls with a little depth, a
+ * green brand accent, and colour reserved otherwise for data and state.
+ * Variable names are the contract with the sub-apps; change values, not names. */
 
-@font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url("assets/fonts/ibm-plex-sans-400.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Sans"; font-weight: 500; font-display: swap; src: url("assets/fonts/ibm-plex-sans-500.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: swap; src: url("assets/fonts/ibm-plex-sans-600.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 400; font-display: swap; src: url("assets/fonts/inter-400.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 500; font-display: swap; src: url("assets/fonts/inter-500.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 600; font-display: swap; src: url("assets/fonts/inter-600.woff2") format("woff2"); }
 @font-face { font-family: "IBM Plex Mono"; font-weight: 400; font-display: swap; src: url("assets/fonts/ibm-plex-mono-400.woff2") format("woff2"); }
 @font-face { font-family: "IBM Plex Mono"; font-weight: 500; font-display: swap; src: url("assets/fonts/ibm-plex-mono-500.woff2") format("woff2"); }
 
@@ -18,37 +19,44 @@
 :root {
   color-scheme: dark;
 
-  /* Surfaces: the page is the darkest plane; panels and controls step up from it
-   * so structure reads from tone and a hairline, not from shadows. */
-  --bg:        #09090b;
-  --bg-elev:   #111114;
-  --bg-elev2:  #19191d;
-  --bg-inset:  #0c0c0e;
+  /* Surfaces step up by tone from the page, so panels read without heavy shadow. */
+  --bg:        #161616;   /* app background                     */
+  --bg-elev:   #1c1c1c;   /* panel / card surface               */
+  --bg-elev2:  #242424;   /* control, nested well, hover        */
+  --bg-inset:  #121212;   /* code wells, recessed               */
 
   /* Ink */
-  --text:      #ededf0;
-  --text-dim:  #a3a6ad;
-  --muted:     #7a7e87;
-  --muted-2:   #4f525a;
+  --text:      #ededed;
+  --text-dim:  #b4b4b4;
+  --muted:     #898989;
+  --muted-2:   #5a5a5a;
 
-  /* Rules */
-  --border:     #222327;
-  --border-2:   #2e3036;
-  --grid:       #18191c;
-  --grid-major: #1f2024;
+  /* Rules, visible enough to describe structure */
+  --border:     #2a2a2a;
+  --border-2:   #3a3a3a;
+  --grid:       #212121;
+  --grid-major: #272727;
 
-  /* One accent, for interaction only: focus, selection, the primary action. */
-  --accent:      #7c9cff;
+  /* Brand green, used for the primary action, selection, focus and links. */
+  --accent:      #3ecf8e;
   --accent-2:    var(--accent);
-  --on-accent:   #0b0b0d;
-  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
-  --accent-line: color-mix(in srgb, var(--accent) 40%, transparent);
+  --accent-hover:#34b87d;
+  --on-accent:   #10231a;
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent) 38%, transparent);
 
   /* State. Always shipped with a word or icon, never colour alone. */
   --ok:   #3ecf8e;
-  --warn: #e5a50a;
-  --err:  #f2555a;
+  --warn: #f5a623;
+  --err:  #f25757;
   --info: var(--accent);
+
+  /* Controls: a surface with a border and a little lift, brighter on hover. */
+  --control-h:      30px;
+  --control-bg:     #242424;
+  --control-bg-hover:#2e2e2e;
+  --control-border: #3a3a3a;
+  --control-border-hover: #4a4a4a;
 
   /* Categorical data colours in fixed order, validated (CVD, normal vision and
    * 3:1 contrast) against the panel surface. */
@@ -61,20 +69,21 @@
   --cat-7: #9085e9;
   --cat-8: #e66767;
 
-  /* Roles built on the slots, so a series or op family keeps one colour everywhere. */
-  --series-train: var(--cat-1);
+  /* Roles built on the slots, so a series or op family keeps one colour everywhere.
+   * Training keeps the brand green so the primary run reads as the primary run. */
+  --series-train: var(--accent);
   --series-test:  var(--cat-2);
-  --series-val:   var(--cat-3);
+  --series-val:   var(--cat-1);
   --op-activation: var(--cat-2);
-  --op-conv:       var(--cat-3);
+  --op-conv:       var(--cat-1);
   --op-pool:       var(--cat-4);
   --op-loss:       var(--cat-5);
   --op-other:      var(--muted);
   --flow-in:       var(--cat-2);
   --flow-out:      var(--cat-7);
 
-  /* Type */
-  --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Type: Inter for the interface, Plex Mono for code and identifiers. */
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --fs-100: 11px;
@@ -82,9 +91,9 @@
   --fs-300: 13px;
   --fs-400: 14px;
   --fs-500: 15px;
-  --fs-600: 17px;
-  --fs-700: 20px;
-  --fs-800: 26px;
+  --fs-600: 16px;
+  --fs-700: 19px;
+  --fs-800: 24px;
 
   --lh-tight: 1.2;
   --lh-snug:  1.35;
@@ -97,54 +106,60 @@
   --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
   --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
 
-  /* Radius: controls stay tight, panels round a little more. */
+  /* Radius */
   --radius:      6px;
   --radius-sm:   4px;
-  --radius-lg:   10px;
+  --radius-lg:   8px;
   --radius-pill: 999px;
 
-  /* Elevation exists only for things that float over content. */
-  --shadow-1: none;
-  --shadow-2: none;
-  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.75), 0 0 0 1px var(--border-2);
+  /* Elevation: a hairline top-light plus a soft drop, Supabase-style. */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-pop: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 16px 40px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--border-2);
   --glow-accent: 0 0 0 1px var(--accent-line);
 
   --topbar-h: 48px;
 
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-1: 120ms;
-  --dur-2: 180ms;
-  --dur-3: 280ms;
+  --dur-1: 110ms;
+  --dur-2: 170ms;
+  --dur-3: 260ms;
 }
 
-/* Light is a separate, selected set (not an inversion), used when a sub-app
- * opts in through data-theme. Data slots take their light-surface steps, and
- * slots 3-5 fall under 3:1 on white, so every use there carries a label. */
+/* Light is a separate, selected set used when a sub-app opts in through
+ * data-theme. Data slots take their light-surface steps; slots 3-5 fall under
+ * 3:1 on white, so every use there carries a label. */
 [data-theme="light"] {
   color-scheme: light;
 
-  --bg:        #f3f4f6;
+  --bg:        #f6f6f5;
   --bg-elev:   #ffffff;
-  --bg-elev2:  #f7f8fa;
-  --bg-inset:  #fafbfc;
+  --bg-elev2:  #f1f1f0;
+  --bg-inset:  #fbfbfa;
 
-  --text:      #15171c;
-  --text-dim:  #474b55;
-  --muted:     #6b707b;
-  --muted-2:   #9aa0aa;
+  --text:      #171717;
+  --text-dim:  #4a4a4a;
+  --muted:     #6b6b6b;
+  --muted-2:   #9a9a9a;
 
-  --border:     #e1e4e8;
-  --border-2:   #cdd1d6;
-  --grid:       #eef0f2;
-  --grid-major: #e4e7eb;
+  --border:     #e4e4e3;
+  --border-2:   #d0d0cf;
+  --grid:       #eeeeed;
+  --grid-major: #e4e4e3;
 
-  --accent:    #1f5bd8;
-  --on-accent: #ffffff;
+  --accent:      #1a8f5c;
+  --accent-hover:#15764c;
+  --on-accent:   #ffffff;
 
-  --ok:   #1a7f37;
+  --ok:   #1a8f5c;
   --warn: #9a6700;
   --err:  #cf222e;
+
+  --control-bg:     #ffffff;
+  --control-bg-hover:#f1f1f0;
+  --control-border: #d0d0cf;
+  --control-border-hover: #b4b4b3;
 
   --cat-1: #2a78d6;
   --cat-2: #eb6834;
@@ -155,7 +170,9 @@
   --cat-7: #4a3aa7;
   --cat-8: #e34948;
 
-  --shadow-pop: 0 6px 24px -6px rgba(21, 23, 28, 0.18), 0 0 0 1px var(--border-2);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.07);
+  --shadow-pop: 0 10px 32px -8px rgba(0, 0, 0, 0.16), 0 0 0 1px var(--border-2);
 }
 
 * { box-sizing: border-box; }
@@ -169,22 +186,21 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Figures line up in columns everywhere without switching to a code face. */
 .readout { font-variant-numeric: tabular-nums; }
 
 ::selection { background: var(--accent-soft); color: var(--text); }
 
 :where(a, button, input, select, textarea, [tabindex], [role="tab"], [role="button"]):focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: 1px;
   border-radius: var(--radius-sm);
 }
 
 * { scrollbar-width: thin; scrollbar-color: var(--border-2) transparent; }
-*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar { width: 11px; height: 11px; }
 *::-webkit-scrollbar-thumb {
   background: var(--border-2);
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   background-clip: padding-box;
   border-radius: var(--radius-pill);
 }

@@ -41,7 +41,7 @@ button { font-family: inherit; }
   align-items: stretch;
   gap: var(--sp-6);
   padding: 0 var(--sp-4);
-  background: var(--bg-elev);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   z-index: 50;
 }
@@ -72,34 +72,37 @@ button { font-family: inherit; }
   position: relative;
   display: flex;
   align-items: center;
+  margin: 8px 0;
   padding: 0 var(--sp-3);
   background: transparent;
   border: none;
+  border-radius: var(--radius);
   color: var(--muted);
   font-family: var(--font);
   font-size: var(--fs-300);
   font-weight: 500;
   cursor: pointer;
-  transition: color var(--dur-1) var(--ease);
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
 
 .topbar-button:hover {
   color: var(--text);
+  background: var(--bg-elev2);
 }
 
 .topbar-button.active {
   color: var(--text);
 }
 
-/* amber underline "trace" like the shell */
 .topbar-button.active::after {
   content: "";
   position: absolute;
   left: var(--sp-3);
   right: var(--sp-3);
-  bottom: -1px;
+  bottom: -8px;
   height: 2px;
-  background: var(--text);
+  background: var(--accent);
+  border-radius: 2px;
 }
 
 .topbar-button svg {
@@ -145,15 +148,18 @@ button { font-family: inherit; }
   justify-content: space-between;
   gap: var(--sp-4);
   border-bottom: 1px solid var(--border);
-  background: var(--bg-elev);
+  background: var(--bg);
   z-index: 10;
 }
 
 .view-tabs {
   display: flex;
-  align-items: stretch;
-  height: 100%;
-  gap: var(--sp-1);
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 .view-tab {
@@ -161,17 +167,23 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: 0 var(--sp-2);
+  height: 26px;
+  padding: 0 10px;
   border: none;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
-  font-size: var(--fs-300);
+  font-size: var(--fs-200);
   font-weight: 500;
   cursor: pointer;
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
+.view-tab:hover { color: var(--text-dim); }
 
 .view-tab.active {
   color: var(--text);
+  background: var(--bg-elev2);
+  box-shadow: var(--shadow-1);
 }
 
 .view-tab.active::after {
@@ -623,6 +635,7 @@ button { font-family: inherit; }
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -730,11 +743,11 @@ button { font-family: inherit; }
   display: grid;
   /* Holds the epoch table: without minmax(0,…) the track grows to the table's
    * full width and .epoch-table-wrap's overflow:auto never gets to engage. */
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
-  flex: 1 1 auto;
-  min-height: 240px;
+  flex: 0 0 auto;
 }
+.bottom-row .epoch-table-card { max-height: 360px; }
 
 .metrics-panel,
 .epoch-table-card {
@@ -768,14 +781,12 @@ button { font-family: inherit; }
 }
 
 .metrics-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
   display: flex;
   flex-direction: column;
 }
 
-.progress-section { margin-bottom: 18px; }
+.progress-section { margin-bottom: 16px; }
+.progress-bar-bg { max-width: 100%; }
 
 .progress-label {
   display: flex;
@@ -808,7 +819,7 @@ button { font-family: inherit; }
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 14px 20px;
 }
 
@@ -1000,13 +1011,16 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
-  padding: 0 var(--sp-2);
-  background: var(--bg-elev);
-  border: 1px solid var(--border-2);
+  height: var(--control-h);
+  padding: 0 10px;
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
   color: var(--muted);
+  transition: border-color var(--dur-1) var(--ease);
 }
+.graph-search:focus-within { border-color: var(--accent); }
 .graph-search:focus-within {
   border-color: var(--accent);
   color: var(--text-dim);
@@ -1104,21 +1118,25 @@ button { font-family: inherit; }
   word-break: break-word;
 }
 .graph-control-btn {
-  width: 30px;
-  height: 30px;
+  width: var(--control-h);
+  height: var(--control-h);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-elev);
-  border: 1px solid var(--border-2);
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
   color: var(--text-dim);
   cursor: pointer;
+  transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
 .graph-control-btn:hover {
   color: var(--text);
-  border-color: var(--muted-2);
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-hover);
 }
+.graph-control-btn:active { background: var(--bg-inset); }
 
 /* ── Code pane header actions + diff ──────────────────────── */
 .code-pane-actions {
@@ -1454,9 +1472,14 @@ button { font-family: inherit; }
 .curve-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
+  gap: var(--sp-5);
   align-items: center;
   flex-shrink: 0;
+  padding: 10px 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
 }
 
 .curve-control {
