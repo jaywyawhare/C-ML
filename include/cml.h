@@ -413,7 +413,9 @@ void cml_reset_ir_context(void);
 
 /**
  * Soft reset: free IR nodes but keep the execution plan cache and buffer cache alive.
- * Use this between inference iterations so repeated calls hit the plan cache.
+ * Use this between same-shape iterations (inference or a training loop) so each
+ * step reuses the cached plan and kernels instead of re-planning from scratch.
+ * Memory stays bounded; it is the faster default for a fixed-shape training loop.
  */
 void cml_reset_ir_graph_only(void);
 

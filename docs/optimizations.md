@@ -1,6 +1,6 @@
 # C-ML Optimization Guide
 
-This document provides a comprehensive overview of all optimization techniques implemented in C-ML, how they work internally, and how to leverage them for maximum performance.
+The optimization techniques C-ML implements, how they work, and how to enable them.
 
 
 ## Table of Contents

@@ -73,7 +73,7 @@ int main(void) {
 | **LLM** | LoRA/QLoRA, Flash Attention, GQA, paged KV cache, RoPE, MoE, speculative decoding, LLaMA 7B-70B |
 | **Training** | 11 optimizers, 13 losses, 8 LR schedulers, gradient checkpointing, DDP, pipeline & tensor parallel |
 | **Compiler** | IR fusion (5 patterns), linearization, codegen to C/PTX/SPIR-V/WGSL/MSL, AOT, JIT, kernel cache |
-| **GPU** | CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL — userspace drivers for NV (RM ioctl) and AMD (KFD) (see maturity below) |
+| **GPU** | CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL - userspace drivers for NV (RM ioctl) and AMD (KFD) (see maturity below) |
 | **Runtime** | LLVM JIT by default (shape-specialized SIMD; interpreter fallback), multi-dtype compute (f32/f64/f16/bf16/int), BLAS, TLSF allocator, memory pools, thread pool |
 | **I/O** | GGUF, SafeTensors, ONNX, PyTorch .pth, int8/int4/NF4 quantization |
 | **Python** | CFFI bindings, NumPy integration, operator overloading |
@@ -81,7 +81,7 @@ int main(void) {
 ### Backend maturity
 
 GPU paths are exercised by CI only through the CPU reference backend, mocks,
-and emulators — driver-call correctness needs the real hardware. Status per
+and emulators - driver-call correctness needs the real hardware. Status per
 backend as of 2026-08:
 
 | Backend | Maturity | Notes |
@@ -117,13 +117,13 @@ hardware        CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL, Adreno, Hexagon, CPU
 
 ## Testing & coverage
 
-156 C test programs (plus Python pytest) run in CI. The suite includes
+180 C test programs (plus Python pytest) run in CI. The suite includes
 cross-dtype conformance (77 ops x 8 dtypes against f32 references), a VJP
 sweep that checks every eager-backward rule against central finite
 differences, an API contract sweep (bad arguments on every public surface),
 and HCQ/quantization/matmul exactness tests.
 
-Branch coverage is measured with union semantics — a branch counts as covered
+Branch coverage is measured with union semantics - a branch counts as covered
 when ANY test binary takes it:
 
 ```sh

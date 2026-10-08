@@ -1,6 +1,6 @@
 # Neural Network Layers API
 
-CML provides a comprehensive set of neural network layers following a consistent Module-based API.
+CML's neural network layers share a consistent Module-based API.
 All layers inherit from `Module` and can be composed using container types like `Sequential`.
 
 Include `"cml.h"` or `"nn/layers.h"` to access all layer types.
@@ -666,7 +666,7 @@ Tensor* output = cml_nn_module_forward((Module*)bn, input);
 
 **BatchNorm1d/2d/3d share one implementation.** The three public types are
 aliases of a common `BatchNormState`, and the forward pass differs only in the
-input rank it accepts — so the per-channel statistics are computed identically
+input rank it accepts - so the per-channel statistics are computed identically
 across the family. If you previously relied on `BatchNorm2d`/`3d` output with
 batch > 1, note that their statistics changed: the old path grouped elements in a
 way that only coincided with per-channel grouping when the batch size was 1.
