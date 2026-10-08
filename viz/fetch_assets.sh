@@ -22,7 +22,7 @@ curl -sL "https://unpkg.com/d3@7.9.0/dist/d3.min.js"                       -o "$
 curl -sL "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"                -o "$DIR/highlight.min.js"
 curl -sL "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/languages/c.min.js"              -o "$DIR/languages/c.min.js"
 curl -sL "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/vs2015.min.css"           -o "$DIR/styles/vs2015.min.css"
-curl -sL "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github.min.css"           -o "$DIR/styles/github.min.css"
+curl -sL "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css"      -o "$DIR/styles/github-dark.min.css"
 
 # IBM Plex Sans + Mono, latin subset, so the tool renders the same offline
 mkdir -p "$DIR/fonts"

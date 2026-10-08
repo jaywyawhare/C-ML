@@ -20,7 +20,7 @@ body.embed .topbar { padding-left: var(--sp-4); }
 .topbar {
   height: var(--exp-topbar-h); display: flex; align-items: stretch; gap: var(--sp-6);
   padding: 0 var(--sp-4);
-  border-bottom: 1px solid var(--border); background: var(--bg-elev);
+  border-bottom: 1px solid var(--border); background: var(--bg);
 }
 .brand { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: var(--fs-400); }
 .brand b { font-weight: 400; color: var(--muted); }

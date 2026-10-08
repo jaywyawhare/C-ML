@@ -15,7 +15,7 @@ body { display: flex; flex-direction: column; }
   align-items: stretch;
   gap: var(--sp-6);
   padding: 0 var(--sp-4);
-  background: var(--bg-elev);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   z-index: 10;
 }

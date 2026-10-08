@@ -1,8 +1,7 @@
 /* C-ML design tokens, shared by the shell, the Visualizer and the Experiment
- * tracker. The surface is a light workbench in the manner of Compiler Explorer
- * or DevTools: chrome is ink and rules, and colour is reserved for data and
- * state. Variable names are part of the contract with the sub-apps; change
- * values here, not names. */
+ * tracker. Chrome is neutral tone and hairlines; colour is reserved for data,
+ * state and the one interaction accent. Variable names are part of the contract
+ * with the sub-apps; change values here, not names. */
 
 @font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url("assets/fonts/ibm-plex-sans-400.woff2") format("woff2"); }
 @font-face { font-family: "IBM Plex Sans"; font-weight: 500; font-display: swap; src: url("assets/fonts/ibm-plex-sans-500.woff2") format("woff2"); }
@@ -17,50 +16,50 @@
 [hidden] { display: none !important; }
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  /* Surfaces: the page is a tone below the panes so panes read without shadows. */
-  --bg:        #f3f4f6;
-  --bg-elev:   #ffffff;
-  --bg-elev2:  #f7f8fa;
-  --bg-inset:  #fafbfc;
+  /* Surfaces: the page is the darkest plane; panels and controls step up from it
+   * so structure reads from tone and a hairline, not from shadows. */
+  --bg:        #09090b;
+  --bg-elev:   #111114;
+  --bg-elev2:  #19191d;
+  --bg-inset:  #0c0c0e;
 
   /* Ink */
-  --text:      #15171c;
-  --text-dim:  #474b55;
-  --muted:     #6b707b;
-  --muted-2:   #9aa0aa;
+  --text:      #ededf0;
+  --text-dim:  #a3a6ad;
+  --muted:     #7a7e87;
+  --muted-2:   #4f525a;
 
   /* Rules */
-  --border:     #e1e4e8;
-  --border-2:   #cdd1d6;
-  --grid:       #eef0f2;
-  --grid-major: #e4e7eb;
+  --border:     #222327;
+  --border-2:   #2e3036;
+  --grid:       #18191c;
+  --grid-major: #1f2024;
 
   /* One accent, for interaction only: focus, selection, the primary action. */
-  --accent:      #1f5bd8;
+  --accent:      #7c9cff;
   --accent-2:    var(--accent);
-  --on-accent:   #ffffff;
-  --accent-soft: color-mix(in srgb, var(--accent) 9%, transparent);
-  --accent-line: color-mix(in srgb, var(--accent) 35%, transparent);
+  --on-accent:   #0b0b0d;
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent) 40%, transparent);
 
   /* State. Always shipped with a word or icon, never colour alone. */
-  --ok:   #1a7f37;
-  --warn: #9a6700;
-  --err:  #cf222e;
+  --ok:   #3ecf8e;
+  --warn: #e5a50a;
+  --err:  #f2555a;
   --info: var(--accent);
 
-  /* Categorical data colours in fixed order, validated (CVD and normal vision)
-   * against the pane surface. Slots 3-5 sit under 3:1 on white, so every use
-   * carries a visible label. */
-  --cat-1: #2a78d6;
-  --cat-2: #eb6834;
-  --cat-3: #1baf7a;
-  --cat-4: #eda100;
-  --cat-5: #e87ba4;
+  /* Categorical data colours in fixed order, validated (CVD, normal vision and
+   * 3:1 contrast) against the panel surface. */
+  --cat-1: #3987e5;
+  --cat-2: #d95926;
+  --cat-3: #199e70;
+  --cat-4: #c98500;
+  --cat-5: #d55181;
   --cat-6: #008300;
-  --cat-7: #4a3aa7;
-  --cat-8: #e34948;
+  --cat-7: #9085e9;
+  --cat-8: #e66767;
 
   /* Roles built on the slots, so a series or op family keeps one colour everywhere. */
   --series-train: var(--cat-1);
@@ -92,25 +91,25 @@
   --lh-body:  1.5;
 
   --tracking-eyebrow: 0;
-  --tracking-tight:   -0.005em;
+  --tracking-tight:   -0.01em;
 
   /* Space (4px base) */
   --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
   --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
 
-  /* Radius: small and only where a shape is a control. */
-  --radius:      4px;
-  --radius-sm:   3px;
-  --radius-lg:   6px;
+  /* Radius: controls stay tight, panels round a little more. */
+  --radius:      6px;
+  --radius-sm:   4px;
+  --radius-lg:   10px;
   --radius-pill: 999px;
 
   /* Elevation exists only for things that float over content. */
   --shadow-1: none;
   --shadow-2: none;
-  --shadow-pop: 0 6px 24px -6px rgba(21, 23, 28, 0.18), 0 0 0 1px var(--border-2);
+  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.75), 0 0 0 1px var(--border-2);
   --glow-accent: 0 0 0 1px var(--accent-line);
 
-  --topbar-h: 44px;
+  --topbar-h: 48px;
 
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -119,43 +118,44 @@
   --dur-3: 280ms;
 }
 
-/* Dark is a separate, selected set (not an inversion), used when a sub-app
- * opts in through data-theme. Data slots take their dark-surface steps. */
-[data-theme="dark"] {
-  color-scheme: dark;
+/* Light is a separate, selected set (not an inversion), used when a sub-app
+ * opts in through data-theme. Data slots take their light-surface steps, and
+ * slots 3-5 fall under 3:1 on white, so every use there carries a label. */
+[data-theme="light"] {
+  color-scheme: light;
 
-  --bg:        #111214;
-  --bg-elev:   #18191c;
-  --bg-elev2:  #202125;
-  --bg-inset:  #0e0f11;
+  --bg:        #f3f4f6;
+  --bg-elev:   #ffffff;
+  --bg-elev2:  #f7f8fa;
+  --bg-inset:  #fafbfc;
 
-  --text:      #e6e7ea;
-  --text-dim:  #b0b3ba;
-  --muted:     #868991;
-  --muted-2:   #5d6068;
+  --text:      #15171c;
+  --text-dim:  #474b55;
+  --muted:     #6b707b;
+  --muted-2:   #9aa0aa;
 
-  --border:     #2a2c31;
-  --border-2:   #383a40;
-  --grid:       #1f2024;
-  --grid-major: #26282c;
+  --border:     #e1e4e8;
+  --border-2:   #cdd1d6;
+  --grid:       #eef0f2;
+  --grid-major: #e4e7eb;
 
-  --accent:    #6f9cff;
-  --on-accent: #0e0f11;
+  --accent:    #1f5bd8;
+  --on-accent: #ffffff;
 
-  --ok:   #3fb950;
-  --warn: #d29922;
-  --err:  #f85149;
+  --ok:   #1a7f37;
+  --warn: #9a6700;
+  --err:  #cf222e;
 
-  --cat-1: #3987e5;
-  --cat-2: #d95926;
-  --cat-3: #199e70;
-  --cat-4: #c98500;
-  --cat-5: #d55181;
+  --cat-1: #2a78d6;
+  --cat-2: #eb6834;
+  --cat-3: #1baf7a;
+  --cat-4: #eda100;
+  --cat-5: #e87ba4;
   --cat-6: #008300;
-  --cat-7: #9085e9;
-  --cat-8: #e66767;
+  --cat-7: #4a3aa7;
+  --cat-8: #e34948;
 
-  --shadow-pop: 0 8px 28px -8px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--border-2);
+  --shadow-pop: 0 6px 24px -6px rgba(21, 23, 28, 0.18), 0 0 0 1px var(--border-2);
 }
 
 * { box-sizing: border-box; }

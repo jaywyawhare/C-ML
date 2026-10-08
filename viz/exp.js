@@ -54,7 +54,7 @@ const S = {
   groupBy: "",               // "" = per-run, else config key -> mean±std bands
   reportMd: "# Experiment Report\n\nWrite notes here. Selected runs' final metrics are embedded below.",
   metricFilter: "",          // substring filter for chart panels
-  theme: "light",
+  theme: "dark",
   diffA: null, diffB: null,
   starred: new Set(),        // pinned to top
   hidden: new Set(),         // excluded from comparison
