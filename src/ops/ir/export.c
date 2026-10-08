@@ -748,6 +748,19 @@ char* cml_ir_export_graph_json(CMLGraph_t ir) {
                           (void*)node->fused_kernel);
         }
 
+        // Output tensor shape and dtype, so the viewer can inspect each node.
+        if (node->output) {
+            append_format(&buffer, &offset, &capacity, ",\"dtype\":\"%s\"",
+                          cml_dtype_to_string(node->output->dtype));
+            if (node->output->ndim > 0 && node->output->shape) {
+                append_format(&buffer, &offset, &capacity, ",\"shape\":[");
+                for (int d = 0; d < node->output->ndim; d++)
+                    append_format(&buffer, &offset, &capacity, d ? ",%d" : "%d",
+                                  node->output->shape[d]);
+                append_format(&buffer, &offset, &capacity, "]");
+            }
+        }
+
         append_format(&buffer, &offset, &capacity, ",\"src\":[");
 
         bool first_edge = true;

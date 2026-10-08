@@ -7,15 +7,23 @@ const VizCharts = (() => {
 
   // ── Shared config ──────────────────────────────────────────
   const MARGIN = { top: 10, right: 15, left: 50, bottom: 30 };
-  const COLORS = {
-    training:   "#4a90e2",
-    testing:    "#f59e0b",
-    validation: "#ef4444",
-    trainAcc:   "#10b981",
-    testAcc:    "#f59e0b",
-    valAcc:     "#ef4444",
-    grid:       "#374151",
-    axis:       "#6b7280",
+
+  /* Read a themed token so charts track the shell's light/dark state and the
+     user's theme toggle, with a fallback for offline/isolated rendering. */
+  function cssVar(name, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+
+  /* Categorical palette, assigned by ENTITY (not by chart or by rank) so a
+     series keeps one colour across loss and accuracy. Blue/orange/aqua are the
+     first three slots of the validated dark categorical order: on the chassis
+     surface they clear the lightness band, the chroma floor, adjacent-pair CVD
+     separation (worst deltaE 9.4), the normal-vision floor, and 3:1 contrast. */
+  const SERIES = {
+    training:   "#3987e5",
+    testing:    "#d95926",
+    validation: "#199e70",
   };
 
 
@@ -102,7 +110,7 @@ const VizCharts = (() => {
     g.append("g").attr("class", "axis")
       .call(d3.axisLeft(y).ticks(6).tickFormat(d3.format(".2~e")));
 
-    const color = o.color || "#4a90e2";
+    const color = o.color || SERIES.training;
     const band = (loArr, hiArr, opacity) => {
       const area = d3.area()
         .x((d, k) => x(idx[k] + 1))
@@ -231,8 +239,9 @@ const VizCharts = (() => {
       .x((d, i) => x(chartData[i].epoch))
       .y(d => y(d));
 
-    // Helper to draw a series
-    function drawSeries(key, color, isDashed, showDots) {
+    // Helper to draw a series as a thin 2px line; points are read on hover
+    // rather than marked on every sample.
+    function drawSeries(key, color, isDashed) {
       const vals = chartData.map(d => d[key]);
       const defined = vals.map((v, i) => ({ v, i })).filter(d => d.v != null);
       if (defined.length === 0) return;
@@ -241,33 +250,24 @@ const VizCharts = (() => {
         .datum(vals)
         .attr("fill", "none")
         .attr("stroke", color)
-        .attr("stroke-width", 2.5)
+        .attr("stroke-width", 2)
+        .attr("stroke-linejoin", "round")
+        .attr("stroke-linecap", "round")
         .attr("d", line);
 
-      if (isDashed) path.attr("stroke-dasharray", "4 4");
-
-      if (showDots) {
-        g.selectAll(null)
-          .data(defined)
-          .enter()
-          .append("circle")
-          .attr("cx", d => x(chartData[d.i].epoch))
-          .attr("cy", d => y(d.v))
-          .attr("r", 5)
-          .attr("fill", color)
-          .attr("stroke", "#111827")
-          .attr("stroke-width", 1);
-      }
+      if (isDashed) path.attr("stroke-dasharray", "6 4");
     }
 
-    // Draw visible series
-    const trainColor = isAccuracy ? COLORS.trainAcc : COLORS.training;
-    const testColor  = isAccuracy ? COLORS.testAcc  : COLORS.testing;
-    const valColor   = isAccuracy ? COLORS.valAcc   : COLORS.validation;
+    // Draw visible series. Colour follows the entity, so a series reads the
+    // same in the loss and accuracy charts; testing stays dashed as a print and
+    // colour-vision cue alongside the hue.
+    const trainColor = SERIES.training;
+    const testColor  = SERIES.testing;
+    const valColor   = SERIES.validation;
 
-    if (visible.training)   drawSeries(trainKey, trainColor, false, false);
-    if (visible.testing)    drawSeries(testKey,  testColor,  true,  true);
-    if (visible.validation) drawSeries(valKey,   valColor,   false, false);
+    if (visible.training)   drawSeries(trainKey, trainColor, false);
+    if (visible.testing)    drawSeries(testKey,  testColor,  true);
+    if (visible.validation) drawSeries(valKey,   valColor,   false);
 
     // ── Tooltip ──────────────────────────────────────────────
     const tooltipClass = isAccuracy ? "accuracy" : "loss";
@@ -289,11 +289,12 @@ const VizCharts = (() => {
 
     // Active dots
     const activeDots = [];
+    const surfaceRing = cssVar("--bg-inset", "#070a0f");
     function addActiveDot(color) {
       const dot = g.append("circle")
         .attr("r", 5)
         .attr("fill", color)
-        .attr("stroke", "white")
+        .attr("stroke", surfaceRing)
         .attr("stroke-width", 2)
         .style("display", "none");
       activeDots.push(dot);
@@ -357,5 +358,5 @@ const VizCharts = (() => {
   }
 
   return { createChart, createDistributionChart, smoothSeries, downsample,
-           positiveFloor, observeResize };
+           positiveFloor, observeResize, SERIES };
 })();

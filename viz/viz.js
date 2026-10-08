@@ -366,7 +366,10 @@ function toCytoscapeElements(graph) {
         parent: (isFused && node.fusedKernelId) ? node.fusedKernelId
               : (State.groupByScope && node.scope) ? "scope::" + node.scope
               : undefined,
-        scope: node.scope || ""
+        scope: node.scope || "",
+        dtype: node.dtype || "",
+        shape: Array.isArray(node.shape) ? node.shape : null,
+        numInputs: Array.isArray(node.src) ? node.src.length : 0
       },
       classes: (isDead ? "dead " : "") + (isFused ? "fused " : "") + (isUnknown ? "unknown" : "")
     });
@@ -474,6 +477,7 @@ function renderGraphView() {
     content.appendChild(el("div", { className: "graph-pane", id: "graph-ops-pane", style: { zIndex: "1" } }));
     content.appendChild(el("div", { className: "model-pane", id: "graph-model-pane", style: { display: "none" } }));
     content.appendChild(buildGraphControls());
+    content.appendChild(buildNodeInspector());
     container.appendChild(content);
 
     // View tab click handlers
@@ -661,7 +665,7 @@ function initCyOpsInteraction(cy) {
   };
 
   cy.on("tap", (evt) => {
-    if (evt.target === cy) { resetHighlights(); return; }
+    if (evt.target === cy) { resetHighlights(); hideNodeInspector(); return; }
     const target = evt.target;
     resetHighlights();
     cy.elements().addClass("dimmed");
@@ -672,6 +676,7 @@ function initCyOpsInteraction(cy) {
       highlightNode(target.target());
     } else if (target.isNode()) {
       highlightNode(target);
+      showNodeInspector(target);
       const incomers = target.incomers("edge");
       incomers.addClass("incoming-highlighted").removeClass("dimmed");
       incomers.sources().forEach(s => { s.addClass("incoming-highlighted").removeClass("dimmed"); if (s.isChild()) s.parent().removeClass("dimmed"); });
@@ -745,6 +750,47 @@ function filterGraphNodes(query) {
   const keep = matches.union(matches.connectedEdges()).union(matches.neighborhood());
   cy.elements().not(keep).addClass("search-hidden");
   matches.addClass("search-match");
+}
+
+// ── Node inspector ─────────────────────────────────────────────────
+function buildNodeInspector() {
+  const panel = el("div", { className: "node-inspector", id: "node-inspector" });
+  const head = el("div", { className: "node-inspector-head" });
+  head.appendChild(el("span", { className: "node-inspector-title", id: "ni-title" }, ""));
+  const close = el("button", { className: "node-inspector-close", title: "Close" }, "×");
+  close.addEventListener("click", hideNodeInspector);
+  head.appendChild(close);
+  panel.appendChild(head);
+  panel.appendChild(el("div", { className: "node-inspector-body", id: "ni-body" }));
+  return panel;
+}
+
+/** Populate and show the inspector for a tapped graph node. */
+function showNodeInspector(node) {
+  const panel = $("#node-inspector"), title = $("#ni-title"), body = $("#ni-body");
+  if (!panel || !node || node.data("isFusedGroup")) { hideNodeInspector(); return; }
+  const d = node.data();
+  title.textContent = d.label || d.id;
+
+  const row = (k, v) => {
+    const r = el("div", { className: "ni-row" });
+    r.appendChild(el("span", { className: "ni-key" }, k));
+    r.appendChild(el("span", { className: "ni-val" }, v));
+    return r;
+  };
+  body.innerHTML = "";
+  body.appendChild(row("dtype", d.dtype || "unknown"));
+  body.appendChild(row("shape", d.shape ? "[" + d.shape.join(", ") + "]" : "scalar"));
+  body.appendChild(row("inputs", String(d.numInputs ?? 0)));
+  if (d.scope) body.appendChild(row("scope", d.scope));
+  const status = [d.isFused && "fused", d.isDead && "dead"].filter(Boolean).join(", ") || "live";
+  body.appendChild(row("status", status));
+  panel.classList.add("visible");
+}
+
+function hideNodeInspector() {
+  const panel = $("#node-inspector");
+  if (panel) panel.classList.remove("visible");
 }
 
 // ── Loading skeleton for the graph pane ───────────────────────────
@@ -2540,9 +2586,10 @@ function renderTrainingView() {
       const trainKey = isAcc ? "showTrainingAcc" : "showTrainingLoss";
       const testKey = isAcc ? "showTestingAcc" : "showTestingLoss";
       const valKey = isAcc ? "showValidationAcc" : "showValidationLoss";
-      const trainColor = isAcc ? "#10b981" : "#4a90e2";
-      const testColor = "#f59e0b";
-      const valColor = "#ef4444";
+      // Legend swatches track the chart series by entity, from one source.
+      const trainColor = VizCharts.SERIES.training;
+      const testColor = VizCharts.SERIES.testing;
+      const valColor = VizCharts.SERIES.validation;
 
       function addToggle(label, stateKey, color, show) {
         if (!show) return;
