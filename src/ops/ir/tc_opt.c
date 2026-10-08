@@ -17,6 +17,9 @@ static CMLTCConfig g_tc_config = {
     .min_m         = CML_TC_DEFAULT_MIN_DIM,
     .min_n         = CML_TC_DEFAULT_MIN_DIM,
     .min_k         = CML_TC_DEFAULT_MIN_DIM,
+    .tile_m        = 16,
+    .tile_n        = 16,
+    .tile_k        = 16,
     .allow_padding = true,
     .prefer_fp16   = false,
 };
@@ -105,7 +108,7 @@ static int round_up(int val, int multiple) { return ((val + multiple - 1) / mult
 static bool dims_tc_compatible(int m, int n, int k, const CMLTCConfig* cfg) {
     if (m < cfg->min_m || n < cfg->min_n || k < cfg->min_k)
         return false;
-    if (m % 16 == 0 && n % 16 == 0 && k % 16 == 0)
+    if (m % cfg->tile_m == 0 && n % cfg->tile_n == 0 && k % cfg->tile_k == 0)
         return true;
     return cfg->allow_padding;
 }
@@ -224,9 +227,9 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
     if (!dims_tc_compatible(m, n, k, &g_tc_config))
         return 0;
 
-    int pm         = round_up(m, 16);
-    int pn         = round_up(n, 16);
-    int pk         = round_up(k, 16);
+    int pm         = round_up(m, g_tc_config.tile_m);
+    int pn         = round_up(n, g_tc_config.tile_n);
+    int pk         = round_up(k, g_tc_config.tile_k);
     bool needs_pad = (pm != m || pn != n || pk != k);
 
     if (needs_pad && !g_tc_config.allow_padding)
@@ -384,9 +387,9 @@ static int rewrite_fused_matmul(CMLGraph_t ir, struct IRNode* reduce_node, struc
     if (!dims_tc_compatible(m, n, k, &g_tc_config))
         return 0;
 
-    int pm = round_up(m, 16);
-    int pn = round_up(n, 16);
-    int pk = round_up(k, 16);
+    int pm = round_up(m, g_tc_config.tile_m);
+    int pn = round_up(n, g_tc_config.tile_n);
+    int pk = round_up(k, g_tc_config.tile_k);
 
     int out_ndim   = reduce_node->output_ndim > 0 ? reduce_node->output_ndim : 2;
     int* out_shape = cml_malloc((size_t)out_ndim * sizeof(int));
@@ -441,12 +444,10 @@ int cml_tc_optimize(CMLGraph_t graph) {
         }
     }
 
+    /* Pad to the detected hardware's native tile, not a fixed 16: AMX is 32 and
+     * XMX is 8x16x8, so a hardcoded 16 padded those wrong. */
     CMLTCHardware hw = tc_detect_hardware();
-    int tile_m, tile_n, tile_k;
-    tc_get_tile_size(hw, &tile_m, &tile_n, &tile_k);
-    (void)tile_m;
-    (void)tile_n;
-    (void)tile_k;
+    tc_get_tile_size(hw, &g_tc_config.tile_m, &g_tc_config.tile_n, &g_tc_config.tile_k);
 
     int rewrites        = 0;
     struct IRNode* node = graph->head;
