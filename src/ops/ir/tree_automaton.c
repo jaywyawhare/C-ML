@@ -417,6 +417,8 @@ static bool match_node_recursive(CMLGraph_t ir, const CMLPatternNode* pattern, s
     switch (pattern->kind) {
     case CML_PAT_ANY:
         return true;
+    case CML_PAT_CONST:
+        return cml_pattern_match_const(node, pattern->const_val);
     case CML_PAT_CAPTURE: {
         if (!result)
             return false;

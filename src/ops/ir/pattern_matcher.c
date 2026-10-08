@@ -87,6 +87,10 @@ static bool match_node(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNo
         /* Capture -- matches any node and records it by name. */
         return record_capture(result, pattern->capture_name, node) == 0;
 
+    case CML_PAT_CONST:
+        /* Constant -- matches a FILL whose value equals const_val. */
+        return cml_pattern_match_const(node, pattern->const_val);
+
     case CML_PAT_OP: {
         /* Must match the UOpType. */
         if (node->type != pattern->op_type)
@@ -197,6 +201,27 @@ CMLPatternNode* cml_pattern_any(void) {
     p->kind       = CML_PAT_ANY;
     p->num_inputs = 0;
     return p;
+}
+
+/** Build a pattern that matches a UOP_FILL node of a specific constant value. */
+CMLPatternNode* cml_pattern_const(float value) {
+    CMLPatternNode* p = cml_calloc(1, sizeof(CMLPatternNode));
+    if (!p)
+        return NULL;
+    p->kind      = CML_PAT_CONST;
+    p->const_val = value;
+    return p;
+}
+
+/** True if @p node is a UOP_FILL whose value equals @p value (within epsilon). */
+bool cml_pattern_match_const(const struct IRNode* node, float value) {
+    if (!node || node->type != UOP_FILL || !node->params)
+        return false;
+    const FillParams* fp = (const FillParams*)node->params;
+    float diff           = fp->value - value;
+    if (diff < 0)
+        diff = -diff;
+    return diff < 1e-7f;
 }
 
 /** Recursively free a pattern tree. */
