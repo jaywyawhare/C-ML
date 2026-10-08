@@ -208,6 +208,12 @@ static int generate_candidates(CMLBeamResult* out, size_t total_elements) {
     for (int bi = 0; bi < NUM_BLOCK_SIZES && num < CML_BEAM_MAX_CANDIDATES; bi++) {
         for (int ui = 0; ui < NUM_UNROLL_FACTORS && num < CML_BEAM_MAX_CANDIDATES; ui++) {
             for (int vi = 0; vi < NUM_VEC_WIDTHS && num < CML_BEAM_MAX_CANDIDATES; vi++) {
+                /* Prune register-heavy configs up front: each thread holds
+                 * roughly unroll * vec live values, so past a cap it spills and
+                 * times poorly. Skipping them keeps the search on viable kernels. */
+                if (UNROLL_FACTORS[ui] * VEC_WIDTHS[vi] > CML_BEAM_MAX_UPCAST)
+                    continue;
+
                 CMLBeamResult* r = &out[num++];
                 memset(r, 0, sizeof(*r));
 
