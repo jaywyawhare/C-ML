@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-bayes_sweep.py — Bayesian hyperparameter optimization via the cmltrack SDK.
+bayes_sweep.py - Bayesian hyperparameter optimization via the cmltrack SDK.
 
 Each trial is a real tracked run (scalars, weight histograms via .watch(),
 system/GPU telemetry, a PR curve). The optimizer proposes configs with a
@@ -21,7 +21,7 @@ from cmltrack.sweep import bayes_search
 
 
 def quality(cfg):
-    """Simulated 'true' ceiling accuracy — peaked at lr~0.01, dropout~0.2, hidden~48, adam."""
+    """Simulated 'true' ceiling accuracy - peaked at lr~0.01, dropout~0.2, hidden~48, adam."""
     dl = abs(math.log10(cfg["lr"]) - math.log10(0.01)) / 2
     dd = abs(cfg["dropout"] - 0.2) / 0.5
     dh = abs(cfg["hidden"] - 48) / 48

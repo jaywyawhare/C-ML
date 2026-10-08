@@ -1,10 +1,10 @@
 "use strict";
-// C-ML Experiments — W&B-style tracker UI (prototype). Layers 3–10 live here.
+// C-ML Experiments - W&B-style tracker UI (prototype). Layers 3-10 live here.
 
 const PALETTE = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#38bdf8", "#a855f7", "#ec4899", "#14b8a6", "#eab308", "#f97316"];
 
 /* Navigation is two levels, because nineteen equal-weight tabs in one row give
- * the reader no hierarchy to scan by — everything looks equally important, so
+ * the reader no hierarchy to scan by - everything looks equally important, so
  * nothing is findable. Each section answers one question; the views inside it
  * are the ways of answering it. `id` is the dispatch key (unchanged, so every
  * renderer keeps working); `label` is what the reader sees. */
@@ -85,7 +85,7 @@ async function boot() {
   tabsEl.innerHTML = "";
   const active = sectionOf(S.tab);
 
-  /* Level 1 — the four questions. */
+  /* Level 1 - the four questions. */
   const sectionRow = el("div", { class: "nav-sections" });
   SECTIONS.forEach((sec, i) => sectionRow.append(el("button", {
     class: "nav-section" + (sec === active ? " active" : ""),
@@ -94,7 +94,7 @@ async function boot() {
     onclick: () => { S.tab = sec.views[0].id; boot(); },
   }, sec.name)));
 
-  /* Level 2 — only the active section's views, so the reader is never asked to
+  /* Level 2 - only the active section's views, so the reader is never asked to
    * scan past destinations that belong to a question they aren't asking. */
   const viewRow = el("div", { class: "nav-views", role: "tablist" });
   active.views.forEach(v => viewRow.append(el("button", {
@@ -345,7 +345,7 @@ function renderConfig(c) {
     const vals = runs.map(r => r.config[k]);
     const differ = new Set(vals.map(v => JSON.stringify(v))).size > 1;
     runs.forEach((r, i) => tr.append(el("td", { style: differ ? { color: "#f59e0b" } : {} },
-      r.config[k] != null ? String(r.config[k]) : "—")));
+      r.config[k] != null ? String(r.config[k]) : " - ")));
     body.append(tr);
   });
   table.append(body);
@@ -456,7 +456,7 @@ async function renderSweep(c) {
   if (!sweeps.length) return c.append(el("div", { class: "empty" }, "No sweep runs found."));
   const sel = el("select", { class: "select", onchange: e => draw(e.target.value) });
   sweeps.forEach(s => sel.append(el("option", {}, s)));
-  c.append(el("div", { class: "controls" }, el("label", {}, "Sweep", sel), el("label", {}, "Parallel coordinates — each line is a run")));
+  c.append(el("div", { class: "controls" }, el("label", {}, "Sweep", sel), el("label", {}, "Parallel coordinates - each line is a run")));
   const host = el("div", { class: "card" }); c.append(host);
   const draw = async (sid) => {
     host.innerHTML = "";
@@ -565,9 +565,9 @@ async function renderTable(c) {
       let v = col.get(r);
       if (col.k === "__name") return tr.append(el("td", {}, el("span", { style: { color: S.color[r.id] } }, "● "), r.name));
       if (col.k === "status") return tr.append(el("td", {}, el("span", { class: "run-status " + (v || "") }, v || "?")));
-      if (col.k === "__dur") return tr.append(el("td", {}, v ? v.toFixed(2) + "s" : "—"));
+      if (col.k === "__dur") return tr.append(el("td", {}, v ? v.toFixed(2) + "s" : " - "));
       if (typeof v === "number") v = Math.abs(v) < 1e-3 && v !== 0 ? v.toExponential(2) : (+v).toFixed(4);
-      tr.append(el("td", {}, v != null ? String(v) : "—"));
+      tr.append(el("td", {}, v != null ? String(v) : " - "));
     });
     body.append(tr);
   });
@@ -586,8 +586,8 @@ async function renderOverview(c) {
   for (const rr of runs) {
     const r = await api(`/api/overview?run=${rr.id}`);
     const kv = (k, v) => el("div", { class: "kv" }, el("span", { class: "kvk" }, k), el("span", { class: "kvv" }, v));
-    const dur = r.duration ? r.duration.toFixed(2) + "s" : "—";
-    const started = r.start ? new Date(r.start * 1000).toLocaleString() : "—";
+    const dur = r.duration ? r.duration.toFixed(2) + "s" : " - ";
+    const started = r.start ? new Date(r.start * 1000).toLocaleString() : " - ";
     const nameIn = el("input", { class: "select", value: r.name, style: { width: "100%" } });
     const tagsIn = el("input", { class: "select", value: (r.tags || []).join(", "), placeholder: "tag, tag…", style: { width: "100%" } });
     const notesIn = el("textarea", { class: "select", rows: "2", style: { width: "100%", resize: "vertical" } });
@@ -601,8 +601,8 @@ async function renderOverview(c) {
       el("h4", {}, el("span", { class: "accent", style: { background: S.color[r.id] } }), r.name,
         el("span", { class: "run-status " + (r.status || ""), style: { marginLeft: "auto" } }, r.status || "?")),
       kv("State", r.status || "?"), kv("Started", started), kv("Duration", dur),
-      kv("Host", r.host || "—"), kv("OS", r.os || "—"), kv("Git", r.git || "—"),
-      kv("Command", r.cmd || "—"),
+      kv("Host", r.host || " - "), kv("OS", r.os || " - "), kv("Git", r.git || " - "),
+      kv("Command", r.cmd || " - "),
       kv("Metrics", `${r.n_metrics} keys · ${r.n_scalars} points`),
       el("div", { class: "sub-h" }, "Summary"),
       ...Object.entries(r.summary).map(([k, v]) => kv(k, typeof v === "number" ? (+v).toFixed(4) : v)),
@@ -725,7 +725,7 @@ async function renderDiff(c) {
     table.append(body);
     return el("div", { class: "card" }, el("h4", {}, el("span", { class: "accent" }), title), table);
   };
-  const fmt = v => v == null ? "—" : typeof v === "number" ? (+v).toFixed(4) : String(v);
+  const fmt = v => v == null ? " - " : typeof v === "number" ? (+v).toFixed(4) : String(v);
   c.append(el("div", { class: "panel-grid", style: { gridTemplateColumns: "1fr 1fr" } },
     section("Config", d.config_diff), section("Summary", d.summary_diff)));
 }
@@ -733,7 +733,7 @@ async function renderDiff(c) {
 // ── Alerts ──────────────────────────────────────────────────────────────────
 async function renderAlerts(c) {
   const alerts = await api("/api/alerts");
-  if (!alerts.length) return c.append(el("div", { class: "empty" }, "No alerts 🎉 — all runs healthy."));
+  if (!alerts.length) return c.append(el("div", { class: "empty" }, "No alerts 🎉 - all runs healthy."));
   const wrap = el("div", { class: "card" },
     el("h4", {}, el("span", { class: "accent" }), "Alerts", el("span", { class: "badge", style: { marginLeft: "auto" } }, `${alerts.length}`)));
   alerts.forEach(a => {
@@ -848,18 +848,18 @@ async function renderLaunch(c) {
   jobs.slice().reverse().forEach(j => body.append(el("tr", {},
     el("td", {}, j.name),
     el("td", {}, el("span", { class: "run-status " + (j.status === "finished" ? "finished" : j.status === "running" ? "running" : "") }, j.status)),
-    el("td", {}, j.exit == null ? "—" : String(j.exit)),
+    el("td", {}, j.exit == null ? " - " : String(j.exit)),
     el("td", { style: { color: "var(--muted)", fontFamily: "ui-monospace,monospace", fontSize: "11px" } }, j.command),
     el("td", { style: { color: "var(--muted)", fontSize: "11px", maxWidth: "240px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, (j.output || "").split("\n").pop()))));
   table.append(body);
   c.append(el("div", { class: "card" }, el("h4", {}, el("span", { class: "accent" }), "Job queue", el("span", { class: "badge", style: { marginLeft: "auto" } }, `${jobs.length} jobs`)),
-    jobs.length ? table : el("div", { class: "empty" }, "No jobs — submit one above or run examples/launch_demo.py")));
+    jobs.length ? table : el("div", { class: "empty" }, "No jobs - submit one above or run examples/launch_demo.py")));
 }
 
 // ── Weave: LLM trace trees ──────────────────────────────────────────────────
 async function renderWeave(c) {
   const traces = await api("/api/traces");
-  if (!traces.length) return c.append(el("div", { class: "empty" }, "No traces — run examples/weave_demo.py"));
+  if (!traces.length) return c.append(el("div", { class: "empty" }, "No traces - run examples/weave_demo.py"));
   const list = el("div", { class: "card", style: { flex: "0 0 280px" } }, el("h4", {}, el("span", { class: "accent" }), "Traces"));
   const detail = el("div", { class: "card", style: { flex: "1" } });
   const draw = async (tid) => {
@@ -923,7 +923,7 @@ async function renderTables(c) {
                 for (let p = 0, q = 0; p < rgb.length; p += 3, q += 4) { im.data[q] = rgb[p]; im.data[q + 1] = rgb[p + 1]; im.data[q + 2] = rgb[p + 2]; im.data[q + 3] = 255; }
                 cv.getContext("2d").putImageData(im, 0, 0);
               });
-            } else tr.append(el("td", {}, v != null ? String(v) : "—"));
+            } else tr.append(el("td", {}, v != null ? String(v) : " - "));
           });
           body.append(tr);
         });
@@ -934,13 +934,13 @@ async function renderTables(c) {
       c.append(card);
     }
   }
-  if (!any) c.append(el("div", { class: "empty" }, "No rich tables — run examples/launch_demo.py (logs a predictions table)."));
+  if (!any) c.append(el("div", { class: "empty" }, "No rich tables - run examples/launch_demo.py (logs a predictions table)."));
 }
 
 // ── Artifact lineage DAG (cytoscape + dagre) ────────────────────────────────
 async function renderLineage(c) {
   const g = await api("/api/lineage");
-  if (!g.nodes.length) return c.append(el("div", { class: "empty" }, "No lineage yet — run examples/launch_demo.py (dataset → run → model)."));
+  if (!g.nodes.length) return c.append(el("div", { class: "empty" }, "No lineage yet - run examples/launch_demo.py (dataset → run → model)."));
   const nRun = g.nodes.filter(n => n.type === "run").length;
   const nArt = g.nodes.filter(n => n.type === "artifact").length;
   const cyDiv = el("div", { style: { width: "100%", height: "72vh", background: "var(--bg)", borderRadius: "8px" } });

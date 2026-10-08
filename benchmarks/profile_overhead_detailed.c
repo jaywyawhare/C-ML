@@ -64,7 +64,7 @@ int main(void) {
         }
         double ir_create = (now() - t0) / iters * 1e3;
 
-        /* 1d. CML without reset (accumulating graph) — just 20 iters to show effect */
+        /* 1d. CML without reset (accumulating graph) - just 20 iters to show effect */
         for (int i = 0; i < 5; i++) {
             Tensor* tC = cml_matmul(tA, tB);
             (void)tensor_data_ptr(tC);

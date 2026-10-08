@@ -22,7 +22,7 @@ int main(void) {
     printf("  num_patches=%d\n", num_patches);
 
     printf("\nViT-Tiny created successfully.\n");
-    printf("(Forward pass requires %dx%d input — skipped for speed.)\n",
+    printf("(Forward pass requires %dx%d input - skipped for speed.)\n",
            vcfg.image_size, vcfg.image_size);
 
     module_free(vit);

@@ -1,9 +1,9 @@
 /* ============================================================================
- * C-ML design system — "Engineering Instrument"
+ * C-ML design system - "Engineering Instrument"
  * ----------------------------------------------------------------------------
  * One shared token layer for the shell, the Visualizer, and the Experiment
  * tracker so all three read as one instrument. The subject is a from-scratch
- * ML compiler — a UOP IR, a JIT, kernels, tensors — so the surface is dressed
+ * ML compiler - a UOP IR, a JIT, kernels, tensors - so the surface is dressed
  * as a piece of lab equipment: a graphite chassis under a faint blueprint grid,
  * an amber signal trace for anything live/primary, a cyan trace for the
  * secondary channel, and mono-forward type for every number and identifier.
@@ -22,8 +22,8 @@
 
 :root {
   /* ── Signal channels (interactive / primary) ───────────────────────────── */
-  --accent:      #ffb454;   /* amber trace — live, primary, selected           */
-  --accent-2:    #4ecdc4;   /* cyan trace  — secondary channel / links         */
+  --accent:      #ffb454;   /* amber trace - live, primary, selected           */
+  --accent-2:    #4ecdc4;   /* cyan trace - secondary channel / links         */
   --accent-soft: rgba(255, 180, 84, 0.14);   /* amber wash (hover/active fills) */
   --accent-line: rgba(255, 180, 84, 0.40);   /* amber hairline                  */
 
@@ -113,7 +113,7 @@ body.instrument-grid {
   background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
 }
 
-/* Uppercased instrument eyebrow/label — used for section kickers and stat keys. */
+/* Uppercased instrument eyebrow/label - used for section kickers and stat keys. */
 .eyebrow {
   font-family: var(--mono);
   font-size: var(--fs-100);

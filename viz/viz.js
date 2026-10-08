@@ -1,4 +1,4 @@
-/* viz.js — C-ML Visualizer (Zero-dependency vanilla JS) */
+/* viz.js - C-ML Visualizer (Zero-dependency vanilla JS) */
 /* global cytoscape, hljs, VizCharts */
 
 "use strict";
@@ -191,7 +191,7 @@ function updateConnStatus() {
 // Loading skeletons
 // ═══════════════════════════════════════════════════════════════
 // True while a tab is still within its initial loading grace window and has
-// received no data yet — used to show a shimmer skeleton instead of an empty state.
+// received no data yet - used to show a shimmer skeleton instead of an empty state.
 function isLoading(tab, hasData) {
   if (hasData) return false;
   const start = State._waitStart[tab];
@@ -1086,7 +1086,7 @@ function generateKernelCode(kernel, backend) {
   const ops = (kernel.isFused && kernel.ops && kernel.ops.length) ? kernel.ops
             : [{ type: kernel.type, inputs: inputs, output: output }];
 
-  // ── C (SIMD) — AVX2 vectorized loop + scalar remainder ───────────────────
+  // ── C (SIMD) - AVX2 vectorized loop + scalar remainder ───────────────────
   if (backend === "c_simd") {
     const canVec = ops.every(o => SIMD_OP[o.type]);
     const L = [`#include <immintrin.h>`, `void ${name}(float** inputs_ptr, float** outputs_ptr, int n) {`];
@@ -1094,7 +1094,7 @@ function generateKernelCode(kernel, backend) {
     L.push(`    float* restrict ${output} = outputs_ptr[0];`);
     if (!canVec) {
       const bad = [...new Set(ops.filter(o => !SIMD_OP[o.type]).map(o => o.type))].join(", ");
-      L.push(`    // no direct AVX2 intrinsic for ${bad} — SLEEF or scalar fallback:`);
+      L.push(`    // no direct AVX2 intrinsic for ${bad} - SLEEF or scalar fallback:`);
       L.push(`    for (int i = 0; i < n; i++) {`);
       emitScalar(L, "        ");
       L.push(`    }`, `}`);
@@ -1131,7 +1131,7 @@ function generateKernelCode(kernel, backend) {
   if (cuda_like) {
     if (backend === "rocm") L.push(`#include <hip/hip_runtime.h>`);
     L.push(`__global__ void ${name}(${[...inputs.map(n => `const float* __restrict__ ${n}`), `float* __restrict__ ${output}`, "int n"].join(", ")}) {`);
-    // (grid-stride loop emitted in the body — no per-thread bounds check needed)
+    // (grid-stride loop emitted in the body - no per-thread bounds check needed)
   } else if (backend === "opencl") {
     L.push(`__kernel void ${name}(${[...inputs.map(n => `__global const float* restrict ${n}`), `__global float* restrict ${output}`, "int n"].join(", ")}) {`);
     L.push(`    int ${iv} = get_global_id(0);`, `    if (${iv} >= n) return;`);
@@ -1172,7 +1172,7 @@ function generateKernelCode(kernel, backend) {
            `    for (int j = 0; j < n; j++) acc ${prod ? "*=" : "+="} ${inputs[0] || "in0"}[j];`,
            `    ${output}[0] = ${kernel.type === "MEAN" ? "acc / (float)n" : "acc"};`);
   } else {
-    // elementwise — single op or a fused chain
+    // elementwise - single op or a fused chain
     if (cuda_like) {
       // grid-stride loop: correct for any launch config + high occupancy (idiomatic CUDA/HIP)
       L.push(`    for (int ${iv} = blockIdx.x * blockDim.x + threadIdx.x; ${iv} < n; ${iv} += gridDim.x * blockDim.x) {`);
@@ -1203,15 +1203,15 @@ function generateKernelCode(kernel, backend) {
  * channel, and anything structural or uncategorised recedes into the graphite
  * neutrals so it never competes with real work for attention. */
 const FLAME_COLORS = {
-  fused:    "#ffb454",   /* amber  — primary signal            */
-  matmul:   "#4ecdc4",   /* cyan   — secondary compute channel */
+  fused:    "#ffb454",   /* amber - primary signal            */
+  matmul:   "#4ecdc4",   /* cyan - secondary compute channel */
   conv:     "#ffce5a",   /* gold                                */
   elemwise: "#57d69a",   /* green                               */
   reduce:   "#ff7a7a",   /* coral                               */
-  movement: "#8b93a7",   /* slate  — data motion, not compute   */
-  index:    "#9d8bc4",   /* violet — data-dependent access      */
-  init:     "#6f7c94",   /* steel  — buffer creation / fill     */
-  optim:    "#d98fb0",   /* rose   — optimizer update           */
+  movement: "#8b93a7",   /* slate - data motion, not compute   */
+  index:    "#9d8bc4",   /* violet - data-dependent access      */
+  init:     "#6f7c94",   /* steel - buffer creation / fill     */
+  optim:    "#d98fb0",   /* rose - optimizer update           */
   other:    "#5c6577",   /* dim slate                           */
   scope:    "#38414f",   /* module frames: structure, recessed  */
   host:     "#2a3140",   /* not in a kernel: framework overhead */
@@ -1733,7 +1733,7 @@ function renderFlameTimeline(sec, chart, fg, match, ROW_MIN, ROW_MAX, ROW_GAP) {
   const frames = buildFlameChart(fg);
   if (!frames.length) {
     sec.appendChild(el("div", { className: "flame-empty" },
-      "No timeline in this profile — re-run with FLAMEGRAPH=1 to capture one."));
+      "No timeline in this profile - re-run with FLAMEGRAPH=1 to capture one."));
     return;
   }
 
@@ -2216,7 +2216,7 @@ function renderCodeGenView() {
     const body = el("div", { className: "code-pane-body" });
     const pre = document.createElement("pre");
     const code = document.createElement("code");
-    // highlight.js — indices map 1:1 with raw source lines
+    // highlight.js - indices map 1:1 with raw source lines
     const highlighted = hljs.highlight(source, { language: "c" }).value.split("\n");
     const rawLines = source.split("\n");
     code.innerHTML = highlighted.map((l, i) => {
@@ -2508,7 +2508,7 @@ function renderTrainingView() {
     cards.appendChild(c);
   }
 
-  // Loss cards, then accuracy cards — each group ends with its best-so-far.
+  // Loss cards, then accuracy cards - each group ends with its best-so-far.
   addCard("Training Loss", fx6(latestTrainingLoss), "indigo");
   if (hasTestingData) addCard("Testing Loss", fx6(latestTestingLoss), "amber");
   if (hasValidationData) addCard("Validation Loss", fx6(latestValidationLoss), "red");
@@ -2836,9 +2836,9 @@ function makeDistRow(d) {
     return card;
   };
   row.appendChild(mk("chart-grad-dist", "Gradient Distribution",
-                     "min–max · IQR · median"));
+                     "min-max · IQR · median"));
   row.appendChild(mk("chart-weight-dist", "Weight Distribution",
-                     "min–max · IQR · median"));
+                     "min-max · IQR · median"));
   return row;
 }
 
@@ -2959,7 +2959,7 @@ function renderTrainingEmpty(container, data) {
 
 
 // ═══════════════════════════════════════════════════════════════
-// WORKER (inline — for graph layout offloading)
+// WORKER (inline - for graph layout offloading)
 // ═══════════════════════════════════════════════════════════════
 // worker.js is optional; layout runs fine in main thread for typical graph sizes.
 // If needed, load viz/worker.js as a Web Worker and postMessage layout data.

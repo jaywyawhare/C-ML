@@ -439,12 +439,12 @@ Monitor IR memory usage:
 
 **A tensor materialised through the graph does not survive
 `cml_reset_ir_context()`.** Its storage comes from the IR execution pool, and the
-reset reclaims that pool — so any pointer you kept, or the tensor handle itself,
+reset reclaims that pool - so any pointer you kept, or the tensor handle itself,
 is dangling afterwards. This is by design (it is what keeps a training loop from
 growing without bound), but it is easy to trip over:
 
 ```c
-/* WRONG — inputs is materialised here, so its buffer lives in the exec pool */
+/* WRONG - inputs is materialised here, so its buffer lives in the exec pool */
 Tensor* inputs = tensor_zeros_2d(n, dim);
 float*  data   = (float*)tensor_data_ptr(inputs);
 
@@ -459,7 +459,7 @@ Two rules follow:
 
 1. **Keep long-lived data in plain host memory** (`malloc`), and build tensors
    from it per iteration. Host allocations are yours and are untouched by resets.
-2. **Free a step's tensors before the reset, not after** — freeing afterwards
+2. **Free a step's tensors before the reset, not after** - freeing afterwards
    touches memory the pool has already reclaimed.
 
 ```c
@@ -480,8 +480,7 @@ for (int step = 0; step < steps; step++) {
 }
 ```
 
-The failure mode is a use-after-free that usually surfaces far from its cause —
-typically a wild pointer inside a BLAS call, because the freed buffer was handed
+The failure mode is a use-after-free that usually surfaces far from its cause - typically a wild pointer inside a BLAS call, because the freed buffer was handed
 back out and overwritten. A custom pool is invisible to AddressSanitizer, so it
 tends to show up only as corrupted allocator metadata.
 

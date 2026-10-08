@@ -3,7 +3,7 @@
 C-ML Visualization Server (Zero Dependencies)
 
 Pure Python stdlib HTTP server with SSE streaming, ETag caching, and GZip compression.
-No FastAPI, no uvicorn — just http.server + socketserver.
+No FastAPI, no uvicorn - just http.server + socketserver.
 """
 
 import gzip

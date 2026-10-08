@@ -1,5 +1,5 @@
 """
-cmltrack.weave — LLM application tracing (prototype, Weave-style).
+cmltrack.weave - LLM application tracing (prototype, Weave-style).
 
 Records nested spans (chains, LLM calls, tools) with token counts, cost, and
 latency into a trace tree that the UI renders. Zero dependencies.

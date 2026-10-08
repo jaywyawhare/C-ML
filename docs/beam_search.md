@@ -2,8 +2,8 @@
 
 C-ML has two related BEAM autotuning systems:
 
-1. **Generic BEAM search** (`beam_search.h`) — tunes any kernel's block size, unroll factor, and vector width. Supports optional CUDA hardware timing.
-2. **OpenCL GEMM BEAM** (built into `opencl_ir_backend`) — tunes tile parameters for GEMM kernels on OpenCL GPUs using OpenCL profiling events.
+1. **Generic BEAM search** (`beam_search.h`) - tunes any kernel's block size, unroll factor, and vector width. Supports optional CUDA hardware timing.
+2. **OpenCL GEMM BEAM** (built into `opencl_ir_backend`) - tunes tile parameters for GEMM kernels on OpenCL GPUs using OpenCL profiling events.
 
 
 ## Table of Contents
@@ -205,7 +205,7 @@ The OpenCL IR backend has a built-in GEMM-specific autotuner that generates and 
 
 ### How It Works
 
-At backend init, a set of parameterized `beam_gemm_N` kernels is compiled — each with different tile sizes and register blocks. On the first GEMM call for a given (M, N, K) shape, the autotuner benchmarks all applicable variants and caches the winner. Subsequent calls for the same shape use the cached variant with zero tuning overhead.
+At backend init, a set of parameterized `beam_gemm_N` kernels is compiled - each with different tile sizes and register blocks. On the first GEMM call for a given (M, N, K) shape, the autotuner benchmarks all applicable variants and caches the winner. Subsequent calls for the same shape use the cached variant with zero tuning overhead.
 
 ```
 Backend init:
@@ -250,8 +250,8 @@ export BEAM=4    # Limit search to the first 4 applicable variants
 ```
 
 When disabled, the backend falls back to:
-- `matmul` — for M,N multiples of 128 and K multiple of 16
-- `matmul_naive` — for all other shapes
+- `matmul` - for M,N multiples of 128 and K multiple of 16
+- `matmul_naive` - for all other shapes
 
 ### Logging
 

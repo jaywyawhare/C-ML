@@ -121,7 +121,7 @@ jobs:
         run: cmake --build build -j$(nproc)
 
   sanitizers:
-    # AddressSanitizer + UndefinedBehaviorSanitizer build — catches heap
+    # AddressSanitizer + UndefinedBehaviorSanitizer build - catches heap
     # corruption, use-after-free, allocator mismatches, and UB that the plain
     # Debug build silently tolerates.
     runs-on: ubuntu-latest

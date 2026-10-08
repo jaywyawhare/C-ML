@@ -1,5 +1,5 @@
 /* ============================================================================
- * Shell chrome — the instrument's header rail + framed content bay.
+ * Shell chrome - the instrument's header rail + framed content bay.
  * One topbar (brand · view nav · signal readout) over two isolated iframes.
  * All hooks used by dashboard.js are preserved: .shell-nav-item[.active],
  * #frame-experiments/#frame-viz[.active], #shell-conn[.live/.down] + .shell-conn-label.

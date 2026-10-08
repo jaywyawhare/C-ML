@@ -16,7 +16,7 @@ int main(void) {
     if (!model) { printf("Failed to create EfficientNet-B0\n"); return 1; }
 
     printf("\nEfficientNet-B0 created successfully.\n");
-    printf("(Forward pass requires 224x224 input — skipped for speed.)\n");
+    printf("(Forward pass requires 224x224 input - skipped for speed.)\n");
 
     module_free(model);
     printf("\nDone.\n");

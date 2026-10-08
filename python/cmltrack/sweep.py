@@ -1,9 +1,9 @@
 """
-cmltrack.sweep — Bayesian hyperparameter optimization (prototype, stdlib-only).
+cmltrack.sweep - Bayesian hyperparameter optimization (prototype, stdlib-only).
 
 A kernel-regression surrogate + UCB acquisition (a lightweight GP stand-in that
 needs no numpy/scipy). Proposes configs that balance exploiting good regions and
-exploring unseen ones — a real strategy beyond grid/random.
+exploring unseen ones - a real strategy beyond grid/random.
 
     from cmltrack.sweep import bayes_search
     space = {"lr": (1e-4, 1e-1, "log"), "dropout": (0.0, 0.5), "opt": ["adam", "sgd"]}

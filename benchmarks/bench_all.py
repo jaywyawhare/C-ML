@@ -41,7 +41,7 @@ def _bench_tinygrad_body(np, TgTensor, tg_nn, TinyJit):
     RUNS = 5
     ITERS = 5  # iters per run() call
 
-    # Each pair is used exactly once across all runs*iters calls — tinygrad never
+    # Each pair is used exactly once across all runs*iters calls - tinygrad never
     # revisits a realized output, so every call dispatches the compiled kernel for
     # real. That makes the pool, not the loop, the memory cost: at N=2048 a pair is
     # 32MB, so full ITERS would hold ~1.8GB live. Fewer iters at 2048 keeps the
@@ -71,7 +71,7 @@ def _bench_tinygrad_body(np, TgTensor, tg_nn, TinyJit):
             t0 = now()
             for a, b in pairs:
                 out = gemm_jit(a, b)
-            out.numpy()  # force GPU sync — OpenCL dispatch is async
+            out.numpy()  # force GPU sync - OpenCL dispatch is async
             return (now() - t0) / iters * 1e3
 
         results[f"gemm_{N}"] = median_of(run, runs=RUNS)
@@ -206,7 +206,7 @@ def _bench_tinygrad_body(np, TgTensor, tg_nn, TinyJit):
 def bench_tensorflow():
     """TensorFlow, benchmarked in graph mode (tf.function).
 
-    Graph mode is TF's normal performance path — eager TF pays a large per-op
+    Graph mode is TF's normal performance path - eager TF pays a large per-op
     Python dispatch cost that says more about the binding than the kernels. Note
     the asymmetry when reading the table: PyTorch here is eager, TF and tinygrad
     are compiled. Conv2d uses NHWC, TF's native CPU layout (torch/cml use NCHW);

@@ -50,7 +50,7 @@ def main():
         print(f"\nRunning PyTorch {torch.__version__} benchmarks...")
         all_results["pytorch"] = bench_torch()
     except ImportError:
-        print("\nPyTorch not available — install torch to compare.")
+        print("\nPyTorch not available - install torch to compare.")
         all_results["pytorch"] = {}
 
     frameworks = [k for k in ("torch_c", "pytorch", "torch_c(OpenCL)") if k in all_results and all_results[k]]

@@ -4,9 +4,9 @@ Fair benchmark: tinygrad vs CML
 Same workloads, same sizes, same iteration counts.
 
 Tests:
-  1. GEMM throughput  — square NxN matmul (N=512, 1024, 2048, 4096)
-  2. Fused op         — matmul + bias_add + relu (same sizes)
-  3. MLP forward pass — batch=64, 784->128->ReLU->10, 100 iters
+  1. GEMM throughput - square NxN matmul (N=512, 1024, 2048, 4096)
+  2. Fused op - matmul + bias_add + relu (same sizes)
+  3. MLP forward pass - batch=64, 784->128->ReLU->10, 100 iters
 """
 
 import time, os, sys
@@ -47,7 +47,7 @@ def bench_gemm(N: int, iters: int = 5):
     a_np = np.random.randn(N, N).astype(np.float32)
     b_np = np.random.randn(N, N).astype(np.float32)
 
-    # warmup — several passes to ensure JIT is compiled and stable
+    # warmup - several passes to ensure JIT is compiled and stable
     for _ in range(5):
         realize(Tensor(a_np + np.float32(1e-9 * _)).matmul(Tensor(b_np)))
 
@@ -102,7 +102,7 @@ def bench_mlp(batch: int = 64, in_f: int = 784, hid: int = 128,
 
     x_np = np.ones((batch, in_f), dtype=np.float32)
 
-    # warmup — fresh input tensor each call to avoid cache hits
+    # warmup - fresh input tensor each call to avoid cache hits
     for _ in range(5):
         realize(model(Tensor(x_np)))
 

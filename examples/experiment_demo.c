@@ -1,5 +1,5 @@
 /*
- * experiment_demo.c — exercises all 10 tracking layers via the cml_exp_* API.
+ * experiment_demo.c - exercises all 10 tracking layers via the cml_exp_* API.
  *
  * Runs a 3-point learning-rate *sweep* (L9). Each run logs:
  *   L1 scalars (train/val loss+acc, grad_norm, lr)   L4 config/hparams
@@ -127,7 +127,7 @@ int main(void) {
         cml_exp_log_console(run, "[info] training complete, model saved");
         cml_exp_run_finish(run, "finished");
         free(w);
-        printf("run %d (lr=%.4g) done — best_acc=%.3f  id=%s\n", r, lr, best_acc, "ok");
+        printf("run %d (lr=%.4g) done - best_acc=%.3f  id=%s\n", r, lr, best_acc, "ok");
     }
 
     printf("\nSweep complete. Data in .cml/experiments/runs/\n");

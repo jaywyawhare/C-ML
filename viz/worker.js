@@ -1,4 +1,4 @@
-/* worker.js — Web Worker for heavy graph layout computation */
+/* worker.js - Web Worker for heavy graph layout computation */
 /* Optional: offloads dagre/ELK layout to a background thread */
 
 "use strict";

@@ -70,7 +70,7 @@ Input: FusionGroup [LOAD(a), LOAD(b), MUL, LOAD(c), ADD]
 Output LinearProgram:
   [0] LOAD    v0 ← tensor(a)
   [1] LOAD    v1 ← tensor(b)
-  [2] COMPUTE v2 ← MUL(v0, v1)    [ELIMINATED — stays in register]
+  [2] COMPUTE v2 ← MUL(v0, v1)    [ELIMINATED - stays in register]
   [3] LOAD    v3 ← tensor(c)
   [4] COMPUTE v4 ← ADD(v2, v3)
   [5] STORE   tensor(out) ← v4
@@ -124,7 +124,7 @@ void cml_fused_kernel(float* in0, float* in1, float* in2, float* out0, int n) {
     for (int i = 0; i < n; i++) {
         float v0 = in0[i];
         float v1 = in1[i];
-        float v2 = v0 * v1;       // eliminated — register only
+        float v2 = v0 * v1;       // eliminated - register only
         float v3 = in2[i];
         float v4 = v2 + v3;
         out0[i] = v4;

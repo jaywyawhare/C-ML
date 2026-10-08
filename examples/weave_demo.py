@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Weave LLM-tracing demo — simulates a RAG assistant and records trace trees
+"""Weave LLM-tracing demo - simulates a RAG assistant and records trace trees
 (chain -> retriever + llm) with token counts, cost, and latency."""
 import os
 import random

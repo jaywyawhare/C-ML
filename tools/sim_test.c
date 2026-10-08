@@ -1,5 +1,5 @@
 /*
- * sim_test.c — Seeded deterministic simulation + OOM sweep for C-ML
+ * sim_test.c - Seeded deterministic simulation + OOM sweep for C-ML
  *
  * Inspired by TigerBeetle's VOPR: given a seed, generate a random computation
  * graph, run it twice and assert bit-identical results (determinism), then sweep

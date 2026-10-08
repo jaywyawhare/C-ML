@@ -19,7 +19,7 @@ int main(void) {
     if (!model) { printf("Failed to create ConvNeXt\n"); return 1; }
 
     printf("\nConvNeXt-Tiny (%d classes) created successfully.\n", num_classes);
-    printf("(Forward pass requires 224x224 input — skipped for speed.)\n");
+    printf("(Forward pass requires 224x224 input - skipped for speed.)\n");
 
     module_free(model);
     printf("\nDone.\n");

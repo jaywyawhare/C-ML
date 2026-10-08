@@ -36,11 +36,11 @@ Draft model            Target model           Accept/Reject
   sequentially           in one forward pass       accept until mismatch
 ```
 
-**Phase 1 — Draft:** Autoregressively generate K tokens using the draft model. Each step feeds the growing sequence back to get the next draft token.
+**Phase 1 - Draft:** Autoregressively generate K tokens using the draft model. Each step feeds the growing sequence back to get the next draft token.
 
-**Phase 2 — Verify:** Concatenate the prefix with all K draft tokens and run a single forward pass of the target model to produce logits for every position.
+**Phase 2 - Verify:** Concatenate the prefix with all K draft tokens and run a single forward pass of the target model to produce logits for every position.
 
-**Phase 3 — Accept/Reject:**
+**Phase 3 - Accept/Reject:**
 
 - Compare each draft token against the target model's argmax prediction at the corresponding position
 - Accept tokens sequentially until the first mismatch
@@ -101,11 +101,11 @@ typedef int (*CMLSampleTokenFn)(void* model_ctx, Tensor* logits, float temperatu
 
 | Parameter | Default | Range | Description |
 |-----------|---------|-------|-------------|
-| `num_draft_tokens` | 5 | 1–16 | Number of tokens to draft per step (K) |
+| `num_draft_tokens` | 5 | 1-16 | Number of tokens to draft per step (K) |
 | `temperature` | 0.8 | > 0 | Sampling temperature (lower = more deterministic) |
 | `top_p` | 0.9 | (0, 1] | Nucleus sampling probability |
 | `top_k` | 40 | >= 1 | Top-k sampling limit |
-| `do_sample` | true | — | Sampling (true) vs greedy (false) |
+| `do_sample` | true | - | Sampling (true) vs greedy (false) |
 
 Maximum draft tokens per step is capped at `CML_SPEC_MAX_DRAFT_TOKENS` (16).
 
@@ -145,10 +145,10 @@ cml_speculative_free(dec);
 
 Each `CMLSpeculativeResult` includes detailed timing:
 
-- **`draft_time_ms`** — Time spent in draft model forward passes
-- **`verify_time_ms`** — Time spent in target model verification
-- **`total_time_ms`** — Wall-clock time for the full step
-- **`acceptance_rate`** — Fraction of draft tokens accepted (0.0–1.0)
+- **`draft_time_ms`** - Time spent in draft model forward passes
+- **`verify_time_ms`** - Time spent in target model verification
+- **`total_time_ms`** - Wall-clock time for the full step
+- **`acceptance_rate`** - Fraction of draft tokens accepted (0.0-1.0)
 
 The decoder also tracks lifetime statistics via `cml_speculative_acceptance_rate()`, which returns the cumulative acceptance rate across all decode steps. A higher acceptance rate means the draft model closely matches the target, yielding greater speedups.
 

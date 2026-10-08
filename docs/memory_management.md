@@ -355,14 +355,13 @@ allocators above. A tensor carries two counters:
 | Field | Meaning |
 |---|---|
 | `ref_count` | Internal graph/API references. `tensor_free()` decrements it and only proceeds once it reaches 0. |
-| `external_refs` | References held **outside** the C core — e.g. a Python (or other language) wrapper that will free the tensor itself. |
+| `external_refs` | References held **outside** the C core - e.g. a Python (or other language) wrapper that will free the tensor itself. |
 
 ### Why external references exist
 
 C-ML executes lazily and rewrites/tears down the IR graph at run boundaries (and,
 per step, inside `optimizer.step()`). A language binding, however, may still hold a
-wrapper object pointing at a tensor that the graph teardown is about to free —
-which would leave the wrapper with a dangling pointer (use-after-free). The
+wrapper object pointing at a tensor that the graph teardown is about to free - which would leave the wrapper with a dangling pointer (use-after-free). The
 `external_refs` counter closes that gap.
 
 ### API

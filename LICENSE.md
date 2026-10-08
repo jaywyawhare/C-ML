@@ -4,11 +4,11 @@
 
 *In the World of Schrödinger's Jerks: Where Sarcasm, Fun, and "Don't Be a Jerk" Collide*
 
-Welcome to the enigmatic realm of software licenses, where we acknowledge that we're all potential Schrödinger's Jerks. In this quirky quantum playground, the rules are as elusive as a cat in a box – simultaneously serious and whimsical. Are you ready for a rollercoaster of paradoxical non-jerkiness? Let's dive in!
+Welcome to the enigmatic realm of software licenses, where we acknowledge that we're all potential Schrödinger's Jerks. In this quirky quantum playground, the rules are as elusive as a cat in a box - simultaneously serious and whimsical. Are you ready for a rollercoaster of paradoxical non-jerkiness? Let's dive in!
 
 **Terms and Conditions**
 
-1. **Golden Rule**: The cornerstone of this license – don't be a jerk. It's not rocket science. Fail to follow this fundamental principle, and the universe will cook up an unspecified punishment just for you. Severity? I get to play judge, jury, and cosmic executioner.
+1. **Golden Rule**: The cornerstone of this license - don't be a jerk. It's not rocket science. Fail to follow this fundamental principle, and the universe will cook up an unspecified punishment just for you. Severity? I get to play judge, jury, and cosmic executioner.
 
 2. **"As Is" Clause**: This software comes "as is." No warranties, no guarantees, nada. Take it or leave it.
 

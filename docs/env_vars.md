@@ -17,20 +17,20 @@ Set `DEBUG=1` (or higher) to print every non-default flag at startup.
 
 | Variable | Values | Default | Description |
 |---|---|---|---|
-| `DEBUG` | `0`–`7` | `0` | Leveled debug output (see breakdown below) |
+| `DEBUG` | `0` - `7` | `0` | Leveled debug output (see breakdown below) |
 | `NO_COLOR` | `0`/`1` | `0` | Disable ANSI color in log output |
-| `NOOPT` | `0`/`1` | `0` | Disable IR/kernel optimization passes — rewrites, reordering, and operator fusion (keeps structural passes: decompose, DCE, dependency graph) |
+| `NOOPT` | `0`/`1` | `0` | Disable IR/kernel optimization passes - rewrites, reordering, and operator fusion (keeps structural passes: decompose, DCE, dependency graph) |
 | `PROFILE` | `0`/`1` | `0` | Enable kernel/op profiling |
 | `NO_MEMORY_PLANNER` | `0`/`1` | `0` | Disable the graph memory planner |
 | `WINO` | `-1`/`0`/`1` | `-1` | Winograd conv override: `-1` auto (per-op), `0` force off, `1` force on |
 | `CHECK_OOB` | `0`/`1` | `0` | Enable out-of-bounds index checking in kernels |
 | `VALIDATE_WITH_CPU` | `0`/`1` | `0` | Force the CPU reference execution path (disables JIT) for a trustworthy baseline |
-| `CACHELEVEL` | `0`–`2` | `2` | Kernel cache level: `<2` disables the on-disk cache |
-| `JIT` | `0`–`2` | `1` | JIT control: `0` off, `1`/`2` on |
+| `CACHELEVEL` | `0` - `2` | `2` | Kernel cache level: `<2` disables the on-disk cache |
+| `JIT` | `0` - `2` | `1` | JIT control: `0` off, `1`/`2` on |
 | `TC` | `0`/`1` | `1` | Use tensor cores when available |
 | `TC_SELECT` | `-1`+ | `-1` | Select a specific tensor-core config (`-1` auto) |
-| `TC_OPT` | `0`–`2` | `0` | Tensor-core optimization aggressiveness |
-| `TRANSCENDENTAL` | `0`–`2` | `1` | Transcendental ops: `2` uses a fast polynomial `exp` on the CPU reference path; `0`/`1` keep libm |
+| `TC_OPT` | `0` - `2` | `0` | Tensor-core optimization aggressiveness |
+| `TRANSCENDENTAL` | `0` - `2` | `1` | Transcendental ops: `2` uses a fast polynomial `exp` on the CPU reference path; `0`/`1` keep libm |
 | `NOLOCALS` | `0`/`1` | `0` | Disable use of local/shared memory in kernels |
 | `SPLIT_REDUCEOP` | `0`/`1` | `1` | Split large reduce ops for parallelism |
 | `IGNORE_BEAM_CACHE` | `0`/`1` | `0` | Ignore the on-disk BEAM search cache |
@@ -40,7 +40,7 @@ Set `DEBUG=1` (or higher) to print every non-default flag at startup.
 | `DISABLE_FUSION` | `0`/`1` | `0` | Disable operator fusion in the scheduler |
 | `DISABLE_JIT` | `0`/`1` | `0` | Disable JIT compilation (force interpreter/BLAS path) |
 | `VIZ` | `0`/`1` | `0` | Launch the graph/kernel visualizer. Also records per-epoch weight/gradient distributions, tags IR nodes with their module scope, and enables `FLAMEGRAPH` capture. Mutually exclusive with `NO_EXPORT` |
-| `NO_EXPORT` | `0`/`1` | `0` | Emit no dashboard/metrics files at all and skip the work behind them. **Mutually exclusive with `VIZ`** — setting both fails `cml_init()`. Use for benchmarking and production training |
+| `NO_EXPORT` | `0`/`1` | `0` | Emit no dashboard/metrics files at all and skip the work behind them. **Mutually exclusive with `VIZ`** - setting both fails `cml_init()`. Use for benchmarking and production training |
 | `FLAMEGRAPH` | `0`/`1` | `0` | Time each fused kernel and write `flamegraph.json` at exit. Implied by `VIZ` and by the `PROFILE` flag |
 | `DEFAULT_FLOAT` | `FLOAT32`, `HALF`/`FLOAT16`, `BFLOAT16`, `FLOAT64` | `FLOAT32` | Default float dtype |
 
@@ -89,7 +89,7 @@ cml_flag_pop(CML_FLAG_DEBUG, prev);
 ```
 
 `cml_flag_was_set()` reports whether a flag was set explicitly in the environment
-(vs. left at its default) — used for tri-state overrides such as `WINO`.
+(vs. left at its default) - used for tri-state overrides such as `WINO`.
 
 ## Other environment variables
 

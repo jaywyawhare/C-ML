@@ -137,7 +137,7 @@ cml.triplet_margin_loss(a, p, n)          cml.cosine_embedding_loss(x1, x2, t)
 ```
 
 `cross_entropy_loss` applies softmax internally and expects `labels` to be a **1-D
-tensor of integer class indices** (PyTorch-style), one per sample — not one-hot
+tensor of integer class indices** (PyTorch-style), one per sample - not one-hot
 vectors. On invalid inputs (e.g. a wrong target shape or dtype) the loss raises a
 `RuntimeError` with a message pointing at the argument shapes, rather than
 returning a broken/NULL tensor.

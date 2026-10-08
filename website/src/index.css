@@ -1,10 +1,10 @@
 /* ============================================================================
- * C-ML site — "Engineering Instrument" design system (shared brand with the
+ * C-ML site - "Engineering Instrument" design system (shared brand with the
  * viz dashboard). The subject is a from-scratch ML compiler; the surface reads
  * as lab equipment: a graphite chassis under a faint blueprint grid, an amber
  * signal trace for anything primary/live, a cyan trace for the secondary
  * channel, and mono numerics. Type: Space Grotesk (display) + IBM Plex Sans
- * (body — technical, readable, not the generic Inter) + JetBrains Mono.
+ * (body - technical, readable, not the generic Inter) + JetBrains Mono.
  * Variable NAMES are kept stable; only values change so the whole file inherits.
  * ========================================================================== */
 :root {
@@ -26,9 +26,9 @@
   --text-3:       #5a6376;
 
   /* Signal channels */
-  --accent:       #ffb454;   /* amber trace — primary/live */
+  --accent:       #ffb454;   /* amber trace - primary/live */
   --accent-light: #ffca7a;
-  --accent-2:     #4ecdc4;   /* cyan trace — secondary/links */
+  --accent-2:     #4ecdc4;   /* cyan trace - secondary/links */
   --accent-soft:  rgba(255, 180, 84, 0.13);
   --accent-line:  rgba(255, 180, 84, 0.40);
 
@@ -85,7 +85,7 @@ body {
 
 ::selection { background: var(--accent-soft); color: var(--text); }
 
-/* Uppercased mono instrument label — section kickers, stat keys. */
+/* Uppercased mono instrument label - section kickers, stat keys. */
 .eyebrow {
   font-family: var(--font-mono);
   font-size: var(--fs-eyebrow);
@@ -153,7 +153,7 @@ a { color: inherit; text-decoration: none; }
   padding-left: 12px;
 }
 
-/* Amber signal tick before the wordmark — the "live" indicator. */
+/* Amber signal tick before the wordmark - the "live" indicator. */
 .nav-logo::before {
   content: '';
   position: absolute;
@@ -858,7 +858,7 @@ section {
   margin: 0 auto;
 }
 
-/* Centered amber node — an instrument tick on the hairline. */
+/* Centered amber node - an instrument tick on the hairline. */
 .divider::after {
   content: '';
   position: absolute;
@@ -1024,7 +1024,7 @@ section {
   scroll-margin-top: 80px;
 }
 
-/* Short amber rule under each h2 — an instrument accent on the section break. */
+/* Short amber rule under each h2 - an instrument accent on the section break. */
 .docs-content h2::after {
   content: '';
   position: absolute;

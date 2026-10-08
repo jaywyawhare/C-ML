@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-exp_server.py — experiment-tracking backend (prototype, zero dependencies).
+exp_server.py - experiment-tracking backend (prototype, zero dependencies).
 
 NOTE: this is now imported by viz/serve.py, which serves the whole UI (viz +
 experiment dashboard) on a single port (default 6969). Running this standalone
@@ -441,7 +441,7 @@ def api_lineage(_):
     """Artifact lineage DAG: dataset --used_by--> run --produces--> model.
 
     Only runs that actually participate in lineage (produce or consume an
-    artifact) are included — disconnected runs would just clutter the graph.
+    artifact) are included - disconnected runs would just clutter the graph.
     Parallel edges between the same run/artifact pair are de-duplicated with a
     count so N runs producing one artifact reads as a single labelled edge.
     """
@@ -675,6 +675,6 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 if __name__ == "__main__":
     get_db()  # warm ingest
     n = len(q("SELECT id FROM runs"))
-    print(f"C-ML Experiments — {n} run(s) from {os.path.abspath(RUNS_DIR)}")
+    print(f"C-ML Experiments - {n} run(s) from {os.path.abspath(RUNS_DIR)}")
     print(f"  http://localhost:{PORT}")
     Server(("", PORT), Handler).serve_forever()
