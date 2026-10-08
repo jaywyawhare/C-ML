@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ops/ir/graph_capture.h"
+#include "tensor/tensor.h"
 #include "ops/uops.h"
 #include "test_harness.h"
 
@@ -191,6 +192,55 @@ static int test_record_with_args(void) {
     return ok;
 }
 
+/* Replay must call the dispatch callback and substitute freshly-bound input
+ * buffers into the captured argument list, so one capture runs against new
+ * inputs. The mock dispatch records the pointer it saw for arg 0. */
+static void* g_seen_arg0    = NULL;
+static int g_dispatch_calls = 0;
+static int mock_dispatch(const struct CMLCapturedNode* node, void* user) {
+    (void)user;
+    g_dispatch_calls++;
+    if (node && node->kernel_args && node->num_args > 0)
+        g_seen_arg0 = node->kernel_args[0];
+    return 0;
+}
+
+static int test_replay_input_substitution(void) {
+    CMLCapturedGraph* g = cml_graph_capture_create();
+    cml_graph_capture_begin(g);
+    size_t grid[3]  = {1, 1, 1};
+    size_t block[3] = {1, 1, 1};
+    void* args[1]   = {(void*)0xDEAD}; /* placeholder captured arg */
+    cml_graph_capture_record(g, UOP_ADD, NULL, grid, block, args, 1, 0);
+    cml_graph_capture_end(g);
+
+    cml_graph_capture_set_dispatch(g, mock_dispatch, NULL);
+    /* node 0, arg 0 is input 0 */
+    cml_graph_capture_map_input_arg(g, 0, 0, 0);
+
+    Tensor a;
+    memset(&a, 0, sizeof(a));
+    int abuf = 0;
+    a.data   = &abuf;
+    Tensor b;
+    memset(&b, 0, sizeof(b));
+    int bbuf = 0;
+    b.data   = &bbuf;
+
+    g_dispatch_calls = 0;
+    cml_graph_capture_bind_input(g, 0, &a);
+    cml_graph_capture_replay(g);
+    int ok = (g_dispatch_calls == 1) && (g_seen_arg0 == &abuf);
+
+    /* Re-bind a different input tensor and replay the same capture. */
+    cml_graph_capture_bind_input(g, 0, &b);
+    cml_graph_capture_replay(g);
+    ok = ok && (g_dispatch_calls == 2) && (g_seen_arg0 == &bbuf);
+
+    cml_graph_capture_free(g);
+    return ok;
+}
+
 int main(void) {
     printf("Graph Capture Tests\n");
 
@@ -210,6 +260,7 @@ int main(void) {
     RUN_TEST(test_print_no_crash);
     RUN_TEST(test_free_null);
     RUN_TEST(test_record_with_args);
+    RUN_TEST(test_replay_input_substitution);
 
     return TEST_SUMMARY();
 }
