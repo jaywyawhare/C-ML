@@ -22,5 +22,15 @@ curl -sL "https://unpkg.com/d3@7.9.0/dist/d3.min.js"                       -o "$
 curl -sL "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"                -o "$DIR/highlight.min.js"
 curl -sL "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/languages/c.min.js"              -o "$DIR/languages/c.min.js"
 curl -sL "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/vs2015.min.css"           -o "$DIR/styles/vs2015.min.css"
+curl -sL "https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/github.min.css"           -o "$DIR/styles/github.min.css"
+
+# IBM Plex Sans + Mono, latin subset, so the tool renders the same offline
+mkdir -p "$DIR/fonts"
+for w in 400 500 600; do
+  curl -sL "https://unpkg.com/@fontsource/ibm-plex-sans@5.1.1/files/ibm-plex-sans-latin-$w-normal.woff2" -o "$DIR/fonts/ibm-plex-sans-$w.woff2"
+done
+for w in 400 500; do
+  curl -sL "https://unpkg.com/@fontsource/ibm-plex-mono@5.1.1/files/ibm-plex-mono-latin-$w-normal.woff2" -o "$DIR/fonts/ibm-plex-mono-$w.woff2"
+done
 
 echo "Done. $(find "$DIR" -type f | wc -l) files downloaded."

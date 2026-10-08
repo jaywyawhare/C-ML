@@ -180,7 +180,7 @@ function updateConnStatus() {
   if (dot) dot.className = "conn-dot " + status;
   if (label) {
     label.textContent = status === "live" ? "Live"
-      : status === "reconnecting" ? "Reconnecting…" : "Idle";
+      : status === "reconnecting" ? "Reconnecting" : "Idle";
   }
   if (time) {
     time.textContent = State._lastDataTs ? `updated ${relativeTime(State._lastDataTs)}` : "";
@@ -285,16 +285,20 @@ function connectDataForTab(tabId) {
 // GRAPH VIEW
 // ═══════════════════════════════════════════════════════════════
 
+/** Op family colour, shared by the IR graph and the model view. */
+function opFamilyColor(label) {
+  const n = (label || "").toLowerCase();
+  if (/relu|sigmoid|tanh|gelu|softmax/.test(n)) return tok("--op-activation");
+  if (/conv|linear|matmul/.test(n)) return tok("--op-conv");
+  if (/pool|norm|dropout|concat|lrn/.test(n)) return tok("--op-pool");
+  if (/loss/.test(n)) return tok("--op-loss");
+  return tok("--op-other");
+}
+
 function getNodeColor(label, isDead, isFused) {
-  if (isDead) return "#ef4444";
-  if (isFused) return "#10b981";
-  if (!label) return "#71717a";
-  const name = label.toLowerCase();
-  if (name.includes("relu") || name.includes("sigmoid") || name.includes("tanh")) return "#ec4899";
-  if (name.includes("conv")) return "#8b5cf6";
-  if (name.includes("pool")) return "#06b6d4";
-  if (name.includes("loss")) return "#f43f5e";
-  return "#64748b";
+  if (isDead) return tok("--err");
+  if (isFused) return tok("--ok");
+  return opFamilyColor(label);
 }
 
 function toCytoscapeElements(graph) {
@@ -417,18 +421,12 @@ function renderGraphView() {
 
     // View tabs
     const viewTabs = el("div", { className: "view-tabs" });
-    const opsTab = el("button", { className: "view-tab active", "data-view": "ops" },
-      svgIcon('<line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>', 14, 14),
-      "Ops Topology"
-    );
+    const opsTab = el("button", { className: "view-tab active", "data-view": "ops" }, "Operations");
     opsTab.appendChild(el("span", { className: "badge", id: "ops-count" }, "0"));
     viewTabs.appendChild(opsTab);
 
     if (modelSummary) {
-      const modelTab = el("button", { className: "view-tab", "data-view": "model" },
-        svgIcon('<rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>', 14, 14),
-        "Architecture"
-      );
+      const modelTab = el("button", { className: "view-tab", "data-view": "model" }, "Architecture");
       viewTabs.appendChild(modelTab);
     }
 
@@ -451,11 +449,11 @@ function renderGraphView() {
     // Legend
     const legend = el("div", { className: "legend", id: "ops-legend" });
     [
-      { color: "#ef4444", label: "Dead Code", dashed: true },
-      { color: "#10b981", label: "Fused Kernel", dashed: true },
-      { color: "#f59e0b", label: "Input Flow", dashed: false },
-      { color: "#a855f7", label: "Output Flow", dashed: false },
-      { color: "#3b82f6", label: "Selected", dashed: false },
+      { color: "var(--err)", label: "Dead code", dashed: true },
+      { color: "var(--ok)", label: "Fused kernel", dashed: true },
+      { color: "var(--flow-in)", label: "Inputs", dashed: false },
+      { color: "var(--flow-out)", label: "Outputs", dashed: false },
+      { color: "var(--accent)", label: "Selected", dashed: false },
     ].forEach(item => {
       const li = el("div", { className: "legend-item" });
       const dot = el("div", { className: "legend-dot" + (item.dashed ? " dashed" : "") });
@@ -511,11 +509,9 @@ function renderGraphView() {
       }
     } else if (!opsPaneEl.querySelector(".empty-state")) {
       opsPaneEl.innerHTML = "";
-      const empty = el("div", { className: "empty-state" },
-        svgIcon('<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>', 48, 48),
-        el("div", { style: { fontSize: "16px" } }, "Waiting for graph data...")
-      );
-      opsPaneEl.appendChild(empty);
+      opsPaneEl.appendChild(emptyState("No graph yet",
+        "Run any example with VIZ=1 and its IR graph appears here.",
+        "VIZ=1 ./build/bin/training_loop_example"));
     }
     return;
   }
@@ -585,73 +581,71 @@ function renderGraphView() {
 }
 
 function cytoscapeOpsStyle() {
-  return [
+  return resolveTokens([
     { selector: "node", style: {
-      "shape": "round-rectangle", "background-color": "#18181b", "border-color": "data(color)",
-      "border-width": 1, "label": "data(label)", "text-wrap": "wrap", "text-max-width": "120px",
-      "font-family": "Inter, system-ui, sans-serif", "font-size": 10, "font-weight": 500,
-      "color": "#e4e4e7", "text-valign": "center", "text-halign": "center",
-      "width": "data(width)", "height": 34, "padding": "5px",
-      "transition-property": "background-color, border-width, border-color, width, height",
-      "transition-duration": "0.2s", "ghost": "yes", "ghost-offset-x": 0, "ghost-offset-y": 2, "ghost-opacity": 0.1
+      "shape": "round-rectangle", "background-color": "var(--bg-elev)", "border-color": "data(color)",
+      "border-width": 1.5, "label": "data(label)", "text-wrap": "wrap", "text-max-width": "120px",
+      "font-family": "IBM Plex Mono, ui-monospace, monospace", "font-size": 10, "font-weight": 500,
+      "color": "var(--text)", "text-valign": "center", "text-halign": "center",
+      "width": "data(width)", "height": 32, "padding": "5px", "corner-radius": 3,
+      "transition-property": "background-color, border-width, border-color",
+      "transition-duration": "0.15s"
     }},
     { selector: "node.fused-cluster", style: {
-      "background-color": "transparent", "background-opacity": 0, "border-color": "#10b981",
-      "border-width": 2, "border-style": "dashed", "label": "", "shape": "round-rectangle", "padding": 12,
+      "background-color": "var(--ok)", "background-opacity": 0.04, "border-color": "var(--ok)",
+      "border-width": 1, "border-style": "dashed", "label": "", "shape": "round-rectangle", "padding": 12,
       "width": "label", "height": "label"
     }},
     { selector: "node.scope-cluster", style: {
-      "background-color": "#8b5cf6", "background-opacity": 0.06, "border-color": "#8b5cf6",
+      "background-color": "var(--bg-elev2)", "background-opacity": 1, "border-color": "var(--border-2)",
       "border-width": 1, "border-style": "solid", "shape": "round-rectangle", "padding": 16,
-      "label": "data(label)", "text-valign": "top", "text-halign": "center",
-      "font-size": 10, "font-weight": 600, "color": "#a78bfa",
-      "text-margin-y": -4, "width": "label", "height": "label"
+      "label": "data(label)", "text-valign": "top", "text-halign": "left", "text-margin-x": 16,
+      "font-family": "IBM Plex Mono, ui-monospace, monospace", "font-size": 10, "font-weight": 500,
+      "color": "var(--muted)", "text-margin-y": -4, "width": "label", "height": "label"
     }},
     { selector: "node.dead", style: {
-      "border-color": "#ef4444", "border-style": "dashed", "border-width": 2,
-      "background-color": "#18181b", "color": "#a1a1aa"
+      "border-color": "var(--err)", "border-style": "dashed", "border-width": 1.5,
+      "background-color": "var(--bg-elev)", "color": "var(--muted)"
     }},
     { selector: "node.unknown", style: {
-      "border-color": "#52525b", "border-style": "dashed", "border-width": 1,
-      "background-color": "#141417", "color": "#71717a", "font-style": "italic"
+      "border-color": "var(--border-2)", "border-style": "dashed", "border-width": 1,
+      "background-color": "var(--bg-inset)", "color": "var(--muted)", "font-style": "italic"
     }},
-    { selector: ".search-hidden", style: { "opacity": 0.08, "transition-duration": "0.15s" }},
+    { selector: ".search-hidden", style: { "opacity": 0.12, "transition-duration": "0.15s" }},
     { selector: "node.search-match", style: {
-      "border-color": "#22d3ee", "border-width": 3, "color": "#e4e4e7", "z-index": 9999
+      "border-color": "var(--accent)", "border-width": 2.5, "z-index": 9999
     }},
-    { selector: "node:selected", style: {
-      "border-color": "#fff", "border-width": 2, "background-color": "#27272a", "z-index": 999
-    }},
+    { selector: "node:selected", style: { "border-color": "var(--accent)", "border-width": 2, "z-index": 999 }},
     { selector: "edge", style: {
-      "curve-style": "taxi", "taxi-direction": "right", "taxi-turn": 15, "taxi-turn-min-distance": 8,
-      "line-color": "#52525b", "line-style": "solid", "width": 1.5,
-      "target-arrow-shape": "triangle", "target-arrow-color": "#52525b", "arrow-scale": 0.9,
-      "font-size": 9, "color": "#a1a1aa", "text-background-color": "#18181b",
+      "curve-style": "taxi", "taxi-turn": 15, "taxi-turn-min-distance": 8,
+      "line-color": "var(--muted-2)", "line-style": "solid", "width": 1.25,
+      "target-arrow-shape": "triangle", "target-arrow-color": "var(--muted-2)", "arrow-scale": 0.8,
+      "font-size": 9, "color": "var(--muted)", "text-background-color": "var(--bg)",
       "text-background-opacity": 1, "text-background-padding": 2, "text-rotation": "autorotate",
       "transition-property": "line-color, width, line-style", "transition-duration": "0.1s"
     }},
-    { selector: "edge:selected", style: {
-      "line-color": "#fafafa", "target-arrow-color": "#fafafa", "width": 2, "z-index": 999
+    { selector: "edge:selected", style: { "line-color": "var(--accent)", "target-arrow-color": "var(--accent)", "width": 2, "z-index": 999 }},
+    { selector: "node.dimmed", style: { "opacity": 0.35, "z-index": 1, "transition-duration": "0.1s" }},
+    { selector: "edge.dimmed", style: { "opacity": 0.25, "z-index": 1, "transition-duration": "0.1s" }},
+    { selector: "node.highlighted", style: {
+      "background-color": "var(--accent)", "background-opacity": 0.1,
+      "border-color": "var(--accent)", "border-width": 2, "z-index": 9999, "transition-duration": "0.1s"
     }},
-    { selector: "node.dimmed", style: { "opacity": 0.75, "z-index": 1, "transition-duration": "0.1s" }},
-    { selector: "edge.dimmed", style: { "opacity": 0.75, "z-index": 1, "transition-duration": "0.1s" }},
-    { selector: ".highlighted", style: {
-      "background-color": "#3b82f6", "line-color": "#3b82f6", "target-arrow-color": "#3b82f6",
-      "border-color": "#60a5fa", "border-width": 2, "z-index": 9999, "transition-duration": "0.1s"
+    { selector: "edge.highlighted", style: {
+      "line-color": "var(--accent)", "target-arrow-color": "var(--accent)", "width": 2.5, "line-style": "solid", "z-index": 9999
     }},
-    { selector: "edge.highlighted", style: { "width": 3, "line-style": "solid" }},
     { selector: "edge.incoming-highlighted", style: {
-      "line-color": "#f59e0b", "target-arrow-color": "#f59e0b", "width": 3, "line-style": "dashed", "z-index": 9999
+      "line-color": "var(--flow-in)", "target-arrow-color": "var(--flow-in)", "width": 2.5, "line-style": "dashed", "z-index": 9999
     }},
     { selector: "edge.outgoing-highlighted", style: {
-      "line-color": "#a855f7", "target-arrow-color": "#a855f7", "width": 3, "line-style": "solid", "z-index": 9999
+      "line-color": "var(--flow-out)", "target-arrow-color": "var(--flow-out)", "width": 2.5, "line-style": "solid", "z-index": 9999
     }},
-    { selector: "node.incoming-highlighted", style: { "border-color": "#f59e0b", "border-width": 3 }},
-    { selector: "node.outgoing-highlighted", style: { "border-color": "#a855f7", "border-width": 3 }},
+    { selector: "node.incoming-highlighted", style: { "border-color": "var(--flow-in)", "border-width": 2 }},
+    { selector: "node.outgoing-highlighted", style: { "border-color": "var(--flow-out)", "border-width": 2 }},
     { selector: ".internal-edge", style: {
-      "line-color": "#71717a", "target-arrow-color": "#71717a", "width": 1.5, "line-style": "solid", "z-index": 10
+      "line-color": "var(--muted)", "target-arrow-color": "var(--muted)", "width": 1.25, "line-style": "solid", "z-index": 10
     }}
-  ];
+  ]);
 }
 
 function initCyOpsInteraction(cy) {
@@ -891,29 +885,14 @@ function parseLayer(layerStr) {
   return { name, params };
 }
 
-function getLayerColor(name) {
-  const n = name.toLowerCase();
-  if (n.includes("relu")) return "#ec4899";
-  if (n.includes("linear")) return "#3b82f6";
-  if (n.includes("conv")) return "#8b5cf6";
-  if (n.includes("pool") || n.includes("lrn")) return "#14b8a6";
-  if (n.includes("concat")) return "#f59e0b";
-  if (n.includes("tanh")) return "#a855f7";
-  if (n.includes("sigmoid")) return "#f472b6";
-  if (n.includes("softmax")) return "#eab308";
-  if (n.includes("batchnorm") || n.includes("layernorm")) return "#06b6d4";
-  if (n.includes("dropout")) return "#f43f5e";
-  return "#64748b";
-}
-
 function modelToCytoscapeElements(layers) {
   if (!layers || layers.length === 0) return [];
   const elements = [];
 
-  elements.push({ data: { id: "input", label: "Input", color: "#10b981", type: "io" } });
+  elements.push({ data: { id: "input", label: "Input", color: tok("--muted"), type: "io" } });
 
   layers.forEach((layer, idx) => {
-    const color = getLayerColor(layer.name);
+    const color = opFamilyColor(layer.name);
     let details = "";
     if (layer.params.in_features && layer.params.out_features) {
       details = `${layer.params.in_features} → ${layer.params.out_features}`;
@@ -936,7 +915,7 @@ function modelToCytoscapeElements(layers) {
     elements.push({ data: { id: `${idx === 0 ? "input" : `layer-${idx - 1}`}->layer-${idx}`, source: idx === 0 ? "input" : `layer-${idx - 1}`, target: `layer-${idx}` } });
   });
 
-  elements.push({ data: { id: "output", label: "Output", color: "#10b981", type: "io" } });
+  elements.push({ data: { id: "output", label: "Output", color: tok("--muted"), type: "io" } });
   elements.push({ data: { id: `layer-${layers.length - 1}->output`, source: `layer-${layers.length - 1}`, target: "output" } });
   return elements;
 }
@@ -958,27 +937,27 @@ function renderModelArchitecture(modelSummary) {
   State._cyModel = cytoscape({
     container: document.getElementById("cy-model"),
     elements,
-    style: [
+    style: resolveTokens([
       { selector: 'node[type="layer"]', style: {
-        "shape": "round-rectangle", "background-color": "transparent", "background-opacity": 0,
-        "border-color": "data(color)", "border-width": 3, "label": "data(label)",
-        "text-wrap": "wrap", "text-max-width": "280px",
-        "font-family": "ui-monospace, SFMono-Regular, Menlo, monospace", "font-size": 26,
-        "color": "#fff", "text-valign": "center", "text-halign": "center",
+        "shape": "round-rectangle", "background-color": "var(--bg-elev)",
+        "border-color": "data(color)", "border-width": 2, "label": "data(label)",
+        "text-wrap": "wrap", "text-max-width": "280px", "corner-radius": 4,
+        "font-family": "IBM Plex Mono, ui-monospace, monospace", "font-size": 24,
+        "color": "var(--text)", "text-valign": "center", "text-halign": "center",
         "width": 320, "height": 90, "padding": "20px 28px"
       }},
       { selector: 'node[type="io"]', style: {
-        "shape": "round-rectangle", "background-color": "transparent", "background-opacity": 0,
-        "border-color": "data(color)", "border-width": 3, "label": "data(label)",
-        "font-family": "ui-monospace, SFMono-Regular, Menlo, monospace", "font-size": 26,
-        "color": "#f9fafb", "text-valign": "center", "text-halign": "center",
-        "width": 320, "height": 90, "padding": "20px 28px"
+        "shape": "round-rectangle", "background-color": "var(--bg-inset)",
+        "border-color": "data(color)", "border-width": 1.5, "border-style": "dashed", "label": "data(label)",
+        "font-family": "IBM Plex Mono, ui-monospace, monospace", "font-size": 24,
+        "color": "var(--muted)", "text-valign": "center", "text-halign": "center",
+        "width": 320, "height": 90, "padding": "20px 28px", "corner-radius": 4
       }},
       { selector: "edge", style: {
-        "curve-style": "bezier", "line-color": "#94a3b8", "target-arrow-color": "#94a3b8",
-        "target-arrow-shape": "triangle", "width": 2.5, "opacity": 0.7
+        "curve-style": "bezier", "line-color": "var(--muted-2)", "target-arrow-color": "var(--muted-2)",
+        "target-arrow-shape": "triangle", "width": 2
       }}
-    ],
+    ]),
     layout: {
       name: "elk",
       elk: {
@@ -1243,26 +1222,24 @@ function generateKernelCode(kernel, backend) {
 
 // Color by kernel kind; fused chains get the accent so a collapsed hot chain
 // reads as one wide bar. Root/phase rows are neutral scaffolding.
-/* Kind colours, drawn from the instrument palette in theme.css rather than a
- * generic chart ramp. The amber channel is reserved for the hot path (fused
- * kernels are 55% of a steady-state step here), cyan is the secondary compute
- * channel, and anything structural or uncategorised recedes into the graphite
- * neutrals so it never competes with real work for attention. */
+/* Kind colours for the profile table: compute kinds take the categorical slots
+ * in fixed order; data motion and structure recede into neutrals so they never
+ * compete with real work. Values are tokens, applied through DOM styles. */
 const FLAME_COLORS = {
-  fused:    "#ffb454",   /* amber - primary signal            */
-  matmul:   "#4ecdc4",   /* cyan - secondary compute channel */
-  conv:     "#ffce5a",   /* gold                                */
-  elemwise: "#57d69a",   /* green                               */
-  reduce:   "#ff7a7a",   /* coral                               */
-  movement: "#8b93a7",   /* slate - data motion, not compute   */
-  index:    "#9d8bc4",   /* violet - data-dependent access      */
-  init:     "#6f7c94",   /* steel - buffer creation / fill     */
-  optim:    "#d98fb0",   /* rose - optimizer update           */
-  other:    "#5c6577",   /* dim slate                           */
-  scope:    "#38414f",   /* module frames: structure, recessed  */
-  host:     "#2a3140",   /* not in a kernel: framework overhead */
-  phase:    "#2b323d",
-  root:     "#232932",
+  fused:    "var(--cat-1)",
+  matmul:   "var(--cat-2)",
+  conv:     "var(--cat-3)",
+  elemwise: "var(--cat-4)",
+  reduce:   "var(--cat-5)",
+  optim:    "var(--cat-7)",
+  movement: "var(--muted)",
+  index:    "var(--muted)",
+  init:     "var(--muted-2)",
+  other:    "var(--muted-2)",
+  scope:    "var(--border-2)",
+  host:     "var(--border-2)",
+  phase:    "var(--border)",
+  root:     "var(--border)",
 };
 
 // The flamegraph.json is emitted at process exit, so fetch it on demand.
@@ -1687,7 +1664,7 @@ function renderProfileReadout(fg) {
     { label: "Total time",   value: fmtMs(total),          note: "across the whole run" },
     { label: "Executions",   value: execs.toLocaleString(), note: `${spans.length} distinct signatures` },
     { label: "Hottest",      value: hottest ? hottest.op : "--",
-      note: hottest ? `${pct(hottest.ms, total)} of total · ${(hottest.count || 1).toLocaleString()} calls` : "",
+      note: hottest ? `${pct(hottest.ms, total)} of total, ${(hottest.count || 1).toLocaleString()} calls` : "",
       hot: true },
     { label: "Slowest call", value: hottest ? fmtMs(Math.max(...spans.map(s => s.max_ms || 0))) : "--",
       note: "single worst dispatch" },
@@ -1734,7 +1711,7 @@ function renderHotKernels(fg) {
 
     const kindCell = el("td");
     const chip = el("span", { className: "prof-kind" }, s.kind || "other");
-    chip.style.setProperty("--k", FLAME_COLORS[s.kind] || FLAME_COLORS.other || "#6b7280");
+    chip.style.setProperty("--k", FLAME_COLORS[s.kind] || FLAME_COLORS.other);
     kindCell.appendChild(chip);
     tr.appendChild(kindCell);
 
@@ -1745,7 +1722,7 @@ function renderHotKernels(fg) {
     const bar = el("div", { className: "prof-bar" });
     const fill = el("div", { className: "prof-bar-fill" });
     fill.style.width = (total ? (s.ms / total) * 100 : 0).toFixed(2) + "%";
-    fill.style.background = FLAME_COLORS[s.kind] || FLAME_COLORS.other || "#6b7280";
+    fill.style.background = FLAME_COLORS[s.kind] || FLAME_COLORS.other;
     bar.appendChild(fill);
     shareCell.appendChild(el("span", { className: "prof-share-num" }, pct(s.ms, total)));
     shareCell.appendChild(bar);
@@ -1902,17 +1879,17 @@ function renderFlameTimeline(sec, chart, fg, match, ROW_MIN, ROW_MAX, ROW_GAP) {
   sec.appendChild(chart);
   sec.appendChild(makeAxis("bottom"));
   sec.appendChild(el("div", { className: "flame-sub flame-tlnote" },
-    `${(winT1 - winT0).toFixed(1)} ms shown · ${drawn.toLocaleString()} blocks`
-    + (merged ? ` · ${mergedInto.toLocaleString()} sub-pixel executions merged into `
+    `${(winT1 - winT0).toFixed(1)} ms shown, ${drawn.toLocaleString()} blocks`
+    + (merged ? `, ${mergedInto.toLocaleString()} sub-pixel executions merged into `
               + `${merged.toLocaleString()} (zoom to separate them)` : "")
-    + " · click a block to zoom the time axis"));
+    + ", click a block to zoom the time axis"));
 }
 
 
 function renderFlameSection() {
   const sec = el("div", { className: "flame-section" });
   const head = el("div", { className: "flame-head" });
-  head.appendChild(el("h2", { className: "flame-title" }, "Execution Flamegraph"));
+  head.appendChild(el("h2", { className: "flame-title" }, "Execution flamegraph"));
   head.appendChild(el("button", { className: "flame-refresh", onClick: loadFlamegraph }, "↻ Refresh"));
   sec.appendChild(head);
 
@@ -1949,15 +1926,15 @@ function renderFlameSection() {
   const warmMs = (fg.spans || []).reduce((n, x) => n + (x.first_ms || 0), 0);
   const sub = el("div", { className: "flame-sub" },
     State._flameWarmup
-      ? `${fg.num_spans} kernels · ${fmtMs(fg.total_ms || 0)} including warm-up`
-      : `${full.count.toLocaleString()} kernels · ${fmtMs(full.ms)} steady state`);
+      ? `${fg.num_spans} kernels, ${fmtMs(fg.total_ms || 0)} including warm-up`
+      : `${full.count.toLocaleString()} kernels, ${fmtMs(full.ms)} steady state`);
   if (!State._flameWarmup && warmMs > 0) {
     sub.appendChild(el("span", { className: "flame-warmnote" },
-      ` · ${fmtMs(warmMs)} of JIT warm-up excluded`));
+      `, ${fmtMs(warmMs)} of JIT warm-up excluded`));
   }
   if (match) {
     sub.appendChild(el("span", { className: "flame-matched" },
-      ` · matched ${pct(matchedMs, full.ms)} of profile`));
+      `, matched ${pct(matchedMs, full.ms)} of profile`));
   }
   sec.appendChild(sub);
 
@@ -2027,7 +2004,7 @@ function renderFlameSection() {
       tools.appendChild(el("button", { className: "flame-crumb-btn", type: "button",
         title: "Previous iteration", onClick: () => goto(cur < 0 ? 0 : cur - 1) }, "‹"));
       tools.appendChild(el("span", { className: "flame-stepno" },
-        cur < 0 ? `${marks.length} steps · ${steps.period.toFixed(2)} ms each`
+        cur < 0 ? `${marks.length} steps, ${steps.period.toFixed(2)} ms each`
                 : `step ${cur + 1} / ${marks.length - 1}`));
       tools.appendChild(el("button", { className: "flame-crumb-btn", type: "button",
         title: "Next iteration", onClick: () => goto(cur < 0 ? 0 : cur + 1) }, "›"));
@@ -2136,7 +2113,7 @@ function renderFlameSection() {
   const legend = el("div", { className: "flame-legend" },
     el("span", { className: "flame-leg-title" }, "width = share of step"),
     el("span", { className: "flame-leg-hint" },
-      "click a frame to zoom · hover for detail · search highlights"));
+      "click a frame to zoom, hover for detail, search highlights"));
   sec.appendChild(legend);
   return sec;
 }
@@ -2167,17 +2144,17 @@ function renderCodeGenView() {
 
   // Sidebar
   const sidebar = el("div", { className: "codegen-sidebar" });
-  sidebar.appendChild(el("div", { className: "codegen-sidebar-header" }, el("h2", {}, "Target Accelerators")));
+  sidebar.appendChild(el("div", { className: "codegen-sidebar-header" }, el("h2", {}, "Backends")));
 
   const accelerators = [
-    { id: "c", name: "C (Scalar)", icon: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>', desc: "Portable C99 implementation" },
-    { id: "c_simd", name: "C (SIMD)", icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>', desc: "AVX2/NEON vector intrinsics" },
-    { id: "cuda", name: "NVIDIA CUDA", icon: '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>', desc: "High-performance GPU backend" },
-    { id: "rocm", name: "AMD ROCm (HIP)", icon: '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>', desc: "AMD GPU via HIP" },
-    { id: "metal", name: "Apple Metal", icon: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>', desc: "Optimized for Apple Silicon" },
-    { id: "opencl", name: "OpenCL", icon: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>', desc: "Cross-platform GPU acceleration" },
-    { id: "wgsl", name: "WebGPU (WGSL)", icon: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>', desc: "Next-gen web graphics" },
-    { id: "cpu", name: "OpenMP CPU", icon: '<rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>', desc: "Multi-threaded CPU fallback" },
+    { id: "c", name: "C (Scalar)", icon: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>', desc: "Portable C99" },
+    { id: "c_simd", name: "C (SIMD)", icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>', desc: "AVX2 and NEON intrinsics" },
+    { id: "cuda", name: "NVIDIA CUDA", icon: '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>', desc: "CUDA C" },
+    { id: "rocm", name: "AMD ROCm (HIP)", icon: '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>', desc: "HIP" },
+    { id: "metal", name: "Apple Metal", icon: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>', desc: "Metal Shading Language" },
+    { id: "opencl", name: "OpenCL", icon: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>', desc: "OpenCL C" },
+    { id: "wgsl", name: "WebGPU (WGSL)", icon: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>', desc: "WGSL" },
+    { id: "cpu", name: "OpenMP CPU", icon: '<rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>', desc: "C with OpenMP" },
   ];
 
   const list = el("div", { className: "codegen-sidebar-list" });
@@ -2198,14 +2175,14 @@ function renderCodeGenView() {
 
   // Stats
   const stats = el("div", { className: "codegen-stats" });
-  stats.appendChild(el("div", { className: "codegen-stats-label" }, "OPTIMIZATION STATS"));
+  stats.appendChild(el("div", { className: "codegen-stats-label" }, "Optimization"));
   const deadRow = el("div", { className: "codegen-stat-row" });
-  deadRow.appendChild(el("span", {}, "Dead Code"));
-  deadRow.appendChild(el("span", { style: { color: "var(--accent-error)" } }, `${kernelData.unoptimized?.deadNodes || 0} nodes`));
+  deadRow.appendChild(el("span", {}, "Dead code"));
+  deadRow.appendChild(el("span", { style: { color: "var(--err)" } }, `${kernelData.unoptimized?.deadNodes || 0} nodes`));
   stats.appendChild(deadRow);
   const fusedRow = el("div", { className: "codegen-stat-row" });
-  fusedRow.appendChild(el("span", {}, "Fused Kernels"));
-  fusedRow.appendChild(el("span", { style: { color: "var(--accent-success)" } }, `${kernelData.optimized?.fusedKernels || 0} kernels`));
+  fusedRow.appendChild(el("span", {}, "Fused kernels"));
+  fusedRow.appendChild(el("span", { style: { color: "var(--ok)" } }, `${kernelData.optimized?.fusedKernels || 0} kernels`));
   stats.appendChild(fusedRow);
   sidebar.appendChild(stats);
 
@@ -2219,7 +2196,7 @@ function renderCodeGenView() {
   const toolbar = el("div", { className: "codegen-toolbar" });
   const fnDiv = el("div", { className: "codegen-toolbar-filename" });
   fnDiv.appendChild(svgIcon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>'));
-  fnDiv.firstChild.style.color = "var(--accent-primary)";
+  fnDiv.firstChild.style.color = "var(--accent)";
   fnDiv.appendChild(el("span", {}, `generated_module_${acc}.${ext}`));
   toolbar.appendChild(fnDiv);
   main.appendChild(toolbar);
@@ -2269,7 +2246,7 @@ function renderCodeGenView() {
       const raw = (rawLines[i] || "").trim();
       const cls = (diffSet && raw && diffSet.has(raw)) ? ` ${diffClass}` : "";
       return `<span class="code-line${cls}">${l}</span>`;
-    }).join("\n");
+    }).join("");
     pre.appendChild(code);
     body.appendChild(pre);
     pane.appendChild(body);
@@ -2300,17 +2277,17 @@ function renderCodeGenView() {
   const addedSet = new Set([...optLines].filter(l => !origLines.has(l)));
 
   const origPane = makeCodePane(
-    "ORIGINAL IR (Unoptimized)",
-    `${kernelData.unoptimized?.deadNodes || 0} DEAD NODES`,
-    "var(--accent-error)",
+    "Original IR",
+    `${kernelData.unoptimized?.deadNodes || 0} dead nodes`,
+    "var(--err)",
     originalSource,
     `original_${acc}.${ext}`,
     removedSet, "removed"
   );
   const optPane = makeCodePane(
-    "OPTIMIZED KERNELS (Fused)",
-    `${kernelData.optimized?.fusedKernels || 0} FUSED KERNELS`,
-    "var(--accent-success)",
+    "Optimized kernels",
+    `${kernelData.optimized?.fusedKernels || 0} fused kernels`,
+    "var(--ok)",
     optimizedSource,
     `optimized_${acc}.${ext}`,
     addedSet, "added"
@@ -2350,58 +2327,21 @@ function syncScroll(a, b) {
   link(b, a);
 }
 
-function renderCodeGenEmpty(container) {
-  const wrap = el("div", { style: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-dark)" } });
-  const box = el("div", { className: "empty-state-box" });
-
-  box.appendChild(el("div", { className: "empty-state-icon",
-    innerHTML: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>'
-  }));
-
-  const text = el("div", { style: { textAlign: "center" } });
-  text.appendChild(el("div", { className: "empty-state-title" }, "No Kernel Data"));
-  text.appendChild(el("div", { className: "empty-state-desc" }, "Kernel Studio generates optimized code for multiple accelerator backends."));
-  box.appendChild(text);
-
-  const grid = el("div", { className: "backend-grid" });
-  [
-    { icon: '<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>', label: "CUDA" },
-    { icon: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>', label: "Metal" },
-    { icon: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>', label: "OpenCL" },
-    { icon: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/>', label: "CPU" },
-    { icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>', label: "SIMD" },
-    { icon: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>', label: "WebGPU" },
-  ].forEach(item => {
-    const gi = el("div", { className: "backend-grid-item" });
-    gi.appendChild(svgIcon(item.icon, 14, 14));
-    gi.appendChild(el("span", {}, item.label));
-    grid.appendChild(gi);
-  });
-  box.appendChild(grid);
-
-  const features = el("div", { className: "feature-list" });
-  [
-    { icon: '<polyline points="3 6 5 6 6 12"/><line x1="10" y1="12.76" x2="10" y2="12.76"/><circle cx="8.5" cy="18.5" r="1.5"/><circle cx="16.5" cy="18.5" r="1.5"/><path d="M6 12h13l-1.5-8H7"/>', color: "#ef4444", text: "Dead code elimination" },
-    { icon: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>', color: "#10b981", text: "Kernel fusion optimization" },
-    { icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>', color: "#f59e0b", text: "Side-by-side comparison" },
-  ].forEach(item => {
-    const fi = el("div", { className: "feature-list-item" });
-    const iconSpan = svgIcon(item.icon, 14, 14);
-    iconSpan.style.color = item.color;
-    fi.appendChild(iconSpan);
-    fi.appendChild(el("span", {}, item.text));
-    features.appendChild(fi);
-  });
-  box.appendChild(features);
-
-  const hint = el("div", { className: "hint-box" });
-  hint.appendChild(svgIcon('<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>', 16, 16));
-  hint.firstChild.style.color = "#10b981";
-  hint.appendChild(el("code", {}, "VIZ=1 ./build/bin/dead_code_example"));
-  box.appendChild(hint);
-
+/** Empty or error state: what is missing, what fills it, and the command to run. */
+function emptyState(title, desc, command, isError) {
+  const box = el("div", { className: "empty-state-box" + (isError ? " is-error" : "") });
+  box.appendChild(el("div", { className: "empty-state-title" }, title));
+  box.appendChild(el("div", { className: "empty-state-desc" }, desc));
+  if (command) box.appendChild(el("code", { className: "empty-cmd" }, command));
+  const wrap = el("div", { className: "empty-state" });
   wrap.appendChild(box);
-  container.appendChild(wrap);
+  return wrap;
+}
+
+function renderCodeGenEmpty(container) {
+  container.appendChild(emptyState("No kernels yet",
+    "Generated code appears here before and after dead code elimination and fusion. Run an example with VIZ=1 to emit it.",
+    "VIZ=1 ./build/bin/dead_code_example"));
 }
 
 
@@ -2764,7 +2704,7 @@ function renderTrainingView() {
   // Throughput
   const throughput = d.throughput || d.samples_per_sec || d.tokens_per_sec || null;
   if (throughput) {
-    const tpDiv = el("div", { style: { marginTop: "8px", paddingTop: "8px", borderTop: "1px solid var(--border-color)" } });
+    const tpDiv = el("div", { style: { marginTop: "8px", paddingTop: "8px", borderTop: "1px solid var(--border)" } });
     tpDiv.appendChild(el("div", { className: "metric-item-label" }, "Throughput"));
     tpDiv.appendChild(el("div", { className: "metric-item-value" }, `${throughput.toLocaleString()} ${d.tokens_per_sec ? "tokens/s" : "samples/s"}`));
     scroll.appendChild(tpDiv);
@@ -2940,52 +2880,11 @@ function renderDistributions(d) {
 }
 
 function renderTrainingEmpty(container, data) {
-  const wrap = el("div", { style: { padding: "24px", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "var(--bg-dark)" } });
-
-  if (data && data.error) {
-    const errBox = el("div", { className: "error-state" });
-    errBox.appendChild(el("div", { className: "error-icon",
-      innerHTML: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
-    }));
-    errBox.appendChild(el("div", { style: { color: "#ef4444", fontSize: "16px", fontWeight: "600" } }, "Error Loading Data"));
-    errBox.appendChild(el("div", { style: { color: "var(--text-secondary)", fontSize: "13px", textAlign: "center" } }, data.error));
-    wrap.appendChild(errBox);
-  } else {
-    const box = el("div", { className: "empty-state-box", style: { maxWidth: "450px" } });
-
-    box.appendChild(el("div", { className: "empty-state-icon",
-      innerHTML: '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>'
-    }));
-
-    const text = el("div", { style: { textAlign: "center" } });
-    text.appendChild(el("div", { className: "empty-state-title" }, "No Training Data"));
-    text.appendChild(el("div", { className: "empty-state-desc" }, "Training metrics will appear here when you run a training example."));
-    box.appendChild(text);
-
-    const features = el("div", { className: "training-features" });
-    [
-      { label: "Loss Curves", color: "#6366f1" },
-      { label: "Accuracy Charts", color: "#10b981" },
-      { label: "Time Metrics", color: "#f59e0b" },
-      { label: "Convergence", color: "#8b5cf6" },
-    ].forEach(item => {
-      const fi = el("div", { className: "training-feature-item" });
-      fi.appendChild(el("span", { className: "dot", style: { background: item.color } }));
-      fi.appendChild(el("span", {}, item.label));
-      features.appendChild(fi);
-    });
-    box.appendChild(features);
-
-    const hint = el("div", { className: "hint-box" });
-    hint.appendChild(svgIcon('<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>', 16, 16));
-    hint.firstChild.style.color = "#10b981";
-    hint.appendChild(el("code", {}, "VIZ=1 ./build/bin/training_loop_example"));
-    box.appendChild(hint);
-
-    wrap.appendChild(box);
-  }
-
-  container.appendChild(wrap);
+  container.appendChild(data && data.error
+    ? emptyState("Could not read training.json", data.error, null, true)
+    : emptyState("No training run yet",
+        "Loss, accuracy and epoch timing stream here while a model trains.",
+        "VIZ=1 ./build/bin/training_loop_example"));
 }
 
 

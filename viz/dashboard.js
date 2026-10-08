@@ -18,6 +18,7 @@
   var frameExp = document.getElementById("frame-experiments");
   var frameViz = document.getElementById("frame-viz");
   var navItems = Array.prototype.slice.call(document.querySelectorAll(".shell-nav-item"));
+  var viewLabel = document.getElementById("shell-view");
   var loaded = { experiments: false, viz: false };
   var current = null;
 
@@ -40,7 +41,12 @@
     current = view;
     var v = VIEWS[view];
 
-    navItems.forEach(function (b) { b.classList.toggle("active", b.dataset.view === view); });
+    navItems.forEach(function (b) {
+      var on = b.dataset.view === view;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    viewLabel.textContent = view;
 
     /* Make the target frame visible BEFORE giving it a src: a frame that is
      * still display:none when src lands can have its load deferred. */
@@ -56,7 +62,7 @@
       postVizTab(v.vizTab);
     }
     if (location.hash.slice(1) !== view) history.replaceState(null, "", "#" + view);
-    document.title = "C-ML · " + view.charAt(0).toUpperCase() + view.slice(1);
+    document.title = view.charAt(0).toUpperCase() + view.slice(1) + " - C-ML";
   }
 
   navItems.forEach(function (b) {
@@ -90,8 +96,8 @@
   function ping() {
     fetch("/status", { cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-      .then(function () { pill.classList.remove("down"); pill.classList.add("live"); label.textContent = "live"; })
-      .catch(function () { pill.classList.remove("live"); pill.classList.add("down"); label.textContent = "offline"; });
+      .then(function () { pill.classList.remove("down"); pill.classList.add("live"); label.textContent = "Connected"; })
+      .catch(function () { pill.classList.remove("live"); pill.classList.add("down"); label.textContent = "Server offline"; });
   }
   ping(); setInterval(ping, 4000);
 

@@ -8,22 +8,12 @@ const VizCharts = (() => {
   // ── Shared config ──────────────────────────────────────────
   const MARGIN = { top: 10, right: 15, left: 50, bottom: 30 };
 
-  /* Read a themed token so charts track the shell's light/dark state and the
-     user's theme toggle, with a fallback for offline/isolated rendering. */
-  function cssVar(name, fallback) {
-    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    return v || fallback;
-  }
-
-  /* Categorical palette, assigned by ENTITY (not by chart or by rank) so a
-     series keeps one colour across loss and accuracy. Blue/orange/aqua are the
-     first three slots of the validated dark categorical order: on the chassis
-     surface they clear the lightness band, the chroma floor, adjacent-pair CVD
-     separation (worst deltaE 9.4), the normal-vision floor, and 3:1 contrast. */
+  /* Colour by ENTITY (not by chart or rank), so a series keeps one colour
+     across loss and accuracy. Read live so the light and dark sets both apply. */
   const SERIES = {
-    training:   "#3987e5",
-    testing:    "#d95926",
-    validation: "#199e70",
+    get training()   { return tok("--series-train"); },
+    get testing()    { return tok("--series-test"); },
+    get validation() { return tok("--series-val"); },
   };
 
 
@@ -325,7 +315,7 @@ const VizCharts = (() => {
 
     // Active dots
     const activeDots = [];
-    const surfaceRing = cssVar("--bg-inset", "#070a0f");
+    const surfaceRing = tok("--bg-elev");
     function addActiveDot(color) {
       const dot = g.append("circle")
         .attr("r", 5)
