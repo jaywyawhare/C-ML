@@ -2740,34 +2740,29 @@ static int decompose_conv2d(CMLGraph_t ir, struct IRNode* node) {
     if (!mm)
         return -1;
 
+    /* Bias add in NHWC-flat [N*M,Cout] space, where bias[Cout] is a trailing
+     * broadcast folded into the elementwise executor (i%Cout) - no
+     * [N,Cout,OH,OW] tensor is materialised. Applied before the output permute;
+     * the per-channel bias is invariant to the axis reorder the permute does. */
+    Tensor* conv_out = mm->output;
+    if (bias && bias->ndim == 1 && bias->shape[0] == Cout) {
+        Tensor* ain[]      = {mm->output, bias};
+        struct IRNode* add = chain_emit(ir, &head, &tail, UOP_ADD, ain, 2, NULL, mm_shape, 2);
+        if (!add)
+            return -1;
+        conv_out = add->output;
+    }
+
     // reshape [N,OH,OW,Cout] then permute -> [N,Cout,OH,OW]
     int r4_shape[4]   = {N, OH, OW, Cout};
-    struct IRNode* r4 = insert_reshape(ir, mm->output, r4_shape, 4, &head, &tail);
+    struct IRNode* r4 = insert_reshape(ir, conv_out, r4_shape, 4, &head, &tail);
     if (!r4)
         return -1;
     int pC[4]          = {0, 3, 1, 2};
     struct IRNode* pmC = insert_permute(ir, r4->output, 4, pC, &head, &tail); // [N,Cout,OH,OW]
     if (!pmC)
         return -1;
-    struct IRNode* result = pmC;
 
-    if (bias && bias->ndim == 1 && bias->shape[0] == Cout) {
-        int br_shape[4]   = {1, Cout, 1, 1};
-        struct IRNode* br = insert_reshape(ir, bias, br_shape, 4, &head, &tail);
-        if (!br)
-            return -1;
-        int be_shape[4]   = {N, Cout, OH, OW};
-        struct IRNode* be = insert_expand(ir, br->output, be_shape, 4, &head, &tail);
-        if (!be)
-            return -1;
-        Tensor* ain[]      = {result->output, be->output};
-        struct IRNode* add = chain_emit(ir, &head, &tail, UOP_ADD, ain, 2, NULL, be_shape, 4);
-        if (!add)
-            return -1;
-        result = add;
-    }
-
-    (void)result;
     replace_node_with_chain(ir, node, head, tail);
     return 0;
 }
