@@ -585,187 +585,132 @@ button { font-family: inherit; }
 }
 
 /* ── Training View ────────────────────────────────────────── */
+/* One surface and one hairline for every region. Colour is spent only on data
+ * (series, status dots), so nothing decorative competes with the curves. */
 .training-layout {
-  padding: 12px;
+  padding: 16px 20px;
   height: 100%;
-  overflow: hidden;
+  overflow: auto;
   display: flex;
   flex-direction: column;
+  gap: 14px;
 }
 
 .training-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
+  align-items: baseline;
+  gap: 16px;
   flex-shrink: 0;
 }
 
 .training-header h3 {
   margin: 0;
   color: var(--text);
-  font-size: 16px;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 .status-badge {
-  padding: 6px 14px;
-  color: white;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: bold;
-  transition: all 0.2s ease;
-}
-
-.status-badge.training {
-  background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
-  color: #0a0e14;
-  box-shadow: 0 2px 8px rgba(255, 180, 84, 0.3);
-}
-
-.status-badge.early-stopped {
-  background: linear-gradient(135deg, var(--accent-warning), #e0a93f);
-  color: #0a0e14;
-  box-shadow: 0 2px 8px rgba(255, 206, 90, 0.3);
-}
-
-.status-badge.completed {
-  background: linear-gradient(135deg, var(--accent-success), #3fb27d);
-  color: #0a0e14;
-  box-shadow: 0 2px 8px rgba(87, 214, 154, 0.3);
-}
-
-.early-stop-tag {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 600;
-  background: rgba(255, 206, 90, 0.1);
-  color: var(--accent-warning);
-  border: 1px solid rgba(255, 206, 90, 0.3);
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
+.status-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted-2);
+}
+
+.status-badge.training::before { background: var(--accent); }
+.status-badge.early-stopped::before { background: var(--warn); }
+.status-badge.completed::before { background: var(--ok); }
+
+/* Readout strip: the run's headline figures in one line, divided by hairlines
+ * rather than boxed into cards that all look alike. */
 .metric-cards {
-  margin-top: 8px;
-  display: grid;
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 10px;
   flex-shrink: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .metric-card {
-  padding: 14px;
-  border-radius: 10px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  padding: 0 22px;
+  border-left: 1px solid var(--border-color);
+}
+
+.metric-card:first-child {
+  padding-left: 0;
+  border-left: 0;
 }
 
 .metric-card-label {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  margin-bottom: 6px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  margin-bottom: 4px;
 }
 
 .metric-card-value {
   color: var(--text);
-  font-size: 20px;
-  font-weight: bold;
+  font-size: 17px;
+  font-weight: 500;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
 
-.metric-card.indigo {
-  background: linear-gradient(135deg, rgba(255, 180, 84, 0.1), rgba(255, 180, 84, 0.05));
-  border: 1px solid rgba(255, 180, 84, 0.2);
-}
-
-.metric-card.amber {
-  background: linear-gradient(135deg, rgba(255, 206, 90, 0.1), rgba(255, 206, 90, 0.05));
-  border: 1px solid rgba(255, 206, 90, 0.2);
-}
-
-.metric-card.red {
-  background: linear-gradient(135deg, rgba(255, 122, 122, 0.1), rgba(255, 122, 122, 0.05));
-  border: 1px solid rgba(255, 122, 122, 0.2);
-}
-
-.metric-card.emerald {
-  background: linear-gradient(135deg, rgba(87, 214, 154, 0.1), rgba(87, 214, 154, 0.05));
-  border: 1px solid rgba(87, 214, 154, 0.2);
-}
-
-.metric-card.sky {
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.1), rgba(78, 205, 196, 0.05));
-  border: 1px solid rgba(78, 205, 196, 0.2);
-}
-
-.metric-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-}
-
 /* Charts row */
 .charts-row {
-  margin-top: 12px;
   display: grid;
   /* minmax(0,1fr), not 1fr: a bare 1fr track is minmax(auto,1fr) and so refuses
    * to shrink below its content, which lets one wide chart push the other out
    * of the row instead of the two sharing it evenly. */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
+  gap: 14px;
   flex: 1 1 auto;
   min-height: 320px;
 }
 
-.chart-card {
-  padding: 14px;
-  border-radius: 10px;
+.chart-card,
+.metrics-panel,
+.epoch-table-card {
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.chart-card.loss {
-  background: linear-gradient(135deg, rgba(255, 180, 84, 0.05), rgba(255, 180, 84, 0.02));
-  border: 1px solid rgba(255, 180, 84, 0.15);
-}
-
-.chart-card.accuracy {
-  background: linear-gradient(135deg, rgba(87, 214, 154, 0.05), rgba(87, 214, 154, 0.02));
-  border: 1px solid rgba(87, 214, 154, 0.15);
 }
 
 .chart-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 10px;
   flex-shrink: 0;
 }
 
-.chart-header h4 {
+.chart-header h4,
+.metrics-panel-title,
+.epoch-table-title {
   margin: 0;
   color: var(--text);
   font-size: 14px;
   font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .chart-toggles {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -775,14 +720,14 @@ button { font-family: inherit; }
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  font-size: 11px;
-  color: var(--text);
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .chart-toggle input { cursor: pointer; }
 
 .chart-toggle-line {
-  width: 12px;
+  width: 14px;
   height: 2px;
   border-radius: 1px;
 }
@@ -800,8 +745,8 @@ button { font-family: inherit; }
 }
 
 .chart-area .axis text {
-  fill: var(--muted);
-  font-size: 9px;
+  fill: var(--text-tertiary);
+  font-size: 10px;
   font-family: var(--mono);
 }
 
@@ -813,15 +758,25 @@ button { font-family: inherit; }
 .chart-area .grid line {
   stroke: var(--grid-major);
   opacity: 1;
-  stroke-dasharray: 3 3;
 }
 
 .chart-area .grid path { stroke: none; }
+
+/* Value at the end of each curve: the reading you came for, set where the
+ * line actually is. Ink, not series colour, so it stays legible on any hue. */
+.chart-area .end-label {
+  fill: var(--text);
+  font-size: 12px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  dominant-baseline: middle;
+}
 
 .chart-tooltip {
   position: absolute;
   pointer-events: none;
   background: var(--bg-inset);
+  border: 1px solid var(--border-2);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 11px;
@@ -832,69 +787,46 @@ button { font-family: inherit; }
   z-index: 100;
 }
 
-.chart-tooltip.loss { border: 1px solid var(--accent-primary); }
-.chart-tooltip.accuracy { border: 1px solid var(--accent-success); }
-
-/* Bottom row: metrics + epoch table */
+/* Bottom row: run health + epoch log */
 .bottom-row {
-  margin-top: 12px;
   display: grid;
   /* Holds the epoch table: without minmax(0,…) the track grows to the table's
    * full width and .epoch-table-wrap's overflow:auto never gets to engage. */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
+  gap: 14px;
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 240px;
 }
 
-/* Training Metrics Panel */
-.metrics-panel {
-  padding: 16px;
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.08), rgba(78, 205, 196, 0.03));
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(78, 205, 196, 0.2);
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+.metrics-panel,
+.epoch-table-card {
   height: 100%;
-  min-height: 0;
   overflow: hidden;
 }
 
 .metrics-panel-title {
-  margin: 0 0 12px 0;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 600;
-  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-
-.metrics-panel-title .accent-bar {
-  width: 3px;
-  height: 16px;
-  background: linear-gradient(135deg, var(--accent-secondary), #3aa79f);
-  border-radius: 2px;
+  margin-bottom: 14px;
+  flex-shrink: 0;
 }
 
 .convergence-badge {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  cursor: default;
-  font-size: 10px;
-  font-weight: 600;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 .convergence-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .metrics-scroll {
@@ -905,179 +837,126 @@ button { font-family: inherit; }
   flex-direction: column;
 }
 
-.progress-section { margin-bottom: 16px; }
+.progress-section { margin-bottom: 18px; }
 
 .progress-label {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-size: 12px;
 }
 
-.progress-label span:first-child {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
+.progress-label span:first-child { color: var(--text-tertiary); }
 
 .progress-label span:last-child {
   color: var(--text);
-  font-size: 11px;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
 
 .progress-bar-bg {
   width: 100%;
-  height: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
+  height: 4px;
+  background: var(--border-color);
+  border-radius: 2px;
   overflow: hidden;
 }
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));
-  transition: width 0.3s ease;
-  box-shadow: 0 0 8px rgba(255, 180, 84, 0.45);
+  background: var(--text-secondary);
+  transition: width var(--dur-3) var(--ease);
 }
 
 .metrics-grid {
-  margin-bottom: 16px;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 14px 20px;
 }
 
 .metric-item-label {
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  margin-bottom: 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  margin-bottom: 3px;
 }
 
 .metric-item-value {
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+}
+
+.metric-item-note {
+  color: var(--text-tertiary);
+  font-family: var(--font);
+  font-size: 12px;
+  margin-left: 4px;
 }
 
 /* Epoch Table */
-.epoch-table-card {
-  padding: 16px;
-  background: linear-gradient(135deg, rgba(255, 180, 84, 0.08), rgba(255, 180, 84, 0.03));
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 180, 84, 0.2);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-}
-
 .epoch-table-title {
-  margin: 0 0 12px 0;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 600;
+  margin-bottom: 10px;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.epoch-table-title .accent-bar {
-  width: 3px;
-  height: 16px;
-  background: linear-gradient(135deg, var(--accent-primary), #e0983a);
-  border-radius: 2px;
 }
 
 .epoch-table-wrap {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  border-radius: var(--radius-sm);
-  background: var(--bg-inset);
-  border: 1px solid rgba(255, 180, 84, 0.12);
-  padding-bottom: 8px;
 }
 
 .epoch-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .epoch-table thead {
   position: sticky;
   top: 0;
-  background: rgba(255, 180, 84, 0.12);
-  backdrop-filter: blur(10px);
+  background: var(--bg-card);
   z-index: 1;
 }
 
-.epoch-table thead tr {
-  border-bottom: 2px solid rgba(255, 180, 84, 0.3);
-}
-
 .epoch-table th {
-  padding: 10px 12px;
+  padding: 6px 10px;
   text-align: left;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-2);
 }
 
-.epoch-table th:not(:first-child) {
-  text-align: right;
-}
-
-.epoch-table td {
-  padding: 8px 12px;
-  color: var(--text);
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 11px;
-}
-
+.epoch-table th:not(:first-child),
 .epoch-table td:not(:first-child) {
   text-align: right;
 }
 
-.epoch-table tbody tr {
-  border-bottom: 1px solid rgba(255, 180, 84, 0.1);
-  transition: all 0.15s ease;
-  cursor: pointer;
+.epoch-table td {
+  padding: 6px 10px;
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.epoch-table tbody tr:hover {
-  background: var(--accent-soft);
-  transform: translateX(2px);
-}
+.epoch-table tbody tr:hover td { color: var(--text); }
 
-.epoch-table tbody tr.latest {
-  background: rgba(255, 180, 84, 0.1);
+.epoch-table tbody tr.latest td {
+  color: var(--text);
   font-weight: 600;
 }
 
 .epoch-dot {
   margin-left: 6px;
-  color: var(--accent-primary);
+  color: var(--accent);
   font-size: 9px;
+}
+
+@media (max-width: 900px) {
+  .charts-row,
+  .bottom-row { grid-template-columns: minmax(0, 1fr); }
+  .metric-card { padding: 0 14px; }
 }
 
 /* ── Scrollbar ────────────────────────────────────────────── */
@@ -1200,10 +1079,7 @@ button { font-family: inherit; }
   border-radius: var(--radius-pill);
   background: var(--bg-inset);
   border: 1px solid var(--border-color);
-  font-family: var(--mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  font-size: 12px;
   color: var(--text-secondary);
   white-space: nowrap;
 }
@@ -1764,44 +1640,37 @@ button { font-family: inherit; }
 .curve-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 24px;
   align-items: center;
-  padding: 8px 14px;
-  margin-bottom: 12px;
-  background: var(--panel, #1a1f2b);
-  border: 1px solid var(--border, #2a3140);
-  border-radius: 6px;
+  flex-shrink: 0;
 }
 
 .curve-control {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
-  color: var(--text-dim, #9aa4b2);
+  font-size: 12px;
+  color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
 }
 
-.curve-control input[type="range"] { width: 130px; accent-color: #4a90e2; }
-.curve-control input[type="checkbox"] { accent-color: #4a90e2; }
+.curve-control input { accent-color: var(--text-secondary); }
+.curve-control input[type="range"] { width: 130px; }
 
 .curve-readout {
   min-width: 30px;
+  font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  color: var(--text, #e5e9f0);
+  color: var(--text);
 }
 
-.dist-row { margin-top: 4px; }
-
-.chart-card.dist-panel { border-left: 3px solid #8b5cf6; }
 .chart-card.dist-panel .chart-area { min-height: 200px; }
 
 .chart-sub {
   margin-left: auto;
-  font-size: 10px;
-  color: var(--text-dim, #9aa4b2);
-  letter-spacing: 0.02em;
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
 .graph-control-btn.active {

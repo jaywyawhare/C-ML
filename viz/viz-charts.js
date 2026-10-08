@@ -162,8 +162,9 @@ const VizCharts = (() => {
     const rect = container.getBoundingClientRect();
     const W = rect.width || 400;
     const H = rect.height || 280;
-    const w = W - MARGIN.left - MARGIN.right;
-    const h = H - MARGIN.top - MARGIN.bottom;
+    const M = Object.assign({}, MARGIN, { right: 72 });
+    const w = W - M.left - M.right;
+    const h = H - M.top - M.bottom;
 
     if (w <= 0 || h <= 0) return;
 
@@ -173,7 +174,7 @@ const VizCharts = (() => {
       .attr("height", H);
 
     const g = svg.append("g")
-      .attr("transform", `translate(${MARGIN.left},${MARGIN.top})`);
+      .attr("transform", `translate(${M.left},${M.top})`);
 
     // Data keys
     const trainKey = isAccuracy ? "trainingAccuracy" : "trainingLoss";
@@ -222,8 +223,10 @@ const VizCharts = (() => {
       .attr("transform", `translate(0,${h})`)
       .call(d3.axisBottom(x).ticks(Math.min(chartData.length, 10)).tickFormat(d3.format("d")));
 
+    const yTicks = y.ticks(6);
+    const pctFmt = d3.format(`.${d3.precisionFixed(yTicks.length > 1 ? yTicks[1] - yTicks[0] : 1)}f`);
     const yAxis = isAccuracy
-      ? d3.axisLeft(y).ticks(6).tickFormat(v => `${v.toFixed(1)}%`)
+      ? d3.axisLeft(y).ticks(6).tickFormat(v => `${pctFmt(v)}%`)
       : logScale
         ? d3.axisLeft(y).ticks(6, "~g")
         : d3.axisLeft(y).ticks(6);
@@ -268,6 +271,39 @@ const VizCharts = (() => {
     if (visible.training)   drawSeries(trainKey, trainColor, false);
     if (visible.testing)    drawSeries(testKey,  testColor,  true);
     if (visible.validation) drawSeries(valKey,   valColor,   false);
+
+    // Label each curve's latest measured value at the point where it ends.
+    // Labels that would overlap are pushed apart vertically, keeping order.
+    const ends = [];
+    [[visible.training, trainKey, trainColor],
+     [visible.testing, testKey, testColor],
+     [visible.validation, valKey, valColor]].forEach(([on, key, color]) => {
+      if (!on) return;
+      for (let i = chartData.length - 1; i >= 0; i--) {
+        const v = chartData[i][key];
+        if (v == null || !isFinite(v)) continue;
+        const raw = chartData[i]["raw_" + key];
+        const shown = raw != null && isFinite(raw) ? raw : v;
+        ends.push({ color, px: x(chartData[i].epoch), py: y(v), ly: y(v),
+                    text: isAccuracy ? `${shown.toFixed(1)}%` : shown.toPrecision(4) });
+        break;
+      }
+    });
+    ends.sort((a, b) => a.ly - b.ly);
+    for (let k = 1; k < ends.length; k++) {
+      ends[k].ly = Math.max(ends[k].ly, ends[k - 1].ly + 15);
+    }
+    const overflow = ends.length ? ends[ends.length - 1].ly - h : 0;
+    if (overflow > 0) ends.forEach(e => { e.ly -= overflow; });
+    // A leader in the series colour ties a displaced label back to its curve.
+    ends.forEach(e => {
+      g.append("path").attr("fill", "none").attr("stroke", e.color).attr("stroke-width", 1)
+        .attr("d", `M${e.px + 4},${e.py} L${e.px + 10},${e.ly} L${e.px + 13},${e.ly}`);
+      g.append("circle").attr("cx", e.px).attr("cy", e.py).attr("r", 3.5)
+        .attr("fill", e.color);
+      g.append("text").attr("class", "end-label")
+        .attr("x", e.px + 16).attr("y", e.ly).text(e.text);
+    });
 
     // ── Tooltip ──────────────────────────────────────────────
     const tooltipClass = isAccuracy ? "accuracy" : "loss";
@@ -336,9 +372,9 @@ const VizCharts = (() => {
         // Position tooltip near cursor
         const tipW = tooltip.offsetWidth;
         const tipH = tooltip.offsetHeight;
-        let tx = mx + MARGIN.left + 12;
+        let tx = mx + M.left + 12;
         let ty = event.offsetY - tipH / 2;
-        if (tx + tipW > W) tx = mx + MARGIN.left - tipW - 12;
+        if (tx + tipW > W) tx = mx + M.left - tipW - 12;
         if (ty < 0) ty = 4;
         if (ty + tipH > H) ty = H - tipH - 4;
         tooltip.style.left = tx + "px";

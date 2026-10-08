@@ -183,7 +183,7 @@ function updateConnStatus() {
       : status === "reconnecting" ? "Reconnecting…" : "Idle";
   }
   if (time) {
-    time.textContent = State._lastDataTs ? `· updated ${relativeTime(State._lastDataTs)}` : "";
+    time.textContent = State._lastDataTs ? `updated ${relativeTime(State._lastDataTs)}` : "";
   }
 }
 
@@ -2519,7 +2519,7 @@ function renderTrainingView() {
 
   // ── Header ─────────────────────────────────────────────────
   const header = el("div", { className: "training-header" });
-  header.appendChild(el("h3", {}, "Training Results"));
+  header.appendChild(el("h3", {}, "Training"));
 
   const statusWrap = el("div", { style: { display: "flex", gap: "8px", alignItems: "center" } });
   const effectiveNumEpochs = d.num_epochs || completedEpochs;
@@ -2527,57 +2527,44 @@ function renderTrainingView() {
   const effectiveExpectedEpochs = d.expected_epochs || effectiveNumEpochs;
 
   let statusText, statusClass;
-  if (d.is_training) { statusText = `Training... (${d.current_epoch || completedEpochs}/${effectiveNumEpochs})`; statusClass = "training"; }
-  else if (d.early_stopped) { statusText = `Early Stopped (${effectiveActualEpochs}/${effectiveExpectedEpochs})`; statusClass = "early-stopped"; }
-  else { statusText = `Completed (${d.current_epoch || completedEpochs}/${effectiveNumEpochs})`; statusClass = "completed"; }
+  if (d.is_training) { statusText = `Training, epoch ${d.current_epoch || completedEpochs} of ${effectiveNumEpochs}`; statusClass = "training"; }
+  else if (d.early_stopped) { statusText = `Stopped early at epoch ${effectiveActualEpochs} of ${effectiveExpectedEpochs}`; statusClass = "early-stopped"; }
+  else { statusText = `Completed ${d.current_epoch || completedEpochs} of ${effectiveNumEpochs} epochs`; statusClass = "completed"; }
 
   statusWrap.appendChild(el("div", { className: `status-badge ${statusClass}` }, statusText));
-  if (d.early_stopped) {
-    const tag = el("div", { className: "early-stop-tag" });
-    tag.appendChild(svgIcon('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>', 14, 14));
-    tag.appendChild(el("span", {}, "Early Stop"));
-    statusWrap.appendChild(tag);
-  }
   header.appendChild(statusWrap);
   layout.appendChild(header);
 
   // ── Metric Cards ───────────────────────────────────────────
   const pct = v => (v != null && isFinite(v)) ? (v * 100).toFixed(2) + "%" : "N/A";
   const fx6 = v => (v != null && isFinite(v)) ? v.toFixed(6) : "N/A";
-  const cardCount = 4 + (hasTestingData ? 2 : 0) + (hasValidationData ? 2 : 0);
-  const cards = el("div", { className: "metric-cards", style: { gridTemplateColumns: `repeat(${cardCount}, minmax(0, 1fr))` } });
+  const cards = el("div", { className: "metric-cards" });
 
-  function addCard(label, value, colorClass) {
-    const c = el("div", { className: `metric-card ${colorClass}` });
+  function addCard(label, value) {
+    const c = el("div", { className: "metric-card" });
     c.appendChild(el("div", { className: "metric-card-label" }, label));
     c.appendChild(el("div", { className: "metric-card-value" }, value));
     cards.appendChild(c);
   }
 
   // Loss cards, then accuracy cards - each group ends with its best-so-far.
-  addCard("Training Loss", fx6(latestTrainingLoss), "indigo");
-  if (hasTestingData) addCard("Testing Loss", fx6(latestTestingLoss), "amber");
-  if (hasValidationData) addCard("Validation Loss", fx6(latestValidationLoss), "red");
-  addCard("Best Loss", fx6(d.best_loss), "sky");
-  addCard("Training Accuracy", pct(latestTrainingAccuracy), "emerald");
-  if (hasTestingData) addCard("Testing Accuracy", pct(latestTestingAccuracy), "amber");
-  if (hasValidationData) addCard("Validation Accuracy", pct(latestValidationAccuracy), "red");
-  addCard("Best Accuracy", pct(d.best_accuracy), "emerald");
+  addCard("Training loss", fx6(latestTrainingLoss));
+  if (hasTestingData) addCard("Testing loss", fx6(latestTestingLoss));
+  if (hasValidationData) addCard("Validation loss", fx6(latestValidationLoss));
+  addCard("Best loss", fx6(d.best_loss));
+  addCard("Training accuracy", pct(latestTrainingAccuracy));
+  if (hasTestingData) addCard("Testing accuracy", pct(latestTestingAccuracy));
+  if (hasValidationData) addCard("Validation accuracy", pct(latestValidationAccuracy));
+  addCard("Best accuracy", pct(d.best_accuracy));
   layout.appendChild(cards);
 
   // ── Charts ─────────────────────────────────────────────────
   const chartsRow = el("div", { className: "charts-row" });
 
-  function makeChartCard(type, title, colorClass) {
-    const card = el("div", { className: `chart-card ${colorClass}` });
+  function makeChartCard(type, title) {
+    const card = el("div", { className: "chart-card" });
     const hdr = el("div", { className: "chart-header" });
     const h4 = el("h4", {}, title);
-    if (d.early_stopped) {
-      const esTag = el("div", { style: { display: "inline-flex", alignItems: "center", gap: "4px", padding: "2px 6px", borderRadius: "3px", fontSize: "9px", fontWeight: "600", background: "rgba(245,158,11,0.15)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)" } });
-      esTag.appendChild(svgIcon('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>', 10, 10));
-      esTag.appendChild(el("span", {}, "Early Stop"));
-      h4.appendChild(esTag);
-    }
     hdr.appendChild(h4);
 
     if (showCheckboxes) {
@@ -2621,8 +2608,8 @@ function renderTrainingView() {
     return card;
   }
 
-  chartsRow.appendChild(makeChartCard("loss", "Loss Curve", "loss"));
-  chartsRow.appendChild(makeChartCard("accuracy", "Accuracy Curve", "accuracy"));
+  chartsRow.appendChild(makeChartCard("loss", "Loss"));
+  chartsRow.appendChild(makeChartCard("accuracy", "Accuracy"));
   layout.appendChild(chartsRow);
 
   layout.appendChild(makeCurveControls());
@@ -2634,10 +2621,7 @@ function renderTrainingView() {
   // Metrics Panel
   const metricsPanel = el("div", { className: "metrics-panel" });
   const mpTitle = el("h4", { className: "metrics-panel-title" });
-  const mpLeft = el("div", { style: { display: "flex", alignItems: "center", gap: "8px" } });
-  mpLeft.appendChild(el("span", { className: "accent-bar" }));
-  mpLeft.appendChild(document.createTextNode("Training Metrics"));
-  mpTitle.appendChild(mpLeft);
+  mpTitle.appendChild(document.createTextNode("Run health"));
 
   // Convergence badge
   const lossTrend = (() => {
@@ -2652,14 +2636,13 @@ function renderTrainingView() {
     if (change < -1) return "degrading";
     return "plateau";
   })();
-  const trendColors = { improving: "#10b981", degrading: "#ef4444", plateau: "#f59e0b", insufficient: "#6b7280" };
-  const trendLabels = { improving: "Converging", degrading: "Diverging", plateau: "Plateau", insufficient: "Init" };
-  const trendArrows = { improving: "\u2193", degrading: "\u2191", plateau: "\u2192", insufficient: "\u2014" };
+  // Status hues always travel with a word, so the trend never rests on colour.
+  const trendColors = { improving: "var(--ok)", degrading: "var(--err)", plateau: "var(--warn)", insufficient: "var(--muted-2)" };
+  const trendLabels = { improving: "Converging", degrading: "Diverging", plateau: "Plateau", insufficient: "Warming up" };
 
-  const badge = el("div", { className: "convergence-badge", style: { background: `${trendColors[lossTrend]}20`, border: `1px solid ${trendColors[lossTrend]}60` } });
-  badge.appendChild(el("div", { className: "convergence-dot", style: { background: trendColors[lossTrend], boxShadow: `0 0 6px ${trendColors[lossTrend]}80` } }));
-  badge.appendChild(el("span", { style: { color: "var(--text)", fontWeight: "600" } }, trendArrows[lossTrend]));
-  badge.appendChild(el("span", { style: { color: "var(--text)", fontWeight: "500", marginLeft: "2px" } }, trendLabels[lossTrend]));
+  const badge = el("div", { className: "convergence-badge" });
+  badge.appendChild(el("span", { className: "convergence-dot", style: { background: trendColors[lossTrend] } }));
+  badge.appendChild(el("span", {}, trendLabels[lossTrend]));
   mpTitle.appendChild(badge);
   metricsPanel.appendChild(mpTitle);
 
@@ -2672,8 +2655,8 @@ function renderTrainingView() {
 
   const progressSection = el("div", { className: "progress-section" });
   const progressLabel = el("div", { className: "progress-label" });
-  progressLabel.appendChild(el("span", {}, "Epoch Progress"));
-  progressLabel.appendChild(el("span", {}, `${currentEpochNum}/${totalEpochs}`));
+  progressLabel.appendChild(el("span", {}, "Epochs"));
+  progressLabel.appendChild(el("span", {}, `${currentEpochNum} of ${totalEpochs}`));
   progressSection.appendChild(progressLabel);
   const barBg = el("div", { className: "progress-bar-bg" });
   barBg.appendChild(el("div", { className: "progress-bar-fill", style: { width: `${epochProgress}%` } }));
@@ -2728,10 +2711,10 @@ function renderTrainingView() {
 
   const gradientHealth = (() => {
     if (!gradientNorm) return null;
-    if (gradientNorm > 100) return { color: "#ef4444", text: "Exploding" };
-    if (gradientNorm < 0.001) return { color: "#ef4444", text: "Vanishing" };
-    if (gradientNorm < 0.01) return { color: "#f59e0b", text: "Low" };
-    return { color: "#10b981", text: "Healthy" };
+    if (gradientNorm > 100) return { color: "var(--err)", text: "Exploding" };
+    if (gradientNorm < 0.001) return { color: "var(--err)", text: "Vanishing" };
+    if (gradientNorm < 0.01) return { color: "var(--warn)", text: "Low" };
+    return { color: "var(--ok)", text: "Healthy" };
   })();
 
   const grid = el("div", { className: "metrics-grid" });
@@ -2747,44 +2730,41 @@ function renderTrainingView() {
     grid.appendChild(item);
   }
 
-  addMetric("Time/Epoch", avgEpochTime ? formatTime(avgEpochTime) : "N/A");
-  addMetric("Total Time", totalTime ? formatTime(totalTime) : "N/A");
-  addMetric("Est. Remaining", d.is_training ? (estimatedRemaining ? formatTime(estimatedRemaining) : "N/A") : "Done");
-  addMetric("Epochs/Hour", epochsPerHour ? formatEpochsPerHour(epochsPerHour) : "N/A");
+  addMetric("Time per epoch", avgEpochTime ? formatTime(avgEpochTime) : "N/A");
+  addMetric("Total time", totalTime ? formatTime(totalTime) : "N/A");
+  addMetric("Remaining", d.is_training ? (estimatedRemaining ? formatTime(estimatedRemaining) : "N/A") : "Done");
+  addMetric("Epochs per hour", epochsPerHour ? formatEpochsPerHour(epochsPerHour) : "N/A");
 
   // Learning rate with schedule badge
   const lrDiv = el("div", { className: "metric-item-value", style: { display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" } });
   if (lr) {
     lrDiv.appendChild(el("span", {}, lr < 0.001 ? lr.toExponential(2) : lr.toFixed(6)));
-    const schedLabel = lrSchedule || "Constant";
-    const schedBg = lrSchedule ? "rgba(99,102,241,0.15)" : "rgba(107,114,128,0.15)";
-    const schedBorder = lrSchedule ? "rgba(99,102,241,0.2)" : "rgba(107,114,128,0.2)";
-    lrDiv.appendChild(el("span", { style: { fontSize: "9px", color: "var(--muted)", marginLeft: "4px", padding: "2px 6px", background: schedBg, borderRadius: "4px", border: `1px solid ${schedBorder}` } }, schedLabel));
+    lrDiv.appendChild(el("span", { className: "metric-item-note" }, (lrSchedule || "constant").toLowerCase()));
   } else {
     lrDiv.textContent = "N/A";
   }
-  addMetric("Learning Rate", lrDiv);
+  addMetric("Learning rate", lrDiv);
 
   // Gradient Health
   const ghDiv = el("div", { className: "metric-item-value", style: { display: "flex", alignItems: "center", gap: "6px" } });
   if (gradientHealth) {
-    ghDiv.appendChild(el("span", { style: { width: "8px", height: "8px", borderRadius: "50%", background: gradientHealth.color, boxShadow: `0 0 6px ${gradientHealth.color}80` } }));
-    ghDiv.appendChild(el("span", { style: { color: gradientHealth.color, fontWeight: "600" } }, gradientHealth.text));
-    if (gradientNorm) ghDiv.appendChild(el("span", { style: { fontSize: "10px", color: "var(--muted)", fontFamily: "monospace", marginLeft: "4px" } }, `(${gradientNorm.toFixed(4)})`));
+    ghDiv.appendChild(el("span", { className: "convergence-dot", style: { background: gradientHealth.color } }));
+    ghDiv.appendChild(el("span", {}, gradientHealth.text));
+    if (gradientNorm) ghDiv.appendChild(el("span", { className: "metric-item-note" }, gradientNorm.toFixed(4)));
   } else {
     ghDiv.textContent = "N/A";
   }
-  addMetric("Gradient Health", ghDiv);
+  addMetric("Gradient health", ghDiv);
 
-  addMetric("Reduction Rate", lossReductionRate !== null ? `${lossReductionRate.toFixed(2)}%` : "N/A");
-  addMetric("Loss Stability (\u03c3)", lossStability !== null ? lossStability.toFixed(6) : "N/A");
+  addMetric("Loss drop, last epoch", lossReductionRate !== null ? `${lossReductionRate.toFixed(2)}%` : "N/A");
+  addMetric("Loss spread (\u03c3)", lossStability !== null ? lossStability.toFixed(6) : "N/A");
 
   scroll.appendChild(grid);
 
   // Throughput
   const throughput = d.throughput || d.samples_per_sec || d.tokens_per_sec || null;
   if (throughput) {
-    const tpDiv = el("div", { style: { marginTop: "8px", paddingTop: "8px", borderTop: "1px solid rgba(16,185,129,0.1)" } });
+    const tpDiv = el("div", { style: { marginTop: "8px", paddingTop: "8px", borderTop: "1px solid var(--border-color)" } });
     tpDiv.appendChild(el("div", { className: "metric-item-label" }, "Throughput"));
     tpDiv.appendChild(el("div", { className: "metric-item-value" }, `${throughput.toLocaleString()} ${d.tokens_per_sec ? "tokens/s" : "samples/s"}`));
     scroll.appendChild(tpDiv);
@@ -2796,8 +2776,7 @@ function renderTrainingView() {
   // ── Epoch Table ────────────────────────────────────────────
   const tableCard = el("div", { className: "epoch-table-card" });
   const ttl = el("h4", { className: "epoch-table-title" });
-  ttl.appendChild(el("span", { className: "accent-bar" }));
-  ttl.appendChild(document.createTextNode("Epoch Summary"));
+  ttl.appendChild(document.createTextNode("Epoch log"));
   tableCard.appendChild(ttl);
 
   const tableWrap = el("div", { className: "epoch-table-wrap" });
@@ -2882,10 +2861,10 @@ function makeDistRow(d) {
     card.appendChild(el("div", { className: "chart-area", id }));
     return card;
   };
-  row.appendChild(mk("chart-grad-dist", "Gradient Distribution",
-                     "min-max · IQR · median"));
-  row.appendChild(mk("chart-weight-dist", "Weight Distribution",
-                     "min-max · IQR · median"));
+  row.appendChild(mk("chart-grad-dist", "Gradient distribution",
+                     "range, interquartile band, median"));
+  row.appendChild(mk("chart-weight-dist", "Weight distribution",
+                     "range, interquartile band, median"));
   return row;
 }
 
@@ -2938,9 +2917,10 @@ function renderCharts(chartData, hasTestingData, hasValidationData, showCheckbox
    so the whole section stays hidden rather than drawing empty axes. */
 function renderDistributions(d) {
   const specs = [
-    { id: "chart-grad-dist",   data: d && d.grad_distribution,   color: "#f59e0b" },
-    { id: "chart-weight-dist", data: d && d.weight_distribution, color: "#8b5cf6" },
+    { id: "chart-grad-dist",   data: d && d.grad_distribution },
+    { id: "chart-weight-dist", data: d && d.weight_distribution },
   ];
+  let anyShown = false;
   specs.forEach(spec => {
     const el = document.getElementById(spec.id);
     if (!el) return;
@@ -2948,11 +2928,15 @@ function renderDistributions(d) {
     const has = spec.data && Array.isArray(spec.data.p50) && spec.data.p50.length > 0;
     if (section) section.style.display = has ? "" : "none";
     if (!has) return;
+    anyShown = true;
 
-    const render = () => VizCharts.createDistributionChart(el, spec.data, { color: spec.color });
+    const render = () => VizCharts.createDistributionChart(el, spec.data);
     render();
     State._chartObservers.push(VizCharts.observeResize(el, render));
   });
+  // An empty row would still claim its flex share and open a gap in the page.
+  const row = document.querySelector(".dist-row");
+  if (row) row.hidden = !anyShown;
 }
 
 function renderTrainingEmpty(container, data) {
