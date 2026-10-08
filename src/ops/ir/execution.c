@@ -2156,6 +2156,56 @@ static void direct_conv_task(void* vd, size_t start, size_t end) {
     }
 }
 
+typedef struct {
+    const float* in;
+    float* out;
+    int N, C, H, W, kh, kw, sh, sw, ph, pw, dh, dw, OH, OW;
+    size_t K;
+    int fast;
+} Im2colData;
+
+/* im2col gather for one (n,c) channel per unit - the channels are disjoint
+ * output columns, so no synchronisation is needed across units. `fast` selects
+ * the contiguous (no pad/stride/dilation) path. Mirrors the inner body of the
+ * serial executor; parallelising over (n,c) spreads the gather across cores. */
+static void im2col_task(void* vd, size_t start, size_t end) {
+    Im2colData* d = (Im2colData*)vd;
+    int C = d->C, H = d->H, W = d->W, kh = d->kh, kw = d->kw, OH = d->OH, OW = d->OW;
+    size_t K = d->K;
+    for (size_t unit = start; unit < end; unit++) {
+        int n            = (int)(unit / (size_t)C);
+        int c            = (int)(unit % (size_t)C);
+        const float* xch = d->in + ((size_t)n * C + c) * H * W;
+        if (d->fast) {
+            for (int ki = 0; ki < kh; ki++)
+                for (int kj = 0; kj < kw; kj++) {
+                    size_t col = ((size_t)c * kh + ki) * kw + kj;
+                    for (int oh = 0; oh < OH; oh++) {
+                        const float* src = xch + (size_t)(oh + ki) * W + kj;
+                        float* dst       = d->out + ((size_t)(n * OH + oh) * OW) * K + col;
+                        for (int ow = 0; ow < OW; ow++)
+                            dst[(size_t)ow * K] = src[ow];
+                    }
+                }
+        } else {
+            for (int ki = 0; ki < kh; ki++)
+                for (int kj = 0; kj < kw; kj++) {
+                    size_t col = ((size_t)c * kh + ki) * kw + kj;
+                    for (int oh = 0; oh < OH; oh++) {
+                        int ih      = oh * d->sh + ki * d->dh - d->ph;
+                        bool row_ok = (ih >= 0 && ih < H);
+                        for (int ow = 0; ow < OW; ow++) {
+                            int iw     = ow * d->sw + kj * d->dw - d->pw;
+                            size_t row = (size_t)(n * OH + oh) * OW + ow;
+                            d->out[row * K + col] =
+                                (row_ok && iw >= 0 && iw < W) ? xch[(size_t)ih * W + iw] : 0.0f;
+                        }
+                    }
+                }
+        }
+    }
+}
+
 /* Give a movement op's output its own contiguous buffer before the kernel
  * writes to it.
  *
@@ -4188,47 +4238,19 @@ not_empty_reduction:;
         int N = xin->shape[0], C = xin->shape[1], H = xin->shape[2], W = xin->shape[3];
         int kh = ip->kh, kw = ip->kw, sh = ip->sh, sw = ip->sw;
         int ph = ip->ph, pw = ip->pw, dh = ip->dh, dw = ip->dw;
-        int OH   = (H + 2 * ph - dh * (kh - 1) - 1) / sh + 1;
-        int OW   = (W + 2 * pw - dw * (kw - 1) - 1) / sw + 1;
-        size_t K = (size_t)C * kh * kw;
-        if (ph == 0 && pw == 0 && sh == 1 && sw == 1 && dh == 1 && dw == 1) {
-            /* Fast path: contiguous source rows (iw = ow + kj). */
-            for (int n = 0; n < N; n++)
-                for (int c = 0; c < C; c++) {
-                    const float* xch = in1_data + ((size_t)n * C + c) * H * W;
-                    for (int ki = 0; ki < kh; ki++)
-                        for (int kj = 0; kj < kw; kj++) {
-                            size_t col = ((size_t)c * kh + ki) * kw + kj;
-                            for (int oh = 0; oh < OH; oh++) {
-                                const float* src = xch + (size_t)(oh + ki) * W + kj;
-                                float* dst = out_data + ((size_t)(n * OH + oh) * OW) * K + col;
-                                for (int ow = 0; ow < OW; ow++)
-                                    dst[(size_t)ow * K] = src[ow];
-                            }
-                        }
-                }
-        } else {
-            /* General path: padding / stride / dilation, bounds-checked. */
-            for (int n = 0; n < N; n++)
-                for (int c = 0; c < C; c++) {
-                    const float* xch = in1_data + ((size_t)n * C + c) * H * W;
-                    for (int ki = 0; ki < kh; ki++)
-                        for (int kj = 0; kj < kw; kj++) {
-                            size_t col = ((size_t)c * kh + ki) * kw + kj;
-                            for (int oh = 0; oh < OH; oh++) {
-                                int ih      = oh * sh + ki * dh - ph;
-                                bool row_ok = (ih >= 0 && ih < H);
-                                for (int ow = 0; ow < OW; ow++) {
-                                    int iw                  = ow * sw + kj * dw - pw;
-                                    size_t row              = (size_t)(n * OH + oh) * OW + ow;
-                                    out_data[row * K + col] = (row_ok && iw >= 0 && iw < W)
-                                                                  ? xch[(size_t)ih * W + iw]
-                                                                  : 0.0f;
-                                }
-                            }
-                        }
-                }
-        }
+        int OH       = (H + 2 * ph - dh * (kh - 1) - 1) / sh + 1;
+        int OW       = (W + 2 * pw - dw * (kw - 1) - 1) / sw + 1;
+        size_t K     = (size_t)C * kh * kw;
+        int fast     = (ph == 0 && pw == 0 && sh == 1 && sw == 1 && dh == 1 && dw == 1);
+        Im2colData d = {in1_data, out_data, N,  C,  H,  W,  kh, kw, sh,
+                        sw,       ph,       pw, dh, dw, OH, OW, K,  fast};
+        /* Channels are disjoint output columns; parallelise over (n,c). Small
+         * gathers run inline to skip the fork/join cost (matches direct_conv). */
+        size_t units = (size_t)N * C;
+        if ((size_t)N * C * (size_t)OH * OW * K >= 4096)
+            threadpool_parallel_for(threadpool_get_global(), im2col_task, &d, units);
+        else
+            im2col_task(&d, 0, units);
         break;
     }
 
