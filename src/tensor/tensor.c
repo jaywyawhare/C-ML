@@ -837,6 +837,19 @@ void tensor_storage_release(Tensor* t) {
     cml_free(s);
 }
 
+/* Call after the kernel stops reading: releasing may free the block the view
+ * aliased. Without this, tensor_free releases only the shared block and leaks
+ * the private buffer a kernel materialized the view onto. */
+void tensor_storage_drop_if_detached(Tensor* t) {
+    if (!t || !t->storage || !t->data)
+        return;
+    const char* block = (const char*)t->storage->data;
+    const char* p     = (const char*)t->data;
+    if (block && p >= block && (p < block + t->storage->nbytes || p == block))
+        return;
+    tensor_storage_release(t);
+}
+
 /** Decrement `t`'s refcount and, at zero, release its data (respecting shared
  *  storage, buffer cache, and device memory), grad, hooks, and metadata. A tensor
  *  with external refs is detached and kept alive instead. */

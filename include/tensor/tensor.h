@@ -184,6 +184,9 @@ void tensor_detach_keep(Tensor* t);
  * last reference goes - use it wherever owned data is freed or replaced. */
 void tensor_storage_share(Tensor* view, Tensor* src);
 void tensor_storage_release(Tensor* t);
+/** Drop `t`'s shared-storage hold once its data no longer lives in that block
+ *  (a view materialized onto a private buffer). No-op while it is still a view. */
+void tensor_storage_drop_if_detached(Tensor* t);
 Tensor* tensor_clone(Tensor* t);
 float tensor_get_float(Tensor* t, size_t idx);
 void tensor_set_float(Tensor* t, size_t idx, float value);
