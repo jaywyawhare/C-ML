@@ -1648,11 +1648,72 @@ Tensor* uop_softmax_bwd(Tensor* grad_y, Tensor* y) {
     if (!grad_y || !y) {
         CML_ERR_NULL("NULL tensor input to uop_softmax_bwd");
     }
+    if (grad_y->numel != y->numel) {
+        LOG_ERROR("uop_softmax_bwd: grad_y/y numel mismatch (%zu vs %zu)", grad_y->numel, y->numel);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
+    }
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
     Tensor* inputs[2] = {grad_y, y};
     if (cml_ir_add_uop(ir, UOP_SOFTMAX_BWD, inputs, 2, NULL) != 0)
+        return NULL;
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = y->ndim;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc((size_t)y->ndim * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    for (int i = 0; i < y->ndim; i++)
+        node->output_shape[i] = y->shape[i];
+    return tensor_from_ir_node(node, ir);
+}
+
+/** Fused log-softmax over the last dim: y = x - max - log(sum exp(x-max)). */
+Tensor* uop_log_softmax_lastdim(Tensor* x) {
+    if (!x) {
+        CML_ERR_NULL("NULL tensor input to uop_log_softmax_lastdim");
+    }
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+    Tensor* inputs[1] = {x};
+    if (cml_ir_add_uop(ir, UOP_LOG_SOFTMAX, inputs, 1, NULL) != 0)
+        return NULL;
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = x->ndim;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc((size_t)x->ndim * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    for (int i = 0; i < x->ndim; i++)
+        node->output_shape[i] = x->shape[i];
+    if (x->requires_grad) {
+        node->requires_grad       = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+/** Adjoint of uop_log_softmax_lastdim: dx = grad_y - exp(y)*rowsum(grad_y). */
+Tensor* uop_log_softmax_bwd(Tensor* grad_y, Tensor* y) {
+    if (!grad_y || !y) {
+        CML_ERR_NULL("NULL tensor input to uop_log_softmax_bwd");
+    }
+    if (grad_y->numel != y->numel) {
+        LOG_ERROR("uop_log_softmax_bwd: grad_y/y numel mismatch (%zu vs %zu)", grad_y->numel,
+                  y->numel);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
+    }
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+    Tensor* inputs[2] = {grad_y, y};
+    if (cml_ir_add_uop(ir, UOP_LOG_SOFTMAX_BWD, inputs, 2, NULL) != 0)
         return NULL;
     struct IRNode* node = cml_ir_get_tail(ir);
     node->output_ndim   = y->ndim;

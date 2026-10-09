@@ -277,6 +277,12 @@ typedef enum {
     UOP_SOFTMAX,
     UOP_SOFTMAX_BWD,
 
+    /* Fused log-softmax over the last dim. LOG_SOFTMAX: x [.,D] -> y [.,D]
+     * (y = x - max - log(sum exp(x-max))). LOG_SOFTMAX_BWD: {grad_y, y} ->
+     * dx = grad_y - exp(y)*rowsum(grad_y). */
+    UOP_LOG_SOFTMAX,
+    UOP_LOG_SOFTMAX_BWD,
+
     UOP_COUNT // Total count
 } UOpType;
 
@@ -382,6 +388,11 @@ Tensor* uop_layernorm_bwd(Tensor* grad_y, Tensor* x, Tensor* gamma, float eps);
 Tensor* uop_softmax_lastdim(Tensor* x);
 /* Adjoint of uop_softmax_lastdim: dx = y*(grad_y - rowsum(grad_y*y)) [.,D]. */
 Tensor* uop_softmax_bwd(Tensor* grad_y, Tensor* y);
+
+/* Fused log-softmax over the last dim (f32): y = x - max - log(sum exp(x-max)). */
+Tensor* uop_log_softmax_lastdim(Tensor* x);
+/* Adjoint of uop_log_softmax_lastdim: dx = grad_y - exp(y)*rowsum(grad_y). */
+Tensor* uop_log_softmax_bwd(Tensor* grad_y, Tensor* y);
 
 /* Shorthands for the shape/reduce ops whose params struct is otherwise rebuilt
  * by hand at every call site. Each is a NULL-propagating pass-through, so a

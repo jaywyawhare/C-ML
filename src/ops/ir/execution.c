@@ -5607,6 +5607,53 @@ not_empty_reduction:;
         break;
     }
 
+    case UOP_LOG_SOFTMAX: {
+        /* y = x - max - log(sum exp(x - max)) over the last dim. */
+        const float* x = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
+        if (!x)
+            return -1;
+        int D       = node->inputs[0]->shape[node->inputs[0]->ndim - 1];
+        size_t rows = node->inputs[0]->numel / (size_t)D;
+        for (size_t r = 0; r < rows; r++) {
+            const float* xr = x + r * D;
+            float* yr       = out_data + r * D;
+            float m         = xr[0];
+            for (int j = 1; j < D; j++)
+                if (xr[j] > m)
+                    m = xr[j];
+            float s = 0.0f;
+            for (int j = 0; j < D; j++)
+                s += expf(xr[j] - m);
+            /* (x - m) - log(s), not x - (m + log(s)): for large logits the latter
+             * loses the log(s) term to float cancellation (m + log(s) == m). */
+            float logs = logf(s);
+            for (int j = 0; j < D; j++)
+                yr[j] = (xr[j] - m) - logs;
+        }
+        break;
+    }
+
+    case UOP_LOG_SOFTMAX_BWD: {
+        /* dx = grad_y - exp(y) * rowsum(grad_y) over the last dim. */
+        const float* g = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
+        const float* y = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
+        if (!g || !y)
+            return -1;
+        int D       = node->inputs[1]->shape[node->inputs[1]->ndim - 1];
+        size_t rows = node->inputs[1]->numel / (size_t)D;
+        for (size_t r = 0; r < rows; r++) {
+            const float* gr = g + r * D;
+            const float* yr = y + r * D;
+            float* dxr      = out_data + r * D;
+            float sum       = 0.0f;
+            for (int j = 0; j < D; j++)
+                sum += gr[j];
+            for (int j = 0; j < D; j++)
+                dxr[j] = gr[j] - expf(yr[j]) * sum;
+        }
+        break;
+    }
+
     case UOP_FUSED_ELEMENTWISE: {
         /* Real kernel fusion: one loop evaluates the whole elementwise chain
          * per output element, keeping intermediates in registers - no
