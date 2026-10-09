@@ -38,17 +38,14 @@ Tensor* rnn_cell_forward(RNNCell* cell, Tensor* input, Tensor* hidden) {
         hidden = tensor_zeros(h_shape, 2, &cfg);
     }
 
-    /* h_new = tanh(input @ W_ih^T + hidden @ W_hh^T + b_ih + b_hh)
-     * All ops go through autograd so gradients reach the weight parameters. */
-    Tensor* wih_t = tensor_transpose(cell->weight_ih->tensor, 0, 1);
-    Tensor* whh_t = tensor_transpose(cell->weight_hh->tensor, 0, 1);
-
-    Tensor* h_new = tensor_add(tensor_matmul(input, wih_t), tensor_matmul(hidden, whh_t));
-
-    if (cell->bias_ih)
-        h_new = tensor_add(h_new, cell->bias_ih->tensor);
-    if (cell->bias_hh)
-        h_new = tensor_add(h_new, cell->bias_hh->tensor);
+    /* h_new = tanh(input @ W_ih^T + hidden @ W_hh^T + b_ih + b_hh). Each
+     * input/hidden projection is one fused LINEAR (x@W^T + b) rather than a
+     * transpose + matmul + bias-add, cutting per-timestep op (and backward-VJP)
+     * count -- the recurrent cost is dispatch, not arithmetic. */
+    Tensor* bih   = cell->bias_ih ? cell->bias_ih->tensor : NULL;
+    Tensor* bhh   = cell->bias_hh ? cell->bias_hh->tensor : NULL;
+    Tensor* h_new = tensor_add(uop_linear(input, cell->weight_ih->tensor, bih),
+                               uop_linear(hidden, cell->weight_hh->tensor, bhh));
 
     h_new = uop_tanh(h_new);
 
@@ -145,18 +142,13 @@ void lstm_cell_forward(LSTMCell* cell, Tensor* input, Tensor* h_prev, Tensor* c_
         c_prev = tensor_zeros(s, 2, &cfg);
     }
 
-    /* gates = input @ W_ih^T + h_prev @ W_hh^T + b_ih + b_hh
-     * All ops go through autograd so gradients reach the weight parameters. */
-    Tensor* wih_t = tensor_transpose(cell->weight_ih->tensor, 0, 1); /* [is, 4*hs] */
-    Tensor* whh_t = tensor_transpose(cell->weight_hh->tensor, 0, 1); /* [hs, 4*hs] */
-
+    /* gates = input @ W_ih^T + h_prev @ W_hh^T + b_ih + b_hh. One fused LINEAR
+     * per projection instead of transpose + matmul + bias-add. */
+    Tensor* bih = cell->bias_ih ? cell->bias_ih->tensor : NULL;
+    Tensor* bhh = cell->bias_hh ? cell->bias_hh->tensor : NULL;
     Tensor* gates =
-        tensor_add(tensor_matmul(input, wih_t), tensor_matmul(h_prev, whh_t)); /* [batch, 4*hs] */
-
-    if (cell->bias_ih)
-        gates = tensor_add(gates, cell->bias_ih->tensor);
-    if (cell->bias_hh)
-        gates = tensor_add(gates, cell->bias_hh->tensor);
+        tensor_add(uop_linear(input, cell->weight_ih->tensor, bih),
+                   uop_linear(h_prev, cell->weight_hh->tensor, bhh)); /* [batch, 4*hs] */
 
     /* Split gates into i, f, g, o via shrink - each [batch, hs] */
     int starts_full[] = {0, 0};
@@ -243,16 +235,11 @@ Tensor* gru_cell_forward(GRUCell* cell, Tensor* input, Tensor* hidden) {
     /* GRU forward using autograd ops so gradients flow to parameters.
      * ih = input @ W_ih^T + b_ih   [batch, 3*hs]
      * hh = hidden @ W_hh^T + b_hh  [batch, 3*hs] */
-    Tensor* wih_t = tensor_transpose(cell->weight_ih->tensor, 0, 1);
-    Tensor* whh_t = tensor_transpose(cell->weight_hh->tensor, 0, 1);
-
-    Tensor* ih = tensor_matmul(input, wih_t);
-    Tensor* hh = tensor_matmul(hidden, whh_t);
-
-    if (cell->bias_ih)
-        ih = tensor_add(ih, cell->bias_ih->tensor);
-    if (cell->bias_hh)
-        hh = tensor_add(hh, cell->bias_hh->tensor);
+    /* One fused LINEAR per projection instead of transpose + matmul + bias-add. */
+    Tensor* ih =
+        uop_linear(input, cell->weight_ih->tensor, cell->bias_ih ? cell->bias_ih->tensor : NULL);
+    Tensor* hh =
+        uop_linear(hidden, cell->weight_hh->tensor, cell->bias_hh ? cell->bias_hh->tensor : NULL);
 
     /* Split ih and hh into 3 gates of size hs each */
     int s_r[] = {0, 0 * hs}, e_r[] = {batch, 1 * hs};
