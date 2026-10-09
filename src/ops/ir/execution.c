@@ -698,6 +698,92 @@ static inline size_t _broadcast_idx(Tensor* inp, Tensor* out_t, size_t flat_i) {
     return idx;
 }
 
+/* Materialize a numpy-broadcast of `in` into contiguous `out`, same semantics as
+ * _broadcast_idx but amortized O(1) per element: the per-output-dim source stride
+ * is computed once (0 on broadcast axes) and the source offset is advanced with an
+ * odometer, so there is no per-element stride rebuild or division. This is the
+ * hot path for EXPAND (and any op that writes a broadcast). */
+static void fast_broadcast_f32(float* out, const float* in, Tensor* inp, Tensor* out_t) {
+    size_t n = out_t->numel;
+    if (n == 0)
+        return;
+    if (inp->numel == 1) {
+        float v = in[0];
+        for (size_t i = 0; i < n; i++)
+            out[i] = v;
+        return;
+    }
+    if (inp->numel == n) {
+        memcpy(out, in, n * sizeof(float));
+        return;
+    }
+
+    int ndim     = out_t->ndim;
+    int inp_ndim = inp->ndim;
+    if (ndim <= 0 || ndim > 8) {
+        /* Fall back to the generic per-element path for odd ranks. */
+        for (size_t i = 0; i < n; i++)
+            out[i] = in[_broadcast_idx(inp, out_t, i)];
+        return;
+    }
+
+    size_t inp_strides[8];
+    if (inp_ndim > 0) {
+        inp_strides[inp_ndim - 1] = 1;
+        for (int d = inp_ndim - 2; d >= 0; d--)
+            inp_strides[d] = inp_strides[d + 1] * (size_t)inp->shape[d + 1];
+    }
+
+    /* Source stride contributed by advancing each OUTPUT axis (0 when that axis
+     * is broadcast or has no matching input axis). */
+    size_t src_stride[8];
+    for (int d = 0; d < ndim; d++) {
+        int inp_d = d - (ndim - inp_ndim);
+        src_stride[d] =
+            (inp_d >= 0 && inp_d < inp_ndim && inp->shape[inp_d] > 1) ? inp_strides[inp_d] : 0;
+    }
+
+    /* Largest trailing run of output axes that is copied verbatim from the input
+     * (not broadcast and contiguous): those map to a contiguous source block, so
+     * the inner loop becomes a memcpy instead of an element-at-a-time gather. The
+     * common "broadcast the leading dims" case copies one big block per outer step. */
+    size_t block   = 1;
+    int block_dims = 0;
+    size_t expect  = 1;
+    for (int d = ndim - 1; d >= 0; d--) {
+        if (src_stride[d] != expect)
+            break;
+        block *= (size_t)out_t->shape[d];
+        expect *= (size_t)out_t->shape[d];
+        block_dims++;
+    }
+
+    int outer = ndim - block_dims;
+    if (outer == 0) {
+        /* Whole thing is one contiguous copy (no broadcast axis). */
+        memcpy(out, in, n * sizeof(float));
+        return;
+    }
+
+    size_t coord[8] = {0};
+    size_t src      = 0;
+    for (size_t off = 0; off < n; off += block) {
+        if (block == 1)
+            out[off] = in[src];
+        else
+            memcpy(out + off, in + src, block * sizeof(float));
+        /* Advance the odometer over the OUTER axes only. */
+        for (int d = outer - 1; d >= 0; d--) {
+            coord[d]++;
+            src += src_stride[d];
+            if (coord[d] < (size_t)out_t->shape[d])
+                break;
+            src -= src_stride[d] * (size_t)out_t->shape[d];
+            coord[d] = 0;
+        }
+    }
+}
+
 /* Broadcast pattern detection for 2D binary ops.
  * Returns: 0=use generic, 1=[R,C]op[1,C] (row broadcast), 2=[R,C]op[R,1] (col broadcast) */
 static inline int _detect_broadcast_2d(Tensor* a, Tensor* b, Tensor* out, size_t* rows,
@@ -4967,10 +5053,7 @@ not_empty_reduction:;
             if (out_data != in1_data)
                 memcpy(out_data, in1_data, out->numel * sizeof(float));
         } else {
-            for (size_t i = 0; i < out->numel; i++) {
-                size_t src  = BROADCAST_IDX(node->inputs[0], out, i);
-                out_data[i] = in1_data[src];
-            }
+            fast_broadcast_f32(out_data, in1_data, node->inputs[0], out);
         }
         break;
     }
