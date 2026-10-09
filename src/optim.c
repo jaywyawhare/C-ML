@@ -903,8 +903,9 @@ static bool sgd_can_step_inplace(Optimizer* optimizer) {
                 continue;
             Tensor* grad = tensor_get_grad(param->tensor);
             if (!grad || !grad->data || !param->tensor->data ||
-                param->tensor->dtype != DTYPE_FLOAT32 || grad->dtype != DTYPE_FLOAT32)
-                return false;
+                param->tensor->dtype != DTYPE_FLOAT32 || grad->dtype != DTYPE_FLOAT32 ||
+                param->tensor->device != DEVICE_CPU || grad->device != DEVICE_CPU)
+                return false; /* non-host buffers: fall back to the device-safe IR path */
         }
     }
     return true;
@@ -937,8 +938,9 @@ int optimizer_step_inplace(Optimizer* optimizer) {
             Tensor* t    = param->tensor;
             Tensor* grad = tensor_get_grad(t);
             if (!grad || !grad->data || !t->data || t->dtype != DTYPE_FLOAT32 ||
-                grad->dtype != DTYPE_FLOAT32)
-                continue;
+                grad->dtype != DTYPE_FLOAT32 || t->device != DEVICE_CPU ||
+                grad->device != DEVICE_CPU)
+                continue; /* non-host buffers can't be indexed as host float* */
             Tensor* mom =
                 (momentum > 0.0f && states && states[i]) ? states[i]->momentum_buffer : NULL;
             sgd_param_inplace(t, grad, mom, lr, weight_decay, momentum);
