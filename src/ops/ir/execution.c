@@ -2242,6 +2242,39 @@ static void direct_conv_task(void* vd, size_t start, size_t end) {
     }
 }
 
+/* f32 view of an input tensor for the compute-in-f32 fused kernels: returns the
+ * data directly for f32 (zero overhead), else a malloc'd f32 copy (*tmp, caller
+ * frees). NULL on alloc/cast failure. */
+static float* fused_f32_in(Tensor* t, float** tmp) {
+    *tmp = NULL;
+    if (!t || !t->data)
+        return NULL;
+    if (t->dtype == DTYPE_FLOAT32)
+        return (float*)t->data;
+    float* b = (float*)cml_malloc(t->numel * sizeof(float));
+    if (!b)
+        return NULL;
+    if (cml_cast_buffer(t->data, t->dtype, b, DTYPE_FLOAT32, t->numel) != 0) {
+        cml_free(b);
+        return NULL;
+    }
+    *tmp = b;
+    return b;
+}
+
+/* f32 output buffer: out->data directly for f32, else a malloc'd temp (*tmp) that
+ * the caller casts back into out->data and frees. */
+static float* fused_f32_out(Tensor* out, float** tmp) {
+    *tmp = NULL;
+    if (!out)
+        return NULL;
+    if (out->dtype == DTYPE_FLOAT32)
+        return (float*)out->data;
+    float* b = (float*)cml_malloc(out->numel * sizeof(float));
+    *tmp     = b;
+    return b;
+}
+
 typedef struct {
     const float* in;
     float* out;
@@ -5560,15 +5593,21 @@ not_empty_reduction:;
     }
 
     case UOP_SOFTMAX: {
-        /* y = exp(x - max) / sum(exp(x - max)) over the last dim. */
-        const float* x = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        if (!x)
+        /* y = exp(x - max) / sum(exp(x - max)) over the last dim. Computes in f32;
+         * half inputs/outputs are cast at the boundary (f32 path is zero-copy). */
+        float *xtmp, *ytmp;
+        const float* x = fused_f32_in(node->inputs[0], &xtmp);
+        float* y       = fused_f32_out(out, &ytmp);
+        if (!x || !y) {
+            cml_free(xtmp);
+            cml_free(ytmp);
             return -1;
+        }
         int D       = node->inputs[0]->shape[node->inputs[0]->ndim - 1];
         size_t rows = node->inputs[0]->numel / (size_t)D;
         for (size_t r = 0; r < rows; r++) {
             const float* xr = x + r * D;
-            float* yr       = out_data + r * D;
+            float* yr       = y + r * D;
             float m         = xr[0];
             for (int j = 1; j < D; j++)
                 if (xr[j] > m)
@@ -5583,40 +5622,60 @@ not_empty_reduction:;
             for (int j = 0; j < D; j++)
                 yr[j] *= inv;
         }
+        if (ytmp)
+            cml_cast_buffer(ytmp, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(xtmp);
+        cml_free(ytmp);
         break;
     }
 
     case UOP_SOFTMAX_BWD: {
         /* dx = y * (grad_y - rowsum(grad_y * y)) over the last dim. */
-        const float* g = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        const float* y = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
-        if (!g || !y)
+        float *gtmp, *ytmp2, *dtmp;
+        const float* g = fused_f32_in(node->inputs[0], &gtmp);
+        const float* y = fused_f32_in(node->inputs[1], &ytmp2);
+        float* dxo     = fused_f32_out(out, &dtmp);
+        if (!g || !y || !dxo) {
+            cml_free(gtmp);
+            cml_free(ytmp2);
+            cml_free(dtmp);
             return -1;
+        }
         int D       = node->inputs[1]->shape[node->inputs[1]->ndim - 1];
         size_t rows = node->inputs[1]->numel / (size_t)D;
         for (size_t r = 0; r < rows; r++) {
             const float* gr = g + r * D;
             const float* yr = y + r * D;
-            float* dxr      = out_data + r * D;
+            float* dxr      = dxo + r * D;
             float dot       = 0.0f;
             for (int j = 0; j < D; j++)
                 dot += gr[j] * yr[j];
             for (int j = 0; j < D; j++)
                 dxr[j] = yr[j] * (gr[j] - dot);
         }
+        if (dtmp)
+            cml_cast_buffer(dtmp, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(gtmp);
+        cml_free(ytmp2);
+        cml_free(dtmp);
         break;
     }
 
     case UOP_LOG_SOFTMAX: {
-        /* y = x - max - log(sum exp(x - max)) over the last dim. */
-        const float* x = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        if (!x)
+        /* y = (x - max) - log(sum exp(x - max)) over the last dim. */
+        float *xtmp, *ytmp;
+        const float* x = fused_f32_in(node->inputs[0], &xtmp);
+        float* y       = fused_f32_out(out, &ytmp);
+        if (!x || !y) {
+            cml_free(xtmp);
+            cml_free(ytmp);
             return -1;
+        }
         int D       = node->inputs[0]->shape[node->inputs[0]->ndim - 1];
         size_t rows = node->inputs[0]->numel / (size_t)D;
         for (size_t r = 0; r < rows; r++) {
             const float* xr = x + r * D;
-            float* yr       = out_data + r * D;
+            float* yr       = y + r * D;
             float m         = xr[0];
             for (int j = 1; j < D; j++)
                 if (xr[j] > m)
@@ -5630,27 +5689,42 @@ not_empty_reduction:;
             for (int j = 0; j < D; j++)
                 yr[j] = (xr[j] - m) - logs;
         }
+        if (ytmp)
+            cml_cast_buffer(ytmp, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(xtmp);
+        cml_free(ytmp);
         break;
     }
 
     case UOP_LOG_SOFTMAX_BWD: {
         /* dx = grad_y - exp(y) * rowsum(grad_y) over the last dim. */
-        const float* g = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        const float* y = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
-        if (!g || !y)
+        float *gtmp, *ytmp2, *dtmp;
+        const float* g = fused_f32_in(node->inputs[0], &gtmp);
+        const float* y = fused_f32_in(node->inputs[1], &ytmp2);
+        float* dxo     = fused_f32_out(out, &dtmp);
+        if (!g || !y || !dxo) {
+            cml_free(gtmp);
+            cml_free(ytmp2);
+            cml_free(dtmp);
             return -1;
+        }
         int D       = node->inputs[1]->shape[node->inputs[1]->ndim - 1];
         size_t rows = node->inputs[1]->numel / (size_t)D;
         for (size_t r = 0; r < rows; r++) {
             const float* gr = g + r * D;
             const float* yr = y + r * D;
-            float* dxr      = out_data + r * D;
+            float* dxr      = dxo + r * D;
             float sum       = 0.0f;
             for (int j = 0; j < D; j++)
                 sum += gr[j];
             for (int j = 0; j < D; j++)
                 dxr[j] = gr[j] - expf(yr[j]) * sum;
         }
+        if (dtmp)
+            cml_cast_buffer(dtmp, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(gtmp);
+        cml_free(ytmp2);
+        cml_free(dtmp);
         break;
     }
 

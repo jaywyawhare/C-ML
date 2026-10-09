@@ -155,15 +155,9 @@ Tensor* tensor_cross_entropy_loss(Tensor* input, Tensor* target) {
     }
 
     /* Fused log-softmax (x - logsumexp) is more numerically stable than
-     * log(softmax(x)) and is one op instead of two. The fused kernel is f32; for
-     * other dtypes fall back to the dtype-safe softmax->log chain. */
-    Tensor* log_softmax;
-    if (input->dtype == DTYPE_FLOAT32) {
-        log_softmax = uop_log_softmax_lastdim(input);
-    } else {
-        Tensor* sm  = tensor_softmax(input, input->ndim - 1);
-        log_softmax = sm ? tensor_log(sm) : NULL;
-    }
+     * log(softmax(x)) and is one op instead of two. The kernel computes in f32
+     * and casts half inputs/outputs at the boundary, so it handles all dtypes. */
+    Tensor* log_softmax = uop_log_softmax_lastdim(input);
     if (!log_softmax)
         return NULL;
 
@@ -784,15 +778,9 @@ Tensor* tensor_cross_entropy_loss_smooth(Tensor* input, Tensor* target, float la
     int num_classes = input->shape[input->ndim - 1];
 
     /* Fused log-softmax (x - logsumexp) is more numerically stable than
-     * log(softmax(x)) and is one op instead of two. The fused kernel is f32; for
-     * other dtypes fall back to the dtype-safe softmax->log chain. */
-    Tensor* log_softmax;
-    if (input->dtype == DTYPE_FLOAT32) {
-        log_softmax = uop_log_softmax_lastdim(input);
-    } else {
-        Tensor* sm  = tensor_softmax(input, input->ndim - 1);
-        log_softmax = sm ? tensor_log(sm) : NULL;
-    }
+     * log(softmax(x)) and is one op instead of two. The kernel computes in f32
+     * and casts half inputs/outputs at the boundary, so it handles all dtypes. */
+    Tensor* log_softmax = uop_log_softmax_lastdim(input);
     if (!log_softmax)
         return NULL;
 
