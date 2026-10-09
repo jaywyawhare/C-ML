@@ -260,6 +260,18 @@ typedef enum {
     UOP_LSTM_CELL,
     UOP_LSTM_CELL_BWD,
 
+    /* Fused RNN (tanh) cell. RNN_CELL: inputs {ih [B,H], hh [B,H]} ->
+     * h_new = tanh(ih+hh) [B,H]. RNN_CELL_BWD: inputs {grad_h [B,H], h_new
+     * [B,H]} -> da = grad_h*(1-h_new^2) [B,H] (same grad for ih and hh). */
+    UOP_RNN_CELL,
+    UOP_RNN_CELL_BWD,
+
+    /* Fused LayerNorm over the last dim. LAYERNORM: inputs {x [.,D], gamma [D]
+     * (optional), beta [D] (optional)} -> y [.,D]. LAYERNORM_BWD: inputs {grad_y,
+     * x, gamma(optional)} -> packed [dx (rows*D) | dgamma (D) | dbeta (D)]. */
+    UOP_LAYERNORM,
+    UOP_LAYERNORM_BWD,
+
     UOP_COUNT // Total count
 } UOpType;
 
@@ -348,6 +360,18 @@ Tensor* uop_lstm_cell(Tensor* gates, Tensor* c_prev);
 /* Adjoint of uop_lstm_cell: packs [dgates(4H) | dc_prev(H)] into [B,5H].
  * grad_packed is [B,2H] = [grad_h_new | grad_c_new]. */
 Tensor* uop_lstm_cell_bwd(Tensor* grad_packed, Tensor* gates, Tensor* c_prev);
+
+/* Fused RNN (tanh) cell: h_new = tanh(ih + hh), all [B,H]. */
+Tensor* uop_rnn_cell(Tensor* ih, Tensor* hh);
+/* Adjoint: da = grad_h * (1 - h_new^2) [B,H], the shared grad for ih and hh. */
+Tensor* uop_rnn_cell_bwd(Tensor* grad_h, Tensor* h_new);
+
+/* Fused LayerNorm over the last dim (f32). gamma/beta may be NULL (no affine).
+ * y = (x - mean) / sqrt(var + eps) * gamma + beta. */
+Tensor* uop_layernorm(Tensor* x, Tensor* gamma, Tensor* beta, float eps);
+/* Adjoint of uop_layernorm: packs [dx (rows*D) | dgamma (D) | dbeta (D)] into a
+ * flat [rows*D + 2D] buffer. gamma may be NULL. */
+Tensor* uop_layernorm_bwd(Tensor* grad_y, Tensor* x, Tensor* gamma, float eps);
 
 /* Shorthands for the shape/reduce ops whose params struct is otherwise rebuilt
  * by hand at every call site. Each is a NULL-propagating pass-through, so a
@@ -762,6 +786,11 @@ Tensor* uop_softsign(Tensor* x);
 
 /* log(sigmoid(x)) = -softplus(-x) */
 Tensor* uop_logsigmoid(Tensor* x);
+
+/* Epsilon for the fused LayerNorm ops (UOP_LAYERNORM / UOP_LAYERNORM_BWD). */
+typedef struct {
+    float eps;
+} LayerNormUOpParams;
 
 typedef struct {
     int kernel_size; // Size of the sliding window

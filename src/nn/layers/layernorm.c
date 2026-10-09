@@ -30,85 +30,15 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
                   last_dim, ln->normalized_shape);
         return NULL;
     }
-    ReduceParams mean_params;
-    int mean_dim         = input->ndim - 1;
-    int mean_dims[]      = {mean_dim};
-    mean_params.dims     = mean_dims;
-    mean_params.num_dims = 1;
-    mean_params.keepdim  = true;
+    /* One fused kernel computes mean/var/normalize/affine over the last dim in a
+     * single pass (and one fused backward), instead of a ~12-op primitive chain. */
+    Tensor* gamma = (ln->affine && ln->weight) ? ln->weight->tensor : NULL;
+    Tensor* beta  = (ln->affine && ln->bias) ? ln->bias->tensor : NULL;
 
-    Tensor* mean_reduced = uop_mean(input, &mean_params);
-    if (!mean_reduced)
+    Tensor* output = uop_layernorm(input, gamma, beta, ln->eps);
+    if (!output)
         return NULL;
 
-    Tensor* centered = uop_sub(input, mean_reduced);
-    if (!centered)
-        return NULL;
-
-    Tensor* diff_sq = uop_mul(centered, centered);
-    if (!diff_sq)
-        return NULL;
-
-    ReduceParams var_params;
-    int var_dims[]      = {mean_dim};
-    var_params.dims     = var_dims;
-    var_params.num_dims = 1;
-    var_params.keepdim  = true;
-
-    Tensor* var_reduced = uop_mean(diff_sq, &var_params);
-    if (!var_reduced)
-        return NULL;
-
-    TensorConfig eps_cfg = (TensorConfig){.dtype      = var_reduced->dtype,
-                                          .device     = var_reduced->device,
-                                          .has_dtype  = true,
-                                          .has_device = true};
-    Tensor* eps_tensor   = tensor_full(var_reduced->shape, var_reduced->ndim, &eps_cfg, ln->eps);
-    if (!eps_tensor)
-        return NULL;
-
-    Tensor* var_eps = uop_add(var_reduced, eps_tensor);
-    if (!var_eps) {
-        tensor_free(eps_tensor);
-        return NULL;
-    }
-    tensor_free(eps_tensor);
-
-    Tensor* std_tensor = uop_sqrt(var_eps);
-    if (!std_tensor)
-        return NULL;
-
-    Tensor* normalized = uop_div(centered, std_tensor);
-    if (!normalized)
-        return NULL;
-
-    Tensor* output = normalized;
-
-    if (ln->affine && ln->weight && ln->bias) {
-        ExpandParams expand_weight;
-        expand_weight.new_shape = input->shape;
-        expand_weight.new_ndim  = input->ndim;
-
-        Tensor* weight_broadcast = uop_expand(ln->weight->tensor, &expand_weight);
-        if (!weight_broadcast)
-            return NULL;
-
-        Tensor* scaled = uop_mul(weight_broadcast, output);
-        if (!scaled)
-            return NULL;
-
-        ExpandParams expand_bias;
-        expand_bias.new_shape = input->shape;
-        expand_bias.new_ndim  = input->ndim;
-
-        Tensor* bias_broadcast = uop_expand(ln->bias->tensor, &expand_bias);
-        if (!bias_broadcast)
-            return NULL;
-
-        output = uop_add(scaled, bias_broadcast);
-        if (!output)
-            return NULL;
-    }
     if (autograd_is_grad_enabled() && input->requires_grad) {
         output->requires_grad = true;
     }

@@ -449,6 +449,43 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             gm_accum(&map, c_prev, uop_shrink(packed, s_c, e_c, 2));
             break;
         }
+        case UOP_RNN_CELL: {
+            /* da = g*(1-h_new^2) is the shared grad for both ih and hh. */
+            Tensor* ih = a;
+            Tensor* hh = b;
+            if (!ih || !hh)
+                break;
+            Tensor* da = uop_rnn_cell_bwd(g, out);
+            if (!da)
+                break;
+            gm_accum(&map, ih, da);
+            gm_accum(&map, hh, da);
+            break;
+        }
+        case UOP_LAYERNORM: {
+            /* Fused backward packs [dx (rows*D) | dgamma (D) | dbeta (D)]. */
+            Tensor* x     = a;
+            Tensor* gamma = (nd->num_inputs >= 3) ? nd->inputs[1] : NULL;
+            Tensor* beta  = (nd->num_inputs >= 3) ? nd->inputs[2] : NULL;
+            if (!x)
+                break;
+            LayerNormUOpParams* lp = (LayerNormUOpParams*)nd->params;
+            float eps              = lp ? lp->eps : 1e-5f;
+            int D                  = x->shape[x->ndim - 1];
+            int rd                 = (int)(x->numel / (size_t)D);
+            Tensor* packed         = uop_layernorm_bwd(g, x, gamma, eps);
+            if (!packed)
+                break;
+            int sdx[1] = {0}, edx[1] = {rd * D};
+            gm_accum(&map, x, ad_reshape(uop_shrink(packed, sdx, edx, 1), x->shape, x->ndim));
+            if (gamma && beta) {
+                int sg[1] = {rd * D}, eg[1] = {rd * D + D};
+                int sb[1] = {rd * D + D}, eb[1] = {rd * D + 2 * D};
+                gm_accum(&map, gamma, uop_shrink(packed, sg, eg, 1));
+                gm_accum(&map, beta, uop_shrink(packed, sb, eb, 1));
+            }
+            break;
+        }
         case UOP_SUM: {
             /* dX = broadcast(dOut) back to X's shape (via keepdim reshape) */
             ReduceParams* rp = (ReduceParams*)nd->params;

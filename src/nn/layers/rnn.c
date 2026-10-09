@@ -42,14 +42,12 @@ Tensor* rnn_cell_forward(RNNCell* cell, Tensor* input, Tensor* hidden) {
      * input/hidden projection is one fused LINEAR (x@W^T + b) rather than a
      * transpose + matmul + bias-add, cutting per-timestep op (and backward-VJP)
      * count -- the recurrent cost is dispatch, not arithmetic. */
-    Tensor* bih   = cell->bias_ih ? cell->bias_ih->tensor : NULL;
-    Tensor* bhh   = cell->bias_hh ? cell->bias_hh->tensor : NULL;
-    Tensor* h_new = tensor_add(uop_linear(input, cell->weight_ih->tensor, bih),
-                               uop_linear(hidden, cell->weight_hh->tensor, bhh));
-
-    h_new = uop_tanh(h_new);
-
-    return h_new;
+    Tensor* bih = cell->bias_ih ? cell->bias_ih->tensor : NULL;
+    Tensor* bhh = cell->bias_hh ? cell->bias_hh->tensor : NULL;
+    Tensor* ih  = uop_linear(input, cell->weight_ih->tensor, bih);
+    Tensor* hh  = uop_linear(hidden, cell->weight_hh->tensor, bhh);
+    /* One fused kernel for tanh(ih+hh) and its backward, instead of add + tanh. */
+    return uop_rnn_cell(ih, hh);
 }
 
 /** Register a recurrent cell's parameter set: weight_ih [gates, input_size],

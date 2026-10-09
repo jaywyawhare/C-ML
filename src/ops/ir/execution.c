@@ -5451,6 +5451,114 @@ not_empty_reduction:;
         break;
     }
 
+    case UOP_RNN_CELL: {
+        /* h_new = tanh(ih + hh). */
+        const float* ih = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
+        const float* hh = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
+        if (!ih || !hh)
+            return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = tanhf(ih[i] + hh[i]);
+        break;
+    }
+
+    case UOP_RNN_CELL_BWD: {
+        /* da = grad_h * (1 - h_new^2); same grad for ih and hh. */
+        const float* g = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
+        const float* h = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
+        if (!g || !h)
+            return -1;
+        for (size_t i = 0; i < out->numel; i++)
+            out_data[i] = g[i] * (1.0f - h[i] * h[i]);
+        break;
+    }
+
+    case UOP_LAYERNORM: {
+        /* y = (x - mean)/sqrt(var+eps) over the last dim, optional affine. */
+        LayerNormUOpParams* p = (LayerNormUOpParams*)node->params;
+        const float* x        = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
+        const float* gm =
+            (node->num_inputs >= 3 && node->inputs[1]) ? (const float*)node->inputs[1]->data : NULL;
+        const float* bt =
+            (node->num_inputs >= 3 && node->inputs[2]) ? (const float*)node->inputs[2]->data : NULL;
+        if (!x || !p)
+            return -1;
+        int D       = node->inputs[0]->shape[node->inputs[0]->ndim - 1];
+        size_t rows = node->inputs[0]->numel / (size_t)D;
+        for (size_t r = 0; r < rows; r++) {
+            const float* xr = x + r * D;
+            float* yr       = out_data + r * D;
+            float mean      = 0.0f;
+            for (int j = 0; j < D; j++)
+                mean += xr[j];
+            mean /= (float)D;
+            float var = 0.0f;
+            for (int j = 0; j < D; j++) {
+                float d = xr[j] - mean;
+                var += d * d;
+            }
+            var /= (float)D;
+            float inv = 1.0f / sqrtf(var + p->eps);
+            for (int j = 0; j < D; j++) {
+                float xh = (xr[j] - mean) * inv;
+                yr[j]    = gm ? xh * gm[j] + (bt ? bt[j] : 0.0f) : xh;
+            }
+        }
+        break;
+    }
+
+    case UOP_LAYERNORM_BWD: {
+        /* Packs [dx (rows*D) | dgamma (D) | dbeta (D)]. */
+        LayerNormUOpParams* p = (LayerNormUOpParams*)node->params;
+        const float* g        = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
+        const float* x        = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
+        const float* gm =
+            (node->num_inputs >= 3 && node->inputs[2]) ? (const float*)node->inputs[2]->data : NULL;
+        if (!g || !x || !p)
+            return -1;
+        int D         = node->inputs[1]->shape[node->inputs[1]->ndim - 1];
+        size_t rows   = node->inputs[1]->numel / (size_t)D;
+        float* dx     = out_data;
+        float* dgamma = out_data + rows * (size_t)D;
+        float* dbeta  = dgamma + D;
+        for (int j = 0; j < D; j++) {
+            dgamma[j] = 0.0f;
+            dbeta[j]  = 0.0f;
+        }
+        for (size_t r = 0; r < rows; r++) {
+            const float* xr = x + r * D;
+            const float* gr = g + r * D;
+            float* dxr      = dx + r * D;
+            float mean      = 0.0f;
+            for (int j = 0; j < D; j++)
+                mean += xr[j];
+            mean /= (float)D;
+            float var = 0.0f;
+            for (int j = 0; j < D; j++) {
+                float d = xr[j] - mean;
+                var += d * d;
+            }
+            var /= (float)D;
+            float inv = 1.0f / sqrtf(var + p->eps);
+            float s1 = 0.0f, s2 = 0.0f;
+            for (int j = 0; j < D; j++) {
+                float xh    = (xr[j] - mean) * inv;
+                float dxhat = gm ? gr[j] * gm[j] : gr[j];
+                s1 += dxhat;
+                s2 += dxhat * xh;
+                dgamma[j] += gr[j] * xh;
+                dbeta[j] += gr[j];
+            }
+            float m1 = s1 / (float)D, m2 = s2 / (float)D;
+            for (int j = 0; j < D; j++) {
+                float xh    = (xr[j] - mean) * inv;
+                float dxhat = gm ? gr[j] * gm[j] : gr[j];
+                dxr[j]      = inv * (dxhat - m1 - xh * m2);
+            }
+        }
+        break;
+    }
+
     case UOP_FUSED_ELEMENTWISE: {
         /* Real kernel fusion: one loop evaluates the whole elementwise chain
          * per output element, keeping intermediates in registers - no
