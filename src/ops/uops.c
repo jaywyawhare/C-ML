@@ -913,12 +913,6 @@ Tensor* uop_gru_cell(Tensor* ih, Tensor* hh, Tensor* hidden) {
     if (ih->ndim != 2 || hh->ndim != 2 || hidden->ndim != 2) {
         CML_ERR_NULL("uop_gru_cell: inputs must be 2D");
     }
-    if (ih->dtype != DTYPE_FLOAT32 || hh->dtype != DTYPE_FLOAT32 ||
-        hidden->dtype != DTYPE_FLOAT32) {
-        LOG_ERROR("uop_gru_cell: fused f32 kernel requires f32 operands");
-        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
-        return NULL;
-    }
     int B = ih->shape[0];
     int H = hidden->shape[1];
     if (ih->shape[1] != 3 * H || hh->shape[1] != 3 * H || hh->shape[0] != B ||
@@ -994,11 +988,6 @@ Tensor* uop_lstm_cell(Tensor* gates, Tensor* c_prev) {
     if (gates->ndim != 2 || c_prev->ndim != 2) {
         CML_ERR_NULL("uop_lstm_cell: inputs must be 2D");
     }
-    if (gates->dtype != DTYPE_FLOAT32 || c_prev->dtype != DTYPE_FLOAT32) {
-        LOG_ERROR("uop_lstm_cell: fused f32 kernel requires f32 operands");
-        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
-        return NULL;
-    }
     int B = c_prev->shape[0];
     int H = c_prev->shape[1];
     if (gates->shape[0] != B || gates->shape[1] != 4 * H) {
@@ -1072,11 +1061,6 @@ Tensor* uop_rnn_cell(Tensor* ih, Tensor* hh) {
     if (ih->ndim != 2 || hh->ndim != 2) {
         CML_ERR_NULL("uop_rnn_cell: inputs must be 2D");
     }
-    if (ih->dtype != DTYPE_FLOAT32 || hh->dtype != DTYPE_FLOAT32) {
-        LOG_ERROR("uop_rnn_cell: fused f32 kernel requires f32 operands");
-        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
-        return NULL;
-    }
     int B = ih->shape[0];
     int H = ih->shape[1];
     if (hh->shape[0] != B || hh->shape[1] != H) {
@@ -1136,12 +1120,6 @@ Tensor* uop_rnn_cell_bwd(Tensor* grad_h, Tensor* h_new) {
 Tensor* uop_layernorm(Tensor* x, Tensor* gamma, Tensor* beta, float eps) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_layernorm");
-    }
-    if (x->dtype != DTYPE_FLOAT32 || (gamma && gamma->dtype != DTYPE_FLOAT32) ||
-        (beta && beta->dtype != DTYPE_FLOAT32)) {
-        LOG_ERROR("uop_layernorm: fused f32 kernel requires f32 operands");
-        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
-        return NULL;
     }
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)

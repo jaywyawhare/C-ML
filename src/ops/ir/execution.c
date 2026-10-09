@@ -5355,18 +5355,25 @@ not_empty_reduction:;
     case UOP_GRU_CELL: {
         /* h_new = (1-z)*n + z*hidden, r/z = sigmoid of the reset/update gates,
          * n = tanh of the candidate; gates packed (r,z,n) along the 3H axis. */
-        const float* ih = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        const float* hh = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
-        const float* hd = node->inputs[2] ? (const float*)node->inputs[2]->data : NULL;
-        if (!ih || !hh || !hd)
+        float *ihtmp, *hhtmp, *hdtmp, *otmp;
+        const float* ih = fused_f32_in(node->inputs[0], &ihtmp);
+        const float* hh = fused_f32_in(node->inputs[1], &hhtmp);
+        const float* hd = fused_f32_in(node->inputs[2], &hdtmp);
+        float* out_f    = fused_f32_out(out, &otmp);
+        if (!ih || !hh || !hd || !out_f) {
+            cml_free(ihtmp);
+            cml_free(hhtmp);
+            cml_free(hdtmp);
+            cml_free(otmp);
             return -1;
+        }
         int B = node->inputs[0]->shape[0];
         int H = (int)out->shape[1];
         for (int b = 0; b < B; b++) {
             const float* ihb = ih + (size_t)b * 3 * H;
             const float* hhb = hh + (size_t)b * 3 * H;
             const float* hdb = hd + (size_t)b * H;
-            float* ob        = out_data + (size_t)b * H;
+            float* ob        = out_f + (size_t)b * H;
             for (int j = 0; j < H; j++) {
                 float r = 1.0f / (1.0f + expf(-(ihb[j] + hhb[j])));
                 float z = 1.0f / (1.0f + expf(-(ihb[H + j] + hhb[H + j])));
@@ -5374,18 +5381,32 @@ not_empty_reduction:;
                 ob[j]   = n + z * (hdb[j] - n);
             }
         }
+        if (otmp)
+            cml_cast_buffer(out_f, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(ihtmp);
+        cml_free(hhtmp);
+        cml_free(hdtmp);
+        cml_free(otmp);
         break;
     }
 
     case UOP_GRU_CELL_BWD: {
         /* Adjoint of UOP_GRU_CELL. Output packs [dih(3H) | dhh(3H) | dhidden(H)]
          * along a 7H axis; gate intermediates are recomputed from the inputs. */
-        const float* g  = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        const float* ih = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
-        const float* hh = node->inputs[2] ? (const float*)node->inputs[2]->data : NULL;
-        const float* hd = node->inputs[3] ? (const float*)node->inputs[3]->data : NULL;
-        if (!g || !ih || !hh || !hd)
+        float *gtmp, *ihtmp, *hhtmp, *hdtmp, *otmp;
+        const float* g  = fused_f32_in(node->inputs[0], &gtmp);
+        const float* ih = fused_f32_in(node->inputs[1], &ihtmp);
+        const float* hh = fused_f32_in(node->inputs[2], &hhtmp);
+        const float* hd = fused_f32_in(node->inputs[3], &hdtmp);
+        float* out_f    = fused_f32_out(out, &otmp);
+        if (!g || !ih || !hh || !hd || !out_f) {
+            cml_free(gtmp);
+            cml_free(ihtmp);
+            cml_free(hhtmp);
+            cml_free(hdtmp);
+            cml_free(otmp);
             return -1;
+        }
         int B = node->inputs[0]->shape[0];
         int H = node->inputs[0]->shape[1];
         for (int b = 0; b < B; b++) {
@@ -5393,7 +5414,7 @@ not_empty_reduction:;
             const float* ihb = ih + (size_t)b * 3 * H;
             const float* hhb = hh + (size_t)b * 3 * H;
             const float* hdb = hd + (size_t)b * H;
-            float* ob        = out_data + (size_t)b * 7 * H;
+            float* ob        = out_f + (size_t)b * 7 * H;
             for (int j = 0; j < H; j++) {
                 float r       = 1.0f / (1.0f + expf(-(ihb[j] + hhb[j])));
                 float z       = 1.0f / (1.0f + expf(-(ihb[H + j] + hhb[H + j])));
@@ -5415,22 +5436,35 @@ not_empty_reduction:;
                 ob[6 * H + j] = dhidden;  /* dhidden */
             }
         }
+        if (otmp)
+            cml_cast_buffer(out_f, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(gtmp);
+        cml_free(ihtmp);
+        cml_free(hhtmp);
+        cml_free(hdtmp);
+        cml_free(otmp);
         break;
     }
 
     case UOP_LSTM_CELL: {
         /* gates (i,f,g,o) packed along 4H; c_new = f*c_prev + i*g,
          * h_new = o*tanh(c_new). Output packs [h_new | c_new] along 2H. */
-        const float* ga = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        const float* cp = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
-        if (!ga || !cp)
+        float *gatmp, *cptmp, *otmp;
+        const float* ga = fused_f32_in(node->inputs[0], &gatmp);
+        const float* cp = fused_f32_in(node->inputs[1], &cptmp);
+        float* out_f    = fused_f32_out(out, &otmp);
+        if (!ga || !cp || !out_f) {
+            cml_free(gatmp);
+            cml_free(cptmp);
+            cml_free(otmp);
             return -1;
+        }
         int B = node->inputs[1]->shape[0];
         int H = node->inputs[1]->shape[1];
         for (int b = 0; b < B; b++) {
             const float* gb = ga + (size_t)b * 4 * H;
             const float* cb = cp + (size_t)b * H;
-            float* ob       = out_data + (size_t)b * 2 * H;
+            float* ob       = out_f + (size_t)b * 2 * H;
             for (int j = 0; j < H; j++) {
                 float ig  = 1.0f / (1.0f + expf(-gb[j]));
                 float fg  = 1.0f / (1.0f + expf(-gb[H + j]));
@@ -5441,24 +5475,36 @@ not_empty_reduction:;
                 ob[H + j] = cn;             /* c_new */
             }
         }
+        if (otmp)
+            cml_cast_buffer(out_f, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(gatmp);
+        cml_free(cptmp);
+        cml_free(otmp);
         break;
     }
 
     case UOP_LSTM_CELL_BWD: {
         /* Adjoint of UOP_LSTM_CELL. grad_packed = [grad_h | grad_c]; output
          * packs [dgates(4H) | dc_prev(H)] along 5H. */
-        const float* gp = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        const float* ga = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
-        const float* cp = node->inputs[2] ? (const float*)node->inputs[2]->data : NULL;
-        if (!gp || !ga || !cp)
+        float *gptmp, *gatmp, *cptmp, *otmp;
+        const float* gp = fused_f32_in(node->inputs[0], &gptmp);
+        const float* ga = fused_f32_in(node->inputs[1], &gatmp);
+        const float* cp = fused_f32_in(node->inputs[2], &cptmp);
+        float* out_f    = fused_f32_out(out, &otmp);
+        if (!gp || !ga || !cp || !out_f) {
+            cml_free(gptmp);
+            cml_free(gatmp);
+            cml_free(cptmp);
+            cml_free(otmp);
             return -1;
+        }
         int B = node->inputs[2]->shape[0];
         int H = node->inputs[2]->shape[1];
         for (int b = 0; b < B; b++) {
             const float* gpb = gp + (size_t)b * 2 * H;
             const float* gb  = ga + (size_t)b * 4 * H;
             const float* cb  = cp + (size_t)b * H;
-            float* ob        = out_data + (size_t)b * 5 * H;
+            float* ob        = out_f + (size_t)b * 5 * H;
             for (int j = 0; j < H; j++) {
                 float ig      = 1.0f / (1.0f + expf(-gb[j]));
                 float fg      = 1.0f / (1.0f + expf(-gb[H + j]));
@@ -5481,46 +5527,81 @@ not_empty_reduction:;
                 ob[4 * H + j] = dcnew * fg;             /* dc_prev */
             }
         }
+        if (otmp)
+            cml_cast_buffer(out_f, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(gptmp);
+        cml_free(gatmp);
+        cml_free(cptmp);
+        cml_free(otmp);
         break;
     }
 
     case UOP_RNN_CELL: {
         /* h_new = tanh(ih + hh). */
-        const float* ih = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        const float* hh = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
-        if (!ih || !hh)
+        float *ihtmp, *hhtmp, *otmp;
+        const float* ih = fused_f32_in(node->inputs[0], &ihtmp);
+        const float* hh = fused_f32_in(node->inputs[1], &hhtmp);
+        float* out_f    = fused_f32_out(out, &otmp);
+        if (!ih || !hh || !out_f) {
+            cml_free(ihtmp);
+            cml_free(hhtmp);
+            cml_free(otmp);
             return -1;
+        }
         for (size_t i = 0; i < out->numel; i++)
-            out_data[i] = tanhf(ih[i] + hh[i]);
+            out_f[i] = tanhf(ih[i] + hh[i]);
+        if (otmp)
+            cml_cast_buffer(out_f, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(ihtmp);
+        cml_free(hhtmp);
+        cml_free(otmp);
         break;
     }
 
     case UOP_RNN_CELL_BWD: {
         /* da = grad_h * (1 - h_new^2); same grad for ih and hh. */
-        const float* g = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        const float* h = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
-        if (!g || !h)
+        float *gtmp, *htmp, *otmp;
+        const float* g = fused_f32_in(node->inputs[0], &gtmp);
+        const float* h = fused_f32_in(node->inputs[1], &htmp);
+        float* out_f   = fused_f32_out(out, &otmp);
+        if (!g || !h || !out_f) {
+            cml_free(gtmp);
+            cml_free(htmp);
+            cml_free(otmp);
             return -1;
+        }
         for (size_t i = 0; i < out->numel; i++)
-            out_data[i] = g[i] * (1.0f - h[i] * h[i]);
+            out_f[i] = g[i] * (1.0f - h[i] * h[i]);
+        if (otmp)
+            cml_cast_buffer(out_f, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(gtmp);
+        cml_free(htmp);
+        cml_free(otmp);
         break;
     }
 
     case UOP_LAYERNORM: {
         /* y = (x - mean)/sqrt(var+eps) over the last dim, optional affine. */
         LayerNormUOpParams* p = (LayerNormUOpParams*)node->params;
-        const float* x        = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        const float* gm =
-            (node->num_inputs >= 3 && node->inputs[1]) ? (const float*)node->inputs[1]->data : NULL;
-        const float* bt =
-            (node->num_inputs >= 3 && node->inputs[2]) ? (const float*)node->inputs[2]->data : NULL;
-        if (!x || !p)
+        bool want_gm          = node->num_inputs >= 3 && node->inputs[1];
+        bool want_bt          = node->num_inputs >= 3 && node->inputs[2];
+        float *xtmp, *gmtmp = NULL, *bttmp = NULL, *otmp;
+        const float* x  = fused_f32_in(node->inputs[0], &xtmp);
+        const float* gm = want_gm ? fused_f32_in(node->inputs[1], &gmtmp) : NULL;
+        const float* bt = want_bt ? fused_f32_in(node->inputs[2], &bttmp) : NULL;
+        float* out_f    = fused_f32_out(out, &otmp);
+        if (!x || !p || !out_f || (want_gm && !gm) || (want_bt && !bt)) {
+            cml_free(xtmp);
+            cml_free(gmtmp);
+            cml_free(bttmp);
+            cml_free(otmp);
             return -1;
+        }
         int D       = node->inputs[0]->shape[node->inputs[0]->ndim - 1];
         size_t rows = node->inputs[0]->numel / (size_t)D;
         for (size_t r = 0; r < rows; r++) {
             const float* xr = x + r * D;
-            float* yr       = out_data + r * D;
+            float* yr       = out_f + r * D;
             float mean      = 0.0f;
             for (int j = 0; j < D; j++)
                 mean += xr[j];
@@ -5537,22 +5618,35 @@ not_empty_reduction:;
                 yr[j]    = gm ? xh * gm[j] + (bt ? bt[j] : 0.0f) : xh;
             }
         }
+        if (otmp)
+            cml_cast_buffer(out_f, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(xtmp);
+        cml_free(gmtmp);
+        cml_free(bttmp);
+        cml_free(otmp);
         break;
     }
 
     case UOP_LAYERNORM_BWD: {
         /* Packs [dx (rows*D) | dgamma (D) | dbeta (D)]. */
         LayerNormUOpParams* p = (LayerNormUOpParams*)node->params;
-        const float* g        = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
-        const float* x        = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
-        const float* gm =
-            (node->num_inputs >= 3 && node->inputs[2]) ? (const float*)node->inputs[2]->data : NULL;
-        if (!g || !x || !p)
+        bool want_gm          = node->num_inputs >= 3 && node->inputs[2];
+        float *gtmp, *xtmp, *gmtmp = NULL, *otmp;
+        const float* g  = fused_f32_in(node->inputs[0], &gtmp);
+        const float* x  = fused_f32_in(node->inputs[1], &xtmp);
+        const float* gm = want_gm ? fused_f32_in(node->inputs[2], &gmtmp) : NULL;
+        float* out_f    = fused_f32_out(out, &otmp);
+        if (!g || !x || !p || !out_f || (want_gm && !gm)) {
+            cml_free(gtmp);
+            cml_free(xtmp);
+            cml_free(gmtmp);
+            cml_free(otmp);
             return -1;
+        }
         int D         = node->inputs[1]->shape[node->inputs[1]->ndim - 1];
         size_t rows   = node->inputs[1]->numel / (size_t)D;
-        float* dx     = out_data;
-        float* dgamma = out_data + rows * (size_t)D;
+        float* dx     = out_f;
+        float* dgamma = out_f + rows * (size_t)D;
         float* dbeta  = dgamma + D;
         for (int j = 0; j < D; j++) {
             dgamma[j] = 0.0f;
@@ -5589,6 +5683,12 @@ not_empty_reduction:;
                 dxr[j]      = inv * (dxhat - m1 - xh * m2);
             }
         }
+        if (otmp)
+            cml_cast_buffer(out_f, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(gtmp);
+        cml_free(xtmp);
+        cml_free(gmtmp);
+        cml_free(otmp);
         break;
     }
 
