@@ -3733,6 +3733,92 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_RNN_CELL: {
+        /* da = grad_h * (1 - h_new^2); same grad into ih and hh. */
+        if (node->num_inputs < 2)
+            break;
+        Tensor* ih     = node->inputs[0];
+        Tensor* hh     = node->inputs[1];
+        const float* h = (const float*)out->data;
+        if (!h)
+            break;
+        float* da = (float*)cml_malloc(out_numel * sizeof(float));
+        if (da) {
+            for (size_t i = 0; i < out_numel; i++)
+                da[i] = out_grad[i] * (1.0f - h[i] * h[i]);
+            if (ih->requires_grad)
+                accumulate_grad(ih, da, out_numel);
+            if (hh->requires_grad)
+                accumulate_grad(hh, da, out_numel);
+        }
+        cml_free(da);
+        break;
+    }
+
+    case UOP_LAYERNORM: {
+        /* Eager adjoint; mirrors UOP_LAYERNORM_BWD, accumulating dx/dgamma/dbeta. */
+        LayerNormUOpParams* p = (LayerNormUOpParams*)node->params;
+        Tensor* x             = node->inputs[0];
+        Tensor* gamma         = (node->num_inputs >= 3) ? node->inputs[1] : NULL;
+        Tensor* beta          = (node->num_inputs >= 3) ? node->inputs[2] : NULL;
+        const float* xv       = x ? (const float*)x->data : NULL;
+        const float* gm       = gamma ? (const float*)gamma->data : NULL;
+        if (!p || !xv)
+            break;
+        int D       = x->shape[x->ndim - 1];
+        size_t rows = x->numel / (size_t)D;
+        float* dx   = (float*)cml_malloc(x->numel * sizeof(float));
+        float* dgm  = (float*)cml_malloc((size_t)D * sizeof(float));
+        float* dbt  = (float*)cml_malloc((size_t)D * sizeof(float));
+        if (dx && dgm && dbt) {
+            for (int j = 0; j < D; j++) {
+                dgm[j] = 0.0f;
+                dbt[j] = 0.0f;
+            }
+            for (size_t r = 0; r < rows; r++) {
+                const float* xr = xv + r * D;
+                const float* gr = out_grad + r * D;
+                float* dxr      = dx + r * D;
+                float mean      = 0.0f;
+                for (int j = 0; j < D; j++)
+                    mean += xr[j];
+                mean /= (float)D;
+                float var = 0.0f;
+                for (int j = 0; j < D; j++) {
+                    float d = xr[j] - mean;
+                    var += d * d;
+                }
+                var /= (float)D;
+                float inv = 1.0f / sqrtf(var + p->eps);
+                float s1 = 0.0f, s2 = 0.0f;
+                for (int j = 0; j < D; j++) {
+                    float xh    = (xr[j] - mean) * inv;
+                    float dxhat = gm ? gr[j] * gm[j] : gr[j];
+                    s1 += dxhat;
+                    s2 += dxhat * xh;
+                    dgm[j] += gr[j] * xh;
+                    dbt[j] += gr[j];
+                }
+                float m1 = s1 / (float)D, m2 = s2 / (float)D;
+                for (int j = 0; j < D; j++) {
+                    float xh    = (xr[j] - mean) * inv;
+                    float dxhat = gm ? gr[j] * gm[j] : gr[j];
+                    dxr[j]      = inv * (dxhat - m1 - xh * m2);
+                }
+            }
+            if (x->requires_grad)
+                accumulate_grad(x, dx, x->numel);
+            if (gamma && gamma->requires_grad)
+                accumulate_grad(gamma, dgm, (size_t)D);
+            if (beta && beta->requires_grad)
+                accumulate_grad(beta, dbt, (size_t)D);
+        }
+        cml_free(dx);
+        cml_free(dgm);
+        cml_free(dbt);
+        break;
+    }
+
     /* no gradient: in-place optimizer steps sit outside differentiation */
     case UOP_SGD_STEP:
     case UOP_ADAM_STEP:

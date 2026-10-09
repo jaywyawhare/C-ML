@@ -1053,6 +1053,141 @@ Tensor* uop_lstm_cell_bwd(Tensor* grad_packed, Tensor* gates, Tensor* c_prev) {
     return tensor_from_ir_node(node, ir);
 }
 
+/** Fused RNN (tanh) cell: ih, hh [B,H] -> h_new = tanh(ih+hh) [B,H]. */
+Tensor* uop_rnn_cell(Tensor* ih, Tensor* hh) {
+    if (!ih || !hh) {
+        CML_ERR_NULL("NULL tensor input to uop_rnn_cell");
+    }
+    if (ih->ndim != 2 || hh->ndim != 2) {
+        CML_ERR_NULL("uop_rnn_cell: inputs must be 2D");
+    }
+    int B = ih->shape[0];
+    int H = ih->shape[1];
+    if (hh->shape[0] != B || hh->shape[1] != H) {
+        LOG_ERROR("uop_rnn_cell: shape mismatch");
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
+    }
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+    Tensor* inputs[2] = {ih, hh};
+    if (cml_ir_add_uop(ir, UOP_RNN_CELL, inputs, 2, NULL) != 0)
+        return NULL;
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 2;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(2 * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    node->output_shape[0] = B;
+    node->output_shape[1] = H;
+    if (ih->requires_grad || hh->requires_grad) {
+        node->requires_grad       = true;
+        node->needs_input_grad[0] = ih->requires_grad;
+        node->needs_input_grad[1] = hh->requires_grad;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+/** Adjoint of uop_rnn_cell: da = grad_h * (1 - h_new^2) [B,H]. */
+Tensor* uop_rnn_cell_bwd(Tensor* grad_h, Tensor* h_new) {
+    if (!grad_h || !h_new) {
+        CML_ERR_NULL("NULL tensor input to uop_rnn_cell_bwd");
+    }
+    int B         = grad_h->shape[0];
+    int H         = grad_h->shape[1];
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+    Tensor* inputs[2] = {grad_h, h_new};
+    if (cml_ir_add_uop(ir, UOP_RNN_CELL_BWD, inputs, 2, NULL) != 0)
+        return NULL;
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 2;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(2 * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    node->output_shape[0] = B;
+    node->output_shape[1] = H;
+    return tensor_from_ir_node(node, ir);
+}
+
+/** Fused LayerNorm over the last dim; gamma/beta both NULL = no affine. */
+Tensor* uop_layernorm(Tensor* x, Tensor* gamma, Tensor* beta, float eps) {
+    if (!x) {
+        CML_ERR_NULL("NULL tensor input to uop_layernorm");
+    }
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+    LayerNormUOpParams* p = cml_malloc(sizeof(LayerNormUOpParams));
+    if (!p)
+        return NULL;
+    p->eps = eps;
+
+    int affine        = (gamma && beta) ? 1 : 0;
+    Tensor* inputs[3] = {x, gamma, beta};
+    int ni            = affine ? 3 : 1;
+    if (cml_ir_add_uop(ir, UOP_LAYERNORM, inputs, ni, p) != 0) {
+        cml_free(p);
+        return NULL;
+    }
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = x->ndim;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc((size_t)x->ndim * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    for (int i = 0; i < x->ndim; i++)
+        node->output_shape[i] = x->shape[i];
+    if (x->requires_grad || (gamma && gamma->requires_grad) || (beta && beta->requires_grad)) {
+        node->requires_grad       = true;
+        node->needs_input_grad[0] = x->requires_grad;
+        if (affine) {
+            node->needs_input_grad[1] = gamma->requires_grad;
+            node->needs_input_grad[2] = beta->requires_grad;
+        }
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+/** Adjoint of uop_layernorm: flat [dx (rows*D) | dgamma (D) | dbeta (D)]. */
+Tensor* uop_layernorm_bwd(Tensor* grad_y, Tensor* x, Tensor* gamma, float eps) {
+    if (!grad_y || !x) {
+        CML_ERR_NULL("NULL tensor input to uop_layernorm_bwd");
+    }
+    int D         = x->shape[x->ndim - 1];
+    size_t rows   = x->numel / (size_t)D;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+    LayerNormUOpParams* p = cml_malloc(sizeof(LayerNormUOpParams));
+    if (!p)
+        return NULL;
+    p->eps = eps;
+
+    Tensor* inputs[3] = {grad_y, x, gamma};
+    int ni            = gamma ? 3 : 2;
+    if (cml_ir_add_uop(ir, UOP_LAYERNORM_BWD, inputs, ni, p) != 0) {
+        cml_free(p);
+        return NULL;
+    }
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 1;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    node->output_shape[0] = (int)(rows * (size_t)D) + 2 * D;
+    return tensor_from_ir_node(node, ir);
+}
+
 /** Matrix multiply a @ b (delegates to tensor_matmul, which handles batching/broadcast). */
 Tensor* uop_matmul(Tensor* a, Tensor* b) {
     if (!a || !b) {
