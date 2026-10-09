@@ -68,9 +68,9 @@ static int test_decompose_composites(void) {
         static const float want[6] = {0.09003057f, 0.24472847f, 0.66524096f,
                                       0.09003057f, 0.24472847f, 0.66524096f};
         exec_and_check("decompose_softmax", y, want, 6, 1e-5f, &ok);
+        /* exec_and_check already reset the IR context, which frees graph-output
+         * tensors like y; only the leaf input x is still owned here. */
         tensor_free(x);
-        if (y)
-            tensor_free(y);
     }
 
     /* mse loss decomposition */
@@ -86,10 +86,10 @@ static int test_decompose_composites(void) {
             acc += ((float)(i + 1)) * ((float)(i + 1));
         float want = acc / 6.0f / 4.0f;
         exec_and_check("decompose_mse", l, &want, 1, 1e-5f, &ok);
+        /* l (a graph output) was freed by the reset inside exec_and_check; only
+         * the leaf inputs p and t remain owned here. */
         tensor_free(p);
         tensor_free(t);
-        if (l)
-            tensor_free(l);
     }
 
     return ok;
