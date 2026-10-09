@@ -3435,7 +3435,17 @@ Tensor* uop_scaled_dot_product_attention_bias(Tensor* q, Tensor* k, Tensor* v, T
     if (!scores)
         return NULL;
 
-    Tensor* scale_t = uop_fill(scores->shape, scores->ndim, scale);
+    /* Scale by a 1-element constant and let uop_mul broadcast it, instead of
+     * materialising a full scores-shaped fill of 1/sqrt(d_k) every call. The
+     * scale is a constant, so only scores' gradient (dout * scale) matters. For
+     * the unexpected rank > 8 case, fall back to a full-shape fill. */
+    int one_shape[8];
+    const int use_scalar = scores->ndim <= 8;
+    if (use_scalar)
+        for (int i = 0; i < scores->ndim; i++)
+            one_shape[i] = 1;
+    Tensor* scale_t = use_scalar ? uop_fill(one_shape, scores->ndim, scale)
+                                 : uop_fill(scores->shape, scores->ndim, scale);
     if (!scale_t)
         return NULL;
     Tensor* scaled = uop_mul(scores, scale_t);
