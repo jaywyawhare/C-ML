@@ -1616,10 +1616,67 @@ Tensor* uop_gelu(Tensor* x) {
 
 /** Numerically-stable softmax along `dim`, composed from max/exp/sum uops; the reduced
  *  max and sum are broadcast back via explicit EXPAND so the VJP is exact. */
+/** Fused softmax over the last dim: y = exp(x-max)/sum(exp(x-max)) per row. */
+Tensor* uop_softmax_lastdim(Tensor* x) {
+    if (!x) {
+        CML_ERR_NULL("NULL tensor input to uop_softmax_lastdim");
+    }
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+    Tensor* inputs[1] = {x};
+    if (cml_ir_add_uop(ir, UOP_SOFTMAX, inputs, 1, NULL) != 0)
+        return NULL;
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = x->ndim;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc((size_t)x->ndim * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    for (int i = 0; i < x->ndim; i++)
+        node->output_shape[i] = x->shape[i];
+    if (x->requires_grad) {
+        node->requires_grad       = true;
+        node->needs_input_grad[0] = true;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+/** Adjoint of uop_softmax_lastdim: dx = y*(grad_y - rowsum(grad_y*y)). */
+Tensor* uop_softmax_bwd(Tensor* grad_y, Tensor* y) {
+    if (!grad_y || !y) {
+        CML_ERR_NULL("NULL tensor input to uop_softmax_bwd");
+    }
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+    Tensor* inputs[2] = {grad_y, y};
+    if (cml_ir_add_uop(ir, UOP_SOFTMAX_BWD, inputs, 2, NULL) != 0)
+        return NULL;
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = y->ndim;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc((size_t)y->ndim * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    for (int i = 0; i < y->ndim; i++)
+        node->output_shape[i] = y->shape[i];
+    return tensor_from_ir_node(node, ir);
+}
+
 Tensor* uop_softmax(Tensor* x, int dim) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_softmax");
     }
+
+    /* The common last-dim softmax runs as one fused kernel (and one fused
+     * backward); other axes keep the explicit reduce/expand chain below. */
+    int ndim = x->ndim;
+    int d    = dim < 0 ? dim + ndim : dim;
+    if (d == ndim - 1)
+        return uop_softmax_lastdim(x);
 
     ReduceParams max_params = {0};
     max_params.dims         = &dim;
