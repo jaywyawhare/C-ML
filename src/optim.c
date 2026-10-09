@@ -757,6 +757,10 @@ static float* optim_param_buffers(ParameterGroup* group, int i, float** grad_dat
     return param_data;
 }
 
+static void sgd_param_inplace(Tensor* t, const Tensor* grad, Tensor* mom, float lr,
+                              float weight_decay, float momentum);
+static bool sgd_can_step_inplace(Optimizer* optimizer);
+
 /** SGD update for every group: emit a uop_sgd_step IR node per parameter
  *  (applying weight decay and momentum). Under FUSE_OPTIM the realizes are
  *  deferred and run in one graph pass before the buffers are adopted. */
@@ -768,6 +772,31 @@ static void sgd_step(Optimizer* optimizer) {
      * executor is is_executed-guarded, so the deferred adopt below never
      * re-executes a node -- momentum stays single-applied. */
     bool fuse = cml_flag_enabled(CML_FLAG_FUSE_OPTIM);
+
+    /* Fast path: when not fusing and every grad is already materialised (the
+     * eager loop realises grads in backward), apply the update in place. The IR
+     * path below emits a uop_sgd_step per parameter and realises each one, and
+     * every realize walks the whole graph head-to-tail - O(params x graph) of
+     * pure dispatch for an update that is a tight per-element loop. */
+    if (!fuse && sgd_can_step_inplace(optimizer)) {
+        for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
+            ParameterGroup* group     = &optimizer->param_groups[g_idx];
+            SGDMomentumState** states = sgd_momentum_states(group, group->momentum);
+            for (int i = 0; i < group->num_parameters; i++) {
+                Parameter* param = group->parameters[i];
+                if (!param || !param->tensor || !param->requires_grad)
+                    continue;
+                Tensor* grad = tensor_get_grad(param->tensor);
+                Tensor* mom  = (group->momentum > 0.0f && states && states[i])
+                                   ? states[i]->momentum_buffer
+                                   : NULL;
+                sgd_param_inplace(param->tensor, grad, mom, group->lr, group->weight_decay,
+                                  group->momentum);
+            }
+            group->step_count++;
+        }
+        return;
+    }
 
     int total = 0;
     for (int g = 0; g < optimizer->num_param_groups; g++)
@@ -845,6 +874,42 @@ static void sgd_step(Optimizer* optimizer) {
     }
 }
 
+/* One parameter's in-place SGD update (dampening=0, nesterov=false), reading
+ * grad->data and writing the parameter (and momentum) buffer directly. */
+static void sgd_param_inplace(Tensor* t, const Tensor* grad, Tensor* mom, float lr,
+                              float weight_decay, float momentum) {
+    float* p        = (float*)t->data;
+    const float* gd = (const float*)grad->data;
+    float* buf      = (mom && mom->data) ? (float*)mom->data : NULL;
+    size_t n        = t->numel;
+    for (size_t k = 0; k < n; k++) {
+        float d = gd[k] + weight_decay * p[k];
+        if (buf) {
+            buf[k] = momentum * buf[k] + d;
+            d      = buf[k];
+        }
+        p[k] -= lr * d;
+    }
+}
+
+/* True if every requires_grad parameter already has a materialised f32 grad, so
+ * the step can run in place without realising any IR node. */
+static bool sgd_can_step_inplace(Optimizer* optimizer) {
+    for (int g = 0; g < optimizer->num_param_groups; g++) {
+        ParameterGroup* group = &optimizer->param_groups[g];
+        for (int i = 0; i < group->num_parameters; i++) {
+            Parameter* param = group->parameters[i];
+            if (!param || !param->tensor || !param->requires_grad)
+                continue;
+            Tensor* grad = tensor_get_grad(param->tensor);
+            if (!grad || !grad->data || !param->tensor->data ||
+                param->tensor->dtype != DTYPE_FLOAT32 || grad->dtype != DTYPE_FLOAT32)
+                return false;
+        }
+    }
+    return true;
+}
+
 /* In-place SGD update (lr / momentum / weight_decay) applied directly to the
  * parameter buffers from param->grad->data - allocates NO IR nodes. This is what
  * lets a static-graph training step stay zero-rebuild (the normal sgd_step emits
@@ -876,18 +941,7 @@ int optimizer_step_inplace(Optimizer* optimizer) {
                 continue;
             Tensor* mom =
                 (momentum > 0.0f && states && states[i]) ? states[i]->momentum_buffer : NULL;
-            float* p        = (float*)t->data;
-            const float* gd = (const float*)grad->data;
-            float* buf      = (mom && mom->data) ? (float*)mom->data : NULL;
-            size_t n        = t->numel;
-            for (size_t k = 0; k < n; k++) {
-                float d = gd[k] + weight_decay * p[k];
-                if (buf) {
-                    buf[k] = momentum * buf[k] + d;
-                    d      = buf[k];
-                }
-                p[k] -= lr * d;
-            }
+            sgd_param_inplace(t, grad, mom, lr, weight_decay, momentum);
         }
         group->step_count++;
     }
