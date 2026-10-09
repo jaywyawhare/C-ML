@@ -450,12 +450,18 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             break;
         }
         case UOP_RNN_CELL: {
-            /* da = g*(1-h_new^2) is the shared grad for both ih and hh. */
+            /* da = g*(1-h_new^2) is the shared grad for both ih and hh. Fused
+             * kernel for 1st-order; differentiable primitive form under
+             * create_graph so double-backward stays correct. */
             Tensor* ih = a;
             Tensor* hh = b;
             if (!ih || !hh)
                 break;
-            Tensor* da = uop_rnn_cell_bwd(g, out);
+            Tensor* da;
+            if (differentiable_grads)
+                da = uop_mul(g, uop_sub(ad_k(out, 1.0f), uop_mul(out, out)));
+            else
+                da = uop_rnn_cell_bwd(g, out);
             if (!da)
                 break;
             gm_accum(&map, ih, da);
@@ -473,7 +479,34 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             float eps              = lp ? lp->eps : 1e-5f;
             int D                  = x->shape[x->ndim - 1];
             int rd                 = (int)(x->numel / (size_t)D);
-            Tensor* packed         = uop_layernorm_bwd(g, x, gamma, eps);
+
+            if (differentiable_grads) {
+                /* Differentiable primitive LN backward for correct double-backward
+                 * (the fused UOP_LAYERNORM_BWD is monolithic). Recompute the
+                 * normalization statistics from x. */
+                int ld[1]       = {x->ndim - 1};
+                ReduceParams rk = {ld, 1, true};
+                Tensor* mean    = ad_expand(uop_mean(x, &rk), x->shape, x->ndim);
+                Tensor* xc      = uop_sub(x, mean);
+                Tensor* var     = uop_mean(uop_mul(xc, xc), &rk);
+                Tensor* inv = ad_expand(uop_rsqrt(uop_add(var, ad_k(var, eps))), x->shape, x->ndim);
+                Tensor* xhat  = uop_mul(xc, inv);
+                Tensor* dxhat = gamma ? uop_mul(g, ad_expand(gamma, x->shape, x->ndim)) : g;
+                Tensor* m1    = ad_expand(uop_mean(dxhat, &rk), x->shape, x->ndim);
+                Tensor* m2    = ad_expand(uop_mean(uop_mul(dxhat, xhat), &rk), x->shape, x->ndim);
+                Tensor* dx    = uop_mul(inv, uop_sub(uop_sub(dxhat, m1), uop_mul(xhat, m2)));
+                gm_accum(&map, x, dx);
+                if (gamma && beta) {
+                    int lead[16], nlead = 0;
+                    for (int ax = 0; ax < x->ndim - 1; ax++)
+                        lead[nlead++] = ax;
+                    gm_accum(&map, gamma, ad_sum_axes(uop_mul(g, xhat), lead, nlead));
+                    gm_accum(&map, beta, ad_sum_axes(g, lead, nlead));
+                }
+                break;
+            }
+
+            Tensor* packed = uop_layernorm_bwd(g, x, gamma, eps);
             if (!packed)
                 break;
             int sdx[1] = {0}, edx[1] = {rd * D};
