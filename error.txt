@@ -1,0 +1,1660 @@
+[  0%] Building C object CMakeFiles/cml.dir/src/core/config.c.o
+[  0%] Building C object CMakeFiles/cml.dir/main.c.o
+[  0%] Building C object CMakeFiles/cml.dir/src/core/dataset.c.o
+[  0%] Building C object CMakeFiles/cml.dir/src/core/augmentation.c.o
+[  0%] Building C object CMakeFiles/cml.dir/src/cml.c.o
+[  0%] Building C object CMakeFiles/cml.dir/src/core/logging.c.o
+[  1%] Building C object CMakeFiles/cml.dir/src/core/training_loop.c.o
+[  1%] Building C object CMakeFiles/cml.dir/src/core/model_architecture.c.o
+[  1%] Building C object CMakeFiles/cml_static.dir/src/cml.c.o
+[  1%] Building C object CMakeFiles/cml_shared.dir/src/cml.c.o
+[  1%] Building C object CMakeFiles/test_nv_mock.dir/tests/test_nv_driver.c.o
+[  1%] Building C object CMakeFiles/test_am_mock.dir/tests/test_am_driver.c.o
+[  1%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/nv_mock.c.o
+[  1%] Building C object CMakeFiles/cml_shared.dir/src/core/logging.c.o
+[  1%] Building C object CMakeFiles/test_nv_mock.dir/src/cml.c.o
+[  1%] Building C object CMakeFiles/cml_shared.dir/src/core/config.c.o
+[  1%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/am_mock.c.o
+[  1%] Building C object CMakeFiles/cml_static.dir/src/core/logging.c.o
+[  1%] Building C object CMakeFiles/test_nv_mock.dir/src/core/logging.c.o
+[  1%] Building C object CMakeFiles/cml.dir/src/core/training_metrics.c.o
+[  1%] Building C object CMakeFiles/cml.dir/src/core/serialization.c.o
+[  1%] Building C object CMakeFiles/test_nv_mock.dir/src/core/config.c.o
+[  1%] Building C object CMakeFiles/test_am_mock.dir/src/cml.c.o
+[  1%] Building C object CMakeFiles/test_nv_mock.dir/src/core/dataset.c.o
+[  1%] Building C object CMakeFiles/test_am_mock.dir/src/core/logging.c.o
+[  1%] Building C object CMakeFiles/test_am_mock.dir/src/core/config.c.o
+[  1%] Building C object CMakeFiles/cml_shared.dir/src/core/dataset.c.o
+[  2%] Building C object CMakeFiles/cml_static.dir/src/core/config.c.o
+[  2%] Building C object CMakeFiles/test_am_mock.dir/src/core/dataset.c.o
+[  2%] Building C object CMakeFiles/cml.dir/src/core/gguf.c.o
+[  2%] Building C object CMakeFiles/cml_shared.dir/src/core/augmentation.c.o
+[  2%] Building C object CMakeFiles/cml_static.dir/src/core/dataset.c.o
+[  2%] Building C object CMakeFiles/test_am_mock.dir/src/core/augmentation.c.o
+[  2%] Building C object CMakeFiles/test_nv_mock.dir/src/core/augmentation.c.o
+[  2%] Building C object CMakeFiles/test_nv_mock.dir/src/core/model_architecture.c.o
+[  2%] Building C object CMakeFiles/cml_static.dir/src/core/augmentation.c.o
+[  2%] Building C object CMakeFiles/cml_shared.dir/src/core/model_architecture.c.o
+[  2%] Building C object CMakeFiles/cml_static.dir/src/core/model_architecture.c.o
+[  3%] Building C object CMakeFiles/test_nv_mock.dir/src/core/training_loop.c.o
+[  3%] Building C object CMakeFiles/cml.dir/src/core/safetensors.c.o
+[  3%] Building C object CMakeFiles/test_nv_mock.dir/src/core/training_metrics.c.o
+[  3%] Building C object CMakeFiles/cml_shared.dir/src/core/training_loop.c.o
+[  3%] Building C object CMakeFiles/test_am_mock.dir/src/core/model_architecture.c.o
+[  3%] Building C object CMakeFiles/cml_shared.dir/src/core/training_metrics.c.o
+[  3%] Building C object CMakeFiles/cml_static.dir/src/core/training_loop.c.o
+[  3%] Building C object CMakeFiles/cml_shared.dir/src/core/serialization.c.o
+[  3%] Building C object CMakeFiles/cml.dir/src/core/cleanup.c.o
+[  3%] Building C object CMakeFiles/test_am_mock.dir/src/core/training_loop.c.o
+[  3%] Building C object CMakeFiles/test_nv_mock.dir/src/core/serialization.c.o
+[  3%] Building C object CMakeFiles/cml_static.dir/src/core/training_metrics.c.o
+[  3%] Building C object CMakeFiles/cml_shared.dir/src/core/gguf.c.o
+[  3%] Building C object CMakeFiles/cml.dir/src/core/error_stack.c.o
+[  3%] Building C object CMakeFiles/test_am_mock.dir/src/core/training_metrics.c.o
+[  3%] Building C object CMakeFiles/test_nv_mock.dir/src/core/gguf.c.o
+[  3%] Building C object CMakeFiles/cml.dir/src/core/computation_graph.c.o
+[  3%] Building C object CMakeFiles/cml_static.dir/src/core/serialization.c.o
+[  4%] Building C object CMakeFiles/cml_shared.dir/src/core/cleanup.c.o
+[  4%] Building C object CMakeFiles/cml_shared.dir/src/core/safetensors.c.o
+[  4%] Building C object CMakeFiles/test_nv_mock.dir/src/core/safetensors.c.o
+[  4%] Building C object CMakeFiles/test_am_mock.dir/src/core/serialization.c.o
+[  4%] Building C object CMakeFiles/cml_static.dir/src/core/gguf.c.o
+[  4%] Building C object CMakeFiles/cml.dir/src/core/graph_context.c.o
+[  4%] Building C object CMakeFiles/cml.dir/src/core/quantization.c.o
+[  5%] Building C object CMakeFiles/cml_static.dir/src/core/safetensors.c.o
+[  5%] Building C object CMakeFiles/test_am_mock.dir/src/core/gguf.c.o
+[  5%] Building C object CMakeFiles/test_nv_mock.dir/src/core/cleanup.c.o
+[  5%] Building C object CMakeFiles/cml_shared.dir/src/core/error_stack.c.o
+[  5%] Building C object CMakeFiles/cml_static.dir/src/core/cleanup.c.o
+[  5%] Building C object CMakeFiles/cml_shared.dir/src/core/computation_graph.c.o
+[  5%] Building C object CMakeFiles/test_am_mock.dir/src/core/safetensors.c.o
+[  5%] Building C object CMakeFiles/test_nv_mock.dir/src/core/error_stack.c.o
+[  5%] Building C object CMakeFiles/cml.dir/src/core/gguf_quant.c.o
+[  5%] Building C object CMakeFiles/cml.dir/src/core/protobuf_mini.c.o
+[  5%] Building C object CMakeFiles/test_am_mock.dir/src/core/cleanup.c.o
+[  5%] Building C object CMakeFiles/test_am_mock.dir/src/core/error_stack.c.o
+[  5%] Building C object CMakeFiles/cml.dir/src/core/pth_loader.c.o
+[  5%] Building C object CMakeFiles/test_nv_mock.dir/src/core/computation_graph.c.o
+[  5%] Building C object CMakeFiles/test_am_mock.dir/src/core/computation_graph.c.o
+[  5%] Building C object CMakeFiles/cml_shared.dir/src/core/graph_context.c.o
+[  5%] Building C object CMakeFiles/test_nv_mock.dir/src/core/graph_context.c.o
+[  5%] Building C object CMakeFiles/cml.dir/src/core/tinyfs.c.o
+[  5%] Building C object CMakeFiles/cml_static.dir/src/core/error_stack.c.o
+[  6%] Building C object CMakeFiles/cml.dir/src/core/threefry.c.o
+[  6%] Building C object CMakeFiles/test_am_mock.dir/src/core/graph_context.c.o
+[  6%] Building C object CMakeFiles/cml_shared.dir/src/core/quantization.c.o
+[  6%] Building C object CMakeFiles/cml.dir/src/core/mlperf_logging.c.o
+[  6%] Building C object CMakeFiles/test_am_mock.dir/src/core/quantization.c.o
+[  6%] Building C object CMakeFiles/test_nv_mock.dir/src/core/quantization.c.o
+[  6%] Building C object CMakeFiles/cml_static.dir/src/core/graph_context.c.o
+[  6%] Building C object CMakeFiles/cml_shared.dir/src/core/gguf_quant.c.o
+[  6%] Building C object CMakeFiles/test_am_mock.dir/src/core/gguf_quant.c.o
+[  6%] Building C object CMakeFiles/test_nv_mock.dir/src/core/gguf_quant.c.o
+[  6%] Building C object CMakeFiles/cml_static.dir/src/core/computation_graph.c.o
+[  6%] Building C object CMakeFiles/cml.dir/src/core/hevc.c.o
+[  6%] Building C object CMakeFiles/cml_static.dir/src/core/quantization.c.o
+[  6%] Building C object CMakeFiles/cml_shared.dir/src/core/protobuf_mini.c.o
+[  6%] Building C object CMakeFiles/cml_shared.dir/src/core/pth_loader.c.o
+[  7%] Building C object CMakeFiles/cml_static.dir/src/core/gguf_quant.c.o
+[  7%] Building C object CMakeFiles/cml.dir/src/core/onnx.c.o
+[  7%] Building C object CMakeFiles/test_nv_mock.dir/src/core/protobuf_mini.c.o
+[  7%] Building C object CMakeFiles/test_nv_mock.dir/src/core/pth_loader.c.o
+[  7%] Building C object CMakeFiles/cml.dir/src/core/onnx_ops.c.o
+[  7%] Building C object CMakeFiles/cml_shared.dir/src/core/tinyfs.c.o
+[  7%] Building C object CMakeFiles/test_am_mock.dir/src/core/protobuf_mini.c.o
+[  7%] Building C object CMakeFiles/test_nv_mock.dir/src/core/tinyfs.c.o
+[  7%] Building C object CMakeFiles/cml.dir/src/alloc/memory_management.c.o
+[  7%] Building C object CMakeFiles/cml_static.dir/src/core/protobuf_mini.c.o
+[  7%] Building C object CMakeFiles/cml.dir/src/alloc/memory_pools.c.o
+[  7%] Building C object CMakeFiles/cml.dir/src/alloc/graph_allocator.c.o
+[  7%] Building C object CMakeFiles/test_am_mock.dir/src/core/pth_loader.c.o
+[  7%] Building C object CMakeFiles/cml_shared.dir/src/core/threefry.c.o
+[  8%] Building C object CMakeFiles/test_nv_mock.dir/src/core/threefry.c.o
+[  8%] Building C object CMakeFiles/cml_shared.dir/src/core/mlperf_logging.c.o
+[  8%] Building C object CMakeFiles/test_am_mock.dir/src/core/tinyfs.c.o
+[  8%] Building C object CMakeFiles/test_am_mock.dir/src/core/threefry.c.o
+[  8%] Building C object CMakeFiles/cml_static.dir/src/core/pth_loader.c.o
+[  8%] Building C object CMakeFiles/cml_static.dir/src/core/tinyfs.c.o
+[  8%] Building C object CMakeFiles/cml_shared.dir/src/core/hevc.c.o
+[  8%] Building C object CMakeFiles/test_am_mock.dir/src/core/mlperf_logging.c.o
+[  8%] Building C object CMakeFiles/test_nv_mock.dir/src/core/mlperf_logging.c.o
+[  8%] Building C object CMakeFiles/test_am_mock.dir/src/core/hevc.c.o
+[  9%] Building C object CMakeFiles/test_am_mock.dir/src/core/onnx.c.o
+[  9%] Building C object CMakeFiles/test_am_mock.dir/src/core/onnx_ops.c.o
+[  9%] Building C object CMakeFiles/cml_shared.dir/src/core/onnx.c.o
+[  9%] Building C object CMakeFiles/cml_static.dir/src/core/threefry.c.o
+[  9%] Building C object CMakeFiles/cml_shared.dir/src/core/onnx_ops.c.o
+[  9%] Building C object CMakeFiles/cml_static.dir/src/core/mlperf_logging.c.o
+[  9%] Building C object CMakeFiles/test_nv_mock.dir/src/core/hevc.c.o
+[  9%] Building C object CMakeFiles/cml.dir/src/alloc/tlsf_alloc.c.o
+[  9%] Building C object CMakeFiles/cml.dir/src/backend/backend.c.o
+[  9%] Building C object CMakeFiles/cml.dir/src/backend/backend_buffer.c.o
+[  9%] Building C object CMakeFiles/cml_static.dir/src/core/hevc.c.o
+[  9%] Building C object CMakeFiles/test_nv_mock.dir/src/core/onnx.c.o
+[ 10%] Building C object CMakeFiles/cml_shared.dir/src/alloc/memory_management.c.o
+[ 10%] Building C object CMakeFiles/test_am_mock.dir/src/alloc/memory_management.c.o
+[ 10%] Building C object CMakeFiles/cml_shared.dir/src/alloc/memory_pools.c.o
+[ 10%] Building C object CMakeFiles/test_nv_mock.dir/src/core/onnx_ops.c.o
+[ 10%] Building C object CMakeFiles/cml_static.dir/src/core/onnx.c.o
+[ 10%] Building C object CMakeFiles/cml.dir/src/backend/device.c.o
+[ 10%] Building C object CMakeFiles/test_am_mock.dir/src/alloc/memory_pools.c.o
+[ 10%] Building C object CMakeFiles/cml_shared.dir/src/alloc/graph_allocator.c.o
+[ 10%] Building C object CMakeFiles/cml_static.dir/src/core/onnx_ops.c.o
+[ 10%] Building C object CMakeFiles/cml_static.dir/src/alloc/memory_management.c.o
+[ 10%] Building C object CMakeFiles/cml.dir/src/backend/threadpool.c.o
+[ 10%] Building C object CMakeFiles/test_am_mock.dir/src/alloc/graph_allocator.c.o
+[ 11%] Building C object CMakeFiles/cml.dir/src/backend/profiling.c.o
+[ 11%] Building C object CMakeFiles/test_nv_mock.dir/src/alloc/memory_management.c.o
+[ 11%] Building C object CMakeFiles/test_am_mock.dir/src/alloc/tlsf_alloc.c.o
+[ 11%] Building C object CMakeFiles/cml_shared.dir/src/alloc/tlsf_alloc.c.o
+[ 11%] Building C object CMakeFiles/test_nv_mock.dir/src/alloc/graph_allocator.c.o
+[ 11%] Building C object CMakeFiles/test_nv_mock.dir/src/alloc/memory_pools.c.o
+[ 11%] Building C object CMakeFiles/cml.dir/src/backend/blas.c.o
+[ 11%] Building C object CMakeFiles/test_am_mock.dir/src/backend/backend.c.o
+[ 11%] Building C object CMakeFiles/cml_shared.dir/src/backend/backend.c.o
+[ 11%] Building C object CMakeFiles/cml_shared.dir/src/backend/backend_buffer.c.o
+[ 11%] Building C object CMakeFiles/cml.dir/src/backend/opencl_backend.c.o
+[ 11%] Building C object CMakeFiles/cml_static.dir/src/alloc/memory_pools.c.o
+[ 11%] Building C object CMakeFiles/cml_static.dir/src/alloc/graph_allocator.c.o
+[ 11%] Building C object CMakeFiles/cml_shared.dir/src/backend/device.c.o
+[ 11%] Building C object CMakeFiles/cml_shared.dir/src/backend/threadpool.c.o
+[ 11%] Building C object CMakeFiles/cml.dir/src/backend/null_device.c.o
+[ 11%] Building C object CMakeFiles/cml_static.dir/src/alloc/tlsf_alloc.c.o
+[ 11%] Building C object CMakeFiles/cml_static.dir/src/backend/backend_buffer.c.o
+[ 12%] Building C object CMakeFiles/cml_static.dir/src/backend/backend.c.o
+[ 12%] Building C object CMakeFiles/test_nv_mock.dir/src/alloc/tlsf_alloc.c.o
+[ 12%] Building C object CMakeFiles/cml_shared.dir/src/backend/profiling.c.o
+[ 12%] Building C object CMakeFiles/cml.dir/src/backend/disk_backend.c.o
+[ 12%] Building C object CMakeFiles/cml_static.dir/src/backend/device.c.o
+[ 12%] Building C object CMakeFiles/cml_static.dir/src/backend/threadpool.c.o
+[ 12%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/backend.c.o
+[ 12%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/backend_buffer.c.o
+[ 12%] Building C object CMakeFiles/cml.dir/src/backend/usb_device.c.o
+[ 12%] Building C object CMakeFiles/cml_static.dir/src/backend/profiling.c.o
+[ 12%] Building C object CMakeFiles/cml_static.dir/src/backend/blas.c.o
+[ 12%] Building C object CMakeFiles/cml.dir/src/backend/remote_device.c.o
+[ 12%] Building C object CMakeFiles/test_am_mock.dir/src/backend/backend_buffer.c.o
+[ 12%] Building C object CMakeFiles/cml_shared.dir/src/backend/blas.c.o
+[ 12%] Building C object CMakeFiles/cml.dir/src/backend/usb3_gpu.c.o
+[ 12%] Building C object CMakeFiles/test_am_mock.dir/src/backend/device.c.o
+[ 12%] Building C object CMakeFiles/cml_shared.dir/src/backend/opencl_backend.c.o
+[ 12%] Building C object CMakeFiles/test_am_mock.dir/src/backend/threadpool.c.o
+[ 12%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/device.c.o
+[ 12%] Building C object CMakeFiles/cml_shared.dir/src/backend/null_device.c.o
+[ 12%] Building C object CMakeFiles/cml.dir/src/backend/thunder_executor.c.o
+[ 12%] Building C object CMakeFiles/test_am_mock.dir/src/backend/profiling.c.o
+[ 12%] Building C object CMakeFiles/cml_static.dir/src/backend/opencl_backend.c.o
+[ 12%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/threadpool.c.o
+[ 12%] Building C object CMakeFiles/cml.dir/src/ops/uops.c.o
+[ 12%] Building C object CMakeFiles/test_am_mock.dir/src/backend/blas.c.o
+[ 12%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/profiling.c.o
+[ 12%] Building C object CMakeFiles/cml_static.dir/src/backend/null_device.c.o
+[ 12%] Building C object CMakeFiles/cml_shared.dir/src/backend/disk_backend.c.o
+[ 12%] Building C object CMakeFiles/test_am_mock.dir/src/backend/opencl_backend.c.o
+[ 12%] Building C object CMakeFiles/cml.dir/src/ops/winograd.c.o
+[ 13%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/blas.c.o
+[ 13%] Building C object CMakeFiles/test_am_mock.dir/src/backend/null_device.c.o
+[ 14%] Building C object CMakeFiles/cml_shared.dir/src/backend/usb_device.c.o
+[ 14%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/opencl_backend.c.o
+[ 14%] Building C object CMakeFiles/cml.dir/src/ops/ir/ir.c.o
+[ 15%] Building C object CMakeFiles/test_am_mock.dir/src/backend/disk_backend.c.o
+[ 15%] Building C object CMakeFiles/cml_static.dir/src/backend/disk_backend.c.o
+[ 15%] Building C object CMakeFiles/cml_shared.dir/src/backend/remote_device.c.o
+[ 15%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/null_device.c.o
+[ 15%] Building C object CMakeFiles/cml.dir/src/ops/ir/intern.c.o
+[ 15%] Building C object CMakeFiles/test_am_mock.dir/src/backend/usb_device.c.o
+[ 15%] Building C object CMakeFiles/test_am_mock.dir/src/backend/remote_device.c.o
+[ 15%] Building C object CMakeFiles/cml_shared.dir/src/backend/usb3_gpu.c.o
+[ 15%] Building C object CMakeFiles/cml_static.dir/src/backend/usb_device.c.o
+[ 15%] Building C object CMakeFiles/cml_static.dir/src/backend/remote_device.c.o
+[ 15%] Building C object CMakeFiles/cml.dir/src/ops/ir/context.c.o
+[ 15%] Building C object CMakeFiles/cml_static.dir/src/backend/usb3_gpu.c.o
+[ 15%] Building C object CMakeFiles/cml_shared.dir/src/backend/thunder_executor.c.o
+[ 15%] Building C object CMakeFiles/test_am_mock.dir/src/backend/usb3_gpu.c.o
+[ 16%] Building C object CMakeFiles/cml.dir/src/ops/ir/execution.c.o
+[ 16%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/disk_backend.c.o
+[ 16%] Building C object CMakeFiles/cml.dir/src/ops/ir/backward.c.o
+[ 16%] Building C object CMakeFiles/cml_shared.dir/src/ops/uops.c.o
+[ 16%] Building C object CMakeFiles/test_am_mock.dir/src/backend/thunder_executor.c.o
+[ 16%] Building C object CMakeFiles/cml_static.dir/src/backend/thunder_executor.c.o
+[ 16%] Building C object CMakeFiles/cml.dir/src/ops/ir/export.c.o
+[ 16%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/usb_device.c.o
+[ 16%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/remote_device.c.o
+[ 16%] Building C object CMakeFiles/cml_static.dir/src/ops/uops.c.o
+[ 16%] Building C object CMakeFiles/cml_shared.dir/src/ops/winograd.c.o
+[ 16%] Building C object CMakeFiles/test_am_mock.dir/src/ops/uops.c.o
+[ 16%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/usb3_gpu.c.o
+[ 16%] Building C object CMakeFiles/cml.dir/src/ops/ir/optimization.c.o
+[ 17%] Building C object CMakeFiles/cml_static.dir/src/ops/winograd.c.o
+[ 17%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/ir.c.o
+[ 17%] Building C object CMakeFiles/test_am_mock.dir/src/ops/winograd.c.o
+[ 17%] Building C object CMakeFiles/test_nv_mock.dir/src/backend/thunder_executor.c.o
+[ 17%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/intern.c.o
+[ 17%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/ir.c.o
+[ 17%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/uops.c.o
+[ 17%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/winograd.c.o
+[ 17%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/intern.c.o
+[ 17%] Building C object CMakeFiles/cml.dir/src/ops/ir/graph_cache.c.o
+[ 17%] Building C object CMakeFiles/cml.dir/src/ops/ir/aot.c.o
+[ 17%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/ir.c.o
+[ 17%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/context.c.o
+[ 17%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/intern.c.o
+[ 17%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/ir.c.o
+[ 17%] Building C object CMakeFiles/cml.dir/src/ops/ir/kernel_cache.c.o
+[ 17%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/context.c.o
+[ 17%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/intern.c.o
+[ 17%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/context.c.o
+[ 17%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/context.c.o
+[ 18%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/execution.c.o
+[ 18%] Building C object CMakeFiles/cml.dir/src/ops/ir/disk_cache.c.o
+[ 18%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/execution.c.o
+[ 18%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/execution.c.o
+[ 18%] Building C object CMakeFiles/cml.dir/src/ops/ir/fusion_patterns.c.o
+[ 18%] Building C object CMakeFiles/cml.dir/src/ops/ir/dispatch.c.o
+[ 18%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/execution.c.o
+[ 18%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/backward.c.o
+[ 18%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/backward.c.o
+[ 18%] Building C object CMakeFiles/cml.dir/src/ops/ir/decompose.c.o
+[ 18%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/backward.c.o
+[ 18%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/backward.c.o
+[ 18%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/export.c.o
+[ 18%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/export.c.o
+[ 18%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/optimization.c.o
+[ 19%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/optimization.c.o
+[ 19%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/export.c.o
+[ 19%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/export.c.o
+[ 19%] Building C object CMakeFiles/cml.dir/src/ops/ir/pattern_matcher.c.o
+[ 19%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/graph_cache.c.o
+[ 19%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/optimization.c.o
+[ 19%] Building C object CMakeFiles/cml.dir/src/ops/ir/tree_automaton.c.o
+[ 19%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/graph_cache.c.o
+[ 19%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/graph_cache.c.o
+[ 19%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/aot.c.o
+[ 19%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/aot.c.o
+[ 19%] Building C object CMakeFiles/cml.dir/src/ops/ir/hcq.c.o
+[ 20%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/aot.c.o
+[ 21%] Building C object CMakeFiles/cml.dir/src/ops/ir/hcq_cuda.c.o
+[ 21%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/kernel_cache.c.o
+[ 21%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/kernel_cache.c.o
+[ 21%] Building C object CMakeFiles/cml.dir/src/ops/ir/hcq_opencl.c.o
+[ 21%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/kernel_cache.c.o
+[ 21%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/disk_cache.c.o
+[ 21%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/optimization.c.o
+[ 21%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/fusion_patterns.c.o
+[ 21%] Building C object CMakeFiles/cml.dir/src/ops/ir/hcq_vulkan.c.o
+[ 21%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/disk_cache.c.o
+[ 21%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/graph_cache.c.o
+[ 21%] Building C object CMakeFiles/cml.dir/src/ops/ir/hcq_nv.c.o
+[ 21%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/aot.c.o
+[ 21%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/fusion_patterns.c.o
+[ 21%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/kernel_cache.c.o
+[ 21%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/dispatch.c.o
+[ 21%] Building C object CMakeFiles/cml.dir/src/ops/ir/hcq_am.c.o
+[ 21%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/dispatch.c.o
+[ 21%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/disk_cache.c.o
+[ 21%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/fusion_patterns.c.o
+[ 21%] Building C object CMakeFiles/cml.dir/src/ops/ir/beam_search.c.o
+[ 21%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/decompose.c.o
+[ 21%] Building C object CMakeFiles/cml.dir/src/ops/ir/opt_transforms.c.o
+[ 21%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/disk_cache.c.o
+[ 21%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/pattern_matcher.c.o
+[ 21%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/dispatch.c.o
+[ 21%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/decompose.c.o
+[ 21%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/fusion_patterns.c.o
+[ 21%] Building C object CMakeFiles/cml.dir/src/ops/ir/tc_opt.c.o
+[ 21%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/decompose.c.o
+[ 21%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/pattern_matcher.c.o
+[ 21%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/tree_automaton.c.o
+[ 21%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/tree_automaton.c.o
+[ 21%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/dispatch.c.o
+[ 21%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/pattern_matcher.c.o
+[ 21%] Building C object CMakeFiles/cml.dir/src/ops/ir/heuristic_opt.c.o
+[ 21%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/hcq.c.o
+[ 21%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/hcq.c.o
+[ 22%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/hcq_cuda.c.o
+[ 22%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/hcq_cuda.c.o
+[ 22%] Building C object CMakeFiles/cml.dir/src/ops/ir/trace.c.o
+[ 22%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/tree_automaton.c.o
+[ 22%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/hcq.c.o
+[ 22%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/hcq_cuda.c.o
+[ 22%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/hcq_opencl.c.o
+[ 23%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/decompose.c.o
+[ 23%] Building C object CMakeFiles/cml.dir/src/ops/ir/tiny_jit.c.o
+[ 23%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/hcq_opencl.c.o
+[ 23%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/hcq_vulkan.c.o
+[ 23%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/pattern_matcher.c.o
+[ 23%] Building C object CMakeFiles/cml.dir/src/ops/ir/beam_cuda_timing.c.o
+[ 23%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/tree_automaton.c.o
+[ 23%] Building C object CMakeFiles/cml.dir/src/ops/ir/schedule.c.o
+[ 23%] Building C object CMakeFiles/cml.dir/src/ops/ir/schedule_v2.c.o
+[ 23%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/hcq_vulkan.c.o
+[ 23%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/hcq_opencl.c.o
+[ 23%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/hcq_nv.c.o
+[ 23%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/hcq_am.c.o
+[ 23%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/hcq.c.o
+[ 23%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/beam_search.c.o
+[ 24%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/hcq_nv.c.o
+[ 24%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/hcq_am.c.o
+[ 24%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/hcq_vulkan.c.o
+[ 24%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/opt_transforms.c.o
+[ 24%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/beam_search.c.o
+[ 24%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/hcq_nv.c.o
+[ 25%] Building C object CMakeFiles/cml.dir/src/ops/ir/linearize.c.o
+[ 25%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/tc_opt.c.o
+[ 25%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/opt_transforms.c.o
+[ 25%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/hcq_cuda.c.o
+[ 25%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/hcq_am.c.o
+[ 25%] Building C object CMakeFiles/cml.dir/src/ops/ir/rangeify.c.o
+[ 25%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/heuristic_opt.c.o
+[ 25%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/tc_opt.c.o
+[ 25%] Building C object CMakeFiles/cml.dir/src/ops/ir/fused_codegen.c.o
+[ 25%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/heuristic_opt.c.o
+[ 26%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/beam_search.c.o
+[ 26%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/hcq_opencl.c.o
+[ 26%] Building C object CMakeFiles/cml.dir/src/ops/ir/runtime_compiler.c.o
+[ 26%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/trace.c.o
+[ 26%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/trace.c.o
+[ 26%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/tiny_jit.c.o
+[ 26%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/hcq_vulkan.c.o
+[ 26%] Building C object CMakeFiles/cml.dir/src/ops/ir/graph_capture.c.o
+[ 26%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/opt_transforms.c.o
+[ 26%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/tiny_jit.c.o
+[ 26%] Building C object CMakeFiles/cml.dir/src/ops/ir/nir_compiler.c.o
+[ 26%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/hcq_nv.c.o
+[ 26%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/hcq_am.c.o
+[ 26%] Building C object CMakeFiles/cml.dir/src/ops/ir/hcq_nir.c.o
+[ 26%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/beam_cuda_timing.c.o
+[ 26%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/beam_cuda_timing.c.o
+[ 26%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/schedule.c.o
+[ 26%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/tc_opt.c.o
+[ 26%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/beam_search.c.o
+[ 26%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/schedule_v2.c.o
+[ 26%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/linearize.c.o
+[ 26%] Building C object CMakeFiles/cml.dir/src/ops/ir/z3_verify.c.o
+[ 26%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/schedule.c.o
+[ 26%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/heuristic_opt.c.o
+[ 26%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/rangeify.c.o
+[ 26%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/schedule_v2.c.o
+[ 26%] Building C object CMakeFiles/cml.dir/src/ops/ir/compiler_viz.c.o
+[ 26%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/opt_transforms.c.o
+[ 26%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/fused_codegen.c.o
+[ 27%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/runtime_compiler.c.o
+[ 27%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/trace.c.o
+[ 27%] Building C object CMakeFiles/cml.dir/src/ops/ir/process_replay.c.o
+[ 28%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/linearize.c.o
+[ 28%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/tc_opt.c.o
+[ 28%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/graph_capture.c.o
+[ 28%] Building C object CMakeFiles/cml.dir/src/ops/ir/memory_planner.c.o
+[ 28%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/heuristic_opt.c.o
+[ 28%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/tiny_jit.c.o
+[ 28%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/rangeify.c.o
+[ 28%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/nir_compiler.c.o
+[ 28%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/hcq_nir.c.o
+[ 28%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/trace.c.o
+[ 28%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/beam_cuda_timing.c.o
+[ 28%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/cuda_backend.c.o
+[ 28%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/cuda_graph_replay.c.o
+[ 28%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/fused_codegen.c.o
+[ 28%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/z3_verify.c.o
+[ 28%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/schedule.c.o
+[ 28%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/schedule_v2.c.o
+[ 29%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/tiny_jit.c.o
+[ 29%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/runtime_compiler.c.o
+[ 29%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/graph_capture.c.o
+[ 29%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/beam_cuda_timing.c.o
+[ 29%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/nir_compiler.c.o
+[ 30%] Building C object CMakeFiles/cml.dir/src/ops/ir/multi_output.c.o
+[ 30%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/compiler_viz.c.o
+[ 30%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/linearize.c.o
+[ 30%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/process_replay.c.o
+[ 30%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/schedule.c.o
+[ 30%] Building C object CMakeFiles/cml.dir/src/ops/ir/cross_boundary_fusion.c.o
+[ 30%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/hcq_nir.c.o
+[ 30%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/rangeify.c.o
+[ 30%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/linearize.c.o
+[ 30%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/rocm_backend.c.o
+[ 30%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/schedule_v2.c.o
+[ 30%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/memory_planner.c.o
+[ 30%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/z3_verify.c.o
+[ 30%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/rangeify.c.o
+[ 30%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/wmma.c.o
+[ 30%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/compiler_viz.c.o
+[ 30%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/fused_codegen.c.o
+[ 30%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/cuda_backend.c.o
+[ 30%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/fused_codegen.c.o
+[ 30%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/process_replay.c.o
+[ 30%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/runtime_compiler.c.o
+[ 30%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/runtime_compiler.c.o
+[ 30%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/wgsl_codegen.c.o
+[ 30%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/ptx_codegen.c.o
+[ 30%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/cuda_graph_replay.c.o
+[ 30%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/nv_driver.c.o
+[ 30%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/memory_planner.c.o
+[ 30%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/multi_output.c.o
+[ 30%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/graph_capture.c.o
+[ 30%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/cross_boundary_fusion.c.o
+[ 30%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/cuda_backend.c.o
+[ 30%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/nv_qmd.c.o
+[ 30%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/cuda_graph_replay.c.o
+[ 30%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/am_driver.c.o
+[ 30%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/graph_capture.c.o
+[ 31%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/nir_compiler.c.o
+[ 31%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/adreno_backend.c.o
+[ 31%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/rocm_backend.c.o
+[ 31%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/nir_compiler.c.o
+[ 31%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/hexagon_backend.c.o
+[ 31%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/wmma.c.o
+[ 31%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/hcq_nir.c.o
+[ 31%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/multi_output.c.o
+[ 31%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/hexagon_sim.c.o
+[ 31%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/z3_verify.c.o
+[ 31%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/compiler_viz.c.o
+[ 31%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/hcq_nir.c.o
+[ 32%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/cross_boundary_fusion.c.o
+[ 33%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/wgsl_codegen.c.o
+[ 33%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/process_replay.c.o
+[ 33%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/z3_verify.c.o
+[ 33%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/amd_profiling.c.o
+[ 33%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/compiler_viz.c.o
+[ 33%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/memory_planner.c.o
+[ 33%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/cuda_backend.c.o
+[ 33%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/rocm_backend.c.o
+[ 33%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/ptx_codegen.c.o
+[ 33%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/cuda_graph_replay.c.o
+[ 33%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/wmma.c.o
+[ 33%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/amx.c.o
+[ 34%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/process_replay.c.o
+[ 34%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/multi_output.c.o
+[ 34%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/nv_driver.c.o
+[ 34%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/nv_qmd.c.o
+[ 34%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/wgsl_codegen.c.o
+[ 34%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/ptx_codegen.c.o
+[ 34%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/rocm_backend.c.o
+[ 34%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/cross_boundary_fusion.c.o
+[ 34%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/memory_planner.c.o
+[ 34%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/cuda_backend.c.o
+[ 34%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/am_driver.c.o
+[ 35%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/xmx.c.o
+[ 35%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/nv_driver.c.o
+[ 35%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/adreno_backend.c.o
+[ 35%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/cuda_graph_replay.c.o
+[ 35%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/hexagon_backend.c.o
+[ 35%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/nv_qmd.c.o
+[ 35%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/rdna3_emu.c.o
+[ 35%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/wmma.c.o
+[ 35%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/wgsl_codegen.c.o
+[ 35%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/multi_output.c.o
+[ 35%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/cross_boundary_fusion.c.o
+[ 35%] Building C object CMakeFiles/cml.dir/src/ops/simd_utils.c.o
+[ 35%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/rocm_backend.c.o
+[ 35%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/wmma.c.o
+[ 35%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/hexagon_sim.c.o
+[ 35%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/am_driver.c.o
+[ 35%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/amd_profiling.c.o
+[ 35%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/amx.c.o
+[ 36%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/ptx_codegen.c.o
+[ 36%] Building C object CMakeFiles/cml.dir/src/ops/simd_math.c.o
+[ 36%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/wgsl_codegen.c.o
+[ 36%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/xmx.c.o
+[ 36%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/ptx_codegen.c.o
+[ 36%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/nv_driver.c.o
+[ 36%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/adreno_backend.c.o
+[ 36%] Building C object CMakeFiles/cml.dir/src/ops/simd_views.c.o
+[ 36%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/nv_driver.c.o
+[ 36%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/nv_qmd.c.o
+[ 36%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/nv_qmd.c.o
+[ 36%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/am_driver.c.o
+[ 36%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/am_driver.c.o
+[ 36%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/hexagon_backend.c.o
+[ 36%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/hexagon_sim.c.o
+[ 36%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/adreno_backend.c.o
+[ 37%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/hexagon_backend.c.o
+[ 37%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/rdna3_emu.c.o
+[ 37%] Building C object CMakeFiles/test_am_mock.dir/src/ops/simd_utils.c.o
+[ 37%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/amd_profiling.c.o
+[ 38%] Building C object CMakeFiles/test_am_mock.dir/src/ops/simd_math.c.o
+[ 38%] Building C object CMakeFiles/test_am_mock.dir/src/ops/simd_views.c.o
+[ 38%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/hexagon_sim.c.o
+[ 38%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/webgpu_backend.c.o
+[ 38%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/webgpu_backend.c.o
+[ 38%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/adreno_backend.c.o
+[ 38%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/amx.c.o
+[ 38%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/amd_profiling.c.o
+[ 38%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/vulkan_backend.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/xmx.c.o
+[ 39%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/hexagon_backend.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/rdna3_emu.c.o
+[ 39%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/vulkan_backend.c.o
+[ 39%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/amx.c.o
+[ 39%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/hexagon_sim.c.o
+[ 39%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/spirv_codegen.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/simd_utils.c.o
+[ 39%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/spirv_codegen.c.o
+[ 39%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/opencl_ir_backend.c.o
+[ 39%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/amd_profiling.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/simd_math.c.o
+[ 39%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/nak_backend.c.o
+[ 39%] Building C object CMakeFiles/cml.dir/src/ops/ir/spec.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/simd_views.c.o
+[ 39%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/amx.c.o
+[ 39%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/opencl_ir_backend.c.o
+[ 39%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/xmx.c.o
+[ 39%] Building C object CMakeFiles/cml.dir/src/ops/ir/late_passes.c.o
+[ 39%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/xmx.c.o
+[ 39%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/rdna3_emu.c.o
+[ 39%] Building C object CMakeFiles/cml_static.dir/src/ops/simd_utils.c.o
+[ 39%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/rdna3_emu.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/webgpu_backend.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/vulkan_backend.c.o
+[ 39%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/nak_backend.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/spirv_codegen.c.o
+[ 39%] Building C object CMakeFiles/cml_shared.dir/src/ops/simd_utils.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/opencl_ir_backend.c.o
+[ 39%] Building C object CMakeFiles/cml_static.dir/src/ops/simd_math.c.o
+[ 39%] Building C object CMakeFiles/cml_shared.dir/src/ops/simd_math.c.o
+[ 39%] Building C object CMakeFiles/cml.dir/src/ops/ir/validate.c.o
+[ 39%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/webgpu_backend.c.o
+[ 39%] Building C object CMakeFiles/cml_static.dir/src/ops/simd_views.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/nak_backend.c.o
+[ 39%] Building C object CMakeFiles/cml.dir/src/ops/ir/viz_server.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/spec.c.o
+[ 39%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/spec.c.o
+[ 39%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/vulkan_backend.c.o
+[ 39%] Building C object CMakeFiles/cml_shared.dir/src/ops/simd_views.c.o
+[ 39%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/late_passes.c.o
+[ 39%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/spirv_codegen.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/late_passes.c.o
+[ 39%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/validate.c.o
+[ 40%] Building C object CMakeFiles/cml.dir/src/ops/ir/schedule_indexing.c.o
+[ 41%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/webgpu_backend.c.o
+[ 41%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/validate.c.o
+[ 41%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/viz_server.c.o
+[ 41%] Building C object CMakeFiles/cml.dir/src/ops/ir/schedule_multi.c.o
+[ 41%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/viz_server.c.o
+[ 41%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/vulkan_backend.c.o
+[ 41%] Building C object CMakeFiles/cml.dir/src/ops/ir/schedule_allreduce.c.o
+[ 42%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/schedule_indexing.c.o
+[ 42%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/schedule_indexing.c.o
+[ 42%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/schedule_multi.c.o
+[ 42%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/spirv_codegen.c.o
+[ 42%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/opencl_ir_backend.c.o
+[ 42%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/schedule_allreduce.c.o
+[ 42%] Building C object CMakeFiles/cml.dir/src/ops/ir/llvm/llvm_backend.c.o
+[ 42%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/gpu_codegen.c.o
+[ 42%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/schedule_multi.c.o
+[ 42%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/nak_backend.c.o
+[ 42%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/opencl_ir_backend.c.o
+[ 42%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/llvm/llvm_backend.c.o
+[ 42%] Building C object CMakeFiles/cml.dir/src/ops/ir/gpu/amd_llvm.c.o
+[ 42%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/schedule_allreduce.c.o
+[ 42%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/gpu_codegen.c.o
+[ 42%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/nak_backend.c.o
+[ 43%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/spec.c.o
+[ 43%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/late_passes.c.o
+[ 43%] Building C object CMakeFiles/cml.dir/src/tensor/tensor.c.o
+[ 43%] Building C object CMakeFiles/test_nv_mock.dir/src/ops/ir/gpu/amd_llvm.c.o
+[ 44%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/llvm/llvm_backend.c.o
+[ 44%] Building C object CMakeFiles/cml.dir/src/tensor/tensor_views.c.o
+[ 44%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/validate.c.o
+[ 44%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/spec.c.o
+[ 44%] Building C object CMakeFiles/test_nv_mock.dir/src/tensor/tensor.c.o
+[ 44%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/gpu_codegen.c.o
+[ 44%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/viz_server.c.o
+[ 44%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/schedule_indexing.c.o
+[ 44%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/late_passes.c.o
+[ 44%] Building C object CMakeFiles/cml.dir/src/tensor/tensor_manipulation.c.o
+[ 44%] Building C object CMakeFiles/test_am_mock.dir/src/ops/ir/gpu/amd_llvm.c.o
+[ 44%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/schedule_multi.c.o
+[ 44%] Building C object CMakeFiles/test_nv_mock.dir/src/tensor/tensor_views.c.o
+[ 44%] Building C object CMakeFiles/cml.dir/src/tensor/tensor_ops_extra.c.o
+[ 44%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/validate.c.o
+[ 44%] Building C object CMakeFiles/test_nv_mock.dir/src/tensor/tensor_manipulation.c.o
+[ 44%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/schedule_allreduce.c.o
+[ 44%] Building C object CMakeFiles/cml.dir/src/tensor/sparse_tensor.c.o
+[ 44%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/llvm/llvm_backend.c.o
+[ 44%] Building C object CMakeFiles/test_am_mock.dir/src/tensor/tensor.c.o
+[ 44%] Building C object CMakeFiles/test_am_mock.dir/src/tensor/tensor_views.c.o
+[ 44%] Building C object CMakeFiles/cml.dir/src/tensor/image_dtype.c.o
+[ 44%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/gpu_codegen.c.o
+[ 44%] Building C object CMakeFiles/test_nv_mock.dir/src/tensor/tensor_ops_extra.c.o
+[ 44%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/viz_server.c.o
+[ 44%] Building C object CMakeFiles/test_am_mock.dir/src/tensor/tensor_manipulation.c.o
+[ 44%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/schedule_indexing.c.o
+[ 44%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/schedule_multi.c.o
+[ 44%] Building C object CMakeFiles/cml_static.dir/src/ops/ir/gpu/amd_llvm.c.o
+[ 44%] Building C object CMakeFiles/cml.dir/src/tensor/shard.c.o
+[ 44%] Building C object CMakeFiles/cml.dir/src/tensor/tensor_hash.c.o
+[ 44%] Building C object CMakeFiles/cml_static.dir/src/tensor/tensor.c.o
+[ 44%] Building C object CMakeFiles/test_nv_mock.dir/src/tensor/sparse_tensor.c.o
+[ 44%] Building C object CMakeFiles/cml_static.dir/src/tensor/tensor_views.c.o
+[ 44%] Building C object CMakeFiles/test_nv_mock.dir/src/tensor/image_dtype.c.o
+[ 45%] Building C object CMakeFiles/cml.dir/src/tensor/shape_tracker.c.o
+[ 45%] Building C object CMakeFiles/test_am_mock.dir/src/tensor/tensor_ops_extra.c.o
+[ 45%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/schedule_allreduce.c.o
+[ 45%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/llvm/llvm_backend.c.o
+[ 45%] Building C object CMakeFiles/cml.dir/src/tensor/dtype_vec.c.o
+[ 45%] Building C object CMakeFiles/test_am_mock.dir/src/tensor/image_dtype.c.o
+[ 45%] Building C object CMakeFiles/test_am_mock.dir/src/tensor/sparse_tensor.c.o
+[ 45%] Building C object CMakeFiles/test_am_mock.dir/src/tensor/shard.c.o
+[ 45%] Building C object CMakeFiles/test_nv_mock.dir/src/tensor/shard.c.o
+[ 45%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/gpu_codegen.c.o
+[ 46%] Building C object CMakeFiles/cml_shared.dir/src/ops/ir/gpu/amd_llvm.c.o
+[ 46%] Building C object CMakeFiles/test_nv_mock.dir/src/tensor/tensor_hash.c.o
+[ 46%] Building C object CMakeFiles/cml_shared.dir/src/tensor/tensor.c.o
+[ 46%] Building C object CMakeFiles/cml.dir/src/tensor/realize.c.o
+[ 46%] Building C object CMakeFiles/cml.dir/src/autograd/autograd.c.o
+[ 46%] Building C object CMakeFiles/cml_shared.dir/src/tensor/tensor_views.c.o
+[ 47%] Building C object CMakeFiles/test_nv_mock.dir/src/tensor/shape_tracker.c.o
+[ 47%] Building C object CMakeFiles/test_nv_mock.dir/src/tensor/dtype_vec.c.o
+[ 47%] Building C object CMakeFiles/cml.dir/src/autograd/forward_ops.c.o
+[ 47%] Building C object CMakeFiles/cml_shared.dir/src/tensor/tensor_manipulation.c.o
+[ 47%] Building C object CMakeFiles/cml_static.dir/src/tensor/tensor_manipulation.c.o
+[ 47%] Building C object CMakeFiles/cml.dir/src/autograd/loss_functions.c.o
+[ 47%] Building C object CMakeFiles/test_nv_mock.dir/src/tensor/realize.c.o
+[ 47%] Building C object CMakeFiles/test_am_mock.dir/src/tensor/tensor_hash.c.o
+[ 47%] Building C object CMakeFiles/cml_static.dir/src/tensor/tensor_ops_extra.c.o
+[ 47%] Building C object CMakeFiles/cml_shared.dir/src/tensor/tensor_ops_extra.c.o
+[ 47%] Building C object CMakeFiles/test_nv_mock.dir/src/autograd/autograd.c.o
+[ 47%] Building C object CMakeFiles/test_am_mock.dir/src/tensor/shape_tracker.c.o
+[ 47%] Building C object CMakeFiles/test_nv_mock.dir/src/autograd/forward_ops.c.o
+[ 47%] Building C object CMakeFiles/cml.dir/src/autograd/checkpointing.c.o
+[ 47%] Building C object CMakeFiles/test_am_mock.dir/src/tensor/dtype_vec.c.o
+[ 47%] Building C object CMakeFiles/cml_shared.dir/src/tensor/sparse_tensor.c.o
+[ 47%] Building C object CMakeFiles/cml.dir/src/autograd/amp.c.o
+[ 47%] Building C object CMakeFiles/test_am_mock.dir/src/tensor/realize.c.o
+[ 47%] Building C object CMakeFiles/cml_shared.dir/src/tensor/image_dtype.c.o
+[ 47%] Building C object CMakeFiles/cml.dir/src/nn.c.o
+[ 47%] Building C object CMakeFiles/test_nv_mock.dir/src/autograd/loss_functions.c.o
+[ 47%] Building C object CMakeFiles/test_nv_mock.dir/src/autograd/checkpointing.c.o
+[ 47%] Building C object CMakeFiles/cml.dir/src/nn/model_io.c.o
+[ 48%] Building C object CMakeFiles/cml_static.dir/src/tensor/sparse_tensor.c.o
+[ 48%] Building C object CMakeFiles/cml_static.dir/src/tensor/image_dtype.c.o
+[ 48%] Building C object CMakeFiles/test_nv_mock.dir/src/autograd/amp.c.o
+[ 48%] Building C object CMakeFiles/test_nv_mock.dir/src/nn.c.o
+[ 49%] Building C object CMakeFiles/test_am_mock.dir/src/autograd/autograd.c.o
+[ 49%] Building C object CMakeFiles/cml_static.dir/src/tensor/shard.c.o
+[ 49%] Building C object CMakeFiles/cml_shared.dir/src/tensor/shard.c.o
+[ 49%] Building C object CMakeFiles/cml.dir/src/nn/layers/linear.c.o
+[ 49%] Building C object CMakeFiles/cml_shared.dir/src/tensor/tensor_hash.c.o
+[ 49%] Building C object CMakeFiles/test_am_mock.dir/src/autograd/forward_ops.c.o
+[ 49%] Building C object CMakeFiles/cml_static.dir/src/tensor/tensor_hash.c.o
+[ 49%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/model_io.c.o
+[ 49%] Building C object CMakeFiles/cml_shared.dir/src/tensor/shape_tracker.c.o
+[ 49%] Building C object CMakeFiles/cml_static.dir/src/tensor/shape_tracker.c.o
+[ 49%] Building C object CMakeFiles/cml.dir/src/nn/layers/activations.c.o
+[ 49%] Building C object CMakeFiles/test_am_mock.dir/src/autograd/loss_functions.c.o
+[ 49%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/linear.c.o
+[ 49%] Building C object CMakeFiles/cml_shared.dir/src/tensor/dtype_vec.c.o
+[ 49%] Building C object CMakeFiles/cml.dir/src/nn/layers/dropout.c.o
+[ 49%] Building C object CMakeFiles/cml_static.dir/src/tensor/dtype_vec.c.o
+[ 49%] Building C object CMakeFiles/cml_shared.dir/src/tensor/realize.c.o
+[ 49%] Building C object CMakeFiles/test_am_mock.dir/src/autograd/checkpointing.c.o
+[ 50%] Building C object CMakeFiles/cml.dir/src/nn/layers/conv2d.c.o
+[ 50%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/activations.c.o
+[ 50%] Building C object CMakeFiles/test_am_mock.dir/src/autograd/amp.c.o
+[ 50%] Building C object CMakeFiles/test_am_mock.dir/src/nn.c.o
+[ 50%] Building C object CMakeFiles/cml_static.dir/src/tensor/realize.c.o
+[ 50%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/dropout.c.o
+[ 50%] Building C object CMakeFiles/cml.dir/src/nn/layers/batchnorm2d.c.o
+[ 50%] Building C object CMakeFiles/test_am_mock.dir/src/nn/model_io.c.o
+[ 50%] Building C object CMakeFiles/cml.dir/src/nn/layers/layernorm.c.o
+[ 51%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/batchnorm2d.c.o
+[ 51%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/conv2d.c.o
+[ 51%] Building C object CMakeFiles/cml_shared.dir/src/autograd/autograd.c.o
+[ 51%] Building C object CMakeFiles/cml_static.dir/src/autograd/autograd.c.o
+[ 51%] Building C object CMakeFiles/cml.dir/src/nn/layers/pooling.c.o
+[ 51%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/layernorm.c.o
+[ 51%] Building C object CMakeFiles/cml.dir/src/nn/layers/sequential.c.o
+[ 51%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/linear.c.o
+[ 51%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/activations.c.o
+[ 51%] Building C object CMakeFiles/cml.dir/src/nn/layers/conv1d.c.o
+[ 51%] Building C object CMakeFiles/cml_static.dir/src/autograd/forward_ops.c.o
+[ 52%] Building C object CMakeFiles/cml_shared.dir/src/autograd/forward_ops.c.o
+[ 52%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/dropout.c.o
+[ 52%] Building C object CMakeFiles/cml_shared.dir/src/autograd/loss_functions.c.o
+[ 52%] Building C object CMakeFiles/cml_shared.dir/src/autograd/checkpointing.c.o
+[ 52%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/pooling.c.o
+[ 52%] Building C object CMakeFiles/cml.dir/src/nn/layers/conv3d.c.o
+[ 52%] Building C object CMakeFiles/cml.dir/src/nn/layers/groupnorm.c.o
+[ 52%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/conv2d.c.o
+[ 52%] Building C object CMakeFiles/cml_shared.dir/src/autograd/amp.c.o
+[ 52%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/batchnorm2d.c.o
+[ 52%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/sequential.c.o
+[ 52%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/layernorm.c.o
+[ 52%] Building C object CMakeFiles/cml_static.dir/src/autograd/loss_functions.c.o
+[ 52%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/conv1d.c.o
+[ 52%] Building C object CMakeFiles/cml.dir/src/nn/layers/embedding.c.o
+[ 52%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/pooling.c.o
+[ 52%] Building C object CMakeFiles/cml_shared.dir/src/nn.c.o
+[ 52%] Building C object CMakeFiles/cml_shared.dir/src/nn/model_io.c.o
+[ 52%] Building C object CMakeFiles/cml_static.dir/src/autograd/checkpointing.c.o
+[ 53%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/sequential.c.o
+[ 53%] Building C object CMakeFiles/cml.dir/src/nn/layers/containers.c.o
+[ 53%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/groupnorm.c.o
+[ 53%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/conv3d.c.o
+[ 53%] Building C object CMakeFiles/cml_static.dir/src/autograd/amp.c.o
+[ 53%] Building C object CMakeFiles/cml_static.dir/src/nn.c.o
+[ 53%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/linear.c.o
+[ 53%] Building C object CMakeFiles/cml.dir/src/nn/layers/rnn.c.o
+[ 53%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/embedding.c.o
+[ 53%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/conv1d.c.o
+[ 54%] Building C object CMakeFiles/cml_static.dir/src/nn/model_io.c.o
+[ 54%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/containers.c.o
+[ 54%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/conv3d.c.o
+[ 54%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/activations.c.o
+[ 54%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/rnn.c.o
+[ 54%] Building C object CMakeFiles/cml.dir/src/nn/layers/transformer.c.o
+[ 54%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/linear.c.o
+[ 54%] Building C object CMakeFiles/cml.dir/src/nn/layers/rmsnorm.c.o
+[ 54%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/activations.c.o
+[ 54%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/dropout.c.o
+[ 54%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/groupnorm.c.o
+[ 54%] Building C object CMakeFiles/cml.dir/src/nn/layers/conv_transpose2d.c.o
+[ 54%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/transformer.c.o
+[ 54%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/conv2d.c.o
+[ 54%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/dropout.c.o
+[ 54%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/conv2d.c.o
+[ 55%] Building C object CMakeFiles/cml.dir/src/nn/layers/instancenorm.c.o
+[ 55%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/embedding.c.o
+[ 55%] Building C object CMakeFiles/cml.dir/src/nn/layers/conv_transpose1d.c.o
+[ 55%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/batchnorm2d.c.o
+[ 55%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/batchnorm2d.c.o
+[ 55%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/containers.c.o
+[ 55%] Building C object CMakeFiles/cml.dir/src/nn/layers/layernorm2d.c.o
+[ 55%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/layernorm.c.o
+[ 55%] Building C object CMakeFiles/cml.dir/src/nn/layers/conv_transpose3d.c.o
+[ 55%] Building C object CMakeFiles/cml.dir/src/nn/layers/batchnorm3d.c.o
+[ 55%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/layernorm.c.o
+[ 55%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/pooling.c.o
+[ 55%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/pooling.c.o
+[ 55%] Building C object CMakeFiles/cml.dir/src/nn/layers/upsample.c.o
+[ 55%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/sequential.c.o
+[ 55%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/rmsnorm.c.o
+[ 55%] Building C object CMakeFiles/cml.dir/src/nn/layers/pixel_shuffle.c.o
+[ 55%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/rnn.c.o
+[ 55%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/sequential.c.o
+[ 55%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/conv1d.c.o
+[ 55%] Building C object CMakeFiles/cml.dir/src/nn/layers/flatten.c.o
+[ 55%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/transformer.c.o
+[ 55%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/conv3d.c.o
+[ 55%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/conv_transpose2d.c.o
+[ 55%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/rmsnorm.c.o
+[ 56%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/instancenorm.c.o
+[ 56%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/conv_transpose2d.c.o
+[ 56%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/instancenorm.c.o
+[ 56%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/conv_transpose1d.c.o
+[ 56%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/batchnorm3d.c.o
+[ 56%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/groupnorm.c.o
+[ 56%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/embedding.c.o
+[ 56%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/conv_transpose1d.c.o
+[ 57%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/conv1d.c.o
+[ 58%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/layernorm2d.c.o
+[ 58%] Building C object CMakeFiles/cml.dir/src/nn/layers/identity.c.o
+[ 58%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/batchnorm3d.c.o
+[ 58%] Building C object CMakeFiles/cml.dir/src/nn/layers/batchnorm1d.c.o
+[ 58%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/conv_transpose3d.c.o
+[ 58%] Building C object CMakeFiles/cml.dir/src/nn/layers/prelu.c.o
+[ 58%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/conv3d.c.o
+[ 58%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/groupnorm.c.o
+[ 58%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/embedding.c.o
+[ 58%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/containers.c.o
+[ 58%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/rnn.c.o
+[ 58%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/layernorm2d.c.o
+[ 58%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/transformer.c.o
+[ 58%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/containers.c.o
+[ 58%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/upsample.c.o
+[ 58%] Building C object CMakeFiles/cml.dir/src/nn/llm_ops.c.o
+[ 58%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/conv_transpose3d.c.o
+[ 59%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/rnn.c.o
+[ 59%] Building C object CMakeFiles/cml.dir/src/nn/llama.c.o
+[ 59%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/transformer.c.o
+[ 59%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/rmsnorm.c.o
+[ 59%] Building C object CMakeFiles/cml.dir/src/nn/lora.c.o
+[ 59%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/pixel_shuffle.c.o
+[ 59%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/upsample.c.o
+[ 59%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/flatten.c.o
+[ 59%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/rmsnorm.c.o
+[ 59%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/pixel_shuffle.c.o
+[ 60%] Building C object CMakeFiles/cml.dir/src/nn/qlora.c.o
+[ 60%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/conv_transpose2d.c.o
+[ 60%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/identity.c.o
+[ 60%] Building C object CMakeFiles/cml.dir/src/nn/paged_attention.c.o
+[ 60%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/conv_transpose2d.c.o
+[ 60%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/batchnorm1d.c.o
+[ 60%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/flatten.c.o
+[ 60%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/instancenorm.c.o
+[ 60%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/conv_transpose1d.c.o
+[ 60%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/batchnorm1d.c.o
+[ 60%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/identity.c.o
+[ 60%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/instancenorm.c.o
+[ 60%] Building C object CMakeFiles/test_am_mock.dir/src/nn/layers/prelu.c.o
+[ 60%] Building C object CMakeFiles/cml.dir/src/nn/serving.c.o
+[ 60%] Building C object CMakeFiles/test_am_mock.dir/src/nn/llm_ops.c.o
+[ 60%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/conv_transpose1d.c.o
+[ 60%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/batchnorm3d.c.o
+[ 60%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/layers/prelu.c.o
+[ 60%] Building C object CMakeFiles/cml.dir/src/nn/speculative.c.o
+[ 60%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/layernorm2d.c.o
+[ 60%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/layernorm2d.c.o
+[ 60%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/batchnorm3d.c.o
+[ 60%] Building C object CMakeFiles/test_am_mock.dir/src/nn/llama.c.o
+[ 60%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/conv_transpose3d.c.o
+[ 60%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/llm_ops.c.o
+[ 60%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/conv_transpose3d.c.o
+[ 60%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/llama.c.o
+[ 60%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/upsample.c.o
+[ 60%] Building C object CMakeFiles/cml.dir/src/nn/openai_api.c.o
+[ 60%] Building C object CMakeFiles/cml.dir/src/nn/state.c.o
+[ 60%] Building C object CMakeFiles/cml.dir/src/optim.c.o
+[ 60%] Building C object CMakeFiles/test_am_mock.dir/src/nn/lora.c.o
+[ 60%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/pixel_shuffle.c.o
+[ 61%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/upsample.c.o
+[ 61%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/lora.c.o
+[ 61%] Building C object CMakeFiles/cml.dir/src/optim/lr_scheduler.c.o
+[ 61%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/flatten.c.o
+[ 61%] Building C object CMakeFiles/test_am_mock.dir/src/nn/qlora.c.o
+[ 61%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/identity.c.o
+[ 61%] Building C object CMakeFiles/cml.dir/src/symbolic/symbolic.c.o
+[ 61%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/flatten.c.o
+[ 61%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/identity.c.o
+[ 62%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/qlora.c.o
+[ 62%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/pixel_shuffle.c.o
+[ 62%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/paged_attention.c.o
+[ 62%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/batchnorm1d.c.o
+[ 62%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/serving.c.o
+[ 62%] Building C object CMakeFiles/cml.dir/src/symbolic/divandmod.c.o
+[ 62%] Building C object CMakeFiles/test_am_mock.dir/src/nn/paged_attention.c.o
+[ 63%] Building C object CMakeFiles/cml_static.dir/src/nn/layers/prelu.c.o
+[ 63%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/batchnorm1d.c.o
+[ 63%] Building C object CMakeFiles/cml.dir/src/distributed/distributed.c.o
+[ 63%] Building C object CMakeFiles/cml_shared.dir/src/nn/layers/prelu.c.o
+[ 63%] Building C object CMakeFiles/test_am_mock.dir/src/nn/serving.c.o
+[ 63%] Building C object CMakeFiles/cml_static.dir/src/nn/llm_ops.c.o
+[ 63%] Building C object CMakeFiles/cml.dir/src/distributed/comm_backend.c.o
+[ 64%] Building C object CMakeFiles/test_am_mock.dir/src/nn/speculative.c.o
+[ 64%] Building C object CMakeFiles/cml.dir/src/distributed/gloo_backend.c.o
+[ 64%] Building C object CMakeFiles/cml_shared.dir/src/nn/llama.c.o
+[ 64%] Building C object CMakeFiles/cml_shared.dir/src/nn/llm_ops.c.o
+[ 64%] Building C object CMakeFiles/cml_shared.dir/src/nn/lora.c.o
+[ 64%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/speculative.c.o
+[ 64%] Building C object CMakeFiles/cml_static.dir/src/nn/llama.c.o
+[ 64%] Building C object CMakeFiles/cml_static.dir/src/nn/lora.c.o
+[ 64%] Building C object CMakeFiles/cml_static.dir/src/nn/qlora.c.o
+[ 64%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/state.c.o
+[ 64%] Building C object CMakeFiles/test_nv_mock.dir/src/nn/openai_api.c.o
+[ 64%] Building C object CMakeFiles/test_am_mock.dir/src/nn/openai_api.c.o
+[ 64%] Building C object CMakeFiles/cml_shared.dir/src/nn/qlora.c.o
+[ 64%] Building C object CMakeFiles/cml_static.dir/src/nn/paged_attention.c.o
+[ 64%] Building C object CMakeFiles/cml.dir/src/distributed/nccl_backend.c.o
+[ 64%] Building C object CMakeFiles/test_nv_mock.dir/src/optim.c.o
+[ 64%] Building C object CMakeFiles/cml_shared.dir/src/nn/paged_attention.c.o
+[ 64%] Building C object CMakeFiles/cml_static.dir/src/nn/serving.c.o
+[ 64%] Building C object CMakeFiles/test_am_mock.dir/src/nn/state.c.o
+[ 64%] Building C object CMakeFiles/test_am_mock.dir/src/optim/lr_scheduler.c.o
+[ 64%] Building C object CMakeFiles/test_am_mock.dir/src/optim.c.o
+[ 64%] Building C object CMakeFiles/test_am_mock.dir/src/symbolic/symbolic.c.o
+[ 64%] Building C object CMakeFiles/test_nv_mock.dir/src/optim/lr_scheduler.c.o
+[ 65%] Building C object CMakeFiles/cml.dir/src/distributed/mpi_backend.c.o
+[ 65%] Building C object CMakeFiles/cml_shared.dir/src/nn/serving.c.o
+[ 65%] Building C object CMakeFiles/cml_shared.dir/src/nn/speculative.c.o
+[ 65%] Building C object CMakeFiles/cml_static.dir/src/nn/speculative.c.o
+[ 65%] Building C object CMakeFiles/cml_static.dir/src/nn/openai_api.c.o
+[ 65%] Building C object CMakeFiles/test_am_mock.dir/src/symbolic/divandmod.c.o
+[ 65%] Building C object CMakeFiles/test_am_mock.dir/src/distributed/distributed.c.o
+[ 65%] Building C object CMakeFiles/cml.dir/src/distributed/ring_allreduce.c.o
+[ 65%] Building C object CMakeFiles/cml_shared.dir/src/nn/openai_api.c.o
+[ 66%] Building C object CMakeFiles/cml_shared.dir/src/nn/state.c.o
+[ 66%] Building C object CMakeFiles/test_nv_mock.dir/src/symbolic/symbolic.c.o
+[ 66%] Building C object CMakeFiles/test_am_mock.dir/src/distributed/comm_backend.c.o
+[ 66%] Building C object CMakeFiles/test_nv_mock.dir/src/symbolic/divandmod.c.o
+[ 66%] Building C object CMakeFiles/cml_static.dir/src/nn/state.c.o
+[ 66%] Building C object CMakeFiles/cml.dir/src/distributed/data_parallel.c.o
+[ 66%] Building C object CMakeFiles/cml_shared.dir/src/optim.c.o
+[ 66%] Building C object CMakeFiles/test_nv_mock.dir/src/distributed/distributed.c.o
+[ 66%] Building C object CMakeFiles/test_am_mock.dir/src/distributed/gloo_backend.c.o
+[ 66%] Building C object CMakeFiles/cml.dir/src/distributed/pipeline_parallel.c.o
+[ 66%] Building C object CMakeFiles/cml_shared.dir/src/optim/lr_scheduler.c.o
+[ 66%] Building C object CMakeFiles/test_nv_mock.dir/src/distributed/comm_backend.c.o
+[ 66%] Building C object CMakeFiles/test_am_mock.dir/src/distributed/nccl_backend.c.o
+[ 66%] Building C object CMakeFiles/test_am_mock.dir/src/distributed/mpi_backend.c.o
+[ 66%] Building C object CMakeFiles/cml_static.dir/src/optim.c.o
+[ 66%] Building C object CMakeFiles/cml_static.dir/src/optim/lr_scheduler.c.o
+[ 66%] Building C object CMakeFiles/test_am_mock.dir/src/distributed/ring_allreduce.c.o
+[ 66%] Building C object CMakeFiles/cml_shared.dir/src/symbolic/symbolic.c.o
+[ 66%] Building C object CMakeFiles/cml.dir/src/distributed/ib_transport.c.o
+[ 66%] Building C object CMakeFiles/cml.dir/src/distributed/tensor_parallel.c.o
+[ 66%] Building C object CMakeFiles/cml_static.dir/src/symbolic/symbolic.c.o
+[ 66%] Building C object CMakeFiles/cml.dir/src/zoo/zoo.c.o
+[ 66%] Building C object CMakeFiles/test_am_mock.dir/src/distributed/data_parallel.c.o
+[ 66%] Building C object CMakeFiles/cml.dir/src/zoo/resnet.c.o
+[ 66%] Building C object CMakeFiles/cml_static.dir/src/symbolic/divandmod.c.o
+[ 66%] Building C object CMakeFiles/cml_shared.dir/src/symbolic/divandmod.c.o
+[ 66%] Building C object CMakeFiles/test_nv_mock.dir/src/distributed/gloo_backend.c.o
+[ 67%] Building C object CMakeFiles/cml_static.dir/src/distributed/distributed.c.o
+[ 67%] Building C object CMakeFiles/cml.dir/src/zoo/gpt2.c.o
+[ 68%] Building C object CMakeFiles/test_am_mock.dir/src/distributed/pipeline_parallel.c.o
+[ 68%] Building C object CMakeFiles/cml_static.dir/src/distributed/comm_backend.c.o
+[ 68%] Building C object CMakeFiles/test_nv_mock.dir/src/distributed/nccl_backend.c.o
+[ 68%] Building C object CMakeFiles/cml.dir/src/zoo/bert.c.o
+[ 69%] Building C object CMakeFiles/test_nv_mock.dir/src/distributed/mpi_backend.c.o
+[ 69%] Building C object CMakeFiles/test_am_mock.dir/src/distributed/tensor_parallel.c.o
+[ 69%] Building C object CMakeFiles/test_nv_mock.dir/src/distributed/ring_allreduce.c.o
+[ 69%] Building C object CMakeFiles/cml.dir/src/zoo/efficientnet.c.o
+[ 69%] Building C object CMakeFiles/cml_shared.dir/src/distributed/distributed.c.o
+[ 69%] Building C object CMakeFiles/test_nv_mock.dir/src/distributed/data_parallel.c.o
+[ 69%] Building C object CMakeFiles/cml.dir/src/zoo/yolov8.c.o
+[ 69%] Building C object CMakeFiles/test_am_mock.dir/src/distributed/ib_transport.c.o
+[ 69%] Building C object CMakeFiles/cml_static.dir/src/distributed/gloo_backend.c.o
+[ 69%] Building C object CMakeFiles/cml.dir/src/zoo/whisper.c.o
+[ 70%] Building C object CMakeFiles/cml.dir/src/zoo/stable_diffusion.c.o
+[ 70%] Building C object CMakeFiles/cml.dir/src/zoo/vit.c.o
+[ 70%] Building C object CMakeFiles/cml_shared.dir/src/distributed/comm_backend.c.o
+[ 70%] Building C object CMakeFiles/test_nv_mock.dir/src/distributed/tensor_parallel.c.o
+[ 70%] Building C object CMakeFiles/test_nv_mock.dir/src/distributed/pipeline_parallel.c.o
+[ 70%] Building C object CMakeFiles/cml_static.dir/src/distributed/nccl_backend.c.o
+[ 70%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/resnet.c.o
+[ 70%] Building C object CMakeFiles/cml_static.dir/src/distributed/mpi_backend.c.o
+[ 70%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/zoo.c.o
+[ 70%] Building C object CMakeFiles/test_nv_mock.dir/src/distributed/ib_transport.c.o
+[ 70%] Building C object CMakeFiles/cml_shared.dir/src/distributed/gloo_backend.c.o
+[ 70%] Building C object CMakeFiles/cml_static.dir/src/distributed/ring_allreduce.c.o
+[ 70%] Building C object CMakeFiles/cml.dir/src/zoo/clip.c.o
+[ 70%] Building C object CMakeFiles/cml_static.dir/src/distributed/data_parallel.c.o
+[ 70%] Building C object CMakeFiles/cml_shared.dir/src/distributed/nccl_backend.c.o
+[ 70%] Building C object CMakeFiles/cml_static.dir/src/distributed/pipeline_parallel.c.o
+[ 70%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/gpt2.c.o
+[ 70%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/zoo.c.o
+[ 70%] Building C object CMakeFiles/cml.dir/src/zoo/t5.c.o
+[ 70%] Building C object CMakeFiles/cml_shared.dir/src/distributed/mpi_backend.c.o
+[ 70%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/bert.c.o
+[ 70%] Building C object CMakeFiles/cml_static.dir/src/distributed/tensor_parallel.c.o
+[ 70%] Building C object CMakeFiles/cml_static.dir/src/distributed/ib_transport.c.o
+[ 70%] Building C object CMakeFiles/cml_static.dir/src/zoo/zoo.c.o
+[ 70%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/efficientnet.c.o
+[ 70%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/resnet.c.o
+[ 70%] Building C object CMakeFiles/cml.dir/src/zoo/unet.c.o
+[ 70%] Building C object CMakeFiles/cml_shared.dir/src/distributed/ring_allreduce.c.o
+[ 70%] Building C object CMakeFiles/cml_static.dir/src/zoo/resnet.c.o
+[ 70%] Building C object CMakeFiles/cml.dir/src/zoo/convnext.c.o
+[ 70%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/yolov8.c.o
+[ 70%] Building C object CMakeFiles/cml_static.dir/src/zoo/gpt2.c.o
+[ 70%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/gpt2.c.o
+[ 70%] Building C object CMakeFiles/cml_shared.dir/src/distributed/data_parallel.c.o
+[ 70%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/bert.c.o
+[ 70%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/efficientnet.c.o
+[ 71%] Building C object CMakeFiles/cml_static.dir/src/zoo/bert.c.o
+[ 71%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/whisper.c.o
+[ 71%] Building C object CMakeFiles/cml.dir/src/zoo/inception.c.o
+[ 71%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/stable_diffusion.c.o
+[ 71%] Building C object CMakeFiles/cml_shared.dir/src/distributed/pipeline_parallel.c.o
+[ 71%] Building C object CMakeFiles/cml.dir/src/zoo/retinanet.c.o
+[ 71%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/vit.c.o
+[ 71%] Building C object CMakeFiles/cml_static.dir/src/zoo/efficientnet.c.o
+[ 71%] Building C object CMakeFiles/cml.dir/src/zoo/mask_rcnn.c.o
+[ 72%] Building C object CMakeFiles/cml_shared.dir/src/distributed/tensor_parallel.c.o
+[ 72%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/yolov8.c.o
+[ 72%] Building C object CMakeFiles/cml.dir/src/zoo/unet3d.c.o
+[ 72%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/whisper.c.o
+[ 72%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/clip.c.o
+[ 72%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/stable_diffusion.c.o
+[ 72%] Building C object CMakeFiles/cml_static.dir/src/zoo/yolov8.c.o
+[ 72%] Building C object CMakeFiles/cml.dir/src/zoo/rnnt.c.o
+[ 72%] Building C object CMakeFiles/cml_shared.dir/src/distributed/ib_transport.c.o
+[ 72%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/t5.c.o
+[ 72%] Building C object CMakeFiles/cml_static.dir/src/zoo/whisper.c.o
+[ 72%] Building C object CMakeFiles/cml.dir/src/datasets/datasets.c.o
+[ 73%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/unet.c.o
+[ 73%] Building C object CMakeFiles/cml_static.dir/src/zoo/stable_diffusion.c.o
+[ 74%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/vit.c.o
+[ 74%] Building C object CMakeFiles/cml_shared.dir/src/zoo/zoo.c.o
+[ 74%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/convnext.c.o
+[ 74%] Building C object CMakeFiles/cml.dir/src/datasets/csv_parser.c.o
+[ 74%] Building C object CMakeFiles/cml_shared.dir/src/zoo/resnet.c.o
+[ 74%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/retinanet.c.o
+[ 74%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/clip.c.o
+[ 74%] Building C object CMakeFiles/cml.dir/src/datasets/idx_parser.c.o
+[ 74%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/inception.c.o
+[ 74%] Building C object CMakeFiles/cml_static.dir/src/zoo/vit.c.o
+[ 74%] Building C object CMakeFiles/cml_shared.dir/src/zoo/gpt2.c.o
+[ 74%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/t5.c.o
+[ 74%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/unet.c.o
+[ 74%] Building C object CMakeFiles/cml_shared.dir/src/zoo/bert.c.o
+[ 75%] Building C object CMakeFiles/cml.dir/src/datasets/builtin_data.c.o
+[ 75%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/unet3d.c.o
+[ 75%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/mask_rcnn.c.o
+[ 75%] Building C object CMakeFiles/cml_shared.dir/src/zoo/efficientnet.c.o
+[ 75%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/convnext.c.o
+[ 75%] Building C object CMakeFiles/cml_static.dir/src/zoo/clip.c.o
+[ 75%] Building C object CMakeFiles/cml.dir/src/datasets/loaders.c.o
+[ 75%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/retinanet.c.o
+[ 75%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/inception.c.o
+[ 75%] Building C object CMakeFiles/cml_static.dir/src/zoo/t5.c.o
+[ 75%] Building C object CMakeFiles/test_am_mock.dir/src/zoo/rnnt.c.o
+[ 75%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/mask_rcnn.c.o
+[ 75%] Building C object CMakeFiles/test_am_mock.dir/src/datasets/datasets.c.o
+[ 75%] Building C object CMakeFiles/cml_shared.dir/src/zoo/yolov8.c.o
+[ 75%] Building C object CMakeFiles/cml_static.dir/src/zoo/unet.c.o
+[ 75%] Building C object CMakeFiles/test_am_mock.dir/src/datasets/csv_parser.c.o
+[ 75%] Building C object CMakeFiles/cml_shared.dir/src/zoo/whisper.c.o
+[ 75%] Building C object CMakeFiles/test_am_mock.dir/src/datasets/idx_parser.c.o
+[ 75%] Building C object CMakeFiles/test_am_mock.dir/src/datasets/builtin_data.c.o
+[ 75%] Building C object CMakeFiles/cml_static.dir/src/zoo/convnext.c.o
+[ 75%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/unet3d.c.o
+[ 75%] Building C object CMakeFiles/cml_shared.dir/src/zoo/stable_diffusion.c.o
+[ 75%] Building C object CMakeFiles/test_am_mock.dir/src/datasets/loaders.c.o
+[ 75%] Building C object CMakeFiles/cml_static.dir/src/zoo/inception.c.o
+[ 75%] Building C object CMakeFiles/test_nv_mock.dir/src/zoo/rnnt.c.o
+[ 75%] Building C object CMakeFiles/cml_static.dir/src/zoo/retinanet.c.o
+[ 75%] Building C object CMakeFiles/cml_shared.dir/src/zoo/vit.c.o
+[ 75%] Building C object CMakeFiles/test_nv_mock.dir/src/datasets/datasets.c.o
+[ 75%] Building C object CMakeFiles/cml_shared.dir/src/zoo/clip.c.o
+[ 75%] Building C object CMakeFiles/test_nv_mock.dir/src/datasets/csv_parser.c.o
+[ 75%] Building C object CMakeFiles/test_nv_mock.dir/src/datasets/idx_parser.c.o
+[ 75%] Building C object CMakeFiles/cml_shared.dir/src/zoo/t5.c.o
+[ 75%] Building C object CMakeFiles/cml_shared.dir/src/zoo/unet.c.o
+[ 75%] Building C object CMakeFiles/cml_static.dir/src/zoo/mask_rcnn.c.o
+[ 76%] Building C object CMakeFiles/test_nv_mock.dir/src/datasets/builtin_data.c.o
+[ 76%] Building C object CMakeFiles/cml_static.dir/src/zoo/unet3d.c.o
+[ 76%] Linking C executable bin/cml
+[ 77%] Building C object CMakeFiles/cml_shared.dir/src/zoo/convnext.c.o
+[ 77%] Building C object CMakeFiles/test_nv_mock.dir/src/datasets/loaders.c.o
+[ 78%] Building C object CMakeFiles/cml_static.dir/src/zoo/rnnt.c.o
+[ 78%] Building C object CMakeFiles/cml_shared.dir/src/zoo/inception.c.o
+[ 78%] Building C object CMakeFiles/cml_static.dir/src/datasets/datasets.c.o
+[ 78%] Building C object CMakeFiles/cml_static.dir/src/datasets/csv_parser.c.o
+[ 78%] Building C object CMakeFiles/cml_shared.dir/src/zoo/retinanet.c.o
+[ 78%] Building C object CMakeFiles/cml_static.dir/src/datasets/idx_parser.c.o
+[ 78%] Building C object CMakeFiles/cml_shared.dir/src/zoo/unet3d.c.o
+[ 78%] Building C object CMakeFiles/cml_shared.dir/src/zoo/mask_rcnn.c.o
+[ 78%] Building C object CMakeFiles/cml_static.dir/src/datasets/builtin_data.c.o
+[ 78%] Building C object CMakeFiles/cml_shared.dir/src/zoo/rnnt.c.o
+[ 78%] Building C object CMakeFiles/cml_static.dir/src/datasets/loaders.c.o
+[ 78%] Building C object CMakeFiles/cml_shared.dir/src/datasets/datasets.c.o
+[ 78%] Building C object CMakeFiles/cml_shared.dir/src/datasets/csv_parser.c.o
+[ 78%] Building C object CMakeFiles/cml_shared.dir/src/datasets/idx_parser.c.o
+[ 78%] Building C object CMakeFiles/cml_shared.dir/src/datasets/loaders.c.o
+[ 78%] Building C object CMakeFiles/cml_shared.dir/src/datasets/builtin_data.c.o
+[ 78%] Linking C executable bin/test_am_mock
+[ 78%] Linking C executable bin/test_nv_mock
+[ 78%] Linking C shared library lib/libcml.so
+[ 78%] Linking C static library lib/libcml.a
+[ 78%] Built target cml
+[ 78%] Built target cml_static
+[ 78%] Building C object CMakeFiles/test_am_driver.dir/tests/test_am_driver.c.o
+[ 79%] Building C object CMakeFiles/opcheck.dir/tests/opcheck.c.o
+[ 79%] Building C object CMakeFiles/bench_backends.dir/tests/bench_backends.c.o
+[ 80%] Building C object CMakeFiles/grad_check.dir/tests/grad_check.c.o
+[ 80%] Building C object CMakeFiles/test_autograd.dir/tests/test_autograd.c.o
+[ 80%] Building C object CMakeFiles/test_backends.dir/tests/test_backends.c.o
+[ 80%] Building C object CMakeFiles/test_beam_search.dir/tests/test_beam_search.c.o
+[ 81%] Building C object CMakeFiles/test_amd_profiling.dir/tests/test_amd_profiling.c.o
+[ 81%] Building C object CMakeFiles/test_compiler_features.dir/tests/test_compiler_features.c.o
+[ 81%] Linking C executable bin/test_amd_profiling
+[ 81%] Linking C executable bin/test_backends
+[ 81%] Linking C executable bin/test_beam_search
+[ 81%] Linking C executable bin/bench_backends
+[ 81%] Linking C executable bin/test_autograd
+[ 81%] Linking C executable bin/opcheck
+[ 81%] Linking C executable bin/test_am_driver
+[ 81%] Linking C executable bin/grad_check
+[ 81%] Linking C executable bin/test_compiler_features
+[ 81%] Built target cml_shared
+[ 81%] Building C object CMakeFiles/test_convergence.dir/tests/test_convergence.c.o
+[ 81%] Built target test_nv_mock
+[ 81%] Built target test_am_mock
+[ 81%] Building C object CMakeFiles/test_cross_boundary_fusion.dir/tests/test_cross_boundary_fusion.c.o
+[ 82%] Building C object CMakeFiles/test_cuda_graph_replay.dir/tests/test_cuda_graph_replay.c.o
+[ 82%] Linking C executable bin/test_convergence
+[ 82%] Linking C executable bin/test_cross_boundary_fusion
+[ 82%] Linking C executable bin/test_cuda_graph_replay
+[ 82%] Built target opcheck
+[ 82%] Built target test_amd_profiling
+[ 82%] Built target test_backends
+[ 82%] Building C object CMakeFiles/test_disk_cache.dir/tests/test_disk_cache.c.o
+[ 82%] Built target test_beam_search
+[ 82%] Built target bench_backends
+[ 82%] Building C object CMakeFiles/test_dispatch.dir/tests/test_dispatch.c.o
+[ 82%] Building C object CMakeFiles/test_disk_backend.dir/tests/test_disk_backend.c.o
+[ 82%] Building C object CMakeFiles/test_edge_cases.dir/tests/test_edge_cases.c.o
+[ 82%] Building C object CMakeFiles/test_distributed.dir/tests/test_distributed.c.o
+[ 82%] Linking C executable bin/test_disk_cache
+[ 82%] Built target test_autograd
+[ 82%] Linking C executable bin/test_dispatch
+[ 82%] Built target test_am_driver
+[ 82%] Built target grad_check
+[ 82%] Linking C executable bin/test_disk_backend
+[ 82%] Building C object CMakeFiles/test_fp8_fnuz.dir/tests/test_fp8_fnuz.c.o
+[ 82%] Built target test_compiler_features
+[ 83%] Building C object CMakeFiles/test_fused_codegen.dir/tests/test_fused_codegen.c.o
+[ 83%] Building C object CMakeFiles/test_fuzzer_ops.dir/tests/test_fuzzer_ops.c.o
+[ 83%] Linking C executable bin/test_edge_cases
+[ 83%] Building C object CMakeFiles/test_fusion_schedule.dir/tests/test_fusion_schedule.c.o
+[ 83%] Built target test_cuda_graph_replay
+[ 83%] Linking C executable bin/test_distributed
+[ 83%] Linking C executable bin/test_fp8_fnuz
+[ 83%] Built target test_cross_boundary_fusion
+[ 83%] Linking C executable bin/test_fusion_schedule
+[ 83%] Building C object CMakeFiles/test_gguf_quant.dir/tests/test_gguf_quant.c.o
+[ 83%] Linking C executable bin/test_fused_codegen
+[ 83%] Building C object CMakeFiles/test_gpu_codegen.dir/tests/test_gpu_codegen.c.o
+[ 83%] Built target test_convergence
+[ 83%] Linking C executable bin/test_gguf_quant
+[ 83%] Building C object CMakeFiles/test_gqa_flash.dir/tests/test_gqa_flash.c.o
+[ 83%] Linking C executable bin/test_gqa_flash
+[ 83%] Linking C executable bin/test_fuzzer_ops
+[ 83%] Built target test_disk_cache
+[ 83%] Building C object CMakeFiles/test_grad_check.dir/tests/test_grad_check.c.o
+[ 83%] Linking C executable bin/test_gpu_codegen
+[ 83%] Built target test_edge_cases
+[ 83%] Built target test_disk_backend
+[ 83%] Linking C executable bin/test_grad_check
+[ 84%] Building C object CMakeFiles/test_graph_cache_integration.dir/tests/test_graph_cache_integration.c.o
+[ 84%] Building C object CMakeFiles/test_graph_capture.dir/tests/test_graph_capture.c.o
+[ 84%] Built target test_dispatch
+[ 84%] Building C object CMakeFiles/test_hcq.dir/tests/test_hcq.c.o
+/home/arrry/dev/personal/C-ML/tests/test_graph_cache_integration.c: In function ‘test_cache_population’:
+/home/arrry/dev/personal/C-ML/tests/test_graph_cache_integration.c:29:12: warning: unused variable ‘h0’ [-Wunused-variable]
+   29 |     size_t h0 = cache->hits, m0 = cache->misses;
+      |            ^~
+/home/arrry/dev/personal/C-ML/tests/test_graph_cache_integration.c: In function ‘test_multi_node_cache’:
+/home/arrry/dev/personal/C-ML/tests/test_graph_cache_integration.c:67:20: warning: unused variable ‘cache’ [-Wunused-variable]
+   67 |     CMLGraphCache* cache = cml_get_graph_cache();
+      |                    ^~~~~
+[ 84%] Linking C executable bin/test_graph_capture
+[ 84%] Linking C executable bin/test_hcq
+[ 84%] Built target test_gguf_quant
+[ 84%] Building C object CMakeFiles/test_heuristic_opt.dir/tests/test_heuristic_opt.c.o
+[ 84%] Built target test_fp8_fnuz
+[ 84%] Linking C executable bin/test_graph_cache_integration
+[ 84%] Building C object CMakeFiles/test_hevc.dir/tests/test_hevc.c.o
+[ 84%] Built target test_fused_codegen
+[ 84%] Built target test_distributed
+[ 84%] Built target test_fusion_schedule
+[ 84%] Building C object CMakeFiles/test_hexagon_sim.dirgon_sim.c.o
+[ 84%] Linking C executable bin/test_hevc
+[ 84%] Building C object CMakeFiles/test_hw_support.dir/tests/test_hw_support.c.o
+[ 84%] Built target test_gqa_flash
+[ 84%] Building C object CMakeFiles/test_ib_transport.dir/tests/test_ib_transport.c.o
+[ 84%] Building C object CMakeFiles/test_image_dtype.dir/tests/test_image_dtype.c.o
+[ 84%] Built target test_gpu_codegen
+[ 84%] Linking C executable bin/test_heuristic_opt
+[ 84%] Building C object CMakeFiles/test_intern.dir/tests/test_intern.c.o
+[ 84%] Linking C executable bin/test_image_dtype
+[ 84%] Built target test_fuzzer_ops
+[ 85%] Linking C executable bin/test_hw_support
+[ 85%] Linking C executable bin/test_ib_transport
+[ 85%] Building C object CMakeFiles/test_kernel_cache.dir/tests/test_kernel_cache.c.o
+[ 85%] Built target test_grad_check
+[ 85%] Linking C executable bin/test_hexagon_sim
+[ 85%] Building C object CMakeFiles/test_label_smoothing.dir/tests/test_label_smoothing.c.o
+[ 85%] Linking C executable bin/test_intern
+[ 85%] Built target test_graph_capture
+[ 85%] Linking C executable bin/test_kernel_cache
+[ 85%] Building C object CMakeFiles/test_late_passes.dir/tests/test_late_passes.c.o
+[ 85%] Linking C executable bin/test_label_smoothing
+[ 85%] Built target test_hevc
+[ 85%] Built target test_hcq
+[ 85%] Linking C executable bin/test_late_passes
+[ 85%] Building C object CMakeFiles/test_llama.dir/tests/test_llama.c.o
+[ 85%] Building C object CMakeFiles/test_llm_ops.dir/tests/test_llm_ops.c.o
+[ 85%] Built target test_graph_cache_integration
+[ 85%] Building C object CMakeFiles/test_loaders.dir/tests/test_loaders.c.o
+[ 85%] Built target test_ib_transport
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c: In function ‘setup_image_dir’:
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:45:37: warning: ‘/images/cat’ directive output may be truncated writing 11 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+   45 |     snprintf(cls0, sizeof(cls0), "%s/images/cat", tmpdir);
+      |                                     ^~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:45:5: note: ‘snprintf’ output between 12 and 523 bytes into a destination of size 512
+   45 |     snprintf(cls0, sizeof(cls0), "%s/images/cat", tmpdir);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:46:37: warning: ‘/images/dog’ directive output may be truncated writing 11 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+   46 |     snprintf(cls1, sizeof(cls1), "%s/images/dog", tmpdir);
+      |                                     ^~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:46:5: note: ‘snprintf’ output between 12 and 523 bytes into a destination of size 512
+   46 |     snprintf(cls1, sizeof(cls1), "%s/images/dog", tmpdir);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:51:37: warning: ‘/img0.ppm’ directive output may be truncated writing 9 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+   51 |     snprintf(path, sizeof(path), "%s/img0.ppm", cls0);
+      |                                     ^~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:51:5: note: ‘snprintf’ output between 10 and 521 bytes into a destination of size 512
+   51 |     snprintf(path, sizeof(path), "%s/img0.ppm", cls0);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:53:37: warning: ‘/img1.ppm’ directive output may be truncated writing 9 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+   53 |     snprintf(path, sizeof(path), "%s/img1.ppm", cls0);
+      |                                     ^~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:53:5: note: ‘snprintf’ output between 10 and 521 bytes into a destination of size 512
+   53 |     snprintf(path, sizeof(path), "%s/img1.ppm", cls0);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:55:37: warning: ‘/img0.ppm’ directive output may be truncated writing 9 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+   55 |     snprintf(path, sizeof(path), "%s/img0.ppm", cls1);
+      |                                     ^~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:55:5: note: ‘snprintf’ output between 10 and 521 bytes into a destination of size 512
+   55 |     snprintf(path, sizeof(path), "%s/img0.ppm", cls1);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c: In function ‘setup_squad_file’:
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:61:37: warning: ‘/squad.json’ directive output may be truncated writing 11 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+   61 |     snprintf(path, sizeof(path), "%s/squad.json", tmpdir);
+      |                                     ^~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:61:5: note: ‘snprintf’ output between 12 and 523 bytes into a destination of size 512
+   61 |     snprintf(path, sizeof(path), "%s/squad.json", tmpdir);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c: In function ‘setup_librispeech_dir’:
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:87:35: warning: ‘/audio/1-2’ directive output may be truncated writing 10 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+   87 |     snprintf(dir, sizeof(dir), "%s/audio/1-2", tmpdir);
+      |                                   ^~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:87:5: note: ‘snprintf’ output between 11 and 522 bytes into a destination of size 512
+   87 |     snprintf(dir, sizeof(dir), "%s/audio/1-2", tmpdir);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:91:37: warning: ‘/1-2-0001.flac’ directive output may be truncated writing 14 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+   91 |     snprintf(path, sizeof(path), "%s/1-2-0001.flac", dir);
+      |                                     ^~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:91:5: note: ‘snprintf’ output between 15 and 526 bytes into a destination of size 512
+   91 |     snprintf(path, sizeof(path), "%s/1-2-0001.flac", dir);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:95:37: warning: ‘/1-2.trans.txt’ directive output may be truncated writing 14 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+   95 |     snprintf(path, sizeof(path), "%s/1-2.trans.txt", dir);
+      |                                     ^~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:95:5: note: ‘snprintf’ output between 15 and 526 bytes into a destination of size 512
+   95 |     snprintf(path, sizeof(path), "%s/1-2.trans.txt", dir);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c: In function ‘test_imagenet_open’:
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:108:35: warning: ‘/images’ directive output may be truncated writing 7 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+  108 |     snprintf(dir, sizeof(dir), "%s/images", tmpdir);
+      |                                   ^~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:108:5: note: �dir, sizeof(dir), "%s/images", tmpdir);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c: In function ‘test_imagenet_load_batch’:
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:121:35: warning: ‘/images’ directive output may be truncated writing 7 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+  121 |     snprintf(dir, sizeof(dir), "%s/images", tmpdir);
+      |                                   ^~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:121:5: note: ‘snprintf’ output between 8 and 519 bytes into a destination of size 512
+  121 |     snprintf(dir, sizeof(dir), "%s/images", tmpdir);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c: In function ‘test_load_image_folder’:
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:138:35: warning: ‘/images’ directive output may be truncated writing 7 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+  138 |     snprintf(dir, sizeof(dir), "%s/images", tmpdir);
+      |                                   ^~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:138:5: note: ‘snprintf’ output between 8 and 519 bytes into a destination of size 512
+  138 |     snprintf(dir, sizeof(dir), "%s/images", tmpdir);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c: In function ‘test_squad_open’:
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:149:37: warning: ‘/squad.json’ directive output may be truncated writing 11 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+  149 |     snprintf(path, sizeof(path), "%s/squad.json", tmpdir);
+      |                                     ^~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:149:5: note: ‘snprintf’ output between 12 and 523 bytes into a destination of size 512
+  149 |     snprintf(path, sizeof(path), "%s/squad.json", tmpdir);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c: In function ‘test_librispeech_open’:
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:163:35: warning: ‘/audio’ directive output may be truncated writing 6 bytes into a region of size between 1 and 512 [-Wformat-truncation=]
+  163 |     snprintf(dir, sizeof(dir), "%s/audio", tmpdir);
+      |                                   ^~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_loaders.c:163:5: note: ‘snprintf’ output between 7 and 518 bytes into a destination of size 512
+  163 |     snprintf(dir, sizeof(dir), "%s/audio", tmpdir);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 85%] Building C object CMakeFiles/test_lora.dir/tests/test_lora.c.o
+[ 85%] Linking C executable bin/test_loaders
+[ 85%] Built target test_image_dtype
+[ 85%] Building C object CMakeFiles/test_memory.dir/tests/test_memory.c.o
+[ 85%] Built target test_hw_support
+[ 85%] Linking C executable bin/test_lora
+[ 85%] Linking C executable bin/test_llm_ops
+[ 85%] Building C object CMakeFiles/test_memory_planner.dir/tests/test_memory_planner.c.o
+[ 85%] Built target test_hexagon_sim
+[ 85%] Built target test_heuristic_opt
+[ 86%] Linking C executable bin/test_llama
+[ 86%] Building C object CMakeFiles/test_metal_backend.dir/tests/test_metal_backend.c.o
+[ 86%] Linking C executable bin/test_memory
+[ 86%] Building C object CMakeFiles/test_missing_ops.dir/tests/test_missing_ops.c.o
+[ 86%] Built target test_kernel_cache
+[ 86%] Linking C executable bin/test_metal_backend
+[ 86%] Building C object CMakeFiles/test_modlist_crash.dir/tests/test_modlist_crash.c.o
+[ 86%] Linking C executable bin/test_memory_planner
+[ 87%] Linking C executable bin/test_missing_ops
+[ 87%] Linking C executable bin/test_modlist_crash
+[ 87%] Built target test_late_passes
+[ 87%] Built target test_intern
+[ 87%] Building C object CMakeFiles/test_new_features.dir/tests/test_new_features.c.o
+[ 87%] Built target test_label_smoothing
+[ 87%] Building C object CMakeFiles/test_multi_gpu.dir/tests/test_multi_gpu.c.o
+[ 87%] Building C object CMakeFiles/test_new_layers.dir/tests/test_new_layers.c.o
+[ 87%] Built target test_loaders
+[ 87%] Building C object CMakeFiles/test_nir_compiler.dir/tests/test_nir_compiler.c.o
+[ 87%] Built target test_llm_ops
+[ 87%] Building C object CMakeFiles/test_nn_layers.dir/tests/test_nn_layers.c.o
+[ 87%] Linking C executable bin/test_multi_gpu
+[ 87%] Built target test_metal_backend
+[ 87%] Built target test_lora
+[ 87%] Linking C executable bin/test_nir_compiler
+[ 88%] Building C object CMakeFiles/test_null_device.dir/tests/test_null_device.c.o
+[ 88%] Built target test_llama
+[ 88%] Building C object CMakeFiles/test_numerical_ops.dir/tests/test_numerical_ops.c.o
+[ 88%] Building C object CMakeFiles/test_nv_driver.dir/tests/test_nv_driver.c.o
+/home/arrry/dev/personal/C-ML/tests/test_numerical_ops.c: In function ‘test_erf_bounds’:
+/home/arrry/dev/personal/C-ML/tests/test_numerical_ops.c:187:11: warning: unused variable ‘exp’ [-Wunused-variable]
+  187 |     float exp[] = {-1.0f, 0.0f, 1.0f};
+      |           ^~~
+[ 88%] Linking C executable bin/test_new_features
+[ 88%] Built target test_memory_planner
+[ 88%] Built target test_memory
+[ 88%] Linking C executable bin/test_new_layers
+[ 88%] Linking C executable bin/test_nn_layers
+[ 88%] Building C object CMakeFiles/test_onnx.dir/tests/test_onnx.c.o
+[ 88%] Linking C executable bin/test_null_device
+[ 88%] Building C object CMakeFiles/test_openai_api.dir/tests/test_openai_api.c.o
+[ 88%] Linking C executable bin/test_onnx
+[ 88%] Built target test_missing_ops
+[ 88%] Linking C executable bin/test_nv_driver
+[ 88%] Built target test_modlist_crash
+[ 88%] Building C object CMakeFiles/test_opencl_ir.dir/tests/test_opencl_ir.c.o
+[ 88%] Building C object CMakeFiles/test_opt_transforms.dir/tests/test_opt_transforms.c.o
+[ 88%] Linking C executable bin/test_openai_api
+[ 88%] Linking C executable bin/test_numerical_ops
+[ 88%] Linking C executable bin/test_opt_transforms
+[ 88%] Built target test_new_features
+[ 88%] Building C object CMakeFiles/test_optim.dir/tests/test_optim.c.o
+[ 88%] Built target test_nir_compiler
+[ 88%] Linking C executable bin/test_opencl_ir
+[ 88%] Building C object CMakeFiles/test_paged_attention.dir/tests/test_paged_attention.c.o
+[ 88%] Built target test_new_layers
+[ 88%] Built target test_null_device
+[ 88%] Built target test_nn_layers
+[ 88%] Building C object CMakeFiles/test_process_replay.dir/tests/test_process_replay.c.o
+[ 88%] Building C object CMakeFiles/test_pattern_matcher.dir/tests/test_pattern_matcher.c.o
+[ 88%] Building C object CMakeFiles/test_pth_loader.dir/tests/test_pth_loader.c.o
+[ 88%] Linking C executable bin/test_optim
+[ 88%] Built target test_multi_gpu
+[ 88%] Built target test_nv_driver
+[ 88%] Building C object CMakeFiles/test_ptx_codegen.dir/tests/test_ptx_codegen.c.o
+[ 88%] Linking C executable bin/test_pth_loader
+[ 88%] Building C object CMakeFiles/test_qlora.dir/tests/test_qlora.c.o
+[ 88%] Built target test_numerical_ops
+[ 88%] Linking C executable bin/test_process_replay
+[ 88%] Built target test_openai_api
+[ 88%] Building C object CMakeFiles/test_rangeify.dir/tests/test_rangeify.c.o
+[ 88%] Linking C executable bin/test_pattern_matcher
+[ 88%] Building C object CMakeFiles/test_remote_device.dir/tests/test_remote_device.c.o
+[ 89%] Linking C executable bin/test_paged_attention
+[ 89%] Linking C executable bin/test_ptx_codegen
+[ 90%] Linking C executable bin/test_remote_device
+[ 90%] Linking C executable bin/test_qlora
+[ 90%] Built target test_onnx
+[ 90%] Linking C executable bin/test_e_compiler.dir/tests/test_runtime_compiler.c.o
+[ 90%] Built target test_opt_transforms
+[ 90%] Building C object CMakeFiles/test_schedule.dir/tests/test_schedule.c.o
+[ 90%] Linking C executable bin/test_runtime_compiler
+[ 90%] Built target test_opencl_ir
+[ 90%] Building C object CMakeFiles/test_schedule_v2.dir/tests/test_schedule_v2.c.o
+[ 90%] Built target test_process_replay
+[ 90%] Linking C executable bin/test_schedule
+[ 90%] Built target test_pattern_matcher
+[ 90%] Building C object CMakeFiles/test_serialization.dir/tests/test_serialization.c.o
+[ 90%] Building C object CMakeFiles/test_serving.dir/tests/test_serving.c.o
+[ 90%] Linking C executable bin/test_schedule_v2
+[ 90%] Linking C executable bin/test_serialization
+[ 90%] Built target test_optim
+[ 90%] Building C object CMakeFiles/test_shard.dir/tests/test_shard.c.o
+[ 90%] Built target test_paged_attention
+[ 90%] Built target test_remote_device
+[ 90%] Linking C executable bin/test_serving
+[ 90%] Building C object CMakeFiles/test_spec.dir/tests/test_spec.c.o
+[ 90%] Built target test_qlora
+[ 90%] Building C object CMakeFiles/test_speculative.dir/tests/test_speculative.c.o
+[ 90%] Building C object CMakeFiles/test_symbolic.dir/tests/test_symbolic.c.o
+[ 90%] Built target test_pth_loader
+[ 90%] Building C object CMakeFiles/test_tc_opt.dir/tests/test_tc_opt.c.o
+[ 91%] Linking C executable bin/test_spec
+[ 91%] Linking C executable bin/test_shard
+[ 91%] Built target test_rangeify
+[ 91%] Linking C executable bin/test_speculative
+[ 91%] Building C object CMakeFiles/test_tensor.dir/tests/test_tensor.c.o
+[ 91%] Built target test_ptx_codegen
+[ 91%] Building C object CMakeFiles/test_tensor_assign.dir/tests/test_tensor_assign.c.o
+[ 91%] Built target test_runtime_compiler
+[ 91%] Linking C executable bin/test_tc_opt
+[ 91%] Built target test_schedule
+[ 91%] Building C object CMakeFiles/test_tensor_hash.dir/tests/test_tensor_hash.c.o
+[ 92%] Building C object CMakeFiles/test_tensor_ops_extra.dir/tests/test_tensor_ops_extra.c.o
+[ 92%] Linking C executable bin/test_tensor_assign
+/home/arrry/dev/personal/C-ML/tests/test_tensor_ops_extra.c:14:27: warning: ‘cpu_i32’ defined but not used [-Wunused-const-variable=]
+   14 | static const TensorConfig cpu_i32 = {
+      |                           ^~~~~~~
+[ 92%] Linking C executable bin/test_symbolic
+[ 92%] Linking C executable bin/test_tensor_hash
+[ 92%] Linking C executable bin/test_tensor
+[ 92%] Built target test_serving
+[ 92%] Building C object CMakeFiles/test_tensor_parallel.dir/tests/test_tensor_parallel.c.o
+[ 92%] Built target test_serialization
+[ 92%] Linking C executable bin/test_tensor_ops_extra
+[ 92%] Built target test_schedule_v2
+[ 92%] Building C object CMakeFiles/test_threefry.dir/tests/test_threefry.c.o
+[ 92%] Built target test_tc_opt
+[ 92%] Building C object CMakeFiles/test_tlsf.dir/tests/test_tlsf.c.o
+[ 92%] Building C object CMakeFiles/test_torch_compat.dir/tests/test_torch_compat.c.o
+[ 92%] Built target test_spec
+[ 92%] Built target test_shard
+[ 92%] Linking C executable bin/test_tensor_parallel
+[ 92%] Linking C executable bin/test_threefry
+[ 92%] Building C object CMakeFiles/test_trace.dir/tests/test_trace.c.o
+[ 92%] Building C object CMakeFiles/test_training_loop.dir/tests/test_training_loop.c.o
+[ 92%] Linking C executable bin/test_torch_compat
+[ 92%] Linking C executable bin/test_tlsf
+[ 92%] Built target test_speculative
+[ 92%] Built target test_symbolic
+[ 93%] Building C object CMakeFiles/test_tree_automaton.dir/tests/test_tree_automaton.c.o
+[ 93%] Linking C executable bin/test_trace
+[ 93%] Linking C executable bin/test_training_loop
+[ 93%] Building C object CMakeFiles/test_usb3_gpu.dir/tests/test_usb3_gpu.c.o
+[ 93%] Built target test_tensor_assign
+[ 93%] Linking C executable bin/test_usb3_gpu
+[ 93%] Building C object CMakeFiles/test_vulkan_backend.dir/tests/test_vulkan_backend.c.o
+[ 93%] Built target test_tensor
+[ 93%] Linking C executable bin/test_tree_automaton
+[ 93%] Building C object CMakeFiles/test_webgpu_backend.dir/tests/test_webgpu_backend.c.o
+[ 93%] Built target test_tensor_hash
+[ 93%] Linking C executable bin/test_vulkan_backend
+[ 93%] Building C object CMakeFiles/test_winograd.dir/tests/test_winograd.c.o
+[ 93%] Linking C executable bin/test_webgpu_backend
+[ 93%] Built target test_tensor_ops_extra
+[ 93%] Built target test_threefry
+[ 93%] Building C object CMakeFiles/test_wmma.dir/tests/test_wmma.c.o
+[ 93%] Building C object CMakeFiles/test_zoo_models.dir/tests/test_zoo_models.c.o
+[ 93%] Linking C executable bin/test_winograd
+/home/arrry/dev/personal/C-ML/tests/test_zoo_models.c:260:12: warning: ‘test_gpt2_param_count_reasonable’ defined but not used [-Wunused-function]
+  260 | static int test_gpt2_param_count_reasonable(void) {
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_zoo_models.c:244:12: warning: ‘test_resnet_param_count_reasonable’ defined but not used [-Wunused-function]
+  244 | static int test_resnet_param_count_reasonable(void) {
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_zoo_models.c:226:12: warning: ‘test_t5_small’ defined but not used [-Wunused-function]
+  226 | static int test_t5_small(void) {
+      |            ^~~~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_zoo_models.c:30:12: warning: ‘has_nonzero’ defined but not used [-Wunused-function]
+   30 | static int has_nonzero(Tensor* t) {
+      |            ^~~~~~~~~~~
+/home/arrry/dev/personal/C-ML/tests/test_zoo_models.c:12:27: warning: ‘cpu_f32’ defined but not used [-Wunused-const-variable=]
+   12 | static const TensorConfig cpu_f32 = {
+      |                           ^~~~~~~
+[ 93%] Linking C executable bin/test_wmma
+[ 93%] Built target test_tlsf
+[ 93%] Built target test_tensor_parallel
+[ 93%] Building C object CMakeFiles/simple_xor.dir/examples/tutorials/simple_xor.c.o
+[ 93%] Building C object CMakeFiles/hello_cml.dir/examples/tutorials/hello_cml.c.o
+[ 93%] Linking C executable bin/test_zoo_models
+[ 93%] Built target test_trace
+[ 93%] Linking C executable bin/hello_cml
+[ 93%] Built target test_torch_compat
+[ 93%] Building C object CMakeFiles/tensor_ops.dir/examples/tutorials/tensor_ops.c.o
+[ 93%] Linking C executable bin/simple_xor
+[ 93%] Built target test_tree_automaton
+[ 93%] Building C object CMakeFiles/linear_regression.dir/examples/tutorials/linear_regression.c.o
+[ 93%] Building C object CMakeFiles/logistic_regression.dir/examples/tutorials/logistic_regression.c.o
+[ 93%] Built target test_usb3_gpu
+[ 93%] Built target test_training_loop
+[ 94%] Linking C executable bin/tensor_ops
+[ 94%] Building C object CMakeFiles/mlp_classifier.dir/examples/tutorials/mlp_classifier.c.o
+[ 94%] Building C object CMakeFiles/autoencoder.dir/examples/tutorials/autoencoder.c.o
+[ 94%] Linking C executable bin/logistic_regression
+[ 94%] Linking C executable bin/linear_regression
+[ 94%] Built target test_webgpu_backend
+[ 94%] Linking C executable bin/autoencoder
+[ 94%] Building C object CMakeFiles/conv_net.dir/examples/tutorials/conv_net.c.o
+[ 94%] Linking C executable bin/mlp_classifier
+[ 94%] Built target test_wmma
+[ 94%] Building C object CMakeFiles/rnn_sequence.dir/examples/tutorials/rnn_sequence.c.o
+[ 94%] Linking C executable bin/conv_net
+[ 94%] Built target test_winograd
+[ 94%] Built target test_vulkan_backend
+[ 94%] Linking C executable bin/rnn_sequence
+[ 94%] Building C object CMakeFiles/lstm_timeseries.dir/examples/tutorials/lstm_timeseries.c.o
+[ 94%] Building C object CMakeFiles/gru_classifier.dir/examples/tutorials/gru_classifier.c.o
+[ 94%] Built target test_zoo_models
+[ 94%] Building C object CMakeFiles/embedding.dir/examples/tutorials/embeddiexecutable bin/lstm_timeseries
+[ 94%] Built target hello_cml
+[ 94%] Linking C executable bin/gru_classifier
+[ 94%] Linking C executable bin/embedding
+[ 94%] Building C object CMakeFiles/gan.dir/examples/tutorials/gan.c.o
+[ 94%] Built target logistic_regression
+[ 94%] Built target simple_xor
+[ 94%] Building C object CMakeFiles/transformer.dir/examples/tutorials/transformer.c.o
+[ 94%] Built target autoencoder
+[ 94%] Built target linear_regression
+[ 94%] Building C object CMakeFiles/multi_task.dir/examples/tutorials/multi_task.c.o
+[ 94%] Built target tensor_ops
+[ 94%] Building C object CMakeFiles/activations.dir/examples/tutorials/activations.c.o
+[ 95%] Building C object CMakeFiles/lr_scheduler.dir/examples/tutorials/lr_scheduler.c.o
+[ 95%] Linking C executable bin/transformer
+[ 95%] Building C object CMakeFiles/bench_forward.dir/examples/benchmarks/bench_forward.c.o
+[ 95%] Linking C executable bin/gan
+[ 95%] Built target conv_net
+[ 95%] Building C object CMakeFiles/bench_gemm.dir/examples/benchmarks/bench_gemm.c.o
+[ 95%] Built target mlp_classifier
+[ 95%] Linking C executable bin/lr_scheduler
+[ 95%] Linking C executable bin/multi_task
+[ 95%] Building C object CMakeFiles/bench_cross_framework.dir/benchmarks/bench_cross_framework.c.o
+[ 95%] Linking C executable bin/activations
+[ 96%] Linking C executable bin/bench_forward
+[ 96%] Linking C executable bin/bench_gemm
+[ 96%] Built target rnn_sequence
+[ 96%] Linking C executable bin/bench_cross_framework
+[ 96%] Building C object CMakeFiles/profile_overhead.dir/benchmarks/profile_overhead.c.o
+[ 96%] Built target embedding
+[ 96%] Built target lstm_timeseries
+[ 96%] Building C object CMakeFiles/profile_overhead_detailed.dir/benchmarks/profile_overhead_detailed.c.o
+[ 96%] Building C object CMakeFiles/profile_mlp_conv.dir/benchmarks/profile_mlp_conv.c.o
+/home/arrry/dev/personal/C-ML/benchmarks/profile_mlp_conv.c: In function ‘main’:
+/home/arrry/dev/personal/C-ML/benchmarks/profile_mlp_conv.c:118:31: warning: unused variable ‘t_biasadd2’ [-Wunused-variable]
+  118 |         double t_matmul2 = 0, t_biasadd2 = 0, t_ir_reset = 0;
+      |                               ^~~~~~~~~~
+/home/arrry/dev/personal/C-ML/benchmarks/profile_mlp_conv.c:118:16: warning: unused variable ‘t_matmul2’ [-Wunused-variable]
+  118 |         double t_matmul2 = 0, t_biasadd2 = 0, t_ir_reset = 0;
+      |                ^~~~~~~~~
+/home/arrry/dev/personal/C-ML/benchmarks/profile_mlp_conv.c:117:64: warning: unused variable ‘t_relu’ [-Wunused-variable]
+  117 |         double t_transpose = 0, t_matmul1 = 0, t_biasadd1 = 0, t_relu = 0;
+      |                                                                ^~~~~~
+/home/arrry/dev/personal/C-ML/benchmarks/profile_mlp_conv.c:117:48: warning: unused variable ‘t_biasadd1’ [-Wunused-variable]
+  117 |         double t_transpose = 0, t_matmul1 = 0, t_biasadd1 = 0, t_relu = 0;
+      |                                                ^~~~~~~~~~
+/home/arrry/dev/personal/C-ML/benchmarks/profile_mlp_conv.c:117:16: warning: unused variable ‘t_transpose’ [-Wunused-variable]
+  117 |         double t_transpose = 0, t_matmul1 = 0, t_biasadd1 = 0, t_relu = 0;
+      |                ^~~~~~~~~~~
+[ 96%] Linking C executable bin/profile_overhead
+[ 96%] Built target gru_classifier
+[ 96%] Building C object CMakeFiles/profile_train_conv.dir/benchmarks/profile_train_conv.c.o
+[ 96%] Linking C executable bin/profile_mlp_conv
+[ 96%] Linking C executable bin/profile_overhead_detailed
+[ 96%] Built target transformer
+[ 96%] Built target gan
+[ 96%] Building C object CMakeFiles/autograd_example.dir/examples/demos/autograd_example.c.o
+[ 96%] Building C object CMakeFiles/llama_inference.dir/examples/llama_inference.c.o
+[ 96%] Linking C executable bin/profile_train_conv
+[ 96%] Built target bench_forward
+[ 96%] Built target activations
+[ 96%] Building C object CMakeFiles/auto_capture_example.dir/examples/demos/auto_capture_example.c.o
+[ 96%] Built target multi_task
+[ 96%] Building C object CMakeFiles/comprehensive_fusion_example.dir/examples/demos/comprehensive_fusion_example.c.o
+[ 96%] Built target lr_scheduler
+[ 96%] Linking C executable bin/autograd_example
+[ 96%] Building C object CMakeFiles/early_stopping_lr_scheduler.dir/examples/demos/early_stopping_lr_scheduler.c.o
+[ 96%] Building C object CMakeFiles/dead_code_example.dir/examples/demos/dead_code_example.c.o
+[ 96%] Linking C executable bin/auto_capture_example
+[ 96%] Built target bench_cross_framework
+[ 96%] Linking C executable bin/llama_inference
+[ 96%] Linking C executable bin/comprehensive_fusion_example
+[ 96%] Linking C executable bin/early_stopping_lr_scheduler
+[ 96%] Built target bench_gemm
+[ 97%] Linking C executable bin/dead_code_example
+[ 97%] Building C object CMakeFiles/mnist_example.dir/examples/demos/mnist_example.c.o
+[ 97%] Building C object CMakeFiles/export_graph.dir/examples/demos/export_graph.c.o
+[ 97%] Built target profile_overhead
+[ 97%] Building C object CMakeFiles/print_kernels.dir/examples/demos/print_kernels.c.o
+[ 97%] Linking C executable bin/export_graph
+[ 97%] Linking C executable bin/mnist_example
+[ 97%] Built target profile_overhead_detailed
+[ 98%] Building C object CMakeFiles/training_loop_example.dir/examples/demos/training_loop_example.c.o
+[ 98%] Linking C executable bin/print_kernels
+[ 98%] Built target profile_mlp_conv
+[ 98%] Building C object CMakeFiles/resnet.dir/examples/demos/resnet.c.o
+[ 98%] Linking C executable bin/training_loop_example
+[ 98%] Built target profile_train_conv
+[ 98%] Building C object CMakeFiles/bert.dir/examples/demos/bert.c.o
+[ 98%] Linking C executable bin/resnet
+[ 98%] Built target auto_capture_example
+[ 98%] Built target autograd_example
+[ 98%] Building C object CMakeFiles/gpt2.dir/examples/demos/gpt2.c.o
+[ 98%] Built target llama_inference
+[ 98%] Built target early_stopping_lr_scheduler
+[ 98%] Linking C executable bin/bert
+[ 98%] Building C object CMakeFiles/t5.dir/examples/demos/t5.c.o
+[ 98%] Building C object CMakeFiles/vit.dir/examples/demos/vit.c.o
+[ 98%] Built target dead_code_example
+[ 98%] Building C object CMakeFiles/unet.dir/examples/demos/unet.c.o
+[ 98%] Built target comprehensive_fusion_example
+[ 98%] Building C object CMakeFiles/clip.dir/examples/demos/clip.c.o
+[ 98%] Linking C executable bin/gpt2
+[ 98%] Building C object CMakeFiles/convnext.dir/examples/demos/convnext.c.o
+[ 98%] Linking C executable bin/clip
+[ 98%] Linking C executable bin/vit
+[ 98%] Linking C executable bin/unet
+[ 98%] Linking C executable bin/convnext
+[ 98%] Linking C executable bin/t5
+[ 98%] Built target print_kernels
+[ 98%] Built target mnist_example
+[ 98%] Building C object CMakeFiles/inception.dir/examples/demos/inception.c.o
+[ 98%] Built target export_graph
+[ 98%] Building C object CMakeFiles/efficientnet.dir/examples/demos/efficientnet.c.o
+[ 98%] Building C object CMakeFiles/whisper.dir/examples/demos/whisper.c.o
+[ 98%] Linking C executable bin/inception
+[ 98%] Linking C executable bin/efficientnet
+[ 98%] Linking C executable bin/whisper
+[ 98%] Built target training_loop_example
+[ 98%] Built target resnet
+[ 98%] Building C object CMakeFiles/stable_diffusion.dir/examples/demos/stable_diffusion.c.o
+[ 98%] Building C object CMakeFiles/yolov8.dir/examples/demos/yolov8.c.o
+[ 98%] Built target bert
+[ 98%] Building C object CMakeFiles/mask_rcnn.dir/examples/demos/mask_rcnn.c.o
+[ 98%] Linking C executable bin/stable_diffusion
+[ 99%] Linking C executable bin/yolov8
+[ 99%] Built target gpt2
+[ 99%] Linking C executable bin/mask_rcnn
+[100%] Building C object CMakeFiles/retinanet.dir/examples/demos/retinanet.c.o
+[100%] Built target t5
+[100%] Building C object CMakeFiles/unet3d.dir/examples/demos/unet3d.c.o
+[100%] Built target unet
+[100%] Built target convnext
+[100%] Built target clip
+[100%] Building C object CMakeFiles/mlperf_resnet50.dir/examples/mlperf/mlperf_resnet50.c.o
+[100%] Building C object CMakeFiles/rnnt.dir/examples/demos/rnnt.c.o
+[100%] Linking C executable bin/retinanet
+[100%] Linking C executable bin/unet3d
+[100%] Linking C executable bin/rnnt
+[100%] Built target efficientnet
+[100%] Linking C executable bin/mlperf_resnet50
+[100%] Built target inception
+[100%] Built target whisper
+[100%] Built target yolov8
+[100%] Built target stable_diffusion
+[100%] Built target mask_rcnn
+[100%] Built target retinanet
+[100%] Built target unet3d
+[100%] Built target rnnt
+[100%] Built target mlperf_resnet50

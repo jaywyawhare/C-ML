@@ -409,6 +409,46 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             }
             break;
         }
+        case UOP_GRU_CELL: {
+            /* Fused backward packs [dih(3H) | dhh(3H) | dhidden(H)] into [B,7H];
+             * slice it back to the three inputs. The ih/hh grads then flow on
+             * through the LINEAR VJPs that produced them. */
+            Tensor* ih     = a;
+            Tensor* hh     = b;
+            Tensor* hidden = nd->num_inputs > 2 ? nd->inputs[2] : NULL;
+            if (!ih || !hh || !hidden)
+                break;
+            int B          = hidden->shape[0];
+            int H          = hidden->shape[1];
+            Tensor* packed = uop_gru_cell_bwd(g, ih, hh, hidden);
+            if (!packed)
+                break;
+            int s_ih[2] = {0, 0}, e_ih[2] = {B, 3 * H};
+            int s_hh[2] = {0, 3 * H}, e_hh[2] = {B, 6 * H};
+            int s_hd[2] = {0, 6 * H}, e_hd[2] = {B, 7 * H};
+            gm_accum(&map, ih, uop_shrink(packed, s_ih, e_ih, 2));
+            gm_accum(&map, hh, uop_shrink(packed, s_hh, e_hh, 2));
+            gm_accum(&map, hidden, uop_shrink(packed, s_hd, e_hd, 2));
+            break;
+        }
+        case UOP_LSTM_CELL: {
+            /* g is the grad of the packed [h_new | c_new] output; the fused
+             * backward returns [dgates(4H) | dc_prev(H)]. */
+            Tensor* gates  = a;
+            Tensor* c_prev = b;
+            if (!gates || !c_prev)
+                break;
+            int B          = c_prev->shape[0];
+            int H          = c_prev->shape[1];
+            Tensor* packed = uop_lstm_cell_bwd(g, gates, c_prev);
+            if (!packed)
+                break;
+            int s_g[2] = {0, 0}, e_g[2] = {B, 4 * H};
+            int s_c[2] = {0, 4 * H}, e_c[2] = {B, 5 * H};
+            gm_accum(&map, gates, uop_shrink(packed, s_g, e_g, 2));
+            gm_accum(&map, c_prev, uop_shrink(packed, s_c, e_c, 2));
+            break;
+        }
         case UOP_SUM: {
             /* dX = broadcast(dOut) back to X's shape (via keepdim reshape) */
             ReduceParams* rp = (ReduceParams*)nd->params;

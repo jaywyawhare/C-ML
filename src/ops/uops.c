@@ -905,6 +905,154 @@ Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias) {
     return tensor_from_ir_node(node, ir);
 }
 
+/** Fused GRU cell gate math: inputs ih/hh [B,3H], hidden [B,H] -> h_new [B,H]. */
+Tensor* uop_gru_cell(Tensor* ih, Tensor* hh, Tensor* hidden) {
+    if (!ih || !hh || !hidden) {
+        CML_ERR_NULL("NULL tensor input to uop_gru_cell");
+    }
+    if (ih->ndim != 2 || hh->ndim != 2 || hidden->ndim != 2) {
+        CML_ERR_NULL("uop_gru_cell: inputs must be 2D");
+    }
+    int B = ih->shape[0];
+    int H = hidden->shape[1];
+    if (ih->shape[1] != 3 * H || hh->shape[1] != 3 * H || hh->shape[0] != B ||
+        hidden->shape[0] != B) {
+        LOG_ERROR("uop_gru_cell: shape mismatch (ih[%d,%d] hh[%d,%d] hidden[%d,%d])", ih->shape[0],
+                  ih->shape[1], hh->shape[0], hh->shape[1], hidden->shape[0], hidden->shape[1]);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    Tensor* inputs[3] = {ih, hh, hidden};
+    if (cml_ir_add_uop(ir, UOP_GRU_CELL, inputs, 3, NULL) != 0)
+        return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 2;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(2 * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    node->output_shape[0] = B;
+    node->output_shape[1] = H;
+
+    if (ih->requires_grad || hh->requires_grad || hidden->requires_grad) {
+        node->requires_grad       = true;
+        node->needs_input_grad[0] = ih->requires_grad;
+        node->needs_input_grad[1] = hh->requires_grad;
+        node->needs_input_grad[2] = hidden->requires_grad;
+    }
+
+    return tensor_from_ir_node(node, ir);
+}
+
+/** Adjoint of uop_gru_cell: packs [dih(3H) | dhh(3H) | dhidden(H)] into [B,7H]. */
+Tensor* uop_gru_cell_bwd(Tensor* grad_h, Tensor* ih, Tensor* hh, Tensor* hidden) {
+    if (!grad_h || !ih || !hh || !hidden) {
+        CML_ERR_NULL("NULL tensor input to uop_gru_cell_bwd");
+    }
+    int B = grad_h->shape[0];
+    int H = grad_h->shape[1];
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    Tensor* inputs[4] = {grad_h, ih, hh, hidden};
+    if (cml_ir_add_uop(ir, UOP_GRU_CELL_BWD, inputs, 4, NULL) != 0)
+        return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 2;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(2 * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    node->output_shape[0] = B;
+    node->output_shape[1] = 7 * H;
+
+    return tensor_from_ir_node(node, ir);
+}
+
+/** Fused LSTM cell gate math: gates [B,4H], c_prev [B,H] -> packed [B,2H]. */
+Tensor* uop_lstm_cell(Tensor* gates, Tensor* c_prev) {
+    if (!gates || !c_prev) {
+        CML_ERR_NULL("NULL tensor input to uop_lstm_cell");
+    }
+    if (gates->ndim != 2 || c_prev->ndim != 2) {
+        CML_ERR_NULL("uop_lstm_cell: inputs must be 2D");
+    }
+    int B = c_prev->shape[0];
+    int H = c_prev->shape[1];
+    if (gates->shape[0] != B || gates->shape[1] != 4 * H) {
+        LOG_ERROR("uop_lstm_cell: shape mismatch (gates[%d,%d] c_prev[%d,%d])", gates->shape[0],
+                  gates->shape[1], c_prev->shape[0], c_prev->shape[1]);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
+    }
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    Tensor* inputs[2] = {gates, c_prev};
+    if (cml_ir_add_uop(ir, UOP_LSTM_CELL, inputs, 2, NULL) != 0)
+        return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 2;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(2 * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    node->output_shape[0] = B;
+    node->output_shape[1] = 2 * H;
+
+    if (gates->requires_grad || c_prev->requires_grad) {
+        node->requires_grad       = true;
+        node->needs_input_grad[0] = gates->requires_grad;
+        node->needs_input_grad[1] = c_prev->requires_grad;
+    }
+
+    return tensor_from_ir_node(node, ir);
+}
+
+/** Adjoint of uop_lstm_cell: packs [dgates(4H) | dc_prev(H)] into [B,5H]. */
+Tensor* uop_lstm_cell_bwd(Tensor* grad_packed, Tensor* gates, Tensor* c_prev) {
+    if (!grad_packed || !gates || !c_prev) {
+        CML_ERR_NULL("NULL tensor input to uop_lstm_cell_bwd");
+    }
+    int B = c_prev->shape[0];
+    int H = c_prev->shape[1];
+
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+
+    Tensor* inputs[3] = {grad_packed, gates, c_prev};
+    if (cml_ir_add_uop(ir, UOP_LSTM_CELL_BWD, inputs, 3, NULL) != 0)
+        return NULL;
+
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 2;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(2 * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    node->output_shape[0] = B;
+    node->output_shape[1] = 5 * H;
+
+    return tensor_from_ir_node(node, ir);
+}
+
 /** Matrix multiply a @ b (delegates to tensor_matmul, which handles batching/broadcast). */
 Tensor* uop_matmul(Tensor* a, Tensor* b) {
     if (!a || !b) {

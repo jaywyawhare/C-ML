@@ -5319,6 +5319,138 @@ not_empty_reduction:;
         break;
     }
 
+    case UOP_GRU_CELL: {
+        /* h_new = (1-z)*n + z*hidden, r/z = sigmoid of the reset/update gates,
+         * n = tanh of the candidate; gates packed (r,z,n) along the 3H axis. */
+        const float* ih = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
+        const float* hh = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
+        const float* hd = node->inputs[2] ? (const float*)node->inputs[2]->data : NULL;
+        if (!ih || !hh || !hd)
+            return -1;
+        int B = node->inputs[0]->shape[0];
+        int H = (int)out->shape[1];
+        for (int b = 0; b < B; b++) {
+            const float* ihb = ih + (size_t)b * 3 * H;
+            const float* hhb = hh + (size_t)b * 3 * H;
+            const float* hdb = hd + (size_t)b * H;
+            float* ob        = out_data + (size_t)b * H;
+            for (int j = 0; j < H; j++) {
+                float r = 1.0f / (1.0f + expf(-(ihb[j] + hhb[j])));
+                float z = 1.0f / (1.0f + expf(-(ihb[H + j] + hhb[H + j])));
+                float n = tanhf(ihb[2 * H + j] + r * hhb[2 * H + j]);
+                ob[j]   = n + z * (hdb[j] - n);
+            }
+        }
+        break;
+    }
+
+    case UOP_GRU_CELL_BWD: {
+        /* Adjoint of UOP_GRU_CELL. Output packs [dih(3H) | dhh(3H) | dhidden(H)]
+         * along a 7H axis; gate intermediates are recomputed from the inputs. */
+        const float* g  = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
+        const float* ih = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
+        const float* hh = node->inputs[2] ? (const float*)node->inputs[2]->data : NULL;
+        const float* hd = node->inputs[3] ? (const float*)node->inputs[3]->data : NULL;
+        if (!g || !ih || !hh || !hd)
+            return -1;
+        int B = node->inputs[0]->shape[0];
+        int H = node->inputs[0]->shape[1];
+        for (int b = 0; b < B; b++) {
+            const float* gb  = g + (size_t)b * H;
+            const float* ihb = ih + (size_t)b * 3 * H;
+            const float* hhb = hh + (size_t)b * 3 * H;
+            const float* hdb = hd + (size_t)b * H;
+            float* ob        = out_data + (size_t)b * 7 * H;
+            for (int j = 0; j < H; j++) {
+                float r       = 1.0f / (1.0f + expf(-(ihb[j] + hhb[j])));
+                float z       = 1.0f / (1.0f + expf(-(ihb[H + j] + hhb[H + j])));
+                float n       = tanhf(ihb[2 * H + j] + r * hhb[2 * H + j]);
+                float gj      = gb[j];
+                float dn      = gj * (1.0f - z);
+                float dz      = gj * (hdb[j] - n);
+                float dhidden = gj * z;
+                float d_an    = dn * (1.0f - n * n);
+                float dr      = d_an * hhb[2 * H + j];
+                float d_az    = dz * z * (1.0f - z);
+                float d_ar    = dr * r * (1.0f - r);
+                ob[j]         = d_ar;     /* dih_r */
+                ob[H + j]     = d_az;     /* dih_z */
+                ob[2 * H + j] = d_an;     /* dih_n */
+                ob[3 * H + j] = d_ar;     /* dhh_r */
+                ob[4 * H + j] = d_az;     /* dhh_z */
+                ob[5 * H + j] = d_an * r; /* dhh_n */
+                ob[6 * H + j] = dhidden;  /* dhidden */
+            }
+        }
+        break;
+    }
+
+    case UOP_LSTM_CELL: {
+        /* gates (i,f,g,o) packed along 4H; c_new = f*c_prev + i*g,
+         * h_new = o*tanh(c_new). Output packs [h_new | c_new] along 2H. */
+        const float* ga = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
+        const float* cp = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
+        if (!ga || !cp)
+            return -1;
+        int B = node->inputs[1]->shape[0];
+        int H = node->inputs[1]->shape[1];
+        for (int b = 0; b < B; b++) {
+            const float* gb = ga + (size_t)b * 4 * H;
+            const float* cb = cp + (size_t)b * H;
+            float* ob       = out_data + (size_t)b * 2 * H;
+            for (int j = 0; j < H; j++) {
+                float ig  = 1.0f / (1.0f + expf(-gb[j]));
+                float fg  = 1.0f / (1.0f + expf(-gb[H + j]));
+                float gg  = tanhf(gb[2 * H + j]);
+                float og  = 1.0f / (1.0f + expf(-gb[3 * H + j]));
+                float cn  = fg * cb[j] + ig * gg;
+                ob[j]     = og * tanhf(cn); /* h_new */
+                ob[H + j] = cn;             /* c_new */
+            }
+        }
+        break;
+    }
+
+    case UOP_LSTM_CELL_BWD: {
+        /* Adjoint of UOP_LSTM_CELL. grad_packed = [grad_h | grad_c]; output
+         * packs [dgates(4H) | dc_prev(H)] along 5H. */
+        const float* gp = node->inputs[0] ? (const float*)node->inputs[0]->data : NULL;
+        const float* ga = node->inputs[1] ? (const float*)node->inputs[1]->data : NULL;
+        const float* cp = node->inputs[2] ? (const float*)node->inputs[2]->data : NULL;
+        if (!gp || !ga || !cp)
+            return -1;
+        int B = node->inputs[2]->shape[0];
+        int H = node->inputs[2]->shape[1];
+        for (int b = 0; b < B; b++) {
+            const float* gpb = gp + (size_t)b * 2 * H;
+            const float* gb  = ga + (size_t)b * 4 * H;
+            const float* cb  = cp + (size_t)b * H;
+            float* ob        = out_data + (size_t)b * 5 * H;
+            for (int j = 0; j < H; j++) {
+                float ig      = 1.0f / (1.0f + expf(-gb[j]));
+                float fg      = 1.0f / (1.0f + expf(-gb[H + j]));
+                float gg      = tanhf(gb[2 * H + j]);
+                float og      = 1.0f / (1.0f + expf(-gb[3 * H + j]));
+                float cn      = fg * cb[j] + ig * gg;
+                float tc      = tanhf(cn);
+                float gh      = gpb[j];
+                float gc      = gpb[H + j];
+                float do_     = gh * tc;
+                float dtc     = gh * og;
+                float dcnew   = gc + dtc * (1.0f - tc * tc);
+                float df      = dcnew * cb[j];
+                float di      = dcnew * gg;
+                float dg      = dcnew * ig;
+                ob[j]         = di * ig * (1.0f - ig);  /* dgate_i */
+                ob[H + j]     = df * fg * (1.0f - fg);  /* dgate_f */
+                ob[2 * H + j] = dg * (1.0f - gg * gg);  /* dgate_g */
+                ob[3 * H + j] = do_ * og * (1.0f - og); /* dgate_o */
+                ob[4 * H + j] = dcnew * fg;             /* dc_prev */
+            }
+        }
+        break;
+    }
+
     case UOP_FUSED_ELEMENTWISE: {
         /* Real kernel fusion: one loop evaluates the whole elementwise chain
          * per output element, keeping intermediates in registers - no

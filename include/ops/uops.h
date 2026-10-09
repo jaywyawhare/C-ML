@@ -247,6 +247,19 @@ typedef enum {
     UOP_FLIP, // reverse along dimension (FlipParams) - appended here to
               // keep existing UOp enum values stable
 
+    /* Fused GRU cell gate math. GRU_CELL: inputs {ih [B,3H], hh [B,3H],
+     * hidden [B,H]} -> h_new [B,H] in one kernel. GRU_CELL_BWD: inputs
+     * {grad_h_new [B,H], ih, hh, hidden} -> packed grads [B,7H] =
+     * [dih(3H) | dhh(3H) | dhidden(H)]. Appended to keep enum values stable. */
+    UOP_GRU_CELL,
+    UOP_GRU_CELL_BWD,
+
+    /* Fused LSTM cell gate math. LSTM_CELL: inputs {gates [B,4H], c_prev [B,H]}
+     * -> packed [B,2H] = [h_new | c_new]. LSTM_CELL_BWD: inputs {grad_packed
+     * [B,2H], gates, c_prev} -> packed grads [B,5H] = [dgates(4H) | dc_prev(H)]. */
+    UOP_LSTM_CELL,
+    UOP_LSTM_CELL_BWD,
+
     UOP_COUNT // Total count
 } UOpType;
 
@@ -322,6 +335,19 @@ Tensor* uop_stride(Tensor* a, StrideParams* params);
 Tensor* uop_slice(Tensor* a, SliceParams* params);
 Tensor* uop_matmul(Tensor* a, Tensor* b);
 Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias);
+
+/* Fused GRU cell gate math (f32). h_new = (1-z)*n + z*hidden with
+ * r=sigmoid(ih_r+hh_r), z=sigmoid(ih_z+hh_z), n=tanh(ih_n+r*hh_n). */
+Tensor* uop_gru_cell(Tensor* ih, Tensor* hh, Tensor* hidden);
+/* Adjoint of uop_gru_cell: packs [dih(3H) | dhh(3H) | dhidden(H)] into [B,7H]. */
+Tensor* uop_gru_cell_bwd(Tensor* grad_h, Tensor* ih, Tensor* hh, Tensor* hidden);
+
+/* Fused LSTM cell gate math (f32). gates [B,4H] = (i,f,g,o); c_new = f*c_prev +
+ * i*g, h_new = o*tanh(c_new). Returns packed [B,2H] = [h_new | c_new]. */
+Tensor* uop_lstm_cell(Tensor* gates, Tensor* c_prev);
+/* Adjoint of uop_lstm_cell: packs [dgates(4H) | dc_prev(H)] into [B,5H].
+ * grad_packed is [B,2H] = [grad_h_new | grad_c_new]. */
+Tensor* uop_lstm_cell_bwd(Tensor* grad_packed, Tensor* gates, Tensor* c_prev);
 
 /* Shorthands for the shape/reduce ops whose params struct is otherwise rebuilt
  * by hand at every call site. Each is a NULL-propagating pass-through, so a
