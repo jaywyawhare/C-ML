@@ -431,6 +431,24 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             gm_accum(&map, hidden, uop_shrink(packed, s_hd, e_hd, 2));
             break;
         }
+        case UOP_LSTM_CELL: {
+            /* g is the grad of the packed [h_new | c_new] output; the fused
+             * backward returns [dgates(4H) | dc_prev(H)]. */
+            Tensor* gates  = a;
+            Tensor* c_prev = b;
+            if (!gates || !c_prev)
+                break;
+            int B          = c_prev->shape[0];
+            int H          = c_prev->shape[1];
+            Tensor* packed = uop_lstm_cell_bwd(g, gates, c_prev);
+            if (!packed)
+                break;
+            int s_g[2] = {0, 0}, e_g[2] = {B, 4 * H};
+            int s_c[2] = {0, 4 * H}, e_c[2] = {B, 5 * H};
+            gm_accum(&map, gates, uop_shrink(packed, s_g, e_g, 2));
+            gm_accum(&map, c_prev, uop_shrink(packed, s_c, e_c, 2));
+            break;
+        }
         case UOP_SUM: {
             /* dX = broadcast(dOut) back to X's shape (via keepdim reshape) */
             ReduceParams* rp = (ReduceParams*)nd->params;

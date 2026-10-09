@@ -150,35 +150,14 @@ void lstm_cell_forward(LSTMCell* cell, Tensor* input, Tensor* h_prev, Tensor* c_
         tensor_add(uop_linear(input, cell->weight_ih->tensor, bih),
                    uop_linear(h_prev, cell->weight_hh->tensor, bhh)); /* [batch, 4*hs] */
 
-    /* Split gates into i, f, g, o via shrink - each [batch, hs] */
-    int starts_full[] = {0, 0};
-    int ends_full[]   = {batch, hs};
-
-    int starts_i[] = {0, 0 * hs}, ends_i[] = {batch, 1 * hs};
-    int starts_f[] = {0, 1 * hs}, ends_f[] = {batch, 2 * hs};
-    int starts_g[] = {0, 2 * hs}, ends_g[] = {batch, 3 * hs};
-    int starts_o[] = {0, 3 * hs}, ends_o[] = {batch, 4 * hs};
-    (void)starts_full;
-    (void)ends_full;
-
-    Tensor* gate_i = uop_shrink(gates, starts_i, ends_i, 2); /* input gate   */
-    Tensor* gate_f = uop_shrink(gates, starts_f, ends_f, 2); /* forget gate  */
-    Tensor* gate_g = uop_shrink(gates, starts_g, ends_g, 2); /* cell gate    */
-    Tensor* gate_o = uop_shrink(gates, starts_o, ends_o, 2); /* output gate  */
-
-    Tensor* i_act = uop_sigmoid(gate_i);
-    Tensor* f_act = uop_sigmoid(gate_f);
-    Tensor* g_act = uop_tanh(gate_g);
-    Tensor* o_act = uop_sigmoid(gate_o);
-
-    /* c_new = f ⊙ c_prev + i ⊙ g */
-    Tensor* c_new = tensor_add(tensor_mul(f_act, c_prev), tensor_mul(i_act, g_act));
-
-    /* h_new = o ⊙ tanh(c_new) */
-    Tensor* h_new = tensor_mul(o_act, uop_tanh(c_new));
-
-    *h_out = h_new;
-    *c_out = c_new;
+    /* One fused kernel for the whole gate computation (i/f/g/o -> c_new, h_new)
+     * instead of 4 shrinks + sigmoid/tanh/mul/add; the backward is one fused op
+     * too. The packed [B,2H] output is sliced back into h_new and c_new. */
+    Tensor* packed = uop_lstm_cell(gates, c_prev);
+    int sh_h[] = {0, 0}, eh_h[] = {batch, hs};
+    int sh_c[] = {0, hs}, eh_c[] = {batch, 2 * hs};
+    *h_out = uop_shrink(packed, sh_h, eh_h, 2);
+    *c_out = uop_shrink(packed, sh_c, eh_c, 2);
 }
 
 /** Construct a torch.nn.LSTMCell (4 stacked gates). Returns NULL on failure. */
