@@ -272,6 +272,11 @@ typedef enum {
     UOP_LAYERNORM,
     UOP_LAYERNORM_BWD,
 
+    /* Fused softmax over the last dim. SOFTMAX: x [.,D] -> y [.,D].
+     * SOFTMAX_BWD: {grad_y, y} -> dx = y*(grad_y - rowsum(grad_y*y)) [.,D]. */
+    UOP_SOFTMAX,
+    UOP_SOFTMAX_BWD,
+
     UOP_COUNT // Total count
 } UOpType;
 
@@ -372,6 +377,11 @@ Tensor* uop_layernorm(Tensor* x, Tensor* gamma, Tensor* beta, float eps);
 /* Adjoint of uop_layernorm: packs [dx (rows*D) | dgamma (D) | dbeta (D)] into a
  * flat [rows*D + 2D] buffer. gamma may be NULL. */
 Tensor* uop_layernorm_bwd(Tensor* grad_y, Tensor* x, Tensor* gamma, float eps);
+
+/* Fused softmax over the last dim (f32). */
+Tensor* uop_softmax_lastdim(Tensor* x);
+/* Adjoint of uop_softmax_lastdim: dx = y*(grad_y - rowsum(grad_y*y)) [.,D]. */
+Tensor* uop_softmax_bwd(Tensor* grad_y, Tensor* y);
 
 /* Shorthands for the shape/reduce ops whose params struct is otherwise rebuilt
  * by hand at every call site. Each is a NULL-propagating pass-through, so a

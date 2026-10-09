@@ -3819,6 +3819,35 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_SOFTMAX: {
+        /* dx = y * (grad_y - rowsum(grad_y*y)); out is the softmax output y. */
+        if (node->num_inputs < 1)
+            break;
+        Tensor* x      = node->inputs[0];
+        const float* y = (const float*)out->data;
+        if (!y)
+            break;
+        int D       = out->shape[out->ndim - 1];
+        size_t rows = out_numel / (size_t)D;
+        float* dx   = (float*)cml_malloc(out_numel * sizeof(float));
+        if (dx) {
+            for (size_t r = 0; r < rows; r++) {
+                const float* gr = out_grad + r * D;
+                const float* yr = y + r * D;
+                float* dxr      = dx + r * D;
+                float dot       = 0.0f;
+                for (int j = 0; j < D; j++)
+                    dot += gr[j] * yr[j];
+                for (int j = 0; j < D; j++)
+                    dxr[j] = yr[j] * (gr[j] - dot);
+            }
+            if (x->requires_grad)
+                accumulate_grad(x, dx, out_numel);
+        }
+        cml_free(dx);
+        break;
+    }
+
     /* no gradient: in-place optimizer steps sit outside differentiation */
     case UOP_SGD_STEP:
     case UOP_ADAM_STEP:
