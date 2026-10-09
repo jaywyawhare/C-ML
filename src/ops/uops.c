@@ -913,6 +913,11 @@ Tensor* uop_gru_cell(Tensor* ih, Tensor* hh, Tensor* hidden) {
     if (ih->ndim != 2 || hh->ndim != 2 || hidden->ndim != 2) {
         CML_ERR_NULL("uop_gru_cell: inputs must be 2D");
     }
+    if (ih->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("uop_gru_cell: fused f32 kernel cannot read dtype %d", ih->dtype);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
+    }
     int B = ih->shape[0];
     int H = hidden->shape[1];
     if (ih->shape[1] != 3 * H || hh->shape[1] != 3 * H || hh->shape[0] != B ||
@@ -988,6 +993,11 @@ Tensor* uop_lstm_cell(Tensor* gates, Tensor* c_prev) {
     if (gates->ndim != 2 || c_prev->ndim != 2) {
         CML_ERR_NULL("uop_lstm_cell: inputs must be 2D");
     }
+    if (gates->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("uop_lstm_cell: fused f32 kernel cannot read dtype %d", gates->dtype);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
+    }
     int B = c_prev->shape[0];
     int H = c_prev->shape[1];
     if (gates->shape[0] != B || gates->shape[1] != 4 * H) {
@@ -1061,6 +1071,11 @@ Tensor* uop_rnn_cell(Tensor* ih, Tensor* hh) {
     if (ih->ndim != 2 || hh->ndim != 2) {
         CML_ERR_NULL("uop_rnn_cell: inputs must be 2D");
     }
+    if (ih->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("uop_rnn_cell: fused f32 kernel cannot read dtype %d", ih->dtype);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
+    }
     int B = ih->shape[0];
     int H = ih->shape[1];
     if (hh->shape[0] != B || hh->shape[1] != H) {
@@ -1120,6 +1135,11 @@ Tensor* uop_rnn_cell_bwd(Tensor* grad_h, Tensor* h_new) {
 Tensor* uop_layernorm(Tensor* x, Tensor* gamma, Tensor* beta, float eps) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_layernorm");
+    }
+    if (x->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("uop_layernorm: fused f32 kernel cannot read dtype %d", x->dtype);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
     }
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
@@ -1621,6 +1641,11 @@ Tensor* uop_softmax_lastdim(Tensor* x) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_softmax_lastdim");
     }
+    if (x->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("uop_softmax_lastdim: fused f32 kernel cannot read dtype %d", x->dtype);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
+    }
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
@@ -1675,6 +1700,11 @@ Tensor* uop_softmax_bwd(Tensor* grad_y, Tensor* y) {
 Tensor* uop_log_softmax_lastdim(Tensor* x) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_log_softmax_lastdim");
+    }
+    if (x->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("uop_log_softmax_lastdim: fused f32 kernel cannot read dtype %d", x->dtype);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
     }
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
@@ -1732,11 +1762,13 @@ Tensor* uop_softmax(Tensor* x, int dim) {
         CML_ERR_NULL("NULL tensor input to uop_softmax");
     }
 
-    /* The common last-dim softmax runs as one fused kernel (and one fused
-     * backward); other axes keep the explicit reduce/expand chain below. */
+    /* The common last-dim f32 softmax runs as one fused kernel (and one fused
+     * backward). Other axes - and non-f32 dtypes, which the f32 kernel cannot
+     * read - keep the explicit reduce/expand chain below (it computes in the
+     * tensor's own dtype via the multi-dtype elementwise path). */
     int ndim = x->ndim;
     int d    = dim < 0 ? dim + ndim : dim;
-    if (d == ndim - 1)
+    if (d == ndim - 1 && x->dtype == DTYPE_FLOAT32)
         return uop_softmax_lastdim(x);
 
     ReduceParams max_params = {0};
