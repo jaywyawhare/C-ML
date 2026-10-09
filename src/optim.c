@@ -759,7 +759,7 @@ static float* optim_param_buffers(ParameterGroup* group, int i, float** grad_dat
 
 static void sgd_param_inplace(Tensor* t, const Tensor* grad, Tensor* mom, float lr,
                               float weight_decay, float momentum);
-static bool sgd_can_step_inplace(Optimizer* optimizer);
+static bool grads_host_ready(Optimizer* optimizer);
 
 /** SGD update for every group: emit a uop_sgd_step IR node per parameter
  *  (applying weight decay and momentum). Under FUSE_OPTIM the realizes are
@@ -778,7 +778,7 @@ static void sgd_step(Optimizer* optimizer) {
      * path below emits a uop_sgd_step per parameter and realises each one, and
      * every realize walks the whole graph head-to-tail - O(params x graph) of
      * pure dispatch for an update that is a tight per-element loop. */
-    if (!fuse && sgd_can_step_inplace(optimizer)) {
+    if (!fuse && grads_host_ready(optimizer)) {
         for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
             ParameterGroup* group     = &optimizer->param_groups[g_idx];
             SGDMomentumState** states = sgd_momentum_states(group, group->momentum);
@@ -894,7 +894,7 @@ static void sgd_param_inplace(Tensor* t, const Tensor* grad, Tensor* mom, float 
 
 /* True if every requires_grad parameter already has a materialised f32 grad, so
  * the step can run in place without realising any IR node. */
-static bool sgd_can_step_inplace(Optimizer* optimizer) {
+static bool grads_host_ready(Optimizer* optimizer) {
     for (int g = 0; g < optimizer->num_param_groups; g++) {
         ParameterGroup* group = &optimizer->param_groups[g];
         for (int i = 0; i < group->num_parameters; i++) {
@@ -906,6 +906,60 @@ static bool sgd_can_step_inplace(Optimizer* optimizer) {
                 param->tensor->dtype != DTYPE_FLOAT32 || grad->dtype != DTYPE_FLOAT32 ||
                 param->tensor->device != DEVICE_CPU || grad->device != DEVICE_CPU)
                 return false; /* non-host buffers: fall back to the device-safe IR path */
+        }
+    }
+    return true;
+}
+
+/* One parameter's in-place Adam update, mirroring the UOP_ADAM_STEP kernel
+ * (bias-corrected moments, optional amsgrad), writing the parameter and its
+ * moment buffers directly. */
+static void adam_param_inplace(Tensor* t, const Tensor* grad, Tensor* exp_avg, Tensor* exp_avg_sq,
+                               Tensor* max_sq, float lr, float b1, float b2, float eps, float wd,
+                               int step) {
+    float* p        = (float*)t->data;
+    const float* gd = (const float*)grad->data;
+    float* m        = (float*)exp_avg->data;
+    float* v        = (float*)exp_avg_sq->data;
+    float* vmax     = (max_sq && max_sq->data) ? (float*)max_sq->data : NULL;
+    float bc1       = 1.0f - powf(b1, (float)step);
+    float bc2       = 1.0f - powf(b2, (float)step);
+    float lr_t      = lr * sqrtf(bc2) / bc1;
+    size_t n        = t->numel;
+    for (size_t j = 0; j < n; j++) {
+        float g = gd[j] + wd * p[j];
+        m[j]    = b1 * m[j] + (1.0f - b1) * g;
+        v[j]    = b2 * v[j] + (1.0f - b2) * g * g;
+        float denom;
+        if (vmax) {
+            vmax[j] = isnan(v[j]) ? v[j] : fmaxf(vmax[j], v[j]);
+            denom   = sqrtf(vmax[j]) + eps;
+        } else {
+            denom = sqrtf(v[j]) + eps;
+        }
+        p[j] -= lr_t * m[j] / denom;
+    }
+}
+
+/* True if grads are host-ready and every Adam moment buffer is allocated, so the
+ * update can run in place without emitting a uop_adam_step per parameter. */
+static bool adam_can_step_inplace(Optimizer* optimizer, bool amsgrad) {
+    if (!grads_host_ready(optimizer))
+        return false;
+    for (int g = 0; g < optimizer->num_param_groups; g++) {
+        ParameterGroup* group = &optimizer->param_groups[g];
+        AdamState** states    = adam_states(optimizer, group, "Adam");
+        if (!states)
+            return false;
+        for (int i = 0; i < group->num_parameters; i++) {
+            Parameter* param = group->parameters[i];
+            if (!param || !param->tensor || !param->requires_grad)
+                continue;
+            AdamState* s = states[i];
+            if (!s || !s->exp_avg || !s->exp_avg->data || !s->exp_avg_sq || !s->exp_avg_sq->data)
+                return false;
+            if (amsgrad && (!s->max_exp_avg_sq || !s->max_exp_avg_sq->data))
+                return false;
         }
     }
     return true;
@@ -1014,6 +1068,31 @@ static void adam_step(Optimizer* optimizer) {
                 }
             }
         }
+    }
+
+    /* Fast path: host-ready grads + allocated moments -> update in place, as in
+     * the SGD path. The IR path emits a uop_adam_step per parameter and realizes
+     * each, every realize walking the whole graph head-to-tail. Skipped under
+     * FUSE_OPTIM so the node-emitting path stays available for co-scheduling. */
+    if (!cml_flag_enabled(CML_FLAG_FUSE_OPTIM) &&
+        adam_can_step_inplace(optimizer, optimizer->amsgrad)) {
+        for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
+            ParameterGroup* group = &optimizer->param_groups[g_idx];
+            AdamState** states    = adam_states(optimizer, group, "Adam");
+            int step              = group->step_count + 1;
+            for (int i = 0; i < group->num_parameters; i++) {
+                Parameter* param = group->parameters[i];
+                if (!param || !param->tensor || !param->requires_grad)
+                    continue;
+                Tensor* grad   = tensor_get_grad(param->tensor);
+                Tensor* max_sq = optimizer->amsgrad ? states[i]->max_exp_avg_sq : NULL;
+                adam_param_inplace(param->tensor, grad, states[i]->exp_avg, states[i]->exp_avg_sq,
+                                   max_sq, group->lr, group->beta1, group->beta2, group->epsilon,
+                                   group->weight_decay, step);
+            }
+            group->step_count++;
+        }
+        return;
     }
 
     for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
