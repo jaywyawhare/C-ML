@@ -1072,8 +1072,10 @@ static void adam_step(Optimizer* optimizer) {
 
     /* Fast path: host-ready grads + allocated moments -> update in place, as in
      * the SGD path. The IR path emits a uop_adam_step per parameter and realizes
-     * each, every realize walking the whole graph head-to-tail. */
-    if (adam_can_step_inplace(optimizer, optimizer->amsgrad)) {
+     * each, every realize walking the whole graph head-to-tail. Skipped under
+     * FUSE_OPTIM so the node-emitting path stays available for co-scheduling. */
+    if (!cml_flag_enabled(CML_FLAG_FUSE_OPTIM) &&
+        adam_can_step_inplace(optimizer, optimizer->amsgrad)) {
         for (int g_idx = 0; g_idx < optimizer->num_param_groups; g_idx++) {
             ParameterGroup* group = &optimizer->param_groups[g_idx];
             AdamState** states    = adam_states(optimizer, group, "Adam");
