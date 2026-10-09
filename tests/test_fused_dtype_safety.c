@@ -1,8 +1,8 @@
 /**
- * The fused softmax/log-softmax kernels are f32-only (they read ->data as
- * float*). uop_softmax must route non-f32 inputs to the dtype-safe reduce/expand
- * chain instead of the fused kernel, producing correct results (not garbage from
- * misreading half data). This checks a bf16 softmax matches the f32 reference.
+ * The fused softmax/log-softmax kernels compute in f32 and cast half
+ * inputs/outputs at the boundary, so they handle non-f32 dtypes natively (not
+ * garbage from misreading half data). This checks a bf16 softmax matches the f32
+ * reference.
  */
 #include <math.h>
 #include <stdio.h>
@@ -14,7 +14,7 @@
 
 int main(void) {
     cml_init();
-    printf("Fused-op dtype safety (bf16 softmax falls back correctly)\n");
+    printf("Fused-op dtype safety (native bf16 softmax)\n");
 
     float xf[D] = {1.0f, 2.0f, 3.0f, 0.5f};
 
@@ -30,9 +30,9 @@ int main(void) {
         ref[j] = rf[j];
     cml_reset_ir_context();
 
-    /* bf16 input (properly converted from f32): must not hit the f32 fused
-     * kernel. cml_tensor interprets raw bytes as the config dtype, so build the
-     * bf16 tensor by casting rather than relabeling. */
+    /* bf16 input (properly converted from f32): runs the fused kernel natively.
+     * cml_tensor interprets raw bytes as the config dtype, so build the bf16
+     * tensor by casting rather than relabeling. */
     Tensor* xf32b = cml_tensor(xf, s, 2, &f32);
     Tensor* xbf   = cml_cast(xf32b, DTYPE_BFLOAT16);
     Tensor* ybf   = uop_softmax(xbf, -1);

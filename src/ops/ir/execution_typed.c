@@ -69,9 +69,13 @@ void cml_lanes_of(const Tensor* t, int dim, size_t* outer, size_t* count, size_t
 }
 
 /* Ops that already implement "handle the dtype or fail cleanly" inside the main
- * switch (cpu_matmul_generic / cpu_conv2d_generic). Routing them here would
- * shadow working code, so they stay on their own path. */
-static bool handles_own_dtype(UOpType t) { return t == UOP_MATMUL || t == UOP_CONV2D; }
+ * switch. matmul/conv run cpu_matmul_generic / cpu_conv2d_generic; the fused
+ * softmax family computes in f32 and casts half inputs/outputs at the boundary.
+ * Routing them here would shadow working code, so they stay on their own path. */
+static bool handles_own_dtype(UOpType t) {
+    return t == UOP_MATMUL || t == UOP_CONV2D || t == UOP_SOFTMAX || t == UOP_SOFTMAX_BWD ||
+           t == UOP_LOG_SOFTMAX || t == UOP_LOG_SOFTMAX_BWD;
+}
 
 /** Decide whether a node must take the dtype-generic typed path instead of the f32 fast path. */
 bool cml_exec_needs_typed(struct IRNode* node, Tensor* out) {

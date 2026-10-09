@@ -1643,11 +1643,6 @@ Tensor* uop_softmax_lastdim(Tensor* x) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_softmax_lastdim");
     }
-    if (x->dtype != DTYPE_FLOAT32) {
-        LOG_ERROR("uop_softmax_lastdim: fused f32 kernel cannot read dtype %d", x->dtype);
-        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
-        return NULL;
-    }
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
@@ -1702,11 +1697,6 @@ Tensor* uop_softmax_bwd(Tensor* grad_y, Tensor* y) {
 Tensor* uop_log_softmax_lastdim(Tensor* x) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_log_softmax_lastdim");
-    }
-    if (x->dtype != DTYPE_FLOAT32) {
-        LOG_ERROR("uop_log_softmax_lastdim: fused f32 kernel cannot read dtype %d", x->dtype);
-        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
-        return NULL;
     }
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
@@ -1764,13 +1754,12 @@ Tensor* uop_softmax(Tensor* x, int dim) {
         CML_ERR_NULL("NULL tensor input to uop_softmax");
     }
 
-    /* The common last-dim f32 softmax runs as one fused kernel (and one fused
-     * backward). Other axes - and non-f32 dtypes, which the f32 kernel cannot
-     * read - keep the explicit reduce/expand chain below (it computes in the
-     * tensor's own dtype via the multi-dtype elementwise path). */
+    /* The common last-dim softmax runs as one fused kernel (and one fused
+     * backward); the kernel computes in f32 and casts half inputs/outputs at the
+     * boundary. Other axes keep the explicit reduce/expand chain below. */
     int ndim = x->ndim;
     int d    = dim < 0 ? dim + ndim : dim;
-    if (d == ndim - 1 && x->dtype == DTYPE_FLOAT32)
+    if (d == ndim - 1)
         return uop_softmax_lastdim(x);
 
     ReduceParams max_params = {0};
