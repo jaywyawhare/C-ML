@@ -65,8 +65,23 @@ int main(void) {
             maxdiff = d;
     }
 
-    int pass = maxdiff < 1e-2f;
-    printf("  input grad maxdiff=%.3e %s\n", (double)maxdiff, pass ? "PASS" : "FAIL");
+    /* Numerical stability: for large equal logits, y must be ~-log(D), not 0
+     * (naive x - (max + log(sum)) cancels the log term in float32). */
+    float big[D];
+    for (int j = 0; j < D; j++)
+        big[j] = 1e8f;
+    int bs[]         = {1, D};
+    Tensor* bx       = cml_tensor(big, bs, 2, &CFG);
+    Tensor* by       = uop_log_softmax_lastdim(bx);
+    const float* byd = (const float*)tensor_data_ptr(by);
+    float want_big   = -logf((float)D);
+    int stable       = byd && fabsf(byd[0] - want_big) < 1e-3f;
+    printf("  large-logit y[0]=%.4f want %.4f %s\n", byd ? (double)byd[0] : 0.0, (double)want_big,
+           stable ? "PASS" : "FAIL");
+    cml_reset_ir_context();
+
+    int pass = (maxdiff < 1e-2f) && stable;
+    printf("  input grad maxdiff=%.3e %s\n", (double)maxdiff, (maxdiff < 1e-2f) ? "PASS" : "FAIL");
     printf(pass ? "Fused log-softmax gradient check passed.\n" : "FAILED.\n");
     return pass ? 0 : 1;
 }

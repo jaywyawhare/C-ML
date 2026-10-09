@@ -5624,9 +5624,11 @@ not_empty_reduction:;
             float s = 0.0f;
             for (int j = 0; j < D; j++)
                 s += expf(xr[j] - m);
-            float lse = m + logf(s);
+            /* (x - m) - log(s), not x - (m + log(s)): for large logits the latter
+             * loses the log(s) term to float cancellation (m + log(s) == m). */
+            float logs = logf(s);
             for (int j = 0; j < D; j++)
-                yr[j] = xr[j] - lse;
+                yr[j] = (xr[j] - m) - logs;
         }
         break;
     }

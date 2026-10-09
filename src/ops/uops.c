@@ -1648,6 +1648,11 @@ Tensor* uop_softmax_bwd(Tensor* grad_y, Tensor* y) {
     if (!grad_y || !y) {
         CML_ERR_NULL("NULL tensor input to uop_softmax_bwd");
     }
+    if (grad_y->numel != y->numel) {
+        LOG_ERROR("uop_softmax_bwd: grad_y/y numel mismatch (%zu vs %zu)", grad_y->numel, y->numel);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
+    }
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
         return NULL;
@@ -1697,6 +1702,12 @@ Tensor* uop_log_softmax_lastdim(Tensor* x) {
 Tensor* uop_log_softmax_bwd(Tensor* grad_y, Tensor* y) {
     if (!grad_y || !y) {
         CML_ERR_NULL("NULL tensor input to uop_log_softmax_bwd");
+    }
+    if (grad_y->numel != y->numel) {
+        LOG_ERROR("uop_log_softmax_bwd: grad_y/y numel mismatch (%zu vs %zu)", grad_y->numel,
+                  y->numel);
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
     }
     CMLGraph_t ir = cml_ir_get_or_create_context();
     if (!ir)
