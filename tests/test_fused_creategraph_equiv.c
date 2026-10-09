@@ -117,6 +117,68 @@ static int check_layernorm(void) {
     return ok;
 }
 
+/* GRU cell: grad of sum(w .* gru_cell(ih,hh,hidden)) w.r.t ih, fused vs cg. */
+static int check_gru(void) {
+    const int H  = 3;
+    float ihd[9] = {0.3f, -0.2f, 0.5f, 0.1f, -0.4f, 0.2f, 0.0f, 0.3f, -0.1f};
+    float hhd[9] = {0.1f, 0.2f, -0.1f, 0.0f, 0.3f, -0.2f, 0.4f, -0.3f, 0.2f};
+    float hd[3]  = {0.2f, -0.1f, 0.3f};
+    float w[3]   = {1.0f, -0.5f, 0.75f};
+    int s3[] = {1, 3 * H}, s1[] = {1, H};
+    float gf[9], gt[9];
+    for (int pass = 0; pass < 2; pass++) {
+        Tensor* ih        = cml_tensor(ihd, s3, 2, &CFG);
+        ih->requires_grad = true;
+        Tensor* hh        = cml_tensor(hhd, s3, 2, &CFG);
+        Tensor* hid       = cml_tensor(hd, s1, 2, &CFG);
+        Tensor* y         = uop_gru_cell(ih, hh, hid);
+        Tensor* wt        = cml_tensor(w, s1, 2, &CFG);
+        Tensor* loss      = uop_sum(uop_mul(y, wt), &(ReduceParams){0});
+        tensor_backward(loss, NULL, false, pass == 1);
+        const float* g = ih->grad ? (const float*)tensor_data_ptr(ih->grad) : NULL;
+        for (int i = 0; i < 3 * H; i++)
+            (pass ? gt : gf)[i] = g ? g[i] : 0.0f;
+        cml_reset_ir_context();
+    }
+    float md = 0.0f;
+    for (int i = 0; i < 9; i++)
+        md = fmaxf(md, fabsf(gf[i] - gt[i]));
+    int ok = md < 1e-5f;
+    printf("  %-12s fused-vs-creategraph grad maxdiff=%.3e %s\n", "gru_cell", (double)md,
+           ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+/* LSTM cell: grad of sum(w .* lstm_cell(gates,c_prev)) w.r.t gates, fused vs cg. */
+static int check_lstm(void) {
+    const int H  = 3;
+    float gd[12] = {0.3f, -0.2f, 0.5f, 0.1f, -0.4f, 0.2f, 0.0f, 0.3f, -0.1f, 0.2f, 0.4f, -0.3f};
+    float cd[3]  = {0.2f, -0.1f, 0.3f};
+    float w[6]   = {1.0f, -0.5f, 0.75f, 0.25f, -1.0f, 0.5f}; /* over packed [h|c], 2H=6 */
+    int s4[] = {1, 4 * H}, s1[] = {1, H}, s2[] = {1, 2 * H};
+    float gf[12], gt[12];
+    for (int pass = 0; pass < 2; pass++) {
+        Tensor* gates        = cml_tensor(gd, s4, 2, &CFG);
+        gates->requires_grad = true;
+        Tensor* c_prev       = cml_tensor(cd, s1, 2, &CFG);
+        Tensor* y            = uop_lstm_cell(gates, c_prev); /* packed [1,2H] */
+        Tensor* wt           = cml_tensor(w, s2, 2, &CFG);
+        Tensor* loss         = uop_sum(uop_mul(y, wt), &(ReduceParams){0});
+        tensor_backward(loss, NULL, false, pass == 1);
+        const float* g = gates->grad ? (const float*)tensor_data_ptr(gates->grad) : NULL;
+        for (int i = 0; i < 4 * H; i++)
+            (pass ? gt : gf)[i] = g ? g[i] : 0.0f;
+        cml_reset_ir_context();
+    }
+    float md = 0.0f;
+    for (int i = 0; i < 12; i++)
+        md = fmaxf(md, fabsf(gf[i] - gt[i]));
+    int ok = md < 1e-5f;
+    printf("  %-12s fused-vs-creategraph grad maxdiff=%.3e %s\n", "lstm_cell", (double)md,
+           ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 int main(void) {
     cml_init();
     printf("Fused vs create_graph first-order grad equivalence\n");
@@ -125,6 +187,8 @@ int main(void) {
     ok &= check("log_softmax", b_logsm);
     ok &= check_rnn();
     ok &= check_layernorm();
+    ok &= check_gru();
+    ok &= check_lstm();
     printf(ok ? "Equivalence holds.\n" : "MISMATCH.\n");
     return ok ? 0 : 1;
 }
