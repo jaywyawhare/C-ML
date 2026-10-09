@@ -495,6 +495,15 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
                 gm_accum(&map, a, dx);
             break;
         }
+        case UOP_LOG_SOFTMAX: {
+            /* dx = g - exp(y)*rowsum(g); out is the log-softmax output y. */
+            if (!a)
+                break;
+            Tensor* dx = uop_log_softmax_bwd(g, out);
+            if (dx)
+                gm_accum(&map, a, dx);
+            break;
+        }
         case UOP_SUM: {
             /* dX = broadcast(dOut) back to X's shape (via keepdim reshape) */
             ReduceParams* rp = (ReduceParams*)nd->params;
