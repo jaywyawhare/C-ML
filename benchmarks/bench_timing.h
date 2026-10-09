@@ -84,15 +84,15 @@ static inline BenchStats bench_stats(double* samples, int n) {
 /* Time `body` (a statement) `trials` times, `inner` reps per trial, into the
  * samples array `buf` (must hold >= `trials` doubles), and return the
  * per-rep BenchStats in seconds. A warmup rep runs first and is not recorded. */
-#define BENCH_COLLECT(buf, trials, inner, body)                                                    \
+#define BENCH_COLLECT(buf, trials, inner, ...)                                                     \
     do {                                                                                           \
         {                                                                                          \
-            body;                                                                                  \
+            __VA_ARGS__;                                                                           \
         } /* warmup */                                                                             \
         for (int _t = 0; _t < (trials); _t++) {                                                    \
             double _t0 = now();                                                                    \
             for (int _r = 0; _r < (inner); _r++) {                                                 \
-                body;                                                                              \
+                __VA_ARGS__;                                                                       \
             }                                                                                      \
             (buf)[_t] = (now() - _t0) / (inner);                                                   \
         }                                                                                          \
