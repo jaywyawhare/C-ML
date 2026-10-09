@@ -418,8 +418,39 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             Tensor* hidden = nd->num_inputs > 2 ? nd->inputs[2] : NULL;
             if (!ih || !hh || !hidden)
                 break;
-            int B          = hidden->shape[0];
-            int H          = hidden->shape[1];
+            int B = hidden->shape[0];
+            int H = hidden->shape[1];
+            if (differentiable_grads) {
+                /* Differentiable primitive GRU backward for correct double-
+                 * backward: recompute the gates, then the adjoints, concatenating
+                 * the per-gate grads back into dih/dhh. */
+                int sr[2] = {0, 0}, er[2] = {B, H};
+                int sz[2] = {0, H}, ez[2] = {B, 2 * H};
+                int sn[2] = {0, 2 * H}, en[2] = {B, 3 * H};
+                Tensor* ihr          = uop_shrink(ih, sr, er, 2);
+                Tensor* ihz          = uop_shrink(ih, sz, ez, 2);
+                Tensor* ihn          = uop_shrink(ih, sn, en, 2);
+                Tensor* hhr          = uop_shrink(hh, sr, er, 2);
+                Tensor* hhz          = uop_shrink(hh, sz, ez, 2);
+                Tensor* hhn          = uop_shrink(hh, sn, en, 2);
+                Tensor* r            = uop_sigmoid(uop_add(ihr, hhr));
+                Tensor* z            = uop_sigmoid(uop_add(ihz, hhz));
+                Tensor* n            = uop_tanh(uop_add(ihn, uop_mul(r, hhn)));
+                Tensor* one          = ad_k(r, 1.0f);
+                Tensor* dn           = uop_mul(g, uop_sub(one, z));
+                Tensor* dz           = uop_mul(g, uop_sub(hidden, n));
+                Tensor* dhd          = uop_mul(g, z);
+                Tensor* dan          = uop_mul(dn, uop_sub(one, uop_mul(n, n)));
+                Tensor* dr           = uop_mul(dan, hhn);
+                Tensor* daz          = uop_mul(dz, uop_mul(z, uop_sub(one, z)));
+                Tensor* dar          = uop_mul(dr, uop_mul(r, uop_sub(one, r)));
+                Tensor* dih_parts[3] = {dar, daz, dan};
+                Tensor* dhh_parts[3] = {dar, daz, uop_mul(dan, r)};
+                gm_accum(&map, ih, uop_cat(dih_parts, 3, 1));
+                gm_accum(&map, hh, uop_cat(dhh_parts, 3, 1));
+                gm_accum(&map, hidden, dhd);
+                break;
+            }
             Tensor* packed = uop_gru_cell_bwd(g, ih, hh, hidden);
             if (!packed)
                 break;
@@ -438,8 +469,38 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             Tensor* c_prev = b;
             if (!gates || !c_prev)
                 break;
-            int B          = c_prev->shape[0];
-            int H          = c_prev->shape[1];
+            int B = c_prev->shape[0];
+            int H = c_prev->shape[1];
+            if (differentiable_grads) {
+                /* Differentiable primitive LSTM backward for correct double-
+                 * backward. g is the grad of the packed [h_new | c_new] output. */
+                int sgh[2] = {0, 0}, egh[2] = {B, H};
+                int sgc[2] = {0, H}, egc[2] = {B, 2 * H};
+                Tensor* gh = uop_shrink(g, sgh, egh, 2);
+                Tensor* gc = uop_shrink(g, sgc, egc, 2);
+                int si[2] = {0, 0}, ei[2] = {B, H};
+                int sf[2] = {0, H}, ef[2] = {B, 2 * H};
+                int sgt[2] = {0, 2 * H}, egt[2] = {B, 3 * H};
+                int so[2] = {0, 3 * H}, eo[2] = {B, 4 * H};
+                Tensor* ig       = uop_sigmoid(uop_shrink(gates, si, ei, 2));
+                Tensor* fg       = uop_sigmoid(uop_shrink(gates, sf, ef, 2));
+                Tensor* gg       = uop_tanh(uop_shrink(gates, sgt, egt, 2));
+                Tensor* og       = uop_sigmoid(uop_shrink(gates, so, eo, 2));
+                Tensor* cn       = uop_add(uop_mul(fg, c_prev), uop_mul(ig, gg));
+                Tensor* tc       = uop_tanh(cn);
+                Tensor* one      = ad_k(ig, 1.0f);
+                Tensor* dtc      = uop_mul(gh, og);
+                Tensor* dcn      = uop_add(gc, uop_mul(dtc, uop_sub(one, uop_mul(tc, tc))));
+                Tensor* dgi      = uop_mul(uop_mul(dcn, gg), uop_mul(ig, uop_sub(one, ig)));
+                Tensor* dgf      = uop_mul(uop_mul(dcn, c_prev), uop_mul(fg, uop_sub(one, fg)));
+                Tensor* dgg      = uop_mul(uop_mul(dcn, ig), uop_sub(one, uop_mul(gg, gg)));
+                Tensor* dgo      = uop_mul(uop_mul(gh, tc), uop_mul(og, uop_sub(one, og)));
+                Tensor* dc       = uop_mul(dcn, fg);
+                Tensor* parts[4] = {dgi, dgf, dgg, dgo};
+                gm_accum(&map, gates, uop_cat(parts, 4, 1));
+                gm_accum(&map, c_prev, dc);
+                break;
+            }
             Tensor* packed = uop_lstm_cell_bwd(g, gates, c_prev);
             if (!packed)
                 break;
