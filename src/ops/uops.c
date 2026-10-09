@@ -931,9 +931,13 @@ Tensor* uop_gru_cell(Tensor* ih, Tensor* hh, Tensor* hidden) {
     if (cml_ir_add_uop(ir, UOP_GRU_CELL, inputs, 3, NULL) != 0)
         return NULL;
 
-    struct IRNode* node   = cml_ir_get_tail(ir);
-    node->output_ndim     = 2;
-    node->output_shape    = cml_malloc(2 * sizeof(int));
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 2;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(2 * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
     node->output_shape[0] = B;
     node->output_shape[1] = H;
 
@@ -963,9 +967,13 @@ Tensor* uop_gru_cell_bwd(Tensor* grad_h, Tensor* ih, Tensor* hh, Tensor* hidden)
     if (cml_ir_add_uop(ir, UOP_GRU_CELL_BWD, inputs, 4, NULL) != 0)
         return NULL;
 
-    struct IRNode* node   = cml_ir_get_tail(ir);
-    node->output_ndim     = 2;
-    node->output_shape    = cml_malloc(2 * sizeof(int));
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 2;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(2 * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
     node->output_shape[0] = B;
     node->output_shape[1] = 7 * H;
 
@@ -997,9 +1005,13 @@ Tensor* uop_lstm_cell(Tensor* gates, Tensor* c_prev) {
     if (cml_ir_add_uop(ir, UOP_LSTM_CELL, inputs, 2, NULL) != 0)
         return NULL;
 
-    struct IRNode* node   = cml_ir_get_tail(ir);
-    node->output_ndim     = 2;
-    node->output_shape    = cml_malloc(2 * sizeof(int));
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 2;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(2 * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
     node->output_shape[0] = B;
     node->output_shape[1] = 2 * H;
 
@@ -1028,9 +1040,13 @@ Tensor* uop_lstm_cell_bwd(Tensor* grad_packed, Tensor* gates, Tensor* c_prev) {
     if (cml_ir_add_uop(ir, UOP_LSTM_CELL_BWD, inputs, 3, NULL) != 0)
         return NULL;
 
-    struct IRNode* node   = cml_ir_get_tail(ir);
-    node->output_ndim     = 2;
-    node->output_shape    = cml_malloc(2 * sizeof(int));
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 2;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(2 * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
     node->output_shape[0] = B;
     node->output_shape[1] = 5 * H;
 

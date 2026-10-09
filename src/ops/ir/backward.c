@@ -3619,6 +3619,120 @@ static int cpu_backward_node(struct IRNode* node) {
     case UOP_RSHIFT:
         break;
 
+    case UOP_GRU_CELL: {
+        /* Eager adjoint of the fused GRU cell (mirrors the graph VJP /
+         * UOP_GRU_CELL_BWD kernel), accumulating into ih / hh / hidden. */
+        if (node->num_inputs < 3)
+            break;
+        Tensor* ih       = node->inputs[0];
+        Tensor* hh       = node->inputs[1];
+        Tensor* hdn      = node->inputs[2];
+        const float* ihd = ih ? (const float*)ih->data : NULL;
+        const float* hhd = hh ? (const float*)hh->data : NULL;
+        const float* hdd = hdn ? (const float*)hdn->data : NULL;
+        if (!ihd || !hhd || !hdd)
+            break;
+        int B      = out->shape[0];
+        int H      = out->shape[1];
+        float* dih = (float*)cml_malloc((size_t)B * 3 * H * sizeof(float));
+        float* dhh = (float*)cml_malloc((size_t)B * 3 * H * sizeof(float));
+        float* dhd = (float*)cml_malloc((size_t)B * H * sizeof(float));
+        if (dih && dhh && dhd) {
+            for (int b = 0; b < B; b++) {
+                const float* ihb = ihd + (size_t)b * 3 * H;
+                const float* hhb = hhd + (size_t)b * 3 * H;
+                const float* hdb = hdd + (size_t)b * H;
+                const float* gb  = out_grad + (size_t)b * H;
+                float* oih       = dih + (size_t)b * 3 * H;
+                float* ohh       = dhh + (size_t)b * 3 * H;
+                float* ohd       = dhd + (size_t)b * H;
+                for (int j = 0; j < H; j++) {
+                    float r        = 1.0f / (1.0f + expf(-(ihb[j] + hhb[j])));
+                    float z        = 1.0f / (1.0f + expf(-(ihb[H + j] + hhb[H + j])));
+                    float n        = tanhf(ihb[2 * H + j] + r * hhb[2 * H + j]);
+                    float gj       = gb[j];
+                    float dn       = gj * (1.0f - z);
+                    float dz       = gj * (hdb[j] - n);
+                    float d_an     = dn * (1.0f - n * n);
+                    float dr       = d_an * hhb[2 * H + j];
+                    float d_az     = dz * z * (1.0f - z);
+                    float d_ar     = dr * r * (1.0f - r);
+                    oih[j]         = d_ar;
+                    oih[H + j]     = d_az;
+                    oih[2 * H + j] = d_an;
+                    ohh[j]         = d_ar;
+                    ohh[H + j]     = d_az;
+                    ohh[2 * H + j] = d_an * r;
+                    ohd[j]         = gj * z;
+                }
+            }
+            if (ih->requires_grad)
+                accumulate_grad(ih, dih, (size_t)B * 3 * H);
+            if (hh->requires_grad)
+                accumulate_grad(hh, dhh, (size_t)B * 3 * H);
+            if (hdn->requires_grad)
+                accumulate_grad(hdn, dhd, (size_t)B * H);
+        }
+        cml_free(dih);
+        cml_free(dhh);
+        cml_free(dhd);
+        break;
+    }
+
+    case UOP_LSTM_CELL: {
+        /* Eager adjoint of the fused LSTM cell. out->grad is packed
+         * [grad_h | grad_c]; accumulate into gates and c_prev. */
+        if (node->num_inputs < 2)
+            break;
+        Tensor* ga       = node->inputs[0];
+        Tensor* cp       = node->inputs[1];
+        const float* gad = ga ? (const float*)ga->data : NULL;
+        const float* cpd = cp ? (const float*)cp->data : NULL;
+        if (!gad || !cpd)
+            break;
+        int B      = cp->shape[0];
+        int H      = cp->shape[1];
+        float* dg  = (float*)cml_malloc((size_t)B * 4 * H * sizeof(float));
+        float* dcp = (float*)cml_malloc((size_t)B * H * sizeof(float));
+        if (dg && dcp) {
+            for (int b = 0; b < B; b++) {
+                const float* gb  = gad + (size_t)b * 4 * H;
+                const float* cb  = cpd + (size_t)b * H;
+                const float* gpb = out_grad + (size_t)b * 2 * H;
+                float* og        = dg + (size_t)b * 4 * H;
+                float* oc        = dcp + (size_t)b * H;
+                for (int j = 0; j < H; j++) {
+                    float ig      = 1.0f / (1.0f + expf(-gb[j]));
+                    float fg      = 1.0f / (1.0f + expf(-gb[H + j]));
+                    float gg      = tanhf(gb[2 * H + j]);
+                    float og_     = 1.0f / (1.0f + expf(-gb[3 * H + j]));
+                    float cn      = fg * cb[j] + ig * gg;
+                    float tc      = tanhf(cn);
+                    float gh      = gpb[j];
+                    float gc      = gpb[H + j];
+                    float do_     = gh * tc;
+                    float dtc     = gh * og_;
+                    float dcnew   = gc + dtc * (1.0f - tc * tc);
+                    float df      = dcnew * cb[j];
+                    float di      = dcnew * gg;
+                    float dgc     = dcnew * ig;
+                    og[j]         = di * ig * (1.0f - ig);
+                    og[H + j]     = df * fg * (1.0f - fg);
+                    og[2 * H + j] = dgc * (1.0f - gg * gg);
+                    og[3 * H + j] = do_ * og_ * (1.0f - og_);
+                    oc[j]         = dcnew * fg;
+                }
+            }
+            if (ga->requires_grad)
+                accumulate_grad(ga, dg, (size_t)B * 4 * H);
+            if (cp->requires_grad)
+                accumulate_grad(cp, dcp, (size_t)B * H);
+        }
+        cml_free(dg);
+        cml_free(dcp);
+        break;
+    }
+
     /* no gradient: in-place optimizer steps sit outside differentiation */
     case UOP_SGD_STEP:
     case UOP_ADAM_STEP:

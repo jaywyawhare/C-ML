@@ -555,8 +555,13 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0, Tensor** 
             Tensor* h_new = NULL;
             Tensor* c_new = NULL;
             lstm_cell_forward(fwd_cell, xt, h_fwd, c_fwd, &h_new, &c_new);
-            h_fwd        = h_new;
-            c_fwd        = c_new;
+            /* On cell failure keep the last valid state rather than letting a
+             * NULL propagate (which would restart the sequence from zeros and
+             * also feed uop_stack a NULL entry). */
+            if (h_new)
+                h_fwd = h_new;
+            if (c_new)
+                c_fwd = c_new;
             fwd_steps[t] = h_fwd;
         }
         final_h[l * nd + 0] = h_fwd;
@@ -577,8 +582,10 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0, Tensor** 
                 Tensor* h_new = NULL;
                 Tensor* c_new = NULL;
                 lstm_cell_forward(rev_cell, xt, h_rev, c_rev, &h_new, &c_new);
-                h_rev        = h_new;
-                c_rev        = c_new;
+                if (h_new)
+                    h_rev = h_new;
+                if (c_new)
+                    c_rev = c_new;
                 rev_steps[t] = h_rev;
             }
             final_h[l * nd + 1] = h_rev;
