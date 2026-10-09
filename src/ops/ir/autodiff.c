@@ -487,19 +487,37 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             break;
         }
         case UOP_SOFTMAX: {
-            /* dx = y*(g - rowsum(g*y)); out is the softmax output y. */
+            /* dx = y*(g - rowsum(g*y)); out is the softmax output y. The fused
+             * backward kernel is fast but monolithic (no VJP of its own), so for
+             * create_graph (higher-order) emit the differentiable primitive form
+             * instead, keeping double-backward correct. */
             if (!a)
                 break;
-            Tensor* dx = uop_softmax_bwd(g, out);
+            Tensor* dx;
+            if (differentiable_grads) {
+                int ld[1] = {out->ndim - 1};
+                Tensor* s = ad_sum(uop_mul(g, out), ld, 1, true);
+                dx        = uop_mul(out, uop_sub(g, ad_expand(s, out->shape, out->ndim)));
+            } else {
+                dx = uop_softmax_bwd(g, out);
+            }
             if (dx)
                 gm_accum(&map, a, dx);
             break;
         }
         case UOP_LOG_SOFTMAX: {
-            /* dx = g - exp(y)*rowsum(g); out is the log-softmax output y. */
+            /* dx = g - exp(y)*rowsum(g); out is the log-softmax output y.
+             * Primitive (differentiable) form under create_graph. */
             if (!a)
                 break;
-            Tensor* dx = uop_log_softmax_bwd(g, out);
+            Tensor* dx;
+            if (differentiable_grads) {
+                int ld[1]  = {out->ndim - 1};
+                Tensor* sg = ad_sum(g, ld, 1, true);
+                dx = uop_sub(g, uop_mul(uop_exp(out), ad_expand(sg, out->shape, out->ndim)));
+            } else {
+                dx = uop_log_softmax_bwd(g, out);
+            }
             if (dx)
                 gm_accum(&map, a, dx);
             break;
