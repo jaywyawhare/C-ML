@@ -241,30 +241,9 @@ Tensor* gru_cell_forward(GRUCell* cell, Tensor* input, Tensor* hidden) {
     Tensor* hh =
         uop_linear(hidden, cell->weight_hh->tensor, cell->bias_hh ? cell->bias_hh->tensor : NULL);
 
-    /* Split ih and hh into 3 gates of size hs each */
-    int s_r[] = {0, 0 * hs}, e_r[] = {batch, 1 * hs};
-    int s_z[] = {0, 1 * hs}, e_z[] = {batch, 2 * hs};
-    int s_n[] = {0, 2 * hs}, e_n[] = {batch, 3 * hs};
-
-    Tensor* ih_r = uop_shrink(ih, s_r, e_r, 2);
-    Tensor* ih_z = uop_shrink(ih, s_z, e_z, 2);
-    Tensor* ih_n = uop_shrink(ih, s_n, e_n, 2);
-
-    Tensor* hh_r = uop_shrink(hh, s_r, e_r, 2);
-    Tensor* hh_z = uop_shrink(hh, s_z, e_z, 2);
-    Tensor* hh_n = uop_shrink(hh, s_n, e_n, 2);
-
-    /* r = sigmoid(ih_r + hh_r), z = sigmoid(ih_z + hh_z) */
-    Tensor* r = uop_sigmoid(tensor_add(ih_r, hh_r));
-    Tensor* z = uop_sigmoid(tensor_add(ih_z, hh_z));
-
-    /* n = tanh(ih_n + r * hh_n) */
-    Tensor* n = uop_tanh(tensor_add(ih_n, tensor_mul(r, hh_n)));
-
-    /* h_new = (1-z)*n + z*hidden = n + z*(hidden - n) */
-    Tensor* h_new = tensor_add(n, tensor_mul(z, tensor_sub(hidden, n)));
-
-    return h_new;
+    /* One fused kernel for the whole gate computation (r/z/n + blend) instead
+     * of 6 shrinks + sigmoid/tanh/mul/add; the backward is one fused op too. */
+    return uop_gru_cell(ih, hh, hidden);
 }
 
 /** Construct a torch.nn.GRUCell (3 stacked gates). Returns NULL on failure. */

@@ -409,6 +409,28 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             }
             break;
         }
+        case UOP_GRU_CELL: {
+            /* Fused backward packs [dih(3H) | dhh(3H) | dhidden(H)] into [B,7H];
+             * slice it back to the three inputs. The ih/hh grads then flow on
+             * through the LINEAR VJPs that produced them. */
+            Tensor* ih     = a;
+            Tensor* hh     = b;
+            Tensor* hidden = nd->num_inputs > 2 ? nd->inputs[2] : NULL;
+            if (!ih || !hh || !hidden)
+                break;
+            int B          = hidden->shape[0];
+            int H          = hidden->shape[1];
+            Tensor* packed = uop_gru_cell_bwd(g, ih, hh, hidden);
+            if (!packed)
+                break;
+            int s_ih[2] = {0, 0}, e_ih[2] = {B, 3 * H};
+            int s_hh[2] = {0, 3 * H}, e_hh[2] = {B, 6 * H};
+            int s_hd[2] = {0, 6 * H}, e_hd[2] = {B, 7 * H};
+            gm_accum(&map, ih, uop_shrink(packed, s_ih, e_ih, 2));
+            gm_accum(&map, hh, uop_shrink(packed, s_hh, e_hh, 2));
+            gm_accum(&map, hidden, uop_shrink(packed, s_hd, e_hd, 2));
+            break;
+        }
         case UOP_SUM: {
             /* dX = broadcast(dOut) back to X's shape (via keepdim reshape) */
             ReduceParams* rp = (ReduceParams*)nd->params;
