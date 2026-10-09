@@ -913,8 +913,9 @@ Tensor* uop_gru_cell(Tensor* ih, Tensor* hh, Tensor* hidden) {
     if (ih->ndim != 2 || hh->ndim != 2 || hidden->ndim != 2) {
         CML_ERR_NULL("uop_gru_cell: inputs must be 2D");
     }
-    if (ih->dtype != DTYPE_FLOAT32) {
-        LOG_ERROR("uop_gru_cell: fused f32 kernel cannot read dtype %d", ih->dtype);
+    if (ih->dtype != DTYPE_FLOAT32 || hh->dtype != DTYPE_FLOAT32 ||
+        hidden->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("uop_gru_cell: fused f32 kernel requires f32 operands");
         error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
@@ -993,8 +994,8 @@ Tensor* uop_lstm_cell(Tensor* gates, Tensor* c_prev) {
     if (gates->ndim != 2 || c_prev->ndim != 2) {
         CML_ERR_NULL("uop_lstm_cell: inputs must be 2D");
     }
-    if (gates->dtype != DTYPE_FLOAT32) {
-        LOG_ERROR("uop_lstm_cell: fused f32 kernel cannot read dtype %d", gates->dtype);
+    if (gates->dtype != DTYPE_FLOAT32 || c_prev->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("uop_lstm_cell: fused f32 kernel requires f32 operands");
         error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
@@ -1071,8 +1072,8 @@ Tensor* uop_rnn_cell(Tensor* ih, Tensor* hh) {
     if (ih->ndim != 2 || hh->ndim != 2) {
         CML_ERR_NULL("uop_rnn_cell: inputs must be 2D");
     }
-    if (ih->dtype != DTYPE_FLOAT32) {
-        LOG_ERROR("uop_rnn_cell: fused f32 kernel cannot read dtype %d", ih->dtype);
+    if (ih->dtype != DTYPE_FLOAT32 || hh->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("uop_rnn_cell: fused f32 kernel requires f32 operands");
         error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
@@ -1136,8 +1137,9 @@ Tensor* uop_layernorm(Tensor* x, Tensor* gamma, Tensor* beta, float eps) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_layernorm");
     }
-    if (x->dtype != DTYPE_FLOAT32) {
-        LOG_ERROR("uop_layernorm: fused f32 kernel cannot read dtype %d", x->dtype);
+    if (x->dtype != DTYPE_FLOAT32 || (gamma && gamma->dtype != DTYPE_FLOAT32) ||
+        (beta && beta->dtype != DTYPE_FLOAT32)) {
+        LOG_ERROR("uop_layernorm: fused f32 kernel requires f32 operands");
         error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
         return NULL;
     }
