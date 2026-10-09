@@ -2668,102 +2668,13 @@ static struct IRNode* insert_expand(CMLGraph_t ir, Tensor* in, const int* new_sh
  * (dilation=1, groups=1); otherwise leaves the node for the executor.
  */
 static int decompose_conv2d(CMLGraph_t ir, struct IRNode* node) {
-    /* Inference (no_grad): keep CONV2D whole so the executor runs a direct /
-     * Winograd / im2col kernel - far faster than the im2col+matmul primitive
-     * chain and no backward graph is needed. Under grad, lower to primitives so
-     * graph-autodiff (which has no CONV2D VJP) can differentiate it. */
-    if (!autograd_is_grad_enabled())
-        return 0;
-    Tensor* x    = node->inputs[0];
-    Tensor* w    = node->inputs[1];
-    Tensor* bias = (node->num_inputs >= 3) ? node->inputs[2] : NULL;
-    if (!x || x->ndim != 4 || !w || w->ndim != 4)
-        return 0;
-    Conv2DParams* p = (Conv2DParams*)node->params;
-    if (!p)
-        return 0;
-    int Cout = w->shape[0], Cin = w->shape[1], kh = w->shape[2], kw = w->shape[3];
-    int sh = p->stride ? p->stride[0] : 1, sw = p->stride ? p->stride[1] : 1;
-    int ph = p->padding ? p->padding[0] : 0, pw = p->padding ? p->padding[1] : 0;
-    int dh = p->dilation ? p->dilation[0] : 1, dw = p->dilation ? p->dilation[1] : 1;
-    int groups = p->groups > 0 ? p->groups : 1;
-    if (dh != 1 || dw != 1 || groups != 1)
-        return 0; // executor fallback
-    if (x->shape[1] != Cin)
-        return 0;
-
-    int N               = x->shape[0];
-    struct IRNode *head = NULL, *tail = NULL;
-    Tensor* cur = x;
-
-    int OH = (x->shape[2] + 2 * ph - kh) / sh + 1; /* dilation==1 guaranteed above */
-    int OW = (x->shape[3] + 2 * pw - kw) / sw + 1;
-    int K = Cin * kh * kw, M = OH * OW;
-
-    /* Fused im2col: [N,Cin,H,W] -> [N*M, K] in a single pass, with K ordered
-     * (Cin,kh,kw) and zero-padding folded in via bounds checks. Replaces the
-     * former pad + unfold×2 + permute×2 + reshape chain (5 materialised
-     * intermediates over ~M·K elements each) that dominated conv forward time. */
-    Im2colParams* icp = cml_malloc(sizeof(Im2colParams));
-    if (!icp)
-        return -1;
-    icp->kh           = kh;
-    icp->kw           = kw;
-    icp->sh           = sh;
-    icp->sw           = sw;
-    icp->ph           = ph;
-    icp->pw           = pw;
-    icp->dh           = 1;
-    icp->dw           = 1;
-    int im_shape[2]   = {N * M, K};
-    struct IRNode* im = create_primitive_node(ir, UOP_IM2COL, &cur, 1, icp, im_shape, 2);
-    if (!im) {
-        cml_free(icp);
-        return -1;
-    }
-    chain_append(&head, &tail, im);
-
-    // weight [Cout,Cin,kh,kw] -> [Cout,K] -> transpose [K,Cout]
-    int wr_shape[2]   = {Cout, K};
-    struct IRNode* wr = insert_reshape(ir, w, wr_shape, 2, &head, &tail);
-    if (!wr)
-        return -1;
-    int wtp[2]        = {1, 0};
-    struct IRNode* wt = insert_permute(ir, wr->output, 2, wtp, &head, &tail); // [K,Cout]
-    if (!wt)
-        return -1;
-
-    // matmul [N*M,K] @ [K,Cout] -> [N*M,Cout]
-    Tensor* mm_in[]   = {im->output, wt->output};
-    int mm_shape[2]   = {N * M, Cout};
-    struct IRNode* mm = chain_emit(ir, &head, &tail, UOP_MATMUL, mm_in, 2, NULL, mm_shape, 2);
-    if (!mm)
-        return -1;
-
-    /* Bias add in NHWC-flat [N*M,Cout] space, where bias[Cout] is a trailing
-     * broadcast folded into the elementwise executor (i%Cout) - no
-     * [N,Cout,OH,OW] tensor is materialised. Applied before the output permute;
-     * the per-channel bias is invariant to the axis reorder the permute does. */
-    Tensor* conv_out = mm->output;
-    if (bias && bias->ndim == 1 && bias->shape[0] == Cout) {
-        Tensor* ain[]      = {mm->output, bias};
-        struct IRNode* add = chain_emit(ir, &head, &tail, UOP_ADD, ain, 2, NULL, mm_shape, 2);
-        if (!add)
-            return -1;
-        conv_out = add->output;
-    }
-
-    // reshape [N,OH,OW,Cout] then permute -> [N,Cout,OH,OW]
-    int r4_shape[4]   = {N, OH, OW, Cout};
-    struct IRNode* r4 = insert_reshape(ir, conv_out, r4_shape, 4, &head, &tail);
-    if (!r4)
-        return -1;
-    int pC[4]          = {0, 3, 1, 2};
-    struct IRNode* pmC = insert_permute(ir, r4->output, 4, pC, &head, &tail); // [N,Cout,OH,OW]
-    if (!pmC)
-        return -1;
-
-    replace_node_with_chain(ir, node, head, tail);
+    /* Conv2d is kept whole in every mode: the executor runs a direct / Winograd
+     * / im2col forward (the direct path materialises no column buffer for shallow
+     * layers) and graph-autodiff differentiates it via the UOP_CONV2D VJP.
+     * Lowering to im2col+matmul here would force the column buffer in the forward
+     * even where the direct kernel needs none. */
+    (void)ir;
+    (void)node;
     return 0;
 }
 

@@ -359,6 +359,56 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             }
             break;
         }
+        case UOP_CONV2D: {
+            /* out = conv2d(x, w, bias), kept whole so the forward runs the direct
+             * / Winograd / im2col executor instead of a lowered im2col+matmul
+             * chain. The VJP is the adjoint of that equivalent lowering:
+             *   im = im2col(x) [N*M,K], w2 = reshape(w,[Cout,K])
+             *   mm = im @ w2ᵀ [N*M,Cout] -> out (reshape+permute to NCHW) + bias
+             * so dx = col2im(g_mm @ w2), dw = reshape((imᵀ @ g_mm)ᵀ),
+             * dbias = Σ_rows g_mm. groups==1 only (grouped convs stay on the
+             * eager path). */
+            Conv2DParams* cp = (Conv2DParams*)nd->params;
+            Tensor* w        = b; /* inputs[1] */
+            if (!cp || !a || !w || a->ndim != 4 || w->ndim != 4)
+                break;
+            if ((cp->groups > 0 ? cp->groups : 1) != 1)
+                break;
+            int N = a->shape[0], Cin = a->shape[1], H = a->shape[2], Wd = a->shape[3];
+            int Cout = w->shape[0], kh = w->shape[2], kw = w->shape[3];
+            int sh = cp->stride ? cp->stride[0] : 1, sw = cp->stride ? cp->stride[1] : 1;
+            int ph = cp->padding ? cp->padding[0] : 0, pw = cp->padding ? cp->padding[1] : 0;
+            int dh = cp->dilation ? cp->dilation[0] : 1, dw = cp->dilation ? cp->dilation[1] : 1;
+            int OH = out->shape[2], OW = out->shape[3];
+            int M = OH * OW, K = Cin * kh * kw;
+
+            int gp[4]      = {0, 2, 3, 1};
+            Tensor* g_nhwc = ad_permute(g, gp, 4); /* [N,OH,OW,Cout] */
+            int gmm_s[2]   = {N * M, Cout};
+            Tensor* g_mm   = ad_reshape(g_nhwc, gmm_s, 2); /* [N*M,Cout] */
+
+            if (nd->num_inputs > 2 && nd->inputs[2]) {
+                int d0[1] = {0};
+                gm_accum(&map, nd->inputs[2], ad_sum(g_mm, d0, 1, false));
+            }
+
+            int w2_s[2] = {Cout, K};
+            Tensor* w2  = ad_reshape(w, w2_s, 2); /* [Cout,K] */
+
+            if (a->requires_grad) {
+                Tensor* grad_im  = uop_matmul(g_mm, w2); /* [N*M,K] */
+                Col2imParams cim = {kh, kw, sh, sw, ph, pw, dh, dw, Cin, H, Wd};
+                gm_accum(&map, a, uop_col2im(grad_im, &cim));
+            }
+            if (w->requires_grad) {
+                Im2colParams ip = {kh, kw, sh, sw, ph, pw, dh, dw};
+                Tensor* im      = uop_im2col(a, &ip);                    /* [N*M,K] */
+                Tensor* grad_wt = uop_matmul(ad_transpose(im, 2), g_mm); /* [K,Cout] */
+                int w_s[4]      = {Cout, Cin, kh, kw};
+                gm_accum(&map, w, ad_reshape(ad_transpose(grad_wt, 2), w_s, 4));
+            }
+            break;
+        }
         case UOP_SUM: {
             /* dX = broadcast(dOut) back to X's shape (via keepdim reshape) */
             ReduceParams* rp = (ReduceParams*)nd->params;
