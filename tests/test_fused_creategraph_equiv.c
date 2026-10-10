@@ -117,6 +117,35 @@ static int check_layernorm(void) {
     return ok;
 }
 
+/* RMSNorm: grad of sum(w .* rmsnorm(x,weight)) w.r.t x, fused vs create_graph. */
+static int check_rmsnorm(void) {
+    float xd[D] = {0.3f, -0.2f, 0.5f, 0.1f, -0.4f};
+    float wd[D] = {1.1f, 0.9f, 1.0f, 1.2f, 0.8f};
+    float rw[D] = {1.0f, -0.5f, 0.25f, 0.75f, -1.0f};
+    int s[] = {1, D}, ds[] = {D};
+    float gf[D], gt[D];
+    for (int pass = 0; pass < 2; pass++) {
+        Tensor* x        = cml_tensor(xd, s, 2, &CFG);
+        x->requires_grad = true;
+        Tensor* weight   = cml_tensor(wd, ds, 1, &CFG);
+        Tensor* y        = uop_rmsnorm(x, weight, 1e-5f);
+        Tensor* wt       = cml_tensor(rw, s, 2, &CFG);
+        Tensor* loss     = uop_sum(uop_mul(y, wt), &(ReduceParams){0});
+        tensor_backward(loss, NULL, false, pass == 1);
+        const float* g = x->grad ? (const float*)tensor_data_ptr(x->grad) : NULL;
+        for (int i = 0; i < D; i++)
+            (pass ? gt : gf)[i] = g ? g[i] : 0.0f;
+        cml_reset_ir_context();
+    }
+    float md = 0.0f;
+    for (int i = 0; i < D; i++)
+        md = fmaxf(md, fabsf(gf[i] - gt[i]));
+    int ok = md < 1e-4f;
+    printf("  %-12s fused-vs-creategraph grad maxdiff=%.3e %s\n", "rmsnorm", (double)md,
+           ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 /* GRU cell: grad of sum(w .* gru_cell(ih,hh,hidden)) w.r.t ih, fused vs cg. */
 static int check_gru(void) {
     const int H  = 3;
@@ -187,6 +216,7 @@ int main(void) {
     ok &= check("log_softmax", b_logsm);
     ok &= check_rnn();
     ok &= check_layernorm();
+    ok &= check_rmsnorm();
     ok &= check_gru();
     ok &= check_lstm();
     printf(ok ? "Equivalence holds.\n" : "MISMATCH.\n");

@@ -89,6 +89,8 @@ static bool handles_own_dtype(UOpType t) {
     case UOP_RNN_CELL_BWD:
     case UOP_LAYERNORM:
     case UOP_LAYERNORM_BWD:
+    case UOP_RMSNORM:
+    case UOP_RMSNORM_BWD:
         return true;
     default:
         return false;
