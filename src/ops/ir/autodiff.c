@@ -580,6 +580,46 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             }
             break;
         }
+        case UOP_RMSNORM: {
+            /* y = x * rsqrt(mean(x^2)+eps) * weight. Fused backward packs
+             * [dx (rows*D) | dweight (D)]. */
+            Tensor* x      = a;
+            Tensor* weight = (nd->num_inputs >= 2) ? nd->inputs[1] : NULL;
+            if (!x || !weight)
+                break;
+            LayerNormUOpParams* lp = (LayerNormUOpParams*)nd->params;
+            float eps              = lp ? lp->eps : 1e-5f;
+            int D                  = x->shape[x->ndim - 1];
+            int rd                 = (int)(x->numel / (size_t)D);
+
+            if (differentiable_grads) {
+                /* Differentiable primitive form for correct double-backward (the
+                 * fused UOP_RMSNORM_BWD is monolithic). */
+                int ld[1]       = {x->ndim - 1};
+                ReduceParams rk = {ld, 1, true};
+                Tensor* ms      = uop_mean(uop_mul(x, x), &rk);
+                Tensor* inv  = ad_expand(uop_rsqrt(uop_add(ms, ad_k(ms, eps))), x->shape, x->ndim);
+                Tensor* xhat = uop_mul(x, inv);
+                Tensor* gw   = uop_mul(g, ad_expand(weight, x->shape, x->ndim));
+                Tensor* m2   = ad_expand(uop_mean(uop_mul(gw, xhat), &rk), x->shape, x->ndim);
+                Tensor* dx   = uop_mul(inv, uop_sub(gw, uop_mul(xhat, m2)));
+                gm_accum(&map, x, dx);
+                int lead[16], nlead = 0;
+                for (int ax = 0; ax < x->ndim - 1; ax++)
+                    lead[nlead++] = ax;
+                gm_accum(&map, weight, ad_sum_axes(uop_mul(g, xhat), lead, nlead));
+                break;
+            }
+
+            Tensor* packed = uop_rmsnorm_bwd(g, x, weight, eps);
+            if (!packed)
+                break;
+            int sdx[1] = {0}, edx[1] = {rd * D};
+            gm_accum(&map, x, ad_reshape(uop_shrink(packed, sdx, edx, 1), x->shape, x->ndim));
+            int sw[1] = {rd * D}, ew[1] = {rd * D + D};
+            gm_accum(&map, weight, uop_shrink(packed, sw, ew, 1));
+            break;
+        }
         case UOP_SOFTMAX: {
             /* dx = y*(g - rowsum(g*y)); out is the softmax output y. The fused
              * backward kernel is fast but monolithic (no VJP of its own), so for

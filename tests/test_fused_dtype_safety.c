@@ -82,6 +82,10 @@ static Tensor* b_layernorm(Tensor** l, int n) {
     (void)n;
     return uop_layernorm(l[0], l[1], l[2], 1e-5f);
 }
+static Tensor* b_rmsnorm(Tensor** l, int n) {
+    (void)n;
+    return uop_rmsnorm(l[0], l[1], 1e-5f);
+}
 
 int main(void) {
     cml_init();
@@ -132,6 +136,15 @@ int main(void) {
     int* lns[]  = {s15, s5, s5};
     int lnn[]   = {2, 1, 1};
     ok &= check("layernorm", b_layernorm, ln, lns, lnn, 3);
+
+    /* RMSNorm: x [1,D], weight [D], D=5. */
+    float rx[5] = {0.3f, -0.2f, 0.5f, 0.1f, -0.4f};
+    float rw[5] = {1.1f, 0.9f, 1.0f, 1.2f, 0.8f};
+    int rs[] = {1, 5}, rws[] = {5};
+    float* rn[] = {rx, rw};
+    int* rns[]  = {rs, rws};
+    int rnn2[]  = {2, 1};
+    ok &= check("rmsnorm", b_rmsnorm, rn, rns, rnn2, 2);
 
     printf(ok ? "Fused-op dtype safety passed.\n" : "FAILED.\n");
     return ok ? 0 : 1;

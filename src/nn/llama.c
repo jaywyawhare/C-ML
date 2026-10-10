@@ -66,58 +66,13 @@ CMLGenerationConfig cml_generation_default_config(void) {
     return config;
 }
 
-/** RMSNorm over the last dim: x * rsqrt(mean(x^2) + eps), scaled by `weight`. */
+/** RMSNorm over the last dim: x * rsqrt(mean(x^2) + eps), scaled by `weight`.
+ * One fused kernel (UOP_RMSNORM) instead of a materialized mul/mean/rsqrt chain,
+ * so the lazy graph fuses it and realizes a single output. */
 static Tensor* rms_norm(Tensor* x, Tensor* weight, float eps) {
     if (!x || !weight)
         return NULL;
-
-    /* x_sq = x * x */
-    Tensor* x_sq = uop_mul(x, x);
-    if (!x_sq)
-        return NULL;
-
-    /* mean_sq = mean(x_sq, dim=-1, keepdim=true) */
-    int last_dim    = x->ndim - 1;
-    ReduceParams rp = {.dims = &last_dim, .num_dims = 1, .keepdim = true};
-    Tensor* mean_sq = uop_mean(x_sq, &rp);
-    if (mean_sq)
-        tensor_ensure_executed(mean_sq);
-    if (!mean_sq)
-        return NULL;
-
-    /* Create eps tensor for addition */
-    Tensor* eps_t = tensor_full(mean_sq->shape, mean_sq->ndim, NULL, eps);
-    if (!eps_t)
-        return NULL;
-
-    /* mean_sq_eps = mean_sq + eps */
-    Tensor* mean_sq_eps = uop_add(mean_sq, eps_t);
-    if (mean_sq_eps)
-        tensor_ensure_executed(mean_sq_eps);
-    tensor_free(eps_t);
-    if (!mean_sq_eps)
-        return NULL;
-
-    /* rsqrt_val = rsqrt(mean_sq_eps) */
-    Tensor* rsqrt_val = uop_rsqrt(mean_sq_eps);
-    if (rsqrt_val)
-        tensor_ensure_executed(rsqrt_val);
-    if (!rsqrt_val)
-        return NULL;
-
-    /* normed = x * rsqrt_val */
-    Tensor* normed = uop_mul(x, rsqrt_val);
-    if (normed)
-        tensor_ensure_executed(normed);
-    if (!normed)
-        return NULL;
-
-    /* result = normed * weight (broadcast weight across seq dim) */
-    Tensor* result = uop_mul(normed, weight);
-    if (result)
-        tensor_ensure_executed(result);
-
-    return result;
+    return uop_rmsnorm(x, weight, eps);
 }
 
 /** SwiGLU feed-forward block: down_proj(silu(x·gate_proj) * (x·up_proj)). */

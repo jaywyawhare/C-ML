@@ -272,6 +272,12 @@ typedef enum {
     UOP_LAYERNORM,
     UOP_LAYERNORM_BWD,
 
+    /* Fused RMSNorm over the last dim. RMSNORM: inputs {x [.,D], weight [D]} ->
+     * y = x * rsqrt(mean(x^2) + eps) * weight [.,D]. RMSNORM_BWD: inputs {grad_y,
+     * x, weight} -> packed [dx (rows*D) | dweight (D)]. */
+    UOP_RMSNORM,
+    UOP_RMSNORM_BWD,
+
     /* Fused softmax over the last dim. SOFTMAX: x [.,D] -> y [.,D].
      * SOFTMAX_BWD: {grad_y, y} -> dx = y*(grad_y - rowsum(grad_y*y)) [.,D]. */
     UOP_SOFTMAX,
@@ -383,6 +389,13 @@ Tensor* uop_layernorm(Tensor* x, Tensor* gamma, Tensor* beta, float eps);
 /* Adjoint of uop_layernorm: packs [dx (rows*D) | dgamma (D) | dbeta (D)] into a
  * flat [rows*D + 2D] buffer. gamma may be NULL. */
 Tensor* uop_layernorm_bwd(Tensor* grad_y, Tensor* x, Tensor* gamma, float eps);
+
+/* Fused RMSNorm over the last dim: y = x * rsqrt(mean(x^2) + eps) * weight.
+ * Computes in f32; half inputs/outputs are cast at the boundary. */
+Tensor* uop_rmsnorm(Tensor* x, Tensor* weight, float eps);
+/* Adjoint of uop_rmsnorm: packs [dx (rows*D) | dweight (D)] into a flat
+ * [rows*D + D] buffer. */
+Tensor* uop_rmsnorm_bwd(Tensor* grad_y, Tensor* x, Tensor* weight, float eps);
 
 /* Fused softmax over the last dim (f32). */
 Tensor* uop_softmax_lastdim(Tensor* x);
@@ -808,7 +821,8 @@ Tensor* uop_softsign(Tensor* x);
 /* log(sigmoid(x)) = -softplus(-x) */
 Tensor* uop_logsigmoid(Tensor* x);
 
-/* Epsilon for the fused LayerNorm ops (UOP_LAYERNORM / UOP_LAYERNORM_BWD). */
+/* Epsilon for the fused normalization ops (UOP_LAYERNORM / UOP_LAYERNORM_BWD and
+ * UOP_RMSNORM / UOP_RMSNORM_BWD). */
 typedef struct {
     float eps;
 } LayerNormUOpParams;

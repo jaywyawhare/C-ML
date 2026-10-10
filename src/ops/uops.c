@@ -1188,6 +1188,72 @@ Tensor* uop_layernorm_bwd(Tensor* grad_y, Tensor* x, Tensor* gamma, float eps) {
     return tensor_from_ir_node(node, ir);
 }
 
+/** Fused RMSNorm over the last dim: y = x * rsqrt(mean(x^2) + eps) * weight. */
+Tensor* uop_rmsnorm(Tensor* x, Tensor* weight, float eps) {
+    if (!x || !weight) {
+        CML_ERR_NULL("NULL tensor input to uop_rmsnorm");
+    }
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+    LayerNormUOpParams* p = cml_malloc(sizeof(LayerNormUOpParams));
+    if (!p)
+        return NULL;
+    p->eps = eps;
+
+    Tensor* inputs[2] = {x, weight};
+    if (cml_ir_add_uop(ir, UOP_RMSNORM, inputs, 2, p) != 0) {
+        cml_free(p);
+        return NULL;
+    }
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = x->ndim;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc((size_t)x->ndim * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    for (int i = 0; i < x->ndim; i++)
+        node->output_shape[i] = x->shape[i];
+    if (x->requires_grad || weight->requires_grad) {
+        node->requires_grad       = true;
+        node->needs_input_grad[0] = x->requires_grad;
+        node->needs_input_grad[1] = weight->requires_grad;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
+/** Adjoint of uop_rmsnorm: flat [dx (rows*D) | dweight (D)]. */
+Tensor* uop_rmsnorm_bwd(Tensor* grad_y, Tensor* x, Tensor* weight, float eps) {
+    if (!grad_y || !x || !weight) {
+        CML_ERR_NULL("NULL tensor input to uop_rmsnorm_bwd");
+    }
+    int D         = x->shape[x->ndim - 1];
+    size_t rows   = x->numel / (size_t)D;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+    LayerNormUOpParams* p = cml_malloc(sizeof(LayerNormUOpParams));
+    if (!p)
+        return NULL;
+    p->eps = eps;
+
+    Tensor* inputs[3] = {grad_y, x, weight};
+    if (cml_ir_add_uop(ir, UOP_RMSNORM_BWD, inputs, 3, p) != 0) {
+        cml_free(p);
+        return NULL;
+    }
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 1;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    node->output_shape[0] = (int)(rows * (size_t)D) + D;
+    return tensor_from_ir_node(node, ir);
+}
+
 /** Matrix multiply a @ b (delegates to tensor_matmul, which handles batching/broadcast). */
 Tensor* uop_matmul(Tensor* a, Tensor* b) {
     if (!a || !b) {

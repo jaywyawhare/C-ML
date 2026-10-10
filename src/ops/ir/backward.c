@@ -3819,6 +3819,54 @@ static int cpu_backward_node(struct IRNode* node) {
         break;
     }
 
+    case UOP_RMSNORM: {
+        /* Eager adjoint; mirrors UOP_RMSNORM_BWD, accumulating dx/dweight.
+         * dx = inv*(g*w - xhat*mean(g*w*xhat)), dweight = sum_rows(g*xhat). */
+        LayerNormUOpParams* p = (LayerNormUOpParams*)node->params;
+        Tensor* x             = node->inputs[0];
+        Tensor* weight        = (node->num_inputs >= 2) ? node->inputs[1] : NULL;
+        const float* xv       = x ? (const float*)x->data : NULL;
+        const float* wv       = weight ? (const float*)weight->data : NULL;
+        if (!p || !xv || !wv)
+            break;
+        int D       = x->shape[x->ndim - 1];
+        size_t rows = x->numel / (size_t)D;
+        float* dx   = (float*)cml_malloc(x->numel * sizeof(float));
+        float* dw   = (float*)cml_malloc((size_t)D * sizeof(float));
+        if (dx && dw) {
+            for (int j = 0; j < D; j++)
+                dw[j] = 0.0f;
+            for (size_t r = 0; r < rows; r++) {
+                const float* xr = xv + r * D;
+                const float* gr = out_grad + r * D;
+                float* dxr      = dx + r * D;
+                float ms        = 0.0f;
+                for (int j = 0; j < D; j++)
+                    ms += xr[j] * xr[j];
+                ms /= (float)D;
+                float inv = 1.0f / sqrtf(ms + p->eps);
+                float m2  = 0.0f;
+                for (int j = 0; j < D; j++) {
+                    float xh = xr[j] * inv;
+                    dw[j] += gr[j] * xh;
+                    m2 += gr[j] * wv[j] * xh;
+                }
+                m2 /= (float)D;
+                for (int j = 0; j < D; j++) {
+                    float xh = xr[j] * inv;
+                    dxr[j]   = inv * (gr[j] * wv[j] - xh * m2);
+                }
+            }
+            if (x->requires_grad)
+                accumulate_grad(x, dx, x->numel);
+            if (weight->requires_grad)
+                accumulate_grad(weight, dw, (size_t)D);
+        }
+        cml_free(dx);
+        cml_free(dw);
+        break;
+    }
+
     case UOP_SOFTMAX: {
         /* dx = y * (grad_y - rowsum(grad_y*y)); out is the softmax output y. */
         if (node->num_inputs < 1)

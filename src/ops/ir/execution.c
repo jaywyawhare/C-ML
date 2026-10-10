@@ -5692,6 +5692,92 @@ not_empty_reduction:;
         break;
     }
 
+    case UOP_RMSNORM: {
+        /* y = x * rsqrt(mean(x^2) + eps) * weight over the last dim. */
+        LayerNormUOpParams* p = (LayerNormUOpParams*)node->params;
+        float *xtmp, *wtmp, *otmp;
+        const float* x = fused_f32_in(node->inputs[0], &xtmp);
+        const float* w = fused_f32_in(node->inputs[1], &wtmp);
+        float* out_f   = fused_f32_out(out, &otmp);
+        if (!x || !w || !p || !out_f) {
+            cml_free(xtmp);
+            cml_free(wtmp);
+            cml_free(otmp);
+            return -1;
+        }
+        int D       = node->inputs[0]->shape[node->inputs[0]->ndim - 1];
+        size_t rows = node->inputs[0]->numel / (size_t)D;
+        for (size_t r = 0; r < rows; r++) {
+            const float* xr = x + r * D;
+            float* yr       = out_f + r * D;
+            float ms        = 0.0f;
+            for (int j = 0; j < D; j++)
+                ms += xr[j] * xr[j];
+            ms /= (float)D;
+            float inv = 1.0f / sqrtf(ms + p->eps);
+            for (int j = 0; j < D; j++)
+                yr[j] = xr[j] * inv * w[j];
+        }
+        if (otmp)
+            cml_cast_buffer(out_f, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(xtmp);
+        cml_free(wtmp);
+        cml_free(otmp);
+        break;
+    }
+
+    case UOP_RMSNORM_BWD: {
+        /* Packs [dx (rows*D) | dweight (D)]. dx = inv*(g*w - xhat*mean(g*w*xhat)),
+         * xhat = x*inv, inv = rsqrt(mean(x^2)+eps); dweight = sum_rows(g*xhat). */
+        LayerNormUOpParams* p = (LayerNormUOpParams*)node->params;
+        float *gtmp, *xtmp, *wtmp, *otmp;
+        const float* g = fused_f32_in(node->inputs[0], &gtmp);
+        const float* x = fused_f32_in(node->inputs[1], &xtmp);
+        const float* w = fused_f32_in(node->inputs[2], &wtmp);
+        float* out_f   = fused_f32_out(out, &otmp);
+        if (!g || !x || !w || !p || !out_f) {
+            cml_free(gtmp);
+            cml_free(xtmp);
+            cml_free(wtmp);
+            cml_free(otmp);
+            return -1;
+        }
+        int D          = node->inputs[1]->shape[node->inputs[1]->ndim - 1];
+        size_t rows    = node->inputs[1]->numel / (size_t)D;
+        float* dx      = out_f;
+        float* dweight = out_f + rows * (size_t)D;
+        for (int j = 0; j < D; j++)
+            dweight[j] = 0.0f;
+        for (size_t r = 0; r < rows; r++) {
+            const float* xr = x + r * D;
+            const float* gr = g + r * D;
+            float* dxr      = dx + r * D;
+            float ms        = 0.0f;
+            for (int j = 0; j < D; j++)
+                ms += xr[j] * xr[j];
+            ms /= (float)D;
+            float inv = 1.0f / sqrtf(ms + p->eps);
+            float m2  = 0.0f;
+            for (int j = 0; j < D; j++) {
+                float xh = xr[j] * inv;
+                dweight[j] += gr[j] * xh;
+                m2 += gr[j] * w[j] * xh;
+            }
+            m2 /= (float)D;
+            for (int j = 0; j < D; j++) {
+                float xh = xr[j] * inv;
+                dxr[j]   = inv * (gr[j] * w[j] - xh * m2);
+            }
+        }
+        if (otmp)
+            cml_cast_buffer(out_f, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(gtmp);
+        cml_free(xtmp);
+        cml_free(wtmp);
+        cml_free(otmp);
+        break;
+    }
+
     case UOP_SOFTMAX: {
         /* y = exp(x - max) / sum(exp(x - max)) over the last dim. Computes in f32;
          * half inputs/outputs are cast at the boundary (f32 path is zero-copy). */
