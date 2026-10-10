@@ -3,6 +3,7 @@
 #include "ops/winograd.h"
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/autodiff.h"
 #include "core/logging.h"
 #include "core/error_stack.h"
 #include "core/error_codes.h"
@@ -3592,6 +3593,56 @@ Tensor* uop_pad_replicate(Tensor* a, int* pad_widths, int num_dims) {
 
 /** Scaled dot-product attention softmax(q k^T / sqrt(d_k) + mask + bias) v, composed from
  *  primitive uops; `mask` and `attn_bias` are optional additive terms. */
+/** Fused scaled-dot-product attention (UOP_SDPA). q,k,v are [B,H,S,D]. */
+Tensor* uop_sdpa(Tensor* q, Tensor* k, Tensor* v, Tensor* mask, Tensor* bias, float scale) {
+    if (!q || !k || !v) {
+        CML_ERR_NULL("NULL tensor input to uop_sdpa");
+    }
+    if (q->ndim != 4 || k->ndim != 4 || v->ndim != 4) {
+        LOG_ERROR("uop_sdpa: q/k/v must be 4D [B,H,S,D]");
+        error_stack_push(CM_INVALID_ARGUMENT, "Operation failed", __FILE__, __LINE__, __func__);
+        return NULL;
+    }
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    if (!ir)
+        return NULL;
+    SDPAUOpParams* p = cml_malloc(sizeof(SDPAUOpParams));
+    if (!p)
+        return NULL;
+    p->scale    = scale;
+    p->has_mask = mask != NULL;
+    p->has_bias = bias != NULL;
+
+    Tensor* inputs[5] = {q, k, v, NULL, NULL};
+    int ni            = 3;
+    if (mask)
+        inputs[ni++] = mask;
+    if (bias)
+        inputs[ni++] = bias;
+    if (cml_ir_add_uop(ir, UOP_SDPA, inputs, ni, p) != 0) {
+        cml_free(p);
+        return NULL;
+    }
+    struct IRNode* node = cml_ir_get_tail(ir);
+    node->output_ndim   = 4;
+    if (!node->output_shape) {
+        node->output_shape = cml_malloc(4 * sizeof(int));
+        if (!node->output_shape)
+            return NULL;
+    }
+    node->output_shape[0] = q->shape[0];
+    node->output_shape[1] = q->shape[1];
+    node->output_shape[2] = q->shape[2];
+    node->output_shape[3] = v->shape[3];
+    if (q->requires_grad || k->requires_grad || v->requires_grad) {
+        node->requires_grad       = true;
+        node->needs_input_grad[0] = q->requires_grad;
+        node->needs_input_grad[1] = k->requires_grad;
+        node->needs_input_grad[2] = v->requires_grad;
+    }
+    return tensor_from_ir_node(node, ir);
+}
+
 Tensor* uop_scaled_dot_product_attention_bias(Tensor* q, Tensor* k, Tensor* v, Tensor* mask,
                                               Tensor* attn_bias) {
     if (!q || !k || !v)
@@ -3599,6 +3650,16 @@ Tensor* uop_scaled_dot_product_attention_bias(Tensor* q, Tensor* k, Tensor* v, T
 
     int d_k     = q->shape[q->ndim - 1];
     float scale = 1.0f / sqrtf((float)d_k);
+
+    /* Fused flash-style attention for the common 4D [B,H,S,D] layout under the
+     * default graph autodiff (its VJP is the primitive attention backward). Eager
+     * backward mode keeps the explicit compose, whose per-op VJPs it understands. */
+    if (q->ndim == 4 && k->ndim == 4 && v->ndim == 4 && cml_autodiff_use_graph()) {
+        Tensor* o = uop_sdpa(q, k, v, mask, attn_bias, scale);
+        if (o)
+            return o;
+        /* fall through to the compose on failure */
+    }
 
     PermuteParams perm_params = {0};
     int* perm                 = cml_malloc((size_t)k->ndim * sizeof(int));

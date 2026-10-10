@@ -620,6 +620,43 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
             gm_accum(&map, weight, uop_shrink(packed, sw, ew, 1));
             break;
         }
+        case UOP_SDPA: {
+            /* Attention VJP, built from primitive (differentiable) ops so it is
+             * correct and supports higher-order. Recompute P = softmax(scale*q@k^T
+             * [+bias][mask]); then dq = dscores@k, dk = dscores^T@q, dv = P^T@g,
+             * where dscores = scale * maskgrad(softmax_bwd(g@v^T, P)). */
+            SDPAUOpParams* sp = (SDPAUOpParams*)nd->params;
+            if (nd->num_inputs < 3)
+                break;
+            Tensor* q = nd->inputs[0];
+            Tensor* k = nd->inputs[1];
+            Tensor* v = nd->inputs[2];
+            if (!q || !k || !v)
+                break;
+            Tensor* mask = (sp && sp->has_mask) ? nd->inputs[3] : NULL;
+            Tensor* bias = (sp && sp->has_bias) ? nd->inputs[sp->has_mask ? 4 : 3] : NULL;
+            float scale  = sp ? sp->scale : 1.0f;
+            int swap[4]  = {0, 1, 3, 2};
+            Tensor* kt   = ad_permute(k, swap, 4);
+            Tensor* sc   = uop_mul(uop_matmul(q, kt), ad_k(uop_matmul(q, kt), scale));
+            if (bias)
+                sc = uop_add(sc, bias);
+            if (mask)
+                sc = uop_masked_fill(sc, mask, -1e9f);
+            Tensor* P  = uop_softmax(sc, -1);
+            Tensor* dV = uop_matmul(ad_permute(P, swap, 4), g);
+            Tensor* dP = uop_matmul(g, ad_permute(v, swap, 4));
+            Tensor* ds = uop_softmax_bwd(dP, P);
+            if (mask)
+                ds = uop_masked_fill(ds, mask, 0.0f);
+            Tensor* dscores = uop_mul(ds, ad_k(ds, scale));
+            gm_accum(&map, q, uop_matmul(dscores, k));
+            gm_accum(&map, k, uop_matmul(ad_permute(dscores, swap, 4), q));
+            gm_accum(&map, v, dV);
+            if (bias)
+                gm_accum(&map, bias, unbroadcast(ds, bias->shape, bias->ndim));
+            break;
+        }
         case UOP_SOFTMAX: {
             /* dx = y*(g - rowsum(g*y)); out is the softmax output y. The fused
              * backward kernel is fast but monolithic (no VJP of its own), so for
