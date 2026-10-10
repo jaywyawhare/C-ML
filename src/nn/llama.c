@@ -85,10 +85,10 @@ static Tensor* swiglu_ffn(Tensor* x, Tensor* gate_proj, Tensor* up_proj, Tensor*
     if (!gate_out)
         return NULL;
 
-    /* gate_activated = silu(gate_out) */
+    /* gate_activated = silu(gate_out). No forced realize here or on `combined`:
+     * leaving them lazy lets the scheduler fuse silu(gate)*up and the gate/up
+     * matmul epilogues into one pass. Only the block output is realized. */
     Tensor* gate_activated = uop_silu(gate_out);
-    if (gate_activated)
-        tensor_ensure_executed(gate_activated);
     if (!gate_activated)
         return NULL;
 
@@ -99,8 +99,6 @@ static Tensor* swiglu_ffn(Tensor* x, Tensor* gate_proj, Tensor* up_proj, Tensor*
 
     /* combined = gate_activated * up_out */
     Tensor* combined = uop_mul(gate_activated, up_out);
-    if (combined)
-        tensor_ensure_executed(combined);
     if (!combined)
         return NULL;
 
