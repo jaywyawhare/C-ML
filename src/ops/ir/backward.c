@@ -4037,6 +4037,24 @@ int cml_ir_execute_backward(CMLGraph_t ir) {
 }
 
 /**
+ * The eager engine (cpu_backward_node) reads every gradient/data buffer as
+ * float*, so a non-f32 grad-carrying node would stride 4 bytes over 2-byte
+ * half elements: garbage math plus out-of-bounds access. Reject that up front
+ * with a clear error. The default graph autodiff path handles half natively;
+ * this limitation is specific to GRAD_MODE=eager.
+ */
+static bool eager_backward_is_f32(CMLGraph_t ir) {
+    for (struct IRNode* n = ir->head; n; n = n->next) {
+        if (!n->requires_grad || !n->output)
+            continue;
+        if (n->output->dtype != DTYPE_FLOAT32 ||
+            (n->output->grad && n->output->grad->dtype != DTYPE_FLOAT32))
+            return false;
+    }
+    return true;
+}
+
+/**
  * Populate backward DCE flags, seed the loss node's gradient with 1.0 (eagerly
  * allocated), and execute the reverse pass from that loss node.
  */
@@ -4049,6 +4067,12 @@ int cml_ir_execute_backward_from(CMLGraph_t ir, struct IRNode* loss_node) {
     struct IRNode* node = loss_node;
     if (!node) {
         LOG_ERROR("No loss node for backward pass");
+        return -1;
+    }
+
+    if (!eager_backward_is_f32(ir)) {
+        LOG_ERROR("Eager backward (GRAD_MODE=eager) requires float32 tensors; "
+                  "use the default graph autodiff for half precision");
         return -1;
     }
 
