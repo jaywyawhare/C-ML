@@ -30,51 +30,16 @@ static Tensor* rmsnorm_forward(Module* module, Tensor* input) {
                   last_dim, rn->normalized_shape);
         return NULL;
     }
-    Tensor* input_sq = uop_mul(input, input);
-    if (!input_sq)
+    if (!rn->weight || !rn->weight->tensor) {
+        LOG_ERROR("RMSNorm: missing weight parameter");
         return NULL;
-    ReduceParams mean_params;
-    int mean_dim         = input->ndim - 1;
-    int mean_dims[]      = {mean_dim};
-    mean_params.dims     = mean_dims;
-    mean_params.num_dims = 1;
-    mean_params.keepdim  = true;
-
-    Tensor* mean_sq = uop_mean(input_sq, &mean_params);
-    if (!mean_sq)
-        return NULL;
-    TensorConfig config = (TensorConfig){
-        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
-    Tensor* eps_tensor = tensor_full(mean_sq->shape, mean_sq->ndim, &config, rn->eps);
-    if (!eps_tensor)
-        return NULL;
-
-    Tensor* mean_sq_eps = uop_add(mean_sq, eps_tensor);
-    tensor_free(eps_tensor);
-    if (!mean_sq_eps)
-        return NULL;
-    Tensor* rms = uop_sqrt(mean_sq_eps);
-    if (!rms)
-        return NULL;
-    Tensor* normalized = uop_div(input, rms);
-    if (!normalized)
-        return NULL;
-    Tensor* output = normalized;
-    if (rn->weight && rn->weight->tensor) {
-        ExpandParams expand_weight;
-        expand_weight.new_shape = input->shape;
-        expand_weight.new_ndim  = input->ndim;
-
-        Tensor* weight_broadcast = uop_expand(rn->weight->tensor, &expand_weight);
-        if (!weight_broadcast)
-            return NULL;
-
-        Tensor* scaled = uop_mul(weight_broadcast, output);
-        if (!scaled)
-            return NULL;
-
-        output = scaled;
     }
+
+    /* One fused kernel (x * rsqrt(mean(x^2)+eps) * weight) instead of a
+     * materialized mul/mean/add/sqrt/div/mul chain; see uop_rmsnorm. */
+    Tensor* output = uop_rmsnorm(input, rn->weight->tensor, rn->eps);
+    if (!output)
+        return NULL;
 
     if (autograd_is_grad_enabled() && input->requires_grad) {
         output->requires_grad = true;
