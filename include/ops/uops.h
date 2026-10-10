@@ -289,6 +289,13 @@ typedef enum {
     UOP_LOG_SOFTMAX,
     UOP_LOG_SOFTMAX_BWD,
 
+    /* Fused scaled-dot-product attention (flash-style tiled online softmax).
+     * SDPA: inputs {q [B,H,Sq,D], k,v [B,H,Sk,D], mask?, bias?} -> O [B,H,Sq,D],
+     * O = softmax(scale*q@k^T [+bias] [masked]) @ v, computed without
+     * materializing the [.,Sq,Sk] scores. Backward is the primitive attention
+     * VJP (see autodiff.c), so no dedicated SDPA_BWD executor is needed. */
+    UOP_SDPA,
+
     UOP_COUNT // Total count
 } UOpType;
 
@@ -826,6 +833,19 @@ Tensor* uop_logsigmoid(Tensor* x);
 typedef struct {
     float eps;
 } LayerNormUOpParams;
+
+/* Params for the fused attention op (UOP_SDPA). Logit scale, plus which optional
+ * operands follow {q,k,v} in node->inputs (mask then bias, in that order). */
+typedef struct {
+    float scale;
+    bool has_mask;
+    bool has_bias;
+} SDPAUOpParams;
+
+/* Fused scaled-dot-product attention over a 4D [B,H,S,D] layout. mask/bias may be
+ * NULL; mask follows masked_fill semantics (fill -1e9 where mask != 0), bias is
+ * added to the scaled logits. Computes in f32; half is cast at the boundary. */
+Tensor* uop_sdpa(Tensor* q, Tensor* k, Tensor* v, Tensor* mask, Tensor* bias, float scale);
 
 typedef struct {
     int kernel_size; // Size of the sliding window

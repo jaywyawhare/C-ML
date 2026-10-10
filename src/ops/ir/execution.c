@@ -2275,6 +2275,21 @@ static float* fused_f32_out(Tensor* out, float** tmp) {
     return b;
 }
 
+/* Flat offset into a mask/bias tensor `t` (ndim <= 4) for the logical attention
+ * score position (b,h,sq,sk), using right-aligned numpy broadcasting (a size-1
+ * dim contributes index 0). Used only by the fused SDPA executor. */
+static size_t sdpa_bcast_index(const Tensor* t, int b, int h, int sq, int sk) {
+    int coord[4] = {b, h, sq, sk};
+    int offset   = 4 - t->ndim;
+    size_t off   = 0;
+    for (int d = 0; d < t->ndim; d++) {
+        int c  = coord[d + offset];
+        int sz = t->shape[d];
+        off    = off * (size_t)sz + (size_t)(sz == 1 ? 0 : c);
+    }
+    return off;
+}
+
 typedef struct {
     const float* in;
     float* out;
@@ -5911,6 +5926,87 @@ not_empty_reduction:;
         cml_free(gtmp);
         cml_free(ytmp2);
         cml_free(dtmp);
+        break;
+    }
+
+    case UOP_SDPA: {
+        /* Flash-style attention: O[b,h,sq,:] = softmax(scale*q.k^T [+bias][mask]) @ v,
+         * with a per-query-row online softmax so the [.,Sq,Sk] scores are never
+         * materialized. mask uses masked_fill semantics (-1e9 where mask != 0). */
+        SDPAUOpParams* p = (SDPAUOpParams*)node->params;
+        if (!p)
+            return -1;
+        /* inputs: q,k,v then optional mask (index 3) then optional bias. */
+        Tensor* mask_t = p->has_mask ? node->inputs[3] : NULL;
+        Tensor* bias_t = p->has_bias ? node->inputs[p->has_mask ? 4 : 3] : NULL;
+        float *qt, *kt, *vt, *mt = NULL, *bt = NULL, *ot;
+        const float* q    = fused_f32_in(node->inputs[0], &qt);
+        const float* k    = fused_f32_in(node->inputs[1], &kt);
+        const float* v    = fused_f32_in(node->inputs[2], &vt);
+        const float* mask = mask_t ? fused_f32_in(mask_t, &mt) : NULL;
+        const float* bias = bias_t ? fused_f32_in(bias_t, &bt) : NULL;
+        float* out_f      = fused_f32_out(out, &ot);
+        if (!q || !k || !v || !out_f || (p->has_mask && !mask) || (p->has_bias && !bias)) {
+            cml_free(qt);
+            cml_free(kt);
+            cml_free(vt);
+            cml_free(mt);
+            cml_free(bt);
+            cml_free(ot);
+            return -1;
+        }
+        int B       = node->inputs[0]->shape[0];
+        int H       = node->inputs[0]->shape[1];
+        int Sq      = node->inputs[0]->shape[2];
+        int Dq      = node->inputs[0]->shape[3];
+        int Sk      = node->inputs[1]->shape[2];
+        int Dv      = node->inputs[2]->shape[3];
+        float scale = p->scale;
+        for (int b = 0; b < B; b++) {
+            for (int h = 0; h < H; h++) {
+                const float* qbh = q + (((size_t)b * H + h) * Sq) * Dq;
+                const float* kbh = k + (((size_t)b * H + h) * Sk) * Dq;
+                const float* vbh = v + (((size_t)b * H + h) * Sk) * Dv;
+                float* obh       = out_f + (((size_t)b * H + h) * Sq) * Dv;
+                for (int sq = 0; sq < Sq; sq++) {
+                    const float* qr = qbh + (size_t)sq * Dq;
+                    float* orow     = obh + (size_t)sq * Dv;
+                    float m = -1e30f, l = 0.0f;
+                    for (int d = 0; d < Dv; d++)
+                        orow[d] = 0.0f;
+                    for (int sk = 0; sk < Sk; sk++) {
+                        const float* kr = kbh + (size_t)sk * Dq;
+                        float dot       = 0.0f;
+                        for (int d = 0; d < Dq; d++)
+                            dot += qr[d] * kr[d];
+                        float s = dot * scale;
+                        if (bias)
+                            s += bias[sdpa_bcast_index(bias_t, b, h, sq, sk)];
+                        if (mask && mask[sdpa_bcast_index(mask_t, b, h, sq, sk)] != 0.0f)
+                            s = -1e9f;
+                        float mnew      = (s > m) ? s : m;
+                        float resc      = expf(m - mnew);
+                        float pe        = expf(s - mnew);
+                        l               = l * resc + pe;
+                        const float* vr = vbh + (size_t)sk * Dv;
+                        for (int d = 0; d < Dv; d++)
+                            orow[d] = orow[d] * resc + pe * vr[d];
+                        m = mnew;
+                    }
+                    float inv = (l > 0.0f) ? 1.0f / l : 0.0f;
+                    for (int d = 0; d < Dv; d++)
+                        orow[d] *= inv;
+                }
+            }
+        }
+        if (ot)
+            cml_cast_buffer(out_f, DTYPE_FLOAT32, out->data, out->dtype, out->numel);
+        cml_free(qt);
+        cml_free(kt);
+        cml_free(vt);
+        cml_free(mt);
+        cml_free(bt);
+        cml_free(ot);
         break;
     }
 

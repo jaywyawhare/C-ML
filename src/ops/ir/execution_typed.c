@@ -91,6 +91,7 @@ static bool handles_own_dtype(UOpType t) {
     case UOP_LAYERNORM_BWD:
     case UOP_RMSNORM:
     case UOP_RMSNORM_BWD:
+    case UOP_SDPA:
         return true;
     default:
         return false;
