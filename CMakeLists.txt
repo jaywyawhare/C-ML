@@ -846,7 +846,9 @@ option(BUILD_EXAMPLES "Build example programs" ON)
 
 function(cml_add_example target_name source_file)
     add_executable(${target_name} ${source_file})
-    target_link_libraries(${target_name} cml_static m dl)
+    # cml_static already exports m/dl/pthread (and backend libs) as PUBLIC usage
+    # requirements, so listing them again double-specifies -lm (Apple ld warns).
+    target_link_libraries(${target_name} cml_static)
     if(LLVM_BACKEND_FOUND)
         target_link_libraries(${target_name} ${LLVM_BACKEND_LIBS_LIST})
     endif()
@@ -1020,8 +1022,9 @@ option(BUILD_FUZZ "Build libFuzzer / AFL fuzz entry points (requires clang)" OFF
 
 if(BUILD_SIM)
     add_executable(sim_test tools/sim_test.c)
-    target_link_libraries(sim_test cml_static m)
-    cml_link_all(sim_test)
+    # cml_static already provides the include dir, m/dl/pthread and backend libs
+    # transitively (PUBLIC), so re-adding m / cml_link_all only duplicates -lm.
+    target_link_libraries(sim_test cml_static)
     # Register as a quick smoke-run (single seed, no oom sweep, no grad check)
     add_test(NAME sim_test COMMAND sim_test --seed 0xC0FFEE --iters 32)
 endif()
@@ -1031,8 +1034,8 @@ if(BUILD_FUZZ)
         message(WARNING "BUILD_FUZZ requires clang; skipping fuzz targets")
     else()
         add_executable(fuzz_ir tools/fuzz_ir.c)
-        target_link_libraries(fuzz_ir cml_static m)
-        cml_link_all(fuzz_ir)
+        # m/dl/pthread + backend libs come transitively from cml_static (PUBLIC).
+        target_link_libraries(fuzz_ir cml_static)
         target_compile_options(fuzz_ir PRIVATE -fsanitize=fuzzer,address,undefined)
         target_link_options(fuzz_ir    PRIVATE -fsanitize=fuzzer,address,undefined)
 
