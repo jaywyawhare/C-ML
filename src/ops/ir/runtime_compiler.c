@@ -12,33 +12,20 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-#define FNV_OFFSET 0xcbf29ce484222325ULL
-#define FNV_PRIME 0x100000001b3ULL
-
-/** Fold `len` bytes into an FNV-1a running hash. */
-static uint64_t hash_bytes(uint64_t h, const void* data, size_t len) {
-    const uint8_t* bytes = (const uint8_t*)data;
-    for (size_t i = 0; i < len; i++) {
-        h ^= (uint64_t)bytes[i];
-        h *= FNV_PRIME;
-    }
-    return h;
-}
-
 /** Compute a content hash over a linear program's ops for cache keying. */
 static uint64_t hash_linear_program(const CMLLinearProgram* prog) {
-    uint64_t h = FNV_OFFSET;
-    h          = hash_bytes(h, &prog->num_ops, sizeof(prog->num_ops));
-    h          = hash_bytes(h, &prog->next_vreg, sizeof(prog->next_vreg));
+    uint64_t h = CML_FNV_OFFSET_BASIS;
+    h          = cml_fnv1a_bytes(h, &prog->num_ops, sizeof(prog->num_ops));
+    h          = cml_fnv1a_bytes(h, &prog->next_vreg, sizeof(prog->next_vreg));
 
     for (int i = 0; i < prog->num_ops; i++) {
         const CMLLinearOp* op = &prog->ops[i];
-        h                     = hash_bytes(h, &op->kind, sizeof(op->kind));
-        h                     = hash_bytes(h, &op->uop, sizeof(op->uop));
-        h                     = hash_bytes(h, &op->dest_reg, sizeof(op->dest_reg));
-        h                     = hash_bytes(h, &op->num_srcs, sizeof(op->num_srcs));
+        h                     = cml_fnv1a_bytes(h, &op->kind, sizeof(op->kind));
+        h                     = cml_fnv1a_bytes(h, &op->uop, sizeof(op->uop));
+        h                     = cml_fnv1a_bytes(h, &op->dest_reg, sizeof(op->dest_reg));
+        h                     = cml_fnv1a_bytes(h, &op->num_srcs, sizeof(op->num_srcs));
         for (int j = 0; j < op->num_srcs; j++) {
-            h = hash_bytes(h, &op->src_regs[j], sizeof(op->src_regs[j]));
+            h = cml_fnv1a_bytes(h, &op->src_regs[j], sizeof(op->src_regs[j]));
         }
     }
     return h;

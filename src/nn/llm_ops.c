@@ -32,6 +32,23 @@ void cml_softmax_rows_inplace(float* data, int rows, int cols) {
     }
 }
 
+/** Temperature softmax of one length-`n` logits row into `out`, max-shifted for
+ *  numerical stability; `t` must be > 0. */
+void cml_softmax_row_temp(const float* in, int n, float t, float* out) {
+    float maxl = in[0];
+    for (int i = 1; i < n; i++)
+        if (in[i] > maxl)
+            maxl = in[i];
+    double denom = 0.0;
+    for (int i = 0; i < n; i++) {
+        out[i] = expf((in[i] - maxl) / t);
+        denom += out[i];
+    }
+    float inv = denom > 0.0 ? (float)(1.0 / denom) : 0.0f;
+    for (int i = 0; i < n; i++)
+        out[i] *= inv;
+}
+
 #define HASH_EMPTY (-1)
 
 /** FNV-1a hash of a NUL-terminated string, used for the tokenizer's vocab table. */

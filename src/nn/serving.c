@@ -201,19 +201,7 @@ static int serving_sample(const float* logits, int vocab, float temperature, flo
     if (!probs)
         return serving_argmax(logits, vocab);
 
-    float maxl = logits[0];
-    for (int i = 1; i < vocab; i++)
-        if (logits[i] > maxl)
-            maxl = logits[i];
-    float sum = 0.0f;
-    for (int i = 0; i < vocab; i++) {
-        float p  = expf((logits[i] - maxl) / temperature);
-        probs[i] = p;
-        sum += p;
-    }
-    float inv = (sum > 0.0f) ? 1.0f / sum : 0.0f;
-    for (int i = 0; i < vocab; i++)
-        probs[i] *= inv;
+    cml_softmax_row_temp(logits, vocab, temperature, probs);
 
     /* nucleus: build a simple descending cutoff by cumulative mass. We avoid a
      * full sort by iterating with a running threshold: draw against the top-p

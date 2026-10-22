@@ -120,6 +120,19 @@ static void* optimizer_alloc_state(ParameterGroup* group, size_t state_size, Sta
     return states;
 }
 
+/** Ensure `group->state` is allocated (one `size`-byte slot per parameter, each
+ *  initialised by `init_fn`); logs a failure tagged `name`. Returns the state
+ *  array, or NULL if allocation failed. */
+static void* optim_ensure_state(ParameterGroup* group, size_t size, StateInitFn init_fn,
+                                const char* name) {
+    if (!group->state) {
+        group->state = optimizer_alloc_state(group, size, init_fn);
+        if (!group->state)
+            LOG_ERROR("Failed to allocate %s state", name);
+    }
+    return group->state;
+}
+
 /* Helper: create a realized zero tensor for optimizer state.
  * Optimizer state tensors are long-lived (must survive IR graph resets).
  * tensor_realize() both executes the lazy fill AND detaches from the IR graph. */
@@ -702,12 +715,8 @@ static void adopt_param_data(Tensor* param, Tensor* updated) {
 static SGDMomentumState** sgd_momentum_states(ParameterGroup* group, float momentum) {
     if (momentum <= 0.0f)
         return NULL;
-    if (!group->state) {
-        group->state = optimizer_alloc_state(group, sizeof(SGDMomentumState), sgd_state_init);
-        if (!group->state)
-            LOG_ERROR("Failed to allocate SGD momentum state");
-    }
-    return (SGDMomentumState**)group->state;
+    return (SGDMomentumState**)optim_ensure_state(group, sizeof(SGDMomentumState), sgd_state_init,
+                                                  "SGD momentum");
 }
 
 /* Per-parameter Adam moments for `group`, allocated on first use along with the
@@ -716,13 +725,11 @@ static AdamState** adam_states(Optimizer* optimizer, ParameterGroup* group, cons
     if (group->state)
         return (AdamState**)group->state;
 
-    group->state = optimizer_alloc_state(group, sizeof(AdamState), adam_state_init);
-    if (!group->state) {
-        LOG_ERROR("Failed to allocate %s state", name);
+    AdamState** states =
+        (AdamState**)optim_ensure_state(group, sizeof(AdamState), adam_state_init, name);
+    if (!states)
         return NULL;
-    }
 
-    AdamState** states = (AdamState**)group->state;
     if (optimizer->amsgrad) {
         for (int i = 0; i < group->num_parameters; i++) {
             if (!states[i] || !group->parameters[i] || !group->parameters[i]->tensor)
@@ -1156,15 +1163,10 @@ static void rmsprop_step(Optimizer* optimizer) {
         float alpha           = group->beta1; // Reuse beta1 for alpha (decay rate)
         float epsilon         = group->epsilon;
 
-        if (!group->state) {
-            group->state = optimizer_alloc_state(group, sizeof(RMSpropState), rmsprop_state_init);
-            if (!group->state) {
-                LOG_ERROR("Failed to allocate RMSprop state");
-                continue;
-            }
-        }
-
-        RMSpropState** states = (RMSpropState**)group->state;
+        RMSpropState** states = (RMSpropState**)optim_ensure_state(
+            group, sizeof(RMSpropState), rmsprop_state_init, "RMSprop");
+        if (!states)
+            continue;
 
         for (int i = 0; i < group->num_parameters; i++) {
             float* grad_data;
@@ -1208,15 +1210,10 @@ static void adagrad_step(Optimizer* optimizer) {
         float weight_decay    = group->weight_decay;
         float epsilon         = group->epsilon;
 
-        if (!group->state) {
-            group->state = optimizer_alloc_state(group, sizeof(AdagradState), adagrad_state_init);
-            if (!group->state) {
-                LOG_ERROR("Failed to allocate Adagrad state");
-                continue;
-            }
-        }
-
-        AdagradState** states = (AdagradState**)group->state;
+        AdagradState** states = (AdagradState**)optim_ensure_state(
+            group, sizeof(AdagradState), adagrad_state_init, "Adagrad");
+        if (!states)
+            continue;
 
         for (int i = 0; i < group->num_parameters; i++) {
             float* grad_data;
@@ -1323,15 +1320,10 @@ static void adadelta_step(Optimizer* optimizer) {
         float weight_decay    = group->weight_decay;
         float epsilon         = group->epsilon;
 
-        if (!group->state) {
-            group->state = optimizer_alloc_state(group, sizeof(AdaDeltaState), adadelta_state_init);
-            if (!group->state) {
-                LOG_ERROR("Failed to allocate AdaDelta state");
-                continue;
-            }
-        }
-
-        AdaDeltaState** states = (AdaDeltaState**)group->state;
+        AdaDeltaState** states = (AdaDeltaState**)optim_ensure_state(
+            group, sizeof(AdaDeltaState), adadelta_state_init, "AdaDelta");
+        if (!states)
+            continue;
 
         for (int i = 0; i < group->num_parameters; i++) {
             float* grad_data;

@@ -10,40 +10,22 @@
 #include "alloc/cml_allocator.h"
 
 #define DEFAULT_NUM_BUCKETS 256
-#define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
-#define FNV_PRIME 0x100000001b3ULL
 
 static CMLKernelFreeFn g_kernel_free_fns[CML_KERNEL_BACKEND_COUNT] = {0};
 
 static CMLKernelCache* g_default_cache = NULL;
 
 /** Seed value for an FNV-1a hash. */
-static uint64_t fnv1a_hash_init(void) { return FNV_OFFSET_BASIS; }
-
-/** Fold one byte into an FNV-1a hash. */
-static uint64_t fnv1a_hash_byte(uint64_t hash, uint8_t byte) {
-    hash ^= byte;
-    hash *= FNV_PRIME;
-    return hash;
-}
-
-/** Fold @p len bytes into an FNV-1a hash. */
-static uint64_t fnv1a_hash_bytes(uint64_t hash, const void* data, size_t len) {
-    const uint8_t* bytes = (const uint8_t*)data;
-    for (size_t i = 0; i < len; i++) {
-        hash = fnv1a_hash_byte(hash, bytes[i]);
-    }
-    return hash;
-}
+static uint64_t fnv1a_hash_init(void) { return CML_FNV_OFFSET_BASIS; }
 
 /** Fold an int into an FNV-1a hash. */
 static uint64_t fnv1a_hash_int(uint64_t hash, int value) {
-    return fnv1a_hash_bytes(hash, &value, sizeof(value));
+    return cml_fnv1a_bytes(hash, &value, sizeof(value));
 }
 
 /** Fold a size_t into an FNV-1a hash. */
 static uint64_t fnv1a_hash_size(uint64_t hash, size_t value) {
-    return fnv1a_hash_bytes(hash, &value, sizeof(value));
+    return cml_fnv1a_bytes(hash, &value, sizeof(value));
 }
 
 /** Create a kernel cache with an entry cap and no memory cap. */

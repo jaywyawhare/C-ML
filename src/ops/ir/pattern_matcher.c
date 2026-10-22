@@ -62,25 +62,6 @@ static int record_capture(CMLMatchResult* result, const char* name, struct IRNod
     return 0;
 }
 
-/**
- * Retrieve a previously captured node by name.
- * Returns NULL if not found.
- *
- * This helper is available for user-defined emit functions that look up
- * captures by name.  The built-in rules do direct lookups instead, so
- * this function may appear unused in the built-in set.
- */
-__attribute__((unused)) static struct IRNode* get_capture(const CMLMatchResult* result,
-                                                          const char* name) {
-    if (!result || !name)
-        return NULL;
-    for (int i = 0; i < result->num_captures; i++) {
-        if (strcmp(result->captures[i].name, name) == 0)
-            return result->captures[i].node;
-    }
-    return NULL;
-}
-
 /** Recursively test whether @p pattern matches @p node, recording captures into @p result. */
 static bool match_node(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNode* node,
                        CMLMatchResult* result) {

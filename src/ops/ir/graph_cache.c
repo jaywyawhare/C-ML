@@ -15,8 +15,6 @@
 #include "alloc/cml_allocator.h"
 
 #define CACHE_NUM_BUCKETS 64
-#define FNV_OFFSET 0xcbf29ce484222325ULL
-#define FNV_PRIME 0x100000001b3ULL
 
 /** Round @p size up to a multiple of @p alignment. */
 static size_t cml_alloc_size_aligned(size_t size, size_t alignment) {
@@ -28,7 +26,7 @@ static CMLGraphCache* g_graph_cache = NULL;
 /** Fold @p val into an FNV-style running hash. */
 static uint64_t hash_combine(uint64_t h, uint64_t val) {
     h ^= val;
-    h *= FNV_PRIME;
+    h *= CML_FNV_PRIME;
     return h;
 }
 
@@ -38,7 +36,7 @@ uint64_t cml_graph_compute_signature(CMLGraph_t ir) {
     if (!ir)
         return 0;
 
-    uint64_t hash = FNV_OFFSET;
+    uint64_t hash = CML_FNV_OFFSET_BASIS;
 
     /* Compute signature from TAIL node only (the output of the graph).
      * This allows caching even when new nodes are added to the IR between forward passes.

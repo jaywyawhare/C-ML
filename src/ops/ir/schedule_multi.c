@@ -6,12 +6,6 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
-static bool tensor_on_device(const Tensor* t, int device_id) __attribute__((unused));
-/** True when tensor `t` currently resides on `device_id`. */
-static bool tensor_on_device(const Tensor* t, int device_id) {
-    return t && (int)t->device == device_id;
-}
-
 /** Return the index into `device_ids` of the tensor's device, or 0 if not found. */
 static int device_for_tensor(const Tensor* t, const int* device_ids, int n) {
     if (!t)
@@ -20,23 +14,6 @@ static int device_for_tensor(const Tensor* t, const int* device_ids, int n) {
         if ((int)t->device == device_ids[i])
             return i;
     return 0;
-}
-
-static CrossDeviceOp* xfer_create(XferDirection dir, int src, int dst, Tensor* t)
-    __attribute__((unused));
-/** Allocate a cross-device transfer descriptor, sizing it from the tensor and probing P2P. */
-static CrossDeviceOp* xfer_create(XferDirection dir, int src, int dst, Tensor* t) {
-    CrossDeviceOp* op = cml_calloc(1, sizeof(CrossDeviceOp));
-    if (!op)
-        return NULL;
-    op->direction     = dir;
-    op->src_device_id = src;
-    op->dst_device_id = dst;
-    op->tensor        = t;
-    if (t)
-        op->byte_size = t->numel * cml_dtype_size(t->dtype);
-    op->p2p_possible = devices_p2p_capable(src, dst);
-    return op;
 }
 
 /** Whether two devices can peer-to-peer copy (currently always false: no P2P path). */

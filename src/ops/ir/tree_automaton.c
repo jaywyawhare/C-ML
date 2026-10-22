@@ -25,9 +25,6 @@ static double aut_now_us(void) {
 #define AUTOMATON_WILDCARD_STATE 1
 #define AUTOMATON_INITIAL_STATES_CAP 64
 
-#define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
-#define FNV_PRIME 0x100000001b3ULL
-
 struct CMLAutomatonState {
     int id;
     int* matched_rules;
@@ -52,16 +49,11 @@ struct CMLAutomaton {
 };
 
 /** Seed an FNV-1a hash. */
-static uint64_t fnv1a_init(void) { return FNV_OFFSET_BASIS; }
+static uint64_t fnv1a_init(void) { return CML_FNV_OFFSET_BASIS; }
 
 /** Fold one int into an FNV-1a running hash. */
 static uint64_t fnv1a_int(uint64_t hash, int value) {
-    const uint8_t* bytes = (const uint8_t*)&value;
-    for (size_t i = 0; i < sizeof(int); i++) {
-        hash ^= bytes[i];
-        hash *= FNV_PRIME;
-    }
-    return hash;
+    return cml_fnv1a_bytes(hash, &value, sizeof(value));
 }
 
 /** Hash an (op, arity, child-states) tuple into a transition-table key. */

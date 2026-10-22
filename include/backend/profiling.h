@@ -63,6 +63,10 @@ double profiler_timer_stop(Timer* timer);
 double profiler_timer_elapsed(Timer* timer);
 void profiler_timer_reset(Timer* timer);
 
+/** Monotonic clock reading in milliseconds (CLOCK_MONOTONIC); 0.0 if the clock
+ *  read fails. Shared wall-clock source for timing across subsystems. */
+double cml_monotonic_ms(void);
+
 Profiler* profiler_create(void);
 void profiler_free(Profiler* profiler);
 void profiler_set_enabled(Profiler* profiler, bool enabled);

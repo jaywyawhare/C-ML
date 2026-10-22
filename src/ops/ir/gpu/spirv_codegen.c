@@ -175,15 +175,6 @@ static void emit_op(SPIRVBuilder* b, uint32_t opcode, uint32_t word_count) {
     spirv_builder_emit(b, (word_count << 16) | opcode);
 }
 
-/** Emit the five-word SPIR-V module header (magic, version, generator, id bound, 0). */
-static void __attribute__((unused)) emit_header(SPIRVBuilder* b, uint32_t bound) {
-    spirv_builder_emit(b, SPIRV_MAGIC);
-    spirv_builder_emit(b, SPIRV_VERSION);
-    spirv_builder_emit(b, SPIRV_GENERATOR);
-    spirv_builder_emit(b, bound);
-    spirv_builder_emit(b, 0); /* reserved */
-}
-
 /** Emit OpCapability Shader. */
 static void emit_capability(SPIRVBuilder* b) {
     emit_op(b, SpvOpCapability, 2);

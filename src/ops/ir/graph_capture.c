@@ -1,24 +1,12 @@
 #include "ops/ir/graph_capture.h"
 #include "ops/ir/ir.h"
 #include "core/logging.h"
+#include "backend/profiling.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
-#ifdef _POSIX_C_SOURCE
-#include <time.h>
 #include "alloc/cml_allocator.h"
-/** Monotonic wall-clock reading in milliseconds. */
-static double get_time_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
-}
-#else
-/** Stub used when CLOCK_MONOTONIC is unavailable; always returns 0. */
-static double get_time_ms(void) { return 0.0; }
-#endif
 
 /** Allocate an idle captured graph with an initial node buffer. */
 CMLCapturedGraph* cml_graph_capture_create(void) {
@@ -66,7 +54,7 @@ int cml_graph_capture_begin(CMLCapturedGraph* graph) {
     }
     graph->num_nodes       = 0;
     graph->state           = CML_CAPTURE_RECORDING;
-    graph->capture_time_ms = get_time_ms();
+    graph->capture_time_ms = cml_monotonic_ms();
     return 0;
 }
 
@@ -123,7 +111,7 @@ int cml_graph_capture_end(CMLCapturedGraph* graph) {
     if (!graph || graph->state != CML_CAPTURE_RECORDING)
         return -1;
 
-    double end                  = get_time_ms();
+    double end                  = cml_monotonic_ms();
     graph->capture_time_ms      = end - graph->capture_time_ms;
     graph->state                = CML_CAPTURE_READY;
     graph->replay_count         = 0;
@@ -136,7 +124,7 @@ int cml_graph_capture_replay(CMLCapturedGraph* graph) {
     if (!graph || graph->state != CML_CAPTURE_READY)
         return -1;
 
-    double start = get_time_ms();
+    double start = cml_monotonic_ms();
 
     /*
      * In a full GPU implementation, this would call:
@@ -170,7 +158,7 @@ int cml_graph_capture_replay(CMLCapturedGraph* graph) {
         }
     }
 
-    double end                 = get_time_ms();
+    double end                 = cml_monotonic_ms();
     graph->last_replay_time_ms = end - start;
     graph->total_replay_time_ms += graph->last_replay_time_ms;
     graph->replay_count++;

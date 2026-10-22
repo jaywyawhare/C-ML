@@ -1,4 +1,5 @@
 #include "ops/ir/process_replay.h"
+#include "ops/ir/internal.h"
 #include "core/logging.h"
 
 #include <stdlib.h>
@@ -16,8 +17,6 @@
 #include <stdint.h>
 #include "alloc/cml_allocator.h"
 
-#define FNV_OFFSET_BASIS 0xcbf29ce484222325ULL
-#define FNV_PRIME 0x100000001b3ULL
 #define HEADER_MAGIC "CMLPR001"
 #define KERNEL_FILE_EXT ".kernel"
 
@@ -27,13 +26,7 @@ static char g_output_dir[4096];
 
 /** 64-bit FNV-1a hash of a byte range, used to key kernels by source. */
 static uint64_t fnv1a(const void* data, size_t len) {
-    uint64_t hash        = FNV_OFFSET_BASIS;
-    const uint8_t* bytes = (const uint8_t*)data;
-    for (size_t i = 0; i < len; i++) {
-        hash ^= bytes[i];
-        hash *= FNV_PRIME;
-    }
-    return hash;
+    return cml_fnv1a_bytes(CML_FNV_OFFSET_BASIS, data, len);
 }
 
 /** Create the directory if it does not already exist. */

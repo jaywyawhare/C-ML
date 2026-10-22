@@ -288,8 +288,7 @@ double profiler_get_total_time(Profiler* profiler, const char* name) {
 
 /* ---------------- Nestable aggregated scopes ---------------- */
 
-/** Monotonic clock in milliseconds. */
-static double now_ms(void) {
+double cml_monotonic_ms(void) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
         return 0.0;
@@ -342,14 +341,14 @@ int profiler_scope_begin(Profiler* profiler, const char* name) {
     sc->child_ms       = 0.0;
     sc->alloc_at_start = allocs;
     sc->bytes_at_start = bytes;
-    sc->start_ms       = now_ms(); /* read the clock last so setup is not timed */
+    sc->start_ms       = cml_monotonic_ms(); /* read the clock last so setup is not timed */
     return 0;
 }
 
 void profiler_scope_end(Profiler* profiler) {
     if (!profiler || !profiler->enabled)
         return;
-    double end = now_ms();
+    double end = cml_monotonic_ms();
     if (profiler->stack_depth <= 0) {
         LOG_WARNING("profiler: scope_end with no open scope");
         return;

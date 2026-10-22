@@ -23,6 +23,10 @@ typedef struct CMLKVCache {
  * numerical stability. Shared by the attention kernels in this family. */
 void cml_softmax_rows_inplace(float* data, int rows, int cols);
 
+/* Temperature softmax of one length-`n` logits row into `out`, max-shifted for
+ * numerical stability. `t` must be > 0 (callers apply their own guard). */
+void cml_softmax_row_temp(const float* in, int n, float t, float* out);
+
 CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim);
 
 void cml_kv_cache_free(CMLKVCache* cache);

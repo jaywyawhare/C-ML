@@ -1,4 +1,5 @@
 #include "backend/blas.h"
+#include "backend/profiling.h"
 #include "core/logging.h"
 #include "ops/simd_math.h"
 
@@ -635,13 +636,6 @@ static int g_at_count            = 0;
 static pthread_mutex_t g_at_lock = PTHREAD_MUTEX_INITIALIZER;
 static bool g_at_loaded          = false;
 
-/** Monotonic wall-clock reading in milliseconds for autotune timing. */
-static double now_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (double)ts.tv_sec * 1e3 + (double)ts.tv_nsec / 1e6;
-}
-
 /** Path to ~/.cml/autotune.json, creating the ~/.cml directory; NULL without $HOME. */
 static const char* autotune_path(void) {
     static char path[512];
@@ -719,11 +713,11 @@ static void autotune_run(const float* A, const float* B, float* C, int M, int N,
     double best_t = 1e18;
     int best      = 0;
     for (int ci = 0; ci < NCAND; ci++) {
-        double t0 = now_ms();
+        double t0 = cml_monotonic_ms();
         for (int r = 0; r < REPS; r++)
             sgemm_packed_avx(A, B, C, M, N, K, alpha, beta, a_pack, b_pack, cands[ci].mc,
                              cands[ci].kc, cands[ci].nc);
-        double dt = now_ms() - t0;
+        double dt = cml_monotonic_ms() - t0;
         if (dt < best_t) {
             best_t = dt;
             best   = ci;

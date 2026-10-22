@@ -1706,27 +1706,6 @@ static void ju_run(void* fnv, float* a, float* out, int64_t n, int64_t na) {
 }
 
 typedef struct {
-    void (*fn)(float*, int64_t);
-    float* out;
-} JFTaskCtx;
-
-/** Threadpool worker: run a fill/no-input kernel over the [start, end) slice. */
-static void jf_task(void* d, size_t start, size_t end) {
-    JFTaskCtx* t = (JFTaskCtx*)d;
-    t->fn(t->out + start, (int64_t)(end - start));
-}
-
-/** Dispatch a no-input (fill-style) JIT kernel, parallelizing past a threshold. */
-__attribute__((unused)) static void jf_run(void* fnv, float* out, int64_t n) {
-    if (n >= JIT_PARALLEL_MIN_ELEMS) {
-        JFTaskCtx ctx = {*(void (**)(float*, int64_t))&fnv, out};
-        threadpool_parallel_for(threadpool_get_global(), jf_task, &ctx, (size_t)n);
-        return;
-    }
-    ((void (*)(float*, int64_t))(void*)fnv)(out, n);
-}
-
-typedef struct {
     void (*fn)(float*, int64_t, float);
     float* out;
     int64_t n;

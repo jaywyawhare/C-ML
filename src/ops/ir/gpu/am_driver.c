@@ -312,23 +312,6 @@ static int sysfs_read_u32(const char* path, uint32_t* val) {
     return ret;
 }
 
-/* Read a string property from a sysfs file. */
-static int sysfs_read_str(const char* path, char* buf, size_t buflen) __attribute__((unused));
-static int sysfs_read_str(const char* path, char* buf, size_t buflen) {
-    FILE* f = fopen(path, "r");
-    if (!f)
-        return -1;
-    if (!fgets(buf, (int)buflen, f)) {
-        fclose(f);
-        return -1;
-    }
-    fclose(f);
-    size_t len = strlen(buf);
-    while (len > 0 && (buf[len - 1] == '\n' || buf[len - 1] == '\r'))
-        buf[--len] = '\0';
-    return 0;
-}
-
 /* Parse a single KFD topology node's properties file into key=value pairs.
  * Calls cb for each pair. Returns 0 on success. */
 typedef void (*prop_cb_t)(const char* key, const char* value, void* ctx);

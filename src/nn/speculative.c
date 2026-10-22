@@ -1,19 +1,13 @@
 #include "nn/speculative.h"
 #include "core/logging.h"
 #include "tensor/tensor.h"
+#include "backend/profiling.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <time.h>
 #include "alloc/cml_allocator.h"
-
-/** Monotonic clock reading in milliseconds, for timing draft/verify phases. */
-static double now_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1.0e6;
-}
 
 /** Index of the max logit in row `row_index` of a [rows, vocab_size] logits tensor. */
 static int argmax_at_row(Tensor* logits, int row_index, int vocab_size) {
@@ -50,19 +44,8 @@ CMLSpeculativeConfig cml_speculative_default_config(void) {
 
 /* Temperature softmax of one logits row into probs[vocab]. */
 static void softmax_row(const float* row, int vocab, float temperature, float* probs) {
-    float t    = temperature > 1e-6f ? temperature : 1.0f;
-    float maxl = row[0];
-    for (int i = 1; i < vocab; i++)
-        if (row[i] > maxl)
-            maxl = row[i];
-    double denom = 0.0;
-    for (int i = 0; i < vocab; i++) {
-        probs[i] = expf((row[i] - maxl) / t);
-        denom += probs[i];
-    }
-    float inv = denom > 0.0 ? (float)(1.0 / denom) : 0.0f;
-    for (int i = 0; i < vocab; i++)
-        probs[i] *= inv;
+    float t = temperature > 1e-6f ? temperature : 1.0f;
+    cml_softmax_row_temp(row, vocab, t, probs);
 }
 
 /** Draw a token index from a normalized probability row by inverse-CDF sampling. */
@@ -182,7 +165,7 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
     }
 
     /* 1. Draft phase: autoregressively generate K tokens with draft model. */
-    double t_draft_start = now_ms();
+    double t_draft_start = cml_monotonic_ms();
 
     int draft_seq_len = prefix_len;
     for (int i = 0; i < K; i++) {
@@ -215,14 +198,14 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
         draft_seq_len++;
     }
 
-    double t_draft_end = now_ms();
+    double t_draft_end = cml_monotonic_ms();
 
     /* 2. Verify phase: single target-model forward on prefix + K drafts. */
-    double t_verify_start = now_ms();
+    double t_verify_start = cml_monotonic_ms();
 
     int verify_seq_len    = prefix_len + K;
     Tensor* target_logits = dec->target_forward(dec->target_model_ctx, full_seq, verify_seq_len);
-    double t_verify_end   = now_ms();
+    double t_verify_end   = cml_monotonic_ms();
 
     if (!target_logits) {
         LOG_ERROR("target forward returned NULL");
