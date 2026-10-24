@@ -21,10 +21,10 @@
 #include "alloc/cml_allocator.h"
 
 /** Find-last-set: index of the most significant set bit (floor(log2 x)), or -1 if x is 0. */
-static inline int tlsf_fls(uint32_t x) {
+static inline int tlsf_fls(size_t x) {
     if (x == 0)
         return -1;
-    return 31 - __builtin_clz(x);
+    return 63 - __builtin_clzll((unsigned long long)x);
 }
 
 /** Find-first-set: index of the least significant set bit, or -1 if x is 0. */
@@ -96,7 +96,7 @@ static void mapping_insert(size_t size, int* fl, int* sl) {
     if (size < (size_t)(1 << (TLSF_FL_INDEX_SHIFT + 1))) {
         f = TLSF_FL_INDEX_SHIFT;
     } else {
-        f = tlsf_fls((uint32_t)size);
+        f = tlsf_fls(size);
     }
     int s = (int)((size >> (f > 4 ? f - 4 : 0)) & (TLSF_SL_INDEX_COUNT - 1));
 
@@ -113,7 +113,7 @@ static void mapping_insert(size_t size, int* fl, int* sl) {
  *  guaranteed to hold blocks large enough to satisfy an allocation of `size`. */
 static void mapping_search(size_t size, int* fl, int* sl) {
     if (size >= (size_t)(1 << (TLSF_FL_INDEX_SHIFT + 1))) {
-        int f        = tlsf_fls((uint32_t)size);
+        int f        = tlsf_fls(size);
         size_t round = ((size_t)1 << (f > 4 ? f - 4 : 0)) - 1;
         size += round;
     }
@@ -252,7 +252,7 @@ static TLSFBlock* find_suitable(CMLTLSFAllocator* a, size_t size) {
     uint32_t sl_map = a->sl_bitmap[fl] & (~0U << sl);
     if (sl_map == 0) {
         /* Nothing at this FL level; try higher FL */
-        uint32_t fl_map = a->fl_bitmap & (~0U << (fl + 1));
+        uint32_t fl_map = fl + 1 < TLSF_FL_INDEX_COUNT ? a->fl_bitmap & (~0U << (fl + 1)) : 0;
         if (fl_map == 0)
             return NULL;
         fl     = tlsf_ffs(fl_map);
