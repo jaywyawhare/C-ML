@@ -81,6 +81,120 @@ static inline AllocHeader* header_from_user(void* user) {
 /** User payload pointer for a header: the bytes immediately past the fixed-size header. */
 static inline void* user_from_header(AllocHeader* h) { return (char*)h + CML_HEADER_SIZE; }
 
+/* Stats (best effort, not perfectly accurate under races) */
+static _Atomic size_t g_total_allocated_bytes = 0;
+static _Atomic size_t g_peak_allocated_bytes  = 0;
+static _Atomic size_t g_alloc_count           = 0;
+
+/* Fault injection: -1 = disabled, >=0 = fail after this many more allocs */
+static _Atomic long g_fault_countdown = -1;
+/* Monotonic allocation index (for pinpointing the failing site) */
+static _Atomic long g_alloc_index = 0;
+
+/** Consume one fault-injection tick: true when this allocation must fail (the countdown then
+ *  disarms itself), false otherwise. Shared by the pooled and passthrough allocators so
+ *  allocation-failure tests behave identically under ASAN. */
+static bool fault_hit(void) {
+    long cd = atomic_load_explicit(&g_fault_countdown, memory_order_relaxed);
+    if (cd >= 0) {
+        long prev = atomic_fetch_sub_explicit(&g_fault_countdown, 1, memory_order_relaxed);
+        if (prev == 0) {
+            atomic_store_explicit(&g_fault_countdown, -1, memory_order_relaxed);
+            return true;
+        }
+    }
+    atomic_fetch_add_explicit(&g_alloc_index, 1, memory_order_relaxed);
+    return false;
+}
+
+/** Account a new `size`-byte allocation in the best-effort stats, raising the peak. */
+static void stats_on_alloc(size_t size) {
+    atomic_fetch_add_explicit(&g_total_allocated_bytes, size, memory_order_relaxed);
+    atomic_fetch_add_explicit(&g_alloc_count, 1, memory_order_relaxed);
+    size_t cur = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
+    size_t pk  = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
+    if (cur > pk)
+        atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
+}
+
+/** Account `size` bytes leaving the live total. */
+static void stats_on_free(size_t size) {
+    atomic_fetch_sub_explicit(&g_total_allocated_bytes, size, memory_order_relaxed);
+}
+
+/** Build with -DCML_ALLOC_PASSTHROUGH=ON (alongside ENABLE_SANITIZERS) to route every allocation
+ *  straight to the system allocator. The pool hands out blocks from its own arenas, so a heap
+ *  tool sees one giant valid mapping and cannot tell a use-after-free or an overflow from
+ *  ordinary traffic; with this on, AddressSanitizer sees each allocation individually and
+ *  reports the write that actually caused it. Diagnostics only: the pool is what makes per-node
+ *  allocation cheap. */
+#if defined(CML_ALLOC_PASSTHROUGH) && CML_ALLOC_PASSTHROUGH
+#ifdef __APPLE__
+#include <malloc/malloc.h>
+#define pt_block_size malloc_size
+#else
+#include <malloc.h>
+#define pt_block_size malloc_usable_size
+#endif
+
+/** Account a fresh libc block in the stats (NULL-safe) and hand it back, so profiler memory
+ *  attribution keeps working under passthrough. */
+static void* pt_track(void* p) {
+    if (p)
+        stats_on_alloc(pt_block_size(p));
+    return p;
+}
+/** Passthrough cml_malloc: straight to libc malloc (0 becomes 1) so ASAN sees each block. */
+void* cml_malloc(size_t size) {
+    if (fault_hit())
+        return NULL;
+    return pt_track(malloc(size ? size : 1));
+}
+/** Passthrough cml_calloc: zeroing libc calloc, honoring the fault-injection hook. */
+void* cml_calloc(size_t n, size_t sz) {
+    if (fault_hit())
+        return NULL;
+    return pt_track(calloc(n ? n : 1, sz ? sz : 1));
+}
+/** Passthrough cml_realloc over libc realloc, honoring the fault-injection hook. */
+void* cml_realloc(void* p, size_t n) {
+    if (fault_hit())
+        return NULL;
+    size_t old = p ? pt_block_size(p) : 0;
+    void* q    = realloc(p, n ? n : 1);
+    if (q)
+        stats_on_free(old);
+    return pt_track(q);
+}
+/** Passthrough cml_free: plain libc free. */
+void cml_free(void* p) {
+    if (p)
+        stats_on_free(pt_block_size(p));
+    free(p);
+}
+/** Passthrough cml_strdup over libc strdup; NULL-safe and fault-injectable. */
+char* cml_strdup(const char* s) {
+    if (!s)
+        return NULL;
+    if (fault_hit())
+        return NULL;
+    return pt_track(strdup(s));
+}
+/** Passthrough aligned allocation via posix_memalign; release with cml_aligned_free. */
+void* cml_aligned_alloc(size_t size, size_t al) {
+    void* p = NULL;
+    if (al < sizeof(void*))
+        al = sizeof(void*);
+    if (posix_memalign(&p, al, size ? size : 1) != 0)
+        return NULL;
+    return pt_track(p);
+}
+/** Passthrough free for cml_aligned_alloc memory. */
+void cml_aligned_free(void* p) { cml_free(p); }
+/** Passthrough has no thread cache, so there is nothing to flush. */
+void cml_allocator_flush_thread_cache(void) {}
+#else
+
 /* ---------------- Size classes ----------------
  * We use a compact table of increasing sizes. Good balance of internal fragmentation vs #classes.
  * Classes chosen so small objects (common for structs, nodes, small temps) have tight fits.
@@ -181,16 +295,6 @@ static bool g_initialized          = false;
 
 /* Thread local */
 static __thread ThreadCache tl_cache = {0};
-
-/* Stats (best effort, not perfectly accurate under races) */
-static _Atomic size_t g_total_allocated_bytes = 0;
-static _Atomic size_t g_peak_allocated_bytes  = 0;
-static _Atomic size_t g_alloc_count           = 0;
-
-/* Fault injection: -1 = disabled, >=0 = fail after this many more allocs */
-static _Atomic long g_fault_countdown = -1;
-/* Monotonic allocation index (for pinpointing the failing site) */
-static _Atomic long g_alloc_index = 0;
 
 /* Forward */
 static void* alloc_from_class(int cls, size_t user_size);
@@ -384,95 +488,6 @@ static void flush_local_to_central(int cls, int keep) {
     }
 }
 
-/* ---------------- Pool bypass (diagnostics) ----------------
- *
- * Build with -DCML_ALLOC_PASSTHROUGH=1 to route every allocation straight to
- * the system allocator. The pool hands out blocks from its own arenas, so a
- * heap tool sees one giant valid mapping and cannot tell a use-after-free or an
- * overflow from ordinary traffic -- corruption only surfaces later as a crash
- * inside alloc_from_class, walking a free list some earlier write clobbered.
- * With this on, AddressSanitizer sees each allocation individually and reports
- * the write that actually caused it. Diagnostics only: the pool is what makes
- * per-node allocation cheap. */
-#if defined(CML_ALLOC_PASSTHROUGH) && CML_ALLOC_PASSTHROUGH
-#include <stdlib.h>
-#include <string.h>
-
-/* Fault injection is mirrored here, not just in the pooled allocator. Omitting
- * it made sim_test fail to link under CML_ALLOC_PASSTHROUGH, which is exactly
- * the configuration ASAN needs -- so the one suite that exercises
- * allocation-failure paths was also the one suite ASAN never covered. Semantics
- * match the pooled path: -1 disables, >=0 fails after that many more allocs and
- * then re-disables itself. The counters themselves are declared unconditionally
- * near the top of the file, so this branch reuses them rather than shadowing. */
-static int pt_fault_hit(void) {
-    long cd = atomic_load_explicit(&g_fault_countdown, memory_order_relaxed);
-    if (cd >= 0) {
-        long prev = atomic_fetch_sub_explicit(&g_fault_countdown, 1, memory_order_relaxed);
-        if (prev == 0) {
-            atomic_store_explicit(&g_fault_countdown, -1, memory_order_relaxed);
-            return 1;
-        }
-    }
-    atomic_fetch_add_explicit(&g_alloc_index, 1, memory_order_relaxed);
-    return 0;
-}
-
-/** Arm fault injection: the nth subsequent allocation returns NULL, then it disarms itself. */
-void cml_malloc_fault_after(int n) {
-    atomic_store_explicit(&g_fault_countdown, (long)n, memory_order_relaxed);
-    atomic_store_explicit(&g_alloc_index, 0, memory_order_relaxed);
-}
-/** Disarm allocation fault injection so every allocation succeeds again. */
-void cml_malloc_fault_reset(void) {
-    atomic_store_explicit(&g_fault_countdown, -1L, memory_order_relaxed);
-}
-/** Allocations observed since the last fault_after, for pinpointing a failing call site. */
-long cml_malloc_alloc_index(void) {
-    return atomic_load_explicit(&g_alloc_index, memory_order_relaxed);
-}
-
-/** Passthrough cml_malloc: straight to libc malloc (0 becomes 1) so ASAN sees each block. */
-void* cml_malloc(size_t size) {
-    if (pt_fault_hit())
-        return NULL;
-    return malloc(size ? size : 1);
-}
-/** Passthrough cml_calloc: zeroing libc calloc, honoring the fault-injection hook. */
-void* cml_calloc(size_t n, size_t sz) {
-    if (pt_fault_hit())
-        return NULL;
-    return calloc(n ? n : 1, sz ? sz : 1);
-}
-/** Passthrough cml_realloc over libc realloc, honoring the fault-injection hook. */
-void* cml_realloc(void* p, size_t n) {
-    if (pt_fault_hit())
-        return NULL;
-    return realloc(p, n ? n : 1);
-}
-/** Passthrough cml_free: plain libc free. */
-void cml_free(void* p) { free(p); }
-/** Passthrough cml_strdup over libc strdup; NULL-safe and fault-injectable. */
-char* cml_strdup(const char* s) {
-    if (!s)
-        return NULL;
-    if (pt_fault_hit())
-        return NULL;
-    return strdup(s);
-}
-/** Passthrough aligned allocation via posix_memalign; release with cml_aligned_free. */
-void* cml_aligned_alloc(size_t size, size_t al) {
-    void* p = NULL;
-    if (al < sizeof(void*))
-        al = sizeof(void*);
-    if (posix_memalign(&p, al, size ? size : 1) != 0)
-        return NULL;
-    return p;
-}
-/** Passthrough free for cml_aligned_alloc memory (plain libc free). */
-void cml_aligned_free(void* p) { free(p); }
-#else
-
 /* ---------------- Allocation paths ---------------- */
 
 /** Allocate one object of size class `cls` for a `user_size` request. Pops the thread-local
@@ -491,14 +506,7 @@ static void* alloc_from_class(int cls, size_t user_size) {
         hdr->class_idx   = (uint16_t)cls;
         hdr->magic       = ALLOC_MAGIC;
 
-        /* update stats */
-        atomic_fetch_add_explicit(&g_total_allocated_bytes, user_size, memory_order_relaxed);
-        atomic_fetch_add_explicit(&g_alloc_count, 1, memory_order_relaxed);
-        size_t cur = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
-        size_t pk  = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
-        if (cur > pk) {
-            atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
-        }
+        stats_on_alloc(user_size);
         return user_from_header(hdr);
     }
 
@@ -536,13 +544,7 @@ static void* alloc_from_class(int cls, size_t user_size) {
     hdr->class_idx   = (uint16_t)cls;
     hdr->magic       = ALLOC_MAGIC;
 
-    atomic_fetch_add_explicit(&g_total_allocated_bytes, user_size, memory_order_relaxed);
-    atomic_fetch_add_explicit(&g_alloc_count, 1, memory_order_relaxed);
-    size_t cur = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
-    size_t pk  = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
-    if (cur > pk)
-        atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
-
+    stats_on_alloc(user_size);
     return user_from_header(hdr);
 }
 
@@ -622,13 +624,7 @@ static void* alloc_large(size_t size) {
     hdr->class_idx   = 0xffff;
     hdr->magic       = ALLOC_MAGIC;
 
-    atomic_fetch_add_explicit(&g_total_allocated_bytes, size, memory_order_relaxed);
-    atomic_fetch_add_explicit(&g_alloc_count, 1, memory_order_relaxed);
-    size_t cur = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
-    size_t pk  = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
-    if (cur > pk)
-        atomic_store_explicit(&g_peak_allocated_bytes, cur, memory_order_relaxed);
-
+    stats_on_alloc(size);
     return user_from_header(hdr);
 }
 
@@ -637,19 +633,10 @@ static void* alloc_large(size_t size) {
  *  Also drives fault injection when armed. Returns NULL on failure. */
 void* cml_malloc(size_t size) {
     if (size == 0)
-        size = 1; /* classic */
+        size = 1;
 
-    /* Fault injection: if a countdown is active, decrement it and fail when it hits 0. */
-    long cd = atomic_load_explicit(&g_fault_countdown, memory_order_relaxed);
-    if (cd >= 0) {
-        long prev = atomic_fetch_sub_explicit(&g_fault_countdown, 1, memory_order_relaxed);
-        if (prev == 0) {
-            /* Reset to disabled so subsequent calls succeed, then return OOM. */
-            atomic_store_explicit(&g_fault_countdown, -1, memory_order_relaxed);
-            return NULL;
-        }
-    }
-    atomic_fetch_add_explicit(&g_alloc_index, 1, memory_order_relaxed);
+    if (fault_hit())
+        return NULL;
 
     if (size >= CML_LARGE_THRESHOLD) {
         return alloc_large(size);
@@ -697,8 +684,7 @@ void* cml_realloc(void* ptr, size_t new_size) {
         /* Shrink: keep same block, just update header */
         hdr->size = new_size;
         /* Note: we do not give memory back to freelist for shrink here (common & fast) */
-        atomic_fetch_sub_explicit(&g_total_allocated_bytes, (old_size - new_size),
-                                  memory_order_relaxed);
+        stats_on_free(old_size - new_size);
         return ptr;
     }
 
@@ -729,7 +715,7 @@ static void free_to_class(int cls, void* user_ptr, size_t user_size) {
     tl_cache.heads[cls] = node;
     tl_cache.counts[cls]++;
 
-    atomic_fetch_sub_explicit(&g_total_allocated_bytes, user_size, memory_order_relaxed);
+    stats_on_free(user_size);
 
     /* If local cache is fat, flush some back to central (keeps memory bounded per thread) */
     if (tl_cache.counts[cls] > CML_MAX_LOCAL_CACHE) {
@@ -746,7 +732,7 @@ static void free_large(void* ptr) {
     size_t sz  = hdr->size;
     hdr->magic = 0xdead;
 
-    atomic_fetch_sub_explicit(&g_total_allocated_bytes, sz, memory_order_relaxed);
+    stats_on_free(sz);
 
     /* Offer the block to the cache for reuse; only truly free it when the cache
      * is full. The raw header start is what the system allocator handed out. */
@@ -842,16 +828,6 @@ void cml_aligned_free(void* ptr) {
     cml_free(real_user);
 }
 
-/** Snapshot the best-effort allocator counters into any non-NULL out params (racy, not exact). */
-void cml_allocator_get_stats(size_t* bytes_allocated, size_t* peak_bytes, size_t* alloc_count) {
-    if (bytes_allocated)
-        *bytes_allocated = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
-    if (peak_bytes)
-        *peak_bytes = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
-    if (alloc_count)
-        *alloc_count = atomic_load_explicit(&g_alloc_count, memory_order_relaxed);
-}
-
 /** Return every block in the calling thread's cache to the central freelists; call before a
  *  thread exits so its cached memory is reusable by others. */
 void cml_allocator_flush_thread_cache(void) {
@@ -864,7 +840,17 @@ void cml_allocator_flush_thread_cache(void) {
     }
 }
 
-/* --- Fault injection API --- */
+#endif /* CML_ALLOC_PASSTHROUGH */
+
+/** Snapshot the best-effort allocator counters into any non-NULL out params (racy, not exact). */
+void cml_allocator_get_stats(size_t* bytes_allocated, size_t* peak_bytes, size_t* alloc_count) {
+    if (bytes_allocated)
+        *bytes_allocated = atomic_load_explicit(&g_total_allocated_bytes, memory_order_relaxed);
+    if (peak_bytes)
+        *peak_bytes = atomic_load_explicit(&g_peak_allocated_bytes, memory_order_relaxed);
+    if (alloc_count)
+        *alloc_count = atomic_load_explicit(&g_alloc_count, memory_order_relaxed);
+}
 
 /** Arm fault injection: the nth subsequent cml_malloc returns NULL, then it disarms itself. */
 void cml_malloc_fault_after(int n) {
@@ -881,5 +867,3 @@ void cml_malloc_fault_reset(void) {
 long cml_malloc_alloc_index(void) {
     return atomic_load_explicit(&g_alloc_index, memory_order_relaxed);
 }
-
-#endif /* CML_ALLOC_PASSTHROUGH */
