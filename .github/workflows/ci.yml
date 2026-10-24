@@ -114,15 +114,30 @@ jobs:
   sanitizers:
     # AddressSanitizer + UndefinedBehaviorSanitizer build - catches heap
     # corruption, use-after-free, allocator mismatches, and UB that the plain
-    # Debug build silently tolerates.
+    # Debug build silently tolerates. The pooled allocator serves small blocks
+    # from its own arenas, which ASan sees as one valid mapping, so the
+    # passthrough leg routes every allocation through libc to catch small-block
+    # overflows and use-after-frees. Its leak check stays off until the graph
+    # leaks that per-allocation tracking exposes are fixed.
+    name: sanitizers (${{ matrix.allocator }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - allocator: pooled
+            passthrough: 'OFF'
+            detect_leaks: 1
+          - allocator: passthrough
+            passthrough: 'ON'
+            detect_leaks: 0
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: asan-${{ runner.os }}
+          key: asan-${{ runner.os }}-${{ matrix.allocator }}
           max-size: 500M
 
       - name: Configure CMake (ASan + UBSan)
@@ -132,6 +147,7 @@ jobs:
             -DBUILD_TESTS=ON \
             -DBUILD_EXAMPLES=OFF \
             -DENABLE_SANITIZERS=ON \
+            -DCML_ALLOC_PASSTHROUGH=${{ matrix.passthrough }} \
             -DCML_NATIVE_OPTIMIZATIONS=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache
 
@@ -141,7 +157,7 @@ jobs:
       - name: Run tests (sanitized)
         run: cd build-asan && ctest --output-on-failure
         env:
-          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          ASAN_OPTIONS: detect_leaks=${{ matrix.detect_leaks }}:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
 
   python-tests:

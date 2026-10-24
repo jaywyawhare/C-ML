@@ -71,6 +71,11 @@ if(ENABLE_SANITIZERS)
     message(STATUS "Sanitizers: address (leak detection on Linux), undefined behavior")
 endif()
 
+option(CML_ALLOC_PASSTHROUGH "Route cml_malloc straight to libc so ASan sees every allocation" OFF)
+if(CML_ALLOC_PASSTHROUGH)
+    add_compile_definitions(CML_ALLOC_PASSTHROUGH=1)
+endif()
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
