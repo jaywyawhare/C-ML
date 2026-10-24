@@ -395,6 +395,15 @@ static char* generate_fused_kernel_code(FusedKernel* kernel) {
     return code;
 }
 
+/** Producer of @p node's input @p i within @p ir: the node its tensor is bound to, else the node
+ *  named by its input name (rewrite-emitted nodes and cml_ir_view copies have names only). */
+static struct IRNode* input_producer(CMLGraph_t ir, const struct IRNode* node, int i) {
+    Tensor* t = node->inputs ? node->inputs[i] : NULL;
+    if (t && t->ir_node && t->ir_context == ir)
+        return t->ir_node;
+    return node->input_names ? cml_ir_find_by_output(ir, node->input_names[i]) : NULL;
+}
+
 /** Compute per-node use counts and liveness flags for dead-code reporting. */
 static void analyze_usage(CMLGraph_t ir) {
     if (!ir || !ir->head)
@@ -432,9 +441,9 @@ static void analyze_usage(CMLGraph_t ir) {
         // If node is used (or is a side-effect node, though we don't have those yet)
         if (curr->is_used) {
             for (int j = 0; j < curr->num_inputs; j++) {
-                if (curr->inputs && curr->inputs[j] && curr->inputs[j]->ir_node) {
-                    struct IRNode* producer = curr->inputs[j]->ir_node;
-                    producer->is_used       = true;
+                struct IRNode* producer = input_producer(ir, curr, j);
+                if (producer) {
+                    producer->is_used = true;
                     producer->use_count++;
                 }
             }
@@ -565,7 +574,9 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
 
                 // Add inputs if not already produced internally
                 for (int j = 0; j < op->num_inputs; j++) {
-                    char* input      = op->input_names[j];
+                    char* input = op->input_names ? op->input_names[j] : NULL;
+                    if (!input)
+                        continue;
                     bool is_internal = false;
                     for (int k = 0; k < num_produced; k++) {
                         if (produced[k] && strcmp(input, produced[k]) == 0) {
@@ -604,7 +615,8 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
             for (int i = 0; i < node->num_inputs; i++) {
                 if (i > 0)
                     append_format(&buffer, &offset, &capacity, ",");
-                append_json_string(&buffer, &offset, &capacity, node->input_names[i]);
+                append_json_string(&buffer, &offset, &capacity,
+                                   node->input_names ? node->input_names[i] : NULL);
             }
         }
         append_format(&buffer, &offset, &capacity, "],");
@@ -765,10 +777,9 @@ char* cml_ir_export_graph_json(CMLGraph_t ir) {
 
         bool first_edge = true;
         for (int i = 0; i < node->num_inputs; i++) {
-            // Find input index
-            if (node->inputs[i] && node->inputs[i]->ir_node) {
-                struct IRNode* input_node = node->inputs[i]->ir_node;
-                int input_idx             = -1;
+            struct IRNode* input_node = input_producer(ir, node, i);
+            if (input_node) {
+                int input_idx = -1;
 
                 // Reverse search is likely faster as inputs are usually recent
                 for (int j = node_idx - 1; j >= 0; j--) {

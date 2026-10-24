@@ -20,6 +20,8 @@
 #include "ops/ir/decompose.h"
 #include "ops/ir/pattern_matcher.h"
 #include "ops/ir/execution.h"
+#include "ops/ir/export.h"
+#include "alloc/cml_allocator.h"
 #include "tensor/realize.h"
 #include "test_harness.h"
 
@@ -230,6 +232,40 @@ static int test_optimize_idempotent(void) {
     return ok;
 }
 
+/* cml_ir_optimize rewrites in place, and its rewrites emit nodes without input tensors
+ * (x * 2 -> x + x here); a view takes them while the live graph keeps computing y. */
+static int test_optimize_view_leaves_graph(void) {
+    cml_reset_ir_context();
+    float a[6]     = {0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f};
+    Tensor* x      = mk23(a);
+    Tensor* two    = tensor_full((int[]){2, 3}, 2, &cfg, 2.0f);
+    Tensor* y      = uop_mul(uop_exp(x), two);
+    CMLGraph_t ir  = cml_ir_get_or_create_context();
+    void* producer = y->ir_node;
+
+    CMLGraph_t view = cml_ir_view(ir);
+    int ok          = view != NULL;
+    if (view) {
+        cml_ir_optimize(view);
+        char* json = cml_ir_export_graph_json(view);
+        ok &= json && strstr(json, "\"label\":\"ADD\"") && !strstr(json, "\"label\":\"MUL\"");
+        cml_free(json);
+        cml_ir_free(view);
+    }
+    ok &= y->ir_node == producer && y->ir_context == ir;
+
+    tensor_ensure_executed(y);
+    const float* got = (const float*)tensor_data_ptr(y);
+    for (int i = 0; i < 6; i++)
+        ok &= got && fabsf(got[i] - 2.0f * expf(a[i])) < 1e-4f;
+
+    tensor_free(x);
+    tensor_free(two);
+    tensor_free(y);
+    cml_reset_ir_context();
+    return ok;
+}
+
 int main(void) {
     cml_init();
 
@@ -239,6 +275,7 @@ int main(void) {
     TEST(cse_interning);
     TEST(pattern_matcher_contract);
     TEST(optimize_idempotent);
+    TEST(optimize_view_leaves_graph);
 
     cml_cleanup();
     return TEST_SUMMARY();

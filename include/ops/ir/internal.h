@@ -112,6 +112,7 @@ struct CMLGraph {
 
     bool is_executed;
     bool is_optimized;
+    bool is_view; // cml_ir_view copy: node outputs are borrowed, never released
     Tensor** execution_results;
     int execution_results_count;
     int execution_results_capacity;

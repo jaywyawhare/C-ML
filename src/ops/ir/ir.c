@@ -355,6 +355,7 @@ CMLGraph_t cml_ir_new(IRTarget target) {
 
     ir->is_executed   = false;
     ir->is_optimized  = false;
+    ir->is_view       = false;
     ir->is_decomposed = false;
     /* Allocator blocks are recycled without zeroing (see cml_malloc), so
      * every field must be set explicitly -- a stale has_backward_nodes from
@@ -988,7 +989,7 @@ void cml_ir_release_node_storage(struct IRNode* node) {
 void cml_ir_destroy_node(CMLGraph_t ir, struct IRNode* node) {
     if (!node)
         return;
-    if (node->output) {
+    if (node->output && node->output->ir_node == node) {
         node->output->ir_node    = NULL;
         node->output->ir_context = NULL;
     }
@@ -1083,6 +1084,71 @@ void cml_ir_adopt_detached(CMLGraph_t ir, Tensor* t) {
     ir->detached_outputs[ir->detached_count++] = t;
 }
 
+/** Copy @p ir's node list for passes that rewrite a graph in place (cml_ir_optimize's rewrites
+ *  emit nodes the executor cannot run, and its DCE detaches live tensors). The copy owns its
+ *  names, shapes and FILL constants (the only params the rewrite rules read), names each input
+ *  after the node its tensor is bound to, and borrows output tensors read-only. */
+CMLGraph_t cml_ir_view(CMLGraph_t ir) {
+    CMLGraph_t view = ir ? cml_ir_new(ir->target) : NULL;
+    if (!view)
+        return NULL;
+    view->is_view = true;
+
+    for (struct IRNode* src = ir->head; src; src = src->next) {
+        struct IRNode* n = cml_calloc(1, sizeof(struct IRNode));
+        if (!n) {
+            cml_ir_free(view);
+            return NULL;
+        }
+        if (view->tail)
+            view->tail->next = n;
+        else
+            view->head = n;
+        view->tail = n;
+        view->node_count++;
+
+        n->type          = src->type;
+        n->num_inputs    = src->num_inputs;
+        n->ref_count     = 1;
+        n->chain_id      = -1;
+        n->output        = src->output;
+        n->output_dtype  = src->output_dtype;
+        n->output_device = src->output_device;
+        n->requires_grad = src->requires_grad;
+        n->is_executed   = src->is_executed;
+        memcpy(n->needs_input_grad, src->needs_input_grad, sizeof(n->needs_input_grad));
+        n->output_name = src->output_name ? cml_strdup(src->output_name) : NULL;
+        n->scope       = src->scope ? cml_strdup(src->scope) : NULL;
+        if (src->output_shape) {
+            n->output_shape = tensor_shape_copy(src->output_shape, src->output_ndim);
+            n->output_ndim  = src->output_ndim;
+        }
+        if (src->num_inputs > 0) {
+            n->input_names = cml_calloc((size_t)src->num_inputs, sizeof(char*));
+            n->inputs      = cml_malloc((size_t)src->num_inputs * sizeof(Tensor*));
+            for (int i = 0; i < src->num_inputs; i++) {
+                Tensor* t        = src->inputs ? src->inputs[i] : NULL;
+                const char* name = src->input_names ? src->input_names[i] : NULL;
+                if (t && t->ir_node && t->ir_context == ir && t->ir_node->output_name)
+                    name = t->ir_node->output_name;
+                if (n->input_names && name)
+                    n->input_names[i] = cml_strdup(name);
+                if (n->inputs)
+                    n->inputs[i] = t;
+            }
+        }
+        if (src->type == UOP_FILL && src->params) {
+            FillParams* fp = cml_malloc(sizeof(FillParams));
+            if (fp) {
+                *fp       = *(const FillParams*)src->params;
+                fp->shape = fp->shape ? tensor_shape_copy(fp->shape, fp->ndim) : NULL;
+                n->params = fp;
+            }
+        }
+    }
+    return view;
+}
+
 /** Tear down an IR graph: free forward/backward output tensors, tensor refs,
  *  nodes, intern table and bookkeeping, guarding tensors reachable twice from
  *  being freed a second time. */
@@ -1107,11 +1173,10 @@ void cml_ir_free(CMLGraph_t ir) {
                     node_idx, node->num_inputs);
             break;
         }
-        if (node->output) {
+        if (node->output && !ir->is_view)
             release_graph_output(&freed, node->output);
-            node->output = NULL;
-        }
-        node = node->next;
+        node->output = NULL;
+        node         = node->next;
         node_idx++;
     }
 
