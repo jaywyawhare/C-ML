@@ -770,6 +770,12 @@ if(BUILD_TESTS)
         endif()
     endforeach()
 
+    # VIZ must only observe. The static graph is re-executed every batch, so an export that
+    # optimized it in place stopped training; VIZ_LAUNCHED keeps the dashboard closed.
+    add_test(NAME test_static_train_loop_viz COMMAND test_static_train_loop)
+    set_tests_properties(test_static_train_loop_viz PROPERTIES
+        ENVIRONMENT "VIZ=1;VIZ_LAUNCHED=1")
+
     # The mock-driver suites simulate Linux kernel GPU/DSP driver interfaces
     # (NVIDIA ioctls, AMD KFD, HIP, Hexagon FastRPC) and link Linux-only
     # backend sources, so they only build on Linux.

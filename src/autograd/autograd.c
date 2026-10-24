@@ -500,12 +500,6 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
     }
 
     if (cml_viz_enabled()) {
-        /* Hold the graph directly: cml_ir_optimize() below clears BOTH
-         * tensor->ir_context and tensor->ir_node (optimization rewrites and
-         * frees nodes, so the tensor's handles would dangle). Reading them
-         * afterwards is what silently disabled this whole export -- graph.json
-         * failed with "no IR node" and the kernel analysis was skipped, so a
-         * training run produced an empty Kernel Studio. */
         CMLGraph_t viz_ir = tensor->ir_context;
 
         if (viz_ir) {
@@ -516,23 +510,27 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
             static uint64_t last_exported_hash = 0;
             uint64_t graph_hash                = cml_ir_graph_hash(viz_ir);
 
-            if (graph_hash != last_exported_hash) {
+            /* The optimizer rewrites in place, and its rewrites and DCE leave tensors
+             * nothing to compute them, so the dashboard's optimized graph comes from a
+             * copy: VIZ executes exactly the graph a run without it would. */
+            CMLGraph_t view = graph_hash != last_exported_hash ? cml_ir_view(viz_ir) : NULL;
+            if (view) {
                 last_exported_hash = graph_hash;
 
-                /* Unoptimized view first -- it must be captured before the
+                /* Unoptimized analysis first -- it must be captured before the
                  * optimizer removes dead code and folds fusion groups. */
-                char* kernel_json_raw = cml_ir_export_kernel_analysis(viz_ir, false);
+                char* kernel_json_raw = cml_ir_export_kernel_analysis(view, false);
 
                 /* Capture every rule firing during optimize for the rewrite
                  * stepper, fresh per exported graph. */
                 cml_rewrite_trace_reset();
-                cml_ir_optimize(viz_ir);
+                cml_ir_optimize(view);
 
                 /* Post-optimization: dead/fused flags are now populated, which
-                 * is what the graph view colours by. Exported from the graph
-                 * rather than the tensor, whose handles optimize just cleared. */
-                char* kernel_json_opt = cml_ir_export_kernel_analysis(viz_ir, true);
-                char* graph_json      = cml_ir_export_graph_json(viz_ir);
+                 * is what the graph view colours by. */
+                char* kernel_json_opt = cml_ir_export_kernel_analysis(view, true);
+                char* graph_json      = cml_ir_export_graph_json(view);
+                cml_ir_free(view);
 
                 if (graph_json) {
                     FILE* gf = fopen("graph.json", "w");
@@ -568,11 +566,6 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
                     }
                     cml_free(rewrites_json);
                 }
-            } else {
-                /* Same graph as last time: skip the export but keep the
-                 * optimization, so execution below behaves identically whether
-                 * or not this step happened to export. */
-                cml_ir_optimize(viz_ir);
             }
 
             tensor_ensure_executed(tensor);
