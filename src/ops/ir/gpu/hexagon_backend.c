@@ -11,7 +11,6 @@ typedef int (*remote_handle_open_fn)(const char* name, uint32_t* handle);
 typedef int (*remote_handle_invoke_fn)(uint32_t handle, uint32_t method_id, void* args, int nargs);
 typedef int (*remote_handle_close_fn)(uint32_t handle);
 
-static void* s_dsp_lib                                 = NULL;
 static remote_handle_open_fn fn_remote_handle_open     = NULL;
 static remote_handle_invoke_fn fn_remote_handle_invoke = NULL;
 static remote_handle_close_fn fn_remote_handle_close   = NULL;
@@ -110,7 +109,6 @@ int cml_hexagon_backend_init(CMLHexagonBackend* backend) {
     backend->has_hmx     = (backend->dsp_version >= 73);
     backend->handle      = lib;
     backend->initialized = true;
-    s_dsp_lib            = lib;
 
     LOG_INFO("Hexagon backend initialized: DSP V%d, HVX %d-byte, HMX=%s", backend->dsp_version,
              backend->hvx_length, backend->has_hmx ? "yes" : "no");
@@ -132,7 +130,6 @@ void cml_hexagon_backend_free(CMLHexagonBackend* backend) {
     if (backend->handle) {
         CML_DLCLOSE(backend->handle);
         backend->handle         = NULL;
-        s_dsp_lib               = NULL;
         fn_remote_handle_open   = NULL;
         fn_remote_handle_invoke = NULL;
         fn_remote_handle_close  = NULL;

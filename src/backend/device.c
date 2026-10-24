@@ -64,16 +64,12 @@ typedef int (*cudaGetDeviceCount_fn)(int*);
 typedef int (*cudaMalloc_fn)(void**, size_t);
 typedef int (*cudaFree_fn)(void*);
 typedef int (*cudaMemcpy_fn)(void*, const void*, size_t, int);
-typedef int (*cudaDeviceSynchronize_fn)(void);
-typedef int (*cudaMemGetInfo_fn)(size_t*, size_t*);
 
 static cudaRuntimeGetVersion_fn cudaRuntimeGetVersion = NULL;
 static cudaGetDeviceCount_fn cudaGetDeviceCount       = NULL;
 static cudaMalloc_fn cudaMalloc                       = NULL;
 static cudaFree_fn cudaFree                           = NULL;
 static cudaMemcpy_fn cudaMemcpy                       = NULL;
-static cudaDeviceSynchronize_fn cudaDeviceSynchronize = NULL;
-static cudaMemGetInfo_fn cudaMemGetInfo               = NULL;
 static void* g_cuda_lib                               = NULL;
 
 #define cudaMemcpyHostToDevice 1
@@ -83,15 +79,11 @@ static void* g_cuda_lib                               = NULL;
 typedef int (*hipMalloc_fn)(void**, size_t);
 typedef int (*hipFree_fn)(void*);
 typedef int (*hipMemcpy_fn)(void*, const void*, size_t, int);
-typedef int (*hipDeviceSynchronize_fn)(void);
-typedef int (*hipMemGetInfo_fn)(size_t*, size_t*);
 
-static hipMalloc_fn hipMalloc                       = NULL;
-static hipFree_fn hipFree                           = NULL;
-static hipMemcpy_fn hipMemcpy                       = NULL;
-static hipDeviceSynchronize_fn hipDeviceSynchronize = NULL;
-static hipMemGetInfo_fn hipMemGetInfo               = NULL;
-static void* g_rocm_lib                             = NULL;
+static hipMalloc_fn hipMalloc = NULL;
+static hipFree_fn hipFree     = NULL;
+static hipMemcpy_fn hipMemcpy = NULL;
+static void* g_rocm_lib       = NULL;
 
 #define hipMemcpyHostToDevice 1
 #define hipMemcpyDeviceToHost 2
@@ -127,9 +119,6 @@ static bool try_load_cuda(void) {
     cudaMalloc = (cudaMalloc_fn)(uintptr_t)CML_DLSYM(g_cuda_lib, "cudaMalloc");
     cudaFree   = (cudaFree_fn)(uintptr_t)CML_DLSYM(g_cuda_lib, "cudaFree");
     cudaMemcpy = (cudaMemcpy_fn)(uintptr_t)CML_DLSYM(g_cuda_lib, "cudaMemcpy");
-    cudaDeviceSynchronize =
-        (cudaDeviceSynchronize_fn)(uintptr_t)CML_DLSYM(g_cuda_lib, "cudaDeviceSynchronize");
-    cudaMemGetInfo = (cudaMemGetInfo_fn)(uintptr_t)CML_DLSYM(g_cuda_lib, "cudaMemGetInfo");
 
     if (!cudaRuntimeGetVersion || !cudaGetDeviceCount) {
         CML_DLCLOSE(g_cuda_lib);
@@ -225,9 +214,6 @@ static bool try_load_rocm(void) {
     hipMalloc = (hipMalloc_fn)(uintptr_t)CML_DLSYM(g_rocm_lib, "hipMalloc");
     hipFree   = (hipFree_fn)(uintptr_t)CML_DLSYM(g_rocm_lib, "hipFree");
     hipMemcpy = (hipMemcpy_fn)(uintptr_t)CML_DLSYM(g_rocm_lib, "hipMemcpy");
-    hipDeviceSynchronize =
-        (hipDeviceSynchronize_fn)(uintptr_t)CML_DLSYM(g_rocm_lib, "hipDeviceSynchronize");
-    hipMemGetInfo = (hipMemGetInfo_fn)(uintptr_t)CML_DLSYM(g_rocm_lib, "hipMemGetInfo");
 
     if (hipMalloc && hipFree && hipMemcpy) {
         LOG_INFO("ROCm library loaded successfully");

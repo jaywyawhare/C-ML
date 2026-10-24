@@ -182,10 +182,10 @@ static bool test_bad_args(void) {
 static bool test_p2p_query_is_reflexive(void) {
     /* A device is trivially reachable from itself; the query must not crash on
      * out-of-range ids either. */
-    bool self = devices_p2p_capable(0, 0);
+    (void)devices_p2p_capable(0, 0); /* value is backend-dependent; the call must be safe */
     (void)devices_p2p_capable(0, 99);
     (void)devices_p2p_capable(-1, 0);
-    return self || !self; /* value is backend-dependent; the call must be safe */
+    return true;
 }
 
 int main(void) {

@@ -482,8 +482,6 @@ static Tensor* execute_cached_forward(Sequential* seq, Tensor* input) {
     return output;
 }
 
-static int g_sequential_depth = 0;
-
 /** True if the fast path is valid and its recorded input shape matches `input`. */
 static bool fast_path_shapes_match(SequentialFastPath* fp, Tensor* input) {
     if (!fp || !fp->valid || !input)
@@ -527,7 +525,6 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
         LOG_WARNING("Cached execution failed, rebuilding graph");
         sequential_invalidate_cache(seq);
     }
-    g_sequential_depth++;
 
     Tensor* output = input;
     for (int i = 0; i < seq->num_modules; i++) {
@@ -546,8 +543,6 @@ static Tensor* sequential_forward(Module* module, Tensor* input) {
 
         output = next_output;
     }
-
-    g_sequential_depth--;
 
     /* Ensure the output data is materialized before returning. */
     if (output && output != input) {

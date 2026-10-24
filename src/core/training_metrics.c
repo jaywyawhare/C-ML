@@ -22,10 +22,7 @@
  * exact same behavior as before. */
 static __thread TrainingMetrics* g_global_metrics = NULL;
 static __thread size_t g_current_epoch            = 0;
-static __thread int g_optimizer_step_count        = 0;
-static __thread int g_last_epoch_step_count       = 0;
 static __thread double g_epoch_start_time         = 0.0;
-static __thread float g_last_loss                 = 0.0f;
 static __thread bool g_epoch_in_progress          = false;
 static __thread bool g_zero_grad_called           = false;
 static __thread Module* g_current_model           = NULL;
@@ -1377,7 +1374,6 @@ void training_metrics_auto_capture_loss(Tensor* loss_tensor) {
 
         if (g_current_epoch < g_global_metrics->num_epochs) {
             g_global_metrics->epoch_training_losses[g_current_epoch] = loss_value;
-            g_last_loss                                              = loss_value;
             if (g_current_epoch == 0 || loss_value < g_global_metrics->best_loss ||
                 fabsf(g_global_metrics->best_loss) < 1e-6f) {
                 g_global_metrics->best_loss = loss_value;
@@ -1441,10 +1437,7 @@ void training_metrics_init_global(void) {
     g_global_metrics = training_metrics_create(100);
     if (g_global_metrics) {
         g_current_epoch         = 0;
-        g_optimizer_step_count  = 0;
-        g_last_epoch_step_count = 0;
         g_epoch_start_time      = 0;
-        g_last_loss             = 0.0f;
         g_epoch_in_progress     = false;
         g_current_model         = NULL;
         g_architecture_exported = false;
@@ -1602,10 +1595,7 @@ void training_metrics_cleanup_global(void) {
         training_metrics_free(g_global_metrics);
         g_global_metrics        = NULL;
         g_current_epoch         = 0;
-        g_optimizer_step_count  = 0;
-        g_last_epoch_step_count = 0;
         g_epoch_start_time      = 0;
-        g_last_loss             = 0.0f;
         g_epoch_in_progress     = false;
         g_current_model         = NULL;
         g_architecture_exported = false;
