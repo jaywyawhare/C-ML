@@ -1163,8 +1163,8 @@ static void rmsprop_step(Optimizer* optimizer) {
         float alpha           = group->beta1; // Reuse beta1 for alpha (decay rate)
         float epsilon         = group->epsilon;
 
-        RMSpropState** states = (RMSpropState**)optim_ensure_state(
-            group, sizeof(RMSpropState), rmsprop_state_init, "RMSprop");
+        RMSpropState** states = (RMSpropState**)optim_ensure_state(group, sizeof(RMSpropState),
+                                                                   rmsprop_state_init, "RMSprop");
         if (!states)
             continue;
 
@@ -1210,8 +1210,8 @@ static void adagrad_step(Optimizer* optimizer) {
         float weight_decay    = group->weight_decay;
         float epsilon         = group->epsilon;
 
-        AdagradState** states = (AdagradState**)optim_ensure_state(
-            group, sizeof(AdagradState), adagrad_state_init, "Adagrad");
+        AdagradState** states = (AdagradState**)optim_ensure_state(group, sizeof(AdagradState),
+                                                                   adagrad_state_init, "Adagrad");
         if (!states)
             continue;
 
