@@ -217,6 +217,10 @@ Tensor* tensor_einsum(const char* equation, Tensor** tensors, int num_tensors) {
     int start = 0;
     for (int i = 0; i <= lhs_len; i++) {
         if (i == lhs_len || lhs[i] == ',') {
+            if (num_inputs == 16) {
+                LOG_ERROR("tensor_einsum: more than 16 operands");
+                return NULL;
+            }
             input_strs[num_inputs] = lhs + start;
             input_lens[num_inputs] = i - start;
             num_inputs++;
