@@ -876,7 +876,6 @@ void cml_ir_free_node_params(struct IRNode* node) {
     node->params = NULL;
 }
 
-static void free_ir_node(struct IRNode* node);
 /** Drop one reference to @p node, releasing its storage and the node when it hits zero. */
 static void free_ir_node(struct IRNode* node) {
     if (!node)
@@ -981,6 +980,22 @@ void cml_ir_release_node_storage(struct IRNode* node) {
     }
 
     cml_ir_free_node_params(node);
+}
+
+/** Free @p node after it was unlinked from @p ir: drop it from the CSE table (it keys on node
+ *  identity, so a stale entry is dereferenced by the next lookup), detach any output tensor
+ *  still bound to it, and release everything it owns. */
+void cml_ir_destroy_node(CMLGraph_t ir, struct IRNode* node) {
+    if (!node)
+        return;
+    if (node->output) {
+        node->output->ir_node    = NULL;
+        node->output->ir_context = NULL;
+    }
+    if (ir)
+        cml_intern_remove(ir->intern_table, node);
+    cml_ir_release_node_storage(node);
+    cml_free(node);
 }
 
 /* Pointers destroyed by the output phases of cml_ir_free.

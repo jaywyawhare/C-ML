@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdatomic.h>
 #include <time.h>
+#include "alloc/cml_allocator.h"
 
 /** Monotonic microsecond clock for per-match rewrite timing. */
 static double rw_now_us(void) {
@@ -18,7 +19,6 @@ static double rw_now_us(void) {
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1e6 + (double)ts.tv_nsec / 1e3;
 }
-#include "alloc/cml_allocator.h"
 
 /** Counter for generating unique output names for replacement nodes. */
 static atomic_int g_rewrite_counter = 0;
@@ -32,11 +32,6 @@ static char* rewrite_unique_name(void) {
     }
     return name;
 }
-
-/**
- * Find the IR node whose output_name matches @p name.
- * Linear scan over the graph's linked list.
- */
 
 /**
  * Record a capture in a CMLMatchResult.
@@ -63,7 +58,7 @@ static int record_capture(CMLMatchResult* result, const char* name, struct IRNod
 }
 
 /** Recursively test whether @p pattern matches @p node, recording captures into @p result. */
-static bool match_node(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNode* node,
+bool cml_pattern_match(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNode* node,
                        CMLMatchResult* result) {
     if (!pattern || !node)
         return false;
@@ -101,7 +96,7 @@ static bool match_node(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNo
             if (!producer)
                 return false;
 
-            if (!match_node(ir, pattern->inputs[i], producer, result))
+            if (!cml_pattern_match(ir, pattern->inputs[i], producer, result))
                 return false;
         }
         return true;
@@ -110,41 +105,6 @@ static bool match_node(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNo
     default:
         return false;
     }
-}
-
-/**
- * Remove @p node from the linked list (does NOT free it).
- */
-
-/**
- * Free an IRNode that has been unlinked from the graph.
- * Only frees the node-level bookkeeping (names, etc.), not
- * deep resources like tensor data or broadcast info.
- */
-/* `ir` is needed only to drop the node from the CSE table: the table keys on
- * node identity, so freeing a node that is still interned leaves a dangling
- * entry for the next lookup to dereference. */
-static void free_unlinked_node(CMLGraph_t ir, struct IRNode* node) {
-    if (!node)
-        return;
-
-    if (node->input_names) {
-        for (int i = 0; i < node->num_inputs; i++) {
-            cml_free(node->input_names[i]);
-        }
-        cml_free(node->input_names);
-    }
-    cml_free(node->output_name);
-    cml_free(node->users);
-
-    /* Clear tensor's back-pointer to avoid dangling refs. */
-    if (node->output) {
-        node->output->ir_node    = NULL;
-        node->output->ir_context = NULL;
-    }
-
-    cml_intern_remove(ir->intern_table, node);
-    cml_free(node);
 }
 
 /** Build an OP pattern node matching @p type with @p num_inputs sub-patterns. */
@@ -276,6 +236,38 @@ int cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pattern, CMLEm
     return 0;
 }
 
+/** Run @p rule's emitter on @p match and splice the replacement in for the matched root, which
+ *  is freed along with its output tensor binding. Returns true if the graph changed. */
+bool cml_rewrite_fire(CMLGraph_t ir, const CMLRewriteRule* rule, const CMLMatchResult* match) {
+    struct IRNode* node        = match->matched_root;
+    bool trace                 = cml_rewrite_trace_enabled();
+    const char* from_name      = trace ? node->output_name : NULL;
+    const char* op_name        = trace ? uop_type_to_string(node->type) : NULL;
+    double t0                  = trace ? rw_now_us() : 0.0;
+    struct IRNode* replacement = rule->emit(ir, match);
+    if (!replacement || replacement == node)
+        return false;
+
+    if (!replacement->output_name)
+        replacement->output_name = rewrite_unique_name();
+    if (trace)
+        cml_rewrite_trace_record(rule->name, op_name, from_name, replacement->output_name,
+                                 rw_now_us() - t0);
+
+    struct IRNode* scan = ir->head;
+    while (scan && scan != replacement)
+        scan = scan->next;
+    if (!scan)
+        cml_ir_insert_before(ir, replacement, node);
+
+    if (node->output_name && replacement->output_name)
+        cml_ir_replace_refs(ir, node->output_name, replacement->output_name);
+
+    cml_ir_unlink_node(ir, node);
+    cml_ir_destroy_node(ir, node);
+    return true;
+}
+
 /** Apply registered rules to @p ir (automaton-accelerated when possible, else
  *  iterative linear matching); returns the total number of rewrites performed. */
 int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations) {
@@ -313,65 +305,10 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
                 memset(&result, 0, sizeof(result));
                 result.matched_root = node;
 
-                if (match_node(ir, rule->pattern, node, &result)) {
-                    /* Pattern matched -- invoke emit to produce a replacement. */
-                    bool trace                 = cml_rewrite_trace_enabled();
-                    const char* from_name      = trace ? node->output_name : NULL;
-                    const char* op_name        = trace ? uop_type_to_string(node->type) : NULL;
-                    double t0                  = trace ? rw_now_us() : 0.0;
-                    struct IRNode* replacement = rule->emit(ir, &result);
-
-                    if (replacement && replacement != node) {
-                        /* Give the replacement a unique output name if it
-                         * does not already have one. */
-                        if (!replacement->output_name) {
-                            replacement->output_name = rewrite_unique_name();
-                        }
-
-                        if (trace)
-                            cml_rewrite_trace_record(rule->name, op_name, from_name,
-                                                     replacement->output_name, rw_now_us() - t0);
-
-                        /* If the replacement node is not already in the
-                         * graph, insert it just before the matched node. */
-                        bool already_in_graph = false;
-                        {
-                            struct IRNode* scan = ir->head;
-                            while (scan) {
-                                if (scan == replacement) {
-                                    already_in_graph = true;
-                                    break;
-                                }
-                                scan = scan->next;
-                            }
-                        }
-                        if (!already_in_graph) {
-                            cml_ir_insert_before(ir, replacement, node);
-                        }
-
-                        /* Rewire all downstream references from the old
-                         * node's output to the replacement's output. */
-                        if (node->output_name && replacement->output_name) {
-                            cml_ir_replace_refs(ir, node->output_name, replacement->output_name);
-                        }
-
-                        /* If the old node had an output tensor, point it to
-                         * the replacement so lazy evaluation still works. */
-                        if (node->output && replacement->output) {
-                            node->output->ir_node    = replacement;
-                            node->output->ir_context = ir;
-                        }
-
-                        /* Unlink and free the old node. */
-                        cml_ir_unlink_node(ir, node);
-                        free_unlinked_node(ir, node);
-
-                        rewrites_this_pass++;
-                        matched = true;
-                    } else if (replacement == node) {
-                        /* Emit returned the same node -- no-op (pattern
-                         * matched but replacement is identity). */
-                    }
+                if (cml_pattern_match(ir, rule->pattern, node, &result) &&
+                    cml_rewrite_fire(ir, rule, &result)) {
+                    rewrites_this_pass++;
+                    matched = true;
                 }
             }
 
@@ -386,20 +323,6 @@ int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations
     }
 
     return total_rewrites;
-}
-
-/**
- * Return true if @p node is a UOP_FILL whose constant value equals @p value.
- */
-static bool is_fill_const(struct IRNode* node, float value) {
-    if (!node || node->type != UOP_FILL || !node->params)
-        return false;
-    FillParams* fp = (FillParams*)node->params;
-    /* Use a small epsilon for float comparison. */
-    float diff = fp->value - value;
-    if (diff < 0)
-        diff = -diff;
-    return diff < 1e-7f;
 }
 
 /** Create a standalone UOP_FILL node of @p value, taking its shape from @p shape_donor. */
@@ -426,16 +349,10 @@ static struct IRNode* make_fill_node(CMLGraph_t ir, float value, struct IRNode* 
 
     /* Copy shape from the shape_donor if available. */
     if (shape_donor && shape_donor->output_shape && shape_donor->output_ndim > 0) {
-        fp->ndim  = shape_donor->output_ndim;
-        fp->shape = cml_malloc((size_t)fp->ndim * sizeof(int));
-        if (fp->shape) {
-            memcpy(fp->shape, shape_donor->output_shape, (size_t)fp->ndim * sizeof(int));
-        }
-        node->output_shape = cml_malloc((size_t)fp->ndim * sizeof(int));
-        if (node->output_shape) {
-            memcpy(node->output_shape, shape_donor->output_shape, (size_t)fp->ndim * sizeof(int));
-        }
-        node->output_ndim = fp->ndim;
+        fp->ndim           = shape_donor->output_ndim;
+        fp->shape          = tensor_shape_copy(shape_donor->output_shape, fp->ndim);
+        node->output_shape = tensor_shape_copy(shape_donor->output_shape, fp->ndim);
+        node->output_ndim  = fp->ndim;
     } else {
         /* Scalar: shape = {1} */
         fp->ndim  = 1;
@@ -465,9 +382,9 @@ static struct IRNode* emit_mul_one(CMLGraph_t ir, const CMLMatchResult* m) {
     if (!lhs || !rhs)
         return NULL;
 
-    if (is_fill_const(rhs, 1.0f))
+    if (cml_pattern_match_const(rhs, 1.0f))
         return lhs;
-    if (is_fill_const(lhs, 1.0f))
+    if (cml_pattern_match_const(lhs, 1.0f))
         return rhs;
     return NULL;
 }
@@ -484,9 +401,9 @@ static struct IRNode* emit_add_zero(CMLGraph_t ir, const CMLMatchResult* m) {
     if (!lhs || !rhs)
         return NULL;
 
-    if (is_fill_const(rhs, 0.0f))
+    if (cml_pattern_match_const(rhs, 0.0f))
         return lhs;
-    if (is_fill_const(lhs, 0.0f))
+    if (cml_pattern_match_const(lhs, 0.0f))
         return rhs;
     return NULL;
 }
@@ -641,9 +558,9 @@ static struct IRNode* emit_mul_two(CMLGraph_t ir, const CMLMatchResult* m) {
 
     /* Check if either operand is FILL(2) */
     const char* x_name = NULL;
-    if (is_fill_const(rhs, 2.0f))
+    if (cml_pattern_match_const(rhs, 2.0f))
         x_name = root->input_names[0];
-    else if (is_fill_const(lhs, 2.0f))
+    else if (cml_pattern_match_const(lhs, 2.0f))
         x_name = root->input_names[1];
     if (!x_name)
         return NULL;
@@ -663,11 +580,8 @@ static struct IRNode* emit_mul_two(CMLGraph_t ir, const CMLMatchResult* m) {
     node->input_names[1] = cml_strdup(x_name);
     node->output_name    = rewrite_unique_name();
     node->output_ndim    = root->output_ndim;
-    if (root->output_shape && root->output_ndim > 0) {
-        node->output_shape = cml_malloc((size_t)root->output_ndim * sizeof(int));
-        if (node->output_shape)
-            memcpy(node->output_shape, root->output_shape, (size_t)root->output_ndim * sizeof(int));
-    }
+    if (root->output_shape && root->output_ndim > 0)
+        node->output_shape = tensor_shape_copy(root->output_shape, root->output_ndim);
     return node;
 }
 
@@ -681,7 +595,7 @@ static struct IRNode* emit_mul_zero(CMLGraph_t ir, const CMLMatchResult* m) {
     struct IRNode* rhs = cml_ir_find_by_output(ir, root->input_names[1]);
     if (!lhs || !rhs)
         return NULL;
-    if (!is_fill_const(rhs, 0.0f) && !is_fill_const(lhs, 0.0f))
+    if (!cml_pattern_match_const(rhs, 0.0f) && !cml_pattern_match_const(lhs, 0.0f))
         return NULL;
     return make_fill_node(ir, 0.0f, root);
 }
@@ -720,12 +634,8 @@ static struct IRNode* emit_div_const(CMLGraph_t ir, const CMLMatchResult* m) {
     mul_node->input_names[1] = cml_strdup(recip_node->output_name);
     mul_node->output_name    = rewrite_unique_name();
     mul_node->output_ndim    = root->output_ndim;
-    if (root->output_shape && root->output_ndim > 0) {
-        mul_node->output_shape = cml_malloc((size_t)root->output_ndim * sizeof(int));
-        if (mul_node->output_shape)
-            memcpy(mul_node->output_shape, root->output_shape,
-                   (size_t)root->output_ndim * sizeof(int));
-    }
+    if (root->output_shape && root->output_ndim > 0)
+        mul_node->output_shape = tensor_shape_copy(root->output_shape, root->output_ndim);
     return mul_node;
 }
 
@@ -996,7 +906,7 @@ int cml_rewrite_dce(CMLGraph_t ir) {
     for (int i = 0; i < count; i++) {
         if (!marked[i]) {
             cml_ir_unlink_node(ir, nodes[i]);
-            free_unlinked_node(ir, nodes[i]);
+            cml_ir_destroy_node(ir, nodes[i]);
             removed++;
         }
     }

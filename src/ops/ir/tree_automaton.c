@@ -1,23 +1,11 @@
 #include "ops/ir/tree_automaton.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/pattern_matcher.h"
-#include "ops/ir/rewrite_trace.h"
 #include "ops/uops.h"
-#include "core/logging.h"
 
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <stdatomic.h>
-#include <time.h>
 #include "alloc/cml_allocator.h"
-
-/** Monotonic microsecond clock for per-match rewrite timing. */
-static double aut_now_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (double)ts.tv_sec * 1e6 + (double)ts.tv_nsec / 1e3;
-}
 
 #define AUTOMATON_INITIAL_TABLE_CAP 256
 #define AUTOMATON_MAX_ARITY CML_PATTERN_MAX_INPUTS
@@ -377,85 +365,6 @@ static int compute_node_state(const CMLAutomaton* aut, struct IRNode* node, cons
     return transition_lookup(aut, key);
 }
 
-static atomic_int g_rewrite_counter = 0;
-
-/** Generate a fresh unique output name for a rewrite-emitted node (`_rwN`). */
-static char* rewrite_unique_name(void) {
-    int id     = atomic_fetch_add(&g_rewrite_counter, 1);
-    char* name = cml_malloc(32);
-    if (name)
-        snprintf(name, 32, "_rw%d", id);
-    return name;
-}
-
-/** Free a node already removed from the graph, clearing its output tensor back-pointers. */
-static void free_unlinked_node(struct IRNode* node) {
-    if (!node)
-        return;
-
-    if (node->input_names) {
-        for (int i = 0; i < node->num_inputs; i++)
-            cml_free(node->input_names[i]);
-        cml_free(node->input_names);
-    }
-    cml_free(node->output_name);
-    cml_free(node->users);
-
-    if (node->output) {
-        node->output->ir_node    = NULL;
-        node->output->ir_context = NULL;
-    }
-
-    cml_free(node);
-}
-
-/** Verify a pattern against an IR subtree, binding captures (with consistency checks). */
-static bool match_node_recursive(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNode* node,
-                                 CMLMatchResult* result) {
-    if (!pattern || !node)
-        return false;
-
-    switch (pattern->kind) {
-    case CML_PAT_ANY:
-        return true;
-    case CML_PAT_CONST:
-        return cml_pattern_match_const(node, pattern->const_val);
-    case CML_PAT_CAPTURE: {
-        if (!result)
-            return false;
-        if (result->num_captures >= CML_PATTERN_MAX_CAPTURES)
-            return false;
-        for (int i = 0; i < result->num_captures; i++) {
-            if (strcmp(result->captures[i].name, pattern->capture_name) == 0)
-                return (result->captures[i].node == node);
-        }
-        CMLCaptureEntry* e = &result->captures[result->num_captures];
-        snprintf(e->name, sizeof(e->name), "%s", pattern->capture_name);
-        e->node = node;
-        result->num_captures++;
-        return true;
-    }
-    case CML_PAT_OP: {
-        if (node->type != pattern->op_type)
-            return false;
-        if (pattern->num_inputs != node->num_inputs)
-            return false;
-        for (int i = 0; i < pattern->num_inputs; i++) {
-            if (!pattern->inputs[i])
-                return false;
-            struct IRNode* producer = cml_ir_find_by_output(ir, node->input_names[i]);
-            if (!producer)
-                return false;
-            if (!match_node_recursive(ir, pattern->inputs[i], producer, result))
-                return false;
-        }
-        return true;
-    }
-    default:
-        return false;
-    }
-}
-
 /* Drive rewriting to a fixpoint: bottom-up assign automaton states, then for accepting
  * states confirm the match and splice in each rule's replacement. Returns total rewrites. */
 int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
@@ -554,48 +463,9 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
                 memset(&result, 0, sizeof(result));
                 result.matched_root = node;
 
-                if (!match_node_recursive(graph, rule->pattern, node, &result))
+                if (!cml_pattern_match(graph, rule->pattern, node, &result) ||
+                    !cml_rewrite_fire(graph, rule, &result))
                     continue;
-
-                bool trace                 = cml_rewrite_trace_enabled();
-                const char* from_name      = trace ? node->output_name : NULL;
-                const char* op_name        = trace ? uop_type_to_string(node->type) : NULL;
-                double t0                  = trace ? aut_now_us() : 0.0;
-                struct IRNode* replacement = rule->emit(graph, &result);
-                if (!replacement || replacement == node)
-                    continue;
-
-                if (!replacement->output_name)
-                    replacement->output_name = rewrite_unique_name();
-
-                if (trace)
-                    cml_rewrite_trace_record(rule->name, op_name, from_name,
-                                             replacement->output_name, aut_now_us() - t0);
-
-                bool already_in_graph = false;
-                {
-                    struct IRNode* scan = graph->head;
-                    while (scan) {
-                        if (scan == replacement) {
-                            already_in_graph = true;
-                            break;
-                        }
-                        scan = scan->next;
-                    }
-                }
-                if (!already_in_graph)
-                    cml_ir_insert_before(graph, replacement, node);
-
-                if (node->output_name && replacement->output_name)
-                    cml_ir_replace_refs(graph, node->output_name, replacement->output_name);
-
-                if (node->output && replacement->output) {
-                    node->output->ir_node    = replacement;
-                    node->output->ir_context = graph;
-                }
-
-                cml_ir_unlink_node(graph, node);
-                free_unlinked_node(node);
                 topo[i] = NULL;
 
                 rewrites_this_pass++;

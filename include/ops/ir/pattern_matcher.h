@@ -67,6 +67,9 @@ CMLPatternNode* cml_pattern_any(void);
 CMLPatternNode* cml_pattern_const(float value);
 /* True if @p node is a UOP_FILL whose value equals @p value (shared by both matchers). */
 bool cml_pattern_match_const(const struct IRNode* node, float value);
+/* Match @p pattern rooted at @p node, binding captures into @p result (shared by both matchers). */
+bool cml_pattern_match(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNode* node,
+                       CMLMatchResult* result);
 void cml_pattern_free(CMLPatternNode* node);
 
 CMLRewriteRegistry* cml_rewrite_registry_create(void);
@@ -74,6 +77,9 @@ void cml_rewrite_registry_free(CMLRewriteRegistry* reg);
 
 int cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pattern, CMLEmitFn emit,
                          int priority, const char* name);
+/* Emit @p rule's replacement for a match and splice it in place of the matched root (shared by
+   both matchers). Returns true if the graph changed. */
+bool cml_rewrite_fire(CMLGraph_t ir, const CMLRewriteRule* rule, const CMLMatchResult* match);
 
 /* Apply all rewrite rules until convergence.
    Returns number of rewrites applied, or -1 on error. */

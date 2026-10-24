@@ -15,7 +15,6 @@
  */
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
-#include "ops/ir/intern.h"
 #include "ops/uops.h"
 #include "tensor/tensor.h"
 #include "core/logging.h"
@@ -386,9 +385,8 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
         int ond  = root->output ? root->output->ndim : root->output_ndim;
         int* osh = root->output ? root->output->shape : root->output_shape;
         if (osh && ond > 0) {
-            fnode->output_shape = cml_malloc((size_t)ond * sizeof(int));
-            memcpy(fnode->output_shape, osh, (size_t)ond * sizeof(int));
-            fnode->output_ndim = ond;
+            fnode->output_shape = tensor_shape_copy(osh, ond);
+            fnode->output_ndim  = ond;
         }
         fnode->requires_grad = root->requires_grad;
 
@@ -446,12 +444,7 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
                 cml_ir_adopt_detached(ir, cnode->output);
                 cnode->output = NULL;
             }
-            /* Leave the CSE table before the memory goes: it keys on node
-             * identity, so a fused-away node left interned is dereferenced by
-             * the next lookup that probes its slot. */
-            cml_intern_remove(ir->intern_table, cnode);
-            cml_ir_release_node_storage(cnode);
-            cml_free(cnode);
+            cml_ir_destroy_node(ir, cnode);
             cnode = nx;
         }
 
@@ -459,9 +452,7 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
          * never visited it - free its orphaned shell here. Its output tensor was
          * transferred to fnode, so NULL it first. */
         root->output = NULL;
-        cml_intern_remove(ir->intern_table, root);
-        cml_ir_release_node_storage(root);
-        cml_free(root);
+        cml_ir_destroy_node(ir, root);
 
         ir->node_count -= (m - 1);
         fused_count++;
@@ -633,17 +624,8 @@ int cml_ir_fuse_matmul_epilogue(CMLGraph_t ir) {
         M->output = F->output;
         if (M->output)
             M->output->ir_node = M;
-        if (M->output_shape) {
-            cml_free(M->output_shape);
-            M->output_shape = NULL;
-        }
-        if (F->output_shape && F->output_ndim > 0) {
-            M->output_shape = cml_malloc((size_t)F->output_ndim * sizeof(int));
-            if (M->output_shape) {
-                memcpy(M->output_shape, F->output_shape, (size_t)F->output_ndim * sizeof(int));
-                M->output_ndim = F->output_ndim;
-            }
-        }
+        cml_ir_set_output_shape(M, F->output_shape, F->output_ndim);
+        F->output_shape = NULL;
 
         /* Unlink + free F's shell (its output was transferred to M). */
         struct IRNode* prev = NULL;
@@ -656,16 +638,7 @@ int cml_ir_fuse_matmul_epilogue(CMLGraph_t ir) {
         if (ir->tail == F)
             ir->tail = prev;
         F->output = NULL;
-        if (F->input_names) {
-            for (int k = 0; k < F->num_inputs; k++)
-                cml_free(F->input_names[k]);
-            cml_free(F->input_names);
-        }
-        cml_free(F->inputs);
-        cml_free(F->output_name);
-        cml_free(F->output_shape);
-        cml_ir_free_node_params(F);
-        cml_free(F);
+        cml_ir_destroy_node(ir, F);
 
         ir->node_count -= 1;
         fused++;

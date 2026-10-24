@@ -2,7 +2,6 @@
 
 #include "ops/ir/decompose.h"
 #include "ops/ir/internal.h"
-#include "ops/ir/intern.h"
 #include "ops/uops.h"
 #include "tensor/tensor.h"
 #include "autograd/autograd.h"
@@ -109,11 +108,8 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type, Tensor*
     node->next        = NULL;
 
     if (out_shape && out_ndim > 0) {
-        node->output_shape = cml_malloc((size_t)out_ndim * sizeof(int));
-        if (node->output_shape) {
-            memcpy(node->output_shape, out_shape, (size_t)out_ndim * sizeof(int));
-        }
-        node->output_ndim = out_ndim;
+        node->output_shape = tensor_shape_copy(out_shape, out_ndim);
+        node->output_ndim  = out_ndim;
     }
 
     // Autograd: inherit requires_grad from inputs
@@ -143,15 +139,9 @@ static struct IRNode* create_primitive_node(CMLGraph_t ir, UOpType type, Tensor*
     node->output           = out_tensor;
 
     if (out_shape && out_ndim > 0) {
-        out_tensor->shape = cml_malloc((size_t)out_ndim * sizeof(int));
-        if (out_tensor->shape) {
-            memcpy(out_tensor->shape, out_shape, (size_t)out_ndim * sizeof(int));
-        }
-        out_tensor->ndim = out_ndim;
-        size_t numel     = 1;
-        for (int i = 0; i < out_ndim; i++)
-            numel *= (size_t)out_shape[i];
-        out_tensor->numel = numel;
+        out_tensor->shape = tensor_shape_copy(out_shape, out_ndim);
+        out_tensor->ndim  = out_ndim;
+        out_tensor->numel = tensor_numel(out_shape, out_ndim);
     }
 
     /* Device from the first input. Dtype follows the same promotion as
@@ -302,16 +292,9 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
 
     ir->node_count += (chain_len - 1);
 
-    /* Drop the node from the CSE table before freeing it. The table keys on
-     * node identity, so a freed node left behind is dereferenced by the next
-     * lookup that probes its slot -- a use-after-free that surfaced as a
-     * mis-compare in entries_match_ex rather than as a crash. */
-    cml_intern_remove(ir->intern_table, original);
-
-    // Free the original node (but NOT its output tensor - we kept it)
+    /* The output tensor now belongs to chain_tail. */
     original->output = NULL;
-    cml_ir_release_node_storage(original);
-    cml_free(original);
+    cml_ir_destroy_node(ir, original);
 }
 
 /**

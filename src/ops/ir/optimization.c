@@ -3,7 +3,6 @@
 #include "ops/ir/pattern_matcher.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/rewrite_trace.h"
-#include "ops/ir/intern.h"
 #include "core/logging.h"
 #include "core/cml_flags.h"
 #include "ops/ir/z3_verify.h"
@@ -162,19 +161,7 @@ static int remove_dead_nodes(CMLGraph_t ir) {
                 ir->tail = prev;
             }
 
-            /* Clear back-pointer before freeing to prevent dangling refs */
-            if (node->output) {
-                node->output->ir_node    = NULL;
-                node->output->ir_context = NULL;
-            }
-
-            /* Same reason as decompose: a dead node must leave the CSE table
-             * before its memory goes, or a later lookup probes a freed node. */
-            cml_intern_remove(ir->intern_table, node);
-            /* Canonical teardown - the hand-rolled field list this used to
-             * duplicate leaked params/scope/build_stack/input_shapes. */
-            cml_ir_release_node_storage(node);
-            cml_free(node);
+            cml_ir_destroy_node(ir, node);
 
             ir->node_count--;
         } else {

@@ -155,9 +155,7 @@ static struct IRNode* create_pad_node(struct IRNode* src_node, const char* src_n
     pad->input_names[0] = cml_strdup(src_name);
     pad->output_name    = tc_unique_name();
     pad->output_ndim    = ndim;
-    pad->output_shape   = cml_malloc((size_t)ndim * sizeof(int));
-    if (pad->output_shape)
-        memcpy(pad->output_shape, padded_shape, (size_t)ndim * sizeof(int));
+    pad->output_shape   = tensor_shape_copy(padded_shape, ndim);
 
     (void)src_node;
     return pad;
@@ -183,9 +181,7 @@ static struct IRNode* create_wmma_node(const char* a_name, const char* b_name, i
     wmma->input_names[1] = cml_strdup(b_name);
     wmma->output_name    = tc_unique_name();
     wmma->output_ndim    = output_ndim;
-    wmma->output_shape   = cml_malloc((size_t)output_ndim * sizeof(int));
-    if (wmma->output_shape)
-        memcpy(wmma->output_shape, output_shape, (size_t)output_ndim * sizeof(int));
+    wmma->output_shape   = tensor_shape_copy(output_shape, output_ndim);
 
     WMMAConfig* cfg = cml_calloc(1, sizeof(WMMAConfig));
     if (cfg) {
@@ -194,26 +190,6 @@ static struct IRNode* create_wmma_node(const char* a_name, const char* b_name, i
     }
 
     return wmma;
-}
-
-/** Free an IR node and all its owned storage, clearing any output tensor back-pointers. */
-static void free_node(struct IRNode* node) {
-    if (!node)
-        return;
-    if (node->input_names) {
-        for (int i = 0; i < node->num_inputs; i++)
-            cml_free(node->input_names[i]);
-        cml_free(node->input_names);
-    }
-    cml_free(node->output_name);
-    cml_free(node->output_shape);
-    cml_free(node->params);
-    cml_free(node->users);
-    if (node->output) {
-        node->output->ir_node    = NULL;
-        node->output->ir_context = NULL;
-    }
-    cml_free(node);
 }
 
 /* Replace a plain MATMUL with a padded WMMA node (plus pad/shrink nodes when the dims
@@ -297,9 +273,8 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
     cml_ir_insert_before(ir, wmma, node);
 
     if (needs_pad && node->output_shape) {
-        int* slice_shape = cml_malloc((size_t)out_ndim * sizeof(int));
+        int* slice_shape = tensor_shape_copy(node->output_shape, out_ndim);
         if (slice_shape) {
-            memcpy(slice_shape, node->output_shape, (size_t)out_ndim * sizeof(int));
             struct IRNode* slice = cml_calloc(1, sizeof(struct IRNode));
             if (slice) {
                 slice->type        = UOP_SHRINK;
@@ -314,10 +289,6 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
 
                     if (node->output_name)
                         cml_ir_replace_refs(ir, node->output_name, slice->output_name);
-                    if (node->output && slice->output_name) {
-                        node->output->ir_node    = slice;
-                        node->output->ir_context = ir;
-                    }
                 } else {
                     cml_free(slice_shape);
                     cml_free(slice);
@@ -326,17 +297,12 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
                 cml_free(slice_shape);
             }
         }
-    } else {
-        if (node->output_name)
-            cml_ir_replace_refs(ir, node->output_name, wmma->output_name);
-        if (node->output) {
-            node->output->ir_node    = wmma;
-            node->output->ir_context = ir;
-        }
+    } else if (node->output_name) {
+        cml_ir_replace_refs(ir, node->output_name, wmma->output_name);
     }
 
     cml_ir_unlink_node(ir, node);
-    free_node(node);
+    cml_ir_destroy_node(ir, node);
 
     LOG_DEBUG("TC opt: rewrote MATMUL [%d,%d,%d] -> WMMA [%d,%d,%d]", m, n, k, pm, pn, pk);
     return 1;
