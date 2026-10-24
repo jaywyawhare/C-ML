@@ -248,6 +248,7 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
         /* step index of each member = its position in `members` (topo). */
         /* Build external input list + operand refs. */
         Tensor* ext[32];
+        const char* ext_name[32];
         int num_ext  = 0;
         UOpType* ops = cml_malloc((size_t)m * sizeof(UOpType));
         int* aa      = cml_malloc((size_t)m * sizeof(int));
@@ -312,8 +313,9 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
                                 ok = 0;
                                 break;
                             }
-                            idx            = num_ext;
-                            ext[num_ext++] = in;
+                            idx               = num_ext;
+                            ext_name[num_ext] = nd->input_names ? nd->input_names[k] : NULL;
+                            ext[num_ext++]    = in;
                         }
                         ref[k] = idx;
                     }
@@ -380,10 +382,16 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
         fnode->params      = fp;
         fnode->inputs      = cml_malloc((size_t)num_ext * sizeof(Tensor*));
         fnode->input_names = cml_calloc((size_t)num_ext, sizeof(char*));
-        for (int e = 0; e < num_ext; e++)
+        for (int e = 0; e < num_ext; e++) {
             fnode->inputs[e] = ext[e];
-        int ond  = root->output ? root->output->ndim : root->output_ndim;
-        int* osh = root->output ? root->output->shape : root->output_shape;
+            if (fnode->input_names && ext_name[e])
+                fnode->input_names[e] = cml_strdup(ext_name[e]);
+        }
+        /* fnode stands in for root, so consumers that name root now name fnode. */
+        fnode->output_name = root->output_name;
+        root->output_name  = NULL;
+        int ond            = root->output ? root->output->ndim : root->output_ndim;
+        int* osh           = root->output ? root->output->shape : root->output_shape;
         if (osh && ond > 0) {
             fnode->output_shape = tensor_shape_copy(osh, ond);
             fnode->output_ndim  = ond;
@@ -626,6 +634,9 @@ int cml_ir_fuse_matmul_epilogue(CMLGraph_t ir) {
             M->output->ir_node = M;
         cml_ir_set_output_shape(M, F->output_shape, F->output_ndim);
         F->output_shape = NULL;
+        cml_free(M->output_name);
+        M->output_name = F->output_name;
+        F->output_name = NULL;
 
         /* Unlink + free F's shell (its output was transferred to M). */
         struct IRNode* prev = NULL;
