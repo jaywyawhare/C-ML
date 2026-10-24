@@ -107,7 +107,7 @@ bool pb_read_field(PBReader* reader, PBField* field) {
 
     case PB_WIRE_LEN: {
         uint64_t len = pb_read_varint(reader);
-        if (reader->pos + len > reader->length) {
+        if (len > reader->length - reader->pos) {
             reader->pos = reader->length;
             return false;
         }
@@ -159,22 +159,4 @@ bool pb_reader_has_data(const PBReader* reader) {
     if (!reader)
         return false;
     return reader->pos < reader->length;
-}
-
-/** No-op skip: pb_read_field already consumed the value; here for caller clarity. */
-void pb_skip_field(PBReader* reader, const PBField* field) {
-    if (!reader || !field)
-        return;
-
-    /*
-     * After pb_read_field() the reader position has already been advanced
-     * past the field value for all wire types we handle (varint, fixed32,
-     * fixed64, LEN).  There is nothing more to skip -- this function is
-     * provided for explicitness in calling code.
-     *
-     * Wire types 3/4 (start/end group, deprecated) require recursion,
-     * but ONNX never uses groups.
-     */
-    (void)reader;
-    (void)field;
 }

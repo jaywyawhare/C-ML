@@ -52,7 +52,6 @@ PBReader pb_reader_sub(const PBField* field);
 const char* pb_field_string(const PBField* field, size_t* out_len);
 
 bool pb_reader_has_data(const PBReader* reader);
-void pb_skip_field(PBReader* reader, const PBField* field);
 
 #ifdef __cplusplus
 }

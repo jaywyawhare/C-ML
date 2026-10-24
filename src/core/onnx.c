@@ -1,6 +1,7 @@
 #include "core/onnx.h"
 #include "core/protobuf_mini.h"
 #include "core/logging.h"
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,34 +36,33 @@ static char* dup_pb_string(const PBField* field) {
     return s;
 }
 
+/* ONNX TensorProto.DataType ids and the CML dtypes that share their byte layout. */
+static const struct {
+    int onnx;
+    DType dtype;
+} ONNX_DTYPES[] = {
+    {1, DTYPE_FLOAT32},   {2, DTYPE_UINT8},    {3, DTYPE_INT8},    {4, DTYPE_UINT16},
+    {5, DTYPE_INT16},     {6, DTYPE_INT32},    {7, DTYPE_INT64},   {9, DTYPE_BOOL},
+    {10, DTYPE_FLOAT16},  {11, DTYPE_FLOAT64}, {12, DTYPE_UINT32}, {13, DTYPE_UINT64},
+    {16, DTYPE_BFLOAT16},
+};
+
+#define ONNX_DTYPE_COUNT (sizeof(ONNX_DTYPES) / sizeof(ONNX_DTYPES[0]))
+
 /** Map an ONNX TensorProto.DataType enum to the CML DType; defaults to FLOAT32. */
 static DType onnx_dtype_to_cml(int onnx_dtype) {
-    switch (onnx_dtype) {
-    case 1:
-        return DTYPE_FLOAT32; /* FLOAT  */
-    case 2:
-        return DTYPE_UINT8; /* UINT8  */
-    case 3:
-        return DTYPE_INT8; /* INT8   */
-    case 5:
-        return DTYPE_INT16; /* INT16  */
-    case 6:
-        return DTYPE_INT32; /* INT32  */
-    case 7:
-        return DTYPE_INT64; /* INT64  */
-    case 10:
-        return DTYPE_FLOAT16; /* FLOAT16 */
-    case 11:
-        return DTYPE_FLOAT64; /* DOUBLE */
-    case 12:
-        return DTYPE_UINT32; /* UINT32 */
-    case 13:
-        return DTYPE_UINT64; /* UINT64 */
-    case 16:
-        return DTYPE_BFLOAT16; /* BFLOAT16 */
-    default:
-        return DTYPE_FLOAT32;
-    }
+    for (size_t i = 0; i < ONNX_DTYPE_COUNT; i++)
+        if (ONNX_DTYPES[i].onnx == onnx_dtype)
+            return ONNX_DTYPES[i].dtype;
+    return DTYPE_FLOAT32;
+}
+
+/** ONNX TensorProto.DataType for @p dtype, or 0 when ONNX has no equivalent. */
+int cml_onnx_elem_type(DType dtype) {
+    for (size_t i = 0; i < ONNX_DTYPE_COUNT; i++)
+        if (ONNX_DTYPES[i].dtype == dtype)
+            return ONNX_DTYPES[i].onnx;
+    return 0;
 }
 
 /*
@@ -77,6 +77,17 @@ static DType onnx_dtype_to_cml(int onnx_dtype) {
  *  20: type           (int32, AttributeType enum)
  */
 
+/** Free what @p attr's value union owns and zero it, so another field can claim the union. */
+static void clear_attr_value(CMLONNXAttribute* attr) {
+    if (attr->type == CML_ONNX_ATTR_INTS)
+        cml_free(attr->value.ints.data);
+    else if (attr->type == CML_ONNX_ATTR_FLOATS)
+        cml_free(attr->value.floats.data);
+    else if (attr->type == CML_ONNX_ATTR_TENSOR && attr->value.tensor)
+        tensor_free(attr->value.tensor);
+    memset(&attr->value, 0, sizeof(attr->value));
+}
+
 static void parse_attribute(PBReader* rd, CMLONNXAttribute* attr) {
     memset(attr, 0, sizeof(*attr));
 
@@ -89,18 +100,21 @@ static void parse_attribute(PBReader* rd, CMLONNXAttribute* attr) {
 
         case 2: /* f (float, stored as fixed32) */
             if (f.wire_type == PB_WIRE_FIXED32) {
+                clear_attr_value(attr);
                 memcpy(&attr->value.f, &f.value.fixed32, sizeof(float));
                 attr->type = CML_ONNX_ATTR_FLOAT;
             }
             break;
 
         case 3: /* i (int64, varint) */
+            clear_attr_value(attr);
             attr->value.i = (int64_t)f.value.varint;
             attr->type    = CML_ONNX_ATTR_INT;
             break;
 
         case 4: /* s (string / bytes) */
             if (f.wire_type == PB_WIRE_LEN) {
+                clear_attr_value(attr);
                 size_t slen = f.value.bytes.length;
                 if (slen >= sizeof(attr->value.s.data))
                     slen = sizeof(attr->value.s.data) - 1;
@@ -113,6 +127,7 @@ static void parse_attribute(PBReader* rd, CMLONNXAttribute* attr) {
 
         case 7: /* floats (packed repeated float) */
             if (f.wire_type == PB_WIRE_LEN) {
+                clear_attr_value(attr);
                 int count               = (int)(f.value.bytes.length / sizeof(float));
                 attr->value.floats.data = (float*)cml_malloc(sizeof(float) * (size_t)count);
                 if (attr->value.floats.data) {
@@ -129,6 +144,7 @@ static void parse_attribute(PBReader* rd, CMLONNXAttribute* attr) {
         case 8: /* ints (packed repeated int64 -- but also non-packed) */
             if (f.wire_type == PB_WIRE_LEN) {
                 /* Packed encoding: each element is a varint */
+                clear_attr_value(attr);
                 PBReader sub = pb_reader_sub(&f);
                 /* First pass: count */
                 PBReader counter = sub;
@@ -147,6 +163,8 @@ static void parse_attribute(PBReader* rd, CMLONNXAttribute* attr) {
                 attr->type = CML_ONNX_ATTR_INTS;
             } else if (f.wire_type == PB_WIRE_VARINT) {
                 /* Non-packed single int in repeated field -- append */
+                if (attr->type != CML_ONNX_ATTR_INTS)
+                    clear_attr_value(attr);
                 int cur      = attr->value.ints.count;
                 int64_t* tmp = (int64_t*)cml_realloc(attr->value.ints.data,
                                                      sizeof(int64_t) * (size_t)(cur + 1));
@@ -157,10 +175,6 @@ static void parse_attribute(PBReader* rd, CMLONNXAttribute* attr) {
                 }
                 attr->type = CML_ONNX_ATTR_INTS;
             }
-            break;
-
-        default:
-            pb_skip_field(rd, &f);
             break;
         }
     }
@@ -210,10 +224,6 @@ static void parse_node(PBReader* rd, CMLONNXNode* node) {
                 node->num_attrs++;
             }
             break;
-
-        default:
-            pb_skip_field(rd, &f);
-            break;
         }
     }
 }
@@ -222,38 +232,45 @@ static void parse_node(PBReader* rd, CMLONNXNode* node) {
  * TensorProto field numbers:
  *   1: dims        (repeated int64)
  *   2: data_type   (int32)
- *   4: raw_data    (bytes)
- *   5: float_data  (packed repeated float)
+ *   4: float_data  (packed repeated float)
+ *   7: int64_data  (packed repeated int64)
  *   8: name        (string)
+ *   9: raw_data    (bytes)
  */
 
-static void parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
+/** Append one TensorProto dim; false once the rank passes 8 or a dim overflows int. */
+static bool append_dim(int* dims, int* ndim, uint64_t dim) {
+    if (*ndim >= 8 || dim > INT_MAX)
+        return false;
+    dims[(*ndim)++] = (int)dim;
+    return true;
+}
+
+/** Parse a TensorProto into @p init; returns -1 when its dims or payload size are malformed. */
+static int parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
     memset(init, 0, sizeof(*init));
 
     int dims[8];
     int ndim                = 0;
+    bool malformed          = false;
     int onnx_dtype          = 1; /* default FLOAT */
     const uint8_t* raw_data = NULL;
     size_t raw_len          = 0;
     float* float_data       = NULL;
-    int float_count         = 0;
+    size_t float_count      = 0;
     int64_t* i64_data       = NULL;
-    int i64_count           = 0;
+    size_t i64_count        = 0;
 
     PBField f;
     while (pb_read_field(rd, &f)) {
         switch (f.field_number) {
         case 1: /* dims (repeated int64) */
             if (f.wire_type == PB_WIRE_VARINT) {
-                /* Non-packed */
-                if (ndim < 8)
-                    dims[ndim++] = (int)f.value.varint;
+                malformed |= !append_dim(dims, &ndim, f.value.varint);
             } else if (f.wire_type == PB_WIRE_LEN) {
-                /* Packed */
                 PBReader sub = pb_reader_sub(&f);
-                while (pb_reader_has_data(&sub) && ndim < 8) {
-                    dims[ndim++] = (int)pb_read_varint(&sub);
-                }
+                while (pb_reader_has_data(&sub))
+                    malformed |= !append_dim(dims, &ndim, pb_read_varint(&sub));
             }
             break;
 
@@ -263,13 +280,15 @@ static void parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
 
         case 4: /* float_data (packed repeated float) */
             if (f.wire_type == PB_WIRE_LEN) {
-                float_count = (int)(f.value.bytes.length / sizeof(float));
-                float_data  = (float*)cml_malloc(sizeof(float) * (size_t)float_count);
+                cml_free(float_data);
+                float_count = f.value.bytes.length / sizeof(float);
+                float_data  = (float*)cml_malloc(sizeof(float) * (float_count ? float_count : 1));
                 if (float_data) {
                     PBReader sub = pb_reader_sub(&f);
-                    for (int i = 0; i < float_count; i++) {
+                    for (size_t i = 0; i < float_count; i++)
                         float_data[i] = pb_read_float(&sub);
-                    }
+                } else {
+                    float_count = 0;
                 }
             }
             break;
@@ -290,15 +309,17 @@ static void parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
                  * dtype would then see garbage. The raw_data path below already
                  * stores genuine int64 bytes; these two must agree. */
                 PBReader sub = pb_reader_sub(&f);
-                int count    = 0;
+                size_t count = 0;
                 while (pb_reader_has_data(&sub)) {
                     pb_read_varint(&sub);
                     count++;
                 }
-                sub      = pb_reader_sub(&f);
-                i64_data = (int64_t*)cml_malloc(sizeof(int64_t) * (size_t)(count > 0 ? count : 1));
+                sub = pb_reader_sub(&f);
+                cml_free(i64_data);
+                i64_count = 0;
+                i64_data  = (int64_t*)cml_malloc(sizeof(int64_t) * (count ? count : 1));
                 if (i64_data) {
-                    for (int i = 0; i < count; i++)
+                    for (size_t i = 0; i < count; i++)
                         i64_data[i] = (int64_t)pb_read_varint(&sub);
                     i64_count = count;
                 }
@@ -307,10 +328,6 @@ static void parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
 
         case 8: /* name */
             copy_pb_string(init->name, sizeof(init->name), &f);
-            break;
-
-        default:
-            pb_skip_field(rd, &f);
             break;
         }
     }
@@ -324,19 +341,31 @@ static void parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
     DType dtype      = onnx_dtype_to_cml(onnx_dtype);
     TensorConfig cfg = {.dtype = dtype, .has_dtype = true};
 
+    const void* payload = NULL;
+    size_t payload_len  = 0;
     if (raw_data && raw_len > 0) {
-        init->tensor = tensor_from_data(raw_data, dims, ndim, &cfg);
+        payload     = raw_data;
+        payload_len = raw_len;
     } else if (i64_data && i64_count > 0) {
-        init->tensor = tensor_from_data(i64_data, dims, ndim, &cfg);
+        payload     = i64_data;
+        payload_len = i64_count * sizeof(int64_t);
     } else if (float_data && float_count > 0) {
-        init->tensor = tensor_from_data(float_data, dims, ndim, &cfg);
-    } else {
-        /* Empty initializer -- create zeros */
-        init->tensor = tensor_zeros(dims, ndim, &cfg);
+        payload     = float_data;
+        payload_len = float_count * sizeof(float);
     }
+
+    /* tensor_from_data copies numel * elem_size bytes, so the payload must be exactly that. */
+    size_t numel, nbytes;
+    malformed |= !tensor_numel_checked(dims, ndim, &numel) ||
+                 !tensor_nbytes_checked(numel, dtype, &nbytes) ||
+                 (payload && payload_len != nbytes);
+    if (!malformed)
+        init->tensor =
+            payload ? tensor_from_data(payload, dims, ndim, &cfg) : tensor_zeros(dims, ndim, &cfg);
 
     cml_free(float_data);
     cml_free(i64_data);
+    return malformed ? -1 : 0;
 }
 
 /*
@@ -480,7 +509,8 @@ static int parse_graph(PBReader* rd, CMLONNXGraph* graph) {
         case 5: /* initializer */
             if (f.wire_type == PB_WIRE_LEN && graph->num_initializers < CML_ONNX_MAX_NODES) {
                 PBReader sub = pb_reader_sub(&f);
-                parse_tensor_proto(&sub, &graph->initializers[graph->num_initializers]);
+                if (parse_tensor_proto(&sub, &graph->initializers[graph->num_initializers]) != 0)
+                    return -1;
                 graph->num_initializers++;
             }
             break;
@@ -499,10 +529,6 @@ static int parse_graph(PBReader* rd, CMLONNXGraph* graph) {
                 parse_value_info(&sub, &graph->outputs[graph->num_outputs]);
                 graph->num_outputs++;
             }
-            break;
-
-        default:
-            pb_skip_field(rd, &f);
             break;
         }
     }
@@ -594,10 +620,6 @@ CMLONNXModel* cml_onnx_load_buffer(const uint8_t* data, size_t length) {
                 saw_model_field = 1;
             }
             break;
-
-        default:
-            pb_skip_field(&reader, &f);
-            break;
         }
     }
 
@@ -674,16 +696,8 @@ void cml_onnx_free(CMLONNXModel* model) {
             for (int j = 0; j < nd->num_outputs; j++) {
                 cml_free(nd->outputs[j]);
             }
-            for (int j = 0; j < nd->num_attrs; j++) {
-                CMLONNXAttribute* a = &nd->attrs[j];
-                if (a->type == CML_ONNX_ATTR_INTS) {
-                    cml_free(a->value.ints.data);
-                } else if (a->type == CML_ONNX_ATTR_FLOATS) {
-                    cml_free(a->value.floats.data);
-                } else if (a->type == CML_ONNX_ATTR_TENSOR && a->value.tensor) {
-                    tensor_free(a->value.tensor);
-                }
-            }
+            for (int j = 0; j < nd->num_attrs; j++)
+                clear_attr_value(&nd->attrs[j]);
         }
         cml_free(g->nodes);
     }

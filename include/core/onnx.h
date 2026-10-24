@@ -93,6 +93,8 @@ CMLONNXModel* cml_onnx_load(const char* filepath);
 CMLONNXModel* cml_onnx_load_buffer(const uint8_t* data, size_t length);
 void cml_onnx_free(CMLONNXModel* model);
 bool cml_onnx_op_supported(const char* op_type);
+/** ONNX TensorProto.DataType for @p dtype, or 0 when ONNX has no equivalent. */
+int cml_onnx_elem_type(DType dtype);
 int cml_onnx_run(CMLONNXModel* model, Tensor** inputs, int num_inputs, Tensor** outputs,
                  int num_outputs);
 int cml_onnx_list_supported_ops(const char*** ops_out, int* count_out);

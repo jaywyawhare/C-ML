@@ -133,48 +133,6 @@ static bool pb_field_packed_int64(PBBuf* b, int field, const int64_t* v, int n) 
 
 /* ── ONNX constants ───────────────────────────────────────────────────────── */
 
-#define ONNX_FLOAT 1
-#define ONNX_UINT8 2
-#define ONNX_INT8 3
-#define ONNX_UINT16 4
-#define ONNX_INT16 5
-#define ONNX_INT32 6
-#define ONNX_INT64 7
-#define ONNX_BOOL 9
-#define ONNX_FLOAT16 10
-#define ONNX_DOUBLE 11
-#define ONNX_BFLOAT16 16
-
-/** Map a CML DType to the ONNX TensorProto.DataType enum; 0 if unsupported. */
-static int onnx_elem_type(DType dt) {
-    switch (dt) {
-    case DTYPE_FLOAT32:
-        return ONNX_FLOAT;
-    case DTYPE_FLOAT64:
-        return ONNX_DOUBLE;
-    case DTYPE_INT8:
-        return ONNX_INT8;
-    case DTYPE_UINT8:
-        return ONNX_UINT8;
-    case DTYPE_INT16:
-        return ONNX_INT16;
-    case DTYPE_UINT16:
-        return ONNX_UINT16;
-    case DTYPE_INT32:
-        return ONNX_INT32;
-    case DTYPE_INT64:
-        return ONNX_INT64;
-    case DTYPE_BOOL:
-        return ONNX_BOOL;
-    case DTYPE_FLOAT16:
-        return ONNX_FLOAT16;
-    case DTYPE_BFLOAT16:
-        return ONNX_BFLOAT16;
-    default:
-        return 0;
-    }
-}
-
 #define OATTR_FLOAT 1
 #define OATTR_INT 2
 #define OATTR_STRING 3
@@ -264,7 +222,7 @@ static bool emit_initializer(ExportCtx* c, Tensor* t, const char* name) {
             return false;
         }
     }
-    int et = onnx_elem_type(t->dtype);
+    int et = cml_onnx_elem_type(t->dtype);
     if (!et) {
         ctx_error(c, "unsupported dtype %d for initializer", (int)t->dtype);
         return false;
@@ -318,7 +276,7 @@ static const char* leaf_name(ExportCtx* c, Tensor* t) {
 
 /* ValueInfoProto{name=1, type=2 TypeProto{tensor_type=1{elem_type=1, shape=2}}}*/
 static bool emit_value_info(PBBuf* dst, int field, Tensor* t, const char* name) {
-    int et = onnx_elem_type(t->dtype);
+    int et = cml_onnx_elem_type(t->dtype);
     if (!et)
         return false;
     PBBuf shape, tt, vi;
@@ -715,7 +673,8 @@ static const char* emit_shape_initializer(ExportCtx* c, const int* shape, int nd
     int64_t dims[1] = {ndim};
     PBBuf tp;
     pb_init(&tp);
-    bool ok = pb_field_packed_int64(&tp, 1, dims, 1) && pb_field_varint(&tp, 2, ONNX_INT64) &&
+    bool ok = pb_field_packed_int64(&tp, 1, dims, 1) &&
+              pb_field_varint(&tp, 2, cml_onnx_elem_type(DTYPE_INT64)) &&
               pb_field_str(&tp, 8, name) &&
               pb_field_len(&tp, 9, sv, (size_t)ndim * sizeof(int64_t)) &&
               pb_field_buf(&c->initializers, 5, &tp);

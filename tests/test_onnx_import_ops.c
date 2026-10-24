@@ -158,11 +158,8 @@ typedef struct {
     int rc;
 } RunResult;
 
-/* Assemble graph -> model bytes, load, execute with a single input "X". */
-static RunResult run_model(Buf* nodes, int nn, Buf* inits, int ni, const int64_t* in_dims,
-                           int in_ndim, const float* in_data, const char** out_names, int nout) {
-    RunResult rr = {.m = NULL, .rc = -100};
-
+/* Assemble a ModelProto whose graph reads a single input "X". */
+static Buf make_model(Buf* nodes, int nn, Buf* inits, int ni, const char** out_names, int nout) {
     Buf g = {.n = 0};
     for (int i = 0; i < nn; i++)
         bw_len(&g, 1, nodes[i].d, nodes[i].n);
@@ -179,8 +176,15 @@ static RunResult run_model(Buf* nodes, int nn, Buf* inits, int ni, const int64_t
     Buf mm = {.n = 0};
     bw_uv(&mm, 1, 6); /* ir_version */
     bw_len(&mm, 7, g.d, g.n);
+    return mm;
+}
 
-    rr.m = cml_onnx_load_buffer(mm.d, mm.n);
+/* Assemble graph -> model bytes, load, execute with a single input "X". */
+static RunResult run_model(Buf* nodes, int nn, Buf* inits, int ni, const int64_t* in_dims,
+                           int in_ndim, const float* in_data, const char** out_names, int nout) {
+    RunResult rr = {.m = NULL, .rc = -100};
+    Buf mm       = make_model(nodes, nn, inits, ni, out_names, nout);
+    rr.m         = cml_onnx_load_buffer(mm.d, mm.n);
     if (!rr.m)
         return rr;
 
@@ -1182,6 +1186,64 @@ static void test_unsupported_op_rejected(void) {
     FREE_MODEL(rr);
 }
 
+static void test_malformed_model_rejected(void) {
+    printf("Test: malformed initializers and lengths rejected\n");
+    const char* outs[] = {"Y"};
+
+    int64_t dims4[1] = {4};
+    float two[2]     = {1, 2};
+    Buf short_init   = init_f32("W", dims4, 1, two, 2);
+    Buf m            = make_model(NULL, 0, &short_init, 1, outs, 1);
+    CHECK("float_data shorter than dims", cml_onnx_load_buffer(m.d, m.n) == NULL);
+
+    int64_t deep_dims[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
+    float one[1]         = {1};
+    Buf deep             = init_f32("W", deep_dims, 9, one, 1);
+    m                    = make_model(NULL, 0, &deep, 1, outs, 1);
+    CHECK("rank above 8", cml_onnx_load_buffer(m.d, m.n) == NULL);
+
+    Buf wrap = {.n = 0};
+    bw_tag(&wrap, 7, 2);
+    bw_varint(&wrap, UINT64_MAX - 1);
+    wrap.d[wrap.n++] = 0;
+    CHECK("length that wraps the cursor", cml_onnx_load_buffer(wrap.d, wrap.n) == NULL);
+}
+
+static void test_bool_initializer_and_attr_reuse(void) {
+    printf("Test: bool initializer and reused attribute union\n");
+    const char* outs[] = {"Y"};
+
+    Buf mask = {.n = 0}, tmp = {.n = 0};
+    int64_t dims3[1] = {3};
+    uint8_t bits[3]  = {1, 0, 1};
+    bw_packed_i64(&tmp, dims3, 1);
+    bw_len(&mask, 1, tmp.d, tmp.n);
+    bw_uv(&mask, 2, 9); /* BOOL */
+    bw_len(&mask, 9, bits, sizeof(bits));
+    bw_str(&mask, 8, "M");
+
+    /* An int and then a non-packed ints element share the attribute's value union. */
+    Buf attr = {.n = 0};
+    bw_str(&attr, 1, "axes");
+    bw_uv(&attr, 3, 0x4141414141ULL);
+    bw_uv(&attr, 8, 2);
+    const char* ins[] = {"X"};
+    Buf nodes[1]      = {make_node("Identity", ins, 1, outs, 1, &attr, 1)};
+
+    Buf m               = make_model(nodes, 1, &mask, 1, outs, 1);
+    CMLONNXModel* model = cml_onnx_load_buffer(m.d, m.n);
+    CHECK("model loads", model != NULL);
+    if (!model)
+        return;
+    Tensor* t = model->graph.initializers[0].tensor;
+    CHECK("bool payload keeps one byte per element",
+          t && t->dtype == DTYPE_BOOL && t->numel == 3 && ((uint8_t*)t->data)[2] == 1);
+    CMLONNXAttribute* a = &model->graph.nodes[0].attrs[0];
+    CHECK("ints replaces the earlier int",
+          a->type == CML_ONNX_ATTR_INTS && a->value.ints.count == 1 && a->value.ints.data[0] == 2);
+    cml_onnx_free(model);
+}
+
 int main(void) {
     printf("=== ONNX Import Op Coverage Tests ===\n\n");
 
@@ -1209,6 +1271,8 @@ int main(void) {
     test_roundtrip_ops_importable();
     test_comparison_ops();
     test_unsupported_op_rejected();
+    test_malformed_model_rejected();
+    test_bool_initializer_and_attr_reuse();
 
     return TEST_SUMMARY();
 }
