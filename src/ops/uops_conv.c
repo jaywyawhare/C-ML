@@ -102,8 +102,7 @@ static Tensor* uop_pool2d(Tensor* input, Pool2DParams* params, UOpType type) {
         return NULL;
 
     int output_shape[4] = {input->shape[0], input->shape[1], out_height, out_width};
-    node->output_shape  = tensor_shape_copy(output_shape, 4);
-    node->output_ndim   = 4;
+    cml_ir_set_output_shape(node, tensor_shape_copy(output_shape, 4), 4);
     if (input->requires_grad) {
         node->requires_grad       = true;
         node->needs_input_grad[0] = true;
@@ -185,8 +184,7 @@ static Tensor* uop_conv3d_like(Tensor* input, Tensor* weight, Tensor* bias,
 
     struct IRNode* node = cml_ir_get_tail(ir);
     int output_shape[5] = {batch, out_channels, out_depth, out_height, out_width};
-    node->output_shape  = tensor_shape_copy(output_shape, 5);
-    node->output_ndim   = 5;
+    cml_ir_set_output_shape(node, tensor_shape_copy(output_shape, 5), 5);
     return tensor_from_ir_node(node, ir);
 }
 
@@ -240,8 +238,7 @@ static Tensor* uop_conv_transpose2d_like(Tensor* input, Tensor* weight, Tensor* 
 
     struct IRNode* node = cml_ir_get_tail(ir);
     int output_shape[4] = {batch, out_channels, out_height, out_width};
-    node->output_shape  = tensor_shape_copy(output_shape, 4);
-    node->output_ndim   = 4;
+    cml_ir_set_output_shape(node, tensor_shape_copy(output_shape, 4), 4);
     return tensor_from_ir_node(node, ir);
 }
 
@@ -299,8 +296,7 @@ static Tensor* uop_conv_transpose3d_like(Tensor* input, Tensor* weight, Tensor* 
 
     struct IRNode* node = cml_ir_get_tail(ir);
     int output_shape[5] = {batch, out_channels, out_depth, out_height, out_width};
-    node->output_shape  = tensor_shape_copy(output_shape, 5);
-    node->output_ndim   = 5;
+    cml_ir_set_output_shape(node, tensor_shape_copy(output_shape, 5), 5);
     return tensor_from_ir_node(node, ir);
 }
 
@@ -433,8 +429,7 @@ Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* pa
     }
 
     int output_shape[4] = {batch, out_channels, out_height, out_width};
-    node->output_shape  = tensor_shape_copy(output_shape, 4);
-    node->output_ndim   = 4;
+    cml_ir_set_output_shape(node, tensor_shape_copy(output_shape, 4), 4);
 
     return tensor_from_ir_node(node, ir);
 }

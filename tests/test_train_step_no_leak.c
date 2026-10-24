@@ -71,11 +71,39 @@ static int test_live_bytes_flat_across_steps(void) {
     return ok;
 }
 
+/* An interned node comes back from cml_ir_add_uop already shaped and its builder shapes it
+ * again; every repeat of the same op used to leak the previous shape array. */
+static int test_interned_ops_keep_live_bytes_flat(void) {
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    float d[6] = {1, 2, 3, 4, 5, 6};
+    int s23[2] = {2, 3}, s32[2] = {3, 2};
+    Tensor* a = cml_tensor(d, s23, 2, &cfg);
+    Tensor* b = cml_tensor(d, s32, 2, &cfg);
+    Tensor* e = tensor_exp(a);
+    Tensor* m = tensor_matmul(a, b);
+
+    size_t before = live_bytes();
+    int ok        = 1;
+    for (int i = 0; i < 16; i++)
+        ok &= tensor_exp(a) == e && tensor_matmul(a, b) == m;
+    long growth = (long)live_bytes() - (long)before;
+    printf("    interned repeats=%d growth=%ld bytes\n", ok, growth);
+
+    tensor_free(e);
+    tensor_free(m);
+    tensor_free(a);
+    tensor_free(b);
+    cml_ir_reset_global_context();
+    return ok && growth == 0;
+}
+
 int main(void) {
     cml_init();
     cml_enable_grad();
     printf("=== training step steady-state memory ===\n");
     TEST(live_bytes_flat_across_steps);
+    TEST(interned_ops_keep_live_bytes_flat);
     cml_cleanup();
     return TEST_SUMMARY();
 }

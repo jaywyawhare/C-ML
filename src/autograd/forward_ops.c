@@ -25,8 +25,7 @@ static Tensor* forward_unary(Tensor* a, UOpType type) {
         return NULL;
 
     struct IRNode* node = cml_ir_get_tail(ir);
-    node->output_shape  = tensor_shape_copy(a->shape, a->ndim);
-    node->output_ndim   = a->ndim;
+    cml_ir_set_output_shape(node, tensor_shape_copy(a->shape, a->ndim), a->ndim);
     if (a->requires_grad) {
         node->requires_grad       = true;
         node->needs_input_grad[0] = true;
@@ -273,7 +272,7 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     struct IRNode* node = cml_ir_get_tail(ir);
     int batch_dims      = (a->ndim > 2) ? a->ndim - 2 : 0;
     int out_ndim        = batch_dims + 2;
-    node->output_shape  = cml_malloc((size_t)out_ndim * sizeof(int));
+    cml_ir_set_output_shape(node, cml_malloc((size_t)out_ndim * sizeof(int)), out_ndim);
     if (!node->output_shape) {
         CML_ERR_NULL("Failed to allocate output shape for matmul");
     }
@@ -282,7 +281,6 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     }
     node->output_shape[out_ndim - 2] = a->shape[a->ndim - 2];
     node->output_shape[out_ndim - 1] = b->shape[b->ndim - 1];
-    node->output_ndim                = out_ndim;
     if (a->requires_grad || b->requires_grad) {
         node->requires_grad       = true;
         node->needs_input_grad[0] = a->requires_grad;

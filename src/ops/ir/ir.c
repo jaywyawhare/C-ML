@@ -1582,6 +1582,14 @@ static bool ir_tensor_resolve_shape(const Tensor* t, const int** out_shape, int*
     return false;
 }
 
+/** Hand @p shape to @p node, freeing any shape it already owns: an interned node comes back
+ *  from cml_ir_add_uop already shaped, and its builder sets the shape again. */
+void cml_ir_set_output_shape(struct IRNode* node, int* shape, int ndim) {
+    cml_free(node->output_shape);
+    node->output_shape = shape;
+    node->output_ndim  = ndim;
+}
+
 /** Compute and store the broadcasted output shape for a multi-input node;
  *  returns -1 on shape mismatch or allocation failure. */
 int cml_ir_compute_broadcast_shape(struct IRNode* node) {
@@ -1596,11 +1604,6 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
     }
     cml_free(node->input_ndims);
     node->input_ndims = NULL;
-    if (node->output_shape) {
-        cml_free(node->output_shape);
-        node->output_shape = NULL;
-        node->output_ndim  = 0;
-    }
 
     int** input_shapes = cml_malloc((size_t)node->num_inputs * sizeof(int*));
     if (!input_shapes)
@@ -1674,8 +1677,7 @@ int cml_ir_compute_broadcast_shape(struct IRNode* node) {
         output_shape[d] = max_dim;
     }
 
-    node->output_shape = output_shape;
-    node->output_ndim  = max_ndim;
+    cml_ir_set_output_shape(node, output_shape, max_ndim);
     node->input_shapes = input_shapes;
     node->input_ndims  = input_ndims;
 

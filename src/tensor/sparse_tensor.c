@@ -384,8 +384,7 @@ Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense) {
                 if (cml_ir_add_uop(ir, UOP_SPMM, inputs, 5, params) == 0) {
                     struct IRNode* node = cml_ir_get_tail(ir);
                     if (node) {
-                        node->output_shape        = tensor_shape_copy(out_shape, 2);
-                        node->output_ndim         = 2;
+                        cml_ir_set_output_shape(node, tensor_shape_copy(out_shape, 2), 2);
                         node->output_dtype        = dense->dtype;
                         node->output_device       = dense->device;
                         node->requires_grad       = true;
