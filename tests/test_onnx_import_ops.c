@@ -500,6 +500,20 @@ static void test_scatter_nd(void) {
     float ref2[6] = {0, 0, 0, 7, 8, 9};
     CHECK("scatternd: negative index", rr2.rc == 0 && out_matches(rr2.outs[0], ref2, 6));
     FREE_MODEL(rr2);
+
+    /* An out-of-range index is refused instead of being written past the output. */
+    int64_t oob_idx[1]  = {8};
+    int64_t oob_dims[2] = {1, 1};
+    float u3[1]         = {1};
+    int64_t u3dims[1]   = {1};
+    Buf inits3[3]       = {
+        init_f32("DATA", ddims, 1, data, 8),
+        init_i64("IDX", oob_dims, 2, oob_idx, 1),
+        init_f32("UPD", u3dims, 1, u3, 1),
+    };
+    RunResult rr3 = run_model(nodes, 1, inits3, 3, dd1, 1, dummy, outs, 1);
+    CHECK("scatternd: out-of-range index refused", rr3.rc != 0);
+    FREE_MODEL(rr3);
 }
 
 static void test_resize_nearest(void) {

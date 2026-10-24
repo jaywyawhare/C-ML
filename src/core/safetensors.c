@@ -4,6 +4,8 @@
 #include "core/safetensors.h"
 #include "core/serialization.h"
 #include "core/logging.h"
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -124,19 +126,27 @@ static char* skip_ws(char* p) {
     return p;
 }
 
+/** Advance over a JSON string body (just past its opening quote), honoring escapes; returns
+ *  the closing quote, or the terminating NUL of an unterminated string. */
+static char* scan_string(char* p) {
+    while (*p && *p != '"') {
+        if (*p == '\\' && p[1])
+            p++;
+        p++;
+    }
+    return p;
+}
+
 /** Parse a JSON string literal into a newly allocated buffer; NULL if not a string. */
 static char* parse_string(char* p, char** out) {
     if (*p != '"')
         return NULL;
-    p++;
-    char* start = p;
-    while (*p && *p != '"') {
-        if (*p == '\\')
-            p++;
-        p++;
-    }
-    size_t len = p - start;
-    *out       = cml_malloc(len + 1);
+    char* start = p + 1;
+    p           = scan_string(start);
+    size_t len  = p - start;
+    *out        = cml_malloc(len + 1);
+    if (!*out)
+        return NULL;
     memcpy(*out, start, len);
     (*out)[len] = '\0';
     if (*p == '"')
@@ -144,7 +154,8 @@ static char* parse_string(char* p, char** out) {
     return p;
 }
 
-/** Parse a signed decimal integer and return the position past it. */
+/** Parse a signed decimal integer and return the position past it; magnitudes beyond
+ *  INT64_MAX saturate so a hostile header cannot trigger signed overflow. */
 static char* parse_int(char* p, int64_t* out) {
     *out    = 0;
     int neg = 0;
@@ -153,7 +164,8 @@ static char* parse_int(char* p, int64_t* out) {
         p++;
     }
     while (*p >= '0' && *p <= '9') {
-        *out = *out * 10 + (*p - '0');
+        int digit = *p - '0';
+        *out      = *out > (INT64_MAX - digit) / 10 ? INT64_MAX : *out * 10 + digit;
         p++;
     }
     if (neg)
@@ -232,19 +244,22 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
             p = skip_ws(p);
             if (*p == ':')
                 p++;
+            p         = skip_ws(p);
             int depth = 0;
-            do {
-                if (*p == '{')
+            while (*p) {
+                if (*p == '"')
+                    p = scan_string(p + 1);
+                else if (*p == '{')
                     depth++;
                 else if (*p == '}')
                     depth--;
-                p++;
-            } while (*p && depth > 0);
+                if (*p)
+                    p++;
+                if (depth <= 0)
+                    break;
+            }
             continue;
         }
-
-        SafeTensorInfo* info = &ctx->tensors[ctx->num_tensors];
-        info->name           = name;
 
         p = skip_ws(p);
         if (*p == ':')
@@ -257,6 +272,9 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
         }
         p++;
 
+        SafeTensorInfo* info = &ctx->tensors[ctx->num_tensors++];
+        info->name           = name;
+
         while (*p && *p != '}') {
             p = skip_ws(p);
             if (*p == ',')
@@ -267,8 +285,8 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
 
             char* key = NULL;
             p         = parse_string(p, &key);
-            if (!p || !key)
-                break;
+            if (!p)
+                goto malformed;
             p = skip_ws(p);
             if (*p == ':')
                 p++;
@@ -277,6 +295,11 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
             if (strcmp(key, "dtype") == 0) {
                 char* dtype_str = NULL;
                 p               = parse_string(p, &dtype_str);
+                if (!p) {
+                    cml_free(key);
+                    goto malformed;
+                }
+                cml_free(info->dtype_str);
                 info->dtype_str = dtype_str;
             } else if (strcmp(key, "shape") == 0) {
                 if (*p == '[')
@@ -290,9 +313,13 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
                     if (*p == ']')
                         break;
                     int64_t dim;
-                    p = parse_int(p, &dim);
-                    if (info->ndim < 8)
-                        info->shape[info->ndim++] = (int)dim;
+                    char* digits = p;
+                    p            = parse_int(p, &dim);
+                    if (p == digits || dim < 0 || dim > INT_MAX || info->ndim == 8) {
+                        cml_free(key);
+                        goto malformed;
+                    }
+                    info->shape[info->ndim++] = (int)dim;
                 }
                 if (*p == ']')
                     p++;
@@ -310,6 +337,10 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
                 p = skip_ws(p);
                 if (*p == ']')
                     p++;
+                if (start < 0 || end < start) {
+                    cml_free(key);
+                    goto malformed;
+                }
                 info->data_start = (size_t)start;
                 info->data_end   = (size_t)end;
             }
@@ -317,11 +348,16 @@ SafeTensorsContext* safetensors_open_read(const char* filepath) {
         }
         if (*p == '}')
             p++;
-        ctx->num_tensors++;
     }
 
     cml_free(header);
     return ctx;
+
+malformed:
+    LOG_ERROR("safetensors_open_read: malformed header in %s", filepath);
+    cml_free(header);
+    safetensors_close(ctx);
+    return NULL;
 }
 
 /** Create a write context that buffers tensor data in memory until close. */
@@ -352,14 +388,25 @@ void safetensors_close(SafeTensorsContext* ctx) {
         char* json      = cml_malloc(json_cap);
         if (json) {
             size_t pos  = 0;
+            bool ok     = true;
             json[pos++] = '{';
 
-            for (int i = 0; i < ctx->write_count; i++) {
+            for (int i = 0; ok && i < ctx->write_count; i++) {
                 SafeTensorInfo* info = &ctx->tensors[i];
-                while (pos + 512 > json_cap) {
-                    json_cap *= 2;
-                    json = cml_realloc(json, json_cap);
+                /* Fixed JSON punctuation plus two %zu offsets fit in 96 bytes; each dim
+                 * takes at most 11 digits and a comma. */
+                size_t need =
+                    strlen(info->name) + strlen(info->dtype_str) + 96 + (size_t)info->ndim * 12;
+                while (ok && pos + need > json_cap) {
+                    char* grown = cml_realloc(json, json_cap * 2);
+                    ok          = grown != NULL;
+                    if (ok) {
+                        json = grown;
+                        json_cap *= 2;
+                    }
                 }
+                if (!ok)
+                    break;
                 if (i > 0)
                     json[pos++] = ',';
                 pos += snprintf(json + pos, json_cap - pos, "\"%s\":{\"dtype\":\"%s\",\"shape\":[",
@@ -374,7 +421,7 @@ void safetensors_close(SafeTensorsContext* ctx) {
             }
             json[pos++] = '}';
 
-            FILE* f = fopen(ctx->filepath, "wb");
+            FILE* f = ok ? fopen(ctx->filepath, "wb") : NULL;
             if (f) {
                 uint64_t header_size = pos;
                 fwrite(&header_size, 8, 1, f);
@@ -437,6 +484,15 @@ Tensor* safetensors_read_tensor(SafeTensorsContext* ctx, const char* name) {
         return NULL;
     tensor_ensure_executed(t);
 
+    size_t nbytes = 0;
+    if (!t->data || !tensor_nbytes_checked(t->numel, t->dtype, &nbytes) || data_size != nbytes ||
+        info->data_end > (size_t)LONG_MAX - 8 - ctx->header_size) {
+        LOG_ERROR("safetensors_read_tensor: '%s' data_offsets span %zu bytes, shape needs %zu",
+                  name, data_size, nbytes);
+        tensor_free(t);
+        return NULL;
+    }
+
     long data_offset = 8 + (long)ctx->header_size + (long)info->data_start;
     fseek(ctx->file, data_offset, SEEK_SET);
     if (fread(t->data, 1, data_size, ctx->file) != data_size) {
@@ -450,7 +506,7 @@ Tensor* safetensors_read_tensor(SafeTensorsContext* ctx, const char* name) {
 int safetensors_write_tensor(SafeTensorsContext* ctx, const char* name, Tensor* tensor) {
     if (!ctx || !name || !tensor || !ctx->is_write)
         return -1;
-    if (ctx->write_count >= MAX_TENSORS)
+    if (ctx->write_count >= MAX_TENSORS || tensor->ndim > 8)
         return -1;
 
     tensor_ensure_executed(tensor);
@@ -460,10 +516,11 @@ int safetensors_write_tensor(SafeTensorsContext* ctx, const char* name, Tensor* 
     size_t data_size = tensor->numel * cml_dtype_size(tensor->dtype);
 
     while (ctx->write_data_size + data_size > ctx->write_data_cap) {
-        ctx->write_data_cap *= 2;
-        ctx->write_data = cml_realloc(ctx->write_data, ctx->write_data_cap);
-        if (!ctx->write_data)
+        uint8_t* grown = cml_realloc(ctx->write_data, ctx->write_data_cap * 2);
+        if (!grown)
             return -1;
+        ctx->write_data = grown;
+        ctx->write_data_cap *= 2;
     }
 
     SafeTensorInfo* info = &ctx->tensors[ctx->write_count];

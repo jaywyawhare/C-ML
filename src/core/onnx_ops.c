@@ -2,6 +2,7 @@
 #include "core/logging.h"
 #include "ops/uops.h"
 #include "tensor/tensor.h"
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -129,9 +130,10 @@ static Tensor* inp(const CMLONNXNode* node, TensorMap* map, int idx) {
     return tensor_map_get(map, node->inputs[idx]);
 }
 
-/* Realized float payload of an optional input; NULL when absent. */
+/* Realized float32 payload of an optional input; NULL when absent or not float32, so a
+ * narrower dtype is never read past its end through a float pointer. */
 static const float* tensor_floats(Tensor* t, int* count) {
-    if (!t)
+    if (!t || t->dtype != DTYPE_FLOAT32)
         return NULL;
     tensor_ensure_executed(t);
     if (count)
@@ -279,13 +281,13 @@ static Tensor* op_reshape(const CMLONNXNode* n, TensorMap* m) {
         return NULL;
 
     int new_ndim = 0;
-    if (!operand_ints_ready(shape, &new_ndim))
+    if (!operand_ints_ready(shape, &new_ndim) || new_ndim > 8)
         return NULL;
 
     int new_shape[8];
     int inferred_idx = -1;
 
-    for (int i = 0; i < new_ndim && i < 8; i++) {
+    for (int i = 0; i < new_ndim; i++) {
         new_shape[i] = (int)operand_int(shape, i);
         if (new_shape[i] == 0) {
             new_shape[i] = (i < x->ndim) ? x->shape[i] : 1;
@@ -318,7 +320,9 @@ static Tensor* op_transpose(const CMLONNXNode* n, TensorMap* m) {
 
     int perm[8];
     if (perm_vals && count > 0) {
-        for (int i = 0; i < count && i < 8; i++)
+        if (count > 8)
+            return NULL;
+        for (int i = 0; i < count; i++)
             perm[i] = (int)perm_vals[i];
     } else {
         for (int i = 0; i < x->ndim; i++)
@@ -1221,25 +1225,29 @@ static Tensor* op_expand(const CMLONNXNode* n, TensorMap* m) {
 /** ONNX Tile: repeat input 0 along each axis by the per-axis counts in the repeats operand. */
 static Tensor* op_tile(const CMLONNXNode* n, TensorMap* m) {
     Tensor* x = inp(n, m, 0);
-    if (!x || x->ndim > 8)
+    if (!x || x->ndim < 1 || x->ndim > 8)
         return NULL;
 
     int rcount        = 0;
     Tensor* repeats_t = inp(n, m, 1);
     if (!operand_ints_ready(repeats_t, &rcount) || rcount != x->ndim)
         return NULL;
+    const float* xd = tensor_floats(x, NULL);
+    if (!xd)
+        return NULL;
 
     int out_shape[8];
     size_t x_strides[8], out_numel = 1;
     for (int i = 0; i < x->ndim; i++) {
-        out_shape[i] = x->shape[i] * (int)operand_int(repeats_t, i);
+        long long r = operand_int(repeats_t, i);
+        if (r < 0 || (x->shape[i] > 0 && r > INT_MAX / x->shape[i]))
+            return NULL;
+        out_shape[i] = x->shape[i] * (int)r;
         out_numel *= (size_t)out_shape[i];
     }
     x_strides[x->ndim - 1] = 1;
     for (int i = x->ndim - 2; i >= 0; i--)
         x_strides[i] = x_strides[i + 1] * (size_t)x->shape[i + 1];
-
-    const float* xd = (const float*)tensor_data_ptr(x);
 
     float* out = (float*)cml_malloc(sizeof(float) * out_numel);
     if (!out)
@@ -1358,9 +1366,9 @@ static Tensor* op_scatter_nd(const CMLONNXNode* n, TensorMap* m) {
         numel *= (size_t)data->shape[i];
     }
 
-    const float* dd = (const float*)tensor_data_ptr(data);
-    const float* ud = (const float*)tensor_data_ptr(upd);
-    if (!dd || !ud || !operand_ints_ready(idx, NULL))
+    const float* dd = tensor_floats(data, NULL);
+    const float* ud = tensor_floats(upd, NULL);
+    if (!dd || !ud || !operand_ints_ready(idx, NULL) || upd->numel < outer * slice_elems)
         return NULL;
 
     float* out = (float*)cml_malloc(sizeof(float) * numel);
@@ -1374,6 +1382,11 @@ static Tensor* op_scatter_nd(const CMLONNXNode* n, TensorMap* m) {
             int ix = (int)operand_int(idx, (int)(e * (size_t)q + (size_t)t));
             if (ix < 0)
                 ix += data->shape[t]; /* negative indices wrap */
+            if (ix < 0 || ix >= data->shape[t]) {
+                LOG_ERROR("onnx_ops: ScatterND index out of range for dim %d", t);
+                cml_free(out);
+                return NULL;
+            }
             base += (size_t)ix * d_strides[t];
         }
         memcpy(out + base, ud + e * slice_elems, sizeof(float) * slice_elems);
@@ -1505,6 +1518,9 @@ static Tensor* op_resize(const CMLONNXNode* n, TensorMap* m) {
         out_numel *= (size_t)od;
     }
 
+    const float* xd = tensor_floats(x, NULL);
+    if (!xd)
+        return NULL;
     float* out = (float*)cml_malloc(sizeof(float) * out_numel);
     if (!out)
         return NULL;
@@ -1513,8 +1529,6 @@ static Tensor* op_resize(const CMLONNXNode* n, TensorMap* m) {
     strides[x->ndim - 1] = 1;
     for (int d = x->ndim - 2; d >= 0; d--)
         strides[d] = strides[d + 1] * (size_t)x->shape[d + 1];
-
-    const float* xd = (const float*)tensor_data_ptr(x);
 
     int cur[8] = {0};
     for (size_t o = 0; o < out_numel; o++) {
@@ -2004,6 +2018,17 @@ int cml_onnx_run(CMLONNXModel* model, Tensor** inputs, int num_inputs, Tensor** 
             LOG_ERROR("onnx_ops: unsupported op '%s' (node '%s')", node->op_type, node->name);
             cml_free(map);
             return -2;
+        }
+
+        /* Handlers index per-dimension scratch arrays sized for rank 8. */
+        for (int j = 0; j < node->num_inputs; j++) {
+            Tensor* t = inp(node, map, j);
+            if (t && t->ndim > 8) {
+                LOG_ERROR("onnx_ops: node '%s' input %d has rank %d (max 8)", node->name, j,
+                          t->ndim);
+                cml_free(map);
+                return -3;
+            }
         }
 
         Tensor* result = handler(node, map);

@@ -2,14 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-/* Raw GGUF spec type IDs (may not be in the project's GGUFTensorType enum) */
-#define GGUF_TENSOR_TYPE_Q4_0 2
-#define GGUF_TENSOR_TYPE_Q4_1 3
-#define GGUF_TENSOR_TYPE_Q8_0 7
-#define GGUF_TENSOR_TYPE_Q4_K 12
-#define GGUF_TENSOR_TYPE_Q5_K 13
-#define GGUF_TENSOR_TYPE_Q6_K 14
-
 /* fp16 -> fp32: pure bit manipulation, no HW intrinsics */
 static float fp16_to_fp32(uint16_t h) {
     const uint32_t sign = (uint32_t)(h & 0x8000u) << 16; /* bit 31          */
@@ -310,12 +302,12 @@ static void dequantize_q6_k(const void* src, float* dst, size_t num_blocks) {
 /** True if the tensor type is one of the supported quantized block formats. */
 bool gguf_type_is_quantized(GGUFTensorType type) {
     switch ((int)type) {
-    case GGUF_TENSOR_TYPE_Q4_0:
-    case GGUF_TENSOR_TYPE_Q4_1:
-    case GGUF_TENSOR_TYPE_Q8_0:
-    case GGUF_TENSOR_TYPE_Q4_K:
-    case GGUF_TENSOR_TYPE_Q5_K:
-    case GGUF_TENSOR_TYPE_Q6_K:
+    case GGUF_TENSOR_Q4_0:
+    case GGUF_TENSOR_Q4_1:
+    case GGUF_TENSOR_Q8_0:
+    case GGUF_TENSOR_Q4_K:
+    case GGUF_TENSOR_Q5_K:
+    case GGUF_TENSOR_Q6_K:
         return true;
     default:
         return false;
@@ -325,17 +317,17 @@ bool gguf_type_is_quantized(GGUFTensorType type) {
 /** Number of elements per quantization block (32 for Q*_0/1, 256 for K-quants); 0 if unknown. */
 int gguf_quant_block_size(GGUFTensorType type) {
     switch ((int)type) {
-    case GGUF_TENSOR_TYPE_Q4_0:
+    case GGUF_TENSOR_Q4_0:
         return QK4_0; /* 32  */
-    case GGUF_TENSOR_TYPE_Q4_1:
+    case GGUF_TENSOR_Q4_1:
         return QK4_1; /* 32  */
-    case GGUF_TENSOR_TYPE_Q8_0:
+    case GGUF_TENSOR_Q8_0:
         return QK8_0; /* 32  */
-    case GGUF_TENSOR_TYPE_Q4_K:
+    case GGUF_TENSOR_Q4_K:
         return QK_K; /* 256 */
-    case GGUF_TENSOR_TYPE_Q5_K:
+    case GGUF_TENSOR_Q5_K:
         return QK_K; /* 256 */
-    case GGUF_TENSOR_TYPE_Q6_K:
+    case GGUF_TENSOR_Q6_K:
         return QK_K; /* 256 */
     default:
         return 0;
@@ -345,17 +337,17 @@ int gguf_quant_block_size(GGUFTensorType type) {
 /** On-disk byte size of one quantization block for the given type; 0 if unknown. */
 size_t gguf_quant_type_size(GGUFTensorType type) {
     switch ((int)type) {
-    case GGUF_TENSOR_TYPE_Q4_0:
+    case GGUF_TENSOR_Q4_0:
         return sizeof(BlockQ4_0);
-    case GGUF_TENSOR_TYPE_Q4_1:
+    case GGUF_TENSOR_Q4_1:
         return sizeof(BlockQ4_1);
-    case GGUF_TENSOR_TYPE_Q8_0:
+    case GGUF_TENSOR_Q8_0:
         return sizeof(BlockQ8_0);
-    case GGUF_TENSOR_TYPE_Q4_K:
+    case GGUF_TENSOR_Q4_K:
         return sizeof(BlockQ4_K);
-    case GGUF_TENSOR_TYPE_Q5_K:
+    case GGUF_TENSOR_Q5_K:
         return sizeof(BlockQ5_K);
-    case GGUF_TENSOR_TYPE_Q6_K:
+    case GGUF_TENSOR_Q6_K:
         return sizeof(BlockQ6_K);
     default:
         return 0;
@@ -381,22 +373,22 @@ int gguf_dequantize(GGUFTensorType type, const void* src, float* dst, size_t num
     const size_t num_blocks = numel / (size_t)block_size;
 
     switch ((int)type) {
-    case GGUF_TENSOR_TYPE_Q4_0:
+    case GGUF_TENSOR_Q4_0:
         dequantize_q4_0(src, dst, num_blocks);
         break;
-    case GGUF_TENSOR_TYPE_Q4_1:
+    case GGUF_TENSOR_Q4_1:
         dequantize_q4_1(src, dst, num_blocks);
         break;
-    case GGUF_TENSOR_TYPE_Q8_0:
+    case GGUF_TENSOR_Q8_0:
         dequantize_q8_0(src, dst, num_blocks);
         break;
-    case GGUF_TENSOR_TYPE_Q4_K:
+    case GGUF_TENSOR_Q4_K:
         dequantize_q4_k(src, dst, num_blocks);
         break;
-    case GGUF_TENSOR_TYPE_Q5_K:
+    case GGUF_TENSOR_Q5_K:
         dequantize_q5_k(src, dst, num_blocks);
         break;
-    case GGUF_TENSOR_TYPE_Q6_K:
+    case GGUF_TENSOR_Q6_K:
         dequantize_q6_k(src, dst, num_blocks);
         break;
     default:

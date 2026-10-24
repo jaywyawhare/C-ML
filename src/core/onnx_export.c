@@ -702,7 +702,11 @@ static const char* ensure_one_scalar(ExportCtx* c) {
 static const char* emit_shape_initializer(ExportCtx* c, const int* shape, int ndim,
                                           const char* name) {
     int64_t sv[8];
-    for (int i = 0; i < ndim && i < 8; i++)
+    if (ndim > 8) {
+        ctx_error(c, "shape initializer rank exceeds 8");
+        return NULL;
+    }
+    for (int i = 0; i < ndim; i++)
         sv[i] = shape[i];
     /* A shape operand is a 1-D int64 tensor holding `ndim` values, so TensorProto
      * dims is [ndim] -- not the shape values themselves. Passing `sv` here

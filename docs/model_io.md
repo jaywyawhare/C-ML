@@ -152,7 +152,7 @@ module_save_gguf(model, "exported.gguf");
 
 ### Notes
 
-- The magic number is `0x46475547` (`"GGUF"` in little-endian).
+- The magic number is `0x46554747` (`"GGUF"` in little-endian); tensor dims are stored innermost-first and each tensor's data is 32-byte aligned (or `general.alignment`), matching llama.cpp.
 - Quantized tensor types are automatically dequantized on read via `gguf_quant.h` (see next section).
 - Metadata types (strings, arrays, etc.) are defined in the `GGUFMetadataType` enum.
 

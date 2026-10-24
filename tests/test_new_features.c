@@ -1238,6 +1238,162 @@ static int test_safetensors_serialization(void) {
     }
 }
 
+/* Little-endian writers for crafting model files byte by byte. */
+static size_t put_u32(unsigned char* p, uint32_t v) {
+    memcpy(p, &v, 4);
+    return 4;
+}
+static size_t put_u64(unsigned char* p, uint64_t v) {
+    memcpy(p, &v, 8);
+    return 8;
+}
+static size_t put_gguf_str(unsigned char* p, const char* s) {
+    size_t n = put_u64(p, strlen(s));
+    memcpy(p + n, s, strlen(s));
+    return n + strlen(s);
+}
+static void write_file(const char* path, const void* buf, size_t len) {
+    FILE* f = fopen(path, "wb");
+    if (f) {
+        fwrite(buf, 1, len, f);
+        fclose(f);
+    }
+}
+
+/* Files must match the GGUF spec llama.cpp reads: "GGUF" magic, dims stored
+ * innermost-first, spec type ids, and 32-byte-aligned tensor offsets. */
+static int test_gguf_spec_layout(void) {
+    const char* path = "/tmp/test_cml_spec.gguf";
+    float a[] = {1, 2, 3}, f[] = {0, 1, 2, 3, 4, 5};
+    int sa[] = {3}, sf[] = {2, 3};
+    Tensor* ta     = tensor_from_data(a, sa, 1, &cpu_f32);
+    Tensor* tf     = tensor_from_data(f, sf, 2, &cpu_f32);
+    GGUFContext* w = gguf_open_write(path);
+    int ok         = w && gguf_write_tensor(w, "a", ta) == 0 && gguf_write_tensor(w, "f", tf) == 0;
+    gguf_close(w);
+    tensor_free(ta);
+    tensor_free(tf);
+
+    unsigned char buf[512] = {0};
+    FILE* fp               = fopen(path, "rb");
+    size_t len             = fp ? fread(buf, 1, sizeof(buf), fp) : 0;
+    if (fp)
+        fclose(fp);
+    ok = ok && len > 24 && memcmp(buf, "GGUF", 4) == 0;
+
+    /* After the 24-byte header, tensor "a" (1 dim) then "f" (2 dims). */
+    size_t off = 24 + 8 + 1 + 4 + 8;
+    uint32_t type;
+    uint64_t data_off, d0, d1;
+    memcpy(&type, buf + off, 4);
+    memcpy(&data_off, buf + off + 4, 8);
+    ok = ok && type == GGUF_TENSOR_F32 && data_off % 32 == 0;
+    off += 12 + 8 + 1 + 4;
+    memcpy(&d0, buf + off, 8);
+    memcpy(&d1, buf + off + 8, 8);
+    memcpy(&data_off, buf + off + 16 + 4, 8);
+    ok = ok && d0 == 3 && d1 == 2 && data_off % 32 == 0 && data_off > 0;
+
+    GGUFContext* r = gguf_open_read(path);
+    Tensor* back   = r ? gguf_read_tensor(r, "f") : NULL;
+    ok             = ok && back && back->shape[0] == 2 && back->shape[1] == 3 &&
+         APPROX(tensor_get_float(back, 5), 5.0f);
+    tensor_free(back);
+    gguf_close(r);
+    remove(path);
+    return ok;
+}
+
+/* Hostile safetensors headers must be rejected, not overflow, hang or crash. */
+static int test_safetensors_rejects_malformed(void) {
+    const char* path          = "/tmp/test_cml_bad.safetensors";
+    const char* bad_headers[] = {
+        "{\"w\":{\"dtype\":5,\"shape\":[1],\"data_offsets\":[0,4]}}",
+        "{\"w\":{\"dtype\":\"F32\",\"shape\":\"abc\",\"data_offsets\":[0,4]}}",
+        "{\"w\":{\"dtype\":\"F32\",\"shape\":[1],\"data_offsets\":[8,4]}}",
+        "{\"w\\",
+    };
+    unsigned char buf[4200] = {0};
+    int ok                  = 1;
+    for (size_t i = 0; i < sizeof(bad_headers) / sizeof(bad_headers[0]); i++) {
+        size_t hl = strlen(bad_headers[i]);
+        put_u64(buf, hl);
+        memcpy(buf + 8, bad_headers[i], hl);
+        write_file(path, buf, 8 + hl + 8);
+        SafeTensorsContext* c = safetensors_open_read(path);
+        Tensor* t             = c ? safetensors_read_tensor(c, "w") : NULL;
+        ok                    = ok && t == NULL;
+        safetensors_close(c);
+    }
+
+    /* data_offsets claiming 4096 bytes for a 1-element tensor: refused before fread. */
+    const char* big = "{\"w\":{\"dtype\":\"F32\",\"shape\":[1],\"data_offsets\":[0,4096]}}";
+    put_u64(buf, strlen(big));
+    memcpy(buf + 8, big, strlen(big));
+    write_file(path, buf, 8 + strlen(big) + 4096);
+    SafeTensorsContext* c = safetensors_open_read(path);
+    ok                    = ok && c && safetensors_read_tensor(c, "w") == NULL;
+    safetensors_close(c);
+
+    /* Metadata with a space after the colon and braces inside strings must not
+     * swallow the tensor that follows it. */
+    const char* meta = "{\"__metadata__\": {\"k\": \"}{\"}, \"w\": {\"dtype\": \"F32\", "
+                       "\"shape\": [2], \"data_offsets\": [0, 8]}}";
+    float vals[2]    = {3.0f, 4.0f};
+    put_u64(buf, strlen(meta));
+    memcpy(buf + 8, meta, strlen(meta));
+    memcpy(buf + 8 + strlen(meta), vals, sizeof(vals));
+    write_file(path, buf, 8 + strlen(meta) + sizeof(vals));
+    c         = safetensors_open_read(path);
+    Tensor* t = c ? safetensors_read_tensor(c, "w") : NULL;
+    ok        = ok && t && APPROX(tensor_get_float(t, 1), 4.0f);
+    tensor_free(t);
+    safetensors_close(c);
+    remove(path);
+    return ok;
+}
+
+/* Hostile GGUF tensor infos and metadata must be rejected, not overflow, hang or
+ * exhaust the stack. */
+static int test_gguf_rejects_malformed(void) {
+    const char* path = "/tmp/test_cml_bad.gguf";
+    static unsigned char buf[2500000];
+    int ok = 1;
+
+    /* One tensor claiming 40 dims (the info record holds 8). */
+    size_t n =
+        put_u32(buf, GGUF_MAGIC) + put_u32(buf + 4, 3) + put_u64(buf + 8, 1) + put_u64(buf + 16, 0);
+    n += put_gguf_str(buf + n, "t");
+    n += put_u32(buf + n, 40);
+    for (int d = 0; d < 40; d++)
+        n += put_u64(buf + n, 1);
+    write_file(path, buf, n + 64);
+    GGUFContext* c = gguf_open_read(path);
+    ok             = ok && c == NULL;
+    gguf_close(c);
+
+    /* 200k nested arrays, then an array of 2^62 bytes at EOF. */
+    n = put_u32(buf, GGUF_MAGIC) + put_u32(buf + 4, 3) + put_u64(buf + 8, 0) + put_u64(buf + 16, 1);
+    n += put_gguf_str(buf + n, "k");
+    n += put_u32(buf + n, GGUF_TYPE_ARRAY);
+    for (int d = 0; d < 200000; d++)
+        n += put_u32(buf + n, GGUF_TYPE_ARRAY) + put_u64(buf + n + 4, 1);
+    write_file(path, buf, n);
+    c = gguf_open_read(path);
+    gguf_close(c);
+
+    n = put_u32(buf, GGUF_MAGIC) + put_u32(buf + 4, 3) + put_u64(buf + 8, 0) + put_u64(buf + 16, 1);
+    n += put_gguf_str(buf + n, "k");
+    n += put_u32(buf + n, GGUF_TYPE_ARRAY);
+    n += put_u32(buf + n, GGUF_TYPE_UINT8) + put_u64(buf + n + 4, (uint64_t)1 << 62);
+    write_file(path, buf, n);
+    c = gguf_open_read(path);
+    gguf_close(c);
+
+    remove(path);
+    return ok;
+}
+
 static int test_tensor_from_url_api(void) {
     // Test that the function exists and handles NULL gracefully
     Tensor* t = tensor_from_url(NULL);
@@ -1292,6 +1448,9 @@ int main(void) {
     TEST(transformer_decoder);
     TEST(gguf_serialization);
     TEST(safetensors_serialization);
+    TEST(gguf_spec_layout);
+    TEST(safetensors_rejects_malformed);
+    TEST(gguf_rejects_malformed);
     TEST(tensor_from_url_api);
 
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
