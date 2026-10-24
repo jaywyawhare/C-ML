@@ -309,17 +309,8 @@ static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
     cml_intern_remove(ir->intern_table, original);
 
     // Free the original node (but NOT its output tensor - we kept it)
-    original->output = NULL; // Prevent double-free
-    if (original->input_names) {
-        for (int i = 0; i < original->num_inputs; i++) {
-            cml_free(original->input_names[i]);
-        }
-        cml_free(original->input_names);
-    }
-    cml_free(original->inputs);
-    cml_free(original->output_name);
-    cml_free(original->output_shape);
-    cml_ir_free_node_params(original);
+    original->output = NULL;
+    cml_ir_release_node_storage(original);
     cml_free(original);
 }
 
@@ -3086,10 +3077,16 @@ static int decompose_scan(CMLGraph_t ir, struct IRNode* start) {
      * →DIV, sigmoid→NEG). Inserted nodes aren't revisited within one scan, so
      * repeat until a full scan creates no new nodes (g_decompose_counter is
      * bumped once per node created). Bounded to guard against error loops. */
+    /* A rewrite frees the node it replaces and relinks its chain through the
+     * predecessor, so each pass restarts from start's predecessor, not start. */
+    struct IRNode* before = NULL;
+    for (struct IRNode* n = ir->head; n && n != start; n = n->next)
+        before = n;
+
     const int MAX_PASSES = 24;
     for (int pass = 0; pass < MAX_PASSES; pass++) {
         int counter_before  = atomic_load(&g_decompose_counter);
-        struct IRNode* node = start;
+        struct IRNode* node = before ? before->next : ir->head;
 
         while (node) {
             struct IRNode* next = node->next;

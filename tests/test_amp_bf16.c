@@ -189,7 +189,7 @@ static int test_scaler_noop_under_bf16(void) {
     loss->grad = NULL;
 
     tensor_free(grad);
-    if (scaled)
+    if (scaled && scaled != loss)
         tensor_free(scaled);
     tensor_free(loss);
     grad_scaler_free(scaler);

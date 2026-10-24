@@ -412,9 +412,8 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
                     memset(tensor->grad->data, 0,
                            tensor->grad->numel * cml_dtype_size(tensor->grad->dtype));
             }
-            if (tensor->grad && tensor->grad->data) {
-                *(float*)tensor->grad->data = 1.0f;
-            }
+            if (tensor->grad && tensor->grad->data)
+                tensor_set_float(tensor->grad, 0, 1.0f);
         } else {
             TensorConfig config = (TensorConfig){.dtype      = tensor->dtype,
                                                  .device     = tensor->device,

@@ -95,6 +95,8 @@ void cml_ir_free_node_params(struct IRNode* node);
 /* Canonical teardown of a node's owned storage (params/scope/build_stack/
  * shapes/...) without freeing the node or touching ref_count. */
 void cml_ir_release_node_storage(struct IRNode* node);
+/* Give a fused-away node's output to the graph, which frees it at teardown. */
+void cml_ir_adopt_detached(CMLGraph_t ir, Tensor* t);
 
 struct CMLGraph {
     IRTarget target;
@@ -132,6 +134,13 @@ struct CMLGraph {
     Tensor** grad_publish_log;
     int grad_publish_count;
     int grad_publish_cap;
+
+    /* Outputs of nodes the elementwise fuser folded away. The graph keeps owning them
+     * exactly like node outputs: teardown frees them, and tensor_free unlinks one a
+     * user releases first (cml_ir_forget_tensor). */
+    Tensor** detached_outputs;
+    int detached_count;
+    int detached_cap;
 
     CMLInternTable* intern_table;
 };

@@ -30,6 +30,13 @@ void cml_ir_set_global_context(CMLGraph_t ir);
  */
 void cml_ir_clear_global_if_current(CMLGraph_t ir);
 
+/**
+ * @brief Drop @a t from every per-context registry that borrows it (grad-publish logs,
+ *        detached fused outputs) so a tensor freed between graph passes is never revisited.
+ *        Called from tensor_free.
+ */
+void cml_ir_forget_tensor(Tensor* t);
+
 /* Frees the current global IR context and sets it to NULL.
    Useful for clearing the graph after a training step. */
 void cml_ir_reset_global_context(void);

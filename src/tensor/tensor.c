@@ -869,7 +869,7 @@ void tensor_storage_release(Tensor* t) {
         return; /* Block stays alive for the remaining references. */
 
     if (s->device == DEVICE_CPU || s->device == DEVICE_AUTO) {
-        if (s->from_buffer_cache && s->nbytes > 0) {
+        if (s->from_buffer_cache) {
             cml_buffer_cache_free(s->data, s->nbytes);
         } else {
             cml_free(s->data);
@@ -896,6 +896,31 @@ void tensor_storage_drop_if_detached(Tensor* t) {
     tensor_storage_release(t);
 }
 
+/** Release `t`'s buffer through the allocator that produced it. A shared block (owner or
+ *  view) only drops this tensor's hold, so it is freed once the last reference goes. A cache
+ *  block goes back to the cache even when a data-dependent op (masked_select, nonzero) shrank
+ *  numel to 0 after allocation. The pointer is nulled so a second call never returns a block
+ *  to the cache twice. */
+void tensor_release_data(Tensor* t) {
+    if (!t)
+        return;
+    if (t->buffer_handle) {
+        cml_backend_buffer_free(t->buffer_handle);
+        t->buffer_handle = NULL;
+    } else if (t->storage) {
+        tensor_storage_release(t);
+    } else if (t->owns_data && t->data) {
+        if (t->device != DEVICE_CPU && t->device != DEVICE_AUTO)
+            device_free(t->data, t->device);
+        else if (t->from_buffer_cache)
+            cml_buffer_cache_free(t->data, t->numel * cml_dtype_size(t->dtype));
+        else
+            cml_free(t->data);
+    }
+    t->data              = NULL;
+    t->from_buffer_cache = false;
+}
+
 /** Decrement `t`'s refcount and, at zero, release its data (respecting shared
  *  storage, buffer cache, and device memory), grad, hooks, and metadata. A tensor
  *  with external refs is detached and kept alive instead. */
@@ -917,6 +942,7 @@ void tensor_free(Tensor* t) {
     }
 
     cml_graph_cache_forget_tensor(t);
+    cml_ir_forget_tensor(t);
 
     // CRITICAL: Clear IR node's output pointer BEFORE freeing the tensor
     // This prevents dangling pointers when cml_ir_free is called later
@@ -929,32 +955,7 @@ void tensor_free(Tensor* t) {
         t->ir_context = NULL;
     }
 
-    if (t->buffer_handle) {
-        cml_backend_buffer_free(t->buffer_handle);
-        t->buffer_handle = NULL;
-        t->data          = NULL;
-    } else if (t->owns_data && t->data) {
-        if (t->storage) {
-            /* Owner of a shared block: drop our reference; the block is freed
-             * only when the last view has released it too. */
-            tensor_storage_release(t);
-        } else if (t->device == DEVICE_CPU || t->device == DEVICE_AUTO) {
-            if (t->from_buffer_cache && t->numel > 0) {
-                cml_buffer_cache_free(t->data, t->numel * cml_dtype_size(t->dtype));
-            } else {
-                cml_free(t->data);
-            }
-        } else {
-            device_free(t->data, t->device);
-        }
-        /* Null after free: a second tensor_free on an already-destroyed tensor
-         * must not return the same block to the buffer cache twice. */
-        t->data = NULL;
-    } else if (!t->owns_data && t->storage) {
-        /* A view holding the base's block alive through shared storage. */
-        tensor_storage_release(t);
-        t->data = NULL;
-    }
+    tensor_release_data(t);
 
     if (t->shape)
         cml_free(t->shape);
@@ -2143,25 +2144,11 @@ int tensor_assign(Tensor* t, Tensor* src) {
         t->ir_context = NULL;
     }
 
-    if (t->owns_data && t->data) {
-        if (t->buffer_handle) {
-            cml_backend_buffer_free(t->buffer_handle);
-            t->buffer_handle = NULL;
-        } else if (t->storage) {
-            /* Shared block: views may still read the old data through it. */
-            tensor_storage_release(t);
-        } else if (t->device == DEVICE_CPU || t->device == DEVICE_AUTO) {
-            cml_free(t->data);
-        } else {
-            device_free(t->data, t->device);
-        }
-    }
+    tensor_release_data(t);
 
     if (t->device == src->device) {
-        t->data              = src->data;
-        t->owns_data         = false;
-        t->buffer_handle     = NULL;
-        t->from_buffer_cache = false;
+        t->data      = src->data;
+        t->owns_data = false;
     } else {
         t->data = cml_malloc(nbytes);
         if (!t->data)

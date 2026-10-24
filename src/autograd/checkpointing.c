@@ -68,12 +68,17 @@ int autograd_checkpoint(Tensor* tensor) {
             return -1;
         }
         for (int i = 0; i < checkpoint->num_inputs; i++) {
-            checkpoint->saved_inputs[i] = tensor->ir_node->inputs[i];
-            /* Hold a reference: the recompute below dereferences these long after
-             * the forward pass, and an input freed in between would be a
-             * use-after-free. Released in autograd_checkpointing_cleanup. */
-            if (checkpoint->saved_inputs[i])
-                tensor_pin(checkpoint->saved_inputs[i]);
+            Tensor* in                  = tensor->ir_node->inputs[i];
+            checkpoint->saved_inputs[i] = in;
+            /* Hold a counted reference: the recompute below dereferences these
+             * long after the forward pass, and an input freed in between would be
+             * a use-after-free. tensor_release drops both counts, so pinning alone
+             * would spend a reference this checkpoint never took and free inputs
+             * the graph still owns. Released in autograd_checkpointing_cleanup. */
+            if (in) {
+                in->ref_count++;
+                tensor_pin(in);
+            }
         }
     } else {
         checkpoint->num_inputs   = 0;
@@ -89,21 +94,9 @@ int autograd_checkpoint(Tensor* tensor) {
      * from. A backend-owned device buffer is left alone -- freeing it needs the
      * backend, and the CPU path is what this feature targets. */
     if (tensor->data && !tensor->buffer_handle) {
-        if (tensor->owns_data) {
-            if (tensor->storage) {
-                tensor_storage_release(tensor);
-            } else if (tensor->from_buffer_cache) {
-                cml_buffer_cache_free(tensor->data, tensor->numel * cml_dtype_size(tensor->dtype));
-            } else {
-                cml_free(tensor->data);
-            }
-        } else if (tensor->storage) {
-            tensor_storage_release(tensor);
-        }
-        tensor->data              = NULL;
-        tensor->owns_data         = false;
-        tensor->from_buffer_cache = false;
-        tensor->is_executed       = false;
+        tensor_release_data(tensor);
+        tensor->owns_data   = false;
+        tensor->is_executed = false;
     }
 
     checkpointed_tensors[num_checkpointed] = checkpoint;

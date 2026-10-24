@@ -1061,7 +1061,8 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
             LOG_ERROR("PTX codegen: Failed to allocate output tensor");
             return -1;
         }
-        out->owns_data = true;
+        out->owns_data         = true;
+        out->from_buffer_cache = true;
     }
 
     char fn_name[64];

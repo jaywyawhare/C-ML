@@ -800,9 +800,7 @@ int device_move_tensor(Tensor* tensor, DeviceType device) {
         return -1;
     }
 
-    if (tensor->owns_data && tensor->data) {
-        device_free(tensor->data, tensor->device);
-    }
+    tensor_release_data(tensor);
 
     tensor->data      = new_data;
     tensor->device    = device;

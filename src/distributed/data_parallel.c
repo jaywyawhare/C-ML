@@ -235,24 +235,11 @@ static bool ddp_alias_grad_to_slot(Tensor* g, float* slot, size_t numel) {
 
     memcpy(slot, g->data, numel * sizeof(float));
 
-    if (g->owns_data) {
-        if (g->storage) {
-            tensor_storage_release(g); /* shared block: drop our hold */
-        } else if (g->from_buffer_cache) {
-            cml_buffer_cache_free(g->data, numel * sizeof(float));
-        } else {
-            cml_free(g->data);
-        }
-    } else if (g->storage) {
-        tensor_storage_release(g);
-    }
-
-    g->data              = slot;
-    g->owns_data         = false; /* the bucket owns this memory now */
-    g->from_buffer_cache = false;
-    g->storage           = NULL;
-    g->storage_offset    = 0;
-    g->is_executed       = true;
+    tensor_release_data(g);
+    g->data           = slot;
+    g->owns_data      = false; /* the bucket owns this memory now */
+    g->storage_offset = 0;
+    g->is_executed    = true;
     return true;
 }
 

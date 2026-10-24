@@ -75,17 +75,7 @@ int tensor_realize_all(Tensor** tensors, int num_tensors) {
 void tensor_unrealize(Tensor* t) {
     if (!t || !t->data)
         return;
-    if (t->owns_data) {
-        if (t->storage) {
-            /* Shared block: views may still read it after we detach. */
-            tensor_storage_release(t);
-        } else if (t->from_buffer_cache) {
-            cml_buffer_cache_free(t->data, t->numel * cml_dtype_size(t->dtype));
-        } else {
-            cml_free(t->data);
-        }
-    }
-    t->data        = NULL;
+    tensor_release_data(t);
     t->is_executed = false;
     t->owns_data   = false;
 

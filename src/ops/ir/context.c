@@ -158,6 +158,28 @@ void cml_ir_clear_global_if_current(CMLGraph_t ir) {
     tls_ir_context = NULL;
 }
 
+/** Drop @p t from per-context bookkeeping as it is freed: the grad-publish logs of the
+ *  thread-local, auto-capture and grad-owning contexts (the double-backward sweep skips the
+ *  NULLed slots), and the detached-output list of the context that adopted it. */
+void cml_ir_forget_tensor(Tensor* t) {
+    CMLGraph_t ctxs[3] = {tls_ir_context, atomic_load(&g_auto_capture_ir),
+                          t->grad ? t->grad->ir_context : NULL};
+    for (int c = 0; c < 3; c++) {
+        CMLGraph_t ir = ctxs[c];
+        if (!ir)
+            continue;
+        for (int i = 0; i < ir->grad_publish_count; i++)
+            if (ir->grad_publish_log[i] == t)
+                ir->grad_publish_log[i] = NULL;
+    }
+
+    CMLGraph_t owner = t->ir_node ? NULL : t->ir_context;
+    if (owner)
+        for (int i = 0; i < owner->detached_count; i++)
+            if (owner->detached_outputs[i] == t)
+                owner->detached_outputs[i] = NULL;
+}
+
 /** Reset the thread-local IR context, tearing down dependent caches in order
  *  (plans hold Tensor* for buffer detach, so they go before the IR tensors). */
 void cml_ir_reset_global_context(void) {

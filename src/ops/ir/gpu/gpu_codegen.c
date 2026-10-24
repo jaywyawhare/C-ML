@@ -1687,7 +1687,8 @@ static int gpu_execute_node(CMLGPUCodegen* cg, struct IRNode* node) {
             LOG_ERROR("GPU codegen: Failed to allocate output tensor");
             return -1;
         }
-        out->owns_data = true;
+        out->owns_data         = true;
+        out->from_buffer_cache = true;
     }
 
     char fn_name[64];

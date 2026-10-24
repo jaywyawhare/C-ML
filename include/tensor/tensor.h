@@ -189,6 +189,10 @@ void tensor_storage_release(Tensor* t);
 /** Drop `t`'s shared-storage hold once its data no longer lives in that block
  *  (a view materialized onto a private buffer). No-op while it is still a view. */
 void tensor_storage_drop_if_detached(Tensor* t);
+/** Release the buffer `t` holds through whichever allocator produced it (backend handle,
+ *  shared storage, execution buffer cache, host or device heap) and clear `t->data`.
+ *  Use it wherever a tensor's data is freed or replaced. */
+void tensor_release_data(Tensor* t);
 Tensor* tensor_clone(Tensor* t);
 float tensor_get_float(Tensor* t, size_t idx);
 void tensor_set_float(Tensor* t, size_t idx, float value);

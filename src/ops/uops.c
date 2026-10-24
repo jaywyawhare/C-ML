@@ -429,8 +429,9 @@ Tensor* uop_max_reduce_dim(Tensor* a, int dim, bool keepdim) {
     return uop_reduce_dim(a, dim, keepdim, UOP_MAX_REDUCE);
 }
 
-/** Reshape `a` to the target shape; a contiguous input keeps a cheap view, while a
- *  non-contiguous one emits a real UOP_RESHAPE node so the executor lays out the data. */
+/** Reshape `a` to the target shape; a realized contiguous input keeps a cheap view, while a
+ *  non-contiguous or still-lazy one emits a real UOP_RESHAPE node, so reshaping never
+ *  executes the graph. */
 Tensor* uop_reshape(Tensor* a, ReshapeParams* params) {
     if (!a || !params) {
         CML_ERR_NULL("NULL input to uop_reshape");
@@ -448,8 +449,11 @@ Tensor* uop_reshape(Tensor* a, ReshapeParams* params) {
      * heap-use-after-free on any `reshape -> reduce -> backward`.
      *
      * When a view is impossible, emit the node and let the executor lay the
-     * data out. The contiguous case keeps the cheap view it always had. */
-    if (!a->is_contiguous) {
+     * data out. The same goes for a still-lazy input: tensor_reshape() would
+     * realize it to alias its storage, executing (and fusing away) nodes that
+     * cml_ir_grad is still walking. Only a realized contiguous input keeps the
+     * cheap view. */
+    if (!a->is_contiguous || (a->ir_node && (!a->is_executed || !a->data))) {
         CMLGraph_t ir = cml_ir_get_or_create_context();
         if (!ir)
             CML_ERR_NULL("no IR context for uop_reshape");

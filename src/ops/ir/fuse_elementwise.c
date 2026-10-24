@@ -412,12 +412,12 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
         if (ir->tail == root)
             ir->tail = fnode;
 
-        /* Re-walk and unlink every consumed member still in the list. We free the
-         * NODE structs but NEVER the member output tensors - those may be owned by
-         * the user (e.g. an intermediate returned by cml_mul that the caller later
-         * tensor_free()s) or by the IR context. We just detach them (ir_node=NULL)
-         * so nothing dereferences the freed node. root's output was transferred to
-         * fnode above, so its shell is freed with output already NULLed. */
+        /* Re-walk and unlink every consumed member still in the list. Member output
+         * tensors are not freed here: a caller may still hold one (an intermediate
+         * returned by cml_mul that it later tensor_free()s). They are detached
+         * (ir_node=NULL) so nothing dereferences the freed node, and adopted by the
+         * graph, which frees them at teardown exactly like node outputs. root's output
+         * was transferred to fnode above, so its shell is freed with output NULLed. */
         struct IRNode* pp    = NULL;
         struct IRNode* cnode = ir->head;
         while (cnode) {
@@ -442,22 +442,15 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
             if (cnode == root) {
                 cnode->output = NULL; /* transferred to fnode */
             } else if (cnode->output) {
-                cnode->output->ir_node = NULL; /* detach; owner frees the tensor */
-                cnode->output          = NULL;
+                cnode->output->ir_node = NULL;
+                cml_ir_adopt_detached(ir, cnode->output);
+                cnode->output = NULL;
             }
-            if (cnode->input_names) {
-                for (int i = 0; i < cnode->num_inputs; i++)
-                    cml_free(cnode->input_names[i]);
-                cml_free(cnode->input_names);
-            }
-            cml_free(cnode->inputs);
-            cml_free(cnode->output_name);
-            cml_free(cnode->output_shape);
             /* Leave the CSE table before the memory goes: it keys on node
              * identity, so a fused-away node left interned is dereferenced by
              * the next lookup that probes its slot. */
             cml_intern_remove(ir->intern_table, cnode);
-            cml_ir_free_node_params(cnode);
+            cml_ir_release_node_storage(cnode);
             cml_free(cnode);
             cnode = nx;
         }
@@ -466,16 +459,8 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
          * never visited it - free its orphaned shell here. Its output tensor was
          * transferred to fnode, so NULL it first. */
         root->output = NULL;
-        if (root->input_names) {
-            for (int i = 0; i < root->num_inputs; i++)
-                cml_free(root->input_names[i]);
-            cml_free(root->input_names);
-        }
-        cml_free(root->inputs);
-        cml_free(root->output_name);
-        cml_free(root->output_shape);
         cml_intern_remove(ir->intern_table, root);
-        cml_ir_free_node_params(root);
+        cml_ir_release_node_storage(root);
         cml_free(root);
 
         ir->node_count -= (m - 1);

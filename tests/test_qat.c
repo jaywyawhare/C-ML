@@ -217,10 +217,10 @@ static int test_ste_gradient_identity(void) {
             ok = 0;
     }
 
-    cml_ir_reset_global_context();
+    tensor_free(fq);
     tensor_free(x);
     tensor_free(w);
-    tensor_free(fq);
+    cml_ir_reset_global_context();
     return ok;
 }
 

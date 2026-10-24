@@ -777,17 +777,7 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
             return NULL;
 
         // Release the default buffer allocated by tensor_create; we'll use the context buffer
-        if (tensor->buffer_handle) {
-            cml_backend_buffer_free(tensor->buffer_handle);
-            tensor->buffer_handle = NULL;
-        } else if (tensor->data) {
-            if (tensor->device == DEVICE_CPU || tensor->device == DEVICE_AUTO) {
-                cml_free(tensor->data);
-            } else {
-                device_free(tensor->data, tensor->device);
-            }
-        }
-        tensor->data      = NULL;
+        tensor_release_data(tensor);
         tensor->owns_data = false;
 
         if (cml_tensor_allocator_alloc(&ctx->tensor_allocator, tensor) != 0) {
@@ -844,18 +834,9 @@ int cml_context_set_param(CMLContext_t ctx, Tensor* tensor) {
          * context's bump allocator so it lives in the same arena as other
          * context tensors.  If the tensor already owns external data we
          * release that allocation first. */
-        if (tensor->owns_data && tensor->data) {
-            if (tensor->device == DEVICE_CPU || tensor->device == DEVICE_AUTO) {
-                cml_free(tensor->data);
-            } else {
-                device_free(tensor->data, tensor->device);
-            }
-            tensor->data      = NULL;
+        if (tensor->buffer_handle != ctx->buffer) {
+            tensor_release_data(tensor);
             tensor->owns_data = false;
-        }
-        if (tensor->buffer_handle && tensor->buffer_handle != ctx->buffer) {
-            cml_backend_buffer_free(tensor->buffer_handle);
-            tensor->buffer_handle = NULL;
         }
 
         if (cml_tensor_allocator_alloc(&ctx->tensor_allocator, tensor) != 0) {

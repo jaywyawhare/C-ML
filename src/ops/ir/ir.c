@@ -364,6 +364,9 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     ir->grad_publish_log           = NULL;
     ir->grad_publish_count         = 0;
     ir->grad_publish_cap           = 0;
+    ir->detached_outputs           = NULL;
+    ir->detached_count             = 0;
+    ir->detached_cap               = 0;
     ir->execution_results          = NULL;
     ir->execution_results_count    = 0;
     ir->execution_results_capacity = 0;
@@ -858,6 +861,15 @@ void cml_ir_free_node_params(struct IRNode* node) {
             cml_free(p);
         break;
     }
+    case UOP_FLIP:
+    case UOP_LAYERNORM:
+    case UOP_LAYERNORM_BWD:
+    case UOP_RMSNORM:
+    case UOP_RMSNORM_BWD:
+    case UOP_SDPA:
+        /* Flat FlipParams / LayerNormUOpParams / SDPAUOpParams. */
+        cml_free(node->params);
+        break;
     default:
         break;
     }
@@ -1027,6 +1039,35 @@ static bool freed_set_contains(const FreedSet* fs, Tensor* t) {
     return false;
 }
 
+/** Release a graph-owned output during teardown. A pinned tensor (external owner, or a value
+ *  holding its published grad) is detached and kept, with ref_count matched to the pin count so
+ *  each owner's tensor_release lands at zero; this graph's consumer refs (cml_ir_add_uop) are
+ *  never returned in teardown and would otherwise leak a parameter grad per step. */
+static void release_graph_output(FreedSet* freed, Tensor* out) {
+    freed_set_add(freed, out);
+    if (out->external_refs > 0) {
+        out->ref_count = out->external_refs;
+        tensor_detach_keep(out);
+    } else {
+        out->ref_count = 1;
+        tensor_free(out);
+    }
+}
+
+/** Hand the output of a node the fuser folded away to @p ir, which then frees it at teardown
+ *  like any node output. On OOM the tensor is simply left unowned. */
+void cml_ir_adopt_detached(CMLGraph_t ir, Tensor* t) {
+    if (ir->detached_count == ir->detached_cap) {
+        int cap        = ir->detached_cap ? ir->detached_cap * 2 : 16;
+        Tensor** grown = cml_realloc(ir->detached_outputs, (size_t)cap * sizeof(Tensor*));
+        if (!grown)
+            return;
+        ir->detached_outputs = grown;
+        ir->detached_cap     = cap;
+    }
+    ir->detached_outputs[ir->detached_count++] = t;
+}
+
 /** Tear down an IR graph: free forward/backward output tensors, tensor refs,
  *  nodes, intern table and bookkeeping, guarding tensors reachable twice from
  *  being freed a second time. */
@@ -1052,20 +1093,7 @@ void cml_ir_free(CMLGraph_t ir) {
             break;
         }
         if (node->output) {
-            Tensor* out = node->output;
-            freed_set_add(&freed, out);
-            if (out->external_refs > 0) {
-                /* Pinned output (external owner, or a value holding its
-                 * published grad): detach and keep it. Match ref_count to the
-                 * pin count so each owner's tensor_release lands at zero; this
-                 * graph's own consumer refs (cml_ir_add_uop) are not returned in
-                 * teardown and would otherwise leak a parameter grad per step. */
-                out->ref_count = out->external_refs;
-                tensor_detach_keep(out);
-            } else {
-                out->ref_count = 1;
-                tensor_free(out);
-            }
+            release_graph_output(&freed, node->output);
             node->output = NULL;
         }
         node = node->next;
@@ -1081,20 +1109,22 @@ void cml_ir_free(CMLGraph_t ir) {
             break;
         }
         if (node->output) {
-            Tensor* out = node->output;
-            freed_set_add(&freed, out);
-            if (out->external_refs > 0) {
-                out->ref_count = out->external_refs; /* match pin count, as above */
-                tensor_detach_keep(out);
-            } else {
-                out->ref_count = 1;
-                tensor_free(out);
-            }
+            release_graph_output(&freed, node->output);
             node->output = NULL;
         }
         node = node->next;
         node_idx++;
     }
+
+    /* Phase 1c: outputs of fused-away nodes. tensor_free NULLs each slot as it frees it, so
+     * every entry is read before its release. */
+    for (int i = 0; i < ir->detached_count; i++)
+        if (ir->detached_outputs[i])
+            release_graph_output(&freed, ir->detached_outputs[i]);
+    cml_free(ir->detached_outputs);
+    ir->detached_outputs = NULL;
+    ir->detached_count   = 0;
+    ir->detached_cap     = 0;
 
     if (ir->tensor_refs) {
         if (freed.p && freed.n > 1)
