@@ -101,6 +101,9 @@ float optimizer_get_group_lr(Optimizer* optimizer, int group_index);
 void optimizer_set_lr_scheduler(Optimizer* optimizer, int step_size, float gamma);
 
 void optimizer_set_grad_clip_norm(Optimizer* optimizer, float norm);
+/** Global L2 norm of the gradients across @p groups, of any dtype; when @p max_norm > 0 and the
+ *  norm exceeds it the gradients are scaled down to it (torch.nn.utils.clip_grad_norm_). */
+float optimizer_clip_grad_norm(const ParameterGroup* groups, int num_groups, float max_norm);
 
 void optimizer_set_amsgrad(Optimizer* optimizer, bool amsgrad);
 

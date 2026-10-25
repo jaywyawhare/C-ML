@@ -7,6 +7,7 @@
 #include "autograd/autograd.h"
 #include "optim.h"
 #include "core/logging.h"
+#include "tensor/dtype_access.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -431,56 +432,21 @@ void training_metrics_set_gradient_norm(TrainingMetrics* metrics, float grad_nor
     metrics->gradient_norm = grad_norm;
 }
 
-/** L2 norm across every parameter's gradient; also caches it on `metrics`.
- * Returns 0 when no parameter carries a gradient. */
+/** L2 norm across every parameter's gradient; also caches it on `metrics`. Returns 0 when no
+ *  parameter carries a gradient. */
 float training_metrics_calculate_gradient_norm(TrainingMetrics* metrics, void** parameters,
                                                int num_parameters) {
     if (!metrics || !parameters || num_parameters == 0)
         return 0.0f;
-
-    float grad_norm_squared = 0.0f;
-    int params_with_grad    = 0;
-
-    for (int i = 0; i < num_parameters; i++) {
-        Parameter* param = (Parameter*)parameters[i];
-        if (!param || !param->tensor)
-            continue;
-
-        Tensor* grad = tensor_get_grad(param->tensor);
-        if (!grad)
-            continue;
-
-        float* grad_data = (float*)tensor_data_ptr(grad);
-        if (!grad_data)
-            continue;
-
-        size_t num_elements = grad->numel; // Use numel field directly
-        if (num_elements == 0 && grad->shape && grad->ndim > 0) {
-            num_elements = 1;
-            for (int d = 0; d < grad->ndim; d++) {
-                num_elements *= (size_t)grad->shape[d];
-            }
-        }
-
-        for (size_t j = 0; j < num_elements; j++) {
-            float g = grad_data[j];
-            grad_norm_squared += g * g;
-        }
-        params_with_grad++;
-    }
-
-    if (params_with_grad == 0)
-        return 0.0f;
-
-    float grad_norm        = sqrtf(grad_norm_squared);
-    metrics->gradient_norm = grad_norm;
-    return grad_norm;
+    ParameterGroup all = {.parameters = (Parameter**)parameters, .num_parameters = num_parameters};
+    metrics->gradient_norm = optimizer_clip_grad_norm(&all, 1, 0.0f);
+    return metrics->gradient_norm;
 }
 
 /** Raw float data pointer of `t` with its element count written to
- * `num_elements`, or NULL when the tensor has no backing data. */
+ * `num_elements`, or NULL when the tensor is not float32 or has no backing data. */
 float* cml_tensor_float_buffer(Tensor* t, size_t* num_elements) {
-    float* data = (float*)tensor_data_ptr(t);
+    float* data = t && t->dtype == DTYPE_FLOAT32 ? (float*)tensor_data_ptr(t) : NULL;
     if (!data)
         return NULL;
 
@@ -500,20 +466,22 @@ float* cml_tensor_float_buffer(Tensor* t, size_t* num_elements) {
 /* One pass over every parameter's data, applied by `visit`. Shared by the
  * weight and gradient summaries, which differ only in which tensor they read. */
 static void dist_accumulate(void** parameters, int num_parameters, bool want_grad,
-                            void (*visit)(const float*, size_t, void*), void* ctx) {
+                            void (*visit)(const void*, size_t, DType, void*), void* ctx) {
     for (int i = 0; i < num_parameters; i++) {
         Parameter* param = (Parameter*)parameters[i];
         if (!param || !param->tensor)
             continue;
 
+        /* Quantized blocks are not numel elements of their dtype, and device memory is not
+         * host-readable, so neither can be summarised by value here. */
         Tensor* t = want_grad ? tensor_get_grad(param->tensor) : param->tensor;
-        if (!t)
+        if (!t || t->quant_type != CML_QUANT_NONE ||
+            (t->device != DEVICE_CPU && t->device != DEVICE_AUTO))
             continue;
 
-        size_t n          = 0;
-        const float* data = cml_tensor_float_buffer(t, &n);
-        if (data && n)
-            visit(data, n, ctx);
+        const void* data = tensor_data_ptr(t);
+        if (data && t->numel)
+            visit(data, t->numel, t->dtype, ctx);
     }
 }
 
@@ -524,10 +492,10 @@ typedef struct {
 } DistPass1;
 
 /** Accumulate min/max/sum/sumsq and zero counts over one parameter's values. */
-static void dist_pass1(const float* data, size_t n, void* ctx) {
+static void dist_pass1(const void* data, size_t n, DType dt, void* ctx) {
     DistPass1* a = (DistPass1*)ctx;
     for (size_t i = 0; i < n; i++) {
-        float v = data[i];
+        float v = (float)cml_load_f64(data, i, dt);
         if (v < a->min)
             a->min = v;
         if (v > a->max)
@@ -545,15 +513,13 @@ typedef struct {
     float lo, scale; /* bin index = (v - lo) * scale */
 } DistPass2;
 
-/** Tally one parameter's values into the quantile histogram bins. */
-static void dist_pass2(const float* data, size_t n, void* ctx) {
+/** Tally one parameter's values into the quantile histogram bins. NaN/Inf (a diverging run)
+ *  land in the end bins instead of being converted to int, which is undefined. */
+static void dist_pass2(const void* data, size_t n, DType dt, void* ctx) {
     DistPass2* h = (DistPass2*)ctx;
     for (size_t i = 0; i < n; i++) {
-        int b = (int)((data[i] - h->lo) * h->scale);
-        if (b < 0)
-            b = 0;
-        if (b >= DIST_BINS)
-            b = DIST_BINS - 1;
+        float pos = ((float)cml_load_f64(data, i, dt) - h->lo) * h->scale;
+        int b     = pos >= 0.0f ? (pos < (float)DIST_BINS ? (int)pos : DIST_BINS - 1) : 0;
         h->bins[b]++;
     }
 }

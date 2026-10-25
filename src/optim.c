@@ -6,6 +6,7 @@
 #include "core/training_metrics.h"
 #include "core/error_stack.h"
 #include "tensor/tensor.h"
+#include "tensor/dtype_access.h"
 #include "autograd/autograd.h"
 #include "backend/blas.h"
 #include <stdio.h>
@@ -635,6 +636,36 @@ void optimizer_set_grad_clip_norm(Optimizer* optimizer, float norm) {
     }
 }
 
+/** Global L2 norm of the gradients across @p groups, of any dtype; when @p max_norm > 0 and the
+ *  norm exceeds it the gradients are scaled down to it (torch.nn.utils.clip_grad_norm_). */
+float optimizer_clip_grad_norm(const ParameterGroup* groups, int num_groups, float max_norm) {
+    float sumsq = 0.0f;
+    for (int g = 0; g < num_groups; g++)
+        for (int i = 0; i < groups[g].num_parameters; i++) {
+            Parameter* p   = groups[g].parameters[i];
+            Tensor* grad   = p && p->tensor ? tensor_get_grad(p->tensor) : NULL;
+            const void* gd = grad ? tensor_data_ptr(grad) : NULL;
+            for (size_t j = 0; gd && j < grad->numel; j++) {
+                float v = (float)cml_load_f64(gd, j, grad->dtype);
+                sumsq += v * v;
+            }
+        }
+    float norm = sqrtf(sumsq);
+    if (max_norm <= 0.0f || norm <= max_norm)
+        return norm;
+
+    float scale = max_norm / (norm + 1e-6f);
+    for (int g = 0; g < num_groups; g++)
+        for (int i = 0; i < groups[g].num_parameters; i++) {
+            Parameter* p = groups[g].parameters[i];
+            Tensor* grad = p && p->tensor ? tensor_get_grad(p->tensor) : NULL;
+            void* gd     = grad ? tensor_data_ptr(grad) : NULL;
+            for (size_t j = 0; gd && j < grad->numel; j++)
+                cml_store_f64(gd, j, grad->dtype, (float)cml_load_f64(gd, j, grad->dtype) * scale);
+        }
+    return norm;
+}
+
 /** Toggle the AMSGrad variant for Adam-family optimizers. */
 void optimizer_set_amsgrad(Optimizer* optimizer, bool amsgrad) {
     if (optimizer) {
@@ -1036,46 +1067,9 @@ static void adam_step(Optimizer* optimizer) {
     if (!optimizer)
         return;
 
-    /* Gradient clipping: compute global L2 norm, then scale all grads down */
-    if (optimizer->grad_clip_norm > 0.0f) {
-        float global_norm = 0.0f;
-        for (int g = 0; g < optimizer->num_param_groups; g++) {
-            ParameterGroup* grp = &optimizer->param_groups[g];
-            for (int i = 0; i < grp->num_parameters; i++) {
-                Parameter* p = grp->parameters[i];
-                if (!p || !p->tensor || !p->requires_grad)
-                    continue;
-                Tensor* grad = tensor_get_grad(p->tensor);
-                if (!grad)
-                    continue;
-                float* gd = (float*)tensor_data_ptr(grad);
-                if (!gd)
-                    continue;
-                for (size_t j = 0; j < p->tensor->numel; j++)
-                    global_norm += gd[j] * gd[j];
-            }
-        }
-        global_norm = sqrtf(global_norm);
-        if (global_norm > optimizer->grad_clip_norm) {
-            float scale = optimizer->grad_clip_norm / (global_norm + 1e-6f);
-            for (int g = 0; g < optimizer->num_param_groups; g++) {
-                ParameterGroup* grp = &optimizer->param_groups[g];
-                for (int i = 0; i < grp->num_parameters; i++) {
-                    Parameter* p = grp->parameters[i];
-                    if (!p || !p->tensor || !p->requires_grad)
-                        continue;
-                    Tensor* grad = tensor_get_grad(p->tensor);
-                    if (!grad)
-                        continue;
-                    float* gd = (float*)tensor_data_ptr(grad);
-                    if (!gd)
-                        continue;
-                    for (size_t j = 0; j < p->tensor->numel; j++)
-                        gd[j] *= scale;
-                }
-            }
-        }
-    }
+    if (optimizer->grad_clip_norm > 0.0f)
+        optimizer_clip_grad_norm(optimizer->param_groups, optimizer->num_param_groups,
+                                 optimizer->grad_clip_norm);
 
     /* Fast path: host-ready grads + allocated moments -> update in place, as in
      * the SGD path. The IR path emits a uop_adam_step per parameter and realizes

@@ -413,9 +413,7 @@ static TrainingConfig default_training_config(void) {
                             .checkpoint_every_n_layers = 0};
 }
 
-/* Clip `model`'s gradients in place so their global L2 norm ≤ max_norm. No-op
- * when max_norm ≤ 0 or the norm is already within bounds. */
-
+/** Clip @p model's gradients in place so their global L2 norm is at most @p max_norm. */
 static void clip_gradients_by_norm(Module* model, float max_norm) {
     if (max_norm <= 0.0f)
         return;
@@ -423,45 +421,8 @@ static void clip_gradients_by_norm(Module* model, float max_norm) {
     int num_params     = 0;
     if (module_collect_parameters(model, &params, &num_params, true) != 0 || !params)
         return;
-
-    float grad_norm_squared = 0.0f;
-    int params_with_grad    = 0;
-    for (int i = 0; i < num_params; i++) {
-        if (!params[i] || !params[i]->tensor)
-            continue;
-        Tensor* grad = tensor_get_grad(params[i]->tensor);
-        if (!grad)
-            continue;
-        size_t num_elements;
-        float* grad_data = cml_tensor_float_buffer(grad, &num_elements);
-        if (!grad_data)
-            continue;
-        for (size_t j = 0; j < num_elements; j++)
-            grad_norm_squared += grad_data[j] * grad_data[j];
-        params_with_grad++;
-    }
-
-    if (params_with_grad > 0) {
-        float grad_norm = sqrtf(grad_norm_squared);
-        if (grad_norm > max_norm) {
-            float clip_factor = max_norm / grad_norm;
-            for (int i = 0; i < num_params; i++) {
-                if (!params[i] || !params[i]->tensor)
-                    continue;
-                Tensor* grad = tensor_get_grad(params[i]->tensor);
-                if (!grad)
-                    continue;
-                size_t num_elements;
-                float* grad_data = cml_tensor_float_buffer(grad, &num_elements);
-                if (!grad_data)
-                    continue;
-                for (size_t j = 0; j < num_elements; j++)
-                    grad_data[j] *= clip_factor;
-            }
-            LOG_DEBUG("Gradient clipped: norm=%.6f, threshold=%.6f, factor=%.6f", (double)grad_norm,
-                      (double)max_norm, (double)clip_factor);
-        }
-    }
+    ParameterGroup all = {.parameters = params, .num_parameters = num_params};
+    optimizer_clip_grad_norm(&all, 1, max_norm);
     cml_free(params);
 }
 

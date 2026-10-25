@@ -1,6 +1,8 @@
 #include "nn/init.h"
 #include "core/threefry.h"
 #include "core/logging.h"
+#include "tensor/dtype_access.h"
+#include "alloc/cml_allocator.h"
 #include <stdlib.h>
 #include <math.h>
 
@@ -12,7 +14,7 @@ void nn_init_uniform(Tensor* tensor, float low, float high) {
     if (tensor_ensure_executed(tensor) != 0)
         return;
 
-    float* data = (float*)tensor_data_ptr(tensor);
+    void* data = tensor_data_ptr(tensor);
     if (!data)
         return;
 
@@ -26,16 +28,16 @@ void nn_init_uniform(Tensor* tensor, float low, float high) {
     if (n == 0)
         return;
 
-    float* samples = (float*)malloc(n * sizeof(float));
+    float* samples = cml_malloc(n * sizeof(float));
     if (!samples)
         return;
 
     cml_rng_uniform(rng, samples, n);
     float span = high - low;
     for (size_t i = 0; i < n; i++)
-        data[i] = low + samples[i] * span;
+        cml_store_f64(data, i, tensor->dtype, low + samples[i] * span);
 
-    free(samples);
+    cml_free(samples);
 }
 
 /** Xavier/Glorot uniform init: uniform in +/-sqrt(6/(fan_in+fan_out)). */
