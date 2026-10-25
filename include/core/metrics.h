@@ -169,6 +169,37 @@ float cml_average_precision(const int* y_true, const float* y_score, int n);
  */
 float cml_bleu(const int* candidate, int cand_len, const int* reference, int ref_len, int max_n);
 
+/**
+ * Levenshtein edit distance (unit-cost insert/delete/substitute) over token-id sequences.
+ * @param a (const int*)
+ * @param alen (int)
+ * @param b (const int*)
+ * @param blen (int)
+ * @return (int)
+ */
+int cml_edit_distance(const int* a, int alen, const int* b, int blen);
+
+/**
+ * Word error rate: reference-to-hypothesis edit distance divided by reference length.
+ * @param reference (const int*)
+ * @param ref_len (int)
+ * @param hypothesis (const int*)
+ * @param hyp_len (int)
+ * @return (float)
+ */
+float cml_wer(const int* reference, int ref_len, const int* hypothesis, int hyp_len);
+
+/**
+ * ROUGE-N recall: clipped candidate/reference n-gram overlap over reference n-gram count.
+ * @param candidate (const int*)
+ * @param cand_len (int)
+ * @param reference (const int*)
+ * @param ref_len (int)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_rouge_n(const int* candidate, int cand_len, const int* reference, int ref_len, int n);
+
 #ifdef __cplusplus
 }
 #endif

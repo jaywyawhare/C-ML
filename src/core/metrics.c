@@ -431,3 +431,83 @@ float cml_bleu(const int* candidate, int cand_len, const int* reference, int ref
     double bp  = cand_len >= ref_len ? 1.0 : exp(1.0 - (double)ref_len / (double)cand_len);
     return (float)(bp * geo);
 }
+
+/** Levenshtein edit distance (insert/delete/substitute, unit cost) over token-id
+ *  sequences. Returns -1 on allocation failure.
+ * @param a (const int*)
+ * @param alen (int)
+ * @param b (const int*)
+ * @param blen (int)
+ * @return (int)
+ */
+int cml_edit_distance(const int* a, int alen, const int* b, int blen) {
+    if (alen < 0 || blen < 0)
+        return -1;
+    if (alen == 0)
+        return blen;
+    if (blen == 0)
+        return alen;
+    int* prev = cml_malloc((size_t)(blen + 1) * sizeof(int));
+    int* cur  = cml_malloc((size_t)(blen + 1) * sizeof(int));
+    if (!prev || !cur) {
+        cml_free(prev);
+        cml_free(cur);
+        return -1;
+    }
+    for (int j = 0; j <= blen; j++)
+        prev[j] = j;
+    for (int i = 1; i <= alen; i++) {
+        cur[0] = i;
+        for (int j = 1; j <= blen; j++) {
+            int cost = (a[i - 1] == b[j - 1]) ? 0 : 1;
+            int del  = prev[j] + 1;
+            int ins  = cur[j - 1] + 1;
+            int sub  = prev[j - 1] + cost;
+            int m    = del < ins ? del : ins;
+            cur[j]   = m < sub ? m : sub;
+        }
+        int* t = prev;
+        prev   = cur;
+        cur    = t;
+    }
+    int res = prev[blen];
+    cml_free(prev);
+    cml_free(cur);
+    return res;
+}
+
+/** Word error rate: edit distance between reference and hypothesis token sequences,
+ *  normalized by reference length. Returns -1 on failure.
+ * @param reference (const int*)
+ * @param ref_len (int)
+ * @param hypothesis (const int*)
+ * @param hyp_len (int)
+ * @return (float)
+ */
+float cml_wer(const int* reference, int ref_len, const int* hypothesis, int hyp_len) {
+    if (ref_len <= 0)
+        return hyp_len > 0 ? 1.0f : 0.0f;
+    int d = cml_edit_distance(reference, ref_len, hypothesis, hyp_len);
+    if (d < 0)
+        return -1.0f;
+    return (float)d / (float)ref_len;
+}
+
+/** ROUGE-N recall: candidate/reference n-gram overlap (clipped by reference counts)
+ *  divided by the number of reference n-grams.
+ * @param candidate (const int*)
+ * @param cand_len (int)
+ * @param reference (const int*)
+ * @param ref_len (int)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_rouge_n(const int* candidate, int cand_len, const int* reference, int ref_len, int n) {
+    if (!candidate || !reference || n <= 0)
+        return 0.0f;
+    int ref_ng = ref_len - n + 1;
+    if (ref_ng <= 0)
+        return 0.0f;
+    int m = clipped_ngram_matches(candidate, cand_len, reference, ref_len, n);
+    return (float)m / (float)ref_ng;
+}
