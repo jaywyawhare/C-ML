@@ -268,3 +268,166 @@ float cml_mae_metric(const float* y_true, const float* y_pred, int n) {
         s += fabs((double)y_true[i] - (double)y_pred[i]);
     return (float)(s / n);
 }
+
+/** Top-k accuracy: fraction of samples whose true class is among the k highest logits.
+ * @param logits (const float*)
+ * @param n_samples (int)
+ * @param n_classes (int)
+ * @param y_true (const int*)
+ * @param k (int)
+ * @return (float)
+ */
+float cml_top_k_accuracy(const float* logits, int n_samples, int n_classes, const int* y_true,
+                         int k) {
+    if (!logits || !y_true || n_samples <= 0 || n_classes <= 0 || k <= 0)
+        return 0.0f;
+    int correct = 0;
+    for (int s = 0; s < n_samples; s++) {
+        int t = y_true[s];
+        if (t < 0 || t >= n_classes)
+            continue;
+        const float* row = logits + (size_t)s * n_classes;
+        float tv         = row[t];
+        /* In top-k iff fewer than k classes score strictly higher than the true class. */
+        int higher = 0;
+        for (int c = 0; c < n_classes; c++)
+            if (row[c] > tv)
+                higher++;
+        if (higher < k)
+            correct++;
+    }
+    return (float)correct / (float)n_samples;
+}
+
+/** Perplexity exp(mean(nll)) from per-token negative log-likelihoods.
+ * @param nll (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_perplexity(const float* nll, int n) {
+    if (!nll || n <= 0)
+        return 0.0f;
+    double s = 0.0;
+    for (int i = 0; i < n; i++)
+        s += nll[i];
+    return (float)exp(s / n);
+}
+
+/** Intersection-over-union of two axis-aligned boxes [x1, y1, x2, y2].
+ * @param a (const float*)
+ * @param b (const float*)
+ * @return (float)
+ */
+float cml_iou(const float* a, const float* b) {
+    if (!a || !b)
+        return 0.0f;
+    float ix1 = a[0] > b[0] ? a[0] : b[0];
+    float iy1 = a[1] > b[1] ? a[1] : b[1];
+    float ix2 = a[2] < b[2] ? a[2] : b[2];
+    float iy2 = a[3] < b[3] ? a[3] : b[3];
+    float iw = ix2 - ix1, ih = iy2 - iy1;
+    if (iw <= 0.0f || ih <= 0.0f)
+        return 0.0f;
+    float inter  = iw * ih;
+    float area_a = (a[2] - a[0]) * (a[3] - a[1]);
+    float area_b = (b[2] - b[0]) * (b[3] - b[1]);
+    float uni    = area_a + area_b - inter;
+    return uni > 0.0f ? inter / uni : 0.0f;
+}
+
+/** Average precision (area under the PR curve) for one class.
+ * @param y_true (const int*)
+ * @param y_score (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_average_precision(const int* y_true, const float* y_score, int n) {
+    if (!y_true || !y_score || n <= 0)
+        return 0.0f;
+    ScoreLabel* sl = cml_malloc((size_t)n * sizeof(ScoreLabel));
+    if (!sl)
+        return 0.0f;
+    long total_pos = 0;
+    for (int i = 0; i < n; i++) {
+        sl[i].score = y_score[i];
+        sl[i].label = y_true[i] ? 1 : 0;
+        total_pos += sl[i].label;
+    }
+    if (total_pos == 0) {
+        cml_free(sl);
+        return 0.0f;
+    }
+    /* Sort descending by score (reuse the ascending comparator, iterate in reverse). */
+    qsort(sl, (size_t)n, sizeof(ScoreLabel), scorelabel_cmp);
+    long tp = 0, fp = 0;
+    double ap = 0.0, prev_recall = 0.0;
+    for (int i = n - 1; i >= 0; i--) {
+        if (sl[i].label)
+            tp++;
+        else
+            fp++;
+        double recall    = (double)tp / (double)total_pos;
+        double precision = (double)tp / (double)(tp + fp);
+        ap += (recall - prev_recall) * precision;
+        prev_recall = recall;
+    }
+    cml_free(sl);
+    return (float)ap;
+}
+
+/* Clipped count of matching n-grams: for each candidate n-gram, consume one equal,
+ * not-yet-consumed reference n-gram. Returns the number matched. */
+static int clipped_ngram_matches(const int* cand, int cl, const int* ref, int rl, int n) {
+    int cand_ng = cl - n + 1, ref_ng = rl - n + 1;
+    if (cand_ng <= 0 || ref_ng <= 0)
+        return 0;
+    char* used = cml_calloc((size_t)ref_ng, 1);
+    if (!used)
+        return 0;
+    int matched = 0;
+    for (int i = 0; i < cand_ng; i++) {
+        for (int j = 0; j < ref_ng; j++) {
+            if (used[j])
+                continue;
+            int eq = 1;
+            for (int t = 0; t < n; t++)
+                if (cand[i + t] != ref[j + t]) {
+                    eq = 0;
+                    break;
+                }
+            if (eq) {
+                used[j] = 1;
+                matched++;
+                break;
+            }
+        }
+    }
+    cml_free(used);
+    return matched;
+}
+
+/** Sentence BLEU over token-id sequences (brevity penalty x geometric-mean n-gram precision).
+ * @param candidate (const int*)
+ * @param cand_len (int)
+ * @param reference (const int*)
+ * @param ref_len (int)
+ * @param max_n (int)
+ * @return (float)
+ */
+float cml_bleu(const int* candidate, int cand_len, const int* reference, int ref_len, int max_n) {
+    if (!candidate || !reference || cand_len <= 0 || ref_len <= 0 || max_n <= 0)
+        return 0.0f;
+    double log_sum = 0.0;
+    for (int n = 1; n <= max_n; n++) {
+        int cand_ng = cand_len - n + 1;
+        if (cand_ng <= 0)
+            return 0.0f; /* candidate too short for this n */
+        int m = clipped_ngram_matches(candidate, cand_len, reference, ref_len, n);
+        if (m == 0)
+            return 0.0f; /* zero precision collapses BLEU to 0 */
+        log_sum += log((double)m / (double)cand_ng);
+    }
+    double geo = exp(log_sum / max_n);
+    double bp  = cand_len >= ref_len ? 1.0 : exp(1.0 - (double)ref_len / (double)cand_len);
+    return (float)(bp * geo);
+}

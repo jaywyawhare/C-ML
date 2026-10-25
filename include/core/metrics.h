@@ -118,6 +118,57 @@ float cml_rmse(const float* y_true, const float* y_pred, int n);
  */
 float cml_mae_metric(const float* y_true, const float* y_pred, int n);
 
+/**
+ * Top-k accuracy: fraction of samples whose true class is among the k highest logits.
+ * @p logits is row-major [n_samples, n_classes].
+ * @param logits (const float*)
+ * @param n_samples (int)
+ * @param n_classes (int)
+ * @param y_true (const int*)
+ * @param k (int)
+ * @return (float)
+ */
+float cml_top_k_accuracy(const float* logits, int n_samples, int n_classes, const int* y_true,
+                         int k);
+
+/**
+ * Perplexity exp(mean(nll)) from per-token negative log-likelihoods (natural log).
+ * @param nll (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_perplexity(const float* nll, int n);
+
+/**
+ * Intersection-over-union of two axis-aligned boxes [x1, y1, x2, y2] (x2>x1, y2>y1).
+ * @param a (const float*)
+ * @param b (const float*)
+ * @return (float)
+ */
+float cml_iou(const float* a, const float* b);
+
+/**
+ * Average precision (area under the precision-recall curve) for one class from binary
+ * labels and detection scores: AP = sum over detections of (R_i - R_{i-1}) * P_i.
+ * @param y_true (const int*)
+ * @param y_score (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_average_precision(const int* y_true, const float* y_score, int n);
+
+/**
+ * Sentence BLEU: brevity penalty times the geometric mean of clipped n-gram precisions
+ * for n = 1..max_n, over token-id sequences. Returns 0 if any n-gram precision is 0.
+ * @param candidate (const int*)
+ * @param cand_len (int)
+ * @param reference (const int*)
+ * @param ref_len (int)
+ * @param max_n (int)
+ * @return (float)
+ */
+float cml_bleu(const int* candidate, int cand_len, const int* reference, int ref_len, int max_n);
+
 #ifdef __cplusplus
 }
 #endif
