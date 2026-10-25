@@ -101,6 +101,39 @@ static int test_batchnorm2d(void) {
     return 1;
 }
 
+/* Running statistics are module state: a graph reset between training steps used to free
+ * them, and the next forward read the freed tensors. */
+static int test_batchnorm2d_trains_across_resets(void) {
+    BatchNorm2d* bn = cml_nn_batchnorm2d(3, 1e-5f, 0.1f, true, true, DTYPE_FLOAT32, DEVICE_CPU);
+    if (!bn)
+        return 0;
+    Module* m = (Module*)bn;
+    module_set_training(m, true);
+    Optimizer* opt = cml_optim_sgd_for_model(m, 0.01f, 0.0f, 0.0f);
+    float x[96], y[96];
+    for (int i = 0; i < 96; i++) {
+        x[i] = sinf((float)i * 0.3f);
+        y[i] = cosf((float)i * 0.2f);
+    }
+    int shape[] = {2, 3, 4, 4};
+    float first = 0.0f, last = 0.0f;
+    for (int step = 0; step < 3; step++) {
+        Tensor* loss = cml_nn_mse_loss(cml_nn_module_forward(m, cml_tensor(x, shape, 4, NULL)),
+                                       cml_tensor(y, shape, 4, NULL));
+        cml_optim_zero_grad(opt);
+        cml_backward(loss, NULL, false, false);
+        cml_optim_step(opt);
+        last = tensor_get_float(loss, 0);
+        if (step == 0)
+            first = last;
+        cml_autograd_step_end(loss);
+    }
+    int ok = isfinite(last) && last < first && tensor_get_float(bn->running_mean, 0) != 0.0f;
+    optimizer_free(opt);
+    module_free(m);
+    return ok;
+}
+
 static int test_layernorm(void) {
     LayerNorm* layer = cml_nn_layernorm(64, 1e-5f, true, DTYPE_FLOAT32, DEVICE_CPU);
     if (!layer)
@@ -283,6 +316,7 @@ int main(void) {
 
     printf("\nNormalization:\n");
     TEST(batchnorm2d);
+    TEST(batchnorm2d_trains_across_resets);
     TEST(layernorm);
     TEST(groupnorm);
 

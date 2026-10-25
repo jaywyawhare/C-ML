@@ -22,10 +22,22 @@ void nn_tensor_param_alias(Tensor* t) {
         t->ref_count++;
 }
 
+/** Detach a lazy tensor a module is taking over from the IR graph, so it survives the graph
+ *  resets between training steps. */
+static int realize_module_tensor(Tensor* tensor, const char* caller, const char* name) {
+    if (tensor->ir_node && tensor_realize(tensor) != 0) {
+        LOG_ERROR("%s: failed to realize lazy tensor '%s'", caller, name);
+        return -1;
+    }
+    return 0;
+}
+
 /** Register a non-trainable buffer (e.g. running stats) by name; the tensor is
  *  borrowed, the name is copied. -1 if the name already exists. */
 int module_add_buffer(Module* module, Tensor* tensor, const char* name) {
     if (!module || !tensor || !name)
+        return -1;
+    if (realize_module_tensor(tensor, __func__, name) != 0)
         return -1;
 
     if (module_get_buffer(module, name)) {
@@ -180,14 +192,8 @@ int module_add_parameter(Module* module, Tensor* tensor, const char* name, bool 
         return -1;
     }
 
-    /* Parameters must be leaf tensors (realized, detached from the IR graph)
-     * so they survive across cml_ir_free() calls between training steps. */
-    if (tensor->ir_node) {
-        if (tensor_realize(tensor) != 0) {
-            LOG_ERROR("module_add_parameter: failed to realize lazy tensor '%s'", name);
-            return -1;
-        }
-    }
+    if (realize_module_tensor(tensor, __func__, name) != 0)
+        return -1;
 
     if (module_get_parameter(module, name) != NULL) {
         LOG_WARNING("Parameter '%s' already exists in module '%s'", name, module->name);

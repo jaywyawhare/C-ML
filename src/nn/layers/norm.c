@@ -70,8 +70,8 @@ static int batchnorm_update_stats(BatchNormState* bn, Tensor* input, int batch, 
 
     if (!bn->current_mean) {
         int stat_shape[] = {channels};
-        bn->current_mean = tensor_zeros(stat_shape, 1, &config);
-        bn->current_var  = tensor_zeros(stat_shape, 1, &config);
+        bn->current_mean = tensor_empty(stat_shape, 1, &config);
+        bn->current_var  = tensor_empty(stat_shape, 1, &config);
         if (!bn->current_mean || !bn->current_var)
             return -1;
     }
