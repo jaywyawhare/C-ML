@@ -236,6 +236,42 @@ static int test_backward_explicit_gradient(void) {
     return ok;
 }
 
+/* A second, unrelated backward on a graph that was never reset: the first pass's last node
+ * was fused away during its execute, and the second pass resumed lowering from it. */
+static int test_backward_twice_without_reset(void) {
+    cml_reset_ir_context();
+    float one = 1.0f, two = 2.0f, half = 0.5f, tenth = 0.1f;
+    Tensor* x = cml_tensor_1d(&two, 1);
+    Tensor* y = cml_tensor_1d(&one, 1);
+    Tensor* e = cml_tensor_1d(&two, 1);
+    if (!x || !y || !e)
+        return 0;
+    cml_set_requires_grad(x, true);
+    cml_set_requires_grad(y, true);
+    Tensor* z = cml_add(tensor_pow(x, e), tensor_pow(y, e));
+    tensor_get_float(z, 0);
+    cml_backward(z, NULL, false, false);
+    tensor_free(z);
+
+    Tensor* w = cml_tensor_1d(&half, 1);
+    Tensor* b = cml_tensor_1d(&tenth, 1);
+    cml_set_requires_grad(w, true);
+    cml_set_requires_grad(b, true);
+    Tensor* out = cml_sigmoid(cml_add(cml_mul(w, x), b));
+    tensor_get_float(out, 0);
+    cml_backward(out, NULL, false, false);
+
+    float s = 1.0f / (1.0f + expf(-1.1f));
+    int ok  = w->grad && APPROX_EQ(tensor_get_float(w->grad, 0), s * (1.0f - s) * 2.0f);
+    tensor_free(out);
+    tensor_free(b);
+    tensor_free(w);
+    tensor_free(e);
+    tensor_free(y);
+    tensor_free(x);
+    return ok;
+}
+
 int main(void) {
     cml_init();
 
@@ -249,6 +285,7 @@ int main(void) {
     TEST(backward_simple);
     TEST(loss_backward);
     TEST(backward_explicit_gradient);
+    TEST(backward_twice_without_reset);
 
     printf("\nGrad Control:\n");
     TEST(requires_grad);

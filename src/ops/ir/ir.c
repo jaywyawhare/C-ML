@@ -985,8 +985,9 @@ void cml_ir_release_node_storage(struct IRNode* node) {
 }
 
 /** Free @p node after it was unlinked from @p ir: drop it from the CSE table (it keys on node
- *  identity, so a stale entry is dereferenced by the next lookup), detach any output tensor
- *  still bound to it, and release everything it owns. */
+ *  identity, so a stale entry is dereferenced by the next lookup), move the graph's last-result
+ *  and lowering-frontier pointers off it, detach any output tensor still bound to it, and release
+ *  everything it owns. */
 void cml_ir_destroy_node(CMLGraph_t ir, struct IRNode* node) {
     if (!node)
         return;
@@ -994,8 +995,14 @@ void cml_ir_destroy_node(CMLGraph_t ir, struct IRNode* node) {
         node->output->ir_node    = NULL;
         node->output->ir_context = NULL;
     }
-    if (ir)
+    if (ir) {
         cml_intern_remove(ir->intern_table, node);
+        if (ir->last_result == node)
+            ir->last_result = NULL;
+        /* Passes only remove lowered nodes, so everything still listed is lowered too. */
+        if (ir->decomposed_frontier == node)
+            ir->decomposed_frontier = ir->tail;
+    }
     cml_ir_release_node_storage(node);
     cml_free(node);
 }
