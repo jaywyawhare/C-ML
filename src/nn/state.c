@@ -520,7 +520,11 @@ void cml_weight_avg_free(CMLWeightAvg* wa) {
     cml_free(wa);
 }
 
-/* Ascending comparator over float magnitudes. */
+/** Ascending qsort comparator over floats.
+ * @param a (const void*)
+ * @param b (const void*)
+ * @return (int)
+ */
 static int prune_mag_cmp(const void* a, const void* b) {
     float x = *(const float*)a, y = *(const float*)b;
     return (x > y) - (x < y);

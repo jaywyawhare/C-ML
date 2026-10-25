@@ -2526,9 +2526,14 @@ SVDResult tensor_svd(Tensor* a) {
     return result;
 }
 
-/* In-place LU factorization with partial pivoting of an n-by-n row-major matrix.
- * On return `a` holds L (unit diagonal, strictly lower) and U (upper), piv[i] is the
- * source row now at position i, and *sign is the permutation parity. -1 if singular. */
+/** In-place LU factorization with partial pivoting of an n-by-n row-major matrix; `a` holds
+ * L (unit diagonal) and U, piv the row permutation, *sign its parity. -1 if singular.
+ * @param a (float*)
+ * @param n (int)
+ * @param piv (int*)
+ * @param sign (float*)
+ * @return (int)
+ */
 static int lu_decompose(float* a, int n, int* piv, float* sign) {
     *sign = 1.0f;
     for (int i = 0; i < n; i++)
@@ -2567,7 +2572,14 @@ static int lu_decompose(float* a, int n, int* piv, float* sign) {
     return 0;
 }
 
-/* Solve A x = b for one column given the LU factors and pivots from lu_decompose. */
+/** Solve A x = b for one column given the LU factors and pivots from lu_decompose.
+ * @param lu (const float*)
+ * @param n (int)
+ * @param piv (const int*)
+ * @param b (const float*)
+ * @param x (float*)
+ * @return (void)
+ */
 static void lu_solve_vec(const float* lu, int n, const int* piv, const float* b, float* x) {
     for (int i = 0; i < n; i++)
         x[i] = b[piv[i]];

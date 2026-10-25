@@ -12,7 +12,10 @@
 
 static const unsigned char NPY_MAGIC[6] = {0x93, 'N', 'U', 'M', 'P', 'Y'};
 
-/* Map a CML dtype to its little-endian NumPy descr string, or NULL if unsupported. */
+/** Map a CML dtype to its little-endian NumPy descr string, or NULL if unsupported.
+ * @param dt (DType)
+ * @return (const char*)
+ */
 static const char* dtype_to_descr(DType dt) {
     switch (dt) {
     case DTYPE_FLOAT32:
@@ -44,7 +47,11 @@ static const char* dtype_to_descr(DType dt) {
     }
 }
 
-/* Parse a NumPy descr (e.g. "<f4") into a dtype; returns -1 on big-endian or unknown kind. */
+/** Parse a NumPy descr (e.g. "<f4") into a dtype; returns -1 on big-endian or unknown kind.
+ * @param d (const char*)
+ * @param out (DType*)
+ * @return (int)
+ */
 static int descr_to_dtype(const char* d, DType* out) {
     char bo = '|';
     if (*d == '<' || *d == '>' || *d == '=' || *d == '|')
