@@ -1087,8 +1087,9 @@ void cml_ir_adopt_detached(CMLGraph_t ir, Tensor* t) {
 
 /** Copy @p ir's node list for passes that rewrite a graph in place (cml_ir_optimize's rewrites
  *  emit nodes the executor cannot run, and its DCE detaches live tensors). The copy owns its
- *  names, shapes and FILL constants (the only params the rewrite rules read), names each input
- *  after the node its tensor is bound to, and borrows output tensors read-only. */
+ *  names, shapes and FILL constants (the only params the rewrite rules read), links nodes by
+ *  name only (an executed node's input tensors may already be freed), and borrows output tensors
+ *  read-only. */
 CMLGraph_t cml_ir_view(CMLGraph_t ir) {
     CMLGraph_t view = ir ? cml_ir_new(ir->target) : NULL;
     if (!view)
@@ -1124,19 +1125,10 @@ CMLGraph_t cml_ir_view(CMLGraph_t ir) {
             n->output_shape = tensor_shape_copy(src->output_shape, src->output_ndim);
             n->output_ndim  = src->output_ndim;
         }
-        if (src->num_inputs > 0) {
+        if (src->num_inputs > 0 && src->input_names) {
             n->input_names = cml_calloc((size_t)src->num_inputs, sizeof(char*));
-            n->inputs      = cml_malloc((size_t)src->num_inputs * sizeof(Tensor*));
-            for (int i = 0; i < src->num_inputs; i++) {
-                Tensor* t        = src->inputs ? src->inputs[i] : NULL;
-                const char* name = src->input_names ? src->input_names[i] : NULL;
-                if (t && t->ir_node && t->ir_context == ir && t->ir_node->output_name)
-                    name = t->ir_node->output_name;
-                if (n->input_names && name)
-                    n->input_names[i] = cml_strdup(name);
-                if (n->inputs)
-                    n->inputs[i] = t;
-            }
+            for (int i = 0; n->input_names && i < src->num_inputs; i++)
+                n->input_names[i] = src->input_names[i] ? cml_strdup(src->input_names[i]) : NULL;
         }
         if (src->type == UOP_FILL && src->params) {
             FillParams* fp = cml_malloc(sizeof(FillParams));

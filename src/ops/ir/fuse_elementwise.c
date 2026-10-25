@@ -605,25 +605,34 @@ int cml_ir_fuse_matmul_epilogue(CMLGraph_t ir) {
             cml_free(ep);
             continue;
         }
-        newin[0] = M->inputs[0];
-        newin[1] = M->inputs[1];
-        int w    = 2;
+        /* input_names is indexed [0..num_inputs) by free_ir_node, so it grows with the
+         * inputs: the gemm operands keep their names and the epilogue's move over from F. */
+        char** newnames = cml_calloc((size_t)(2 + num_epi), sizeof(char*));
+        newin[0]        = M->inputs[0];
+        newin[1]        = M->inputs[1];
+        int w           = 2;
         for (int k = 0; k < F->num_inputs; k++)
-            if (k != mi)
+            if (k != mi) {
+                if (newnames && F->input_names) {
+                    newnames[w]       = F->input_names[k];
+                    F->input_names[k] = NULL;
+                }
                 newin[w++] = F->inputs[k];
+            }
         cml_free(M->inputs);
         M->inputs = newin;
-        /* input_names is indexed [0..num_inputs) by free_ir_node; growing
-         * num_inputs without growing input_names would read out of bounds and
-         * free garbage. Drop the old names (debug-only) and NULL it. */
         if (M->input_names) {
-            for (int k = 0; k < M->num_inputs; k++)
-                cml_free(M->input_names[k]);
+            for (int k = 0; k < M->num_inputs; k++) {
+                if (newnames && k < 2)
+                    newnames[k] = M->input_names[k];
+                else
+                    cml_free(M->input_names[k]);
+            }
             cml_free(M->input_names);
-            M->input_names = NULL;
         }
-        M->num_inputs = 2 + num_epi;
-        M->params     = ep;
+        M->input_names = newnames;
+        M->num_inputs  = 2 + num_epi;
+        M->params      = ep;
 
         /* M now produces F's output (downstream references stay valid). The old
          * gemm-output tensor was single-use (only F); detach it. */
