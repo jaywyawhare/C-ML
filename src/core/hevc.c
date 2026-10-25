@@ -706,3 +706,20 @@ int cml_hevc_intra_predict(int mode, int n, const uint8_t* top, const uint8_t* l
         hevc_angular(n, angle, left, top, corner, 1, out);
     return 0;
 }
+
+/**
+ * Reconstruct an n x n block (H.265 §8.6.5): add the signed residual to the
+ * predicted samples and clip to 8-bit. All buffers are n*n row-major.
+ * @param pred (const uint8_t*)
+ * @param residual (const int32_t*)
+ * @param n (int)
+ * @param out (uint8_t*)
+ * @return (int)
+ */
+int cml_hevc_reconstruct(const uint8_t* pred, const int32_t* residual, int n, uint8_t* out) {
+    if (!pred || !residual || !out || n <= 0)
+        return -1;
+    for (int i = 0; i < n * n; i++)
+        out[i] = hevc_clip8((int)pred[i] + residual[i]);
+    return 0;
+}

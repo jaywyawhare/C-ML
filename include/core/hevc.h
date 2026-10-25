@@ -108,3 +108,14 @@ int cml_hevc_inverse_transform(const int32_t* coeffs, int32_t* block, int size, 
  * Returns 0 on success, -1 on a bad mode, size or NULL pointer. */
 int cml_hevc_intra_predict(int mode, int n, const uint8_t* top, const uint8_t* left, uint8_t corner,
                            uint8_t* out);
+
+/**
+ * Reconstruct an n x n block (H.265 §8.6.5): out = clip8(pred + residual). All
+ * buffers are n*n row-major.
+ * @param pred (const uint8_t*)
+ * @param residual (const int32_t*)
+ * @param n (int)
+ * @param out (uint8_t*)
+ * @return (int)
+ */
+int cml_hevc_reconstruct(const uint8_t* pred, const int32_t* residual, int n, uint8_t* out);
