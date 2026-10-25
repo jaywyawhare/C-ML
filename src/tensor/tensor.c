@@ -3018,6 +3018,284 @@ EigResult tensor_eigh(Tensor* a) {
 }
 
 /**
+ * Sum of the main-diagonal entries of a 2D matrix (0 if not 2D).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_trace(Tensor* a) {
+    if (!a || a->ndim != 2)
+        return 0.0f;
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return 0.0f;
+    int m = a->shape[0], n = a->shape[1];
+    int diag = m < n ? m : n;
+    double s = 0.0;
+    for (int i = 0; i < diag; i++)
+        s += (double)tensor_get_float(a, (size_t)i * n + i);
+    return (float)s;
+}
+
+/**
+ * Kronecker product of two 2D matrices: [ma,na] x [mb,nb] -> [ma*mb, na*nb].
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_kron(Tensor* a, Tensor* b) {
+    if (!a || !b || a->ndim != 2 || b->ndim != 2) {
+        LOG_ERROR("tensor_kron: both inputs must be 2D matrices");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    tensor_ensure_executed(b);
+    if (!a->data || !b->data)
+        return NULL;
+    int ma = a->shape[0], na = a->shape[1], mb = b->shape[0], nb = b->shape[1];
+    int rows = ma * mb, cols = na * nb;
+    float* out = cml_malloc((size_t)rows * cols * sizeof(float));
+    if (!out)
+        return NULL;
+    for (int i = 0; i < ma; i++)
+        for (int j = 0; j < na; j++) {
+            float av = tensor_get_float(a, (size_t)i * na + j);
+            for (int k = 0; k < mb; k++)
+                for (int l = 0; l < nb; l++)
+                    out[(size_t)(i * mb + k) * cols + (j * nb + l)] =
+                        av * tensor_get_float(b, (size_t)k * nb + l);
+        }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[]    = {rows, cols};
+    Tensor* result = tensor_from_data(out, shape, 2, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Cross product of two length-3 vectors, returned as a length-3 vector.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cross(Tensor* a, Tensor* b) {
+    if (!a || !b || a->ndim != 1 || b->ndim != 1 || a->shape[0] != 3 || b->shape[0] != 3) {
+        LOG_ERROR("tensor_cross: both inputs must be length-3 vectors");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    tensor_ensure_executed(b);
+    if (!a->data || !b->data)
+        return NULL;
+    float ax = tensor_get_float(a, 0), ay = tensor_get_float(a, 1), az = tensor_get_float(a, 2);
+    float bx = tensor_get_float(b, 0), by = tensor_get_float(b, 1), bz = tensor_get_float(b, 2);
+    float out[3]        = {ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx};
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[] = {3};
+    return tensor_from_data(out, shape, 1, &config);
+}
+
+/**
+ * Sign and log-absolute determinant of a square matrix via LU (stable where det overflows).
+ * @param a (Tensor*)
+ * @return (SlogdetResult)
+ */
+SlogdetResult tensor_slogdet(Tensor* a) {
+    SlogdetResult r = {0.0f, -INFINITY};
+    if (!a || a->ndim != 2 || a->shape[0] != a->shape[1]) {
+        LOG_ERROR("tensor_slogdet: input must be a square matrix");
+        return r;
+    }
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return r;
+    int n     = a->shape[0];
+    float* lu = cml_malloc((size_t)n * n * sizeof(float));
+    int* piv  = cml_malloc((size_t)n * sizeof(int));
+    if (!lu || !piv) {
+        cml_free(lu);
+        cml_free(piv);
+        return r;
+    }
+    for (int i = 0; i < n * n; i++)
+        lu[i] = tensor_get_float(a, i);
+    float sign;
+    if (lu_decompose(lu, n, piv, &sign) == 0) {
+        double logabs = 0.0;
+        for (int i = 0; i < n; i++) {
+            float d = lu[i * n + i];
+            if (d < 0.0f)
+                sign = -sign;
+            logabs += log(fabs((double)d));
+        }
+        r.sign      = sign;
+        r.logabsdet = (float)logabs;
+    }
+    cml_free(lu);
+    cml_free(piv);
+    return r;
+}
+
+/** Ascending comparator over floats for qsort (NaN sorts last). */
+static int float_asc_cmp(const void* x, const void* y) {
+    float a = *(const float*)x, b = *(const float*)y;
+    if (a < b)
+        return -1;
+    if (a > b)
+        return 1;
+    return (a != a) - (b != b);
+}
+
+/** Linear-interpolated q-quantile of an ascending-sorted buffer (q in [0,1]). */
+static float sorted_quantile(const float* sorted, int n, float q) {
+    if (n == 1)
+        return sorted[0];
+    if (q <= 0.0f)
+        return sorted[0];
+    if (q >= 1.0f)
+        return sorted[n - 1];
+    float pos  = q * (n - 1);
+    int lo     = (int)pos;
+    float frac = pos - lo;
+    return sorted[lo] + frac * (sorted[lo + 1] - sorted[lo]);
+}
+
+/** Sort all elements of @p a ascending into a fresh buffer; returns NULL if empty. */
+static float* tensor_sorted_values(Tensor* a, int* count) {
+    *count = 0;
+    if (!a)
+        return NULL;
+    tensor_ensure_executed(a);
+    if (!a->data || a->numel == 0)
+        return NULL;
+    float* buf = cml_malloc(a->numel * sizeof(float));
+    if (!buf)
+        return NULL;
+    for (size_t i = 0; i < a->numel; i++)
+        buf[i] = tensor_get_float(a, i);
+    qsort(buf, a->numel, sizeof(float), float_asc_cmp);
+    *count = (int)a->numel;
+    return buf;
+}
+
+/**
+ * q-quantile (q in [0,1], linear interpolation, NumPy convention) over all elements.
+ * @param a (Tensor*)
+ * @param q (float)
+ * @return (float)
+ */
+float tensor_quantile(Tensor* a, float q) {
+    int n      = 0;
+    float* buf = tensor_sorted_values(a, &n);
+    if (!buf)
+        return 0.0f;
+    float v = sorted_quantile(buf, n, q);
+    cml_free(buf);
+    return v;
+}
+
+/**
+ * Median of all elements (linear interpolation for an even count); 0 if empty.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_median(Tensor* a) { return tensor_quantile(a, 0.5f); }
+
+/**
+ * p-th percentile (p in [0,100]) over all elements.
+ * @param a (Tensor*)
+ * @param p (float)
+ * @return (float)
+ */
+float tensor_percentile(Tensor* a, float p) { return tensor_quantile(a, p / 100.0f); }
+
+/**
+ * Covariance matrix [v,v] of a 2D [v,obs] (rowvar true) or [obs,v] input; normalized by obs-1.
+ * @param a (Tensor*)
+ * @param rowvar (bool)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cov(Tensor* a, bool rowvar) {
+    if (!a || a->ndim != 2) {
+        LOG_ERROR("tensor_cov: input must be a 2D matrix");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return NULL;
+    int v    = rowvar ? a->shape[0] : a->shape[1];
+    int obs  = rowvar ? a->shape[1] : a->shape[0];
+    int cols = a->shape[1];
+    if (obs < 2) {
+        LOG_ERROR("tensor_cov: need at least 2 observations");
+        return NULL;
+    }
+    float* mean = cml_calloc((size_t)v, sizeof(float));
+    float* out  = cml_malloc((size_t)v * v * sizeof(float));
+    if (!mean || !out) {
+        cml_free(mean);
+        cml_free(out);
+        return NULL;
+    }
+#define AT(var, ob)                                                                                \
+    tensor_get_float(a, rowvar ? (size_t)(var) * cols + (ob) : (size_t)(ob) * cols + (var))
+    for (int i = 0; i < v; i++) {
+        double s = 0.0;
+        for (int o = 0; o < obs; o++)
+            s += AT(i, o);
+        mean[i] = (float)(s / obs);
+    }
+    for (int i = 0; i < v; i++)
+        for (int j = i; j < v; j++) {
+            double s = 0.0;
+            for (int o = 0; o < obs; o++)
+                s += ((double)AT(i, o) - mean[i]) * ((double)AT(j, o) - mean[j]);
+            float c        = (float)(s / (obs - 1));
+            out[i * v + j] = c;
+            out[j * v + i] = c;
+        }
+#undef AT
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[]    = {v, v};
+    Tensor* result = tensor_from_data(out, shape, 2, &config);
+    cml_free(mean);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Pearson correlation matrix [v,v], the covariance normalized to unit diagonal.
+ * @param a (Tensor*)
+ * @param rowvar (bool)
+ * @return (Tensor*)
+ */
+Tensor* tensor_corrcoef(Tensor* a, bool rowvar) {
+    Tensor* cov = tensor_cov(a, rowvar);
+    if (!cov)
+        return NULL;
+    tensor_ensure_executed(cov);
+    int v     = cov->shape[0];
+    float* c  = (float*)cov->data;
+    float* sd = cml_malloc((size_t)v * sizeof(float)); /* standard deviations (sqrt of variances) */
+    if (!sd) {
+        tensor_free(cov);
+        return NULL;
+    }
+    for (int i = 0; i < v; i++)
+        sd[i] = sqrtf(c[i * v + i]);
+    for (int i = 0; i < v; i++)
+        for (int j = 0; j < v; j++) {
+            float den    = sd[i] * sd[j];
+            float r      = den > 0.0f ? c[i * v + j] / den : 0.0f;
+            c[i * v + j] = r < -1.0f ? -1.0f : (r > 1.0f ? 1.0f : r);
+        }
+    cml_free(sd);
+    return cov;
+}
+
+/**
  * Download `url` (via curl/wget) to a temp file and load it with tensor_read_file.
  * NULL on download or parse failure.
  * @param url (const char*)

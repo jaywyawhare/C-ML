@@ -477,6 +477,80 @@ Tensor* tensor_pinv(Tensor* a);
  */
 EigResult tensor_eigh(Tensor* a);
 
+/**
+ * Sum of the main-diagonal entries of a 2D matrix (0 if not 2D).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_trace(Tensor* a);
+
+/**
+ * Kronecker product of two 2D matrices: [ma,na] x [mb,nb] -> [ma*mb, na*nb].
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_kron(Tensor* a, Tensor* b);
+
+/**
+ * Cross product of two length-3 vectors, returned as a length-3 vector.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cross(Tensor* a, Tensor* b);
+
+typedef struct {
+    float sign;      // Sign of the determinant (-1, 0 or 1)
+    float logabsdet; // Natural log of the absolute determinant (-inf if singular)
+} SlogdetResult;
+
+/**
+ * Sign and log-absolute determinant of a square matrix via LU (stable where det overflows).
+ * @param a (Tensor*)
+ * @return (SlogdetResult)
+ */
+SlogdetResult tensor_slogdet(Tensor* a);
+
+/**
+ * Median of all elements (linear interpolation for an even count); 0 if empty.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_median(Tensor* a);
+
+/**
+ * q-quantile (q in [0,1], linear interpolation, NumPy convention) over all elements.
+ * @param a (Tensor*)
+ * @param q (float)
+ * @return (float)
+ */
+float tensor_quantile(Tensor* a, float q);
+
+/**
+ * p-th percentile (p in [0,100]) over all elements.
+ * @param a (Tensor*)
+ * @param p (float)
+ * @return (float)
+ */
+float tensor_percentile(Tensor* a, float p);
+
+/**
+ * Covariance matrix [v,v] of a 2D [v,obs] (rowvar true) or [obs,v] input; normalized by obs-1.
+ * @param a (Tensor*)
+ * @param rowvar (bool)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cov(Tensor* a, bool rowvar);
+
+/**
+ * Pearson correlation matrix [v,v], the covariance normalized to unit diagonal.
+ * @param a (Tensor*)
+ * @param rowvar (bool)
+ * @return (Tensor*)
+ */
+Tensor* tensor_corrcoef(Tensor* a, bool rowvar);
+
 Tensor* tensor_from_url(const char* url);
 
 Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y);
