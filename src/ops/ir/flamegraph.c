@@ -3,11 +3,11 @@
 #include "alloc/cml_allocator.h"
 #include "core/cml_flags.h"
 #include "core/logging.h"
+#include "backend/profiling.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -91,13 +91,6 @@ static FlameSpan* g_spans = NULL;
 static int g_nspans       = 0;
 static int g_scap         = 0;
 static double g_t_origin  = -1.0;
-
-/** Current monotonic clock reading in milliseconds. */
-double cml_flame_now_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1e6;
-}
 
 /** Whether flamegraph capture is active: FLAMEGRAPH or PROFILE, or VIZ (whose dashboard has a
  *  flamegraph panel) unless FLAMEGRAPH=0 declines the per-node clock reads; never under NO_EXPORT.
@@ -394,7 +387,7 @@ void cml_flame_record(const struct IRNode* node, double ms) {
     /* Record time is the end of the dispatch, so the start is one duration back.
      * The executor's own t0 is a few hundred nanoseconds earlier; not worth
      * widening the API for. */
-    const double now = cml_flame_now_ms();
+    const double now = cml_monotonic_ms();
     if (g_t_origin < 0.0)
         g_t_origin = now - ms;
     if (g_nspans < FLAME_MAX_SPANS) {

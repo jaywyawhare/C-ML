@@ -33,9 +33,6 @@ void cml_flame_reset(void);
  * when disabled. Op/kind strings are static; `node` is only read, not retained. */
 void cml_flame_record(const struct IRNode* node, double ms);
 
-/* Monotonic millisecond clock used to bracket a span (CLOCK_MONOTONIC). */
-double cml_flame_now_ms(void);
-
 /* Write the accumulated spans to `path` as flamegraph.json. Returns 0 on success,
  * -1 on error or when disabled / no spans. Does not clear the buffer. */
 int cml_flame_export(const char* path);

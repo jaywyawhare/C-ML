@@ -27,6 +27,7 @@
 #include "ops/winograd.h"
 #include "ops/ir/dispatch.h"
 #include "ops/ir/flamegraph.h"
+#include "backend/profiling.h"
 #include "ops/ir/cpu_lazy_materialize.h"
 #include "core/gguf_quant.h"
 #include "core/quantization.h"
@@ -6162,7 +6163,7 @@ int cpu_execute_ir(CMLGraph_t ir) {
          * enabled check is a cached bool so the off-path cost is ~nil. GPU-path
          * nodes take their own `continue` above and aren't timed in this slice. */
         const int _flame       = cml_flame_enabled();
-        const double _flame_t0 = _flame ? cml_flame_now_ms() : 0.0;
+        const double _flame_t0 = _flame ? cml_monotonic_ms() : 0.0;
 
         int _rc;
 #ifdef CML_HAS_VULKAN
@@ -6194,7 +6195,7 @@ int cpu_execute_ir(CMLGraph_t ir) {
             LOG_WARNING("CPU fallback: failed to execute node");
         }
         if (_flame)
-            cml_flame_record(node, cml_flame_now_ms() - _flame_t0);
+            cml_flame_record(node, cml_monotonic_ms() - _flame_t0);
         g_total_nodes_executed++;
 
         node = node->next;

@@ -7,7 +7,7 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/rewrite_trace.h"
-#include "ops/ir/flamegraph.h"
+#include "backend/profiling.h"
 #include "ops/uops.h"
 #include <stdlib.h>
 #include <string.h>
@@ -512,7 +512,7 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
             static uint64_t last_exported_hash = 0;
             static double last_export_ms       = -1e9;
             uint64_t graph_hash                = cml_ir_graph_hash(viz_ir);
-            double now_ms                      = cml_flame_now_ms();
+            double now_ms                      = cml_monotonic_ms();
 
             /* The optimizer rewrites in place, and its rewrites and DCE leave tensors
              * nothing to compute them, so the dashboard's optimized graph comes from a

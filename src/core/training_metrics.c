@@ -4,7 +4,7 @@
 #include "core/cml_flags.h"
 #include "nn.h"
 #include "ops/ir/internal.h"
-#include "ops/ir/flamegraph.h"
+#include "backend/profiling.h"
 #include "autograd/autograd.h"
 #include "optim.h"
 #include "core/logging.h"
@@ -43,7 +43,7 @@ static __thread Tensor* g_acc_target = NULL;
  *  final file. */
 static void export_live(void) {
     static __thread double last_ms = -1e9;
-    double now_ms                  = cml_flame_now_ms();
+    double now_ms                  = cml_monotonic_ms();
     if (now_ms - last_ms < 1000.0)
         return;
     last_ms = now_ms;
