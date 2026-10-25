@@ -547,6 +547,70 @@ char* cml_ptx_gen_unary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) 
                         "    mul.f32 %%f1, %%f1, %%f3;\n\n",    // 0.5x*(1+tanh)
                         hex_gelu_k2, hex_gelu_k1);
         break;
+    case UOP_ROUND:
+        // round to nearest even, matching rintf/the CPU kernel
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+                        "    cvt.rni.f32.f32 %%f1, %%f0;\n\n");
+        break;
+    case UOP_LOG10:
+        // log10(x) = log2(x) / log2(10)
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+                        "    lg2.approx.f32 %%f1, %%f0;\n"
+                        "    mul.f32 %%f1, %%f1, 0f3E9A209B;\n\n"); // 1/log2(10)
+        break;
+    case UOP_SINH:
+        // (exp(x) - exp(-x)) / 2, exp(x) = ex2(x*log2e)
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+                        "    mul.f32 %%f2, %%f0, 0f3FB8AA3B;\n" // x*log2e
+                        "    ex2.approx.f32 %%f2, %%f2;\n"      // exp(x)
+                        "    neg.f32 %%f3, %%f0;\n"
+                        "    mul.f32 %%f3, %%f3, 0f3FB8AA3B;\n"
+                        "    ex2.approx.f32 %%f3, %%f3;\n" // exp(-x)
+                        "    sub.f32 %%f1, %%f2, %%f3;\n"
+                        "    mul.f32 %%f1, %%f1, 0f3F000000;\n\n"); // * 0.5
+        break;
+    case UOP_COSH:
+        // (exp(x) + exp(-x)) / 2
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+                        "    mul.f32 %%f2, %%f0, 0f3FB8AA3B;\n"
+                        "    ex2.approx.f32 %%f2, %%f2;\n"
+                        "    neg.f32 %%f3, %%f0;\n"
+                        "    mul.f32 %%f3, %%f3, 0f3FB8AA3B;\n"
+                        "    ex2.approx.f32 %%f3, %%f3;\n"
+                        "    add.f32 %%f1, %%f2, %%f3;\n"
+                        "    mul.f32 %%f1, %%f1, 0f3F000000;\n\n");
+        break;
+    case UOP_ASINH:
+        // ln(x + sqrt(x*x + 1)) = log2(...) * ln2
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+                        "    mul.f32 %%f2, %%f0, %%f0;\n"       // x*x
+                        "    add.f32 %%f2, %%f2, 0f3F800000;\n" // x*x + 1
+                        "    sqrt.approx.f32 %%f2, %%f2;\n"
+                        "    add.f32 %%f2, %%f2, %%f0;\n" // x + sqrt(x*x+1)
+                        "    lg2.approx.f32 %%f2, %%f2;\n"
+                        "    mul.f32 %%f1, %%f2, 0f3F317218;\n\n"); // * ln2
+        break;
+    case UOP_ACOSH:
+        // ln(x + sqrt(x*x - 1)), defined for x >= 1
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+                        "    mul.f32 %%f2, %%f0, %%f0;\n"       // x*x
+                        "    sub.f32 %%f2, %%f2, 0f3F800000;\n" // x*x - 1
+                        "    sqrt.approx.f32 %%f2, %%f2;\n"
+                        "    add.f32 %%f2, %%f2, %%f0;\n" // x + sqrt(x*x-1)
+                        "    lg2.approx.f32 %%f2, %%f2;\n"
+                        "    mul.f32 %%f1, %%f2, 0f3F317218;\n\n"); // * ln2
+        break;
+    case UOP_ATANH:
+        // 0.5 * ln((1+x)/(1-x)) = log2((1+x)/(1-x)) * (ln2 / 2)
+        pos += snprintf(ptx + pos, (size_t)(PTX_BUF_SIZE - pos),
+                        "    add.f32 %%f2, %%f0, 0f3F800000;\n" // 1 + x
+                        "    mov.f32 %%f3, 0f3F800000;\n"
+                        "    sub.f32 %%f3, %%f3, %%f0;\n" // 1 - x
+                        "    rcp.approx.f32 %%f3, %%f3;\n"
+                        "    mul.f32 %%f2, %%f2, %%f3;\n" // (1+x)/(1-x)
+                        "    lg2.approx.f32 %%f2, %%f2;\n"
+                        "    mul.f32 %%f1, %%f2, 0f3EB17218;\n\n"); // * ln2/2
+        break;
     default:
         cml_free(ptx);
         return NULL;
