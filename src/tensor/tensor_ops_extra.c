@@ -1273,3 +1273,96 @@ Tensor* cml_bartlett_window(int N, const TensorConfig* config) {
     }
     return out;
 }
+
+/**
+ * DFT sample frequencies for a length-n FFT with sample spacing d (NumPy np.fft.fftfreq).
+ * @param n (int)
+ * @param d (float)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
+Tensor* cml_fftfreq(int n, float d, const TensorConfig* config) {
+    if (n < 1 || d == 0.0f)
+        return NULL;
+    Tensor* out = window_tensor(n, config);
+    if (out && out->data) {
+        float* f   = (float*)out->data;
+        float norm = 1.0f / (d * n);
+        int half   = (n - 1) / 2 + 1; /* count of non-negative frequencies */
+        for (int i = 0; i < n; i++)
+            f[i] = (i < half ? i : i - n) * norm;
+        out->is_executed = true;
+    }
+    return out;
+}
+
+/**
+ * Non-negative DFT frequencies for a length-n real FFT with spacing d (NumPy np.fft.rfftfreq).
+ * @param n (int)
+ * @param d (float)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
+Tensor* cml_rfftfreq(int n, float d, const TensorConfig* config) {
+    if (n < 1 || d == 0.0f)
+        return NULL;
+    int bins    = n / 2 + 1;
+    Tensor* out = window_tensor(bins, config);
+    if (out && out->data) {
+        float* f   = (float*)out->data;
+        float norm = 1.0f / (d * n);
+        for (int i = 0; i < bins; i++)
+            f[i] = i * norm;
+        out->is_executed = true;
+    }
+    return out;
+}
+
+/**
+ * Analytic signal of a real 1-D signal via the Hilbert transform, returned as [n,2] complex.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_hilbert(Tensor* x) {
+    if (!x)
+        return NULL;
+    extern int tensor_realize(Tensor*);
+    if (tensor_realize(x) != 0 || !x->data || x->ndim != 1 || x->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("cml_hilbert: input must be a float32 1-D signal");
+        return NULL;
+    }
+    int n            = x->shape[0];
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = x->device, .has_dtype = true, .has_device = true};
+    int cshape[] = {n, 2};
+    Tensor* cin  = tensor_empty(cshape, 2, &cfg);
+    if (!cin || !cin->data) {
+        tensor_free(cin);
+        return NULL;
+    }
+    float* cd = (float*)cin->data;
+    for (int i = 0; i < n; i++) {
+        cd[2 * i]     = (float)tensor_get_float(x, i);
+        cd[2 * i + 1] = 0.0f;
+    }
+    cin->is_executed = true;
+    Tensor* F        = cml_fft(cin, 0);
+    tensor_free(cin);
+    if (!F)
+        return NULL;
+    float* fd = (float*)tensor_data_ptr(F);
+    for (int k = 0; k < n; k++) { /* double positive freqs, zero negative (scipy.signal.hilbert) */
+        float m;
+        if (k == 0 || (n % 2 == 0 && k == n / 2))
+            m = 1.0f;
+        else if (k < (n + 1) / 2)
+            m = 2.0f;
+        else
+            m = 0.0f;
+        fd[2 * k] *= m;
+        fd[2 * k + 1] *= m;
+    }
+    Tensor* out = cml_fft(F, 1);
+    tensor_free(F);
+    return out;
+}
