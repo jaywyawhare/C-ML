@@ -3,7 +3,6 @@
 #include "core/dataset.h"
 #include "core/cml_flags.h"
 #include "nn.h"
-#include "ops/ir/internal.h"
 #include "backend/profiling.h"
 #include "autograd/autograd.h"
 #include "optim.h"
@@ -270,9 +269,7 @@ static void capture_distributions_for_epoch(TrainingMetrics* metrics, size_t epo
     if (!metrics || !cml_viz_enabled() || g_last_dist_epoch == epoch)
         return;
 
-    int num_params = 0;
-    for (int g = 0; g < optimizer->num_param_groups; g++)
-        num_params += optimizer->param_groups[g].num_parameters;
+    int num_params = optimizer_get_total_parameters(optimizer);
     Parameter** params =
         num_params > 0 ? cml_malloc((size_t)num_params * sizeof(Parameter*)) : NULL;
     if (!params)
