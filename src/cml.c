@@ -1704,6 +1704,27 @@ Tensor* cml_nn_huber_loss(Tensor* input, Tensor* target, float delta) {
     return tensor_huber_loss(input, target, delta);
 }
 /**
+ * Public API: focal loss (-> tensor_focal_loss).
+ * @param input (Tensor*)
+ * @param target (Tensor*)
+ * @param alpha (float)
+ * @param gamma (float)
+ * @return (Tensor*)
+ */
+Tensor* cml_nn_focal_loss(Tensor* input, Tensor* target, float alpha, float gamma) {
+    return tensor_focal_loss(input, target, alpha, gamma);
+}
+/**
+ * Public API: soft Dice loss (-> tensor_dice_loss).
+ * @param input (Tensor*)
+ * @param target (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
+Tensor* cml_nn_dice_loss(Tensor* input, Tensor* target, float eps) {
+    return tensor_dice_loss(input, target, eps);
+}
+/**
  * Public API: KL-divergence loss (-> tensor_kl_div_loss).
  * @param input (Tensor*)
  * @param target (Tensor*)
@@ -2873,6 +2894,66 @@ Tensor* cml_pinv(Tensor* a) { return tensor_pinv(a); }
  * @return (EigResult)
  */
 EigResult cml_eigh(Tensor* a) { return tensor_eigh(a); }
+/**
+ * Public API: trace of a 2D matrix (-> tensor_trace).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_trace(Tensor* a) { return tensor_trace(a); }
+/**
+ * Public API: Kronecker product (-> tensor_kron).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_kron(Tensor* a, Tensor* b) { return tensor_kron(a, b); }
+/**
+ * Public API: cross product of two length-3 vectors (-> tensor_cross).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_cross(Tensor* a, Tensor* b) { return tensor_cross(a, b); }
+/**
+ * Public API: sign and log-absolute determinant (-> tensor_slogdet).
+ * @param a (Tensor*)
+ * @return (SlogdetResult)
+ */
+SlogdetResult cml_slogdet(Tensor* a) { return tensor_slogdet(a); }
+/**
+ * Public API: median of all elements (-> tensor_median).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_median(Tensor* a) { return tensor_median(a); }
+/**
+ * Public API: q-quantile over all elements (-> tensor_quantile).
+ * @param a (Tensor*)
+ * @param q (float)
+ * @return (float)
+ */
+float cml_quantile(Tensor* a, float q) { return tensor_quantile(a, q); }
+/**
+ * Public API: p-th percentile over all elements (-> tensor_percentile).
+ * @param a (Tensor*)
+ * @param p (float)
+ * @return (float)
+ */
+float cml_percentile(Tensor* a, float p) { return tensor_percentile(a, p); }
+/**
+ * Public API: covariance matrix (-> tensor_cov).
+ * @param a (Tensor*)
+ * @param rowvar (bool)
+ * @return (Tensor*)
+ */
+Tensor* cml_cov(Tensor* a, bool rowvar) { return tensor_cov(a, rowvar); }
+/**
+ * Public API: correlation matrix (-> tensor_corrcoef).
+ * @param a (Tensor*)
+ * @param rowvar (bool)
+ * @return (Tensor*)
+ */
+Tensor* cml_corrcoef(Tensor* a, bool rowvar) { return tensor_corrcoef(a, rowvar); }
 
 /**
  * Public API: load a tensor from a URL (-> tensor_from_url).

@@ -96,7 +96,15 @@ Tensor* cml_tensor_1d(const float* data, int size);
  * cml_fft transforms a complex signal tensor stored as [n,2] and returns [n,2]. */
 int cml_fft_1d(float* re, float* im, int n, int inverse);
 Tensor* cml_fft(Tensor* x, int inverse);
-Tensor* cml_fft2(Tensor* x, int inverse); /* 2-D FFT of [H,W,2] complex image */
+Tensor* cml_fft2(Tensor* x, int inverse);                /* 2-D FFT of [H,W,2] complex image */
+Tensor* cml_rfft(Tensor* x);                             /* real-input FFT of [n] -> [n/2+1,2] */
+Tensor* cml_irfft(Tensor* x, int n);                     /* inverse real FFT of [n/2+1,2] -> [n] */
+Tensor* cml_convolve1d(Tensor* a, Tensor* b, int mode);  /* 0 full, 1 same, 2 valid */
+Tensor* cml_correlate1d(Tensor* a, Tensor* b, int mode); /* 0 full, 1 same, 2 valid */
+Tensor* cml_histogram(Tensor* a, int bins, float lo, float hi);
+Tensor* cml_bincount(Tensor* a, int minlength);
+int cml_searchsorted(Tensor* sorted, float value, int right);
+Tensor* cml_interp1d(Tensor* x, Tensor* xp, Tensor* fp);
 
 Tensor* cml_add(Tensor* a, Tensor* b);
 /* In-place elementwise (eager): a op= b into a's realized buffer, no allocation.
@@ -167,6 +175,15 @@ float cml_matrix_norm(Tensor* a);
 int cml_matrix_rank(Tensor* a, float tol);
 Tensor* cml_pinv(Tensor* a);
 EigResult cml_eigh(Tensor* a);
+float cml_trace(Tensor* a);
+Tensor* cml_kron(Tensor* a, Tensor* b);
+Tensor* cml_cross(Tensor* a, Tensor* b);
+SlogdetResult cml_slogdet(Tensor* a);
+float cml_median(Tensor* a);
+float cml_quantile(Tensor* a, float q);
+float cml_percentile(Tensor* a, float p);
+Tensor* cml_cov(Tensor* a, bool rowvar);
+Tensor* cml_corrcoef(Tensor* a, bool rowvar);
 
 Tensor* cml_transpose(Tensor* a, int dim1, int dim2);
 Tensor* cml_reshape(Tensor* a, int* new_shape, int new_ndim);
@@ -398,6 +415,8 @@ Tensor* cml_nn_mae_loss(Tensor* input, Tensor* target);
 Tensor* cml_nn_bce_loss(Tensor* input, Tensor* target);
 Tensor* cml_nn_cross_entropy_loss(Tensor* input, Tensor* target);
 Tensor* cml_nn_huber_loss(Tensor* input, Tensor* target, float delta);
+Tensor* cml_nn_focal_loss(Tensor* input, Tensor* target, float alpha, float gamma);
+Tensor* cml_nn_dice_loss(Tensor* input, Tensor* target, float eps);
 Tensor* cml_nn_kl_div_loss(Tensor* input, Tensor* target);
 Tensor* cml_nn_sparse_cross_entropy_loss(Tensor* input, Tensor* target);
 Tensor* cml_nn_triplet_margin_loss(Tensor* anchor, Tensor* positive, Tensor* negative,
