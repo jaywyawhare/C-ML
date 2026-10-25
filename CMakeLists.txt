@@ -287,6 +287,7 @@ set(CORE_SOURCES
     src/core/augmentation.c
     src/core/metrics.c
     src/core/lr_finder.c
+    src/core/interpret.c
     src/core/model_architecture.c
     src/core/training_loop.c
     src/core/training_metrics.c
