@@ -46,6 +46,62 @@ void nn_state_dict_print(const StateDict* sd);
 
 int nn_state_dict_lerp(StateDict* dst, const StateDict* src, float alpha);
 
+/**
+ * Clone @p module's current weights into a new StateDict that OWNS its tensors (deep
+ * copy, independent of the live parameters). Free with nn_state_dict_free_full.
+ * @param module (const Module*)
+ * @return (StateDict*)
+ */
+StateDict* nn_state_dict_clone(const Module* module);
+
+/**
+ * Free a StateDict that owns its tensors (frees each value tensor and the dict).
+ * @param sd (StateDict*)
+ * @return (void)
+ */
+void nn_state_dict_free_full(StateDict* sd);
+
+/* Keep-best checkpoint: snapshots a model's weights whenever a monitored metric improves,
+ * and restores them on demand. Owns the snapshot tensors. */
+typedef struct CMLCheckpoint {
+    StateDict* best; /* owned clone of the best weights, or NULL until first update */
+    float best_metric;
+    int maximize; /* 1 = higher metric is better, 0 = lower is better */
+    int has_best;
+} CMLCheckpoint;
+
+/**
+ * Create a keep-best checkpoint. @p maximize selects whether higher or lower is better.
+ * @param maximize (int)
+ * @return (CMLCheckpoint*)
+ */
+CMLCheckpoint* cml_checkpoint_create(int maximize);
+
+/**
+ * Record @p metric for @p model; if it improves on the best so far, snapshot the weights.
+ * Returns 1 if a new best was saved, 0 otherwise.
+ * @param ckpt (CMLCheckpoint*)
+ * @param model (Module*)
+ * @param metric (float)
+ * @return (int)
+ */
+int cml_checkpoint_update(CMLCheckpoint* ckpt, Module* model, float metric);
+
+/**
+ * Load the best snapshot back into @p model. Returns 0 on success, -1 if none saved.
+ * @param ckpt (CMLCheckpoint*)
+ * @param model (Module*)
+ * @return (int)
+ */
+int cml_checkpoint_restore(CMLCheckpoint* ckpt, Module* model);
+
+/**
+ * Free a checkpoint and its snapshot.
+ * @param ckpt (CMLCheckpoint*)
+ * @return (void)
+ */
+void cml_checkpoint_free(CMLCheckpoint* ckpt);
+
 /* Running average of a model's weights (EMA or SWA): owns cloned shadow tensors kept
  * separate from the live parameters, so training is unaffected until they are copied back. */
 typedef struct CMLWeightAvg {

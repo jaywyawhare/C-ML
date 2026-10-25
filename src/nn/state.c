@@ -351,33 +351,113 @@ int nn_state_dict_lerp(StateDict* dst, const StateDict* src, float alpha) {
  * @param decay (float)
  * @return (CMLWeightAvg*)
  */
-CMLWeightAvg* cml_weight_avg_create(const Module* model, float decay) {
-    if (!model)
+/** Clone @p module's current weights into a StateDict that owns its tensors.
+ * @param module (const Module*)
+ * @return (StateDict*)
+ */
+StateDict* nn_state_dict_clone(const Module* module) {
+    if (!module)
         return NULL;
-    StateDict* live = nn_get_state_dict(model, NULL);
+    StateDict* live = nn_get_state_dict(module, NULL);
     if (!live)
         return NULL;
-    CMLWeightAvg* wa = cml_calloc(1, sizeof(CMLWeightAvg));
-    StateDict* avg   = nn_state_dict_create();
-    if (!wa || !avg) {
+    StateDict* out = nn_state_dict_create();
+    if (!out) {
         nn_state_dict_free(live);
-        nn_state_dict_free(avg);
-        cml_free(wa);
         return NULL;
     }
     for (int i = 0; i < live->count; i++) {
         Tensor* c = tensor_clone(live->entries[i].value);
-        if (!c || nn_state_dict_set(avg, live->entries[i].key, c) != 0) {
+        if (!c || nn_state_dict_set(out, live->entries[i].key, c) != 0) {
             tensor_free(c);
-            for (int j = 0; j < avg->count; j++)
-                tensor_free(avg->entries[j].value);
-            nn_state_dict_free(avg);
+            nn_state_dict_free_full(out);
             nn_state_dict_free(live);
-            cml_free(wa);
             return NULL;
         }
     }
     nn_state_dict_free(live);
+    return out;
+}
+
+/** Free a StateDict that owns its tensors.
+ * @param sd (StateDict*)
+ * @return (void)
+ */
+void nn_state_dict_free_full(StateDict* sd) {
+    if (!sd)
+        return;
+    for (int i = 0; i < sd->count; i++)
+        tensor_free(sd->entries[i].value);
+    nn_state_dict_free(sd);
+}
+
+/** Create a keep-best checkpoint.
+ * @param maximize (int)
+ * @return (CMLCheckpoint*)
+ */
+CMLCheckpoint* cml_checkpoint_create(int maximize) {
+    CMLCheckpoint* c = cml_calloc(1, sizeof(CMLCheckpoint));
+    if (c)
+        c->maximize = maximize ? 1 : 0;
+    return c;
+}
+
+/** Snapshot @p model's weights if @p metric improves on the best so far.
+ * @param ckpt (CMLCheckpoint*)
+ * @param model (Module*)
+ * @param metric (float)
+ * @return (int)
+ */
+int cml_checkpoint_update(CMLCheckpoint* ckpt, Module* model, float metric) {
+    if (!ckpt || !model)
+        return 0;
+    int improved = !ckpt->has_best ||
+                   (ckpt->maximize ? metric > ckpt->best_metric : metric < ckpt->best_metric);
+    if (!improved)
+        return 0;
+    StateDict* snap = nn_state_dict_clone(model);
+    if (!snap)
+        return 0;
+    nn_state_dict_free_full(ckpt->best);
+    ckpt->best        = snap;
+    ckpt->best_metric = metric;
+    ckpt->has_best    = 1;
+    return 1;
+}
+
+/** Load the best snapshot back into @p model. Returns 0 on success, -1 if none saved.
+ * @param ckpt (CMLCheckpoint*)
+ * @param model (Module*)
+ * @return (int)
+ */
+int cml_checkpoint_restore(CMLCheckpoint* ckpt, Module* model) {
+    if (!ckpt || !model || !ckpt->has_best)
+        return -1;
+    return nn_load_state_dict(model, ckpt->best, false);
+}
+
+/** Free a checkpoint and its snapshot.
+ * @param ckpt (CMLCheckpoint*)
+ * @return (void)
+ */
+void cml_checkpoint_free(CMLCheckpoint* ckpt) {
+    if (!ckpt)
+        return;
+    nn_state_dict_free_full(ckpt->best);
+    cml_free(ckpt);
+}
+
+CMLWeightAvg* cml_weight_avg_create(const Module* model, float decay) {
+    if (!model)
+        return NULL;
+    StateDict* avg = nn_state_dict_clone(model);
+    if (!avg)
+        return NULL;
+    CMLWeightAvg* wa = cml_calloc(1, sizeof(CMLWeightAvg));
+    if (!wa) {
+        nn_state_dict_free_full(avg);
+        return NULL;
+    }
     wa->avg   = avg;
     wa->decay = decay;
     wa->count = 0;
@@ -435,10 +515,6 @@ int cml_weight_avg_copy_to(CMLWeightAvg* wa, Module* model) {
 void cml_weight_avg_free(CMLWeightAvg* wa) {
     if (!wa)
         return;
-    if (wa->avg) {
-        for (int i = 0; i < wa->avg->count; i++)
-            tensor_free(wa->avg->entries[i].value);
-        nn_state_dict_free(wa->avg);
-    }
+    nn_state_dict_free_full(wa->avg);
     cml_free(wa);
 }
