@@ -292,6 +292,7 @@ set(CORE_SOURCES
     src/core/npy_io.c
     src/core/audio_io.c
     src/core/audio_features.c
+    src/core/ctc.c
     src/core/model_architecture.c
     src/core/training_loop.c
     src/core/training_metrics.c
