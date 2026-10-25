@@ -32,8 +32,9 @@ static int realize_module_tensor(Tensor* tensor, const char* caller, const char*
     return 0;
 }
 
-/** Register a non-trainable buffer (e.g. running stats) by name; the tensor is
- *  borrowed, the name is copied. -1 if the name already exists. */
+/** Register a non-trainable buffer (e.g. running stats) by name; the tensor is borrowed, the
+ *  name is copied. Lazy tensors are realized first so they survive IR teardown between steps;
+ *  -1 if the name already exists or on error. */
 int module_add_buffer(Module* module, Tensor* tensor, const char* name) {
     if (!module || !tensor || !name)
         return -1;
@@ -370,7 +371,7 @@ int module_set_parameter(Module* module, const char* name, Tensor* tensor) {
 }
 
 /** Run a module's forward pass, pushing an IR scope named after the module so emitted
- *  nodes can be grouped back into layers; also remembers the outermost module as viz root. */
+ *  nodes can be grouped back into layers. */
 Tensor* module_forward(Module* module, Tensor* input) {
     if (!module) {
         return NULL;

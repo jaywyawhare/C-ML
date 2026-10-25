@@ -34,7 +34,8 @@ static const char* program_path(void) { return g_argv0; }
 int main(int argc, char** argv) {
     g_argv0 = argv[0];
 
-    /* Child mode: report whether cml_init() accepted this environment. */
+    /* Child mode: report whether cml_init() accepted this environment and, for --probe-gates,
+     * whether it left any VIZ-only path on. */
     if (argc > 1 && argv[1] && argv[1][0] == '-') {
         if (cml_init() != 0)
             return 3;

@@ -965,8 +965,8 @@ void tensor_free(Tensor* t) {
         cml_free(t->strides);
 
     if (t->grad) {
-        /* The grad is pinned when published (see autodiff publish loop); release
-         * that reference so it is freed exactly once, here, by its owning parent. */
+        /* A published grad carries a pin and a reference for each parent holding it (see
+         * the autodiff publish loop); drop this parent's, so the last holder frees it. */
         Tensor* g = t->grad;
         t->grad   = NULL;
         tensor_release(g);

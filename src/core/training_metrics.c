@@ -650,8 +650,8 @@ static void export_distribution_series(FILE* f, const char* name, const Distribu
 int training_metrics_export_json(const TrainingMetrics* metrics, const char* path,
                                  bool incremental) {
     /* NO_EXPORT: every metrics file goes through here, so one guard covers the
-     * lot. This path is NOT VIZ-gated -- auto_capture_loss/optimizer rewrite
-     * training.json on every step, so an ordinary training run pays for a
+     * lot. This path is NOT VIZ-gated -- the auto-capture hooks rewrite
+     * training.json up to once a second, so an ordinary training run pays for a
      * dashboard it never opens. */
     if (cml_flag_enabled(CML_FLAG_NO_EXPORT))
         return 0;

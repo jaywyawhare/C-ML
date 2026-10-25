@@ -24,7 +24,7 @@ void cml_rewrite_trace_begin_pass(const char* pass_name);
 void cml_rewrite_trace_record(const char* rule, const char* op, const char* from, const char* to,
                               double dur_us);
 
-/** Drop all recorded events and passes (call before a fresh compile). */
+/** Drop all recorded events and passes; cml_ir_optimize does this before its rewrite rules. */
 void cml_rewrite_trace_reset(void);
 
 /** Serialize the recorded passes/events to a JSON string (caller frees), or

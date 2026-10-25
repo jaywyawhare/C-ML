@@ -11,7 +11,7 @@ typedef struct Optimizer Optimizer;
 typedef struct Tensor Tensor;
 typedef struct Dataset Dataset;
 
-/* Per-epoch shape of a parameter population (all weights, or all gradients).
+/** Per-epoch shape of a parameter population (all weights, or all gradients).
  * A single gradient-norm scalar hides the failure modes that matter -- dead
  * units, a few exploding channels, a layer that stopped moving -- because they
  * all average out. Percentiles come from a fixed-bin histogram over [min,max]
@@ -62,8 +62,9 @@ typedef struct {
     size_t actual_epochs;   // Actual number of epochs completed (after early stopping)
 } TrainingMetrics;
 
-/* Materialised float data of `t` plus its element count; `numel` is recomputed
- * from the shape when the tensor has not cached it. NULL when unavailable. */
+/** Materialised float data of `t` plus its element count; `numel` is recomputed
+ * from the shape when the tensor has not cached it. NULL when `t` is not
+ * float32 or has no data. */
 float* cml_tensor_float_buffer(Tensor* t, size_t* num_elements);
 
 TrainingMetrics* training_metrics_create(size_t num_epochs);
@@ -71,7 +72,7 @@ void training_metrics_start_epoch(TrainingMetrics* metrics);
 void training_metrics_record_epoch(TrainingMetrics* metrics, size_t epoch, float loss,
                                    float accuracy);
 
-/* Pass 0.0f for optional test/val metrics if not available */
+/** Pass 0.0f for optional test/val metrics if not available */
 void training_metrics_record_epoch_full(TrainingMetrics* metrics, size_t epoch, float train_loss,
                                         float train_accuracy, float test_loss, float test_accuracy,
                                         float val_loss, float val_accuracy);
@@ -85,12 +86,12 @@ void training_metrics_set_gradient_norm(TrainingMetrics* metrics, float grad_nor
 float training_metrics_calculate_gradient_norm(TrainingMetrics* metrics, void** parameters,
                                                int num_parameters);
 
-/* Summarise the weight and gradient populations for `epoch`. Call once per
+/** Summarise the weight and gradient populations for `epoch`. Call once per
  * epoch, after backward; skipped cheaply when the arrays were never allocated. */
 void training_metrics_record_distributions(TrainingMetrics* metrics, size_t epoch,
                                            void** parameters, int num_parameters);
 
-/* incremental=true exports only completed epochs (for real-time updates) */
+/** incremental=true exports only completed epochs (for real-time updates) */
 int training_metrics_export_json(const TrainingMetrics* metrics, const char* path,
                                  bool incremental);
 int training_metrics_export_epoch_update(const TrainingMetrics* metrics, size_t epoch,
@@ -99,7 +100,7 @@ int training_metrics_export_architecture(Module* module, const char* path);
 void training_metrics_free(TrainingMetrics* metrics);
 void training_metrics_log(TrainingMetrics* metrics, size_t epoch);
 
-/*
+/**
  * Training step helper: forward pass, loss, backward, optimizer step,
  * and automatic metrics recording.
  */
@@ -110,10 +111,10 @@ TrainingMetrics* training_metrics_get_global(void);
 void training_metrics_auto_capture_loss(Tensor* loss_tensor);
 void training_metrics_auto_capture_optimizer(Optimizer* optimizer);
 
-/*
+/**
  * Classification losses call this with (prediction, target) so the metrics layer
- * can auto-compute per-epoch accuracy during loss capture. Pointers are only read
- * during the immediately-following backward pass; not retained.
+ * can auto-compute per-epoch accuracy during loss capture. The pointers are kept
+ * until the next loss capture reads them, or until either tensor is freed.
  */
 void training_metrics_note_prediction(Tensor* prediction, Tensor* target);
 void training_metrics_init_global(void);
@@ -132,7 +133,7 @@ int training_metrics_evaluate_dataset(Module* model, Dataset* dataset,
                                       Tensor* (*loss_fn)(Tensor*, Tensor*), bool is_validation);
 void training_metrics_mark_early_stop(size_t actual_epochs);
 
-/*
+/**
  * Close the current epoch: records it as completed, advances the epoch index and
  * exports. Call at the end of every epoch when using manual epoch control
  * (which training_metrics_set_expected_epochs turns on) -- otherwise the index

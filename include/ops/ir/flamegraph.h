@@ -23,27 +23,28 @@ extern "C" {
 
 struct IRNode;
 
-/* Cached check of the FLAMEGRAPH env var (truthy and not "0"/"false"). */
+/** Whether span capture is on: FLAMEGRAPH or PROFILE, or VIZ unless FLAMEGRAPH=0; never under
+ * NO_EXPORT. */
 int cml_flame_enabled(void);
 
-/* Clear the accumulated spans (call at the start of a step you want to profile). */
+/** Clear the accumulated spans (call at the start of a step you want to profile). */
 void cml_flame_reset(void);
 
-/* Append one kernel span. `ms` is the measured wall time for this node. No-op
+/** Append one kernel span. `ms` is the measured wall time for this node. No-op
  * when disabled. Op/kind strings are static; `node` is only read, not retained. */
 void cml_flame_record(const struct IRNode* node, double ms);
 
-/* Write the accumulated spans to `path` as flamegraph.json. Returns 0 on success,
+/** Write the accumulated spans to `path` as flamegraph.json. Returns 0 on success,
  * -1 on error or when disabled / no spans. Does not clear the buffer. */
 int cml_flame_export(const char* path);
 
-/* Write the same spans to `path` in Chrome Trace Event format (complete "X"
+/** Write the same spans to `path` in Chrome Trace Event format (complete "X"
  * events, ts/dur in microseconds) so a profile opens directly in
  * chrome://tracing or the Perfetto UI. Returns 0 on success, -1 on error or
  * when disabled / no spans. Does not clear the buffer. */
 int cml_flame_export_chrome_trace(const char* path);
 
-/* Number of spans currently buffered. */
+/** Total number of recorded node executions, including any the timeline dropped. */
 long long cml_flame_num_spans(void);
 
 #ifdef __cplusplus
