@@ -352,6 +352,7 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     ir->last_result   = NULL;
     ir->backward_head = NULL;
     ir->node_count    = 0;
+    ir->name_seq      = 0;
 
     ir->is_executed   = false;
     ir->is_optimized  = false;
@@ -1427,7 +1428,7 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
                         cml_free(node);
                         return -1;
                     }
-                    snprintf(new_name, 32, "t%d", ir->tensor_count + ir->node_count);
+                    snprintf(new_name, 32, "t%d", ir->name_seq++);
                     ir->tensor_refs[ir->tensor_count] = t;
                     t->ref_count++;
                     ir->tensor_names[ir->tensor_count] = new_name;
@@ -1471,7 +1472,7 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
         cml_free(node);
         return -1;
     }
-    snprintf(output_name, 32, "t%d", ir->tensor_count + ir->node_count);
+    snprintf(output_name, 32, "t%d", ir->name_seq++);
     node->output_name = output_name;
 
     node->params = params;

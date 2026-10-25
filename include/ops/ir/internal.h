@@ -109,6 +109,7 @@ struct CMLGraph {
     struct IRNode* last_result;   // Last node from cml_ir_add_uop (may be interned)
     struct IRNode* backward_head; // Backward graph (lazy)
     int node_count;
+    int name_seq; // next "t%d" suffix; node_count shrinks when nodes fuse, so it cannot name them
 
     bool is_executed;
     bool is_optimized;
