@@ -511,3 +511,181 @@ float cml_rouge_n(const int* candidate, int cand_len, const int* reference, int 
     int m = clipped_ngram_matches(candidate, cand_len, reference, ref_len, n);
     return (float)m / (float)ref_ng;
 }
+
+/** Matthews correlation coefficient for binary labels (0/1); 0 when a margin is empty.
+ * @param y_true (const int*)
+ * @param y_pred (const int*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_matthews_corrcoef(const int* y_true, const int* y_pred, int n) {
+    if (!y_true || !y_pred || n <= 0)
+        return 0.0f;
+    long tp = 0, tn = 0, fp = 0, fn = 0;
+    for (int i = 0; i < n; i++) {
+        int t = y_true[i] ? 1 : 0, p = y_pred[i] ? 1 : 0;
+        if (p && t)
+            tp++;
+        else if (p && !t)
+            fp++;
+        else if (!p && t)
+            fn++;
+        else
+            tn++;
+    }
+    double denom = sqrt((double)(tp + fp) * (tp + fn) * (tn + fp) * (tn + fn));
+    if (denom == 0.0)
+        return 0.0f;
+    return (float)(((double)tp * tn - (double)fp * fn) / denom);
+}
+
+/** Cohen's kappa agreement over multi-class labels, via the confusion matrix.
+ * @param y_true (const int*)
+ * @param y_pred (const int*)
+ * @param n (int)
+ * @param num_classes (int)
+ * @return (float)
+ */
+float cml_cohen_kappa(const int* y_true, const int* y_pred, int n, int num_classes) {
+    CMLConfusionMatrix* cm = cml_confusion_matrix(y_true, y_pred, n, num_classes);
+    if (!cm)
+        return 0.0f;
+    int c        = cm->num_classes;
+    double total = 0.0, diag = 0.0, expected = 0.0;
+    for (int i = 0; i < c; i++)
+        for (int j = 0; j < c; j++)
+            total += cm->counts[i * c + j];
+    if (total == 0.0) {
+        cml_confusion_matrix_free(cm);
+        return 0.0f;
+    }
+    for (int k = 0; k < c; k++) {
+        double row = 0.0, col = 0.0;
+        for (int j = 0; j < c; j++)
+            row += cm->counts[k * c + j];
+        for (int i = 0; i < c; i++)
+            col += cm->counts[i * c + k];
+        diag += cm->counts[k * c + k];
+        expected += row * col;
+    }
+    double po = diag / total;
+    double pe = expected / (total * total);
+    cml_confusion_matrix_free(cm);
+    if (pe >= 1.0)
+        return 0.0f;
+    return (float)((po - pe) / (1.0 - pe));
+}
+
+/** Pearson correlation coefficient between two equal-length sequences.
+ * @param x (const float*)
+ * @param y (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_pearson(const float* x, const float* y, int n) {
+    if (!x || !y || n <= 1)
+        return 0.0f;
+    double mx = 0.0, my = 0.0;
+    for (int i = 0; i < n; i++) {
+        mx += x[i];
+        my += y[i];
+    }
+    mx /= n;
+    my /= n;
+    double sxy = 0.0, sxx = 0.0, syy = 0.0;
+    for (int i = 0; i < n; i++) {
+        double dx = x[i] - mx, dy = y[i] - my;
+        sxy += dx * dy;
+        sxx += dx * dx;
+        syy += dy * dy;
+    }
+    if (sxx == 0.0 || syy == 0.0)
+        return 0.0f;
+    return (float)(sxy / sqrt(sxx * syy));
+}
+
+/* Write tie-averaged 1-based ranks of v[0..n) into out, ordered by original index. */
+static void average_ranks(const float* v, int n, float* out) {
+    ScoreLabel* sl = cml_malloc((size_t)n * sizeof(ScoreLabel));
+    if (!sl)
+        return;
+    for (int i = 0; i < n; i++) {
+        sl[i].score = v[i];
+        sl[i].label = i;
+    }
+    qsort(sl, (size_t)n, sizeof(ScoreLabel), scorelabel_cmp);
+    int i = 0;
+    while (i < n) {
+        int j = i;
+        while (j + 1 < n && sl[j + 1].score == sl[i].score)
+            j++;
+        float rank = (i + j) / 2.0f + 1.0f; /* average of 1-based ranks i+1..j+1 */
+        for (int k = i; k <= j; k++)
+            out[sl[k].label] = rank;
+        i = j + 1;
+    }
+    cml_free(sl);
+}
+
+/** Spearman rank correlation (Pearson correlation of tie-averaged ranks).
+ * @param x (const float*)
+ * @param y (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_spearman(const float* x, const float* y, int n) {
+    if (!x || !y || n <= 1)
+        return 0.0f;
+    float* rx = cml_malloc((size_t)n * sizeof(float));
+    float* ry = cml_malloc((size_t)n * sizeof(float));
+    float res = 0.0f;
+    if (rx && ry) {
+        average_ranks(x, n, rx);
+        average_ranks(y, n, ry);
+        res = cml_pearson(rx, ry, n);
+    }
+    cml_free(rx);
+    cml_free(ry);
+    return res;
+}
+
+/** Expected calibration error: average confidence-accuracy gap over equal-width bins.
+ * @param confidences (const float*)
+ * @param correct (const int*)
+ * @param n (int)
+ * @param n_bins (int)
+ * @return (float)
+ */
+float cml_expected_calibration_error(const float* confidences, const int* correct, int n,
+                                     int n_bins) {
+    if (!confidences || !correct || n <= 0 || n_bins <= 0)
+        return 0.0f;
+    double* sum_conf = cml_calloc((size_t)n_bins, sizeof(double));
+    double* sum_acc  = cml_calloc((size_t)n_bins, sizeof(double));
+    long* count      = cml_calloc((size_t)n_bins, sizeof(long));
+    if (!sum_conf || !sum_acc || !count) {
+        cml_free(sum_conf);
+        cml_free(sum_acc);
+        cml_free(count);
+        return 0.0f;
+    }
+    for (int i = 0; i < n; i++) {
+        float c = confidences[i];
+        int b   = (int)(c * n_bins);
+        if (b >= n_bins)
+            b = n_bins - 1;
+        if (b < 0)
+            b = 0;
+        sum_conf[b] += c;
+        sum_acc[b] += correct[i] ? 1.0 : 0.0;
+        count[b]++;
+    }
+    double ece = 0.0;
+    for (int b = 0; b < n_bins; b++)
+        if (count[b] > 0)
+            ece += count[b] / (double)n * fabs(sum_acc[b] / count[b] - sum_conf[b] / count[b]);
+    cml_free(sum_conf);
+    cml_free(sum_acc);
+    cml_free(count);
+    return (float)ece;
+}

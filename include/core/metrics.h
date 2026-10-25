@@ -200,6 +200,54 @@ float cml_wer(const int* reference, int ref_len, const int* hypothesis, int hyp_
  */
 float cml_rouge_n(const int* candidate, int cand_len, const int* reference, int ref_len, int n);
 
+/**
+ * Matthews correlation coefficient for binary (0/1) labels.
+ * @param y_true (const int*)
+ * @param y_pred (const int*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_matthews_corrcoef(const int* y_true, const int* y_pred, int n);
+
+/**
+ * Cohen's kappa agreement over multi-class labels.
+ * @param y_true (const int*)
+ * @param y_pred (const int*)
+ * @param n (int)
+ * @param num_classes (int)
+ * @return (float)
+ */
+float cml_cohen_kappa(const int* y_true, const int* y_pred, int n, int num_classes);
+
+/**
+ * Pearson correlation coefficient between two sequences.
+ * @param x (const float*)
+ * @param y (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_pearson(const float* x, const float* y, int n);
+
+/**
+ * Spearman rank correlation between two sequences.
+ * @param x (const float*)
+ * @param y (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_spearman(const float* x, const float* y, int n);
+
+/**
+ * Expected calibration error over equal-width confidence bins.
+ * @param confidences (const float*)
+ * @param correct (const int*)
+ * @param n (int)
+ * @param n_bins (int)
+ * @return (float)
+ */
+float cml_expected_calibration_error(const float* confidences, const int* correct, int n,
+                                     int n_bins);
+
 #ifdef __cplusplus
 }
 #endif
