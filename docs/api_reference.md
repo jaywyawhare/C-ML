@@ -590,6 +590,10 @@ Dataset* cml_dataset_from_csv(const char* path, int target_col);
 ```
 
 `target_col` specifies which column is the label. Use `-1` for the last column.
+Date/time columns are split into numeric features (year/month/day/dow, hour/minute/second)
+and text columns are mapped to integer categories. For date order, cyclical encoding, or
+an explicit header/delimiter, call `cml_csv_parse_ex` with `CSVParseOptions` (see
+[datasets.md](datasets.md)).
 
 ### Dataset Operations
 

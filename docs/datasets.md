@@ -57,7 +57,33 @@ Dataset* cml_dataset_load(const char* name);
 Dataset* cml_dataset_from_csv(const char* filepath, int target_col);
 ```
 
-CSV loading auto-detects: header rows, delimiters (comma/semicolon), and string labels (encoded as integers).
+CSV loading auto-detects header rows, delimiters (comma/semicolon/tab), and string
+labels (encoded as integers). Text feature columns are likewise mapped to integer
+categories, and date/time columns are split into numeric features.
+
+### Date and time columns
+
+A column whose first data value is a date, a time, or both is expanded into numeric
+feature columns, named after the source column (or `colN` when there is no header):
+
+| Cell | Features |
+|------|----------|
+| `2024-01-15` (date) | `.year`, `.month`, `.day`, `.dow` (0 = Sunday) |
+| `08:30:00` (time) | `.hour`, `.minute`, `.second` |
+| `2024-01-15T08:30:00` (datetime) | the date and time features together |
+
+ISO 8601 (`YYYY-MM-DD`, with `T` or a space before the time) is always recognised.
+For full control, use `cml_csv_parse_ex` with `CSVParseOptions`:
+
+```c
+CSVParseOptions o = cml_csv_default_options();
+o.date_order      = CML_CSV_DATE_DMY; // read 01/02/2024 as day/month/year
+o.cyclical        = 1;                // also emit sin/cos for month, day-of-week, hour
+o.expand_datetime = 0;               // or: keep date/time columns as one numeric column (leading number via strtod)
+
+float *X, *y; int n, nf, nc; char **classes, **feature_names;
+cml_csv_parse_ex("events.csv", &o, &X, &y, &n, &nf, &nc, &classes, &feature_names);
+```
 
 ### Preprocessing
 
