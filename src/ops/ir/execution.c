@@ -6159,9 +6159,9 @@ int cpu_execute_ir(CMLGraph_t ir) {
         }
 
         /* Flamegraph: bracket this node's dispatch at fused-kernel granularity
-         * (a fused chain is a single node here). Opt-in via FLAMEGRAPH; the
-         * enabled check is a cached bool so the off-path cost is ~nil. GPU-path
-         * nodes take their own `continue` above and aren't timed in this slice. */
+         * (a fused chain is a single node here). Opt-in via FLAMEGRAPH, PROFILE or
+         * VIZ; the check is a few flag-registry reads, so the off-path cost is ~nil.
+         * GPU-path nodes take their own `continue` above and aren't timed in this slice. */
         const int _flame       = cml_flame_enabled();
         const double _flame_t0 = _flame ? cml_monotonic_ms() : 0.0;
 

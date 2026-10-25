@@ -83,16 +83,9 @@ Epoch 1000: 14,126 nodes  // 14MB+ of memory!
 
 ### The Solution: Context Reset
 
-The global IR context is reset after each training step:
-
-```c
-void cml_ir_reset_global_context(void) {
-    if (g_global_ir_context) {
-        cml_ir_free(g_global_ir_context);
-        g_global_ir_context = NULL;
-    }
-}
-```
+The thread-local IR context is reset after each training step. `cml_ir_reset_global_context()`
+frees the graph along with the graph, CPU-execute and buffer caches; `cml_ir_reset_graph_only()`,
+which `cml_autograd_step_end()` uses, frees only the graph and keeps those caches warm.
 
 **When it's called:**
 
@@ -279,7 +272,7 @@ void cml_ir_reset_global_context(void);
 **Side effects:**
 
 - Frees all IR nodes in the global context
-- Sets `g_global_ir_context` to NULL
+- Clears the graph, CPU-execute and buffer caches
 - Next operation will create a new context
 
 
@@ -304,8 +297,8 @@ void cml_ir_ensure_gradients_executed(CMLGraph_t ir);
 **Example:**
 
 ```c
-// At the end of a hand-written training step:
-cml_ir_ensure_gradients_executed(tensor->ir_context);
+// Before resetting the graph in a hand-written loop:
+cml_ir_ensure_gradients_executed(cml_ir_get_or_create_context());
 cml_ir_reset_global_context();
 ```
 
@@ -377,14 +370,15 @@ VIZ=1 ./my_training_program
 ./my_training_program
 ```
 
-### 2. Materialize Data Before IR Reset
+### 2. Copy Data Out Before IR Reset
 
-If you need to access tensor values after the graph is reset, ensure they're executed first:
+A reset frees graph outputs, so executing a tensor is not enough to keep it: copy out the values you
+need first, or end the step with `cml_autograd_step_end(loss)`, which detaches `loss`:
 
 ```c
 Tensor* loss = compute_loss(output, target);
 
-// Materialize loss value BEFORE the reset
+// Copy the loss value out BEFORE the reset
 float loss_value = tensor_get_float(loss, 0);
 
 cml_backward(loss, NULL, false, false);

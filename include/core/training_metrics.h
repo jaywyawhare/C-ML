@@ -72,7 +72,8 @@ void training_metrics_start_epoch(TrainingMetrics* metrics);
 void training_metrics_record_epoch(TrainingMetrics* metrics, size_t epoch, float loss,
                                    float accuracy);
 
-/** Pass 0.0f for optional test/val metrics if not available */
+/** Record train plus optional test/val loss and accuracy for `epoch`. A split is recorded only
+ * when its loss and accuracy are both finite and non-negative: pass NAN for one that is absent. */
 void training_metrics_record_epoch_full(TrainingMetrics* metrics, size_t epoch, float train_loss,
                                         float train_accuracy, float test_loss, float test_accuracy,
                                         float val_loss, float val_accuracy);
@@ -91,7 +92,8 @@ float training_metrics_calculate_gradient_norm(TrainingMetrics* metrics, void** 
 void training_metrics_record_distributions(TrainingMetrics* metrics, size_t epoch,
                                            void** parameters, int num_parameters);
 
-/** incremental=true exports only completed epochs (for real-time updates) */
+/** Write the metrics as JSON to `path`; `incremental` marks the run as still training. Returns 0
+ * on success (and under NO_EXPORT), negative on error. */
 int training_metrics_export_json(const TrainingMetrics* metrics, const char* path,
                                  bool incremental);
 int training_metrics_export_epoch_update(const TrainingMetrics* metrics, size_t epoch,

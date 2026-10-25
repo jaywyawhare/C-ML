@@ -13,8 +13,8 @@ DEBUG=4 NOOPT=1 ./my_program
 
 Set `DEBUG=1` (or higher) to print every non-default flag at startup.
 
-A value is an integer, or a word: `false`, `no` and `off` read as `0`, any other word as `1`.
-An empty value leaves the flag at its default.
+A registry flag's value is an integer, or a word: `false`, `no` and `off` read as `0`, any other
+word as `1`. An empty value leaves the flag at its default. `DEFAULT_FLOAT` takes a dtype name.
 
 ## Global flags
 

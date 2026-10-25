@@ -23,8 +23,8 @@ VIZ=1 ./your_program        # exports the artifacts and launches the dashboard
 The graph and kernel exports are re-run only when the graph's structure changes,
 and at most once a second, not on every step: a training loop rebuilds the same
 graph each iteration and the dashboard only ever shows the latest, so exporting
-per step rewrote identical files hundreds of times. A shape change re-triggers it
-automatically.
+per step would rewrite identical files hundreds of times. A shape change
+re-triggers it automatically.
 
 ### Turning everything off
 
