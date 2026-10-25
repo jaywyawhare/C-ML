@@ -2003,31 +2003,30 @@ static char* cml_capture_build_stack(void) {
 #endif /* _WIN32 */
 }
 
-/** Push @p name onto the thread-local module scope path (for graph grouping). */
+/** Push @p name onto the thread-local module scope path (for graph grouping). Every push counts
+ *  toward the depth, even one too deep or too long to name, so each pop undoes exactly one. */
 void cml_ir_scope_push(const char* name) {
-    if (!cml_ir_scope_enabled() || !name || g_scope_depth >= IR_SCOPE_MAX_DEPTH)
+    if (!cml_ir_scope_enabled())
         return;
-
-    int len = (int)strlen(g_scope_path);
-    int add = (int)strlen(name) + (len > 0 ? 1 : 0);
-    if (len + add >= IR_SCOPE_MAX_LEN) {
-        /* Too deep to name: still push so the pop stays balanced. */
-        g_scope_ends[g_scope_depth++] = len;
-        return;
+    if (g_scope_depth < IR_SCOPE_MAX_DEPTH) {
+        int len = (int)strlen(g_scope_path);
+        int add = name && *name ? (int)strlen(name) + (len > 0) : 0;
+        if (add && len + add < IR_SCOPE_MAX_LEN) {
+            if (len > 0)
+                g_scope_path[len++] = '/';
+            strcpy(g_scope_path + len, name);
+        }
+        g_scope_ends[g_scope_depth] = (int)strlen(g_scope_path);
     }
-    if (len > 0)
-        g_scope_path[len++] = '/';
-    strcpy(g_scope_path + len, name);
-    g_scope_ends[g_scope_depth++] = (int)strlen(g_scope_path);
+    g_scope_depth++;
 }
 
 /** Pop the innermost module scope, truncating the path back to its parent. */
 void cml_ir_scope_pop(void) {
     if (!cml_ir_scope_enabled() || g_scope_depth <= 0)
         return;
-    g_scope_depth--;
-    int keep           = g_scope_depth > 0 ? g_scope_ends[g_scope_depth - 1] : 0;
-    g_scope_path[keep] = '\0';
+    if (--g_scope_depth < IR_SCOPE_MAX_DEPTH)
+        g_scope_path[g_scope_depth > 0 ? g_scope_ends[g_scope_depth - 1] : 0] = '\0';
 }
 
 /** Current module scope path, or NULL when scoping is disabled or empty. */
