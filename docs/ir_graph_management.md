@@ -63,7 +63,7 @@ graph, with or without `VIZ`:
 ```c
 cml_backward(loss, NULL, false, false);
 cml_optim_step(optimizer);
-cml_autograd_step_end(loss); /* keeps loss readable, then cml_ir_reset_global_context() */
+cml_autograd_step_end(loss); /* keeps loss readable, then frees the graph */
 ```
 
 
@@ -83,7 +83,7 @@ Epoch 1000: 14,126 nodes  // 14MB+ of memory!
 
 ### The Solution: Context Reset
 
-The global IR context is now reset after each backward pass:
+The global IR context is reset after each training step:
 
 ```c
 void cml_ir_reset_global_context(void) {
@@ -304,7 +304,7 @@ void cml_ir_ensure_gradients_executed(CMLGraph_t ir);
 **Example:**
 
 ```c
-// In cml_backward():
+// At the end of a hand-written training step:
 cml_ir_ensure_gradients_executed(tensor->ir_context);
 cml_ir_reset_global_context();
 ```
@@ -379,15 +379,16 @@ VIZ=1 ./my_training_program
 
 ### 2. Materialize Data Before IR Reset
 
-If you need to access tensor values after `cml_backward()`, ensure they're executed first:
+If you need to access tensor values after the graph is reset, ensure they're executed first:
 
 ```c
 Tensor* loss = compute_loss(output, target);
 
-// Materialize loss value BEFORE backward
+// Materialize loss value BEFORE the reset
 float loss_value = tensor_get_float(loss, 0);
 
 cml_backward(loss, NULL, false, false);
+cml_ir_reset_global_context();
 
 // loss_value is still valid
 printf("Loss: %f\n", loss_value);
@@ -400,12 +401,12 @@ Never store pointers to IR nodes or contexts across training iterations:
 ```c
 // BAD - IR will be freed!
 CMLGraph_t my_context = tensor->ir_context;
-cml_backward(loss, NULL, false, false);
+cml_autograd_step_end(loss);
 // my_context is now dangling!
 
 // GOOD - Use tensor data directly
 float loss_value = tensor_get_float(loss, 0);
-cml_backward(loss, NULL, false, false);
+cml_autograd_step_end(loss);
 // loss_value is still valid
 ```
 
@@ -496,11 +497,11 @@ tends to show up only as corrupted allocator metadata.
 **Solution:** Ensure `cml_ir_ensure_gradients_executed()` is called before reset.
 
 
-### Issue: Loss value is garbage after backward pass
+### Issue: Loss value is garbage after a graph reset
 
 **Cause:** Loss tensor data was freed when IR was reset.
 
-**Solution:** Call `tensor_ensure_executed(loss)` before backward pass, or read loss value before calling `cml_backward()`.
+**Solution:** Read the loss value before the reset, or end the step with `cml_autograd_step_end(loss)`, which keeps `loss` readable.
 
 
 ### Issue: Validation metrics show as 0 in UI
@@ -542,8 +543,7 @@ IR reset adds minimal overhead:
 
 ### Recommendations
 
-- **Always enable** for visualization (`VIZ=1`)
-- **Disable** for production training (no VIZ)
+- **Always reset** after each step, with or without `VIZ`
 - **Profile** if training on very large graphs (millions of nodes)
 
 

@@ -13,6 +13,9 @@ DEBUG=4 NOOPT=1 ./my_program
 
 Set `DEBUG=1` (or higher) to print every non-default flag at startup.
 
+A value is an integer, or a word: `false`, `no` and `off` read as `0`, any other word as `1`.
+An empty value leaves the flag at its default.
+
 ## Global flags
 
 | Variable | Values | Default | Description |
@@ -42,6 +45,7 @@ Set `DEBUG=1` (or higher) to print every non-default flag at startup.
 | `VIZ` | `0`/`1` | `0` | Launch the graph/kernel visualizer. Also records per-epoch weight/gradient distributions, tags IR nodes with their module scope, and enables `FLAMEGRAPH` capture. Mutually exclusive with `NO_EXPORT` |
 | `NO_EXPORT` | `0`/`1` | `0` | Emit no dashboard/metrics files at all and skip the work behind them. **Mutually exclusive with `VIZ`** - setting both fails `cml_init()`. Use for benchmarking and production training |
 | `FLAMEGRAPH` | `0`/`1` | `0` | Time each fused kernel and write `flamegraph.json` at exit. Implied by `VIZ` and by the `PROFILE` flag |
+| `REWRITE_TRACE` | `0`/`1` | `0` | Record rewrite-rule firings for `cml_rewrite_trace_export_json()` (the dashboard's rewrite stepper). Implied by `VIZ` |
 | `DEFAULT_FLOAT` | `FLOAT32`, `HALF`/`FLOAT16`, `BFLOAT16`, `FLOAT64` | `FLOAT32` | Default float dtype |
 
 ### `DEBUG` breakdown
@@ -100,6 +104,5 @@ These are read directly by their subsystems rather than through the registry:
 - **Caching / paths:** `CACHE_DIR`, `DISK_CACHE`, `CML_EXP_DIR`
 - **Fusion scheduler:** `FUSION_SCHEDULER`
 - **Visualizer:** `VIZ_SCRIPT`, `VIZ_LAUNCHED`
-- **Profiling:** `FLAMEGRAPH`
 - **Process replay:** `PROCESS_REPLAY`, `PROCESS_REPLAY_DIR`
 - **Distributed:** `RANK`, `LOCAL_RANK`, `WORLD_SIZE`, `MASTER_ADDR`, `NCCL_PORT`, `GLOO_PORT`

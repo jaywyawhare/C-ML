@@ -21,9 +21,10 @@ VIZ=1 ./your_program        # exports the artifacts and launches the dashboard
 | `flamegraph.json` | Per-kernel execution timings (see below) |
 
 The graph and kernel exports are re-run only when the graph's structure changes,
-not on every step: a training loop rebuilds the same graph each iteration and the
-dashboard only ever shows the latest, so exporting per step rewrote identical
-files hundreds of times. A shape change re-triggers it automatically.
+and at most once a second, not on every step: a training loop rebuilds the same
+graph each iteration and the dashboard only ever shows the latest, so exporting
+per step rewrote identical files hundreds of times. A shape change re-triggers it
+automatically.
 
 ### Turning everything off
 
@@ -35,8 +36,9 @@ NO_EXPORT=1 ./your_program
 ```
 
 Worth knowing: `training.json` is written even without `VIZ`, because the
-auto-capture metrics path is not VIZ-gated - a 57-epoch run rewrote it ~199
-times. `NO_EXPORT=1` is what silences that.
+auto-capture metrics path is not VIZ-gated - it is rewritten up to once a second
+while training, plus whenever an epoch is closed and at exit. `NO_EXPORT=1` is
+what silences that.
 
 `VIZ=1` and `NO_EXPORT=1` are **mutually exclusive**; setting both fails
 `cml_init()` with an explanatory error rather than silently picking a winner.
