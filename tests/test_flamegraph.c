@@ -58,6 +58,11 @@ int main(void) {
 
     CHECK("every execution counted", cml_flame_num_spans() == 152);
 
+    char quoted_scope[] = "Seq/\"q\"\\x";
+    add->scope          = quoted_scope;
+    cml_flame_record(add, 1.0);
+    add->scope = NULL;
+
     const char* path = "/tmp/cml_flamegraph_test.json";
     remove(path);
     CHECK("export succeeds", cml_flame_export(path) == 0);
@@ -74,13 +79,15 @@ int main(void) {
         fclose(f);
 
         CHECK("marked as aggregated", strstr(buf, "\"aggregated\":true") != NULL);
-        CHECK("num_spans is total executions", strstr(buf, "\"num_spans\":152") != NULL);
+        CHECK("num_spans is total executions", strstr(buf, "\"num_spans\":153") != NULL);
+        CHECK("scope strings are JSON-escaped",
+              strstr(buf, "\"scope\":\"Seq/\\\"q\\\"\\\\x\"") != NULL);
 
-        /* 3 signatures -> 3 entries, however many executions there were. */
+        /* 4 signatures (3 + the quoted scope) -> 4 entries, however many executions. */
         int entries = 0;
         for (const char* p = buf; (p = strstr(p, "\"op\":")); p++)
             entries++;
-        CHECK("one entry per signature, not per execution", entries == 3);
+        CHECK("one entry per signature, not per execution", entries == 4);
 
         /* MATMUL@4096: 100 x 1.0 + one 9.0 = 109.0 over 101 executions, max 9.0. */
         CHECK("summed time per signature", strstr(buf, "\"ms\":109.0000") != NULL);

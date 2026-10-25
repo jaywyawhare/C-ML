@@ -126,6 +126,49 @@ int main(void) {
         }
     }
 
+    /* Distributions read each parameter in its own dtype: a half-precision buffer read
+     * as float32 overran it and summarised garbage. */
+    {
+        TensorConfig hcfg = {
+            .dtype = DTYPE_FLOAT16, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+        Tensor* h       = tensor_empty((int[]){4}, 1, &hcfg);
+        const float v[] = {-2.0f, 0.5f, 1.0f, 3.0f};
+        for (int i = 0; h && i < 4; i++)
+            tensor_set_float(h, (size_t)i, v[i]);
+        Parameter p    = {.tensor = h};
+        void* params[] = {&p};
+        training_metrics_record_distributions(m, 1, params, 1);
+        CHECK("half-precision weights summarised by value",
+              m->epoch_weight_dist[1].min == -2.0f && m->epoch_weight_dist[1].max == 3.0f);
+        tensor_free(h);
+    }
+
+    /* A classification loss stashes its prediction for the next backward's accuracy. One
+     * that is never backpropagated (a validation loss) must not leave that stash dangling
+     * once its tensors are freed. */
+    {
+        float probs[2] = {0.2f, 0.9f}, labels[2] = {0.0f, 1.0f};
+        Tensor* pred = cml_tensor_1d(probs, 2);
+        Tensor* tgt  = cml_tensor_1d(labels, 2);
+        Tensor* bce  = tensor_bce_loss(pred, tgt);
+        tensor_free(bce);
+        tensor_free(pred);
+        tensor_free(tgt);
+        cml_ir_reset_global_context();
+
+        float xv[2] = {1.0f, 2.0f}, yv[2] = {0.0f, 0.0f};
+        Tensor* x        = cml_tensor_1d(xv, 2);
+        Tensor* y        = cml_tensor_1d(yv, 2);
+        x->requires_grad = true;
+        Tensor* mse      = tensor_mse_loss(x, y);
+        tensor_backward(mse, NULL, false, false);
+        CHECK("backward after an unpropagated classification loss", x->grad != NULL);
+        tensor_free(mse);
+        tensor_free(x);
+        tensor_free(y);
+        cml_ir_reset_global_context();
+    }
+
     training_metrics_free(m);
     CHECK("training_metrics_free (no crash)", 1);
 
