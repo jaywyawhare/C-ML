@@ -158,6 +158,11 @@ Tensor* cml_matmul(Tensor* a, Tensor* b);
 Tensor* cml_dot(Tensor* a, Tensor* b);
 QRResult cml_qr(Tensor* a);
 SVDResult cml_svd(Tensor* a);
+Tensor* cml_cholesky(Tensor* a);
+Tensor* cml_solve(Tensor* a, Tensor* b);
+Tensor* cml_inverse(Tensor* a);
+float cml_det(Tensor* a);
+Tensor* cml_lstsq(Tensor* a, Tensor* b);
 
 Tensor* cml_transpose(Tensor* a, int dim1, int dim2);
 Tensor* cml_reshape(Tensor* a, int* new_shape, int new_ndim);

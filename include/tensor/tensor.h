@@ -406,6 +406,43 @@ typedef struct {
  */
 SVDResult tensor_svd(Tensor* a);
 
+/**
+ * Lower-triangular Cholesky factor L (L L^T = A) of a symmetric positive-definite matrix.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cholesky(Tensor* a);
+
+/**
+ * Solve A x = b for a square A and vector/matrix b via LU with partial pivoting.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_solve(Tensor* a, Tensor* b);
+
+/**
+ * Inverse of a square matrix (solves A X = I).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_inverse(Tensor* a);
+
+/**
+ * Determinant of a square matrix via LU with partial pivoting.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_det(Tensor* a);
+
+/**
+ * Least-squares solution of an overdetermined A x = b (A is [m,n], m>=n).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_lstsq(Tensor* a, Tensor* b);
+
 Tensor* tensor_from_url(const char* url);
 
 Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y);

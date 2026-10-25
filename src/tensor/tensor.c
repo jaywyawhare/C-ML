@@ -2526,6 +2526,287 @@ SVDResult tensor_svd(Tensor* a) {
     return result;
 }
 
+/* In-place LU factorization with partial pivoting of an n-by-n row-major matrix.
+ * On return `a` holds L (unit diagonal, strictly lower) and U (upper), piv[i] is the
+ * source row now at position i, and *sign is the permutation parity. -1 if singular. */
+static int lu_decompose(float* a, int n, int* piv, float* sign) {
+    *sign = 1.0f;
+    for (int i = 0; i < n; i++)
+        piv[i] = i;
+    for (int col = 0; col < n; col++) {
+        int p      = col;
+        float best = fabsf(a[col * n + col]);
+        for (int r = col + 1; r < n; r++) {
+            float v = fabsf(a[r * n + col]);
+            if (v > best) {
+                best = v;
+                p    = r;
+            }
+        }
+        if (best < 1e-20f)
+            return -1;
+        if (p != col) {
+            for (int c = 0; c < n; c++) {
+                float t        = a[col * n + c];
+                a[col * n + c] = a[p * n + c];
+                a[p * n + c]   = t;
+            }
+            int ti   = piv[col];
+            piv[col] = piv[p];
+            piv[p]   = ti;
+            *sign    = -*sign;
+        }
+        float d = a[col * n + col];
+        for (int r = col + 1; r < n; r++) {
+            float f        = a[r * n + col] / d;
+            a[r * n + col] = f;
+            for (int c = col + 1; c < n; c++)
+                a[r * n + c] -= f * a[col * n + c];
+        }
+    }
+    return 0;
+}
+
+/* Solve A x = b for one column given the LU factors and pivots from lu_decompose. */
+static void lu_solve_vec(const float* lu, int n, const int* piv, const float* b, float* x) {
+    for (int i = 0; i < n; i++)
+        x[i] = b[piv[i]];
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < i; j++)
+            x[i] -= lu[i * n + j] * x[j];
+    for (int i = n - 1; i >= 0; i--) {
+        for (int j = i + 1; j < n; j++)
+            x[i] -= lu[i * n + j] * x[j];
+        x[i] /= lu[i * n + i];
+    }
+}
+
+/**
+ * Cholesky factor L (lower triangular, L L^T = A) of a symmetric positive-definite matrix.
+ * NULL if A is not square or not positive-definite.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cholesky(Tensor* a) {
+    if (!a || a->ndim != 2 || a->shape[0] != a->shape[1]) {
+        LOG_ERROR("tensor_cholesky: input must be a square matrix");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return NULL;
+    int n    = a->shape[0];
+    float* L = cml_calloc((size_t)n * n, sizeof(float));
+    if (!L)
+        return NULL;
+    for (int j = 0; j < n; j++) {
+        float diag = tensor_get_float(a, j * n + j);
+        for (int c = 0; c < j; c++)
+            diag -= L[j * n + c] * L[j * n + c];
+        if (diag <= 0.0f) {
+            LOG_ERROR("tensor_cholesky: matrix is not positive-definite");
+            cml_free(L);
+            return NULL;
+        }
+        L[j * n + j] = sqrtf(diag);
+        for (int i = j + 1; i < n; i++) {
+            float s = tensor_get_float(a, i * n + j);
+            for (int c = 0; c < j; c++)
+                s -= L[i * n + c] * L[j * n + c];
+            L[i * n + j] = s / L[j * n + j];
+        }
+    }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[] = {n, n};
+    Tensor* out = tensor_from_data(L, shape, 2, &config);
+    cml_free(L);
+    return out;
+}
+
+/**
+ * Solve A x = b (A square, b a vector [n] or matrix [n,k]) via LU with partial pivoting.
+ * Returns x shaped like b, or NULL if A is singular or shapes mismatch.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_solve(Tensor* a, Tensor* b) {
+    if (!a || a->ndim != 2 || a->shape[0] != a->shape[1] || !b) {
+        LOG_ERROR("tensor_solve: A must be a square matrix");
+        return NULL;
+    }
+    int n = a->shape[0];
+    if (b->ndim < 1 || b->ndim > 2 || b->shape[0] != n) {
+        LOG_ERROR("tensor_solve: b must be [n] or [n,k] matching A");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    tensor_ensure_executed(b);
+    if (!a->data || !b->data)
+        return NULL;
+    int rhs    = (b->ndim == 2) ? b->shape[1] : 1;
+    float* lu  = cml_malloc((size_t)n * n * sizeof(float));
+    int* piv   = cml_malloc((size_t)n * sizeof(int));
+    float* col = cml_malloc((size_t)n * sizeof(float));
+    float* x   = cml_malloc((size_t)n * sizeof(float));
+    float* out = cml_malloc((size_t)n * rhs * sizeof(float));
+    if (!lu || !piv || !col || !x || !out) {
+        cml_free(lu);
+        cml_free(piv);
+        cml_free(col);
+        cml_free(x);
+        cml_free(out);
+        return NULL;
+    }
+    for (int i = 0; i < n * n; i++)
+        lu[i] = tensor_get_float(a, i);
+    float sign;
+    if (lu_decompose(lu, n, piv, &sign) != 0) {
+        LOG_ERROR("tensor_solve: matrix is singular");
+        cml_free(lu);
+        cml_free(piv);
+        cml_free(col);
+        cml_free(x);
+        cml_free(out);
+        return NULL;
+    }
+    for (int c = 0; c < rhs; c++) {
+        for (int i = 0; i < n; i++)
+            col[i] = tensor_get_float(b, i * rhs + c);
+        lu_solve_vec(lu, n, piv, col, x);
+        for (int i = 0; i < n; i++)
+            out[i * rhs + c] = x[i];
+    }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, b->shape, b->ndim, &config);
+    cml_free(lu);
+    cml_free(piv);
+    cml_free(col);
+    cml_free(x);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Inverse of a square matrix, computed by solving A X = I. NULL if A is singular.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_inverse(Tensor* a) {
+    if (!a || a->ndim != 2 || a->shape[0] != a->shape[1]) {
+        LOG_ERROR("tensor_inverse: input must be a square matrix");
+        return NULL;
+    }
+    int n               = a->shape[0];
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[] = {n, n};
+    Tensor* eye = tensor_zeros(shape, 2, &config);
+    if (!eye)
+        return NULL;
+    tensor_ensure_executed(eye);
+    float* e = (float*)eye->data;
+    for (int i = 0; i < n; i++)
+        e[i * n + i] = 1.0f;
+    Tensor* inv = tensor_solve(a, eye);
+    tensor_free(eye);
+    return inv;
+}
+
+/**
+ * Determinant of a square matrix via LU with partial pivoting. 0 if singular or non-square.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_det(Tensor* a) {
+    if (!a || a->ndim != 2 || a->shape[0] != a->shape[1]) {
+        LOG_ERROR("tensor_det: input must be a square matrix");
+        return 0.0f;
+    }
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return 0.0f;
+    int n     = a->shape[0];
+    float* lu = cml_malloc((size_t)n * n * sizeof(float));
+    int* piv  = cml_malloc((size_t)n * sizeof(int));
+    if (!lu || !piv) {
+        cml_free(lu);
+        cml_free(piv);
+        return 0.0f;
+    }
+    for (int i = 0; i < n * n; i++)
+        lu[i] = tensor_get_float(a, i);
+    float sign, det = 0.0f;
+    if (lu_decompose(lu, n, piv, &sign) == 0) {
+        det = sign;
+        for (int i = 0; i < n; i++)
+            det *= lu[i * n + i];
+    }
+    cml_free(lu);
+    cml_free(piv);
+    return det;
+}
+
+/**
+ * Least-squares solution of an overdetermined system A x = b (A is [m,n], m>=n) via the
+ * normal equations A^T A x = A^T b. Returns x shaped like b ([n] or [n,k]), or NULL.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_lstsq(Tensor* a, Tensor* b) {
+    if (!a || a->ndim != 2 || !b) {
+        LOG_ERROR("tensor_lstsq: A must be a 2D matrix");
+        return NULL;
+    }
+    int m = a->shape[0], n = a->shape[1];
+    if (m < n || b->ndim < 1 || b->ndim > 2 || b->shape[0] != m) {
+        LOG_ERROR("tensor_lstsq: need m>=n and b with leading dim m");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    tensor_ensure_executed(b);
+    if (!a->data || !b->data)
+        return NULL;
+    int rhs    = (b->ndim == 2) ? b->shape[1] : 1;
+    float* ata = cml_malloc((size_t)n * n * sizeof(float));
+    float* atb = cml_malloc((size_t)n * rhs * sizeof(float));
+    if (!ata || !atb) {
+        cml_free(ata);
+        cml_free(atb);
+        return NULL;
+    }
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++) {
+            float s = 0.0f;
+            for (int r = 0; r < m; r++)
+                s += tensor_get_float(a, r * n + i) * tensor_get_float(a, r * n + j);
+            ata[i * n + j] = s;
+        }
+    for (int i = 0; i < n; i++)
+        for (int c = 0; c < rhs; c++) {
+            float s = 0.0f;
+            for (int r = 0; r < m; r++)
+                s += tensor_get_float(a, r * n + i) * tensor_get_float(b, r * rhs + c);
+            atb[i * rhs + c] = s;
+        }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int ata_shape[] = {n, n};
+    Tensor* ata_t   = tensor_from_data(ata, ata_shape, 2, &config);
+    int atb_ndim    = b->ndim;
+    int atb_shape[] = {n, rhs};
+    Tensor* atb_t   = tensor_from_data(atb, atb_shape, atb_ndim, &config);
+    Tensor* x       = (ata_t && atb_t) ? tensor_solve(ata_t, atb_t) : NULL;
+    tensor_free(ata_t);
+    tensor_free(atb_t);
+    cml_free(ata);
+    cml_free(atb);
+    return x;
+}
+
 /**
  * Download `url` (via curl/wget) to a temp file and load it with tensor_read_file.
  * NULL on download or parse failure.

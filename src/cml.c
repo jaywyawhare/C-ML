@@ -2816,6 +2816,38 @@ QRResult cml_qr(Tensor* a) { return tensor_qr(a); }
  * @return (SVDResult)
  */
 SVDResult cml_svd(Tensor* a) { return tensor_svd(a); }
+/**
+ * Public API: Cholesky factor of an SPD matrix (-> tensor_cholesky).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_cholesky(Tensor* a) { return tensor_cholesky(a); }
+/**
+ * Public API: solve A x = b (-> tensor_solve).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_solve(Tensor* a, Tensor* b) { return tensor_solve(a, b); }
+/**
+ * Public API: matrix inverse (-> tensor_inverse).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_inverse(Tensor* a) { return tensor_inverse(a); }
+/**
+ * Public API: matrix determinant (-> tensor_det).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_det(Tensor* a) { return tensor_det(a); }
+/**
+ * Public API: least-squares solve (-> tensor_lstsq).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_lstsq(Tensor* a, Tensor* b) { return tensor_lstsq(a, b); }
 
 /**
  * Public API: load a tensor from a URL (-> tensor_from_url).
