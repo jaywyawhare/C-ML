@@ -1178,3 +1178,98 @@ Tensor* cml_interp1d(Tensor* x, Tensor* xp, Tensor* fp) {
     cml_free(fpb);
     return out;
 }
+
+/** Allocate a 1-D window tensor of length N, defaulting to float32/CPU when config is NULL. */
+static Tensor* window_tensor(int N, const TensorConfig* config) {
+    TensorConfig def = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    int shape[] = {N};
+    return tensor_empty(shape, 1, config ? config : &def);
+}
+
+/** Fill a generalized cosine window w[i] = a0 - a1*cos(2pi i/(N-1)) + a2*cos(4pi i/(N-1)). */
+static void fill_cosine_window(float* w, int N, float a0, float a1, float a2) {
+    if (N == 1) {
+        w[0] = 1.0f;
+        return;
+    }
+    for (int i = 0; i < N; i++) {
+        float x = 2.0f * (float)M_PI * i / (N - 1);
+        w[i]    = a0 - a1 * cosf(x) + a2 * cosf(2.0f * x);
+    }
+}
+
+/**
+ * Hann window of length N (NumPy np.hanning convention). NULL if N<1.
+ * @param N (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
+Tensor* cml_hann_window(int N, const TensorConfig* config) {
+    if (N < 1)
+        return NULL;
+    Tensor* out = window_tensor(N, config);
+    if (out && out->data) {
+        fill_cosine_window((float*)out->data, N, 0.5f, 0.5f, 0.0f);
+        out->is_executed = true;
+    }
+    return out;
+}
+
+/**
+ * Hamming window of length N (NumPy np.hamming convention). NULL if N<1.
+ * @param N (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
+Tensor* cml_hamming_window(int N, const TensorConfig* config) {
+    if (N < 1)
+        return NULL;
+    Tensor* out = window_tensor(N, config);
+    if (out && out->data) {
+        fill_cosine_window((float*)out->data, N, 0.54f, 0.46f, 0.0f);
+        out->is_executed = true;
+    }
+    return out;
+}
+
+/**
+ * Blackman window of length N (NumPy np.blackman convention). NULL if N<1.
+ * @param N (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
+Tensor* cml_blackman_window(int N, const TensorConfig* config) {
+    if (N < 1)
+        return NULL;
+    Tensor* out = window_tensor(N, config);
+    if (out && out->data) {
+        fill_cosine_window((float*)out->data, N, 0.42f, 0.5f, 0.08f);
+        out->is_executed = true;
+    }
+    return out;
+}
+
+/**
+ * Bartlett (triangular) window of length N (NumPy np.bartlett convention). NULL if N<1.
+ * @param N (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
+Tensor* cml_bartlett_window(int N, const TensorConfig* config) {
+    if (N < 1)
+        return NULL;
+    Tensor* out = window_tensor(N, config);
+    if (out && out->data) {
+        float* w = (float*)out->data;
+        if (N == 1) {
+            w[0] = 1.0f;
+        } else {
+            float half = (N - 1) / 2.0f;
+            for (int i = 0; i < N; i++)
+                w[i] = 1.0f - fabsf((i - half) / half);
+        }
+        out->is_executed = true;
+    }
+    return out;
+}
