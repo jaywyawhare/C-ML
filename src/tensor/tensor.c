@@ -4262,6 +4262,552 @@ float tensor_hmean(Tensor* a) {
 }
 
 /**
+ * Rolling window sum of a 1-D tensor, returning [n-window+1].
+ * @param a (Tensor*)
+ * @param window (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_rolling_sum(Tensor* a, int window) {
+    if (!a || a->ndim != 1 || window < 1 || window > a->shape[0]) {
+        LOG_ERROR("tensor_rolling_sum: need a 1-D tensor and 1 <= window <= length");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return NULL;
+    int n      = a->shape[0];
+    int out_n  = n - window + 1;
+    float* out = cml_malloc((size_t)out_n * sizeof(float));
+    if (!out)
+        return NULL;
+    double acc = 0.0;
+    for (int i = 0; i < window; i++)
+        acc += tensor_get_float(a, i);
+    out[0] = (float)acc;
+    for (int i = 1; i < out_n; i++) {
+        acc += (double)tensor_get_float(a, i + window - 1) - tensor_get_float(a, i - 1);
+        out[i] = (float)acc;
+    }
+    Tensor* result = tensor_vec_like(out, out_n, a);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Rolling window mean of a 1-D tensor, returning [n-window+1].
+ * @param a (Tensor*)
+ * @param window (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_rolling_mean(Tensor* a, int window) {
+    Tensor* s = tensor_rolling_sum(a, window);
+    if (!s)
+        return NULL;
+    tensor_ensure_executed(s);
+    float* d = (float*)s->data;
+    for (size_t i = 0; i < s->numel; i++)
+        d[i] /= (float)window;
+    return s;
+}
+
+/**
+ * Exponentially weighted moving average of a 1-D tensor (y[i]=alpha*x[i]+(1-alpha)*y[i-1]).
+ * @param a (Tensor*)
+ * @param alpha (float)
+ * @return (Tensor*)
+ */
+Tensor* tensor_ewma(Tensor* a, float alpha) {
+    if (!a || a->ndim != 1 || alpha <= 0.0f || alpha > 1.0f) {
+        LOG_ERROR("tensor_ewma: need a 1-D tensor and alpha in (0,1]");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return NULL;
+    int n      = a->shape[0];
+    float* out = cml_malloc((size_t)n * sizeof(float));
+    if (!out)
+        return NULL;
+    double y = tensor_get_float(a, 0);
+    out[0]   = (float)y;
+    for (int i = 1; i < n; i++) {
+        y      = alpha * (double)tensor_get_float(a, i) + (1.0 - alpha) * y;
+        out[i] = (float)y;
+    }
+    Tensor* result = tensor_vec_like(out, n, a);
+    cml_free(out);
+    return result;
+}
+
+/** Cumulative max (keep_max true) or min over all elements, same shape as input. */
+static Tensor* tensor_cumextremum(Tensor* a, int keep_max) {
+    if (!a)
+        return NULL;
+    tensor_ensure_executed(a);
+    if (!a->data || a->numel == 0)
+        return NULL;
+    float* out = cml_malloc(a->numel * sizeof(float));
+    if (!out)
+        return NULL;
+    float run = tensor_get_float(a, 0);
+    out[0]    = run;
+    for (size_t i = 1; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        run     = keep_max ? (v > run ? v : run) : (v < run ? v : run);
+        out[i]  = run;
+    }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, a->shape, a->ndim, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Cumulative maximum over all elements (flattened), same shape as input.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cummax(Tensor* a) { return tensor_cumextremum(a, 1); }
+
+/**
+ * Cumulative minimum over all elements (flattened), same shape as input.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cummin(Tensor* a) { return tensor_cumextremum(a, 0); }
+
+/** Multiply two row-major square n x n float matrices into C (C must not alias A or B). */
+static void square_matmul(const float* A, const float* B, float* C, int n) {
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++) {
+            double s = 0.0;
+            for (int k = 0; k < n; k++)
+                s += (double)A[i * n + k] * B[k * n + j];
+            C[i * n + j] = (float)s;
+        }
+}
+
+/**
+ * Integer matrix power a^p of a square matrix (p<0 uses the inverse; p=0 is the identity).
+ * @param a (Tensor*)
+ * @param p (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_matrix_power(Tensor* a, int p) {
+    if (!a || a->ndim != 2 || a->shape[0] != a->shape[1]) {
+        LOG_ERROR("tensor_matrix_power: input must be a square matrix");
+        return NULL;
+    }
+    int n          = a->shape[0];
+    Tensor* base_t = NULL;
+    if (p < 0) {
+        base_t = tensor_inverse(a);
+        if (!base_t)
+            return NULL;
+        tensor_ensure_executed(base_t);
+        p = -p;
+    } else {
+        tensor_ensure_executed(a);
+        if (!a->data)
+            return NULL;
+    }
+    Tensor* src = base_t ? base_t : a;
+    float* base = cml_malloc((size_t)n * n * sizeof(float));
+    float* acc  = cml_malloc((size_t)n * n * sizeof(float));
+    float* tmp  = cml_malloc((size_t)n * n * sizeof(float));
+    if (!base || !acc || !tmp) {
+        cml_free(base);
+        cml_free(acc);
+        cml_free(tmp);
+        tensor_free(base_t);
+        return NULL;
+    }
+    for (int i = 0; i < n * n; i++)
+        base[i] = tensor_get_float(src, i);
+    for (int i = 0; i < n * n; i++)
+        acc[i] = 0.0f;
+    for (int i = 0; i < n; i++)
+        acc[i * n + i] = 1.0f; /* identity, correct result for p==0 */
+    while (p > 0) {
+        if (p & 1) {
+            square_matmul(acc, base, tmp, n);
+            float* t = acc;
+            acc      = tmp;
+            tmp      = t;
+        }
+        p >>= 1;
+        if (p > 0) {
+            square_matmul(base, base, tmp, n);
+            float* t = base;
+            base     = tmp;
+            tmp      = t;
+        }
+    }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[]    = {n, n};
+    Tensor* result = tensor_from_data(acc, shape, 2, &config);
+    cml_free(base);
+    cml_free(acc);
+    cml_free(tmp);
+    tensor_free(base_t);
+    return result;
+}
+
+/**
+ * 2-norm condition number (ratio of largest to smallest singular value) of a matrix.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_cond(Tensor* a) {
+    if (!a || a->ndim != 2)
+        return 0.0f;
+    SVDResult svd = tensor_svd(a);
+    if (!svd.S)
+        return 0.0f;
+    int k        = svd.S->shape[0];
+    float* s     = (float*)tensor_data_ptr(svd.S); /* singular values, descending */
+    float result = (k > 0 && s[k - 1] > 0.0f) ? s[0] / s[k - 1] : INFINITY;
+    tensor_free(svd.U);
+    tensor_free(svd.S);
+    tensor_free(svd.Vt);
+    return result;
+}
+
+/**
+ * Solve a triangular system A x = b by substitution (lower true = forward, else back).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param lower (bool)
+ * @return (Tensor*)
+ */
+Tensor* tensor_solve_triangular(Tensor* a, Tensor* b, bool lower) {
+    if (!a || a->ndim != 2 || a->shape[0] != a->shape[1] || !b) {
+        LOG_ERROR("tensor_solve_triangular: A must be a square matrix");
+        return NULL;
+    }
+    int n = a->shape[0];
+    if (b->ndim < 1 || b->ndim > 2 || b->shape[0] != n) {
+        LOG_ERROR("tensor_solve_triangular: b must be [n] or [n,k] matching A");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    tensor_ensure_executed(b);
+    if (!a->data || !b->data)
+        return NULL;
+    int rhs    = (b->ndim == 2) ? b->shape[1] : 1;
+    float* out = cml_malloc((size_t)n * rhs * sizeof(float));
+    if (!out)
+        return NULL;
+    for (int c = 0; c < rhs; c++) {
+        if (lower) {
+            for (int i = 0; i < n; i++) {
+                double s = tensor_get_float(b, (size_t)i * rhs + c);
+                for (int j = 0; j < i; j++)
+                    s -= (double)tensor_get_float(a, (size_t)i * n + j) * out[(size_t)j * rhs + c];
+                out[(size_t)i * rhs + c] = (float)(s / tensor_get_float(a, (size_t)i * n + i));
+            }
+        } else {
+            for (int i = n - 1; i >= 0; i--) {
+                double s = tensor_get_float(b, (size_t)i * rhs + c);
+                for (int j = i + 1; j < n; j++)
+                    s -= (double)tensor_get_float(a, (size_t)i * n + j) * out[(size_t)j * rhs + c];
+                out[(size_t)i * rhs + c] = (float)(s / tensor_get_float(a, (size_t)i * n + i));
+            }
+        }
+    }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, b->shape, b->ndim, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Matrix exponential of a square matrix via scaling-and-squaring with a Taylor series.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_expm(Tensor* a) {
+    if (!a || a->ndim != 2 || a->shape[0] != a->shape[1]) {
+        LOG_ERROR("tensor_expm: input must be a square matrix");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return NULL;
+    int n       = a->shape[0];
+    size_t nn   = (size_t)n * n;
+    double norm = 0.0; /* max absolute row sum (infinity norm) sets the scaling */
+    for (int i = 0; i < n; i++) {
+        double row = 0.0;
+        for (int j = 0; j < n; j++)
+            row += fabs((double)tensor_get_float(a, (size_t)i * n + j));
+        if (row > norm)
+            norm = row;
+    }
+    int s = 0;
+    while (norm > 0.5) {
+        norm *= 0.5;
+        s++;
+    }
+    float scale = 1.0f / (float)(1u << s);
+
+    float* scaled = cml_malloc(nn * sizeof(float));
+    float* term   = cml_malloc(nn * sizeof(float));
+    float* result = cml_malloc(nn * sizeof(float));
+    float* tmp    = cml_malloc(nn * sizeof(float));
+    if (!scaled || !term || !result || !tmp) {
+        cml_free(scaled);
+        cml_free(term);
+        cml_free(result);
+        cml_free(tmp);
+        return NULL;
+    }
+    for (int i = 0; i < n * n; i++) {
+        scaled[i] = tensor_get_float(a, i) * scale;
+        result[i] = 0.0f;
+        term[i]   = 0.0f;
+    }
+    for (int i = 0; i < n; i++) {
+        result[i * n + i] = 1.0f; /* identity */
+        term[i * n + i]   = 1.0f;
+    }
+    for (int k = 1; k <= 18; k++) { /* Taylor: term_k = term_{k-1} * scaled / k */
+        square_matmul(term, scaled, tmp, n);
+        float inv_k = 1.0f / (float)k;
+        for (int i = 0; i < n * n; i++) {
+            term[i] = tmp[i] * inv_k;
+            result[i] += term[i];
+        }
+    }
+    for (int step = 0; step < s; step++) {
+        square_matmul(result, result, tmp, n);
+        float* t = result;
+        result   = tmp;
+        tmp      = t;
+    }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[]  = {n, n};
+    Tensor* outt = tensor_from_data(result, shape, 2, &config);
+    cml_free(scaled);
+    cml_free(term);
+    cml_free(result);
+    cml_free(tmp);
+    return outt;
+}
+
+/** Digamma (psi) via recurrence up to 6 then the standard asymptotic expansion. */
+static float digamma_scalar(float x) {
+    double r = 0.0, v = x;
+    while (v < 6.0) {
+        r -= 1.0 / v;
+        v += 1.0;
+    }
+    double f = 1.0 / (v * v);
+    r += log(v) - 0.5 / v - f * (1.0 / 12.0 - f * (1.0 / 120.0 - f * (1.0 / 252.0)));
+    return (float)r;
+}
+
+static float logit_scalar(float p) { return logf(p / (1.0f - p)); }
+
+/** Apply a scalar function to every element, returning a new tensor shaped like @p a. */
+static Tensor* elementwise_map(Tensor* a, float (*fn)(float)) {
+    if (!a)
+        return NULL;
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return NULL;
+    float* out = cml_malloc(a->numel * sizeof(float));
+    if (!out)
+        return NULL;
+    for (size_t i = 0; i < a->numel; i++)
+        out[i] = fn(tensor_get_float(a, i));
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, a->shape, a->ndim, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Complementary error function erfc applied element-wise.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_erfc(Tensor* a) { return elementwise_map(a, erfcf); }
+
+/**
+ * Natural log of the absolute gamma function applied element-wise.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_lgamma(Tensor* a) { return elementwise_map(a, lgammaf); }
+
+/**
+ * Digamma (psi) function applied element-wise.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_digamma(Tensor* a) { return elementwise_map(a, digamma_scalar); }
+
+/**
+ * Logit log(p/(1-p)) applied element-wise.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_logit(Tensor* a) { return elementwise_map(a, logit_scalar); }
+
+/**
+ * Toeplitz matrix [len(c), len(r)] with first column c and first row r.
+ * @param c (Tensor*)
+ * @param r (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_toeplitz(Tensor* c, Tensor* r) {
+    if (!c || !r || c->ndim != 1 || r->ndim != 1) {
+        LOG_ERROR("tensor_toeplitz: c and r must be 1-D");
+        return NULL;
+    }
+    tensor_ensure_executed(c);
+    tensor_ensure_executed(r);
+    if (!c->data || !r->data)
+        return NULL;
+    int m = c->shape[0], n = r->shape[0];
+    float* out = cml_malloc((size_t)m * n * sizeof(float));
+    if (!out)
+        return NULL;
+    for (int i = 0; i < m; i++)
+        for (int j = 0; j < n; j++)
+            out[(size_t)i * n + j] =
+                i >= j ? tensor_get_float(c, i - j) : tensor_get_float(r, j - i);
+    TensorConfig config = {
+        .dtype = c->dtype, .device = c->device, .has_dtype = true, .has_device = true};
+    int shape[]    = {m, n};
+    Tensor* result = tensor_from_data(out, shape, 2, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Circulant matrix [n,n] whose first column is c (column j is c rotated down by j).
+ * @param c (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_circulant(Tensor* c) {
+    if (!c || c->ndim != 1) {
+        LOG_ERROR("tensor_circulant: c must be 1-D");
+        return NULL;
+    }
+    tensor_ensure_executed(c);
+    if (!c->data)
+        return NULL;
+    int n      = c->shape[0];
+    float* out = cml_malloc((size_t)n * n * sizeof(float));
+    if (!out)
+        return NULL;
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            out[(size_t)i * n + j] = tensor_get_float(c, ((i - j) % n + n) % n);
+    TensorConfig config = {
+        .dtype = c->dtype, .device = c->device, .has_dtype = true, .has_device = true};
+    int shape[]    = {n, n};
+    Tensor* result = tensor_from_data(out, shape, 2, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Hankel matrix [len(c), len(r)] with first column c and last row r.
+ * @param c (Tensor*)
+ * @param r (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_hankel(Tensor* c, Tensor* r) {
+    if (!c || !r || c->ndim != 1 || r->ndim != 1) {
+        LOG_ERROR("tensor_hankel: c and r must be 1-D");
+        return NULL;
+    }
+    tensor_ensure_executed(c);
+    tensor_ensure_executed(r);
+    if (!c->data || !r->data)
+        return NULL;
+    int m = c->shape[0], n = r->shape[0];
+    float* out = cml_malloc((size_t)m * n * sizeof(float));
+    if (!out)
+        return NULL;
+    for (int i = 0; i < m; i++)
+        for (int j = 0; j < n; j++) {
+            int d = i + j;
+            out[(size_t)i * n + j] =
+                d < m ? tensor_get_float(c, d) : tensor_get_float(r, d - m + 1);
+        }
+    TensorConfig config = {
+        .dtype = c->dtype, .device = c->device, .has_dtype = true, .has_device = true};
+    int shape[]    = {m, n};
+    Tensor* result = tensor_from_data(out, shape, 2, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Remove a trend from a 1-D tensor: type 0 subtracts the mean, type 1 subtracts a fitted line.
+ * @param y (Tensor*)
+ * @param type (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_detrend(Tensor* y, int type) {
+    if (!y || y->ndim != 1) {
+        LOG_ERROR("tensor_detrend: input must be a 1-D tensor");
+        return NULL;
+    }
+    tensor_ensure_executed(y);
+    if (!y->data)
+        return NULL;
+    int n      = y->shape[0];
+    float* out = cml_malloc((size_t)n * sizeof(float));
+    if (!out)
+        return NULL;
+    if (type == 0) {
+        double mu = 0.0;
+        for (int i = 0; i < n; i++)
+            mu += tensor_get_float(y, i);
+        mu /= n;
+        for (int i = 0; i < n; i++)
+            out[i] = (float)(tensor_get_float(y, i) - mu);
+    } else {
+        float* xs = cml_malloc((size_t)n * sizeof(float));
+        if (!xs) {
+            cml_free(out);
+            return NULL;
+        }
+        for (int i = 0; i < n; i++)
+            xs[i] = (float)i;
+        Tensor* xt     = tensor_vec_like(xs, n, y);
+        Tensor* coeffs = xt ? tensor_polyfit(xt, y, 1) : NULL; /* line through sample index */
+        Tensor* fit    = coeffs ? tensor_polyval(coeffs, xt) : NULL;
+        if (fit) {
+            tensor_ensure_executed(fit);
+            for (int i = 0; i < n; i++)
+                out[i] = tensor_get_float(y, i) - tensor_get_float(fit, i);
+        }
+        cml_free(xs);
+        tensor_free(xt);
+        tensor_free(coeffs);
+        tensor_free(fit);
+        if (!fit) {
+            cml_free(out);
+            return NULL;
+        }
+    }
+    Tensor* result = tensor_vec_like(out, n, y);
+    cml_free(out);
+    return result;
+}
+
+/**
  * Download `url` (via curl/wget) to a temp file and load it with tensor_read_file.
  * NULL on download or parse failure.
  * @param url (const char*)

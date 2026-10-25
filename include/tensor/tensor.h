@@ -800,6 +800,134 @@ float tensor_gmean(Tensor* a);
  */
 float tensor_hmean(Tensor* a);
 
+/**
+ * Rolling window sum of a 1-D tensor, returning [n-window+1].
+ * @param a (Tensor*)
+ * @param window (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_rolling_sum(Tensor* a, int window);
+
+/**
+ * Rolling window mean of a 1-D tensor, returning [n-window+1].
+ * @param a (Tensor*)
+ * @param window (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_rolling_mean(Tensor* a, int window);
+
+/**
+ * Exponentially weighted moving average of a 1-D tensor (y[i]=alpha*x[i]+(1-alpha)*y[i-1]).
+ * @param a (Tensor*)
+ * @param alpha (float)
+ * @return (Tensor*)
+ */
+Tensor* tensor_ewma(Tensor* a, float alpha);
+
+/**
+ * Cumulative maximum over all elements (flattened), same shape as input.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cummax(Tensor* a);
+
+/**
+ * Cumulative minimum over all elements (flattened), same shape as input.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cummin(Tensor* a);
+
+/**
+ * Integer matrix power a^p of a square matrix (p<0 uses the inverse; p=0 is the identity).
+ * @param a (Tensor*)
+ * @param p (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_matrix_power(Tensor* a, int p);
+
+/**
+ * 2-norm condition number (ratio of largest to smallest singular value) of a matrix.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_cond(Tensor* a);
+
+/**
+ * Solve a triangular system A x = b by substitution (lower true = forward, else back).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param lower (bool)
+ * @return (Tensor*)
+ */
+Tensor* tensor_solve_triangular(Tensor* a, Tensor* b, bool lower);
+
+/**
+ * Matrix exponential of a square matrix via scaling-and-squaring with a Taylor series.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_expm(Tensor* a);
+
+/**
+ * Complementary error function erfc applied element-wise.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_erfc(Tensor* a);
+
+/**
+ * Natural log of the absolute gamma function applied element-wise.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_lgamma(Tensor* a);
+
+/**
+ * Digamma (psi) function applied element-wise.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_digamma(Tensor* a);
+
+/**
+ * Logit log(p/(1-p)) applied element-wise.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_logit(Tensor* a);
+
+/**
+ * Toeplitz matrix [len(c), len(r)] with first column c and first row r.
+ * @param c (Tensor*)
+ * @param r (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_toeplitz(Tensor* c, Tensor* r);
+
+/**
+ * Circulant matrix [n,n] whose first column is c (column j is c rotated down by j).
+ * @param c (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_circulant(Tensor* c);
+
+/**
+ * Hankel matrix [len(c), len(r)] with first column c and last row r.
+ * @param c (Tensor*)
+ * @param r (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_hankel(Tensor* c, Tensor* r);
+
+/**
+ * Remove a trend from a 1-D tensor: type 0 subtracts the mean, type 1 subtracts a fitted line.
+ * @param y (Tensor*)
+ * @param type (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_detrend(Tensor* y, int type);
+
 Tensor* tensor_from_url(const char* url);
 
 Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y);
