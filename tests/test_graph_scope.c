@@ -3,7 +3,6 @@
  * graph back into the layers it came from. VIZ must also only observe: the
  * same seeded training runs bit-identically with and without it. */
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "cml.h"

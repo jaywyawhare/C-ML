@@ -3,7 +3,6 @@
 #include "core/logging.h"
 #include "tensor/dtype_access.h"
 #include "alloc/cml_allocator.h"
-#include <stdlib.h>
 #include <math.h>
 
 /** Fill `tensor` in-place with U(low, high) samples from the global RNG; no-op on bad args. */

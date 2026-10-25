@@ -3,7 +3,6 @@
 #include "alloc/cml_allocator.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 /* One recorded rule application. Strings are owned copies: emitted nodes and
