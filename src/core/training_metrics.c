@@ -4,6 +4,7 @@
 #include "core/cml_flags.h"
 #include "nn.h"
 #include "ops/ir/internal.h"
+#include "ops/ir/flamegraph.h"
 #include "autograd/autograd.h"
 #include "optim.h"
 #include "core/logging.h"
@@ -32,6 +33,22 @@ static __thread bool g_manual_epoch_control       = false;
 /* Set by classification losses; read once during the following loss capture. */
 static __thread Tensor* g_acc_pred   = NULL;
 static __thread Tensor* g_acc_target = NULL;
+
+/* The live dashboard file the auto-capture hooks rewrite. */
+#define LIVE_METRICS_PATH "training.json"
+
+/** Rewrite the live training.json from an auto-capture hook, at most once a second: the hooks
+ *  fire several times a step and every rewrite carries the whole history, so per-step writes
+ *  make a long run quadratic. The dashboard polls, and cleanup (also run atexit) writes the
+ *  final file. */
+static void export_live(void) {
+    static __thread double last_ms = -1e9;
+    double now_ms                  = cml_flame_now_ms();
+    if (now_ms - last_ms < 1000.0)
+        return;
+    last_ms = now_ms;
+    training_metrics_export_json(g_global_metrics, LIVE_METRICS_PATH, true);
+}
 
 /** Stash the latest prediction/target pair for the next loss auto-capture to
  * derive classification accuracy from. */
@@ -1154,8 +1171,7 @@ int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn
             training_metrics_set_gradient_norm(metrics, grad_norm);
         }
         if (cml_viz_enabled()) {
-            const char* metrics_path = "training.json";
-            training_metrics_export_epoch_update(metrics, epoch, metrics_path);
+            training_metrics_export_epoch_update(metrics, epoch, LIVE_METRICS_PATH);
         }
     }
 
@@ -1184,8 +1200,7 @@ static void training_metrics_auto_detect_epoch(Optimizer* optimizer) {
             if (g_current_epoch < g_global_metrics->num_epochs) {
                 g_global_metrics->epoch_times[g_current_epoch] = (float)epoch_time_sec;
                 g_global_metrics->total_time += (float)epoch_time_sec;
-                const char* metrics_path = "training.json";
-                training_metrics_export_json(g_global_metrics, metrics_path, true);
+                export_live();
             }
         }
 
@@ -1215,8 +1230,7 @@ void training_metrics_set_expected_epochs(size_t num_epochs) {
     if (g_global_metrics->actual_epochs == 0 || g_global_metrics->actual_epochs > num_epochs) {
         g_global_metrics->actual_epochs = num_epochs;
     }
-    const char* metrics_path = "training.json";
-    training_metrics_export_json(g_global_metrics, metrics_path, true);
+    export_live();
 }
 
 /** Flag the run as early-stopped at `actual_epochs`, trim the epoch count, and
@@ -1229,8 +1243,7 @@ void training_metrics_mark_early_stop(size_t actual_epochs) {
     if (g_global_metrics->actual_epochs < g_global_metrics->num_epochs) {
         g_global_metrics->num_epochs = g_global_metrics->actual_epochs;
     }
-    const char* metrics_path = "training.json";
-    training_metrics_export_json(g_global_metrics, metrics_path, false); // Final export
+    training_metrics_export_json(g_global_metrics, LIVE_METRICS_PATH, false);
 }
 
 /** Track `model` as the current one and derive its parameter counts, exporting
@@ -1306,8 +1319,7 @@ void training_metrics_auto_export_architecture(Module* model) {
                     }
                 }
                 fclose(f);
-                const char* metrics_path = "training.json";
-                training_metrics_export_json(g_global_metrics, metrics_path, true);
+                export_live();
             }
         }
     }
@@ -1348,8 +1360,7 @@ void training_metrics_auto_capture_loss(Tensor* loss_tensor) {
                         g_global_metrics->best_accuracy = acc;
                 }
             }
-            const char* metrics_path = "training.json";
-            training_metrics_export_json(g_global_metrics, metrics_path, true);
+            export_live();
         }
     }
     g_acc_pred   = NULL;
@@ -1382,8 +1393,7 @@ void training_metrics_auto_capture_optimizer(Optimizer* optimizer) {
         optimizer_clip_grad_norm(optimizer->param_groups, optimizer->num_param_groups, 0.0f);
     if (grad_norm > 0.0f)
         g_global_metrics->gradient_norm = grad_norm;
-    const char* metrics_path = "training.json";
-    training_metrics_export_json(g_global_metrics, metrics_path, true);
+    export_live();
 }
 /** Reset the per-session auto-capture state, so a re-initialised session starts at epoch 0. */
 static void reset_capture_state(void) {
@@ -1430,8 +1440,7 @@ void training_metrics_auto_capture_train_accuracy(float train_accuracy) {
         if (g_current_epoch == 0 || train_accuracy > g_global_metrics->best_accuracy) {
             g_global_metrics->best_accuracy = train_accuracy;
         }
-        const char* metrics_path = "training.json";
-        training_metrics_export_json(g_global_metrics, metrics_path, true);
+        export_live();
     }
 }
 /** Hook: record validation loss/accuracy against the just-finished epoch, lazily
@@ -1458,8 +1467,7 @@ void training_metrics_auto_capture_validation(float val_loss, float val_accuracy
     if (epoch_index < g_global_metrics->num_epochs) {
         g_global_metrics->epoch_validation_losses[epoch_index]     = val_loss;
         g_global_metrics->epoch_validation_accuracies[epoch_index] = val_accuracy;
-        const char* metrics_path                                   = "training.json";
-        training_metrics_export_json(g_global_metrics, metrics_path, true);
+        export_live();
     }
 }
 /** Hook: record final test loss/accuracy against the last epoch slot. */
@@ -1487,8 +1495,7 @@ void training_metrics_auto_capture_test(float test_loss, float test_accuracy) {
     if (last_epoch < g_global_metrics->num_epochs) {
         g_global_metrics->epoch_testing_losses[last_epoch]     = test_loss;
         g_global_metrics->epoch_testing_accuracies[last_epoch] = test_accuracy;
-        const char* metrics_path                               = "training.json";
-        training_metrics_export_json(g_global_metrics, metrics_path, true);
+        export_live();
     }
 }
 
@@ -1556,16 +1563,14 @@ void training_metrics_complete_epoch(void) {
     }
     g_global_metrics->actual_epochs = completed;
     g_current_epoch++;
-    const char* metrics_path = "training.json";
-    training_metrics_export_json(g_global_metrics, metrics_path, false);
+    training_metrics_export_json(g_global_metrics, LIVE_METRICS_PATH, false);
 }
 
 /** Final export, then free the global metrics object and reset auto-capture
  * state. */
 void training_metrics_cleanup_global(void) {
     if (g_global_metrics) {
-        const char* metrics_path = "training.json";
-        training_metrics_export_json(g_global_metrics, metrics_path, false);
+        training_metrics_export_json(g_global_metrics, LIVE_METRICS_PATH, false);
 
         training_metrics_free(g_global_metrics);
         g_global_metrics       = NULL;
