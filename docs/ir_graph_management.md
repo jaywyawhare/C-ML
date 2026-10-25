@@ -56,11 +56,14 @@ cml_backward(loss, NULL, false, false);
 
 ### Graph Reset
 
-After each training iteration, the IR graph is automatically reset to prevent memory accumulation:
+Reset the IR graph after each training iteration to prevent memory accumulation. `cml_train` does
+this before every batch; a hand-written loop calls it itself. `cml_backward()` never resets the
+graph, with or without `VIZ`:
 
 ```c
-// Automatic reset happens inside cml_backward() when VIZ=1
-// This prevents node accumulation across epochs
+cml_backward(loss, NULL, false, false);
+cml_optim_step(optimizer);
+cml_autograd_step_end(loss); /* keeps loss readable, then cml_ir_reset_global_context() */
 ```
 
 
@@ -93,9 +96,8 @@ void cml_ir_reset_global_context(void) {
 
 **When it's called:**
 
-- Automatically after `cml_backward()` completes
-- Only when `VIZ=1` environment variable is set
-- After gradients and loss values are materialized
+- By `cml_train` before each batch
+- By a hand-written loop after each step, once gradients and loss values are materialized
 
 **Result:**
 
@@ -270,8 +272,8 @@ void cml_ir_reset_global_context(void);
 
 **When to call:**
 
-- Automatically called by `cml_backward()` when `VIZ=1`
-- Can be called manually for custom training loops
+- Called by `cml_train` before each batch
+- Called by custom training loops after each step
 - Must call after gradients are materialized
 
 **Side effects:**
@@ -362,15 +364,16 @@ static void analyze_usage(CMLGraph_t ir);
 
 ## Best Practices
 
-### 1. Enable Visualization Carefully
+### 1. Enable Visualization Freely
 
-The IR reset mechanism is only active when `VIZ=1`:
+`VIZ=1` only adds the dashboard exports; it never changes what runs, the results, or when the
+graph is reset:
 
 ```bash
 # Development/debugging
 VIZ=1 ./my_training_program
 
-# Production (no IR overhead)
+# Production (no export overhead)
 ./my_training_program
 ```
 
@@ -513,12 +516,11 @@ tends to show up only as corrupted allocator metadata.
 
 ### Issue: Memory keeps growing across epochs
 
-**Cause:** IR context is not being reset (VIZ not set, or custom training loop).
+**Cause:** IR context is not being reset (custom training loop).
 
 **Solution:**
 
-- Set `VIZ=1` environment variable
-- Or manually call `cml_ir_reset_global_context()` after each iteration
+- Call `cml_autograd_step_end(loss)` or `cml_ir_reset_global_context()` after each iteration
 
 
 ## Performance Considerations
