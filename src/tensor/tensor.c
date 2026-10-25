@@ -3179,6 +3179,22 @@ static float* tensor_sorted_values(Tensor* a, int* count) {
     return buf;
 }
 
+/** Sorted unique values of @p a in a fresh buffer; returns NULL if empty. */
+static float* sorted_unique_values(Tensor* a, int* count) {
+    int n      = 0;
+    float* buf = tensor_sorted_values(a, &n);
+    if (!buf) {
+        *count = 0;
+        return NULL;
+    }
+    int u = 0;
+    for (int i = 0; i < n; i++)
+        if (i == 0 || buf[i] != buf[u - 1])
+            buf[u++] = buf[i];
+    *count = u;
+    return buf;
+}
+
 /**
  * q-quantile (q in [0,1], linear interpolation, NumPy convention) over all elements.
  * @param a (Tensor*)
@@ -3397,14 +3413,10 @@ Tensor* tensor_tile(Tensor* a, int reps) {
  * @return (Tensor*)
  */
 Tensor* tensor_unique(Tensor* a) {
-    int n      = 0;
-    float* buf = tensor_sorted_values(a, &n);
+    int u      = 0;
+    float* buf = sorted_unique_values(a, &u);
     if (!buf)
         return NULL;
-    int u = 0;
-    for (int i = 0; i < n; i++)
-        if (i == 0 || buf[i] != buf[u - 1])
-            buf[u++] = buf[i];
     Tensor* out = tensor_vec_like(buf, u, a);
     cml_free(buf);
     return out;
@@ -3791,6 +3803,462 @@ Tensor* tensor_normalize_l2(Tensor* x) {
     Tensor* result = tensor_from_data(out, x->shape, 2, &config);
     cml_free(out);
     return result;
+}
+
+/** Validate two equal-length 1-D vectors and expose their length, else return 0. */
+static int vec_pair(Tensor* a, Tensor* b, int* n) {
+    if (!a || !b || a->ndim != 1 || b->ndim != 1 || a->shape[0] != b->shape[0])
+        return 0;
+    tensor_ensure_executed(a);
+    tensor_ensure_executed(b);
+    if (!a->data || !b->data)
+        return 0;
+    *n = a->shape[0];
+    return 1;
+}
+
+/**
+ * Cosine similarity a.b / (|a||b|) of two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float tensor_cosine_similarity(Tensor* a, Tensor* b) {
+    int n;
+    if (!vec_pair(a, b, &n))
+        return 0.0f;
+    double dot = 0.0, na = 0.0, nb = 0.0;
+    for (int i = 0; i < n; i++) {
+        double x = tensor_get_float(a, i), y = tensor_get_float(b, i);
+        dot += x * y;
+        na += x * x;
+        nb += y * y;
+    }
+    double den = sqrt(na) * sqrt(nb);
+    return den > 0.0 ? (float)(dot / den) : 0.0f;
+}
+
+/**
+ * Euclidean (L2) distance between two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float tensor_euclidean_distance(Tensor* a, Tensor* b) {
+    int n;
+    if (!vec_pair(a, b, &n))
+        return 0.0f;
+    double s = 0.0;
+    for (int i = 0; i < n; i++) {
+        double d = (double)tensor_get_float(a, i) - tensor_get_float(b, i);
+        s += d * d;
+    }
+    return (float)sqrt(s);
+}
+
+/**
+ * Manhattan (L1) distance between two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float tensor_manhattan_distance(Tensor* a, Tensor* b) {
+    int n;
+    if (!vec_pair(a, b, &n))
+        return 0.0f;
+    double s = 0.0;
+    for (int i = 0; i < n; i++)
+        s += fabs((double)tensor_get_float(a, i) - tensor_get_float(b, i));
+    return (float)s;
+}
+
+/**
+ * Pairwise Euclidean distances [m,n] between rows of [m,d] a and [n,d] b.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cdist(Tensor* a, Tensor* b) {
+    if (!a || !b || a->ndim != 2 || b->ndim != 2 || a->shape[1] != b->shape[1]) {
+        LOG_ERROR("tensor_cdist: inputs must be [m,d] and [n,d] with matching d");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    tensor_ensure_executed(b);
+    if (!a->data || !b->data)
+        return NULL;
+    int m = a->shape[0], n = b->shape[0], d = a->shape[1];
+    float* out = cml_malloc((size_t)m * n * sizeof(float));
+    if (!out)
+        return NULL;
+    for (int i = 0; i < m; i++)
+        for (int j = 0; j < n; j++) {
+            double s = 0.0;
+            for (int k = 0; k < d; k++) {
+                double diff = (double)tensor_get_float(a, (size_t)i * d + k) -
+                              tensor_get_float(b, (size_t)j * d + k);
+                s += diff * diff;
+            }
+            out[(size_t)i * n + j] = (float)sqrt(s);
+        }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[]    = {m, n};
+    Tensor* result = tensor_from_data(out, shape, 2, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Principal component analysis of a 2D [samples,features] matrix via covariance eigendecomposition.
+ * @param x (Tensor*)
+ * @param n_components (int)
+ * @return (PCAResult)
+ */
+PCAResult tensor_pca(Tensor* x, int n_components) {
+    PCAResult result = {NULL, NULL, NULL};
+    if (!x || x->ndim != 2 || n_components < 1 || n_components > x->shape[1]) {
+        LOG_ERROR("tensor_pca: need a 2D matrix and 1 <= n_components <= features");
+        return result;
+    }
+    tensor_ensure_executed(x);
+    if (!x->data)
+        return result;
+    int ns = x->shape[0], d = x->shape[1];
+    Tensor* cov = tensor_cov(x, false); /* features are the variables */
+    if (!cov)
+        return result;
+    EigResult eig = tensor_eigh(cov); /* eigenvalues ascending, eigenvectors as columns */
+    tensor_free(cov);
+    if (!eig.values || !eig.vectors) {
+        tensor_free(eig.values);
+        tensor_free(eig.vectors);
+        return result;
+    }
+    float* evals = (float*)tensor_data_ptr(eig.values);
+    float* evecs = (float*)tensor_data_ptr(eig.vectors);
+    double total = 0.0;
+    for (int i = 0; i < d; i++)
+        total += evals[i] > 0.0f ? evals[i] : 0.0f;
+
+    float* mean  = cml_calloc((size_t)d, sizeof(float));
+    float* comp  = cml_malloc((size_t)n_components * d * sizeof(float));
+    float* ratio = cml_malloc((size_t)n_components * sizeof(float));
+    float* trans = cml_malloc((size_t)ns * n_components * sizeof(float));
+    if (!mean || !comp || !ratio || !trans) {
+        cml_free(mean);
+        cml_free(comp);
+        cml_free(ratio);
+        cml_free(trans);
+        tensor_free(eig.values);
+        tensor_free(eig.vectors);
+        return result;
+    }
+    for (int c = 0; c < d; c++) {
+        double mu = 0.0;
+        for (int r = 0; r < ns; r++)
+            mu += tensor_get_float(x, (size_t)r * d + c);
+        mean[c] = (float)(mu / ns);
+    }
+    for (int p = 0; p < n_components; p++) {
+        int col  = d - 1 - p; /* descending eigenvalue order */
+        ratio[p] = total > 0.0 ? (float)(evals[col] / total) : 0.0f;
+        for (int c = 0; c < d; c++)
+            comp[(size_t)p * d + c] = evecs[(size_t)c * d + col];
+    }
+    for (int r = 0; r < ns; r++)
+        for (int p = 0; p < n_components; p++) {
+            double s = 0.0;
+            for (int c = 0; c < d; c++)
+                s += ((double)tensor_get_float(x, (size_t)r * d + c) - mean[c]) *
+                     comp[(size_t)p * d + c];
+            trans[(size_t)r * n_components + p] = (float)s;
+        }
+    TensorConfig config = {
+        .dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    int cshape[]                    = {n_components, d};
+    int rshape[]                    = {n_components};
+    int tshape[]                    = {ns, n_components};
+    result.components               = tensor_from_data(comp, cshape, 2, &config);
+    result.explained_variance_ratio = tensor_from_data(ratio, rshape, 1, &config);
+    result.transformed              = tensor_from_data(trans, tshape, 2, &config);
+    cml_free(mean);
+    cml_free(comp);
+    cml_free(ratio);
+    cml_free(trans);
+    tensor_free(eig.values);
+    tensor_free(eig.vectors);
+    return result;
+}
+
+/** Whether a value exists in an ascending-sorted buffer (binary search). */
+static int sorted_contains(const float* s, int n, float v) {
+    int lo = 0, hi = n - 1;
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
+        if (s[mid] == v)
+            return 1;
+        if (s[mid] < v)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return 0;
+}
+
+/**
+ * Sorted values common to both 1-D tensors (unique).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_intersect1d(Tensor* a, Tensor* b) {
+    int na = 0, nb = 0;
+    float* ua = sorted_unique_values(a, &na);
+    float* ub = sorted_unique_values(b, &nb);
+    if (!ua || !ub) {
+        cml_free(ua);
+        cml_free(ub);
+        return NULL;
+    }
+    float* out = cml_malloc((size_t)(na < nb ? na : nb) * sizeof(float) + 1);
+    int k      = 0;
+    for (int i = 0, j = 0; i < na && j < nb;) {
+        if (ua[i] < ub[j])
+            i++;
+        else if (ua[i] > ub[j])
+            j++;
+        else
+            out[k++] = ua[i++], j++;
+    }
+    Tensor* result = tensor_vec_like(out, k, a);
+    cml_free(ua);
+    cml_free(ub);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Sorted union of the unique values of two 1-D tensors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_union1d(Tensor* a, Tensor* b) {
+    int na = 0, nb = 0;
+    float* ua = sorted_unique_values(a, &na);
+    float* ub = sorted_unique_values(b, &nb);
+    if (!ua || !ub) {
+        cml_free(ua);
+        cml_free(ub);
+        return NULL;
+    }
+    float* out = cml_malloc((size_t)(na + nb) * sizeof(float) + 1);
+    int k = 0, i = 0, j = 0;
+    while (i < na || j < nb) {
+        float v;
+        if (j >= nb || (i < na && ua[i] < ub[j]))
+            v = ua[i++];
+        else if (i >= na || ub[j] < ua[i])
+            v = ub[j++];
+        else {
+            v = ua[i++];
+            j++;
+        }
+        if (k == 0 || out[k - 1] != v)
+            out[k++] = v;
+    }
+    Tensor* result = tensor_vec_like(out, k, a);
+    cml_free(ua);
+    cml_free(ub);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Sorted unique values present in a but not in b.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_setdiff1d(Tensor* a, Tensor* b) {
+    int na = 0, nb = 0;
+    float* ua = sorted_unique_values(a, &na);
+    float* ub = sorted_unique_values(b, &nb);
+    if (!ua) {
+        cml_free(ub);
+        return NULL;
+    }
+    float* out = cml_malloc((size_t)na * sizeof(float) + 1);
+    int k      = 0;
+    for (int i = 0; i < na; i++)
+        if (!ub || !sorted_contains(ub, nb, ua[i]))
+            out[k++] = ua[i];
+    Tensor* result = tensor_vec_like(out, k, a);
+    cml_free(ua);
+    cml_free(ub);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Membership mask (1.0/0.0) the shape of a, marking elements that appear in b.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_isin(Tensor* a, Tensor* b) {
+    if (!a)
+        return NULL;
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return NULL;
+    int nb     = 0;
+    float* ub  = sorted_unique_values(b, &nb);
+    float* out = cml_malloc(a->numel * sizeof(float));
+    if (!out) {
+        cml_free(ub);
+        return NULL;
+    }
+    for (size_t i = 0; i < a->numel; i++)
+        out[i] = (ub && sorted_contains(ub, nb, tensor_get_float(a, i))) ? 1.0f : 0.0f;
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, a->shape, a->ndim, &config);
+    cml_free(ub);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Peak-to-peak range (max - min) over all elements.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_ptp(Tensor* a) {
+    if (!a)
+        return 0.0f;
+    tensor_ensure_executed(a);
+    if (!a->data || a->numel == 0)
+        return 0.0f;
+    float lo = tensor_get_float(a, 0), hi = lo;
+    for (size_t i = 1; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        if (v < lo)
+            lo = v;
+        if (v > hi)
+            hi = v;
+    }
+    return hi - lo;
+}
+
+/**
+ * Interquartile range Q3 - Q1 over all elements (linear interpolation).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_iqr(Tensor* a) { return tensor_quantile(a, 0.75f) - tensor_quantile(a, 0.25f); }
+
+/**
+ * Most frequent value over all elements (smallest value on ties).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_mode(Tensor* a) {
+    int n      = 0;
+    float* buf = tensor_sorted_values(a, &n);
+    if (!buf)
+        return 0.0f;
+    float best     = buf[0];
+    int best_count = 1, run = 1;
+    for (int i = 1; i < n; i++) {
+        run = (buf[i] == buf[i - 1]) ? run + 1 : 1;
+        if (run > best_count) {
+            best_count = run;
+            best       = buf[i];
+        }
+    }
+    cml_free(buf);
+    return best;
+}
+
+/**
+ * Shannon entropy of elements treated as a distribution (normalized to sum 1); base<=0 uses e.
+ * @param a (Tensor*)
+ * @param base (float)
+ * @return (float)
+ */
+float tensor_entropy(Tensor* a, float base) {
+    if (!a)
+        return 0.0f;
+    tensor_ensure_executed(a);
+    if (!a->data || a->numel == 0)
+        return 0.0f;
+    double sum = 0.0;
+    for (size_t i = 0; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        if (v > 0.0f)
+            sum += v;
+    }
+    if (sum <= 0.0)
+        return 0.0f;
+    double h = 0.0;
+    for (size_t i = 0; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        if (v > 0.0f) {
+            double p = v / sum;
+            h -= p * log(p);
+        }
+    }
+    if (base > 0.0f)
+        h /= log((double)base);
+    return (float)h;
+}
+
+/**
+ * Geometric mean exp(mean(log x)) over all elements (requires positive values).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_gmean(Tensor* a) {
+    if (!a)
+        return 0.0f;
+    tensor_ensure_executed(a);
+    if (!a->data || a->numel == 0)
+        return 0.0f;
+    double s = 0.0;
+    for (size_t i = 0; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        if (v <= 0.0f) {
+            LOG_ERROR("tensor_gmean: all values must be positive");
+            return 0.0f;
+        }
+        s += log((double)v);
+    }
+    return (float)exp(s / a->numel);
+}
+
+/**
+ * Harmonic mean n / sum(1/x) over all elements (requires positive values).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_hmean(Tensor* a) {
+    if (!a)
+        return 0.0f;
+    tensor_ensure_executed(a);
+    if (!a->data || a->numel == 0)
+        return 0.0f;
+    double s = 0.0;
+    for (size_t i = 0; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        if (v <= 0.0f) {
+            LOG_ERROR("tensor_hmean: all values must be positive");
+            return 0.0f;
+        }
+        s += 1.0 / v;
+    }
+    return (float)(a->numel / s);
 }
 
 /**

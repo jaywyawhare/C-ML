@@ -679,6 +679,127 @@ Tensor* tensor_robust_scale(Tensor* x);
  */
 Tensor* tensor_normalize_l2(Tensor* x);
 
+/**
+ * Cosine similarity a.b / (|a||b|) of two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float tensor_cosine_similarity(Tensor* a, Tensor* b);
+
+/**
+ * Euclidean (L2) distance between two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float tensor_euclidean_distance(Tensor* a, Tensor* b);
+
+/**
+ * Manhattan (L1) distance between two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float tensor_manhattan_distance(Tensor* a, Tensor* b);
+
+/**
+ * Pairwise Euclidean distances [m,n] between rows of [m,d] a and [n,d] b.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_cdist(Tensor* a, Tensor* b);
+
+typedef struct {
+    Tensor* components;               // Principal axes [k, features], largest variance first
+    Tensor* explained_variance_ratio; // Fraction of total variance per component [k]
+    Tensor* transformed;              // Centered input projected onto the components [samples, k]
+} PCAResult;
+
+/**
+ * Principal component analysis of a 2D [samples,features] matrix via covariance eigendecomposition.
+ * @param x (Tensor*)
+ * @param n_components (int)
+ * @return (PCAResult)
+ */
+PCAResult tensor_pca(Tensor* x, int n_components);
+
+/**
+ * Sorted values common to both 1-D tensors (unique).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_intersect1d(Tensor* a, Tensor* b);
+
+/**
+ * Sorted union of the unique values of two 1-D tensors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_union1d(Tensor* a, Tensor* b);
+
+/**
+ * Sorted unique values present in a but not in b.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_setdiff1d(Tensor* a, Tensor* b);
+
+/**
+ * Membership mask (1.0/0.0) the shape of a, marking elements that appear in b.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_isin(Tensor* a, Tensor* b);
+
+/**
+ * Peak-to-peak range (max - min) over all elements.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_ptp(Tensor* a);
+
+/**
+ * Interquartile range Q3 - Q1 over all elements (linear interpolation).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_iqr(Tensor* a);
+
+/**
+ * Most frequent value over all elements (smallest value on ties).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_mode(Tensor* a);
+
+/**
+ * Shannon entropy of elements treated as a distribution (normalized to sum 1); base<=0 uses e.
+ * @param a (Tensor*)
+ * @param base (float)
+ * @return (float)
+ */
+float tensor_entropy(Tensor* a, float base);
+
+/**
+ * Geometric mean exp(mean(log x)) over all elements (requires positive values).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_gmean(Tensor* a);
+
+/**
+ * Harmonic mean n / sum(1/x) over all elements (requires positive values).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_hmean(Tensor* a);
+
 Tensor* tensor_from_url(const char* url);
 
 Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y);
