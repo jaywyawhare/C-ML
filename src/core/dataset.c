@@ -1765,3 +1765,210 @@ int transform_normalize(Dataset* dataset, float* mean, float* std) {
 
     return 0;
 }
+
+/**
+ * Build a new dataset from the rows of @p dataset at the given @p indices, copying the
+ * feature/target rows and carrying over class and normalization metadata. Returns NULL
+ * on a bad argument or allocation failure; the caller owns the result.
+ * @param dataset (Dataset*)
+ * @param indices (const int*)
+ * @param count (int)
+ * @return (Dataset*)
+ */
+Dataset* dataset_gather(Dataset* dataset, const int* indices, int count) {
+    if (!dataset || !dataset->X || !dataset->y || !indices || count <= 0)
+        return NULL;
+    int in = dataset->input_size, out = dataset->output_size;
+    const float* srcX = (const float*)tensor_data_ptr(dataset->X);
+    const float* srcY = (const float*)tensor_data_ptr(dataset->y);
+    if (!srcX || !srcY)
+        return NULL;
+
+    float* X = cml_malloc((size_t)count * (size_t)in * sizeof(float));
+    float* y = cml_malloc((size_t)count * (size_t)out * sizeof(float));
+    if (!X || !y) {
+        cml_free(X);
+        cml_free(y);
+        return NULL;
+    }
+    for (int k = 0; k < count; k++) {
+        int i = indices[k];
+        if (i < 0 || i >= dataset->num_samples) {
+            cml_free(X);
+            cml_free(y);
+            return NULL;
+        }
+        memcpy(X + (size_t)k * in, srcX + (size_t)i * in, (size_t)in * sizeof(float));
+        memcpy(y + (size_t)k * out, srcY + (size_t)i * out, (size_t)out * sizeof(float));
+    }
+    Dataset* ds = dataset_from_arrays(X, y, count, in, out);
+    if (ds) {
+        ds->num_classes = dataset->num_classes;
+        /* class_names is left NULL (not shared) so each gathered set owns its own
+         * metadata and dataset_free never double-frees the parent's names. */
+        ds->is_normalized = dataset->is_normalized;
+    }
+    cml_free(X);
+    cml_free(y);
+    return ds;
+}
+
+/* Deterministic in-place Fisher-Yates over idx[0..n) using a small LCG seeded by seed. */
+static void shuffle_indices(int* idx, int n, unsigned int seed) {
+    unsigned int s = seed ? seed : 1u;
+    for (int i = n - 1; i > 0; i--) {
+        s      = s * 1103515245u + 12345u;
+        int j  = (int)((s >> 8) % (unsigned int)(i + 1));
+        int t  = idx[i];
+        idx[i] = idx[j];
+        idx[j] = t;
+    }
+}
+
+/**
+ * K-fold split: fold @p fold in [0,k) becomes the validation set and the rest the
+ * training set. With @p shuffle the row order is permuted deterministically by @p seed
+ * first. Writes new datasets to @p train and @p val (caller frees). Returns 0 on success.
+ * @param dataset (Dataset*)
+ * @param k (int)
+ * @param fold (int)
+ * @param shuffle (bool)
+ * @param seed (unsigned int)
+ * @param train (Dataset**)
+ * @param val (Dataset**)
+ * @return (int)
+ */
+int dataset_kfold(Dataset* dataset, int k, int fold, bool shuffle, unsigned int seed,
+                  Dataset** train, Dataset** val) {
+    if (!dataset || !train || !val || k < 2 || fold < 0 || fold >= k || dataset->num_samples < k) {
+        LOG_ERROR("Invalid parameters for dataset_kfold");
+        return -1;
+    }
+    int n    = dataset->num_samples;
+    int* idx = cml_malloc((size_t)n * sizeof(int));
+    if (!idx)
+        return -1;
+    for (int i = 0; i < n; i++)
+        idx[i] = i;
+    if (shuffle)
+        shuffle_indices(idx, n, seed);
+
+    int lo = (int)((long)fold * n / k);
+    int hi = (int)((long)(fold + 1) * n / k);
+    int vn = hi - lo, tn = n - vn;
+
+    int* vidx = cml_malloc((size_t)vn * sizeof(int));
+    int* tidx = cml_malloc((size_t)tn * sizeof(int));
+    if (!vidx || !tidx) {
+        cml_free(idx);
+        cml_free(vidx);
+        cml_free(tidx);
+        return -1;
+    }
+    int vc = 0, tc = 0;
+    for (int i = 0; i < n; i++) {
+        if (i >= lo && i < hi)
+            vidx[vc++] = idx[i];
+        else
+            tidx[tc++] = idx[i];
+    }
+
+    *val   = dataset_gather(dataset, vidx, vn);
+    *train = dataset_gather(dataset, tidx, tn);
+    cml_free(idx);
+    cml_free(vidx);
+    cml_free(tidx);
+    if (!*val || !*train) {
+        dataset_free(*val);
+        dataset_free(*train);
+        *val = *train = NULL;
+        return -1;
+    }
+    return 0;
+}
+
+/**
+ * Stratified k-fold: like dataset_kfold but each class's samples are distributed across
+ * the folds (round-robin per class after a per-class deterministic shuffle), keeping the
+ * class balance of every fold close to the whole. Uses the integer-rounded target of a
+ * single-output dataset as the class. Returns 0 on success.
+ * @param dataset (Dataset*)
+ * @param k (int)
+ * @param fold (int)
+ * @param seed (unsigned int)
+ * @param train (Dataset**)
+ * @param val (Dataset**)
+ * @return (int)
+ */
+int dataset_kfold_stratified(Dataset* dataset, int k, int fold, unsigned int seed, Dataset** train,
+                             Dataset** val) {
+    if (!dataset || !dataset->y || !train || !val || k < 2 || fold < 0 || fold >= k ||
+        dataset->output_size != 1 || dataset->num_samples < k) {
+        LOG_ERROR("Invalid parameters for dataset_kfold_stratified");
+        return -1;
+    }
+    int n             = dataset->num_samples;
+    const float* ydat = (const float*)tensor_data_ptr(dataset->y);
+    if (!ydat)
+        return -1;
+
+    /* Assign each sample a fold: group by class, shuffle within class, round-robin. */
+    int* order = cml_malloc((size_t)n * sizeof(int));
+    int* sfold = cml_malloc((size_t)n * sizeof(int));
+    if (!order || !sfold) {
+        cml_free(order);
+        cml_free(sfold);
+        return -1;
+    }
+    int nc = dataset->num_classes > 0 ? dataset->num_classes : 1;
+    for (int c = 0; c < nc; c++) {
+        int cnt = 0;
+        for (int i = 0; i < n; i++)
+            if ((int)(ydat[i] + 0.5f) == c)
+                order[cnt++] = i;
+        shuffle_indices(order, cnt, seed + (unsigned int)c + 1u);
+        for (int j = 0; j < cnt; j++)
+            sfold[order[j]] = j % k;
+    }
+
+    int vn = 0;
+    for (int i = 0; i < n; i++)
+        vn += (sfold[i] == fold);
+    int tn = n - vn;
+    if (vn == 0 || tn == 0) {
+        cml_free(order);
+        cml_free(sfold);
+        LOG_ERROR("dataset_kfold_stratified: empty fold (too few samples per class)");
+        return -1;
+    }
+    int* vidx = cml_malloc((size_t)vn * sizeof(int));
+    int* tidx = cml_malloc((size_t)tn * sizeof(int));
+    if (!vidx || !tidx) {
+        cml_free(order);
+        cml_free(sfold);
+        cml_free(vidx);
+        cml_free(tidx);
+        return -1;
+    }
+    int vc = 0, tc = 0;
+    for (int i = 0; i < n; i++) {
+        if (sfold[i] == fold)
+            vidx[vc++] = i;
+        else
+            tidx[tc++] = i;
+    }
+
+    *val   = dataset_gather(dataset, vidx, vn);
+    *train = dataset_gather(dataset, tidx, tn);
+    cml_free(order);
+    cml_free(sfold);
+    cml_free(vidx);
+    cml_free(tidx);
+    if (!*val || !*train) {
+        dataset_free(*val);
+        dataset_free(*train);
+        *val = *train = NULL;
+        return -1;
+    }
+    return 0;
+}

@@ -97,6 +97,45 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
                         Dataset** train_dataset, Dataset** val_dataset, Dataset** test_dataset);
 int dataset_normalize(Dataset* dataset, const char* method);
 int dataset_shuffle(Dataset* dataset, unsigned int seed);
+
+/**
+ * Build a new dataset from the rows at @p indices (deep copy; caller frees).
+ * @param dataset (Dataset*)
+ * @param indices (const int*)
+ * @param count (int)
+ * @return (Dataset*)
+ */
+Dataset* dataset_gather(Dataset* dataset, const int* indices, int count);
+
+/**
+ * K-fold split: fold @p fold in [0,k) is validation, the rest is training. @p shuffle
+ * permutes row order deterministically by @p seed. Writes new datasets to @p train /
+ * @p val (caller frees). Returns 0 on success.
+ * @param dataset (Dataset*)
+ * @param k (int)
+ * @param fold (int)
+ * @param shuffle (bool)
+ * @param seed (unsigned int)
+ * @param train (Dataset**)
+ * @param val (Dataset**)
+ * @return (int)
+ */
+int dataset_kfold(Dataset* dataset, int k, int fold, bool shuffle, unsigned int seed,
+                  Dataset** train, Dataset** val);
+
+/**
+ * Stratified k-fold (single-output datasets): distributes each class across folds to
+ * keep class balance even. Returns 0 on success.
+ * @param dataset (Dataset*)
+ * @param k (int)
+ * @param fold (int)
+ * @param seed (unsigned int)
+ * @param train (Dataset**)
+ * @param val (Dataset**)
+ * @return (int)
+ */
+int dataset_kfold_stratified(Dataset* dataset, int k, int fold, unsigned int seed, Dataset** train,
+                             Dataset** val);
 int dataset_get_statistics(Dataset* dataset, void* stats);
 
 DataLoader* dataloader_create(Dataset* dataset, int batch_size, bool shuffle);
