@@ -63,7 +63,10 @@ static int test_f64_arith(void) {
     return ok;
 }
 
-/* 1e8 + 1 is exact in f64 but rounds to 1e8 in f32 - proves native f64 compute. */
+/**
+ * 1e8 + 1 is exact in f64 but rounds to 1e8 in f32 - proves native f64 compute.
+ * @return (int)
+ */
 static int test_f64_precision(void) {
     double a[] = {1e8};
     double b[] = {1.0};
@@ -79,7 +82,10 @@ static int test_f64_precision(void) {
     return ok;
 }
 
-/* 2^24 + 1 = 16777217 is exact in int32 but NOT representable in f32. */
+/**
+ * 2^24 + 1 = 16777217 is exact in int32 but NOT representable in f32.
+ * @return (int)
+ */
 static int test_i32_exact(void) {
     int32_t a[] = {16777216, 100, 7};
     int32_t b[] = {1, 25, 6};
@@ -100,7 +106,10 @@ static int test_i32_exact(void) {
     return ok;
 }
 
-/* int64 product 1e6 * 1e6 = 1e12 is exact in int64, lossy as f32. */
+/**
+ * int64 product 1e6 * 1e6 = 1e12 is exact in int64, lossy as f32.
+ * @return (int)
+ */
 static int test_i64_exact(void) {
     int64_t a[] = {1000000, 9};
     int64_t b[] = {1000000, 8};
@@ -116,7 +125,10 @@ static int test_i64_exact(void) {
     return ok;
 }
 
-/* f64 broadcasting: scalar * vector. */
+/**
+ * f64 broadcasting: scalar * vector.
+ * @return (int)
+ */
 static int test_f64_broadcast(void) {
     double v[] = {1.0, 2.0, 3.0, 4.0};
     double s[] = {2.5};
@@ -134,7 +146,10 @@ static int test_f64_broadcast(void) {
     return ok;
 }
 
-/* f64 unary: neg/abs plus exp/log round-trip in double precision. */
+/**
+ * f64 unary: neg/abs plus exp/log round-trip in double precision.
+ * @return (int)
+ */
 static int test_f64_unary(void) {
     double a[] = {0.5, 1.0, 2.0, 4.0};
     Tensor* ta = tensor_from_data(a, (int[]){4}, 1, &cfg_f64);
@@ -163,7 +178,10 @@ static int test_f64_unary(void) {
     return ok;
 }
 
-/* integer neg/abs. */
+/**
+ * integer neg/abs.
+ * @return (int)
+ */
 static int test_int_unary(void) {
     int32_t a[] = {-5, 3, -100, 42};
     Tensor* ta  = tensor_from_data(a, (int[]){4}, 1, &cfg_i32);
@@ -181,7 +199,10 @@ static int test_int_unary(void) {
     return ok;
 }
 
-/* global reductions across dtypes. */
+/**
+ * global reductions across dtypes.
+ * @return (int)
+ */
 static int test_reductions_global(void) {
     double a[]      = {1.0, 2.0, 3.0, 4.0, 5.0}; /* sum 15, mean 3 */
     Tensor* ta      = tensor_from_data(a, (int[]){5}, 1, &cfg_f64);
@@ -218,7 +239,10 @@ static int test_reductions_global(void) {
     return ok;
 }
 
-/* per-dimension reductions on an f64 [2,3] matrix. */
+/**
+ * per-dimension reductions on an f64 [2,3] matrix.
+ * @return (int)
+ */
 static int test_reductions_axis(void) {
     double a[] = {1, 2, 3, 4, 5, 6}; /* [[1,2,3],[4,5,6]] */
     Tensor* ta = tensor_from_data(a, (int[]){2, 3}, 2, &cfg_f64);
@@ -244,7 +268,10 @@ static int test_reductions_axis(void) {
     return ok;
 }
 
-/* mixed-dtype binary ops promote to the wider type (numpy-style). */
+/**
+ * mixed-dtype binary ops promote to the wider type (numpy-style).
+ * @return (int)
+ */
 static int test_promotion(void) {
     float af[]  = {1.0f, 2.0f, 3.0f};
     double bd[] = {0.5, 0.5, 0.5};
@@ -275,7 +302,10 @@ static int test_promotion(void) {
     return ok;
 }
 
-/* precision-preserving cast (not routed through f32). */
+/**
+ * precision-preserving cast (not routed through f32).
+ * @return (int)
+ */
 static int test_cast_precision(void) {
     int64_t a[] = {9007199254740993LL, 5}; /* 2^53 + 1, unrepresentable in f32/f64 exactly */
     Tensor* ta  = tensor_from_data(a, (int[]){2}, 1, &cfg_i64);
@@ -291,7 +321,10 @@ static int test_cast_precision(void) {
     return ok;
 }
 
-/* comparisons return DTYPE_BOOL (numpy-style), across input dtypes. */
+/**
+ * comparisons return DTYPE_BOOL (numpy-style), across input dtypes.
+ * @return (int)
+ */
 static int test_comparisons(void) {
     int32_t a[] = {1, 5, 3, 2};
     int32_t b[] = {2, 2, 2, 2};
@@ -338,7 +371,10 @@ static int test_comparisons(void) {
     return ok;
 }
 
-/* f64 and int matmul in native precision. */
+/**
+ * f64 and int matmul in native precision.
+ * @return (int)
+ */
 static int test_matmul(void) {
     /* f64 [2,3] @ [3,2] */
     double a[] = {1, 2, 3, 4, 5, 6};    /* [[1,2,3],[4,5,6]] */
@@ -385,7 +421,10 @@ static int test_matmul(void) {
     return ok;
 }
 
-/* f64 direct conv2d: 3x3 input, 2x2 identity-ish kernel, stride 1, no pad. */
+/**
+ * f64 direct conv2d: 3x3 input, 2x2 identity-ish kernel, stride 1, no pad.
+ * @return (int)
+ */
 static int test_conv2d(void) {
     double in[] = {1, 2, 3, 4, 5, 6, 7, 8, 9}; /* [1,1,3,3] */
     double w[]  = {1, 0, 0, 1};                /* [1,1,2,2] */
@@ -412,8 +451,11 @@ static int test_conv2d(void) {
     return ok;
 }
 
-/* f16/bf16 compute (in f32, stored as half). Values read back via
- * tensor_get_float; tolerances reflect half precision. */
+/**
+ * f16/bf16 compute (in f32, stored as half). Values read back via
+ * tensor_get_float; tolerances reflect half precision.
+ * @return (int)
+ */
 static int test_half(void) {
     float av[] = {1.0f, 2.0f, 3.0f, 4.0f};
     float bv[] = {0.5f, 1.5f, 2.5f, 0.25f};

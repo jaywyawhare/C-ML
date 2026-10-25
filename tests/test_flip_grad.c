@@ -12,7 +12,10 @@
 static TensorConfig cfg = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
-/* 1-D: y = flip(x); loss = sum(y * w) => dL/dx = flip(w). */
+/**
+ * 1-D: y = flip(x); loss = sum(y * w) => dL/dx = flip(w).
+ * @return (int)
+ */
 static int test_flip_grad_1d(void) {
     float xd[4]  = {1, 2, 3, 4};
     float wd[4]  = {10, 20, 30, 40};
@@ -40,7 +43,10 @@ static int test_flip_grad_1d(void) {
     return ok;
 }
 
-/* 2-D flip along dim 1 to exercise the strided scatter path. */
+/**
+ * 2-D flip along dim 1 to exercise the strided scatter path.
+ * @return (int)
+ */
 static int test_flip_grad_2d(void) {
     float xd[6]  = {1, 2, 3, 4, 5, 6}; /* [[1,2,3],[4,5,6]] */
     float wd[6]  = {1, 2, 3, 4, 5, 6};

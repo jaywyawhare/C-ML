@@ -281,12 +281,15 @@ static int test_conv2d_pattern(void) {
     return pass;
 }
 
-/* A real convolutional network trained end to end on the bundled 1797-sample
+/**
+ * A real convolutional network trained end to end on the bundled 1797-sample
  * 8x8 digits set (10 classes), with a held-out test split and a hard accuracy
  * threshold. Unlike the toy cases above, this exercises the full conv training
  * path (im2col decompose, pooling backward, sparse cross-entropy) on real,
  * noisy, multi-class data, so passing means the stack can actually fit a model
- * that generalizes, not just memorize a handful of points. */
+ * that generalizes, not just memorize a handful of points.
+ * @return (int)
+ */
 static int test_digits_cnn(void) {
     printf("  [Digits CNN] Conv(1,8)-ReLU-Pool-Conv(8,16)-ReLU-Pool-Linear(64,10), "
            "Adam lr=0.01, 12 epochs\n");

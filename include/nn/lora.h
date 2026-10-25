@@ -36,17 +36,31 @@ typedef struct CMLLoRAAdapter {
     bool merged;
 } CMLLoRAAdapter;
 
-/* base_weight is not owned and must outlive the LoRA layer.
- * lora_A initialized with Xavier, lora_B initialized to zeros. */
+/**
+ * base_weight is not owned and must outlive the LoRA layer.
+ * lora_A initialized with Xavier, lora_B initialized to zeros.
+ * @param base_weight (Tensor*)
+ * @param rank (int)
+ * @param alpha (float)
+ * @return (CMLLoRALinear*)
+ */
 CMLLoRALinear* cml_lora_linear_create(Tensor* base_weight, int rank, float alpha);
 
-/* Frees lora_A, lora_B, frozen_base. Does NOT free base_weight. */
+/**
+ * Frees lora_A, lora_B, frozen_base. Does NOT free base_weight.
+ * @param lora (CMLLoRALinear*)
+ * @return (void)
+ */
 void cml_lora_linear_free(CMLLoRALinear* lora);
 
 Tensor* cml_lora_linear_forward(CMLLoRALinear* lora, Tensor* input);
 
-/* Modifies base_weight in-place: W += scaling * B @ A.
- * Saves a frozen copy for later unmerge. */
+/**
+ * Modifies base_weight in-place: W += scaling * B @ A.
+ * Saves a frozen copy for later unmerge.
+ * @param lora (CMLLoRALinear*)
+ * @return (int)
+ */
 int cml_lora_linear_merge(CMLLoRALinear* lora);
 
 int cml_lora_linear_unmerge(CMLLoRALinear* lora);
@@ -55,7 +69,12 @@ CMLLoRAAdapter* cml_lora_adapter_create(const char* name, int rank, float alpha)
 
 void cml_lora_adapter_free(CMLLoRAAdapter* adapter);
 
-/* The adapter takes ownership of the layer. */
+/**
+ * The adapter takes ownership of the layer.
+ * @param adapter (CMLLoRAAdapter*)
+ * @param layer (CMLLoRALinear*)
+ * @return (int)
+ */
 int cml_lora_adapter_add_layer(CMLLoRAAdapter* adapter, CMLLoRALinear* layer);
 
 int cml_lora_adapter_merge_all(CMLLoRAAdapter* adapter);

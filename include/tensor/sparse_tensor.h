@@ -24,10 +24,19 @@ SparseCOOData* sparse_coo_tensor(Tensor* indices, Tensor* values, const int* den
 SparseCOOData* sparse_from_dense(Tensor* dense);
 Tensor* sparse_to_dense(SparseCOOData* sparse, const TensorConfig* config);
 
-/* C = A * B where A is sparse [M, K] and B is dense [K, N] */
+/**
+ * C = A * B where A is sparse [M, K] and B is dense [K, N]
+ * @param sparse (SparseCOOData*)
+ * @param dense (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* sparse_matmul(SparseCOOData* sparse, Tensor* dense);
 
-/* Sort indices and sum duplicate entries */
+/**
+ * Sort indices and sum duplicate entries
+ * @param sparse (SparseCOOData*)
+ * @return (SparseCOOData*)
+ */
 SparseCOOData* sparse_coalesce(SparseCOOData* sparse);
 
 void sparse_free(SparseCOOData* sparse);

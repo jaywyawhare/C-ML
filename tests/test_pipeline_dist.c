@@ -26,7 +26,11 @@
 #define M 4
 #define EPS 2e-3f
 
-/* Linear [D,D] with weight = scale*I, no bias. */
+/**
+ * Linear [D,D] with weight = scale*I, no bias.
+ * @param scale (float)
+ * @return (Module*)
+ */
 static Module* make_scale_stage(float scale) {
     Linear* lin = nn_linear(D, D, DTYPE_FLOAT32, DEVICE_CPU, false);
     if (!lin)

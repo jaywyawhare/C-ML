@@ -33,7 +33,17 @@ struct IRNode* cml_intern_lookup(CMLInternTable* table, uint64_t hash, int op_ty
                                  struct IRNode** inputs, int num_inputs, const void* arg_bytes,
                                  size_t arg_len);
 
-/* Variants that also distinguish leaf tensors by pointer identity */
+/**
+ * Variants that also distinguish leaf tensors by pointer identity
+ * @param op_type (int)
+ * @param dtype (int)
+ * @param inputs (struct IRNode**)
+ * @param raw_inputs (struct Tensor**)
+ * @param num_inputs (int)
+ * @param arg_bytes (const void*)
+ * @param arg_len (size_t)
+ * @return (uint64_t)
+ */
 uint64_t cml_intern_hash_node_ex(int op_type, int dtype, struct IRNode** inputs,
                                  struct Tensor** raw_inputs, int num_inputs, const void* arg_bytes,
                                  size_t arg_len);

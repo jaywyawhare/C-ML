@@ -249,7 +249,12 @@ int cml_qmatmul_affine_int8(const float* x, const int8_t* w, float scale, int32_
 
 static int nf4_find_nearest(float normalized);
 
-/* Nibble order: high nibble = even flat index, low nibble = odd flat index. */
+/**
+ * Nibble order: high nibble = even flat index, low nibble = odd flat index.
+ * @param p (const uint8_t*)
+ * @param idx (size_t)
+ * @return (int)
+ */
 static inline int int4_unpack_signed(const uint8_t* p, size_t idx) {
     uint8_t b   = p[idx >> 1];
     uint8_t nib = (idx & 1) ? (uint8_t)(b & 0x0F) : (uint8_t)(b >> 4);
@@ -979,8 +984,14 @@ QuantParams cml_qat_observer_params(const QatObserver* obs) {
     return params;
 }
 
-/* dequant(quant(t)) as a lazy uop composite; intermediates stay owned by the
- * IR context until teardown (same lifetime convention as the VJP builders). */
+/**
+ * dequant(quant(t)) as a lazy uop composite; intermediates stay owned by the
+ * IR context until teardown (same lifetime convention as the VJP builders).
+ * @param t (Tensor*)
+ * @param scale (float)
+ * @param zero_point (int32_t)
+ * @return (Tensor*)
+ */
 static Tensor* qat_fake_quant_composite(Tensor* t, float scale, int32_t zero_point) {
     /* q = clamp(round(t/scale) + zp, -128, 127); out = (q - zp) * scale */
     Tensor* s        = uop_fill(t->shape, t->ndim, scale);

@@ -30,18 +30,38 @@ bool winograd_applicable(int kernel_h, int kernel_w, int stride_h, int stride_w,
 
 WinogradConfig winograd_select_variant(int height, int width);
 
-/*
+/**
  * Transform weight tensor to Winograd domain.
  * weight: [out_channels, in_channels, 3, 3]
+ * @param weight (const float*)
+ * @param out_channels (int)
+ * @param in_channels (int)
+ * @param config (const WinogradConfig*)
+ * @param transformed (float*)
+ * @return (int)
  */
 int winograd_transform_weight(const float* weight, int out_channels, int in_channels,
                               const WinogradConfig* config, float* transformed);
 
-/*
+/**
  * input:  [batch, in_channels, height, width]
  * weight: [out_channels, in_channels, 3, 3]
  * bias:   [out_channels] or NULL
  * output: [batch, out_channels, out_h, out_w]
+ * @param input (const float*)
+ * @param weight (const float*)
+ * @param bias (const float*)
+ * @param output (float*)
+ * @param batch (int)
+ * @param in_channels (int)
+ * @param out_channels (int)
+ * @param height (int)
+ * @param width (int)
+ * @param padding_h (int)
+ * @param padding_w (int)
+ * @param groups (int)
+ * @param config (const WinogradConfig*)
+ * @return (int)
  */
 int winograd_conv2d(const float* input, const float* weight, const float* bias, float* output,
                     int batch, int in_channels, int out_channels, int height, int width,

@@ -45,25 +45,52 @@ CMLRowParallelLinear* cml_row_parallel_create(Tensor* full_weight, Tensor* full_
 
 void cml_row_parallel_free(CMLRowParallelLinear* rp);
 
-/* Caller must all-reduce sum outputs across ranks for the final result. */
+/**
+ * Caller must all-reduce sum outputs across ranks for the final result.
+ * @param rp (CMLRowParallelLinear*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* cml_row_parallel_forward(CMLRowParallelLinear* rp, Tensor* input);
 
-/* All tensors in partials must have the same shape and dtype. Sums a set of
- * in-process partials (single-process simulation of tensor parallelism). */
+/**
+ * All tensors in partials must have the same shape and dtype. Sums a set of
+ * in-process partials (single-process simulation of tensor parallelism).
+ * @param partials (Tensor**)
+ * @param num_parts (int)
+ * @return (Tensor*)
+ */
 Tensor* cml_tp_all_reduce_sum(Tensor** partials, int num_parts);
 
-/* All-gather for column-parallel outputs: concatenates each rank's partial
+/**
+ * All-gather for column-parallel outputs: concatenates each rank's partial
  * [batch, out_features/tp] along `dim` (-1 = feature dim) into the full
- * [batch, out_features] result. Rank order = array order. */
+ * [batch, out_features] result. Rank order = array order.
+ * @param partials (Tensor**)
+ * @param num_parts (int)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* cml_tp_all_gather(Tensor** partials, int num_parts, int dim);
 
-/* Sum a row-parallel forward partial across ranks IN PLACE via the default
+/**
+ * Sum a row-parallel forward partial across ranks IN PLACE via the default
  * process group (real distributed collective; no-op at world_size==1). Because
  * all-reduce-sum has an identity gradient, the in-place reduction preserves
- * correct per-rank gradients for the sharded weight. Returns 0 on success. */
+ * correct per-rank gradients for the sharded weight. Returns 0 on success.
+ * @param partial (Tensor*)
+ * @return (int)
+ */
 int cml_row_parallel_all_reduce(Tensor* partial);
 
-/* Returns a freshly allocated copy of the shard data. */
+/**
+ * Returns a freshly allocated copy of the shard data.
+ * @param weight (Tensor*)
+ * @param dim (int)
+ * @param tp_size (int)
+ * @param tp_rank (int)
+ * @return (Tensor*)
+ */
 Tensor* cml_tp_shard_weight(Tensor* weight, int dim, int tp_size, int tp_rank);
 
 #ifdef __cplusplus

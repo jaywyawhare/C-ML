@@ -157,8 +157,11 @@ static int test_am_defines(void) {
     return 1;
 }
 
-/* No AMX matmul is wired up on any target (the kernels return -1), so it must
- * never be advertised: tc_opt would route matmuls to the stub. */
+/**
+ * No AMX matmul is wired up on any target (the kernels return -1), so it must
+ * never be advertised: tc_opt would route matmuls to the stub.
+ * @return (int)
+ */
 static int test_amx_availability(void) { return !cml_amx_available(); }
 
 static int test_amx_null_args(void) {

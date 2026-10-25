@@ -89,14 +89,27 @@ int cml_graph_capture_replay(CMLCapturedGraph* graph);
 int cml_graph_capture_bind_input(CMLCapturedGraph* graph, int index, Tensor* tensor);
 int cml_graph_capture_bind_output(CMLCapturedGraph* graph, int index, Tensor* tensor);
 
-/* Install the backend's per-node dispatch callback used by replay. */
+/**
+ * Install the backend's per-node dispatch callback used by replay.
+ * @param graph (CMLCapturedGraph*)
+ * @param dispatch_fn (int (*)(const struct CMLCapturedNode*, void*))
+ * @param user (void*)
+ * @return (int)
+ */
 int cml_graph_capture_set_dispatch(CMLCapturedGraph* graph,
                                    int (*dispatch_fn)(const struct CMLCapturedNode*, void*),
                                    void* user);
 
-/* Record that argument @p arg_index of node @p node_index is the input bound at
+/**
+ * Record that argument @p arg_index of node @p node_index is the input bound at
  * @p input_index, so replay substitutes that input's current data buffer. This
- * is how one captured graph runs against fresh input tensors. */
+ * is how one captured graph runs against fresh input tensors.
+ * @param graph (CMLCapturedGraph*)
+ * @param node_index (int)
+ * @param arg_index (int)
+ * @param input_index (int)
+ * @return (int)
+ */
 int cml_graph_capture_map_input_arg(CMLCapturedGraph* graph, int node_index, int arg_index,
                                     int input_index);
 int cml_graph_capture_reset(CMLCapturedGraph* graph);

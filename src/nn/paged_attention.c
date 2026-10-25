@@ -357,9 +357,18 @@ int cml_paged_cache_append(CMLPagedKVCache* cache, int seq_id, const float* key,
     return 0;
 }
 
-/* Core attention over one cache sequence, writing one batch row of output.
+/**
+ * Core attention over one cache sequence, writing one batch row of output.
  * q_row points at this row's [seq_q, num_heads*head_dim] slice; out_row is the
- * matching output slice. Returns 0 on success. */
+ * matching output slice. Returns 0 on success.
+ * @param cache (CMLPagedKVCache*)
+ * @param bt (CMLBlockTable*)
+ * @param q_row (const float*)
+ * @param out_row (float*)
+ * @param seq_q (int)
+ * @param config (const CMLGQAConfig*)
+ * @return (int)
+ */
 static int paged_gqa_forward_seq(CMLPagedKVCache* cache, CMLBlockTable* bt, const float* q_row,
                                  float* out_row, int seq_q, const CMLGQAConfig* config) {
     int num_heads    = config->num_heads;

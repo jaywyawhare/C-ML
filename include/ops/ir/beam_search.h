@@ -63,7 +63,13 @@ bool cml_beam_search_enabled(void);
 int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, size_t total_elements,
                          int ndim, const int* shape, CMLBeamConfig* best_out);
 
-/* Returns 0 if found (best_out populated), -1 if not cached */
+/**
+ * Returns 0 if found (best_out populated), -1 if not cached
+ * @param ctx (CMLBeamSearchCtx*)
+ * @param kernel_hash (uint64_t)
+ * @param best_out (CMLBeamConfig*)
+ * @return (int)
+ */
 int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, CMLBeamConfig* best_out);
 
 int cml_beam_search_store(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, const CMLBeamConfig* config,

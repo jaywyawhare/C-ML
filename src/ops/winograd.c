@@ -126,13 +126,32 @@ static void extract_tile(const float* src, float* tile, int tile_row, int tile_c
     }
 }
 
-/* V = B^T * d * B */
+/**
+ * V = B^T * d * B
+ * @param BT_flat (const float*)
+ * @param B_flat (const float*)
+ * @param tile (const float*)
+ * @param V (float*)
+ * @param ts (int)
+ * @param tmp (float*)
+ * @return (void)
+ */
 static void transform_input_tile(const float* BT_flat, const float* B_flat, const float* tile,
                                  float* V, int ts, float* tmp) {
     mat_mul_triple(BT_flat, tile, B_flat, V, ts, ts, ts, ts, tmp);
 }
 
-/* Y = A^T * M * A */
+/**
+ * Y = A^T * M * A
+ * @param AT_flat (const float*)
+ * @param A_flat (const float*)
+ * @param M (const float*)
+ * @param Y (float*)
+ * @param out_tile (int)
+ * @param ts (int)
+ * @param tmp (float*)
+ * @return (void)
+ */
 static void transform_output_tile(const float* AT_flat, const float* A_flat, const float* M,
                                   float* Y, int out_tile, int ts, float* tmp) {
     mat_mul_triple(AT_flat, M, A_flat, Y, out_tile, ts, ts, out_tile, tmp);
@@ -217,7 +236,15 @@ WinogradConfig winograd_select_variant(int height, int width) {
     return cfg;
 }
 
-/* U[oc][ic] = G * g * G^T for each filter g[3x3] */
+/**
+ * U[oc][ic] = G * g * G^T for each filter g[3x3]
+ * @param weight (const float*)
+ * @param out_channels (int)
+ * @param in_channels (int)
+ * @param config (const WinogradConfig*)
+ * @param transformed (float*)
+ * @return (int)
+ */
 int winograd_transform_weight(const float* weight, int out_channels, int in_channels,
                               const WinogradConfig* config, float* transformed) {
     if (!weight || !config || !transformed)

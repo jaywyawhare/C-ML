@@ -16,7 +16,10 @@
 static TensorConfig cfg = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
-/* Model churn: fresh Sequential + SGD each cycle; reset between steps. */
+/**
+ * Model churn: fresh Sequential + SGD each cycle; reset between steps.
+ * @return (int)
+ */
 static int test_model_churn(void) {
     int ok = 1;
     for (int cycle = 0; cycle < 8; cycle++) {
@@ -61,7 +64,10 @@ static int test_model_churn(void) {
     return ok;
 }
 
-/* View-of-temporary churn: base dies immediately, view outlives it. */
+/**
+ * View-of-temporary churn: base dies immediately, view outlives it.
+ * @return (int)
+ */
 static int test_view_temporary_churn(void) {
     int ok = 1;
     float expected[12];
@@ -99,7 +105,10 @@ static int test_view_temporary_churn(void) {
     return ok;
 }
 
-/* Mixed op + reset pressure: exercises plan-cache replay across resets. */
+/**
+ * Mixed op + reset pressure: exercises plan-cache replay across resets.
+ * @return (int)
+ */
 static int test_reset_pressure(void) {
     int ok      = 1;
     int shape[] = {32, 32};
@@ -127,10 +136,13 @@ static int test_reset_pressure(void) {
     return ok;
 }
 
-/* Attention-block soak: the reshape + batched-matmul + softmax path that
+/**
+ * Attention-block soak: the reshape + batched-matmul + softmax path that
  * severed the autograd graph before the cml_reshape fix. Trains one block for
  * many steps to shake out lifecycle bugs (heap corruption, use-after-free,
- * leaks across reset) on the exact composition transformers exercise. */
+ * leaks across reset) on the exact composition transformers exercise.
+ * @return (int)
+ */
 static int test_attention_soak(void) {
     const int B = 4, S = 6, d = 8, NP_MAX = 8;
     Linear* lq      = cml_nn_linear(d, d, DTYPE_FLOAT32, DEVICE_CPU, true);

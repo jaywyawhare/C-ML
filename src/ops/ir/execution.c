@@ -65,9 +65,12 @@ CMLLLVMBackend* cml_get_llvm_backend(void) {
     return g_llvm_backend;
 }
 
-/* The shape-specialized LLVM JIT is the default execution path; it falls back to
+/**
+ * The shape-specialized LLVM JIT is the default execution path; it falls back to
  * the scalar interpreter per-node for unsupported ops/shapes. Set DISABLE_JIT=1
- * (or BACKEND=interp) to force the pure interpreter (reference path). */
+ * (or BACKEND=interp) to force the pure interpreter (reference path).
+ * @return (int)
+ */
 static int cml_ir_use_jit(void) {
     static int checked = 0, enabled = 1;
     if (!checked) {
@@ -90,8 +93,11 @@ static int cml_ir_use_jit(void) {
 #endif
 
 #ifdef CML_HAS_VULKAN
-/* Opt-in GPU execution: USE_VULKAN=1 routes supported float32 nodes
- * (elementwise + 2D matmul) to the Vulkan compute backend; CPU/JIT otherwise. */
+/**
+ * Opt-in GPU execution: USE_VULKAN=1 routes supported float32 nodes
+ * (elementwise + 2D matmul) to the Vulkan compute backend; CPU/JIT otherwise.
+ * @return (int)
+ */
 static int cml_ir_use_vulkan(void) {
     static int cached = -1;
     if (cached < 0) {
@@ -453,8 +459,13 @@ static inline void wino_f23_input_transform(const float d[16], float V[16]) {
 }
 #endif
 
-/* Weight transform: U = G * g * G^T for 3x3 filter
- * G = [1,0,0; 0.5,0.5,0.5; 0.5,-0.5,0.5; 0,0,1] */
+/**
+ * Weight transform: U = G * g * G^T for 3x3 filter
+ * G = [1,0,0; 0.5,0.5,0.5; 0.5,-0.5,0.5; 0,0,1]
+ * @param g (const float[9])
+ * @param U (float[16])
+ * @return (void)
+ */
 static inline void wino_f23_weight_transform(const float g[9], float U[16]) {
     float t[12]; /* 4x3 */
     for (int j = 0; j < 3; j++) {
@@ -511,10 +522,15 @@ static inline void wino_f23_output_transform(const float M[16], float Y[4]) {
 }
 #endif
 
-/* Read one index element from an index tensor of any integer/float dtype.
+/**
+ * Read one index element from an index tensor of any integer/float dtype.
  * Gather/scatter used to read every index tensor through a float* cast,
  * which turned int32 indices into denormal floats and (int) casts of those
- * into 0 -- silently gathering row 0 and scattering gradients to row 0. */
+ * into 0 -- silently gathering row 0 and scattering gradients to row 0.
+ * @param t (const Tensor*)
+ * @param i (size_t)
+ * @return (int)
+ */
 static int cml_index_read(const Tensor* t, size_t i) {
     const void* d = t ? t->data : NULL;
     if (!d)
@@ -542,9 +558,25 @@ static int cml_index_read(const Tensor* t, size_t i) {
     }
 }
 
-/* BLAS-batched Winograd F(2,3) with hardcoded transforms.
+/**
+ * BLAS-batched Winograd F(2,3) with hardcoded transforms.
  * Uses add/sub-only transforms (no generic matmul) + batched GEMM/inline
- * multiply at each of the 16 Winograd points. */
+ * multiply at each of the 16 Winograd points.
+ * @param blas (CMLBlasContext*)
+ * @param input (const float*)
+ * @param weight (const float*)
+ * @param bias (const float*)
+ * @param output (float*)
+ * @param batch (int)
+ * @param in_channels (int)
+ * @param out_channels (int)
+ * @param H (int)
+ * @param W (int)
+ * @param pad_h (int)
+ * @param pad_w (int)
+ * @param groups (int)
+ * @return (int)
+ */
 static int winograd_conv2d_blas(CMLBlasContext* blas, const float* input, const float* weight,
                                 const float* bias, float* output, int batch, int in_channels,
                                 int out_channels, int H, int W, int pad_h, int pad_w, int groups) {
@@ -745,11 +777,18 @@ static inline size_t _broadcast_idx(Tensor* inp, Tensor* out_t, size_t flat_i) {
     return idx;
 }
 
-/* Materialize a numpy-broadcast of `in` into contiguous `out`, same semantics as
+/**
+ * Materialize a numpy-broadcast of `in` into contiguous `out`, same semantics as
  * _broadcast_idx but amortized O(1) per element: the per-output-dim source stride
  * is computed once (0 on broadcast axes) and the source offset is advanced with an
  * odometer, so there is no per-element stride rebuild or division. This is the
- * hot path for EXPAND (and any op that writes a broadcast). */
+ * hot path for EXPAND (and any op that writes a broadcast).
+ * @param out (float*)
+ * @param in (const float*)
+ * @param inp (Tensor*)
+ * @param out_t (Tensor*)
+ * @return (void)
+ */
 static void fast_broadcast_f32(float* out, const float* in, Tensor* inp, Tensor* out_t) {
     size_t n = out_t->numel;
     if (n == 0)
@@ -831,8 +870,16 @@ static void fast_broadcast_f32(float* out, const float* in, Tensor* inp, Tensor*
     }
 }
 
-/* Broadcast pattern detection for 2D binary ops.
- * Returns: 0=use generic, 1=[R,C]op[1,C] (row broadcast), 2=[R,C]op[R,1] (col broadcast) */
+/**
+ * Broadcast pattern detection for 2D binary ops.
+ * Returns: 0=use generic, 1=[R,C]op[1,C] (row broadcast), 2=[R,C]op[R,1] (col broadcast)
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param out (Tensor*)
+ * @param rows (size_t*)
+ * @param cols (size_t*)
+ * @return (int)
+ */
 static inline int _detect_broadcast_2d(Tensor* a, Tensor* b, Tensor* out, size_t* rows,
                                        size_t* cols) {
     if (out->ndim != 2)
@@ -987,7 +1034,8 @@ static int is_elementwise_binary(UOpType t) {
         return -1;                                                                                 \
     }
 
-/* Broadcast index map for one operand, or NULL when the operand is already
+/**
+ * Broadcast index map for one operand, or NULL when the operand is already
  * output-shaped (the common case, where index == i).
  *
  * `i % operand_numel` is NOT numpy broadcasting: it is right only when the
@@ -995,7 +1043,11 @@ static int is_elementwise_binary(UOpType t) {
  * operand 0,1,0,1,0,1 where it must be 0,0,0,1,1,1, so every leading-dim
  * broadcast -- `x - mean(x, dim=1, keepdim=True)` and friends -- silently mixed
  * rows. _broadcast_idx is shape-aware; precomputing it once per operand keeps
- * the inner loop a plain load. */
+ * the inner loop a plain load.
+ * @param in (Tensor*)
+ * @param out (Tensor*)
+ * @return (size_t*)
+ */
 static size_t* build_bcast_map(Tensor* in, Tensor* out) {
     if (!in || !out || in->numel == out->numel)
         return NULL;
@@ -1216,11 +1268,18 @@ static int is_reduction_op(UOpType t) {
     return t == UOP_SUM || t == UOP_MEAN || t == UOP_MAX_REDUCE || t == UOP_MIN_REDUCE;
 }
 
-/* Dtype-generic reduction (sum/mean/max/min). All layouts - global, 2D-per-dim,
+/**
+ * Dtype-generic reduction (sum/mean/max/min). All layouts - global, 2D-per-dim,
  * and N-d-per-dim - collapse to a single (outer, inner, count) formulation:
  * output p reduces `count` elements starting at (p/inner)*count*inner + (p%inner)
  * with stride `inner`. Mean/sum accumulate in double then cast to the output
- * type (int mean truncates, matching the same-dtype output convention). */
+ * type (int mean truncates, matching the same-dtype output convention).
+ * @param node (struct IRNode*)
+ * @param in (const void*)
+ * @param outp (void*)
+ * @param dt (DType)
+ * @return (int)
+ */
 static int cpu_reduce_generic(struct IRNode* node, const void* in, void* outp, DType dt) {
     Tensor* inp = node->inputs[0];
     if (!inp || !in || !outp)
@@ -1320,10 +1379,23 @@ static int cpu_reduce_generic(struct IRNode* node, const void* in, void* outp, D
 #undef CML_REDUCE_T
 }
 
-/* Dtype-generic matmul C[b] = A[b] @ B[b] over `batch` matrices of [M,K]x[K,N].
+/**
+ * Dtype-generic matmul C[b] = A[b] @ B[b] over `batch` matrices of [M,K]x[K,N].
  * a_stride/b_stride are per-batch element offsets (0 = operand shared across the
  * batch, enabling A- or B-broadcast). Float accumulates in double, integers in
- * int64, then cast to the output type. Returns 0 on success, -1 on bad dtype. */
+ * int64, then cast to the output type. Returns 0 on success, -1 on bad dtype.
+ * @param A (const void*)
+ * @param B (const void*)
+ * @param C (void*)
+ * @param batch (int)
+ * @param a_stride (size_t)
+ * @param b_stride (size_t)
+ * @param M (int)
+ * @param K (int)
+ * @param N (int)
+ * @param dt (DType)
+ * @return (int)
+ */
 static int cpu_matmul_generic(const void* A, const void* B, void* C, int batch, size_t a_stride,
                               size_t b_stride, int M, int K, int N, DType dt) {
 #define CML_MATMUL_T(CTYPE, ACC)                                                                   \
@@ -1398,10 +1470,15 @@ static int cpu_matmul_generic(const void* A, const void* B, void* C, int batch, 
 #undef CML_MATMUL_HALF
 }
 
-/* Dtype-generic direct conv2d (naive but fully general: groups / stride /
+/**
+ * Dtype-generic direct conv2d (naive but fully general: groups / stride /
  * padding / dilation / optional bias). The f32 path uses Winograd/im2col+BLAS;
  * this reference implementation backs the non-f32 dtypes. All operands must
- * share the dtype. Returns 0 on success, -1 on bad dtype/args. */
+ * share the dtype. Returns 0 on success, -1 on bad dtype/args.
+ * @param node (struct IRNode*)
+ * @param dt (DType)
+ * @return (int)
+ */
 static int cpu_conv2d_generic(struct IRNode* node, DType dt) {
     Tensor* input_t  = node->inputs[0];
     Tensor* weight_t = node->inputs[1];
@@ -1537,12 +1614,22 @@ static int cpu_conv2d_generic(struct IRNode* node, DType dt) {
  * win of fusion. */
 #define FE_BLK 512
 
-/* Resolve one operand ref to a contiguous block pointer of length `bs`.
- *   ref == UNUSED           -> NULL (op ignores it)
- *   ref < 0                 -> prior step result row in tmp (block-local)
- *   ref >= 0, numel==total  -> the external input, contiguous at i0
- *   ref >= 0, numel==1      -> scalar splat into `splat`
- *   ref >= 0, else          -> defensive modulo-broadcast into `splat` */
+/**
+ * Resolve one operand ref to a contiguous block pointer of length `bs`.
+ * ref == UNUSED           -> NULL (op ignores it)
+ * ref < 0                 -> prior step result row in tmp (block-local)
+ * ref >= 0, numel==total  -> the external input, contiguous at i0
+ * ref >= 0, numel==1      -> scalar splat into `splat`
+ * ref >= 0, else          -> defensive modulo-broadcast into `splat`
+ * @param ref (int)
+ * @param ind (const float* const*)
+ * @param innum (const size_t*)
+ * @param tmp (const float*)
+ * @param i0 (size_t)
+ * @param bs (int)
+ * @param splat (float*)
+ * @return (const float*)
+ */
 static inline const float* fused_operand_block(int ref, const float* const* ind,
                                                const size_t* innum, const float* tmp, size_t i0,
                                                int bs, float* splat) {
@@ -1573,8 +1660,18 @@ static inline const float* fused_operand_block(int ref, const float* const* ind,
     return splat;
 }
 
-/* Evaluate one primitive elementwise op over a block. Operand block pointers
- * pa/pb/pc are broadcast-resolved (or NULL if unused). Tight per-op loops. */
+/**
+ * Evaluate one primitive elementwise op over a block. Operand block pointers
+ * pa/pb/pc are broadcast-resolved (or NULL if unused). Tight per-op loops.
+ * @param t (UOpType)
+ * @param pa (const float*)
+ * @param pb (const float*)
+ * @param pc (const float*)
+ * @param k (float)
+ * @param dst (float*)
+ * @param bs (int)
+ * @return (void)
+ */
 static void fused_eval_block(UOpType t, const float* pa, const float* pb, const float* pc, float k,
                              float* dst, int bs) {
     switch (t) {
@@ -1690,8 +1787,16 @@ static void fused_eval_block(UOpType t, const float* pa, const float* pb, const 
     }
 }
 
-/* Scalar evaluation of one fused op (matmul epilogue, applied per output element
- * after the gemm). Mirrors fused_eval_block. */
+/**
+ * Scalar evaluation of one fused op (matmul epilogue, applied per output element
+ * after the gemm). Mirrors fused_eval_block.
+ * @param t (UOpType)
+ * @param a (float)
+ * @param b (float)
+ * @param c (float)
+ * @param k (float)
+ * @return (float)
+ */
 static inline float fe_scalar_eval(UOpType t, float a, float b, float c, float k) {
     switch (t) {
     case UOP_ADD:
@@ -1747,9 +1852,15 @@ static inline float fe_scalar_eval(UOpType t, float a, float b, float c, float k
     }
 }
 
-/* Apply a matmul epilogue (bias-add + activation chain) in-place over the gemm
+/**
+ * Apply a matmul epilogue (bias-add + activation chain) in-place over the gemm
  * output. Operand refs: MATMUL_ACC_REF -> the gemm result out_data[i];
- * >=0 -> epilogue input node->inputs[2+ref] (broadcast); <0 -> prior step. */
+ * >=0 -> epilogue input node->inputs[2+ref] (broadcast); <0 -> prior step.
+ * @param node (struct IRNode*)
+ * @param out_data (float*)
+ * @param total (size_t)
+ * @return (void)
+ */
 void cml_apply_matmul_epilogue(struct IRNode* node, float* out_data, size_t total) {
     FusedElementwiseParams* fp = (FusedElementwiseParams*)node->params;
     if (!fp || fp->num_steps <= 0 || fp->num_steps > 256 || !out_data)
@@ -1998,10 +2109,19 @@ static void cum_axis_f32(const float* in, const Tensor* inp, int dim, float* out
     }
 }
 
-/* General per-axis sort over (outer, count, inner), producing either the sorted
+/**
+ * General per-axis sort over (outer, count, inner), producing either the sorted
  * values or the permutation. SORT/ARGSORT implemented only ndim 1 and 2 and
  * memcpy'd the input first, so for rank 3+ they returned an unsorted copy.
- * Ties keep the earlier index, matching a stable sort. */
+ * Ties keep the earlier index, matching a stable sort.
+ * @param in (const float*)
+ * @param inp (const Tensor*)
+ * @param dim (int)
+ * @param descending (bool)
+ * @param out (float*)
+ * @param want_indices (bool)
+ * @return (int)
+ */
 static int sort_axis_f32(const float* in, const Tensor* inp, int dim, bool descending, float* out,
                          bool want_indices) {
     if (dim < 0)
@@ -2048,11 +2168,19 @@ static int sort_axis_f32(const float* in, const Tensor* inp, int dim, bool desce
     return 0;
 }
 
-/* General movement kernels over (outer, count, inner).
+/**
+ * General movement kernels over (outer, count, inner).
  *
  * ROLL, REPEAT_INTERLEAVE and CAT implemented only ndim 1 and 2 and wrote
  * nothing at all for rank 3+ -- roll and cat returned an all-zero tensor and
- * repeat_interleave a partially written one. */
+ * repeat_interleave a partially written one.
+ * @param t (const Tensor*)
+ * @param dim (int)
+ * @param outer (size_t*)
+ * @param count (size_t*)
+ * @param inner (size_t*)
+ * @return (void)
+ */
 static void movement_lanes(const Tensor* t, int dim, size_t* outer, size_t* count, size_t* inner) {
     size_t o = 1, n = 1;
     for (int i = 0; i < dim; i++)
@@ -2137,10 +2265,20 @@ static void repeat_interleave_axis_f32(const float* in, const Tensor* inp, int r
                         in[(o * count + j) * inner + m];
 }
 
-/* General N-dimensional pad. The previous kernel implemented 1-D and 2-D and
+/**
+ * General N-dimensional pad. The previous kernel implemented 1-D and 2-D and
  * fell back to `out[i] = in[i]` for rank 3+ -- a flat copy that ignored the pad
  * widths entirely and left the tail as whatever the buffer held.
- * pad_widths is [before0, after0, before1, after1, ...]. */
+ * pad_widths is [before0, after0, before1, after1, ...].
+ * @param in (const float*)
+ * @param inp (const Tensor*)
+ * @param out_t (const Tensor*)
+ * @param pad_widths (const int*)
+ * @param mode (PadMode)
+ * @param value (float)
+ * @param out (float*)
+ * @return (void)
+ */
 static void pad_nd_f32(const float* in, const Tensor* inp, const Tensor* out_t,
                        const int* pad_widths, PadMode mode, float value, float* out) {
     int nd = inp->ndim;
@@ -2186,12 +2324,22 @@ static void pad_nd_f32(const float* in, const Tensor* inp, const Tensor* out_t,
     }
 }
 
-/* Diagonal over an arbitrary (dim1, dim2) plane of a rank-N input.
+/**
+ * Diagonal over an arbitrary (dim1, dim2) plane of a rank-N input.
  *
  * The output drops dim2 and reuses dim1's slot for the diagonal index, which is
  * the shape uop_diagonal builds. Decompose each output element into its
  * coordinates, read the diagonal index out of dim1's slot and map the rest
- * straight through. */
+ * straight through.
+ * @param in (const float*)
+ * @param inp (const Tensor*)
+ * @param out_t (const Tensor*)
+ * @param offset (int)
+ * @param dim1 (int)
+ * @param dim2 (int)
+ * @param out (float*)
+ * @return (void)
+ */
 static void diagonal_nd_f32(const float* in, const Tensor* inp, const Tensor* out_t, int offset,
                             int dim1, int dim2, float* out) {
     int nd = inp->ndim;
@@ -2238,9 +2386,19 @@ static void diagonal_nd_f32(const float* in, const Tensor* inp, const Tensor* ou
     }
 }
 
-/* scatter: out = copy of `base`, then out[..., index[j], ...] = src[j] along
+/**
+ * scatter: out = copy of `base`, then out[..., index[j], ...] = src[j] along
  * `dim`, with index and src indexed identically (PyTorch's rule). Every
- * element of index is visited, so this is rank-agnostic. */
+ * element of index is visited, so this is rank-agnostic.
+ * @param base (const float*)
+ * @param idx (const float*)
+ * @param src (const float*)
+ * @param idx_t (const Tensor*)
+ * @param out_t (const Tensor*)
+ * @param dim (int)
+ * @param out (float*)
+ * @return (void)
+ */
 static void scatter_nd_f32(const float* base, const float* idx, const float* src,
                            const Tensor* idx_t, const Tensor* out_t, int dim, float* out) {
     int nd = out_t->ndim;
@@ -2279,8 +2437,15 @@ static void scatter_nd_f32(const float* base, const float* idx, const float* src
     }
 }
 
-/* nonzero: one row of `ndim` coordinates per non-zero element, unused rows
- * filled with -1. Returns the number of elements written. */
+/**
+ * nonzero: one row of `ndim` coordinates per non-zero element, unused rows
+ * filled with -1. Returns the number of elements written.
+ * @param in (const float*)
+ * @param inp (const Tensor*)
+ * @param out_numel (size_t)
+ * @param out (float*)
+ * @return (size_t)
+ */
 static size_t nonzero_nd_f32(const float* in, const Tensor* inp, size_t out_numel, float* out) {
     int nd = inp->ndim;
     if (nd <= 0 || nd > 8)
@@ -2372,9 +2537,14 @@ static void direct_conv_task(void* vd, size_t start, size_t end) {
     }
 }
 
-/* f32 view of an input tensor for the compute-in-f32 fused kernels: returns the
+/**
+ * f32 view of an input tensor for the compute-in-f32 fused kernels: returns the
  * data directly for f32 (zero overhead), else a malloc'd f32 copy (*tmp, caller
- * frees). NULL on alloc/cast failure. */
+ * frees). NULL on alloc/cast failure.
+ * @param t (Tensor*)
+ * @param tmp (float**)
+ * @return (float*)
+ */
 static float* fused_f32_in(Tensor* t, float** tmp) {
     *tmp = NULL;
     if (!t || !t->data)
@@ -2392,8 +2562,13 @@ static float* fused_f32_in(Tensor* t, float** tmp) {
     return b;
 }
 
-/* f32 output buffer: out->data directly for f32, else a malloc'd temp (*tmp) that
- * the caller casts back into out->data and frees. */
+/**
+ * f32 output buffer: out->data directly for f32, else a malloc'd temp (*tmp) that
+ * the caller casts back into out->data and frees.
+ * @param out (Tensor*)
+ * @param tmp (float**)
+ * @return (float*)
+ */
 static float* fused_f32_out(Tensor* out, float** tmp) {
     *tmp = NULL;
     if (!out)
@@ -2405,9 +2580,17 @@ static float* fused_f32_out(Tensor* out, float** tmp) {
     return b;
 }
 
-/* Flat offset into a mask/bias tensor `t` (ndim <= 4) for the logical attention
+/**
+ * Flat offset into a mask/bias tensor `t` (ndim <= 4) for the logical attention
  * score position (b,h,sq,sk), using right-aligned numpy broadcasting (a size-1
- * dim contributes index 0). Used only by the fused SDPA executor. */
+ * dim contributes index 0). Used only by the fused SDPA executor.
+ * @param t (const Tensor*)
+ * @param b (int)
+ * @param h (int)
+ * @param sq (int)
+ * @param sk (int)
+ * @return (size_t)
+ */
 static size_t sdpa_bcast_index(const Tensor* t, int b, int h, int sq, int sk) {
     int coord[4] = {b, h, sq, sk};
     int offset   = 4 - t->ndim;
@@ -2428,10 +2611,16 @@ typedef struct {
     int fast;
 } Im2colData;
 
-/* im2col gather for one (n,c) channel per unit - the channels are disjoint
+/**
+ * im2col gather for one (n,c) channel per unit - the channels are disjoint
  * output columns, so no synchronisation is needed across units. `fast` selects
  * the contiguous (no pad/stride/dilation) path. Mirrors the inner body of the
- * serial executor; parallelising over (n,c) spreads the gather across cores. */
+ * serial executor; parallelising over (n,c) spreads the gather across cores.
+ * @param vd (void*)
+ * @param start (size_t)
+ * @param end (size_t)
+ * @return (void)
+ */
 static void im2col_task(void* vd, size_t start, size_t end) {
     Im2colData* d = (Im2colData*)vd;
     int C = d->C, H = d->H, W = d->W, kh = d->kh, kw = d->kw, OH = d->OH, OW = d->OW;
@@ -2470,7 +2659,8 @@ static void im2col_task(void* vd, size_t start, size_t end) {
     }
 }
 
-/* Give a movement op's output its own contiguous buffer before the kernel
+/**
+ * Give a movement op's output its own contiguous buffer before the kernel
  * writes to it.
  *
  * uop_slice and uop_expand are unusual: each returns a strided *view* of its
@@ -2485,7 +2675,15 @@ static void im2col_task(void* vd, size_t start, size_t end) {
  * result, so an expand of [2,1] -> [2,3] read back as all-zeros.
  *
  * Detaching the output and resetting its view metadata makes the contiguous
- * write and every subsequent read agree. Returns the buffer to write to. */
+ * write and every subsequent read agree. Returns the buffer to write to.
+ * @param in (const Tensor*)
+ * @param layout (const Tensor*)
+ * @param out (const Tensor*)
+ * @param sp (const SliceParams*)
+ * @param i (size_t)
+ * @param src (size_t*)
+ * @return (bool)
+ */
 bool cml_slice_src(const Tensor* in, const Tensor* layout, const Tensor* out, const SliceParams* sp,
                    size_t i, size_t* src) {
     size_t off = layout->storage_offset, rem = i, contig = 1;
@@ -6405,8 +6603,11 @@ void cml_reset_exec_stats(void) {
  * internally to record the fused execution on first sight). */
 static CMLTinyJit* g_tinyjit = NULL;
 
-/* Replay hits on the process-global TinyJit (opt-in TINYJIT_REPLAY path). Lets a
- * test confirm replay actually engaged rather than only that results are correct. */
+/**
+ * Replay hits on the process-global TinyJit (opt-in TINYJIT_REPLAY path). Lets a
+ * test confirm replay actually engaged rather than only that results are correct.
+ * @return (size_t)
+ */
 size_t cml_ir_tinyjit_replay_hits(void) {
     size_t h = 0;
     if (g_tinyjit)
@@ -6429,10 +6630,14 @@ static int cml_tinyjit_active(void) {
     return on;
 }
 
-/* Zero-rebuild static graph: reset the executed flags on computed (op) nodes so
+/**
+ * Zero-rebuild static graph: reset the executed flags on computed (op) nodes so
  * the next execute re-runs them on the current input-buffer contents, reusing
  * the existing nodes and output buffers. Leaves (num_inputs==0: inputs/weights)
- * keep their materialized data. */
+ * keep their materialized data.
+ * @param ir (CMLGraph_t)
+ * @return (void)
+ */
 void cml_ir_clear_executed(CMLGraph_t ir) {
     if (!ir)
         return;
@@ -6446,13 +6651,17 @@ void cml_ir_clear_executed(CMLGraph_t ir) {
     ir->is_executed = false;
 }
 
-/* Re-run an already-built graph after its input/weight buffers were overwritten,
+/**
+ * Re-run an already-built graph after its input/weight buffers were overwritten,
  * WITHOUT rebuilding it - the zero-rebuild static-graph step. Recomputes every op
  * node directly via cpu_execute_ir (the fusion path when enabled); does NOT go
  * through cml_ir_execute, whose TinyJit replay would return the values recorded on
  * the first run instead of recomputing from the updated buffers. The graph is
  * already decomposed + fused from the first execute, so this only re-runs kernels
- * - no decompose, no fusion pass, no node allocation. */
+ * - no decompose, no fusion pass, no node allocation.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_reexecute(CMLGraph_t ir) {
     if (!ir)
         return -1;
@@ -6509,12 +6718,17 @@ int cml_ir_execute_cpu(CMLGraph_t ir) {
     return cpu_execute_ir(ir);
 }
 
-/* Resolve BACKEND= once through the canonical dispatch parser so every
+/**
+ * Resolve BACKEND= once through the canonical dispatch parser so every
  * execution entry point honors the same backend set. Previously
  * cml_ir_execute only recognized "opencl" and cml_ir_execute_up_to only
  * metal/opencl, silently ignoring cuda/rocm/vulkan/nv/am/nir/webgpu. Returns
  * the requested backend (CML_BACKEND_CPU_FALLBACK when unset/unparseable -
- * never a GPU route) and the dispatch context to run it on. */
+ * never a GPU route) and the dispatch context to run it on.
+ * @param out_backend (CMLBackendType*)
+ * @param out_ctx (CMLDispatchContext**)
+ * @return (int)
+ */
 static int ir_resolve_env_backend(CMLBackendType* out_backend, CMLDispatchContext** out_ctx) {
     static int resolved             = 0;
     static CMLBackendType backend   = CML_BACKEND_CPU_FALLBACK;

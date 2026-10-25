@@ -14,16 +14,25 @@ extern "C" {
  * Allocations are at least 16-byte aligned (64-byte for >=64B requests when possible).
  */
 
-/* Core replacements */
+/**
+ * Core replacements
+ * @param size (size_t)
+ * @return (void*)
+ */
 void* cml_malloc(size_t size);
 void* cml_calloc(size_t nmemb, size_t size);
 void* cml_realloc(void* ptr, size_t new_size);
 void cml_free(void* ptr);
 
-/* String helper */
+/**
+ * String helper
+ * @param s (const char*)
+ * @return (char*)
+ */
 char* cml_strdup(const char* s);
 
-/* Aligned allocation (alignment must be power of two, >= 16).
+/**
+ * Aligned allocation (alignment must be power of two, >= 16).
  *
  * IMPORTANT: pointers returned by cml_aligned_alloc() MUST be freed with
  * cml_aligned_free(), not cml_free().
@@ -41,26 +50,41 @@ char* cml_strdup(const char* s);
  * Also never mix system malloc/calloc/aligned_alloc/posix_memalign pointers
  * with cml_free() or cml_aligned_free() - those must go through the matching
  * system free() (or cml_malloc/cml_aligned_alloc equivalents end-to-end).
+ * @param size (size_t)
+ * @param alignment (size_t)
+ * @return (void*)
  */
 void* cml_aligned_alloc(size_t size, size_t alignment);
 void cml_aligned_free(void* ptr);
 
-/* Stats (approximate, racy) */
+/**
+ * Stats (approximate, racy)
+ * @param bytes_allocated (size_t*)
+ * @param peak_bytes (size_t*)
+ * @param alloc_count (size_t*)
+ * @return (void)
+ */
 void cml_allocator_get_stats(size_t* bytes_allocated, size_t* peak_bytes, size_t* alloc_count);
 
-/* Optional: flush this thread's caches back to central (call before thread exit if desired) */
+/**
+ * Optional: flush this thread's caches back to central (call before thread exit if desired)
+ * @return (void)
+ */
 void cml_allocator_flush_thread_cache(void);
 
-/* Fault injection for simulation / OOM testing.
+/**
+ * Fault injection for simulation / OOM testing.
  *
  * cml_malloc_fault_after(n): the next n successful allocations succeed normally;
- *   the (n+1)-th call returns NULL (simulates OOM).  n=0 → fail immediately.
- *   Call cml_malloc_fault_reset() to disable.
+ * the (n+1)-th call returns NULL (simulates OOM).  n=0 → fail immediately.
+ * Call cml_malloc_fault_reset() to disable.
  *
  * cml_malloc_fault_reset(): disable fault injection (default state).
  *
  * cml_malloc_alloc_index(): returns how many allocations have been made since
- *   the last reset - useful to binary-search for the failing site.
+ * the last reset - useful to binary-search for the failing site.
+ * @param n (int)
+ * @return (void)
  */
 void cml_malloc_fault_after(int n);
 void cml_malloc_fault_reset(void);

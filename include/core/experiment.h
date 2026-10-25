@@ -27,66 +27,174 @@ extern "C" {
 
 typedef struct CMLRun CMLRun;
 
-/* Start a run. project/name may be NULL (defaults applied). config_json is an
+/**
+ * Start a run. project/name may be NULL (defaults applied). config_json is an
  * optional JSON object string of hyperparameters, e.g. "{\"lr\":0.01}".
  * Returns NULL on failure. Root dir defaults to ./.cml/experiments (override
- * with the CML_EXP_DIR env var). */
+ * with the CML_EXP_DIR env var).
+ * @param project (const char*)
+ * @param name (const char*)
+ * @param config_json (const char*)
+ * @return (CMLRun*)
+ */
 CMLRun* cml_exp_run_init(const char* project, const char* name, const char* config_json);
 
-/* Tag a run as part of a sweep (shows up in parallel-coordinates). */
+/**
+ * Tag a run as part of a sweep (shows up in parallel-coordinates).
+ * @param run (CMLRun*)
+ * @param sweep_id (const char*)
+ * @return (void)
+ */
 void cml_exp_set_sweep(CMLRun* run, const char* sweep_id);
 
-/* L1: log a scalar metric at a training step. */
+/**
+ * L1: log a scalar metric at a training step.
+ * @param run (CMLRun*)
+ * @param name (const char*)
+ * @param step (long)
+ * @param value (double)
+ * @return (void)
+ */
 void cml_exp_log_scalar(CMLRun* run, const char* name, long step, double value);
 
-/* L4: add/replace a config key (value_json is a raw JSON scalar/string). */
+/**
+ * L4: add/replace a config key (value_json is a raw JSON scalar/string).
+ * @param run (CMLRun*)
+ * @param key (const char*)
+ * @param value_json (const char*)
+ * @return (void)
+ */
 void cml_exp_config_set(CMLRun* run, const char* key, const char* value_json);
 
-/* L6: log a histogram of raw values (binned into `bins` buckets in C). */
+/**
+ * L6: log a histogram of raw values (binned into `bins` buckets in C).
+ * @param run (CMLRun*)
+ * @param name (const char*)
+ * @param step (long)
+ * @param values (const float*)
+ * @param n (size_t)
+ * @param bins (int)
+ * @return (void)
+ */
 void cml_exp_log_histogram(CMLRun* run, const char* name, long step, const float* values, size_t n,
                            int bins);
 
-/* L7: sample this process's CPU%/RSS from /proc and log them at `step`. */
+/**
+ * L7: sample this process's CPU%/RSS from /proc and log them at `step`.
+ * @param run (CMLRun*)
+ * @param step (long)
+ * @return (void)
+ */
 void cml_exp_log_system(CMLRun* run, long step);
 
-/* L8: log an RGB image (row-major, 3 bytes/pixel). Stored raw; the UI renders
- * it onto a canvas. Good for confusion matrices, weight visualizations, etc. */
+/**
+ * L8: log an RGB image (row-major, 3 bytes/pixel). Stored raw; the UI renders
+ * it onto a canvas. Good for confusion matrices, weight visualizations, etc.
+ * @param run (CMLRun*)
+ * @param name (const char*)
+ * @param step (long)
+ * @param rgb (const unsigned char*)
+ * @param width (int)
+ * @param height (int)
+ * @return (void)
+ */
 void cml_exp_log_image(CMLRun* run, const char* name, long step, const unsigned char* rgb,
                        int width, int height);
 
-/* L8b: log a small table as CSV text (first row = header). */
+/**
+ * L8b: log a small table as CSV text (first row = header).
+ * @param run (CMLRun*)
+ * @param name (const char*)
+ * @param step (long)
+ * @param csv (const char*)
+ * @return (void)
+ */
 void cml_exp_log_table(CMLRun* run, const char* name, long step, const char* csv);
 
-/* L10: record an artifact (model/dataset) by path; size + fnv hash captured.
+/**
+ * L10: record an artifact (model/dataset) by path; size + fnv hash captured.
  * aliases is an optional comma-separated list (e.g. "latest,best") for the
- * model registry; may be NULL. */
+ * model registry; may be NULL.
+ * @param run (CMLRun*)
+ * @param name (const char*)
+ * @param type (const char*)
+ * @param path (const char*)
+ * @param aliases (const char*)
+ * @return (void)
+ */
 void cml_exp_log_artifact(CMLRun* run, const char* name, const char* type, const char* path,
                           const char* aliases);
 
 /* Run management (W&B parity extras) --------------------------------------- */
-/* Tag a run (repeatable); tags drive filtering/grouping in the UI. */
+/**
+ * Tag a run (repeatable); tags drive filtering/grouping in the UI.
+ * @param run (CMLRun*)
+ * @param tag (const char*)
+ * @return (void)
+ */
 void cml_exp_add_tag(CMLRun* run, const char* tag);
-/* Free-form markdown notes shown on the run's overview. */
+/**
+ * Free-form markdown notes shown on the run's overview.
+ * @param run (CMLRun*)
+ * @param notes (const char*)
+ * @return (void)
+ */
 void cml_exp_set_notes(CMLRun* run, const char* notes);
-/* Capture a line of console output (stdout/stderr) for the Logs tab. */
+/**
+ * Capture a line of console output (stdout/stderr) for the Logs tab.
+ * @param run (CMLRun*)
+ * @param line (const char*)
+ * @return (void)
+ */
 void cml_exp_log_console(CMLRun* run, const char* line);
-/* Set a custom summary value (the "final" number shown in the run table). */
+/**
+ * Set a custom summary value (the "final" number shown in the run table).
+ * @param run (CMLRun*)
+ * @param key (const char*)
+ * @param value (double)
+ * @return (void)
+ */
 void cml_exp_summary_set(CMLRun* run, const char* key, double value);
 
-/* Raise an alert (level: "info"/"warn"/"error") - surfaces in the Alerts tab
- * and can flag diverging/NaN runs. */
+/**
+ * Raise an alert (level: "info"/"warn"/"error") - surfaces in the Alerts tab
+ * and can flag diverging/NaN runs.
+ * @param run (CMLRun*)
+ * @param level (const char*)
+ * @param message (const char*)
+ * @return (void)
+ */
 void cml_exp_alert(CMLRun* run, const char* level, const char* message);
 
-/* Log an x/y curve (PR curve, ROC, calibration, ...). Rendered as a line plot
- * in the Curves tab. xlabel/ylabel are axis titles (may be NULL). */
+/**
+ * Log an x/y curve (PR curve, ROC, calibration, ...). Rendered as a line plot
+ * in the Curves tab. xlabel/ylabel are axis titles (may be NULL).
+ * @param run (CMLRun*)
+ * @param name (const char*)
+ * @param xlabel (const char*)
+ * @param ylabel (const char*)
+ * @param xs (const float*)
+ * @param ys (const float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void cml_exp_log_curve(CMLRun* run, const char* name, const char* xlabel, const char* ylabel,
                        const float* xs, const float* ys, size_t n);
 
-/* Mark the run finished ("finished"/"crashed"/...) and flush. Also records
- * end time + duration + captured summary. */
+/**
+ * Mark the run finished ("finished"/"crashed"/...) and flush. Also records
+ * end time + duration + captured summary.
+ * @param run (CMLRun*)
+ * @param status (const char*)
+ * @return (void)
+ */
 void cml_exp_run_finish(CMLRun* run, const char* status);
 
-/* Accessor: the run's id (stable string). */
+/**
+ * Accessor: the run's id (stable string).
+ * @param run (const CMLRun*)
+ * @return (const char*)
+ */
 const char* cml_exp_run_id(const CMLRun* run);
 
 #ifdef __cplusplus

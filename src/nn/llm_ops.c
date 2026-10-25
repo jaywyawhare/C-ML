@@ -481,8 +481,17 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
     return result;
 }
 
-/* Append this step's K/V rows -- laid out [seq_new, kv_heads, head_dim] -- to
- * `kv_cache`. Returns the new cache length, or -1 on failure. */
+/**
+ * Append this step's K/V rows -- laid out [seq_new, kv_heads, head_dim] -- to
+ * `kv_cache`. Returns the new cache length, or -1 on failure.
+ * @param kv_cache (CMLKVCache*)
+ * @param k_data (float*)
+ * @param v_data (float*)
+ * @param seq_new (int)
+ * @param kv_heads (int)
+ * @param head_dim (int)
+ * @return (int)
+ */
 static int kv_cache_append_step(CMLKVCache* kv_cache, float* k_data, float* v_data, int seq_new,
                                 int kv_heads, int head_dim) {
     int kv_shape[]   = {seq_new, kv_heads, head_dim};

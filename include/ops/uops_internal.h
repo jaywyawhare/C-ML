@@ -14,7 +14,15 @@
 extern "C" {
 #endif
 
-/* Finalize the graph's tail node as a fresh source tensor of the given shape. */
+/**
+ * Finalize the graph's tail node as a fresh source tensor of the given shape.
+ * @param ir (CMLGraph_t)
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* cml_uop_finish_source_node(CMLGraph_t ir, const int* shape, int ndim, DType dtype,
                                    DeviceType device);
 

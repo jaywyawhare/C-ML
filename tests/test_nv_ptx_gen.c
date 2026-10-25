@@ -31,7 +31,12 @@ static void fail(const char* name, const char* why) {
     failures++;
 }
 
-/* Build a one-node graph for `op` and return its PTX. */
+/**
+ * Build a one-node graph for `op` and return its PTX.
+ * @param op (UOpType)
+ * @param nargs (int)
+ * @return (char*)
+ */
 static char* ptx_for(UOpType op, int nargs) {
     TensorConfig c = {
         .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
@@ -100,7 +105,15 @@ static char* ptx_for(UOpType op, int nargs) {
     return cml_nv_gen_ptx_for_node((struct IRNode*)r->ir_node, 50);
 }
 
-/* `need` must appear; `banned` (if given) must not. */
+/**
+ * `need` must appear; `banned` (if given) must not.
+ * @param name (const char*)
+ * @param op (UOpType)
+ * @param nargs (int)
+ * @param need (const char*)
+ * @param banned (const char*)
+ * @return (void)
+ */
 static void check(const char* name, UOpType op, int nargs, const char* need, const char* banned) {
     checks++;
     char* ptx = ptx_for(op, nargs);

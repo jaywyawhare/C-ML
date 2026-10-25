@@ -54,8 +54,15 @@ typedef struct CMLSPIRVCodegen {
 CMLSPIRVCodegen* cml_spirv_codegen_create(void);
 void cml_spirv_codegen_destroy(CMLSPIRVCodegen* cg);
 
-/* Each function returns a heap-allocated uint32_t array of SPIR-V words.
-   Caller must free(). out_size is set to the size in bytes. */
+/**
+ * Each function returns a heap-allocated uint32_t array of SPIR-V words.
+ * Caller must free(). out_size is set to the size in bytes.
+ * @param cg (CMLSPIRVCodegen*)
+ * @param op (UOpType)
+ * @param name (const char*)
+ * @param out_size (size_t*)
+ * @return (uint32_t*)
+ */
 uint32_t* cml_spirv_gen_unary(CMLSPIRVCodegen* cg, UOpType op, const char* name, size_t* out_size);
 uint32_t* cml_spirv_gen_binary(CMLSPIRVCodegen* cg, UOpType op, const char* name, size_t* out_size);
 uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* name,

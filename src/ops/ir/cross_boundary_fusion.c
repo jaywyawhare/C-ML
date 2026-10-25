@@ -7,10 +7,10 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/*
+/**
  * Softmax + CrossEntropy pattern:
- *   Forward: exp(x) -> sum(exp(x)) -> div -> softmax output
- *   Backward: softmax(x) - one_hot(target)
+ * Forward: exp(x) -> sum(exp(x)) -> div -> softmax output
+ * Backward: softmax(x) - one_hot(target)
  *
  * The fused kernel computes softmax in the forward pass and holds the
  * result in registers. The backward pass becomes a single subtraction.
@@ -18,6 +18,9 @@
  * Detection: look for EXP -> SUM -> RECIP -> MUL chain (softmax decomposition)
  * followed by a backward node that consumes the softmax output and a
  * one-hot target to produce gradients via SUB.
+ * @param node (struct IRNode*)
+ * @param chain_len (int*)
+ * @return (bool)
  */
 static bool match_softmax_sequence(struct IRNode* node, int* chain_len) {
     if (!node || node->type != UOP_EXP)
@@ -45,12 +48,15 @@ static bool match_softmax_sequence(struct IRNode* node, int* chain_len) {
     return true;
 }
 
-/*
+/**
  * LayerNorm pattern:
- *   Forward: mean(x) -> sub -> square -> mean -> add(eps) -> rsqrt -> mul -> scale+bias
- *   Backward: needs mean and variance, which we keep in registers
+ * Forward: mean(x) -> sub -> square -> mean -> add(eps) -> rsqrt -> mul -> scale+bias
+ * Backward: needs mean and variance, which we keep in registers
  *
  * Detection: MEAN -> SUB chain with the SUB feeding into SQUARE -> MEAN -> RSQRT.
+ * @param node (struct IRNode*)
+ * @param chain_len (int*)
+ * @return (bool)
  */
 static bool match_layernorm_sequence(struct IRNode* node, int* chain_len) {
     if (!node || node->type != UOP_MEAN)
@@ -84,16 +90,19 @@ static bool match_layernorm_sequence(struct IRNode* node, int* chain_len) {
     return true;
 }
 
-/*
+/**
  * GELU pattern (approximate):
- *   x * sigmoid(1.702 * x)  -- this is UOP_QUICK_GELU
- *   or: x * 0.5 * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
+ * x * sigmoid(1.702 * x)  -- this is UOP_QUICK_GELU
+ * or: x * 0.5 * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
  *
  * For the backward pass, the sigmoid intermediate is needed.
  * If we detect QUICK_GELU or a MUL -> SIGMOID chain, we can
  * fuse forward+backward to reuse the sigmoid value.
  *
  * Detection: MUL node whose one input feeds through SIGMOID.
+ * @param node (struct IRNode*)
+ * @param chain_len (int*)
+ * @return (bool)
  */
 static bool match_gelu_sequence(struct IRNode* node, int* chain_len) {
     if (!node)
@@ -136,11 +145,13 @@ static bool match_gelu_sequence(struct IRNode* node, int* chain_len) {
     return false;
 }
 
-/*
+/**
  * Check if a forward node's output is consumed only by its
  * corresponding backward node(s). This is the primary criterion
  * for cross-boundary fusion: if no other forward node needs the
  * intermediate, we can keep it in registers.
+ * @param fwd_node (struct IRNode*)
+ * @return (bool)
  */
 static bool output_only_consumed_by_backward(struct IRNode* fwd_node) {
     if (!fwd_node || !fwd_node->output)
@@ -179,8 +190,14 @@ static int find_node_index_in_schedule(CMLFusionSchedule* sched, struct IRNode* 
     return -1;
 }
 
-/* Scan the schedule for softmax/layernorm/GELU forward nodes whose output is consumed only
- * by their backward counterpart, recording each as a cross-boundary fusion candidate. */
+/**
+ * Scan the schedule for softmax/layernorm/GELU forward nodes whose output is consumed only
+ * by their backward counterpart, recording each as a cross-boundary fusion candidate.
+ * @param sched (CMLFusionSchedule*)
+ * @param out (CMLCrossBoundaryFusion**)
+ * @param count (int*)
+ * @return (int)
+ */
 int cml_cross_boundary_analyze(CMLFusionSchedule* sched, CMLCrossBoundaryFusion** out, int* count) {
     if (!sched || !out || !count)
         return -1;
@@ -265,12 +282,16 @@ int cml_cross_boundary_analyze(CMLFusionSchedule* sched, CMLCrossBoundaryFusion*
     return 0;
 }
 
-/*
+/**
  * Apply cross-boundary fusions by merging forward+backward schedule items.
  * For each fusion:
- *   - Mark forward nodes as fused with their backward counterparts
- *   - Set fusion metadata so the codegen can emit combined kernels
- *   - Update memory estimates (register-kept intermediates save bandwidth)
+ * - Mark forward nodes as fused with their backward counterparts
+ * - Set fusion metadata so the codegen can emit combined kernels
+ * - Update memory estimates (register-kept intermediates save bandwidth)
+ * @param sched (CMLFusionSchedule*)
+ * @param fusions (CMLCrossBoundaryFusion*)
+ * @param count (int)
+ * @return (int)
  */
 int cml_cross_boundary_fuse(CMLFusionSchedule* sched, CMLCrossBoundaryFusion* fusions, int count) {
     if (!sched || !fusions || count <= 0)

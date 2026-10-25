@@ -587,9 +587,15 @@ Tensor* tensor_kl_div_loss(Tensor* input, Tensor* target) {
     return uop_sum(diff, &reduce_params);
 }
 
-/* Per-sample sparse cross-entropy over the last axis:
+/**
+ * Per-sample sparse cross-entropy over the last axis:
  * -input[target] + log(sum(exp(input))). When `log_sum_exp_out` is non-NULL the
- * log-sum-exp term is returned through it (the smoothing variant reuses it). */
+ * log-sum-exp term is returned through it (the smoothing variant reuses it).
+ * @param input (Tensor*)
+ * @param target (Tensor*)
+ * @param log_sum_exp_out (Tensor**)
+ * @return (Tensor*)
+ */
 static Tensor* ce_loss_per_sample(Tensor* input, Tensor* target, Tensor** log_sum_exp_out) {
     Tensor* target_logits = uop_gather(input, target, -1);
     if (!target_logits)
@@ -797,8 +803,14 @@ Tensor* tensor_cosine_embedding_loss(Tensor* x1, Tensor* x2, Tensor* target, flo
     return uop_add(uop_mul(weight_pos, pos_loss), uop_mul(weight_neg, neg_loss));
 }
 
-/* Blend the plain cross-entropy against its uniform-target counterpart:
- * (1 - eps) * ce + eps * uniform. */
+/**
+ * Blend the plain cross-entropy against its uniform-target counterpart:
+ * (1 - eps) * ce + eps * uniform.
+ * @param ce_loss (Tensor*)
+ * @param uniform_loss (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 static Tensor* blend_label_smoothing(Tensor* ce_loss, Tensor* uniform_loss, float eps) {
     int scalar_shape[]    = {1};
     Tensor* one_minus_eps = uop_fill(scalar_shape, 1, 1.0f - eps);

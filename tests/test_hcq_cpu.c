@@ -23,7 +23,12 @@ static int check(const char* name, int ok) {
     return ok;
 }
 
-/* A real CPU kernel: out[i] = a[i] + b[i]. */
+/**
+ * A real CPU kernel: out[i] = a[i] + b[i].
+ * @param args (void**)
+ * @param num_args (int)
+ * @return (void)
+ */
 static void vadd_kernel(void** args, int num_args) {
     if (num_args < 4)
         return;

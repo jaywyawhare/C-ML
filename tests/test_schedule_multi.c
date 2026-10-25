@@ -20,7 +20,10 @@
 #include "test_harness.h"
 #include "test_require.h"
 
-/* A small graph with enough kernels to spread over several devices. */
+/**
+ * A small graph with enough kernels to spread over several devices.
+ * @return (CMLSchedule*)
+ */
 static CMLSchedule* build_schedule(void) {
     float ad[8], bd[8];
     for (int i = 0; i < 8; i++) {
@@ -67,9 +70,12 @@ static bool test_build_and_free(void) {
     return ok;
 }
 
-/* Every kernel in the source schedule must land on exactly one device -- a
+/**
+ * Every kernel in the source schedule must land on exactly one device -- a
  * partition that dropped or duplicated kernels would still "work" but compute
- * the wrong thing. */
+ * the wrong thing.
+ * @return (bool)
+ */
 static bool test_partition_preserves_kernel_count(void) {
     CMLSchedule* s = build_schedule();
     if (!s) {
@@ -95,7 +101,10 @@ static bool test_partition_preserves_kernel_count(void) {
     return ok;
 }
 
-/* One device means nothing crosses a device boundary. */
+/**
+ * One device means nothing crosses a device boundary.
+ * @return (bool)
+ */
 static bool test_single_device_needs_no_transfers(void) {
     CMLSchedule* s = build_schedule();
     if (!s) {
@@ -125,7 +134,10 @@ static bool test_single_device_needs_no_transfers(void) {
     return ok;
 }
 
-/* run() must not report success for compute steps it cannot execute. */
+/**
+ * run() must not report success for compute steps it cannot execute.
+ * @return (bool)
+ */
 static bool test_run_refuses_compute_steps(void) {
     CMLSchedule* s = build_schedule();
     if (!s) {

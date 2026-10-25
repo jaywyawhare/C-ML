@@ -3,8 +3,11 @@
 #include <string.h>
 #include <stdint.h>
 
-/* No AMX path is wired up on any target yet: both Apple AMX and the x86
- * AMX-TILE tiles fall back to the generic matmul. */
+/**
+ * No AMX path is wired up on any target yet: both Apple AMX and the x86
+ * AMX-TILE tiles fall back to the generic matmul.
+ * @return (bool)
+ */
 bool cml_amx_available(void) { return false; }
 
 /**

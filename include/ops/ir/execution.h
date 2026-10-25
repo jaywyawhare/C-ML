@@ -10,12 +10,19 @@ extern "C" {
 
 int cml_ir_execute(CMLGraph_t ir);
 
-/* Replay-hit count on the global TinyJit (TINYJIT_REPLAY path); for tests. */
+/**
+ * Replay-hit count on the global TinyJit (TINYJIT_REPLAY path); for tests.
+ * @return (size_t)
+ */
 size_t cml_ir_tinyjit_replay_hits(void);
 int cml_ir_execute_cpu(CMLGraph_t ir);
 
-/* Simple scalar interpreter used as a fallback when other backends
-   are not available or fail. */
+/**
+ * Simple scalar interpreter used as a fallback when other backends
+ * are not available or fail.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cpu_execute_ir(CMLGraph_t ir);
 
 /**
@@ -24,66 +31,114 @@ int cpu_execute_ir(CMLGraph_t ir);
  */
 void cml_cpu_execute_cache_reset(void);
 
-/* Executes up to and including the target node (for lazy evaluation). */
+/**
+ * Executes up to and including the target node (for lazy evaluation).
+ * @param ir (CMLGraph_t)
+ * @param target_node (struct IRNode*)
+ * @return (int)
+ */
 int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node);
 
 void cml_print_exec_stats(void);
 void cml_reset_exec_stats(void);
 
-/* Uses cached buffers when available, otherwise allocates new memory.
-   Buffers are allocated in power-of-2 size buckets for efficient reuse. */
+/**
+ * Uses cached buffers when available, otherwise allocates new memory.
+ * Buffers are allocated in power-of-2 size buckets for efficient reuse.
+ * @param size (size_t)
+ * @return (void*)
+ */
 void* cml_buffer_cache_alloc(size_t size);
 
-/* Returns buffer to cache for future reuse. If cache is full, frees memory. */
+/**
+ * Returns buffer to cache for future reuse. If cache is full, frees memory.
+ * @param ptr (void*)
+ * @param size (size_t)
+ * @return (void)
+ */
 void cml_buffer_cache_free(void* ptr, size_t size);
 
 void cml_print_buffer_cache_stats(void);
 void cml_cleanup_buffer_cache(void);
-/* Destroys the underlying TLSF execution pool.  Must be called only after
- * all tensors with buffer-cache-allocated data have been freed. */
+/**
+ * Destroys the underlying TLSF execution pool.  Must be called only after
+ * all tensors with buffer-cache-allocated data have been freed.
+ * @return (void)
+ */
 void cml_exec_pool_shutdown(void);
 
-/* On first call: records kernel launch sequence.
-   On subsequent calls with same graph structure: replays without re-scheduling. */
+/**
+ * On first call: records kernel launch sequence.
+ * On subsequent calls with same graph structure: replays without re-scheduling.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_execute_traced(CMLGraph_t ir);
 
-/* Fused CPU scheduler entrypoint. */
+/**
+ * Fused CPU scheduler entrypoint.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_execute_fusion(CMLGraph_t ir);
 
-/* Whether operator fusion should run: off under NOOPT=1, DISABLE_FUSION=1 or
+/**
+ * Whether operator fusion should run: off under NOOPT=1, DISABLE_FUSION=1 or
  * FUSION_SCHEDULER=0. The fusers below check this themselves, so callers only
- * need it to skip work they would otherwise do on fusion's behalf. */
+ * need it to skip work they would otherwise do on fusion's behalf.
+ * @return (int)
+ */
 int cml_ir_fusion_enabled(void);
 
-/* Real elementwise kernel fusion: collapse maximal single-use elementwise
+/**
+ * Real elementwise kernel fusion: collapse maximal single-use elementwise
  * chains into UOP_FUSED_ELEMENTWISE nodes. Returns the number of chains fused
  * (0 when fusion is disabled). Mutates the graph in place; safe to run after
- * decompose + autodiff. */
+ * decompose + autodiff.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_fuse_elementwise(CMLGraph_t ir);
 
-/* Allow the fuser to fuse requires_grad (forward) chains too - only safe when
+/**
+ * Allow the fuser to fuse requires_grad (forward) chains too - only safe when
  * the full fwd+bwd graph is present so use_count reflects backward refs.
- * tensor_backward sets it around the combined-graph execute; off by default. */
+ * tensor_backward sets it around the combined-graph execute; off by default.
+ * @param on (int)
+ * @return (void)
+ */
 void cml_ir_fuse_set_allow_grad(int on);
 
-/* Matmul epilogue fusion: fold a single-use elementwise (bias+activation) chain
+/**
+ * Matmul epilogue fusion: fold a single-use elementwise (bias+activation) chain
  * that consumes a gemm output back INTO the matmul node (applied in-place to the
  * M*N result by every backend). Run after cml_ir_fuse_elementwise. Returns the
- * number of matmuls that gained an epilogue. */
+ * number of matmuls that gained an epilogue.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_fuse_matmul_epilogue(CMLGraph_t ir);
 
-/* Mark every computed (op) node in the graph as not-yet-executed so the next
+/**
+ * Mark every computed (op) node in the graph as not-yet-executed so the next
  * cml_ir_execute re-runs it, WITHOUT rebuilding the graph. Leaf/data nodes
  * (num_inputs==0 - inputs, weights) keep their materialized buffers. This is the
  * primitive behind a zero-rebuild "static graph": build the graph once, then each
  * iteration overwrite the input buffers, cml_ir_clear_executed(ir), and
- * cml_ir_execute(ir) - no new IR nodes are allocated. */
+ * cml_ir_execute(ir) - no new IR nodes are allocated.
+ * @param ir (CMLGraph_t)
+ * @return (void)
+ */
 void cml_ir_clear_executed(CMLGraph_t ir);
 
-/* Zero-rebuild re-run of an already-built static graph after overwriting its
+/**
+ * Zero-rebuild re-run of an already-built static graph after overwriting its
  * input/weight buffers: clears executed flags and recomputes via cpu_execute_ir
  * (fusion path when on), bypassing TinyJit's replay (which would return the
- * first-run values instead of recomputing). No decompose/fusion/allocation. */
+ * first-run values instead of recomputing). No decompose/fusion/allocation.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_reexecute(CMLGraph_t ir);
 
 #ifdef __cplusplus

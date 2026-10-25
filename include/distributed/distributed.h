@@ -80,8 +80,14 @@ int cml_dist_allgather(Tensor** output, Tensor* input);
 
 int cml_dist_barrier(void);
 
-/* Point-to-point (used by pipeline parallelism). `tag` pairs a send with its
- * matching recv. Both sides must agree on the tensor's element count. */
+/**
+ * Point-to-point (used by pipeline parallelism). `tag` pairs a send with its
+ * matching recv. Both sides must agree on the tensor's element count.
+ * @param tensor (Tensor*)
+ * @param dst_rank (int)
+ * @param tag (int)
+ * @return (int)
+ */
 int cml_dist_send(Tensor* tensor, int dst_rank, int tag);
 
 int cml_dist_recv(Tensor* tensor, int src_rank, int tag);

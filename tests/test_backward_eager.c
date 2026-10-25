@@ -26,14 +26,27 @@ static void fill(Tensor* t, const float* xs) {
 
 static float read_at(Tensor* t, size_t i) { return ((float*)tensor_data_ptr(t))[i]; }
 
-/* Sum of op(x) as a scalar loss - the standard hook to differentiate. */
+/**
+ * Sum of op(x) as a scalar loss - the standard hook to differentiate.
+ * @param y (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* sum_loss(Tensor* y) {
     ReduceParams rp = {0};
     return uop_sum(y, &rp);
 }
 
-/* Central finite difference of loss(op(x)) w.r.t. x[idx]. Rebuilds the graph
- * each call (eager mode keeps no state across resets). */
+/**
+ * Central finite difference of loss(op(x)) w.r.t. x[idx]. Rebuilds the graph
+ * each call (eager mode keeps no state across resets).
+ * @param op (Tensor* (*)(Tensor*))
+ * @param xs (const float*)
+ * @param n (int)
+ * @param idx (int)
+ * @param eps (float)
+ * @param ndim (int)
+ * @return (float)
+ */
 static float numeric_grad(Tensor* (*op)(Tensor*), const float* xs, int n, int idx, float eps,
                           int ndim) {
     int sh[2] = {g_rows, g_cols};
@@ -203,7 +216,10 @@ static int test_eager_matmul_reduce(void) {
     return ok;
 }
 
-/* Gradient ACCUMULATION: two backwards without zeroing must sum. */
+/**
+ * Gradient ACCUMULATION: two backwards without zeroing must sum.
+ * @return (int)
+ */
 static int test_eager_accumulation(void) {
     cml_reset_ir_context();
     int sh[2] = {g_rows, g_cols};
@@ -244,7 +260,10 @@ static int test_eager_accumulation(void) {
     return ok;
 }
 
-/* Custom upstream gradient: d L/d y given explicitly flows back as grad*y'. */
+/**
+ * Custom upstream gradient: d L/d y given explicitly flows back as grad*y'.
+ * @return (int)
+ */
 static int test_eager_custom_seed(void) {
     cml_reset_ir_context();
     int sh[2]   = {g_rows, g_cols};
@@ -274,8 +293,11 @@ static int test_eager_custom_seed(void) {
     return ok;
 }
 
-/* Loss-rooted pruning: an auxiliary branch with requires_grad that does NOT
- * feed the loss must not receive gradients (and must not crash). */
+/**
+ * Loss-rooted pruning: an auxiliary branch with requires_grad that does NOT
+ * feed the loss must not receive gradients (and must not crash).
+ * @return (int)
+ */
 static int test_eager_detached_branch(void) {
     cml_reset_ir_context();
     int sh[2] = {g_rows, g_cols};
@@ -478,8 +500,12 @@ static int test_vjp_sweep_unary(void) {
     return ok && ran >= 30;
 }
 
-/* reductions and shape ops: gradient of sum over op is all-ones through the
- * VJP; verify against numeric where meaningful. */
+/**
+ * reductions and shape ops: gradient of sum over op is all-ones through the
+ * VJP; verify against numeric where meaningful.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* v_mean(Tensor* x) {
     ReduceParams rp = {0};
     return uop_mean(x, &rp);

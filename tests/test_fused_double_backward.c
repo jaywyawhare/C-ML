@@ -19,8 +19,12 @@
 static TensorConfig CFG = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
-/* Returns: 1 = grad exists and is differentiable, 0 = grad exists but not
- * differentiable, -1 = no grad / crash-free failure. */
+/**
+ * Returns: 1 = grad exists and is differentiable, 0 = grad exists but not
+ * differentiable, -1 = no grad / crash-free failure.
+ * @param make (Tensor* (*)(Tensor*))
+ * @return (int)
+ */
 static int probe(Tensor* (*make)(Tensor*)) {
     float xd[D]      = {0.3f, -0.2f, 0.5f, 0.1f};
     int s[]          = {1, D};
@@ -44,9 +48,15 @@ static int probe(Tensor* (*make)(Tensor*)) {
 static Tensor* via_softmax(Tensor* x) { return uop_softmax(x, -1); }
 static Tensor* via_mul(Tensor* x) { return uop_mul(x, x); }
 
-/* Full second-order probe: penalty = sum(grad^2); d(penalty)/dx via double
+/**
+ * Full second-order probe: penalty = sum(grad^2); d(penalty)/dx via double
  * backward, compared against a finite difference of the first-order grad.
- * Returns the analytic value for x[idx], and writes the numerical one. */
+ * Returns the analytic value for x[idx], and writes the numerical one.
+ * @param analytic_out (float*)
+ * @param numeric_out (float*)
+ * @param idx (int)
+ * @return (int)
+ */
 static int softmax_double_grad(float* analytic_out, float* numeric_out, int idx) {
     float xd[D] = {0.3f, -0.2f, 0.5f, 0.1f};
     int s[]     = {1, D};

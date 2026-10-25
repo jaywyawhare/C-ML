@@ -271,11 +271,16 @@ Tensor* sparse_to_dense(SparseCOOData* sparse, const TensorConfig* config) {
     return output;
 }
 
-/* Split the [nnz, 2] coordinate tensor into two eager INT32 columns. The
+/**
+ * Split the [nnz, 2] coordinate tensor into two eager INT32 columns. The
  * backward VJPs gather/scatter rows with the primitive uops, which need 1-D
  * index tensors; keeping them as eager tensors (not params blobs) lets both
  * autograd engines read them without special-casing. Returns NULL on failure
- * and owns nothing else. */
+ * and owns nothing else.
+ * @param sparse (SparseCOOData*)
+ * @param column (int)
+ * @return (Tensor*)
+ */
 static Tensor* spmm_split_coords(SparseCOOData* sparse, int column) {
     int shape[]      = {sparse->nnz};
     TensorConfig cfg = (TensorConfig){.dtype      = DTYPE_INT32,

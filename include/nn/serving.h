@@ -117,28 +117,56 @@ CMLServingContext* cml_serving_create(const CMLServingConfig* config);
 
 void cml_serving_free(CMLServingContext* ctx);
 
-/* KV cache is not owned; caller must keep it alive */
+/**
+ * KV cache is not owned; caller must keep it alive
+ * @param ctx (CMLServingContext*)
+ * @param cache (CMLPagedKVCache*)
+ * @return (void)
+ */
 void cml_serving_set_kv_cache(CMLServingContext* ctx, CMLPagedKVCache* cache);
 
-/*
+/**
  * Attach a model forward callback so cml_serving_step actually generates tokens.
  * `vocab_size` is the logits width the callback produces; `eos_token_id` stops a
  * sequence early when produced (pass a negative value to disable).
+ * @param ctx (CMLServingContext*)
+ * @param forward_fn (CMLServingForwardFn)
+ * @param model (void*)
+ * @param vocab_size (int)
+ * @param eos_token_id (int)
+ * @return (void)
  */
 void cml_serving_set_model(CMLServingContext* ctx, CMLServingForwardFn forward_fn, void* model,
                            int vocab_size, int eos_token_id);
 
-/* Returns request_id on success, -1 on failure (e.g. queue full).
- * prompt_tokens is copied internally. max_new_tokens 0 = use config default. */
+/**
+ * Returns request_id on success, -1 on failure (e.g. queue full).
+ * prompt_tokens is copied internally. max_new_tokens 0 = use config default.
+ * @param ctx (CMLServingContext*)
+ * @param prompt_tokens (const int*)
+ * @param num_tokens (int)
+ * @param max_new_tokens (int)
+ * @return (int)
+ */
 int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens, int num_tokens,
                        int max_new_tokens);
 
-/* Run one scheduling iteration. Returns number of active sequences. */
+/**
+ * Run one scheduling iteration. Returns number of active sequences.
+ * @param ctx (CMLServingContext*)
+ * @return (int)
+ */
 int cml_serving_step(CMLServingContext* ctx);
 
 CMLSequenceStatus cml_serving_get_status(CMLServingContext* ctx, int request_id);
 
-/* Returns pointer to internal token array (do not free), or NULL if not found. */
+/**
+ * Returns pointer to internal token array (do not free), or NULL if not found.
+ * @param ctx (CMLServingContext*)
+ * @param request_id (int)
+ * @param out_count (int*)
+ * @return (const int*)
+ */
 const int* cml_serving_get_tokens(CMLServingContext* ctx, int request_id, int* out_count);
 
 int cml_serving_finish_request(CMLServingContext* ctx, int request_id);

@@ -77,8 +77,14 @@ void cml_speculative_set_draft_model(CMLSpeculativeDecoder* dec, void* ctx,
 void cml_speculative_set_target_model(CMLSpeculativeDecoder* dec, void* ctx,
                                       CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn);
 
-/* Drafts K tokens, verifies with target model, accepts matching tokens.
- * Returns heap-allocated result (free with cml_speculative_result_free). */
+/**
+ * Drafts K tokens, verifies with target model, accepts matching tokens.
+ * Returns heap-allocated result (free with cml_speculative_result_free).
+ * @param dec (CMLSpeculativeDecoder*)
+ * @param prefix_tokens (const int*)
+ * @param prefix_len (int)
+ * @return (CMLSpeculativeResult*)
+ */
 CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
                                                   const int* prefix_tokens, int prefix_len);
 

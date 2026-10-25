@@ -101,8 +101,11 @@ static int test_batchnorm2d(void) {
     return 1;
 }
 
-/* Running statistics are module state: a graph reset between training steps used to free
- * them, and the next forward read the freed tensors. */
+/**
+ * Running statistics are module state: a graph reset between training steps used to free
+ * them, and the next forward read the freed tensors.
+ * @return (int)
+ */
 static int test_batchnorm2d_trains_across_resets(void) {
     BatchNorm2d* bn = cml_nn_batchnorm2d(3, 1e-5f, 0.1f, true, true, DTYPE_FLOAT32, DEVICE_CPU);
     if (!bn)

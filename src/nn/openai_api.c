@@ -465,10 +465,16 @@ static void chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json
     }
 }
 
-/* The message array lives on the heap: 64 messages are ~0.5 MB, more than a
+/**
+ * The message array lives on the heap: 64 messages are ~0.5 MB, more than a
  * default macOS secondary-thread stack (512 KB), and the server normally runs
  * on its own thread. On the stack it overflowed (SIGBUS) once inlined into
- * handle_request, even for requests that never reach this handler. */
+ * handle_request, even for requests that never reach this handler.
+ * @param fd (int)
+ * @param srv (CMLOpenAIServer*)
+ * @param body_json (const char*)
+ * @return (void)
+ */
 static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json) {
     ChatMessage* msgs = (ChatMessage*)cml_malloc(MAX_MESSAGES * sizeof(*msgs));
     if (!msgs) {

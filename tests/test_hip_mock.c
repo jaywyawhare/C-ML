@@ -10,7 +10,11 @@
 #include "ops/ir/gpu/hip_mock.h"
 #include "test_harness.h"
 
-/* Backend accessor for the queue's private handle (hcq_rocm.c). */
+/**
+ * Backend accessor for the queue's private handle (hcq_rocm.c).
+ * @param queue (CMLHCQQueue*)
+ * @return (CMLROCmBackend*)
+ */
 extern CMLROCmBackend* cml_hcq_rocm_queue_backend(CMLHCQQueue* queue);
 extern void cml_hcq_rocm_signal_destroy(CMLHCQSignal* signal);
 

@@ -63,11 +63,27 @@ typedef struct {
 CMLPatternNode* cml_pattern_op(UOpType type, CMLPatternNode** inputs, int num_inputs);
 CMLPatternNode* cml_pattern_capture(const char* name);
 CMLPatternNode* cml_pattern_any(void);
-/* Match a UOP_FILL node whose constant value equals @p value. */
+/**
+ * Match a UOP_FILL node whose constant value equals @p value.
+ * @param value (float)
+ * @return (CMLPatternNode*)
+ */
 CMLPatternNode* cml_pattern_const(float value);
-/* True if @p node is a UOP_FILL whose value equals @p value (shared by both matchers). */
+/**
+ * True if @p node is a UOP_FILL whose value equals @p value (shared by both matchers).
+ * @param node (const struct IRNode*)
+ * @param value (float)
+ * @return (bool)
+ */
 bool cml_pattern_match_const(const struct IRNode* node, float value);
-/* Match @p pattern rooted at @p node, binding captures into @p result (shared by both matchers). */
+/**
+ * Match @p pattern rooted at @p node, binding captures into @p result (shared by both matchers).
+ * @param ir (CMLGraph_t)
+ * @param pattern (const CMLPatternNode*)
+ * @param node (struct IRNode*)
+ * @param result (CMLMatchResult*)
+ * @return (bool)
+ */
 bool cml_pattern_match(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNode* node,
                        CMLMatchResult* result);
 void cml_pattern_free(CMLPatternNode* node);
@@ -77,18 +93,34 @@ void cml_rewrite_registry_free(CMLRewriteRegistry* reg);
 
 int cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pattern, CMLEmitFn emit,
                          int priority, const char* name);
-/* Emit @p rule's replacement for a match and splice it in place of the matched root (shared by
-   both matchers). Returns true if the graph changed. */
+/**
+ * Emit @p rule's replacement for a match and splice it in place of the matched root (shared by
+ * both matchers). Returns true if the graph changed.
+ * @param ir (CMLGraph_t)
+ * @param rule (const CMLRewriteRule*)
+ * @param match (const CMLMatchResult*)
+ * @return (bool)
+ */
 bool cml_rewrite_fire(CMLGraph_t ir, const CMLRewriteRule* rule, const CMLMatchResult* match);
 
-/* Apply all rewrite rules until convergence.
-   Returns number of rewrites applied, or -1 on error. */
+/**
+ * Apply all rewrite rules until convergence.
+ * Returns number of rewrites applied, or -1 on error.
+ * @param reg (CMLRewriteRegistry*)
+ * @param ir (CMLGraph_t)
+ * @param max_iterations (int)
+ * @return (int)
+ */
 int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations);
 
 CMLRewriteRegistry* cml_rewrite_builtin_rules(void);
 
-/* Remove nodes not reachable from outputs.
-   Returns number of nodes removed, or -1 on error. */
+/**
+ * Remove nodes not reachable from outputs.
+ * Returns number of nodes removed, or -1 on error.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_rewrite_dce(CMLGraph_t ir);
 
 #ifdef __cplusplus

@@ -7,7 +7,13 @@
 #include "core/hevc.h"
 #include "test_harness.h"
 
-/* Ramp references: top[i] = 10+i, left[i] = 50+i (2n = 8 samples each), corner 99. */
+/**
+ * Ramp references: top[i] = 10+i, left[i] = 50+i (2n = 8 samples each), corner 99.
+ * @param top (uint8_t*)
+ * @param left (uint8_t*)
+ * @param corner (uint8_t*)
+ * @return (void)
+ */
 static void refs(uint8_t* top, uint8_t* left, uint8_t* corner) {
     for (int i = 0; i < 8; i++) {
         top[i]  = (uint8_t)(10 + i);

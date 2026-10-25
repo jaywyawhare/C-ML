@@ -5,14 +5,25 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/* Deadlock-free paired send/recv for a ring step.
+/**
+ * Deadlock-free paired send/recv for a ring step.
  *
  * The naive "send to right, then recv from left" order deadlocks once a chunk
  * exceeds the kernel socket send buffer: every rank blocks in send() and nobody
  * is receiving. Ordering by rank parity breaks the cycle - even ranks send then
  * receive, odd ranks receive then send - so a blocking sender is always paired
  * with a peer that has already posted (or is about to post) the matching
- * receive. The send and recv buffers are disjoint here, so this is safe. */
+ * receive. The send and recv buffers are disjoint here, so this is safe.
+ * @param ops (DistCommOps*)
+ * @param send_t (Tensor*)
+ * @param right (int)
+ * @param recv_t (Tensor*)
+ * @param left (int)
+ * @param tag (int)
+ * @param ctx (void*)
+ * @param rank (int)
+ * @return (int)
+ */
 static int ring_sendrecv(DistCommOps* ops, Tensor* send_t, int right, Tensor* recv_t, int left,
                          int tag, void* ctx, int rank) {
     if ((rank & 1) == 0) {

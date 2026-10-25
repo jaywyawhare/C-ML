@@ -24,7 +24,16 @@ typedef Tensor* (*Builder)(Tensor* x);
 static Tensor* b_softmax(Tensor* x) { return uop_softmax(x, -1); }
 static Tensor* b_logsm(Tensor* x) { return uop_log_softmax_lastdim(x); }
 
-/* input grad of sum(w .* op(x)) for a fixed readout w, with the given create_graph flag. */
+/**
+ * input grad of sum(w .* op(x)) for a fixed readout w, with the given create_graph flag.
+ * @param op (Builder)
+ * @param xd (const float*)
+ * @param w (const float*)
+ * @param n (int)
+ * @param cg (bool)
+ * @param out (float*)
+ * @return (void)
+ */
 static void grad_of(Builder op, const float* xd, const float* w, int n, bool cg, float* out) {
     int s[]          = {1, n};
     Tensor* x        = cml_tensor((float*)xd, s, 2, &CFG);
@@ -57,7 +66,10 @@ static int check(const char* name, Builder op) {
     return pass;
 }
 
-/* RNN cell: grad of sum(w .* rnn_cell(ih,hh)) w.r.t ih, fused vs create_graph. */
+/**
+ * RNN cell: grad of sum(w .* rnn_cell(ih,hh)) w.r.t ih, fused vs create_graph.
+ * @return (int)
+ */
 static int check_rnn(void) {
     float ihd[D] = {0.3f, -0.2f, 0.5f, 0.1f, -0.4f};
     float hhd[D] = {0.1f, 0.2f, -0.1f, 0.0f, 0.3f};
@@ -86,7 +98,10 @@ static int check_rnn(void) {
     return ok;
 }
 
-/* LayerNorm: grad of sum(w .* layernorm(x,gamma,beta)) w.r.t x, fused vs create_graph. */
+/**
+ * LayerNorm: grad of sum(w .* layernorm(x,gamma,beta)) w.r.t x, fused vs create_graph.
+ * @return (int)
+ */
 static int check_layernorm(void) {
     float xd[D] = {0.3f, -0.2f, 0.5f, 0.1f, -0.4f};
     float gd[D] = {1.1f, 0.9f, 1.0f, 1.2f, 0.8f};
@@ -117,7 +132,10 @@ static int check_layernorm(void) {
     return ok;
 }
 
-/* RMSNorm: grad of sum(w .* rmsnorm(x,weight)) w.r.t x, fused vs create_graph. */
+/**
+ * RMSNorm: grad of sum(w .* rmsnorm(x,weight)) w.r.t x, fused vs create_graph.
+ * @return (int)
+ */
 static int check_rmsnorm(void) {
     float xd[D] = {0.3f, -0.2f, 0.5f, 0.1f, -0.4f};
     float wd[D] = {1.1f, 0.9f, 1.0f, 1.2f, 0.8f};
@@ -146,7 +164,10 @@ static int check_rmsnorm(void) {
     return ok;
 }
 
-/* GRU cell: grad of sum(w .* gru_cell(ih,hh,hidden)) w.r.t ih, fused vs cg. */
+/**
+ * GRU cell: grad of sum(w .* gru_cell(ih,hh,hidden)) w.r.t ih, fused vs cg.
+ * @return (int)
+ */
 static int check_gru(void) {
     const int H  = 3;
     float ihd[9] = {0.3f, -0.2f, 0.5f, 0.1f, -0.4f, 0.2f, 0.0f, 0.3f, -0.1f};
@@ -178,7 +199,10 @@ static int check_gru(void) {
     return ok;
 }
 
-/* LSTM cell: grad of sum(w .* lstm_cell(gates,c_prev)) w.r.t gates, fused vs cg. */
+/**
+ * LSTM cell: grad of sum(w .* lstm_cell(gates,c_prev)) w.r.t gates, fused vs cg.
+ * @return (int)
+ */
 static int check_lstm(void) {
     const int H  = 3;
     float gd[12] = {0.3f, -0.2f, 0.5f, 0.1f, -0.4f, 0.2f, 0.0f, 0.3f, -0.1f, 0.2f, 0.4f, -0.3f};

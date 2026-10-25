@@ -234,8 +234,15 @@ static int serving_argmax(const float* logits, int n) {
     return best;
 }
 
-/* Sample a token id from logits. temperature <= 0 => greedy argmax; otherwise
- * temperature scaling + nucleus (top-p) sampling. */
+/**
+ * Sample a token id from logits. temperature <= 0 => greedy argmax; otherwise
+ * temperature scaling + nucleus (top-p) sampling.
+ * @param logits (const float*)
+ * @param vocab (int)
+ * @param temperature (float)
+ * @param top_p (float)
+ * @return (int)
+ */
 static int serving_sample(const float* logits, int vocab, float temperature, float top_p) {
     if (temperature <= 0.0f || vocab <= 1)
         return serving_argmax(logits, vocab);
@@ -294,7 +301,12 @@ static int serving_sample(const float* logits, int vocab, float temperature, flo
     return chosen;
 }
 
-/* Generate one token for an active DECODING request. Returns 0 on success. */
+/**
+ * Generate one token for an active DECODING request. Returns 0 on success.
+ * @param ctx (CMLServingContext*)
+ * @param req (CMLSequenceRequest*)
+ * @return (int)
+ */
 static int serving_generate_one(CMLServingContext* ctx, CMLSequenceRequest* req) {
     float* logits = (float*)cml_malloc((size_t)ctx->vocab_size * sizeof(float));
     if (!logits) {

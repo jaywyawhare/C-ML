@@ -59,26 +59,48 @@ CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences, in
 
 void cml_paged_kv_cache_free(CMLPagedKVCache* cache);
 
-/* Returns block ID >= 0, or -1 if pool exhausted. */
+/**
+ * Returns block ID >= 0, or -1 if pool exhausted.
+ * @param cache (CMLPagedKVCache*)
+ * @return (int)
+ */
 int cml_paged_cache_alloc_block(CMLPagedKVCache* cache);
 
 void cml_paged_cache_free_block(CMLPagedKVCache* cache, int block_id);
 
-/* Returns sequence ID >= 0, or -1 if max sequences reached. */
+/**
+ * Returns sequence ID >= 0, or -1 if max sequences reached.
+ * @param cache (CMLPagedKVCache*)
+ * @return (int)
+ */
 int cml_paged_cache_init_sequence(CMLPagedKVCache* cache);
 
 void cml_paged_cache_free_sequence(CMLPagedKVCache* cache, int seq_id);
 
-/* Allocates a new block automatically when the current tail block is full. */
+/**
+ * Allocates a new block automatically when the current tail block is full.
+ * @param cache (CMLPagedKVCache*)
+ * @param seq_id (int)
+ * @param key (const float*)
+ * @param value (const float*)
+ * @return (int)
+ */
 int cml_paged_cache_append(CMLPagedKVCache* cache, int seq_id, const float* key,
                            const float* value);
 
 Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id, Tensor* Q,
                               const CMLGQAConfig* config);
 
-/* Batched paged attention: Q is [batch, seq_len, num_heads*head_dim] and
+/**
+ * Batched paged attention: Q is [batch, seq_len, num_heads*head_dim] and
  * seq_ids[b] is the cache sequence attending for batch row b. Output is
- * [batch, seq_len, num_heads*head_dim] on CPU f32. */
+ * [batch, seq_len, num_heads*head_dim] on CPU f32.
+ * @param cache (CMLPagedKVCache*)
+ * @param seq_ids (const int*)
+ * @param Q (Tensor*)
+ * @param config (const CMLGQAConfig*)
+ * @return (Tensor*)
+ */
 Tensor* cml_paged_gqa_forward_batch(CMLPagedKVCache* cache, const int* seq_ids, Tensor* Q,
                                     const CMLGQAConfig* config);
 

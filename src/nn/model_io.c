@@ -20,8 +20,14 @@
 #define CML_IO_MAX_NDIM 16
 #define CML_IO_MAX_PARAMS (1 << 20)
 
-/* Checked stdio wrappers: a short read/write or stream error fails loudly
- * instead of silently corrupting the file or continuing past garbage. */
+/**
+ * Checked stdio wrappers: a short read/write or stream error fails loudly
+ * instead of silently corrupting the file or continuing past garbage.
+ * @param f (FILE*)
+ * @param buf (const void*)
+ * @param n (size_t)
+ * @return (bool)
+ */
 static bool io_write(FILE* f, const void* buf, size_t n) {
     return n == 0 || (fwrite(buf, 1, n, f) == n && !ferror(f));
 }
@@ -59,8 +65,13 @@ static bool io_skip(FILE* f, uint64_t n) {
     return true;
 }
 
-/* Serialize a module's parameters to an open file: count, then each param's
- * name, dtype, shape and raw data. */
+/**
+ * Serialize a module's parameters to an open file: count, then each param's
+ * name, dtype, shape and raw data.
+ * @param f (FILE*)
+ * @param model (Module*)
+ * @return (bool)
+ */
 static bool write_model_params(FILE* f, Module* model) {
     int32_t num_params = model->num_parameters;
     if (!io_write(f, &num_params, sizeof(num_params)))
@@ -125,9 +136,15 @@ int model_save(Module* model, const char* filepath) {
     return 0;
 }
 
-/* Read one serialized parameter's header -- length-prefixed name, dtype and
+/**
+ * Read one serialized parameter's header -- length-prefixed name, dtype and
  * rank -- returning the freshly allocated name, or NULL on malformed input or
- * allocation failure. */
+ * allocation failure.
+ * @param f (FILE*)
+ * @param dtype (int32_t*)
+ * @param ndim (int32_t*)
+ * @return (char*)
+ */
 static char* read_param_header(FILE* f, int32_t* dtype, int32_t* ndim) {
     int32_t name_len;
     if (!io_read(f, &name_len, sizeof(name_len)) || name_len < 0 || name_len > CML_IO_MAX_NAME_LEN)

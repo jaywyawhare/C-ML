@@ -109,8 +109,12 @@ static int build_flat_steps(ScheduleAllReduce* ar) {
     return 0;
 }
 
-/* Binomial tree: reduce up to rank 0 (log2(n) rounds), then broadcast back
- * down. 2*(n-1) full-buffer transfers; latency-optimal for small buffers. */
+/**
+ * Binomial tree: reduce up to rank 0 (log2(n) rounds), then broadcast back
+ * down. 2*(n-1) full-buffer transfers; latency-optimal for small buffers.
+ * @param ar (ScheduleAllReduce*)
+ * @return (int)
+ */
 static int build_tree_steps(ScheduleAllReduce* ar) {
     int n     = ar->num_devices;
     int ns    = 2 * (n - 1);
@@ -322,10 +326,15 @@ int schedule_allreduce_run(ScheduleAllReduce* ar) {
     return 0;
 }
 
-/* Insert the all-reduce's communication into a schedule as SCHED_COPY items so
+/**
+ * Insert the all-reduce's communication into a schedule as SCHED_COPY items so
  * the schedule's kernel/byte accounting reflects the injected collective. Grows
  * items + dependencies + dep_counts together to keep cml_schedule_free (which
- * iterates dependencies[0..num_items)) consistent. */
+ * iterates dependencies[0..num_items)) consistent.
+ * @param sched (CMLSchedule*)
+ * @param ar (ScheduleAllReduce*)
+ * @return (int)
+ */
 int schedule_allreduce_inject(CMLSchedule* sched, ScheduleAllReduce* ar) {
     if (!sched || !ar || ar->num_steps <= 0)
         return -1;

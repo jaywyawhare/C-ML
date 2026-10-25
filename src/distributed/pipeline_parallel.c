@@ -78,11 +78,18 @@ CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
     return pipeline;
 }
 
-/* 1F1B per-stage program: (P-1-s) warmup forwards, then one forward paired with
+/**
+ * 1F1B per-stage program: (P-1-s) warmup forwards, then one forward paired with
  * one backward, then the remaining backwards. Deeper stages warm up less, so by
  * the time stage 0 finishes its warmup the last stage is already retiring
  * backwards -- that is what caps the number of simultaneously live
- * activations. */
+ * activations.
+ * @param out (PipeUnit*)
+ * @param stage (int)
+ * @param P (int)
+ * @param M (int)
+ * @return (void)
+ */
 static void pipe_fill_stage_program(PipeUnit* out, int stage, int P, int M) {
     int k    = 0;
     int warm = P - 1 - stage;

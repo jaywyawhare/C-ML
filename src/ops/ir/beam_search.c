@@ -234,9 +234,14 @@ static int cmp_beam_result(const void* a, const void* b) {
     return 0;
 }
 
-/* Enumerate the block-size x unroll x vector-width search space into `out`,
+/**
+ * Enumerate the block-size x unroll x vector-width search space into `out`,
  * seeding each candidate's time with its heuristic score so the caller can
- * rank them before (optionally) measuring for real. Returns the count. */
+ * rank them before (optionally) measuring for real. Returns the count.
+ * @param out (CMLBeamResult*)
+ * @param total_elements (size_t)
+ * @return (int)
+ */
 static int generate_candidates(CMLBeamResult* out, size_t total_elements) {
     int num = 0;
     for (int bi = 0; bi < NUM_BLOCK_SIZES && num < CML_BEAM_MAX_CANDIDATES; bi++) {
@@ -274,8 +279,17 @@ static int generate_candidates(CMLBeamResult* out, size_t total_elements) {
     return num;
 }
 
-/* Tune a kernel using the CPU cost model: check cache, generate candidates, keep the top
- * beam_width by heuristic, pick the lowest estimated time, and cache the winner. */
+/**
+ * Tune a kernel using the CPU cost model: check cache, generate candidates, keep the top
+ * beam_width by heuristic, pick the lowest estimated time, and cache the winner.
+ * @param ctx (CMLBeamSearchCtx*)
+ * @param kernel_hash (uint64_t)
+ * @param total_elements (size_t)
+ * @param ndim (int)
+ * @param shape (const int*)
+ * @param best_out (CMLBeamConfig*)
+ * @return (int)
+ */
 int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, size_t total_elements,
                          int ndim, const int* shape, CMLBeamConfig* best_out) {
     if (!ctx || !best_out) {
@@ -348,8 +362,17 @@ int cml_beam_search_tune(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, size_t tot
     return 0;
 }
 
-/* Tune a kernel by measuring on real hardware: heuristic pre-filter to 2*beam_width, then
- * time each survivor via `timing_fn` and cache the fastest. */
+/**
+ * Tune a kernel by measuring on real hardware: heuristic pre-filter to 2*beam_width, then
+ * time each survivor via `timing_fn` and cache the fastest.
+ * @param ctx (CMLBeamSearchCtx*)
+ * @param kernel_hash (uint64_t)
+ * @param total_elements (size_t)
+ * @param timing_fn (CMLBeamTimingFn)
+ * @param user_data (void*)
+ * @param best_out (CMLBeamConfig*)
+ * @return (int)
+ */
 int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, size_t total_elements,
                             CMLBeamTimingFn timing_fn, void* user_data, CMLBeamConfig* best_out) {
     if (!ctx || !timing_fn || !best_out) {
@@ -502,8 +525,17 @@ int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path) {
     return 0;
 }
 
-/* Tune over enumerated opt lists for a linear program: turn each into a beam config, score
- * it (hardware `timing_fn` or a throughput model), and cache the best. */
+/**
+ * Tune over enumerated opt lists for a linear program: turn each into a beam config, score
+ * it (hardware `timing_fn` or a throughput model), and cache the best.
+ * @param ctx (CMLBeamSearchCtx*)
+ * @param kernel_hash (uint64_t)
+ * @param prog (struct LinearProgram*)
+ * @param timing_fn (CMLBeamTimingFn)
+ * @param user_data (void*)
+ * @param best_out (CMLBeamConfig*)
+ * @return (int)
+ */
 int cml_beam_search_tune_opt(CMLBeamSearchCtx* ctx, uint64_t kernel_hash,
                              struct LinearProgram* prog, CMLBeamTimingFn timing_fn, void* user_data,
                              CMLBeamConfig* best_out) {

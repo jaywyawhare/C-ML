@@ -4,8 +4,14 @@
 #include <stddef.h>
 #include "backend/device.h"
 
-/* For CPU-only allocations (structs, etc).
- * For tensor data, use device_alloc() / device_free() instead. */
+/**
+ * For CPU-only allocations (structs, etc).
+ * For tensor data, use device_alloc() / device_free() instead.
+ * @param size (size_t)
+ * @param file (const char*)
+ * @param line (int)
+ * @return (void*)
+ */
 void* cml_safe_malloc(size_t size, const char* file, int line);
 void* cml_safe_calloc(size_t nmemb, size_t size, const char* file, int line);
 void* cml_safe_realloc(void* ptr, size_t size, const char* file, int line);

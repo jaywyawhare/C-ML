@@ -215,8 +215,16 @@ static int run_opt_passes(LLVMModuleRef mod, LLVMTargetMachineRef tm, int opt_le
     return 0;
 }
 
-/* Emit `mod` as an AMDGPU object into a fresh heap buffer, then dispose the
- * module and target machine either way. `what` names the source for logging. */
+/**
+ * Emit `mod` as an AMDGPU object into a fresh heap buffer, then dispose the
+ * module and target machine either way. `what` names the source for logging.
+ * @param tm (LLVMTargetMachineRef)
+ * @param mod (LLVMModuleRef)
+ * @param what (const char*)
+ * @param code_object (void**)
+ * @param code_size (size_t*)
+ * @return (int)
+ */
 static int amd_emit_code_object(LLVMTargetMachineRef tm, LLVMModuleRef mod, const char* what,
                                 void** code_object, size_t* code_size) {
     LLVMMemoryBufferRef obj_buf = NULL;

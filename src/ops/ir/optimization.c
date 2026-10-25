@@ -56,8 +56,12 @@ static int build_dependency_graph(CMLGraph_t ir) {
     return 0;
 }
 
-/* Mark nodes reachable from the tail and any externally-referenced outputs (DCE roots)
- * via a worklist walk; conservatively marks everything live on allocation failure. */
+/**
+ * Mark nodes reachable from the tail and any externally-referenced outputs (DCE roots)
+ * via a worklist walk; conservatively marks everything live on allocation failure.
+ * @param ir (CMLGraph_t)
+ * @return (void)
+ */
 static void mark_reachable_nodes(CMLGraph_t ir) {
     if (!ir)
         return;
@@ -200,8 +204,14 @@ static bool node_uses_output(struct IRNode* node1, struct IRNode* node2) {
     return false;
 }
 
-/* Decide whether a producer/consumer pair matches a known fusion pattern (FMA, NEG+ADD,
- * identity collapses, elementwise/reduction chains); returns the chosen type via out-param. */
+/**
+ * Decide whether a producer/consumer pair matches a known fusion pattern (FMA, NEG+ADD,
+ * identity collapses, elementwise/reduction chains); returns the chosen type via out-param.
+ * @param node1 (struct IRNode*)
+ * @param node2 (struct IRNode*)
+ * @param fusion_type (FusionType*)
+ * @return (bool)
+ */
 static bool can_fuse_operations(struct IRNode* node1, struct IRNode* node2,
                                 FusionType* fusion_type) {
     if (!node1 || !node2 || !fusion_type)
@@ -382,7 +392,14 @@ static char* find_other_input(struct IRNode* producer, struct IRNode* consumer) 
     return NULL;
 }
 
-/* Bind a fused kernel onto both nodes of a fused pair. */
+/**
+ * Bind a fused kernel onto both nodes of a fused pair.
+ * @param n1 (struct IRNode*)
+ * @param n2 (struct IRNode*)
+ * @param kernel (FusedKernel*)
+ * @param fusion_type (FusionType)
+ * @return (void)
+ */
 static void mark_fused_pair(struct IRNode* n1, struct IRNode* n2, FusedKernel* kernel,
                             FusionType fusion_type) {
     n1->fused_kernel = n2->fused_kernel = kernel;
@@ -390,8 +407,14 @@ static void mark_fused_pair(struct IRNode* n1, struct IRNode* n2, FusedKernel* k
     n1->fusion_type = n2->fusion_type = fusion_type;
 }
 
-/* Realize a fusion for the pair: build the fused kernel and tag both nodes, rewriting
- * operands for NEG+ADD -> SUB where applicable. */
+/**
+ * Realize a fusion for the pair: build the fused kernel and tag both nodes, rewriting
+ * operands for NEG+ADD -> SUB where applicable.
+ * @param node1 (struct IRNode*)
+ * @param node2 (struct IRNode*)
+ * @param fusion_type (FusionType)
+ * @return (int)
+ */
 static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType fusion_type) {
     if (!node1 || !node2)
         return -1;
@@ -543,8 +566,12 @@ static int find_fusable_chain(struct IRNode* start, struct IRNode** chain, int m
     return chain_len;
 }
 
-/* Scan the graph fusing elementwise chains into shared kernels and, failing that, pairwise
- * producer/consumer fusions. */
+/**
+ * Scan the graph fusing elementwise chains into shared kernels and, failing that, pairwise
+ * producer/consumer fusions.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 static int fuse_operations(CMLGraph_t ir) {
     if (!ir)
         return -1;
@@ -611,8 +638,12 @@ static int fuse_operations(CMLGraph_t ir) {
     return 0;
 }
 
-/* Topologically re-sort the node list (Kahn's algorithm) so producers sit near consumers;
- * leaves the order unchanged if a cycle prevents a complete sort. */
+/**
+ * Topologically re-sort the node list (Kahn's algorithm) so producers sit near consumers;
+ * leaves the order unchanged if a cycle prevents a complete sort.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 static int reorder_for_cache_locality(CMLGraph_t ir) {
     if (!ir || ir->node_count <= 0)
         return -1;
@@ -727,8 +758,12 @@ static int reorder_for_cache_locality(CMLGraph_t ir) {
     return 0;
 }
 
-/* Full IR optimization pipeline: dependency build, DCE, then (unless NOOPT) rewrite rules,
- * optional Z3 bounds verification, operation fusion, and cache-locality reordering. */
+/**
+ * Full IR optimization pipeline: dependency build, DCE, then (unless NOOPT) rewrite rules,
+ * optional Z3 bounds verification, operation fusion, and cache-locality reordering.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_optimize(CMLGraph_t ir) {
     if (!ir)
         return -1;

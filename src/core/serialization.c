@@ -128,9 +128,15 @@ void module_named_parameters_free(NamedParameter* named_params, int num_params) 
 #define MODEL_VERSION 2
 #define MODEL_VERSION_MIN 1
 
-/* Walk the module chain the way DDP's buffer broadcast does (containers flatten
+/**
+ * Walk the module chain the way DDP's buffer broadcast does (containers flatten
  * their children through ->next) and name each buffer "<module index>.<name>"
- * so two layers' running_mean do not collide. */
+ * so two layers' running_mean do not collide.
+ * @param module (Module*)
+ * @param out (NamedBuffer**)
+ * @param count (int*)
+ * @return (int)
+ */
 int module_named_buffers(Module* module, NamedBuffer** out, int* count) {
     *out   = NULL;
     *count = 0;
@@ -178,7 +184,13 @@ void module_named_buffers_free(NamedBuffer* nb, int count) {
     cml_free(nb);
 }
 
-/* Write {name_len, name, tensor}; the record layout parameters already use. */
+/**
+ * Write {name_len, name, tensor}; the record layout parameters already use.
+ * @param file (FILE*)
+ * @param name (const char*)
+ * @param t (Tensor*)
+ * @return (int)
+ */
 static int write_named_tensor(FILE* file, const char* name, Tensor* t) {
     int name_len         = name ? (int)strlen(name) : 0;
     int32_t name_len_int = (int32_t)name_len;
@@ -189,8 +201,14 @@ static int write_named_tensor(FILE* file, const char* name, Tensor* t) {
     return tensor_write_stream(t, file);
 }
 
-/* Copy `src` into `dst` in place when shape and dtype agree, crossing devices if
- * needed. Returns false (having warned) on a mismatch. */
+/**
+ * Copy `src` into `dst` in place when shape and dtype agree, crossing devices if
+ * needed. Returns false (having warned) on a mismatch.
+ * @param dst (Tensor*)
+ * @param src (Tensor*)
+ * @param what (const char*)
+ * @return (bool)
+ */
 static bool copy_into_tensor(Tensor* dst, Tensor* src, const char* what) {
     if (!dst || !src)
         return false;

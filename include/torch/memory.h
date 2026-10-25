@@ -39,29 +39,52 @@ typedef struct TorchMemoryOptions {
 
 CML_API TorchMemoryOptions torch_memory_default_options(void);
 
-/* Allocate an owned arena of `size` bytes. */
+/**
+ * Allocate an owned arena of `size` bytes.
+ * @param size (size_t)
+ * @return (TorchMemoryManager*)
+ */
 CML_API TorchMemoryManager* torch_memory_create(size_t size);
 
-/* Wrap a caller-supplied buffer (not freed on destroy). */
+/**
+ * Wrap a caller-supplied buffer (not freed on destroy).
+ * @param buffer (void*)
+ * @param size (size_t)
+ * @return (TorchMemoryManager*)
+ */
 CML_API TorchMemoryManager* torch_memory_from_buffer(void* buffer, size_t size);
 
 CML_API void torch_memory_free(TorchMemoryManager* mgr);
 
-/* Bump-allocate `size` bytes from the arena.
+/**
+ * Bump-allocate `size` bytes from the arena.
  * Returns NULL when mgr is NULL, size is 0, or the arena is exhausted
- * (used + aligned(size) > arena_size). Does not grow the arena. */
+ * (used + aligned(size) > arena_size). Does not grow the arena.
+ * @param mgr (TorchMemoryManager*)
+ * @param size (size_t)
+ * @return (void*)
+ */
 CML_API void* torch_memory_alloc(TorchMemoryManager* mgr, size_t size);
 
 CML_API size_t torch_memory_used(const TorchMemoryManager* mgr);
 CML_API size_t torch_memory_peak(const TorchMemoryManager* mgr);
 CML_API size_t torch_memory_remaining(const TorchMemoryManager* mgr);
 
-/* Rewind the bump pointer to the start of the arena.
+/**
+ * Rewind the bump pointer to the start of the arena.
  * Pointers previously returned by torch_memory_alloc() are invalidated and
- * must not be dereferenced after this call. peak_bytes is preserved. */
+ * must not be dereferenced after this call. peak_bytes is preserved.
+ * @param mgr (TorchMemoryManager*)
+ * @return (void)
+ */
 CML_API void torch_memory_reset(TorchMemoryManager* mgr);
 
-/* Reserve graph buffers from a worst-case IR graph. */
+/**
+ * Reserve graph buffers from a worst-case IR graph.
+ * @param mgr (TorchMemoryManager*)
+ * @param graph (CMLGraph_t)
+ * @return (bool)
+ */
 CML_API bool torch_memory_reserve_graph(TorchMemoryManager* mgr, CMLGraph_t graph);
 
 CML_API CMLContext_t torch_memory_get_context(TorchMemoryManager* mgr);

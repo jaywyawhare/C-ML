@@ -16,7 +16,10 @@
 extern "C" {
 #endif
 
-/* Cached defaults (synced in torch_set_default_*). Use accessors for thread-safe reads. */
+/**
+ * Cached defaults (synced in torch_set_default_*). Use accessors for thread-safe reads.
+ * @return (DType)
+ */
 DType torch_default_dtype_cached(void);
 DeviceType torch_default_device_cached(void);
 

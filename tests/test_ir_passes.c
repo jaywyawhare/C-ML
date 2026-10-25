@@ -57,8 +57,11 @@ static void exec_and_check(const char* name, Tensor* y, const float* want, size_
     cml_reset_ir_context();
 }
 
-/* Each composite op must survive cml_ir_decompose and produce the same value
- * as its primitive expansion. */
+/**
+ * Each composite op must survive cml_ir_decompose and produce the same value
+ * as its primitive expansion.
+ * @return (int)
+ */
 static int test_decompose_composites(void) {
     float a[6] = {1, 2, 3, 4, 5, 6};
     int ok     = 1;
@@ -97,8 +100,11 @@ static int test_decompose_composites(void) {
 
     return ok;
 }
-/* DCE must keep nodes feeding the tail AND nodes whose outputs escaped the
- * graph (external refs), and drop truly dead ones. */
+/**
+ * DCE must keep nodes feeding the tail AND nodes whose outputs escaped the
+ * graph (external refs), and drop truly dead ones.
+ * @return (int)
+ */
 static int test_dce_roots(void) {
     cml_reset_ir_context();
     float a[6] = {1, 2, 3, 4, 5, 6};
@@ -144,8 +150,11 @@ static int test_dce_roots(void) {
     return ok;
 }
 
-/* CSE via intern: identical subgraphs built twice should reuse one node and
- * both consumers read the same values. */
+/**
+ * CSE via intern: identical subgraphs built twice should reuse one node and
+ * both consumers read the same values.
+ * @return (int)
+ */
 static int test_cse_interning(void) {
     cml_reset_ir_context();
     float a[6] = {1, 2, 3, 4, 5, 6};
@@ -172,8 +181,11 @@ static int test_cse_interning(void) {
     return ok;
 }
 
-/* Pattern matcher API: builders accept valid trees and free cleanly; matching
- * machinery survives malformed input. */
+/**
+ * Pattern matcher API: builders accept valid trees and free cleanly; matching
+ * machinery survives malformed input.
+ * @return (int)
+ */
 static int test_pattern_matcher_contract(void) {
     int ok = 1;
 
@@ -202,8 +214,11 @@ static int test_pattern_matcher_contract(void) {
     return ok;
 }
 
-/* Optimize pipeline on an already-primitive graph is idempotent and keeps
- * values intact. */
+/**
+ * Optimize pipeline on an already-primitive graph is idempotent and keeps
+ * values intact.
+ * @return (int)
+ */
 static int test_optimize_idempotent(void) {
     cml_reset_ir_context();
     float a[6] = {0.5f, 1.5f, 2.5f, 3.5f, 4.5f, 5.5f};
@@ -233,8 +248,11 @@ static int test_optimize_idempotent(void) {
     return ok;
 }
 
-/* cml_ir_optimize rewrites in place, and its rewrites emit nodes without input tensors
- * (x * 2 -> x + x here); a view takes them while the live graph keeps computing y. */
+/**
+ * cml_ir_optimize rewrites in place, and its rewrites emit nodes without input tensors
+ * (x * 2 -> x + x here); a view takes them while the live graph keeps computing y.
+ * @return (int)
+ */
 static int test_optimize_view_leaves_graph(void) {
     cml_reset_ir_context();
     float a[6]     = {0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f};
@@ -267,8 +285,11 @@ static int test_optimize_view_leaves_graph(void) {
     return ok;
 }
 
-/* Fusion shrinks node_count, which output names used to be drawn from, so nodes built after
- * a fused execution reused names still in the graph and name-based passes mislinked them. */
+/**
+ * Fusion shrinks node_count, which output names used to be drawn from, so nodes built after
+ * a fused execution reused names still in the graph and name-based passes mislinked them.
+ * @return (int)
+ */
 static int test_names_stay_unique_after_fusion(void) {
     cml_reset_ir_context();
     float a[6] = {0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f};
@@ -291,8 +312,11 @@ static int test_names_stay_unique_after_fusion(void) {
     return ok;
 }
 
-/* The graph JSON export visits each node once; it used to walk every root-to-leaf path, which
- * doubles with each residual block. */
+/**
+ * The graph JSON export visits each node once; it used to walk every root-to-leaf path, which
+ * doubles with each residual block.
+ * @return (int)
+ */
 static int test_export_json_residual_chain(void) {
     cml_reset_ir_context();
     float a[6] = {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f};

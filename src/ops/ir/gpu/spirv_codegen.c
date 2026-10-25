@@ -320,8 +320,15 @@ static void emit_member_decorate(SPIRVBuilder* b, uint32_t struct_id, uint32_t m
     spirv_builder_emit(b, value);
 }
 
-/* One-line spellings of the SPIR-V instructions this file emits by the dozen.
- * Each writes the same word stream the hand-rolled emit_op/emit pairs did. */
+/**
+ * One-line spellings of the SPIR-V instructions this file emits by the dozen.
+ * Each writes the same word stream the hand-rolled emit_op/emit pairs did.
+ * @param b (SPIRVBuilder*)
+ * @param result (uint32_t)
+ * @param storage_class (uint32_t)
+ * @param pointee (uint32_t)
+ * @return (void)
+ */
 static void emit_pointer_type(SPIRVBuilder* b, uint32_t result, uint32_t storage_class,
                               uint32_t pointee) {
     emit_op(b, SpvOpTypePointer, 4);
@@ -418,7 +425,17 @@ static void emit_runtime_array(SPIRVBuilder* b, uint32_t result, uint32_t elemen
     spirv_builder_emit(b, element_type);
 }
 
-/* The void/bool/uint/float/uvec3/void() set every generated kernel declares. */
+/**
+ * The void/bool/uint/float/uvec3/void() set every generated kernel declares.
+ * @param b (SPIRVBuilder*)
+ * @param id_void (uint32_t)
+ * @param id_bool (uint32_t)
+ * @param id_uint (uint32_t)
+ * @param id_float (uint32_t)
+ * @param id_uint3 (uint32_t)
+ * @param id_void_fn (uint32_t)
+ * @return (void)
+ */
 static void emit_scalar_types(SPIRVBuilder* b, uint32_t id_void, uint32_t id_bool, uint32_t id_uint,
                               uint32_t id_float, uint32_t id_uint3, uint32_t id_void_fn) {
     emit_op(b, SpvOpTypeVoid, 2);
@@ -457,13 +474,27 @@ static void emit_uint_constant_id(SPIRVBuilder* b, uint32_t uint_type, uint32_t 
     spirv_builder_emit(b, value);
 }
 
-/* Bind `var` to descriptor set 0 at `binding`. */
+/**
+ * Bind `var` to descriptor set 0 at `binding`.
+ * @param b (SPIRVBuilder*)
+ * @param var (uint32_t)
+ * @param binding (uint32_t)
+ * @return (void)
+ */
 static void emit_binding(SPIRVBuilder* b, uint32_t var, uint32_t binding) {
     emit_decorate(b, var, SpvDecorationDescriptorSet, 0);
     emit_decorate(b, var, SpvDecorationBinding, binding);
 }
 
-/* OpFunction ... OpLabel: the entry of every generated kernel. */
+/**
+ * OpFunction ... OpLabel: the entry of every generated kernel.
+ * @param b (SPIRVBuilder*)
+ * @param id_void (uint32_t)
+ * @param id_func (uint32_t)
+ * @param id_void_fn (uint32_t)
+ * @param id_label (uint32_t)
+ * @return (void)
+ */
 static void emit_function_entry(SPIRVBuilder* b, uint32_t id_void, uint32_t id_func,
                                 uint32_t id_void_fn, uint32_t id_label) {
     emit_op(b, SpvOpFunction, 5);
@@ -513,7 +544,14 @@ static void emit_access_chain2(SPIRVBuilder* b, uint32_t ptr_type, uint32_t resu
     spirv_builder_emit(b, index1);
 }
 
-/* Read gl_GlobalInvocationID.x, the flat element index of every kernel. */
+/**
+ * Read gl_GlobalInvocationID.x, the flat element index of every kernel.
+ * @param b (SPIRVBuilder*)
+ * @param id_uint (uint32_t)
+ * @param id_uint3 (uint32_t)
+ * @param id_var_gid (uint32_t)
+ * @return (uint32_t)
+ */
 static uint32_t emit_global_invocation_x(SPIRVBuilder* b, uint32_t id_uint, uint32_t id_uint3,
                                          uint32_t id_var_gid) {
     uint32_t vec = spirv_builder_alloc_id(b);
@@ -523,7 +561,16 @@ static uint32_t emit_global_invocation_x(SPIRVBuilder* b, uint32_t id_uint, uint
     return x;
 }
 
-/* Load `buffer[index]` from a struct-of-runtime-array storage buffer. */
+/**
+ * Load `buffer[index]` from a struct-of-runtime-array storage buffer.
+ * @param b (SPIRVBuilder*)
+ * @param elem_type (uint32_t)
+ * @param elem_ptr_type (uint32_t)
+ * @param buffer_var (uint32_t)
+ * @param member (uint32_t)
+ * @param index (uint32_t)
+ * @return (uint32_t)
+ */
 static uint32_t emit_load_element(SPIRVBuilder* b, uint32_t elem_type, uint32_t elem_ptr_type,
                                   uint32_t buffer_var, uint32_t member, uint32_t index) {
     uint32_t ptr = spirv_builder_alloc_id(b);
@@ -533,7 +580,15 @@ static uint32_t emit_load_element(SPIRVBuilder* b, uint32_t elem_type, uint32_t 
     return value;
 }
 
-/* Load a single struct member -- how the kernels read their `n` parameter. */
+/**
+ * Load a single struct member -- how the kernels read their `n` parameter.
+ * @param b (SPIRVBuilder*)
+ * @param type (uint32_t)
+ * @param ptr_type (uint32_t)
+ * @param var (uint32_t)
+ * @param member (uint32_t)
+ * @return (uint32_t)
+ */
 static uint32_t emit_load_scalar(SPIRVBuilder* b, uint32_t type, uint32_t ptr_type, uint32_t var,
                                  uint32_t member) {
     uint32_t ptr = spirv_builder_alloc_id(b);
@@ -554,8 +609,17 @@ static void emit_label(SPIRVBuilder* b, uint32_t id_label) {
     spirv_builder_emit(b, id_label);
 }
 
-/* Guard the kernel body with `if (index < n)`, using a structured selection
- * that merges at `id_label_end`. */
+/**
+ * Guard the kernel body with `if (index < n)`, using a structured selection
+ * that merges at `id_label_end`.
+ * @param b (SPIRVBuilder*)
+ * @param id_bool (uint32_t)
+ * @param id_index (uint32_t)
+ * @param id_n (uint32_t)
+ * @param id_label_body (uint32_t)
+ * @param id_label_end (uint32_t)
+ * @return (void)
+ */
 static void emit_bounds_check(SPIRVBuilder* b, uint32_t id_bool, uint32_t id_index, uint32_t id_n,
                               uint32_t id_label_body, uint32_t id_label_end) {
     uint32_t id_cmp = spirv_builder_alloc_id(b);
@@ -649,9 +713,13 @@ typedef struct {
     uint32_t id_void, id_bool, id_uint, id_float, id_uint3, id_void_fn, id_rtarray;
 } SpirvCoreIds;
 
-/* Start a compute-shader module: reserve the five header words (back-patched by
+/**
+ * Start a compute-shader module: reserve the five header words (back-patched by
  * spirv_finish_kernel), emit the capability/import/memory-model triple, and
- * pre-allocate the core type IDs in declaration order. */
+ * pre-allocate the core type IDs in declaration order.
+ * @param ids (SpirvCoreIds*)
+ * @return (SPIRVBuilder*)
+ */
 static SPIRVBuilder* spirv_begin_kernel(SpirvCoreIds* ids) {
     SPIRVBuilder* b = spirv_builder_create();
     if (!b)
@@ -674,8 +742,14 @@ static SPIRVBuilder* spirv_begin_kernel(SpirvCoreIds* ids) {
     return b;
 }
 
-/* Close the entry function, back-patch the module header (the five words
- * reserved up front) and hand the finished word stream to the caller. */
+/**
+ * Close the entry function, back-patch the module header (the five words
+ * reserved up front) and hand the finished word stream to the caller.
+ * @param b (SPIRVBuilder*)
+ * @param cg (CMLSPIRVCodegen*)
+ * @param out_size (size_t*)
+ * @return (uint32_t*)
+ */
 static uint32_t* spirv_finish_kernel(SPIRVBuilder* b, CMLSPIRVCodegen* cg, size_t* out_size) {
     emit_op(b, SpvOpReturn, 1);
     emit_op(b, SpvOpFunctionEnd, 1);
@@ -692,17 +766,22 @@ static uint32_t* spirv_finish_kernel(SPIRVBuilder* b, CMLSPIRVCodegen* cg, size_
     return result;
 }
 
-/*
+/**
  * Generate a unary compute shader:
- *   layout(set=0, binding=0) buffer InBuf  { float data[]; } inBuf;
- *   layout(set=0, binding=1) buffer OutBuf { float data[]; } outBuf;
- *   layout(set=0, binding=2) buffer Params { uint n; }       params;
+ * layout(set=0, binding=0) buffer InBuf  { float data[]; } inBuf;
+ * layout(set=0, binding=1) buffer OutBuf { float data[]; } outBuf;
+ * layout(set=0, binding=2) buffer Params { uint n; }       params;
  *
- *   void main() {
- *       uint idx = gl_GlobalInvocationID.x;
- *       if (idx >= n) return;
- *       outBuf.data[idx] = op(inBuf.data[idx]);
- *   }
+ * void main() {
+ * uint idx = gl_GlobalInvocationID.x;
+ * if (idx >= n) return;
+ * outBuf.data[idx] = op(inBuf.data[idx]);
+ * }
+ * @param cg (CMLSPIRVCodegen*)
+ * @param op (UOpType)
+ * @param name (const char*)
+ * @param out_size (size_t*)
+ * @return (uint32_t*)
  */
 uint32_t* cml_spirv_gen_unary(CMLSPIRVCodegen* cg, UOpType op, const char* name, size_t* out_size) {
     (void)name;
@@ -1148,30 +1227,35 @@ uint32_t* cml_spirv_gen_binary(CMLSPIRVCodegen* cg, UOpType op, const char* name
     return spirv_finish_kernel(b, cg, out_size);
 }
 
-/*
+/**
  * Generate a reduction compute shader (SUM or MEAN):
- *   layout(set=0, binding=0) buffer InBuf  { float data[]; } inBuf;
- *   layout(set=0, binding=1) buffer OutBuf { float data[]; } outBuf;
- *   layout(set=0, binding=2) uniform Params { uint n; }      params;
- *   shared float sdata[256];
+ * layout(set=0, binding=0) buffer InBuf  { float data[]; } inBuf;
+ * layout(set=0, binding=1) buffer OutBuf { float data[]; } outBuf;
+ * layout(set=0, binding=2) uniform Params { uint n; }      params;
+ * shared float sdata[256];
  *
- *   void main() {
- *       uint tid = gl_LocalInvocationID.x;
- *       uint gid = gl_GlobalInvocationID.x;
- *       sdata[tid] = (gid < n) ? inBuf.data[gid] : 0.0;
- *       barrier();
- *       for (uint s = 128; s > 0; s >>= 1) {
- *           if (tid < s) sdata[tid] += sdata[tid + s];
- *           barrier();
- *       }
- *       if (tid == 0) {
- *           float result = sdata[0];
- *           if (MEAN) result /= float(n);
- *           outBuf.data[0] = result;
- *       }
- *   }
+ * void main() {
+ * uint tid = gl_LocalInvocationID.x;
+ * uint gid = gl_GlobalInvocationID.x;
+ * sdata[tid] = (gid < n) ? inBuf.data[gid] : 0.0;
+ * barrier();
+ * for (uint s = 128; s > 0; s >>= 1) {
+ * if (tid < s) sdata[tid] += sdata[tid + s];
+ * barrier();
+ * }
+ * if (tid == 0) {
+ * float result = sdata[0];
+ * if (MEAN) result /= float(n);
+ * outBuf.data[0] = result;
+ * }
+ * }
  *
  * Implementation uses unrolled tree reduction (8 steps for 256 threads).
+ * @param cg (CMLSPIRVCodegen*)
+ * @param op (UOpType)
+ * @param name (const char*)
+ * @param out_size (size_t*)
+ * @return (uint32_t*)
  */
 uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* name,
                                   size_t* out_size) {
@@ -1465,24 +1549,28 @@ uint32_t* cml_spirv_gen_reduction(CMLSPIRVCodegen* cg, UOpType op, const char* n
     return spirv_finish_kernel(b, cg, out_size);
 }
 
-/*
+/**
  * Generate a matrix multiplication compute shader:
- *   layout(set=0, binding=0) buffer A { float data[]; } aBuf;
- *   layout(set=0, binding=1) buffer B { float data[]; } bBuf;
- *   layout(set=0, binding=2) buffer C { float data[]; } cBuf;
- *   layout(set=0, binding=3) uniform Params { uint M; uint N; uint K; } params;
+ * layout(set=0, binding=0) buffer A { float data[]; } aBuf;
+ * layout(set=0, binding=1) buffer B { float data[]; } bBuf;
+ * layout(set=0, binding=2) buffer C { float data[]; } cBuf;
+ * layout(set=0, binding=3) uniform Params { uint M; uint N; uint K; } params;
  *
- *   layout(local_size_x=16, local_size_y=16) in;
+ * layout(local_size_x=16, local_size_y=16) in;
  *
- *   void main() {
- *       uint col = gl_GlobalInvocationID.x;
- *       uint row = gl_GlobalInvocationID.y;
- *       if (row >= M || col >= N) return;
- *       float sum = 0.0;
- *       for (uint k = 0; k < K; k++)
- *           sum += A[row * K + k] * B[k * N + col];
- *       C[row * N + col] = sum;
- *   }
+ * void main() {
+ * uint col = gl_GlobalInvocationID.x;
+ * uint row = gl_GlobalInvocationID.y;
+ * if (row >= M || col >= N) return;
+ * float sum = 0.0;
+ * for (uint k = 0; k < K; k++)
+ * sum += A[row * K + k] * B[k * N + col];
+ * C[row * N + col] = sum;
+ * }
+ * @param cg (CMLSPIRVCodegen*)
+ * @param name (const char*)
+ * @param out_size (size_t*)
+ * @return (uint32_t*)
  */
 uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* out_size) {
     (void)name;
@@ -1801,16 +1889,21 @@ uint32_t* cml_spirv_gen_matmul(CMLSPIRVCodegen* cg, const char* name, size_t* ou
     return spirv_finish_kernel(b, cg, out_size);
 }
 
-/*
+/**
  * Generate a fill compute shader:
- *   layout(set=0, binding=0) buffer OutBuf { float data[]; } outBuf;
- *   layout(set=0, binding=1) uniform Params { uint n; }     params;
+ * layout(set=0, binding=0) buffer OutBuf { float data[]; } outBuf;
+ * layout(set=0, binding=1) uniform Params { uint n; }     params;
  *
- *   void main() {
- *       uint idx = gl_GlobalInvocationID.x;
- *       if (idx >= n) return;
- *       outBuf.data[idx] = value;
- *   }
+ * void main() {
+ * uint idx = gl_GlobalInvocationID.x;
+ * if (idx >= n) return;
+ * outBuf.data[idx] = value;
+ * }
+ * @param cg (CMLSPIRVCodegen*)
+ * @param value (float)
+ * @param name (const char*)
+ * @param out_size (size_t*)
+ * @return (uint32_t*)
  */
 uint32_t* cml_spirv_gen_fill(CMLSPIRVCodegen* cg, float value, const char* name, size_t* out_size) {
     (void)name;

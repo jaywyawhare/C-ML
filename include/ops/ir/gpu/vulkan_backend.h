@@ -202,11 +202,19 @@ int cml_vulkan_kernel_dispatch(CMLVulkanBackend* backend, CMLVulkanKernel* kerne
 int cml_vulkan_execute_graph(CMLVulkanBackend* backend, CMLGraph_t ir);
 int cml_vulkan_synchronize(CMLVulkanBackend* backend);
 
-/* Execute one IR node on the GPU (float32 elementwise + 2D matmul).
- * Returns 0 on success, -1 for unsupported op/dtype (caller falls back to CPU). */
+/**
+ * Execute one IR node on the GPU (float32 elementwise + 2D matmul).
+ * Returns 0 on success, -1 for unsupported op/dtype (caller falls back to CPU).
+ * @param backend (CMLVulkanBackend*)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 int cml_vulkan_execute_node(CMLVulkanBackend* backend, struct IRNode* node);
 
-/* Process-wide Vulkan backend (lazy init); NULL if no device is available. */
+/**
+ * Process-wide Vulkan backend (lazy init); NULL if no device is available.
+ * @return (CMLVulkanBackend*)
+ */
 CMLVulkanBackend* cml_vulkan_get_backend(void);
 
 #ifdef __cplusplus

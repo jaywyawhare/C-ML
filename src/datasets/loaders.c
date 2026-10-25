@@ -10,9 +10,14 @@
 #include <strings.h>
 #include "alloc/cml_allocator.h"
 
-/* cml_malloc-backed strndup: strings produced here are released with cml_free
+/**
+ * cml_malloc-backed strndup: strings produced here are released with cml_free
  * elsewhere in this file, so they must carry a cml AllocHeader (system strndup
- * does not, which makes cml_free over-read). */
+ * does not, which makes cml_free over-read).
+ * @param s (const char*)
+ * @param n (size_t)
+ * @return (char*)
+ */
 static char* cml_strndup_(const char* s, size_t n) {
     char* r = (char*)cml_malloc(n + 1);
     if (r) {

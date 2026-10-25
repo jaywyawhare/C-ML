@@ -40,9 +40,16 @@ static void remap_srcs(LinearOp* op, int old_reg, int new_reg) {
     }
 }
 
-/* Split op `i` into `lanes` scalar copies, one fresh vreg per lane, and point
+/**
+ * Split op `i` into `lanes` scalar copies, one fresh vreg per lane, and point
  * later references to the original destination at the first lane's register.
- * `remap_store_dest` also rewrites stores that wrote to it. */
+ * `remap_store_dest` also rewrites stores that wrote to it.
+ * @param prog (struct LinearProgram*)
+ * @param i (int)
+ * @param lanes (int)
+ * @param remap_store_dest (bool)
+ * @return (int)
+ */
 static int scalarize_op(struct LinearProgram* prog, int i, int lanes, bool remap_store_dest) {
     if (ensure_capacity(prog, lanes - 1) != 0)
         return -1;

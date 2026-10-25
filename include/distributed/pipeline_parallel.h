@@ -58,48 +58,70 @@ typedef struct CMLPipelineParallel {
 CMLPipelineParallel* cml_pipeline_create(PipelineStage* stages, int num_stages,
                                          const PipelineConfig* config);
 
-/* Build the execution order for `num_stages` x `num_micro_batches` units.
+/**
+ * Build the execution order for `num_stages` x `num_micro_batches` units.
  *
  * Both orders are valid topological orders of the pipeline dependency graph:
  * F(s,m) after F(s-1,m), B(s,m) after F(s,m) and after B(s+1,m). They differ in
  * when backwards run:
  *
- *   GPipe (interleaved=false): every forward, then every backward. All M
- *   micro-batches' activations are live at once at every stage.
+ * GPipe (interleaved=false): every forward, then every backward. All M
+ * micro-batches' activations are live at once at every stage.
  *
- *   1F1B (interleaved=true): stage s runs (num_stages-1-s) warmup forwards, then
- *   alternates one forward with one backward, then drains its remaining
- *   backwards. Each stage holds at most (num_stages-s) micro-batches of
- *   activations, so peak activation memory is bounded by the depth rather than
- *   the micro-batch count.
+ * 1F1B (interleaved=true): stage s runs (num_stages-1-s) warmup forwards, then
+ * alternates one forward with one backward, then drains its remaining
+ * backwards. Each stage holds at most (num_stages-s) micro-batches of
+ * activations, so peak activation memory is bounded by the depth rather than
+ * the micro-batch count.
  *
  * Returns a malloc'd array of 2*num_stages*num_micro_batches units (free with
- * cml_free) and writes its length to *out_num_units. NULL on invalid input. */
+ * cml_free) and writes its length to *out_num_units. NULL on invalid input.
+ * @param num_stages (int)
+ * @param num_micro_batches (int)
+ * @param interleaved (bool)
+ * @param out_num_units (int*)
+ * @return (PipeUnit*)
+ */
 PipeUnit* cml_pipeline_build_schedule(int num_stages, int num_micro_batches, bool interleaved,
                                       int* out_num_units);
 
 Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input);
 
-/* Back-propagates every (stage, micro-batch) unit in the configured schedule
+/**
+ * Back-propagates every (stage, micro-batch) unit in the configured schedule
  * order. Under `interleaved`, a micro-batch's cached stage outputs are released
  * as soon as its backward reaches stage 0 -- that early release is the point of
  * 1F1B -- so an interleaved backward consumes the forward's cache and cannot be
- * run twice against the same forward. */
+ * run twice against the same forward.
+ * @param pipeline (CMLPipelineParallel*)
+ * @param grad_output (Tensor*)
+ * @return (int)
+ */
 int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output);
 
-/* True cross-rank pipeline parallelism: world_size == num_stages and this rank
+/**
+ * True cross-rank pipeline parallelism: world_size == num_stages and this rank
  * runs ONLY stage `rank`, streaming micro-batch activations to rank+1 and
  * receiving from rank-1 over the process group. Because each stage is a separate
  * process, stages run concurrently - real pipeline overlap. `input` is used only
  * on rank 0; every other rank passes NULL and receives from upstream. Returns
- * the assembled output on the LAST rank and NULL on all others (check rank). */
+ * the assembled output on the LAST rank and NULL on all others (check rank).
+ * @param pipeline (CMLPipelineParallel*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* cml_pipeline_dist_forward(CMLPipelineParallel* pipeline, Tensor* input);
 
-/* Mirror of the distributed forward: the last rank seeds gradients from
+/**
+ * Mirror of the distributed forward: the last rank seeds gradients from
  * `grad_output` (its per-sample loss gradient, same shape as the forward
  * output); every rank back-props its stage and streams the input-gradient
  * upstream so all stages get weight gradients. Must follow a
- * cml_pipeline_dist_forward on the same pipeline. */
+ * cml_pipeline_dist_forward on the same pipeline.
+ * @param pipeline (CMLPipelineParallel*)
+ * @param grad_output (Tensor*)
+ * @return (int)
+ */
 int cml_pipeline_dist_backward(CMLPipelineParallel* pipeline, Tensor* grad_output);
 
 void cml_pipeline_free(CMLPipelineParallel* pipeline);

@@ -26,7 +26,10 @@ static void fill_tensor(Tensor* t, const float* xs, size_t n) {
 }
 
 /* ── quad: f(x) = sum(x*x) ─────────────────────────────────────────────── */
-/* dpenalty/dx where penalty(x) = sum((df/dx)^2) = 4*sum(x^2) → exactly 8x. */
+/**
+ * dpenalty/dx where penalty(x) = sum((df/dx)^2) = 4*sum(x^2) → exactly 8x.
+ * @return (int)
+ */
 static int test_quad_double_grad_exact(void) {
     const int n = 8;
     float xs[8];
@@ -84,7 +87,12 @@ static int test_quad_double_grad_exact(void) {
     return ok;
 }
 
-/* Penalty value under the full procedure, for finite differences. */
+/**
+ * Penalty value under the full procedure, for finite differences.
+ * @param xs (const float*)
+ * @param n (int)
+ * @return (float)
+ */
 static float quad_penalty(const float* xs, int n) {
     cml_reset_ir_context();
     int sh[1] = {n};
@@ -160,7 +168,15 @@ static int test_quad_double_grad_finite_diff(void) {
 }
 
 /* ── matmul: h = x@w, loss = sum(h*h) ──────────────────────────────────── */
-/* Exercises double differentiation through the MATMUL/TRANSPOSE/ADD VJPs. */
+/**
+ * Exercises double differentiation through the MATMUL/TRANSPOSE/ADD VJPs.
+ * @param xs (const float*)
+ * @param ws (const float*)
+ * @param m (int)
+ * @param k (int)
+ * @param p (int)
+ * @return (float)
+ */
 static float matmul_penalty(const float* xs, const float* ws, int m, int k, int p) {
     cml_reset_ir_context();
     int xsh[2] = {m, k}, wsh[2] = {k, p};
@@ -246,11 +262,16 @@ static int test_matmul_double_grad_finite_diff(void) {
     return 1;
 }
 
-/* Double-differentiate a composite VJP: quick-gelu's derivative contains a
+/**
+ * Double-differentiate a composite VJP: quick-gelu's derivative contains a
  * sigmoid, and its VJP chain contains SUB/MUL composites. Under strict mode
  * any composite without a direct VJP rule would fail the second pass, so
  * this also proves the backward-subgraph composite rules are complete for
- * this chain. */
+ * this chain.
+ * @param xs (const float*)
+ * @param n (int)
+ * @return (float)
+ */
 static float qgelu_penalty(const float* xs, int n) {
     cml_reset_ir_context();
     int sh[1] = {n};
@@ -336,9 +357,12 @@ static int test_composite_vjp_double_grad(void) {
     return 1;
 }
 
-/* Without create_graph the published grad stays a plain result: it must NOT
+/**
+ * Without create_graph the published grad stays a plain result: it must NOT
  * be marked differentiable (a second backward over it would silently track
- * nothing, which is exactly the ambiguity this flag exists to control). */
+ * nothing, which is exactly the ambiguity this flag exists to control).
+ * @return (int)
+ */
 static int test_no_create_graph_grad_inert(void) {
     const int n = 4;
     float xs[4] = {0.5f, 0.7f, 0.9f, 1.1f};

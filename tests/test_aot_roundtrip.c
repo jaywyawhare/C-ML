@@ -23,7 +23,10 @@ static void check_close(const char* what, float got, float want) {
     printf("  FAIL %s: got %.6f want %.6f\n", what, got, want);
 }
 
-/* out = relu(x @ W), x:[M,K], W:[K,N] -> out:[M,N]  (two graph inputs) */
+/**
+ * out = relu(x @ W), x:[M,K], W:[K,N] -> out:[M,N]  (two graph inputs)
+ * @return (void)
+ */
 static void test_matmul_relu(void) {
     printf("test_matmul_relu\n");
     cml_ir_reset_global_context();
@@ -86,7 +89,10 @@ static void test_matmul_relu(void) {
     cml_aot_free(model);
 }
 
-/* out = sigmoid(x * 2 - 1), tests scalar broadcast + chained intermediates */
+/**
+ * out = sigmoid(x * 2 - 1), tests scalar broadcast + chained intermediates
+ * @return (void)
+ */
 static void test_elementwise_chain(void) {
     printf("test_elementwise_chain\n");
     cml_ir_reset_global_context();
@@ -141,10 +147,13 @@ static void test_elementwise_chain(void) {
     cml_aot_free(model);
 }
 
-/* Reductions: the emitter picks init/accumulate per op, and MIN_REDUCE used to
+/**
+ * Reductions: the emitter picks init/accumulate per op, and MIN_REDUCE used to
  * be produced by the switch's `default` arm rather than its own case -- correct
  * only for as long as it stayed the last unhandled member of the label group.
- * Nothing exercised the reduction path at all, so verify each one end to end. */
+ * Nothing exercised the reduction path at all, so verify each one end to end.
+ * @return (void)
+ */
 static void test_reductions(void) {
     printf("test_reductions\n");
 
@@ -219,9 +228,12 @@ static void test_reductions(void) {
     }
 }
 
-/* A FILL of an integral value emitted `x[i] = 0f;` -- "%.9gf" renders 0.0f as
+/**
+ * A FILL of an integral value emitted `x[i] = 0f;` -- "%.9gf" renders 0.0f as
  * "0", and "0f" is not a C constant, so the generated file did not compile at
- * all. Any graph containing a whole-number constant hit this. */
+ * all. Any graph containing a whole-number constant hit this.
+ * @return (void)
+ */
 static void test_integral_constant(void) {
     printf("test_integral_constant\n");
     cml_ir_reset_global_context();
@@ -246,10 +258,13 @@ static void test_integral_constant(void) {
     printf("  integral constants compile: PASS\n");
 }
 
-/* The AOT backend is a third code generator, alongside the interpreter and the
+/**
+ * The AOT backend is a third code generator, alongside the interpreter and the
  * JIT, and it had its own copies of the NaN-swallowing selection patterns:
  * relu emitted `x > 0.0f ? x : 0.0f` and the max/min reductions accumulated
- * with ordered compares, so a NaN input came back as a plausible finite value. */
+ * with ordered compares, so a NaN input came back as a plausible finite value.
+ * @return (void)
+ */
 static void test_nan_through_aot(void) {
     printf("test_nan_through_aot\n");
     cml_ir_reset_global_context();
@@ -300,8 +315,11 @@ static void test_nan_through_aot(void) {
     cml_aot_free(model);
 }
 
-/* EXPAND with a real broadcast ([1,3] -> [2,3]); the AOT path previously only
- * handled scalar and identity expands. */
+/**
+ * EXPAND with a real broadcast ([1,3] -> [2,3]); the AOT path previously only
+ * handled scalar and identity expands.
+ * @return (void)
+ */
 static void test_expand_broadcast(void) {
     printf("test_expand_broadcast\n");
     cml_ir_reset_global_context();
@@ -350,7 +368,10 @@ static void test_expand_broadcast(void) {
     cml_aot_free(model);
 }
 
-/* Multi-dim reduction: sum a [2,2,2] over dims {0,2} -> [2]. */
+/**
+ * Multi-dim reduction: sum a [2,2,2] over dims {0,2} -> [2].
+ * @return (void)
+ */
 static void test_multidim_reduce(void) {
     printf("test_multidim_reduce\n");
     cml_ir_reset_global_context();

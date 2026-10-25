@@ -22,8 +22,13 @@ struct CMLGraphAllocator {
     bool use_pooling;          // Enable memory pooling
 };
 
-/* Allocate the parallel per-buffer arrays. On failure everything allocated so
- * far, including `galloc` itself, is released and -1 returned. */
+/**
+ * Allocate the parallel per-buffer arrays. On failure everything allocated so
+ * far, including `galloc` itself, is released and -1 returned.
+ * @param galloc (CMLGraphAllocator_t)
+ * @param n_bufs (int)
+ * @return (int)
+ */
 static int galloc_alloc_slots(CMLGraphAllocator_t galloc, int n_bufs) {
     galloc->buffer_types    = cml_malloc((size_t)n_bufs * sizeof(CMLBackendBufferType_t));
     galloc->buffers         = cml_malloc((size_t)n_bufs * sizeof(CMLBackendBuffer_t));
@@ -161,9 +166,11 @@ static size_t calculate_tensor_size(Tensor* tensor) {
 
 static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph);
 
-/*
+/**
  * Full liveness analysis: topo-sort the graph, track exact lifetime
  * intervals, and return peak(sum of alive tensor sizes) across all steps.
+ * @param graph (CMLComputationGraph_t)
+ * @return (size_t)
  */
 static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
     if (!graph)
@@ -372,7 +379,11 @@ static size_t calculate_peak_memory(CMLComputationGraph_t graph) {
     return peak_memory;
 }
 
-/* Fallback: adaptive liveness factor (30-50%) based on graph complexity */
+/**
+ * Fallback: adaptive liveness factor (30-50%) based on graph complexity
+ * @param graph (CMLComputationGraph_t)
+ * @return (size_t)
+ */
 static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph) {
     if (!graph)
         return 0;

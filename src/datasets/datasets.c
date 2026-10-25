@@ -156,7 +156,15 @@ const char* cml_dataset_download(const char* url, const char* filename) {
     return path;
 }
 
-/* Helper: decompress .gz file */
+/**
+ * Helper: decompress .gz file
+ * @param url (const char*)
+ * @param gz_name (const char*)
+ * @param final_name (const char*)
+ * @param out (char*)
+ * @param outsz (size_t)
+ * @return (const char*)
+ */
 static const char* download_and_gunzip(const char* url, const char* gz_name, const char* final_name,
                                        char* out, size_t outsz) {
     const char* dir = cml_dataset_cache_dir();

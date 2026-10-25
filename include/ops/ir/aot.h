@@ -61,11 +61,22 @@ AOTCompileOptions cml_aot_default_options(void);
 
 int cml_aot_compile(CMLGraph_t ir, const char* output_path, const AOTCompileOptions* options);
 
-/* Traces the module's forward pass with sample input to capture IR, then compiles. */
+/**
+ * Traces the module's forward pass with sample input to capture IR, then compiles.
+ * @param module (struct Module*)
+ * @param sample_input (Tensor*)
+ * @param output_path (const char*)
+ * @param options (const AOTCompileOptions*)
+ * @return (int)
+ */
 int cml_aot_compile_module(struct Module* module, Tensor* sample_input, const char* output_path,
                            const AOTCompileOptions* options);
 
-/* Uses dlopen/dlsym. Zero compilation dependency at runtime. */
+/**
+ * Uses dlopen/dlsym. Zero compilation dependency at runtime.
+ * @param path (const char*)
+ * @return (CMLAOTModel*)
+ */
 CMLAOTModel* cml_aot_load(const char* path);
 
 int cml_aot_execute(CMLAOTModel* model, Tensor** inputs, int num_inputs, Tensor** outputs,

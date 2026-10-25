@@ -111,7 +111,18 @@ typedef Tensor* (*binary_op_fn)(Tensor*, Tensor*);
 typedef float (*binary_ref_fn)(float, float);
 typedef void (*binary_simd_fn)(const float*, const float*, float*, size_t);
 
-/* mode: 0 equal, 1 lhs scalar, 2 rhs scalar */
+/**
+ * mode: 0 equal, 1 lhs scalar, 2 rhs scalar
+ * @param name (const char*)
+ * @param op (binary_op_fn)
+ * @param ref (binary_ref_fn)
+ * @param simd (binary_simd_fn)
+ * @param lo (float)
+ * @param hi (float)
+ * @param atol (float)
+ * @param rtol (float)
+ * @return (void)
+ */
 static void check_binary(const char* name, binary_op_fn op, binary_ref_fn ref, binary_simd_fn simd,
                          float lo, float hi, float atol, float rtol) {
     tests_run++;
@@ -248,7 +259,11 @@ static float rb_mul(float a, float b) { return a * b; }
 static float rb_div(float a, float b) { return a / (b + 1e-8f); } /* kernel adds eps */
 static float rb_max(float a, float b) { return a > b ? a : b; }
 
-/* reduce whole tensor -> scalar (dims=NULL / num_dims=0 means "all axes") */
+/**
+ * reduce whole tensor -> scalar (dims=NULL / num_dims=0 means "all axes")
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* red_sum(Tensor* x) {
     ReduceParams rp = {NULL, 0, false};
     return uop_sum(x, &rp);

@@ -18,7 +18,10 @@ DistCommOps* cml_dist_create_gloo_backend(void);
 
 void cml_dist_free_backend(DistCommOps* ops, void* backend_ctx);
 
-/* Tries NCCL first, then MPI, then Gloo. */
+/**
+ * Tries NCCL first, then MPI, then Gloo.
+ * @return (DistCommOps*)
+ */
 DistCommOps* cml_dist_auto_select_backend(void);
 
 const char* cml_dist_backend_name(DistBackendType type);

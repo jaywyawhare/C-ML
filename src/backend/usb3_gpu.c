@@ -376,8 +376,15 @@ int cml_usb3_gpu_write32(CMLUSB3GPU* dev, uint64_t offset, uint32_t value) {
     return cml_usb3_gpu_scsi_cmd(dev, cdb, 10, &buf, sizeof(buf), true);
 }
 
-/* Build the vendor SCSI CDB for a PCIe window access: opcode, sub-command,
- * then the 64-bit device address and 32-bit length, both big-endian. */
+/**
+ * Build the vendor SCSI CDB for a PCIe window access: opcode, sub-command,
+ * then the 64-bit device address and 32-bit length, both big-endian.
+ * @param cdb (uint8_t*)
+ * @param sub_cmd (uint8_t)
+ * @param addr (uint64_t)
+ * @param len (uint32_t)
+ * @return (void)
+ */
 static void usb3_build_pcie_cdb(uint8_t* cdb, uint8_t sub_cmd, uint64_t addr, uint32_t len) {
     memset(cdb, 0, 16);
     cdb[0] = SCSI_VENDOR_CMD;

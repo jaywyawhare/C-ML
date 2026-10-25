@@ -11,7 +11,11 @@
 #include "ops/ir/context.h"
 #include "test_harness.h"
 
-/* Composite UOPs that MUST NOT survive decomposition. */
+/**
+ * Composite UOPs that MUST NOT survive decomposition.
+ * @param t (UOpType)
+ * @return (int)
+ */
 static int is_composite(UOpType t) {
     switch (t) {
     case UOP_RELU:

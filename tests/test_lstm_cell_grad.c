@@ -43,7 +43,11 @@ static void set_weights(LSTMCell* c) {
     }
 }
 
-/* MSE(h_out, target) for one fused LSTM step; resets the IR graph after. */
+/**
+ * MSE(h_out, target) for one fused LSTM step; resets the IR graph after.
+ * @param c (LSTMCell*)
+ * @return (float)
+ */
 static float loss_value(LSTMCell* c) {
     int xs[] = {1, IN}, hs[] = {1, HID}, ts[] = {1, HID};
     Tensor* x  = cml_tensor((float*)X0, xs, 2, &CFG);

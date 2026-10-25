@@ -31,13 +31,23 @@ typedef struct {
     char name[32];            /* kernel name where applicable */
 } CMLHIPMockEntry;
 
-/* Initialize `backend` fully against the mock driver (no dlopen). */
+/**
+ * Initialize `backend` fully against the mock driver (no dlopen).
+ * @param backend (CMLROCmBackend*)
+ * @return (int)
+ */
 int cml_rocm_backend_init_mock(CMLROCmBackend* backend);
 
-/* True when CML_HIP_MOCK=1 is set in the environment. */
+/**
+ * True when CML_HIP_MOCK=1 is set in the environment.
+ * @return (bool)
+ */
 bool cml_hip_mock_enabled_from_env(void);
 
-/* Journal inspection for tests. */
+/**
+ * Journal inspection for tests.
+ * @return (void)
+ */
 void cml_hip_mock_reset(void);
 int cml_hip_mock_journal_len(void);
 const CMLHIPMockEntry* cml_hip_mock_journal_at(int i);

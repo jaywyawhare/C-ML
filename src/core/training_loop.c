@@ -466,7 +466,10 @@ void cml_print_progress_bar(float percent, const char* message) {
     }
 }
 
-/* Default hyperparameters for the training-loop entry points. */
+/**
+ * Default hyperparameters for the training-loop entry points.
+ * @return (TrainingConfig)
+ */
 static TrainingConfig default_training_config(void) {
     return (TrainingConfig){.epochs                    = 10,
                             .verbose                   = true,

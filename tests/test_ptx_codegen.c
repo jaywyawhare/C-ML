@@ -436,8 +436,11 @@ static void test_bounds_check(void) {
     PASS();
 }
 
-/* Each op must emit well-formed PTX containing an instruction distinctive to
- * its lowering. */
+/**
+ * Each op must emit well-formed PTX containing an instruction distinctive to
+ * its lowering.
+ * @return (void)
+ */
 static void test_new_unary_ops(void) {
     struct {
         UOpType op;

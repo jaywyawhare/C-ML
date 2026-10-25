@@ -1238,7 +1238,12 @@ static int test_safetensors_serialization(void) {
     }
 }
 
-/* Little-endian writers for crafting model files byte by byte. */
+/**
+ * Little-endian writers for crafting model files byte by byte.
+ * @param p (unsigned char*)
+ * @param v (uint32_t)
+ * @return (size_t)
+ */
 static size_t put_u32(unsigned char* p, uint32_t v) {
     memcpy(p, &v, 4);
     return 4;
@@ -1260,8 +1265,11 @@ static void write_file(const char* path, const void* buf, size_t len) {
     }
 }
 
-/* Files must match the GGUF spec llama.cpp reads: "GGUF" magic, dims stored
- * innermost-first, spec type ids, and 32-byte-aligned tensor offsets. */
+/**
+ * Files must match the GGUF spec llama.cpp reads: "GGUF" magic, dims stored
+ * innermost-first, spec type ids, and 32-byte-aligned tensor offsets.
+ * @return (int)
+ */
 static int test_gguf_spec_layout(void) {
     const char* path = "/tmp/test_cml_spec.gguf";
     float a[] = {1, 2, 3}, f[] = {0, 1, 2, 3, 4, 5};
@@ -1304,7 +1312,10 @@ static int test_gguf_spec_layout(void) {
     return ok;
 }
 
-/* Hostile safetensors headers must be rejected, not overflow, hang or crash. */
+/**
+ * Hostile safetensors headers must be rejected, not overflow, hang or crash.
+ * @return (int)
+ */
 static int test_safetensors_rejects_malformed(void) {
     const char* path          = "/tmp/test_cml_bad.safetensors";
     const char* bad_headers[] = {
@@ -1353,8 +1364,11 @@ static int test_safetensors_rejects_malformed(void) {
     return ok;
 }
 
-/* Hostile GGUF tensor infos and metadata must be rejected, not overflow, hang or
- * exhaust the stack. */
+/**
+ * Hostile GGUF tensor infos and metadata must be rejected, not overflow, hang or
+ * exhaust the stack.
+ * @return (int)
+ */
 static int test_gguf_rejects_malformed(void) {
     const char* path = "/tmp/test_cml_bad.gguf";
     static unsigned char buf[2500000];

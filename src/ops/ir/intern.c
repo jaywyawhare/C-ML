@@ -26,8 +26,12 @@ uint64_t cml_fnv1a_bytes(uint64_t h, const void* data, size_t len) {
     return h;
 }
 
-/* Structural graph hash and output-slot capture, shared by the trace cache and
- * the tiny JIT: both key their caches on the same notion of "same graph". */
+/**
+ * Structural graph hash and output-slot capture, shared by the trace cache and
+ * the tiny JIT: both key their caches on the same notion of "same graph".
+ * @param ir (CMLGraph_t)
+ * @return (uint64_t)
+ */
 uint64_t cml_ir_graph_hash(CMLGraph_t ir) {
     if (!ir)
         return 0;

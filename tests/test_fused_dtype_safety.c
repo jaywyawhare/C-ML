@@ -20,8 +20,17 @@ static TensorConfig F32 = {
 /* Build op(inputs...) for a given dtype; the builder reads leaves from `mk`. */
 typedef Tensor* (*OpBuilder)(Tensor** leaves, int n);
 
-/* Compare op's output in bf16 against its f32 reference. `vals`/`shapes`/`ndims`
- * describe n leaf tensors; each is materialized in f32 (reference) then bf16. */
+/**
+ * Compare op's output in bf16 against its f32 reference. `vals`/`shapes`/`ndims`
+ * describe n leaf tensors; each is materialized in f32 (reference) then bf16.
+ * @param name (const char*)
+ * @param op (OpBuilder)
+ * @param vals (float**)
+ * @param shapes (int**)
+ * @param ndims (int*)
+ * @param n (int)
+ * @return (int)
+ */
 static int check(const char* name, OpBuilder op, float** vals, int** shapes, int* ndims, int n) {
     Tensor* lf[8];
     for (int i = 0; i < n; i++)

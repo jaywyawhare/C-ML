@@ -78,7 +78,13 @@ LRScheduler* lr_scheduler_reduce_on_plateau(Optimizer* optimizer, float factor, 
                                             float min_lr);
 LRScheduler* lr_scheduler_exponential(Optimizer* optimizer, float gamma);
 
-/* lr = eta_min + (initial_lr - eta_min) * (1 + cos(pi * epoch / T_max)) / 2 */
+/**
+ * lr = eta_min + (initial_lr - eta_min) * (1 + cos(pi * epoch / T_max)) / 2
+ * @param optimizer (Optimizer*)
+ * @param T_max (int)
+ * @param eta_min (float)
+ * @return (LRScheduler*)
+ */
 LRScheduler* lr_scheduler_cosine(Optimizer* optimizer, int T_max, float eta_min);
 
 LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int total_steps,
@@ -86,11 +92,24 @@ LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int tota
 LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int num_milestones,
                                      float gamma);
 
-/* lr = (initial_lr - min_lr) * (1 - epoch/total_iters)^power + min_lr */
+/**
+ * lr = (initial_lr - min_lr) * (1 - epoch/total_iters)^power + min_lr
+ * @param optimizer (Optimizer*)
+ * @param total_iters (int)
+ * @param power (float)
+ * @param min_lr (float)
+ * @return (LRScheduler*)
+ */
 LRScheduler* lr_scheduler_polynomial(Optimizer* optimizer, int total_iters, float power,
                                      float min_lr);
 
-/* Linear warmup for first N steps, then delegates to inner scheduler */
+/**
+ * Linear warmup for first N steps, then delegates to inner scheduler
+ * @param inner (LRScheduler*)
+ * @param warmup_steps (int)
+ * @param warmup_start_factor (float)
+ * @return (LRScheduler*)
+ */
 LRScheduler* lr_scheduler_warmup(LRScheduler* inner, int warmup_steps, float warmup_start_factor);
 
 float lr_scheduler_update(LRScheduler* scheduler, float metric);

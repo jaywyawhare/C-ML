@@ -698,7 +698,14 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
     }
 }
 
-/* NumPy-style broadcasting: shapes aligned from the right, dims compatible if equal or 1 */
+/**
+ * NumPy-style broadcasting: shapes aligned from the right, dims compatible if equal or 1
+ * @param shape1 (int*)
+ * @param ndim1 (int)
+ * @param shape2 (int*)
+ * @param ndim2 (int)
+ * @return (bool)
+ */
 bool tensor_can_broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2) {
     if (!shape1 || !shape2)
         return false;

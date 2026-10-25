@@ -62,7 +62,14 @@ static TensorConfig cfg(void) {
     return c;
 }
 
-/* Distinct values so a misplaced element is always visible. */
+/**
+ * Distinct values so a misplaced element is always visible.
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param base (float)
+ * @param step (float)
+ * @return (Tensor*)
+ */
 static Tensor* mk(const int* shape, int ndim, float base, float step) {
     TensorConfig c = cfg();
     Tensor* t      = tensor_zeros((int*)shape, ndim, &c);

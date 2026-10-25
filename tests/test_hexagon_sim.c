@@ -6,7 +6,10 @@
 #include "ops/ir/gpu/hexagon_sim.h"
 #include "test_harness.h"
 
-/* Instruction encoding helpers */
+/**
+ * Instruction encoding helpers
+ * @return (uint32_t)
+ */
 static uint32_t encode_nop(void) { return 0; }
 static uint32_t encode_halt(void) { return 0xF0000000; }
 

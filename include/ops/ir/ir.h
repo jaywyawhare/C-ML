@@ -36,11 +36,20 @@ int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs,
 struct IRNode* cml_ir_get_tail(CMLGraph_t ir);
 const char* uop_type_to_string(UOpType type);
 
-/* @param output_file Output file path (NULL = return string) */
+/**
+ *
+ * @param ir (CMLGraph_t)
+ * @param output_file (const char*)
+ * @return (char*)
+ */
 char* cml_ir_compile(CMLGraph_t ir, const char* output_file);
 char* cml_ir_to_string(CMLGraph_t ir);
 
-/* Computes the output shape from input shapes using NumPy-style broadcasting rules. */
+/**
+ * Computes the output shape from input shapes using NumPy-style broadcasting rules.
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 int cml_ir_compute_broadcast_shape(struct IRNode* node);
 
 #ifdef __cplusplus

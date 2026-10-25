@@ -35,7 +35,11 @@ static void init_weights(void) {
         B2[i] = -0.1f * i;
     }
 }
-/* out = relu(X@W1 + B1) @ W2 + B2, built around the given input tensor X */
+/**
+ * out = relu(X@W1 + B1) @ W2 + B2, built around the given input tensor X
+ * @param X (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* build_mlp(Tensor* X) {
     Tensor *w1 = cml_tensor_2d(W1, 4, 4), *b1 = cml_tensor_1d(B1, 4);
     Tensor *w2 = cml_tensor_2d(W2, 4, 4), *b2 = cml_tensor_1d(B2, 4);

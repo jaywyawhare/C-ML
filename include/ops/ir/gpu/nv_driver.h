@@ -253,12 +253,17 @@ int cml_nv_execute_graph(CMLNVDriver* drv, CMLGraph_t ir);
 
 struct IRNode;
 
-/* PTX text for a single node, or NULL if this generator cannot emit that op.
+/**
+ * PTX text for a single node, or NULL if this generator cannot emit that op.
  * Exposed so the emitted assembly can be checked without a GPU: it is otherwise
  * reachable only through cml_nv_execute_graph, which needs real hardware, and
  * that is how three separate bugs survived in it (doubled %% in the register
  * names, tanh/sigmoid/silu silently compiling to a copy, and exp/log emitting
- * ex2/lg2 -- i.e. 2**x and log2 -- instead of e**x and ln). Caller frees. */
+ * ex2/lg2 -- i.e. 2**x and log2 -- instead of e**x and ln). Caller frees.
+ * @param node (struct IRNode*)
+ * @param sm (int)
+ * @return (char*)
+ */
 char* cml_nv_gen_ptx_for_node(struct IRNode* node, int sm);
 
 #ifdef __cplusplus

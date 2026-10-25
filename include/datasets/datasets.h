@@ -26,10 +26,20 @@ typedef struct {
     int cyclical;            /* also emit sin/cos pairs for periodic components */
 } CSVParseOptions;
 
-/* Auto-detects header row, delimiter, and string labels; expands date/time columns. */
+/**
+ * Auto-detects header row, delimiter, and string labels; expands date/time columns.
+ * @param filepath (const char*)
+ * @param target_col (int)
+ * @return (Dataset*)
+ */
 Dataset* cml_dataset_from_csv(const char* filepath, int target_col);
 
-/* Returns cached path (static buffer) if file already exists. */
+/**
+ * Returns cached path (static buffer) if file already exists.
+ * @param url (const char*)
+ * @param filename (const char*)
+ * @return (const char*)
+ */
 const char* cml_dataset_download(const char* url, const char* filename);
 
 const char* cml_dataset_cache_dir(void);
@@ -45,13 +55,28 @@ float* cml_idx_load_labels(const char* path, int* n);
 int cml_csv_parse(const char* filepath, int target_col, float** X_out, float** y_out,
                   int* num_samples, int* num_features, int* num_classes, char*** class_names_out);
 
-/* Default parse options: last column target, auto header/delimiter, ISO dates,
- * date/time expansion on, no cyclical encoding. */
+/**
+ * Default parse options: last column target, auto header/delimiter, ISO dates,
+ * date/time expansion on, no cyclical encoding.
+ * @return (CSVParseOptions)
+ */
 CSVParseOptions cml_csv_default_options(void);
 
-/* Like cml_csv_parse with full control. When feature_names_out is non-NULL it
+/**
+ * Like cml_csv_parse with full control. When feature_names_out is non-NULL it
  * receives num_features heap-allocated feature names (caller frees each, then the
- * array). All output arrays are cml_malloc'd. Returns 0 on success. */
+ * array). All output arrays are cml_malloc'd. Returns 0 on success.
+ * @param filepath (const char*)
+ * @param opts (const CSVParseOptions*)
+ * @param X_out (float**)
+ * @param y_out (float**)
+ * @param num_samples (int*)
+ * @param num_features (int*)
+ * @param num_classes (int*)
+ * @param class_names_out (char***)
+ * @param feature_names_out (char***)
+ * @return (int)
+ */
 int cml_csv_parse_ex(const char* filepath, const CSVParseOptions* opts, float** X_out,
                      float** y_out, int* num_samples, int* num_features, int* num_classes,
                      char*** class_names_out, char*** feature_names_out);

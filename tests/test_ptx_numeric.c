@@ -76,7 +76,11 @@ static float r_leaky_relu(float x) { return x >= 0 ? x : 0.01f * x; }
 static float r_elu(float x) { return x >= 0 ? x : (expf(x) - 1.0f); }
 static float r_mish(float x) { return x * tanhf(logf(1.0f + expf(x))); }
 static float r_hardswish(float x) { return x * r_hard_sigmoid(x); }
-/* tanh-approximation GELU, matching execution_typed.c */
+/**
+ * tanh-approximation GELU, matching execution_typed.c
+ * @param x (float)
+ * @return (float)
+ */
 static float r_gelu(float x) {
     const float k = 0.7978845608028654f; /* sqrt(2/pi) */
     return 0.5f * x * (1.0f + tanhf(k * (x + 0.044715f * x * x * x)));
@@ -255,10 +259,13 @@ static int test_fill_value(void) {
     return ok;
 }
 
-/* The guard must leave elements past n untouched: grid*block > n here (40 > 37),
+/**
+ * The guard must leave elements past n untouched: grid*block > n here (40 > 37),
  * so a missing or inverted `setp.ge.u32` bounds check would scribble past the
  * end -- which on a real GPU is a memory fault, and is exactly the kind of bug
- * text inspection cannot see. */
+ * text inspection cannot see.
+ * @return (int)
+ */
 static int test_bounds_guard(void) {
     char* ptx = cml_ptx_gen_unary(g_cg, UOP_NEG, "k");
     if (!ptx)
@@ -290,8 +297,11 @@ static int test_bounds_guard(void) {
     return ok;
 }
 
-/* The interpreter must refuse what it does not implement, so a future codegen
- * change cannot quietly pass by emitting instructions nobody executes. */
+/**
+ * The interpreter must refuse what it does not implement, so a future codegen
+ * change cannot quietly pass by emitting instructions nobody executes.
+ * @return (int)
+ */
 static int test_interpreter_rejects_unknown(void) {
     static const char* bogus = ".visible .entry k(\n"
                                "    .param .u64 param_out,\n"

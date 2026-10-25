@@ -17,8 +17,13 @@
 
 typedef Optimizer* (*OptFactory)(Parameter**, int);
 
-/* Overwrite parameter buffers with a fixed pattern so both runs start identical
- * regardless of the (non-libc-seeded) weight initialiser. */
+/**
+ * Overwrite parameter buffers with a fixed pattern so both runs start identical
+ * regardless of the (non-libc-seeded) weight initialiser.
+ * @param params (Parameter**)
+ * @param np (int)
+ * @return (void)
+ */
 static void init_params(Parameter** params, int np) {
     for (int i = 0; i < np; i++) {
         Tensor* t = params[i] ? params[i]->tensor : NULL;
@@ -45,8 +50,13 @@ static Optimizer* make_adam_ams(Parameter** p, int n) {
     optimizer_set_amsgrad(o, true);
     return o;
 }
-/* Host-side optimizers (no IR step node): FUSE_OPTIM realizes their gradients in
- * one backward-graph pass, which must not change the result. */
+/**
+ * Host-side optimizers (no IR step node): FUSE_OPTIM realizes their gradients in
+ * one backward-graph pass, which must not change the result.
+ * @param p (Parameter**)
+ * @param n (int)
+ * @return (Optimizer*)
+ */
 static Optimizer* make_rmsprop(Parameter** p, int n) {
     return cml_optim_rmsprop(p, n, 0.01f, 0.0f, 0.99f, 1e-8f);
 }
@@ -75,10 +85,18 @@ static Optimizer* make_adamax(Parameter** p, int n) {
     return cml_optim_adamax(p, n, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
 }
 
-/* Train a fresh fixed-init model for `steps` real steps (forward/loss/backward/
+/**
+ * Train a fresh fixed-init model for `steps` real steps (forward/loss/backward/
  * step/reset -- the ordinary loop), optionally forcing the node-emitting IR
  * path, and flatten the final parameters into `out`. Fixed seed and fixed input
- * make the gradient sequence identical between the two runs. */
+ * make the gradient sequence identical between the two runs.
+ * @param make (OptFactory)
+ * @param steps (int)
+ * @param force_ir (bool)
+ * @param out (float*)
+ * @param out_n (int*)
+ * @return (void)
+ */
 static void run(OptFactory make, int steps, bool force_ir, float* out, int* out_n) {
     srand(1234);
     Sequential* m = cml_nn_sequential();

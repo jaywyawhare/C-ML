@@ -92,8 +92,12 @@ struct IRNode {
 };
 
 void cml_ir_free_node_params(struct IRNode* node);
-/* Canonical teardown of a node's owned storage (params/scope/build_stack/
- * shapes/...) without freeing the node or touching ref_count. */
+/**
+ * Canonical teardown of a node's owned storage (params/scope/build_stack/
+ * shapes/...) without freeing the node or touching ref_count.
+ * @param node (struct IRNode*)
+ * @return (void)
+ */
 void cml_ir_release_node_storage(struct IRNode* node);
 /**
  * Free an unlinked node: leave the CSE table, move the graph's last-result and frontier pointers
@@ -111,7 +115,12 @@ void cml_ir_destroy_node(CMLGraph_t ir, struct IRNode* node);
  * @return (void)
  */
 void cml_ir_set_output_shape(struct IRNode* node, int* shape, int ndim);
-/* Give a fused-away node's output to the graph, which frees it at teardown. */
+/**
+ * Give a fused-away node's output to the graph, which frees it at teardown.
+ * @param ir (CMLGraph_t)
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void cml_ir_adopt_detached(CMLGraph_t ir, Tensor* t);
 
 struct CMLGraph {
@@ -169,13 +178,23 @@ struct CMLGraph {
 
 uint64_t cml_fnv1a_bytes(uint64_t hash, const void* data, size_t len);
 
-/* Structural hash of `ir`'s forward graph: op type, output shape and input
- * count of every node. Two graphs with the same hash replay interchangeably. */
+/**
+ * Structural hash of `ir`'s forward graph: op type, output shape and input
+ * count of every node. Two graphs with the same hash replay interchangeably.
+ * @param ir (CMLGraph_t)
+ * @return (uint64_t)
+ */
 uint64_t cml_ir_graph_hash(CMLGraph_t ir);
 
-/* Collect the output data pointers of `ir`'s forward nodes into `ptrs` (at most
+/**
+ * Collect the output data pointers of `ir`'s forward nodes into `ptrs` (at most
  * `max`), one slot per node, NULL where a node has no realized output. Returns
- * how many slots were written -- the tensor binding a trace replay expects. */
+ * how many slots were written -- the tensor binding a trace replay expects.
+ * @param ir (CMLGraph_t)
+ * @param ptrs (void**)
+ * @param max (int)
+ * @return (int)
+ */
 int cml_ir_output_slots(CMLGraph_t ir, void** ptrs, int max);
 
 /* Graph-editing primitives shared by the IR rewrite passes (pattern matcher,
@@ -183,24 +202,48 @@ int cml_ir_output_slots(CMLGraph_t ir, void** ptrs, int max);
 struct IRNode* cml_ir_find_by_output(CMLGraph_t ir, const char* output_name);
 void cml_ir_unlink_node(CMLGraph_t ir, struct IRNode* node);
 
-/* Repoint every input reference to `old_name` at `new_name`. */
+/**
+ * Repoint every input reference to `old_name` at `new_name`.
+ * @param ir (CMLGraph_t)
+ * @param old_name (const char*)
+ * @param new_name (const char*)
+ * @return (void)
+ */
 void cml_ir_replace_refs(CMLGraph_t ir, const char* old_name, const char* new_name);
 
-/* Splice `new_node` in just before `before`, or at the tail when `before` is
- * NULL or not in the graph. */
+/**
+ * Splice `new_node` in just before `before`, or at the tail when `before` is
+ * NULL or not in the graph.
+ * @param ir (CMLGraph_t)
+ * @param new_node (struct IRNode*)
+ * @param before (struct IRNode*)
+ * @return (void)
+ */
 void cml_ir_insert_before(CMLGraph_t ir, struct IRNode* new_node, struct IRNode* before);
 
-/* Module scope tracking for the graph view. Without it graph.json is a flat
+/**
+ * Module scope tracking for the graph view. Without it graph.json is a flat
  * list of primitives -- after decomposition a real model is thousands of nodes
  * and no one can find anything. module_forward pushes/pops around every layer,
  * so nesting (Sequential/Linear) falls out for free. Only records under VIZ:
- * outside the dashboard the strdup per node is pure overhead. */
+ * outside the dashboard the strdup per node is pure overhead.
+ * @param name (const char*)
+ * @return (void)
+ */
 void cml_ir_scope_push(const char* name);
 void cml_ir_scope_pop(void);
 const char* cml_ir_scope_current(void);
 
-/* Axis-wise lane decomposition: element (o,j,i) of `t` around `dim` lives at
- * (o*count + j)*inner + i. */
+/**
+ * Axis-wise lane decomposition: element (o,j,i) of `t` around `dim` lives at
+ * (o*count + j)*inner + i.
+ * @param t (const Tensor*)
+ * @param dim (int)
+ * @param outer (size_t*)
+ * @param count (size_t*)
+ * @param inner (size_t*)
+ * @return (void)
+ */
 void cml_lanes_of(const Tensor* t, int dim, size_t* outer, size_t* count, size_t* inner);
 
 /* The permutation the SORT/TOPK forward uses for one lane: `ord[0..k)` holds the
@@ -210,11 +253,20 @@ void cml_lanes_of(const Tensor* t, int dim, size_t* outer, size_t* count, size_t
 void cml_lane_order(const void* src, DType dt, size_t base, size_t inner, size_t cnt, size_t k,
                     bool desc, size_t* ord);
 
-/* Element of `in` read by flat output index `i` of a strided slice, addressed
+/**
+ * Element of `in` read by flat output index `i` of a strided slice, addressed
  * through `layout` (normally `in` itself, which may be a view: its data points
  * at the base buffer, so its strides and storage_offset apply; or a contiguous
  * buffer of in's shape, such as its gradient). Returns false when the element
- * falls outside `in`. Shared by both forward kernels and the backward. */
+ * falls outside `in`. Shared by both forward kernels and the backward.
+ * @param in (const Tensor*)
+ * @param layout (const Tensor*)
+ * @param out (const Tensor*)
+ * @param sp (const SliceParams*)
+ * @param i (size_t)
+ * @param src (size_t*)
+ * @return (bool)
+ */
 bool cml_slice_src(const Tensor* in, const Tensor* layout, const Tensor* out, const SliceParams* sp,
                    size_t i, size_t* src);
 

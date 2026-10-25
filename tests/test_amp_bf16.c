@@ -12,18 +12,24 @@
 
 static int test_amp_env_default(void);
 
-/* The dtype CML_AMP_DTYPE asks for; the value is cached on first read inside
- * the library, so every suite in this binary sees the same answer. */
+/**
+ * The dtype CML_AMP_DTYPE asks for; the value is cached on first read inside
+ * the library, so every suite in this binary sees the same answer.
+ * @return (DType)
+ */
 static DType amp_env_expected_dtype(void) {
     const char* env = getenv("CML_AMP_DTYPE");
     return (env && (strcmp(env, "bf16") == 0 || strcmp(env, "bfloat16") == 0)) ? DTYPE_BFLOAT16
                                                                                : DTYPE_FLOAT16;
 }
 
-/* Tiny linear layer y = w·x trained under bf16 autocast. The forward runs in
+/**
+ * Tiny linear layer y = w·x trained under bf16 autocast. The forward runs in
  * bf16 (cast-in), gradients come back through the bf16 graph, and the fp32
  * master weight is updated manually - the canonical AMP loop without an
- * optimizer, so the test isolates autocast/scaler behavior. */
+ * optimizer, so the test isolates autocast/scaler behavior.
+ * @return (int)
+ */
 static int test_bf16_training(void) {
     if (autocast_is_enabled())
         return 0;
@@ -139,9 +145,12 @@ static int test_amp_dtype_api(void) {
     return autocast_get_dtype() == DTYPE_FLOAT16;
 }
 
-/* CML_AMP_DTYPE selects the default target dtype; it is cached on first read,
+/**
+ * CML_AMP_DTYPE selects the default target dtype; it is cached on first read,
  * so this suite validates whichever variant it was launched with and CTest
- * registers both (plain, and with CML_AMP_DTYPE=bf16). */
+ * registers both (plain, and with CML_AMP_DTYPE=bf16).
+ * @return (int)
+ */
 static int test_amp_env_default(void) {
     return autocast_default_dtype() == amp_env_expected_dtype();
 }

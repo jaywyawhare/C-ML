@@ -14,8 +14,12 @@
 
 #define FUSED_BUF_SIZE 16384
 
-/* Lower a fusion group into a flat LOAD/COMPUTE/STORE program, assigning vregs and
- * skipping stores for buffers the group marked eliminated (kept in registers). */
+/**
+ * Lower a fusion group into a flat LOAD/COMPUTE/STORE program, assigning vregs and
+ * skipping stores for buffers the group marked eliminated (kept in registers).
+ * @param g (const CMLFusionGroup*)
+ * @return (CMLLinearProgram*)
+ */
 CMLLinearProgram* cml_linearize_group(const CMLFusionGroup* g) {
     if (!g || g->num_nodes == 0)
         return NULL;
@@ -402,8 +406,13 @@ static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
     return buf;
 }
 
-/* Emit NVIDIA PTX for the fused kernel (one thread per element). Returns NULL for any op
- * that cannot be lowered, so the caller falls back to a backend that can run it. */
+/**
+ * Emit NVIDIA PTX for the fused kernel (one thread per element). Returns NULL for any op
+ * that cannot be lowered, so the caller falls back to a backend that can run it.
+ * @param prog (const CMLLinearProgram*)
+ * @param work_size (size_t)
+ * @return (char*)
+ */
 char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = cml_malloc(FUSED_BUF_SIZE);
     if (!buf)
@@ -734,9 +743,15 @@ static void emit(uint32_t** ptr, uint32_t word) {
     (*ptr)++;
 }
 
-/* Emit a self-contained SPIR-V 1.3 compute shader for the fused kernel, one storage
+/**
+ * Emit a self-contained SPIR-V 1.3 compute shader for the fused kernel, one storage
  * buffer per LOAD/STORE. Returns the word array (length in out_num_words) or NULL if an
- * op cannot be lowered. */
+ * op cannot be lowered.
+ * @param prog (const CMLLinearProgram*)
+ * @param work_size (size_t)
+ * @param out_num_words (int*)
+ * @return (uint32_t*)
+ */
 uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size,
                                      int* out_num_words) {
     if (!prog || !out_num_words)
@@ -1346,8 +1361,14 @@ static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) 
     return buf;
 }
 
-/* Generate a fused kernel for the requested backend, counting I/O buffers and falling
- * back to the C backend for unsupported targets. */
+/**
+ * Generate a fused kernel for the requested backend, counting I/O buffers and falling
+ * back to the C backend for unsupported targets.
+ * @param prog (const CMLLinearProgram*)
+ * @param backend (CMLFusedBackend)
+ * @param work_size (size_t)
+ * @return (CMLFusedKernel*)
+ */
 CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog, CMLFusedBackend backend,
                                   size_t work_size) {
     if (!prog || prog->num_ops == 0)

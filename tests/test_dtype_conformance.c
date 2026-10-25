@@ -50,11 +50,16 @@ static const char* dtype_name(DType d) {
     }
 }
 
-/* Tolerance scales with the storage format's precision: the half types compute
+/**
+ * Tolerance scales with the storage format's precision: the half types compute
  * in f32 and round the result back, so an 8-bit-mantissa bf16 cannot match an
  * f32 reference to 1e-5. Source values are small integers, so most results are
  * exact anyway; the looser bound only matters for accumulated values (prod,
- * matmul, logsumexp). */
+ * matmul, logsumexp).
+ * @param d (DType)
+ * @param want (double)
+ * @return (double)
+ */
 static double dtype_tol(DType d, double want) {
     switch (d) {
     case DTYPE_FLOAT16:
@@ -79,9 +84,16 @@ static bool dtype_holds(DType d, double v) {
     }
 }
 
-/* Source values are small integers so every dtype under test -- including int8
+/**
+ * Source values are small integers so every dtype under test -- including int8
  * and the half formats -- represents them exactly; a mismatch is then a real
- * kernel bug and never a rounding artefact. */
+ * kernel bug and never a rounding artefact.
+ * @param dt (DType)
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param vals (const double*)
+ * @return (Tensor*)
+ */
 static Tensor* make(DType dt, const int* shape, int ndim, const double* vals) {
     TensorConfig c = cfg_of(dt);
     Tensor* t      = tensor_zeros((int*)shape, ndim, &c);
@@ -280,9 +292,14 @@ static Tensor* b_matmul(Tensor** in, int n) {
     return uop_matmul(in[0], in[1]);
 }
 
-/* Composite chains: single-op cases can pass while the passes that rewrite
+/**
+ * Composite chains: single-op cases can pass while the passes that rewrite
  * whole graphs (elementwise fusion, JIT codegen) still mishandle a dtype, so
- * these run several ops together. */
+ * these run several ops together.
+ * @param in (Tensor**)
+ * @param n (int)
+ * @return (Tensor*)
+ */
 static Tensor* b_chain(Tensor** in, int n) {
     (void)n;
     Tensor* t = uop_mul(in[0], in[1]);
@@ -376,9 +393,14 @@ static Tensor* b_unfold(Tensor** in, int n) {
     (void)n;
     return uop_unfold(in[0], 2, 1);
 }
-/* Rank-3 movement cases. Every kernel in this family had an ndim==1/2 special
+/**
+ * Rank-3 movement cases. Every kernel in this family had an ndim==1/2 special
  * case and no general arm, in both the f32 interpreter and the typed path, so
- * rank-2 conformance could not see it. */
+ * rank-2 conformance could not see it.
+ * @param in (Tensor**)
+ * @param n (int)
+ * @return (Tensor*)
+ */
 static Tensor* b_pad3(Tensor** in, int n) {
     (void)n;
     static int pw[6] = {0, 1, 1, 0, 1, 1};
@@ -429,7 +451,12 @@ static Tensor* b_masked_select3(Tensor** in, int n) {
     return uop_masked_select(in[0], in[1]);
 }
 
-/* 4-D cases: NCHW input, so they exercise conv/pool index arithmetic */
+/**
+ * 4-D cases: NCHW input, so they exercise conv/pool index arithmetic
+ * @param in (Tensor**)
+ * @param n (int)
+ * @return (Tensor*)
+ */
 static Tensor* b_maxpool(Tensor** in, int n) {
     (void)n;
     Pool2DParams p = {.kernel_size       = {2, 2},
@@ -586,9 +613,13 @@ static const Case CASES[] = {
     {"conv2d", b_conv2d, 1, {1, 1, 3, 3}, 4, {A33}},
 };
 
-/* Integer-domain ops have no float reference to compare against -- bitwise and
+/**
+ * Integer-domain ops have no float reference to compare against -- bitwise and
  * shift results are defined on the bit pattern, not on a numeric value -- so
- * they are checked against values computed by hand. */
+ * they are checked against values computed by hand.
+ * @param dt (DType)
+ * @return (void)
+ */
 static void run_int_cases(DType dt) {
     const double A[4]    = {0xF0, 0xFF, 12, 7};
     const double B[4]    = {0x0F, 0x0F, 10, 2};
@@ -686,11 +717,14 @@ static void run_int_cases(DType dt) {
     cml_reset_ir_context();
 }
 
-/* A comparison yields a bool mask. Lowering SUB to ADD(a, MUL(b, -1)) once
+/**
+ * A comparison yields a bool mask. Lowering SUB to ADD(a, MUL(b, -1)) once
  * gave the MUL its first input's dtype, so for a bool mask `1 - mask` came out
  * as `1 + mask`, and where(mask, a, b) -- which lowers through that SUB --
  * returned a + 2b where the mask was true, with matching wrong gradients. The
- * mask must not be realized first: the bug only showed in a single graph. */
+ * mask must not be realized first: the bug only showed in a single graph.
+ * @return (int)
+ */
 static int test_bool_mask_arithmetic(void) {
     float av[6] = {1, 5, 3, -2, 0, 7}, bv[6] = {2, 4, 3, -1, 1, 6};
     int sh[1]        = {6};
@@ -722,11 +756,14 @@ static int test_bool_mask_arithmetic(void) {
     return ok;
 }
 
-/* Each slice in a chain is a strided view of the base tensor. Realizing one
+/**
+ * Each slice in a chain is a strided view of the base tensor. Realizing one
  * only gave the output a private buffer when it aliased the *direct* input, so
  * once the first slice had its own buffer the middle one was written straight
  * into the base tensor's storage. The first chain still read correctly; any
- * later read of the base -- here, the same chain again -- saw corrupted data. */
+ * later read of the base -- here, the same chain again -- saw corrupted data.
+ * @return (int)
+ */
 static int test_chained_slices_preserve_base(void) {
     float av[120];
     for (int i = 0; i < 120; i++)

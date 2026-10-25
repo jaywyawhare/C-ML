@@ -47,8 +47,11 @@ static int check(const char* name, int ok) {
 
 /* ---- observers ---- */
 
-/* Plain MINMAX mode must track the exact running extremes across batches,
- * ignore later smaller values, and clear on reset(). */
+/**
+ * Plain MINMAX mode must track the exact running extremes across batches,
+ * ignore later smaller values, and clear on reset().
+ * @return (int)
+ */
 static int test_observer_minmax(void) {
     QatObserver* obs = cml_qat_observer_create(CML_QAT_OBS_MINMAX, 0.0f);
     if (!obs)
@@ -86,10 +89,13 @@ static int test_observer_minmax(void) {
     return ok;
 }
 
-/* Moving-average mode: an outlier batch must decay away geometrically. Each
+/**
+ * Moving-average mode: an outlier batch must decay away geometrically. Each
  * batch here spans its range deterministically (linspace), so after enough
  * updates the running stats sit exactly on the in-range extremes up to the
- * vanishing outlier residue 4 * 0.5^49. */
+ * vanishing outlier residue 4 * 0.5^49.
+ * @return (int)
+ */
 static int test_observer_ema(void) {
     QatObserver* obs = cml_qat_observer_create(CML_QAT_OBS_MOVING_AVG_MINMAX, 0.5f);
     if (!obs)
@@ -123,8 +129,12 @@ static int test_observer_ema(void) {
 
 /* ---- fake quant ---- */
 
-/* Max abs error against the unquantized values must be <= scale/2, and every
- * output must sit exactly on the quantization grid. */
+/**
+ * Max abs error against the unquantized values must be <= scale/2, and every
+ * output must sit exactly on the quantization grid.
+ * @param n (int)
+ * @return (int)
+ */
 static int test_fake_quant_error_bound(int n) {
     float* xd = malloc(sizeof(float) * n);
     for (int i = 0; i < n; i++)
@@ -159,12 +169,15 @@ static int test_fake_quant_error_bound(int n) {
     return ok;
 }
 
-/* STE gradient: with loss L = sum(w * fq(x)), dL/dx must equal w exactly
+/**
+ * STE gradient: with loss L = sum(w * fq(x)), dL/dx must equal w exactly
  * (identity pass-through), including for elements outside the calibrated
  * range. Cross-checked against central differences of the STE surrogate
  * f(x) = sum(w * (x + c)) with c = fq - x frozen from the base evaluation -
  * differencing the raw forward would probe the piecewise-constant rounding,
- * not the estimator. */
+ * not the estimator.
+ * @return (int)
+ */
 static int test_ste_gradient_identity(void) {
     const int n = 8;
     float xd[8], wd[8];
@@ -226,8 +239,11 @@ static int test_ste_gradient_identity(void) {
 
 /* ---- tiny end-to-end: linear layer trained through weight fake-quant ---- */
 
-/* y = X @ W with W fake-quantized each step (observer recalibrating as SGD
- * moves it). The loss must drop well below its starting value. */
+/**
+ * y = X @ W with W fake-quantized each step (observer recalibrating as SGD
+ * moves it). The loss must drop well below its starting value.
+ * @return (int)
+ */
 static int test_linear_training_with_weight_fake_quant(void) {
     enum { N = 16, K = 3 };
     float xd[N * K], td[N];

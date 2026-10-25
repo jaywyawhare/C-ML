@@ -26,8 +26,14 @@ static Tensor* make_1d(const float* d, int n) {
     return tensor_from_data(d, shape, 1, &cfg);
 }
 
-/* Run one op through the executor and return its output tensor (owned by the
- * caller). `nin` inputs, one unbound output slot. */
+/**
+ * Run one op through the executor and return its output tensor (owned by the
+ * caller). `nin` inputs, one unbound output slot.
+ * @param name (const char*)
+ * @param in (Tensor**)
+ * @param nin (int)
+ * @return (Tensor*)
+ */
 static Tensor* run_op(const char* name, Tensor** in, int nin) {
     CMLThunderExecutor* exec = cml_thunder_create("cml_cpu");
     REQUIRE(exec);
@@ -166,7 +172,10 @@ static bool test_where(void) {
     return ok;
 }
 
-/* torch.max reduces every axis, matching how torch.sum and torch.mean dispatch. */
+/**
+ * torch.max reduces every axis, matching how torch.sum and torch.mean dispatch.
+ * @return (bool)
+ */
 static bool test_max_reduce(void) {
     const float x[5] = {1.0f, -4.0f, 7.5f, 2.0f, 0.0f};
     const float w[1] = {7.5f};
@@ -180,9 +189,12 @@ static bool test_max_reduce(void) {
     return ok;
 }
 
-/* An op that was never in the table, and the four pruned from it, must all fail
+/**
+ * An op that was never in the table, and the four pruned from it, must all fail
  * with the same clear "unsupported" path rather than resolving and dying in
- * dispatch. */
+ * dispatch.
+ * @return (bool)
+ */
 static bool test_unsupported_ops_rejected(void) {
     const float x[2] = {1.0f, 2.0f};
     Tensor* a        = make_1d(x, 2);
@@ -203,9 +215,12 @@ static bool test_unsupported_ops_rejected(void) {
     return ok;
 }
 
-/* The contract this suite exists to protect: every name the table advertises
+/**
+ * The contract this suite exists to protect: every name the table advertises
  * executes. Driven through the public API, so it covers the whole table, not
- * just the ops repaired above. */
+ * just the ops repaired above.
+ * @return (bool)
+ */
 static bool test_every_advertised_unary_op_dispatches(void) {
     /* Positive inputs so log/sqrt are in domain. */
     const float x[3] = {0.5f, 1.5f, 2.5f};

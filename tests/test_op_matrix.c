@@ -33,7 +33,11 @@ static TensorConfig i32c(void) {
 
 static int g_fail = 0;
 
-/* Execute and release; record structural failure only. */
+/**
+ * Execute and release; record structural failure only.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 static void run(Tensor* t) {
     if (!t)
         return; /* clean rejection is acceptable */

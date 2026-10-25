@@ -5,7 +5,8 @@
 
 struct IRNode;
 
-/* Typed (non-float32) execution.
+/**
+ * Typed (non-float32) execution.
  *
  * The float32 executor reads every buffer as `float*`. This path covers the
  * same ops for every other dtype: kernels are written once against the
@@ -14,13 +15,22 @@ struct IRNode;
  *
  * Returns 0 if the node was executed, -1 if no typed kernel applies. A -1 must
  * NOT fall through to the float32 path -- reinterpreting a non-f32 buffer as
- * float silently produces garbage, which is what this path exists to prevent. */
+ * float silently produces garbage, which is what this path exists to prevent.
+ * @param node (struct IRNode*)
+ * @param out (Tensor*)
+ * @return (int)
+ */
 int cml_exec_typed(struct IRNode* node, Tensor* out);
 
-/* True when `node` must be routed through cml_exec_typed rather than the f32
+/**
+ * True when `node` must be routed through cml_exec_typed rather than the f32
  * kernels, i.e. any participating buffer is not float32. Index/predicate ops
  * whose output dtype differs from f32 by design (argmax, comparisons) are
- * judged on their inputs, not their output. */
+ * judged on their inputs, not their output.
+ * @param node (struct IRNode*)
+ * @param out (Tensor*)
+ * @return (bool)
+ */
 bool cml_exec_needs_typed(struct IRNode* node, Tensor* out);
 
 #endif /* CML_OPS_IR_EXECUTION_TYPED_H */

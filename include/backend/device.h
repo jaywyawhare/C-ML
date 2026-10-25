@@ -31,13 +31,19 @@ typedef struct {
     bool available;      // Is device available?
 } DeviceInfo;
 
-/* Detects all available devices; sets default to best available
-   (CUDA > Metal > ROCm > Vulkan > OpenCL > oneAPI > CPU) */
+/**
+ * Detects all available devices; sets default to best available
+ * (CUDA > Metal > ROCm > Vulkan > OpenCL > oneAPI > CPU)
+ * @return (void)
+ */
 void device_init(void);
 void device_cleanup(void);
 bool device_detect_available(void);
 
-/* Priority: CUDA > Metal > ROCm > Vulkan > OpenCL > oneAPI > CPU */
+/**
+ * Priority: CUDA > Metal > ROCm > Vulkan > OpenCL > oneAPI > CPU
+ * @return (DeviceType)
+ */
 DeviceType device_get_best_available(void);
 
 bool device_cuda_available(void);
@@ -46,7 +52,10 @@ bool device_metal_available(void);
 bool device_rocm_available(void);
 int device_rocm_get_count(void);
 
-/* If DEVICE_AUTO is set, returns the best available device */
+/**
+ * If DEVICE_AUTO is set, returns the best available device
+ * @return (DeviceType)
+ */
 DeviceType device_get_default(void);
 void device_set_default(DeviceType device);
 DeviceType device_get_current(void);
@@ -64,7 +73,12 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
 int device_copy_to_device(void* dst, const void* src, size_t size, DeviceType device);
 int device_copy_from_device(void* dst, const void* src, size_t size, DeviceType device);
 
-/* Allocates memory on target device, copies data, and frees old memory */
+/**
+ * Allocates memory on target device, copies data, and frees old memory
+ * @param tensor (struct Tensor*)
+ * @param device (DeviceType)
+ * @return (int)
+ */
 int device_move_tensor(struct Tensor* tensor, DeviceType device);
 int device_move_tensor_to_default(struct Tensor* tensor);
 
@@ -72,8 +86,13 @@ struct Tensor* tensor_empty_auto(int* shape, int ndim, int dtype);
 struct Tensor* tensor_zeros_auto(int* shape, int ndim, int dtype);
 struct Tensor* tensor_ones_auto(int* shape, int ndim, int dtype);
 
-/* Creates N virtual GPU devices backed by CPU memory.
-   Allows testing multi-GPU code paths without real hardware. */
+/**
+ * Creates N virtual GPU devices backed by CPU memory.
+ * Allows testing multi-GPU code paths without real hardware.
+ * @param num_devices (int)
+ * @param memory_per_device (size_t)
+ * @return (int)
+ */
 int device_sim_gpu_enable(int num_devices, size_t memory_per_device);
 void device_sim_gpu_disable(void);
 bool device_sim_gpu_available(void);

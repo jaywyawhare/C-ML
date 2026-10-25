@@ -59,8 +59,13 @@ typedef struct {
 CMLTinyJit* cml_tinyjit_create(void);
 void cml_tinyjit_free(CMLTinyJit* jit);
 
-/* First call: execute normally + record trace.
-   Subsequent calls: replay cached trace if graph hash + shapes match. */
+/**
+ * First call: execute normally + record trace.
+ * Subsequent calls: replay cached trace if graph hash + shapes match.
+ * @param jit (CMLTinyJit*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_tinyjit_execute(CMLTinyJit* jit, CMLGraph_t ir);
 
 void cml_tinyjit_stats(const CMLTinyJit* jit, size_t* hits, size_t* misses, size_t* invalidations);

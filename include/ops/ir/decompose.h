@@ -14,15 +14,24 @@
 extern "C" {
 #endif
 
-/* Idempotent -- guarded by ir->is_decomposed flag.
-   Should be called before optimization (fusion can then optimize the
-   primitive chains). */
+/**
+ * Idempotent -- guarded by ir->is_decomposed flag.
+ * Should be called before optimization (fusion can then optimize the
+ * primitive chains).
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_decompose(CMLGraph_t ir);
 
-/* Decompose only the node range starting at `start` (NULL means head).
+/**
+ * Decompose only the node range starting at `start` (NULL means head).
  * Used by double-backward to lower ops appended between two grad passes
  * without touching already-emitted backward nodes, which a whole-graph
- * re-lower would corrupt. Marks the context decomposed like the full pass. */
+ * re-lower would corrupt. Marks the context decomposed like the full pass.
+ * @param ir (CMLGraph_t)
+ * @param start (struct IRNode*)
+ * @return (int)
+ */
 int cml_ir_decompose_from(CMLGraph_t ir, struct IRNode* start);
 
 #ifdef __cplusplus

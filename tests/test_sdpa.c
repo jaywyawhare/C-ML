@@ -39,7 +39,14 @@ static void init_data(void) {
 
 static int qs[] = {B, H, SQ, DH}, ks[] = {B, H, SK, DH}, ms[] = {B, H, SQ, SK};
 
-/* Independent naive attention reference straight from the arrays. */
+/**
+ * Independent naive attention reference straight from the arrays.
+ * @param with_mask (int)
+ * @param with_bias (int)
+ * @param scale (float)
+ * @param out (float*)
+ * @return (void)
+ */
 static void naive(int with_mask, int with_bias, float scale, float* out) {
     for (int b = 0; b < B; b++)
         for (int h = 0; h < H; h++)
@@ -71,7 +78,13 @@ static void naive(int with_mask, int with_bias, float scale, float* out) {
             }
 }
 
-/* Forward: fused vs an independent naive attention (ground truth). */
+/**
+ * Forward: fused vs an independent naive attention (ground truth).
+ * @param name (const char*)
+ * @param with_mask (int)
+ * @param with_bias (int)
+ * @return (int)
+ */
 static int check_forward(const char* name, int with_mask, int with_bias) {
     float scale = 1.0f / sqrtf((float)DH);
     float nref[NEL], got[NEL];
@@ -94,7 +107,13 @@ static int check_forward(const char* name, int with_mask, int with_bias) {
     return ok;
 }
 
-/* Scalar loss sum(fused SDPA) for a finite-difference grad-check over `buf`. */
+/**
+ * Scalar loss sum(fused SDPA) for a finite-difference grad-check over `buf`.
+ * @param with_mask (int)
+ * @param with_bias (int)
+ * @param scale (float)
+ * @return (float)
+ */
 static float fwd_loss(int with_mask, int with_bias, float scale) {
     Tensor* q    = cml_tensor(QD, qs, 4, &CFG);
     Tensor* k    = cml_tensor(KD, ks, 4, &CFG);
@@ -124,7 +143,13 @@ static float max_fd_diff(int wm, int wb, float scale, float* buf, const float* a
     return md;
 }
 
-/* Gradient check: analytic dq/dk/dv vs finite differences of the fused forward. */
+/**
+ * Gradient check: analytic dq/dk/dv vs finite differences of the fused forward.
+ * @param name (const char*)
+ * @param with_mask (int)
+ * @param with_bias (int)
+ * @return (int)
+ */
 static int check_grad(const char* name, int with_mask, int with_bias) {
     float scale = 1.0f / sqrtf((float)DH);
     float aq[NEL], ak[NEL], av[NEL];
@@ -159,7 +184,10 @@ static int check_grad(const char* name, int with_mask, int with_bias) {
     return ok;
 }
 
-/* Native bf16 forward matches the f32 reference within bf16 precision. */
+/**
+ * Native bf16 forward matches the f32 reference within bf16 precision.
+ * @return (int)
+ */
 static int check_bf16(void) {
     float scale = 1.0f / sqrtf((float)DH);
     float ref[NEL];

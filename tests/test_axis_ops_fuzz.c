@@ -121,7 +121,16 @@ static Tensor* build(int op, Tensor* a, int axis) {
     }
 }
 
-/* Reference over one lane: elements are at base + j*inner for j in [0,count). */
+/**
+ * Reference over one lane: elements are at base + j*inner for j in [0,count).
+ * @param op (int)
+ * @param in (const float*)
+ * @param base (size_t)
+ * @param inner (size_t)
+ * @param count (size_t)
+ * @param out_lane (float*)
+ * @return (void)
+ */
 static void ref_lane(int op, const float* in, size_t base, size_t inner, size_t count,
                      float* out_lane) {
     if (is_reduction(op)) {

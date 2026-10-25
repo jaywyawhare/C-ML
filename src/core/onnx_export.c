@@ -250,7 +250,13 @@ static const char* ctx_error(ExportCtx* c, const char* fmt, ...) {
     return c->err;
 }
 
-/* Pointer-keyed registry: returns existing name for t, or registers `name`. */
+/**
+ * Pointer-keyed registry: returns existing name for t, or registers `name`.
+ * @param c (ExportCtx*)
+ * @param t (Tensor*)
+ * @param name (const char*)
+ * @return (const char*)
+ */
 static const char* intern_name(ExportCtx* c, Tensor* t, const char* name) {
     for (int i = 0; i < c->num_names; i++)
         if (c->names[i].t == t)
@@ -297,7 +303,13 @@ static bool is_user_input(ExportCtx* c, Tensor* t) {
     return false;
 }
 
-/* Emit one TensorProto (initializer) for an eager tensor. */
+/**
+ * Emit one TensorProto (initializer) for an eager tensor.
+ * @param c (ExportCtx*)
+ * @param t (Tensor*)
+ * @param name (const char*)
+ * @return (bool)
+ */
 static bool emit_initializer(ExportCtx* c, Tensor* t, const char* name) {
     if (!t->data && t->numel > 0) {
         tensor_ensure_executed(t);
@@ -332,7 +344,12 @@ static bool emit_initializer(ExportCtx* c, Tensor* t, const char* name) {
     return ok;
 }
 
-/* Name for an eager leaf tensor: graph input if user-listed, else initializer. */
+/**
+ * Name for an eager leaf tensor: graph input if user-listed, else initializer.
+ * @param c (ExportCtx*)
+ * @param t (Tensor*)
+ * @return (const char*)
+ */
 static const char* leaf_name(ExportCtx* c, Tensor* t) {
     const char* existing = lookup_name(c, t);
     if (existing)
@@ -358,7 +375,14 @@ static const char* leaf_name(ExportCtx* c, Tensor* t) {
     return nm;
 }
 
-/* ValueInfoProto{name=1, type=2 TypeProto{tensor_type=1{elem_type=1, shape=2}}}*/
+/**
+ * ValueInfoProto{name=1, type=2 TypeProto{tensor_type=1{elem_type=1, shape=2}}}
+ * @param dst (PBBuf*)
+ * @param field (int)
+ * @param t (Tensor*)
+ * @param name (const char*)
+ * @return (bool)
+ */
 static bool emit_value_info(PBBuf* dst, int field, Tensor* t, const char* name) {
     int et = cml_onnx_elem_type(t->dtype);
     if (!et)
@@ -636,9 +660,14 @@ static const char* map_uop(struct IRNode* n) {
     }
 }
 
-/* Rank of node input `i`. Prefers the `input_ndims` snapshot: the `inputs`
+/**
+ * Rank of node input `i`. Prefers the `input_ndims` snapshot: the `inputs`
  * Tensor* array can be cleared once the graph is realized, and reading ndim
- * straight off it then yields 0. Returns 0 when neither is available. */
+ * straight off it then yields 0. Returns 0 when neither is available.
+ * @param n (struct IRNode*)
+ * @param i (int)
+ * @return (int)
+ */
 static int input_rank(struct IRNode* n, int i) {
     if (i < 0 || i >= n->num_inputs)
         return 0;
@@ -647,7 +676,13 @@ static int input_rank(struct IRNode* n, int i) {
     return (n->inputs && n->inputs[i]) ? n->inputs[i]->ndim : 0;
 }
 
-/* Attributes for ops carrying parameters. Returns false on error. */
+/**
+ * Attributes for ops carrying parameters. Returns false on error.
+ * @param c (ExportCtx*)
+ * @param n (struct IRNode*)
+ * @param attrs (AttrList*)
+ * @return (bool)
+ */
 static bool build_attrs(ExportCtx* c, struct IRNode* n, AttrList* attrs) {
     switch (n->type) {
     case UOP_PERMUTE: {
@@ -758,7 +793,11 @@ static bool build_attrs(ExportCtx* c, struct IRNode* n, AttrList* attrs) {
     }
 }
 
-/* Shared scalar-1 f32 initializer for synthesized Div operands (RECIP). */
+/**
+ * Shared scalar-1 f32 initializer for synthesized Div operands (RECIP).
+ * @param c (ExportCtx*)
+ * @return (const char*)
+ */
 static const char* ensure_one_scalar(ExportCtx* c) {
     Tensor* existing = NULL;
     for (int i = 0; i < c->num_names; i++)
@@ -782,7 +821,14 @@ static const char* ensure_one_scalar(ExportCtx* c) {
     return intern_name(c, one, "cml_one_f32");
 }
 
-/* Int64 shape-vector initializer (Reshape/Expand second operand). */
+/**
+ * Int64 shape-vector initializer (Reshape/Expand second operand).
+ * @param c (ExportCtx*)
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param name (const char*)
+ * @return (const char*)
+ */
 static const char* emit_shape_initializer(ExportCtx* c, const int* shape, int ndim,
                                           const char* name) {
     int64_t sv[8];
@@ -813,10 +859,16 @@ static const char* emit_shape_initializer(ExportCtx* c, const int* shape, int nd
     return name;
 }
 
-/*
+/**
  * Emit a node whose operand set differs from the raw IR inputs.
  * Returns 0 = fully handled, -1 = error. `out_name` is the exported name of
  * this node's output tensor.
+ * @param c (ExportCtx*)
+ * @param n (struct IRNode*)
+ * @param in_names (const char* const*)
+ * @param nin (int)
+ * @param out_name (const char*)
+ * @return (int)
  */
 static int export_special(ExportCtx* c, struct IRNode* n, const char* const* in_names, int nin,
                           const char* out_name) {

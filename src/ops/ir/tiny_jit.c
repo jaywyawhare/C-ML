@@ -102,9 +102,13 @@ static int cml_tinyjit_plain_walk(CMLGraph_t ir) {
     return 0;
 }
 
-/* Recompute every node into scratch buffers and require bit-identical results
+/**
+ * Recompute every node into scratch buffers and require bit-identical results
  * against the just-produced real outputs. The live outputs are swapped out and
- * restored, so a failed check never corrupts the current execution. */
+ * restored, so a failed check never corrupts the current execution.
+ * @param ir (CMLGraph_t)
+ * @return (bool)
+ */
 static bool cml_tinyjit_verify(CMLGraph_t ir) {
     int n = 0;
     for (struct IRNode* nd = ir->head; nd; nd = nd->next)

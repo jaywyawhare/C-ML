@@ -237,8 +237,12 @@ static int nccl_exchange_unique_id(NCCLContext* nccl, int world_size, int rank, 
     return 0;
 }
 
-/* Block until the collective enqueued on nccl->stream has finished, so the host
- * may safely read/scale the result. No-op if libcudart wasn't resolved. */
+/**
+ * Block until the collective enqueued on nccl->stream has finished, so the host
+ * may safely read/scale the result. No-op if libcudart wasn't resolved.
+ * @param nccl (NCCLContext*)
+ * @return (void)
+ */
 static void nccl_stream_sync(NCCLContext* nccl) {
     if (nccl && nccl->cudaStreamSynchronize)
         nccl->cudaStreamSynchronize(nccl->stream);

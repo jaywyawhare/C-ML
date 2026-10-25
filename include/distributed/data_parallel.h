@@ -55,23 +55,41 @@ typedef struct CMLDataParallel {
 
 DDPConfig cml_ddp_default_config(void);
 
-/* Broadcasts parameters from rank 0, sets up gradient buckets. */
+/**
+ * Broadcasts parameters from rank 0, sets up gradient buckets.
+ * @param module (Module*)
+ * @param config (const DDPConfig*)
+ * @return (CMLDataParallel*)
+ */
 CMLDataParallel* cml_ddp_create(Module* module, const DDPConfig* config);
 
 Tensor* cml_ddp_forward(CMLDataParallel* ddp, Tensor* input);
 
-/* Slice a global batch along dim 0 into this rank's shard (extra rows go to the
+/**
+ * Slice a global batch along dim 0 into this rank's shard (extra rows go to the
  * lowest ranks when world_size doesn't divide the batch). Returns a fresh tensor
  * the caller owns; returns `full_batch` unchanged at world_size==1. Feed each
  * rank its shard so data parallelism trains on distinct data rather than N
- * identical replicas. */
+ * identical replicas.
+ * @param ddp (CMLDataParallel*)
+ * @param full_batch (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* cml_ddp_shard_input(CMLDataParallel* ddp, Tensor* full_batch);
 
-/* Bucketed all-reduce of gradients, averaged by world_size.
- * Call after tensor_backward() and before optimizer_step(). */
+/**
+ * Bucketed all-reduce of gradients, averaged by world_size.
+ * Call after tensor_backward() and before optimizer_step().
+ * @param ddp (CMLDataParallel*)
+ * @return (int)
+ */
 int cml_ddp_sync_gradients(CMLDataParallel* ddp);
 
-/* Does NOT free the underlying module. */
+/**
+ * Does NOT free the underlying module.
+ * @param ddp (CMLDataParallel*)
+ * @return (void)
+ */
 void cml_ddp_free(CMLDataParallel* ddp);
 
 #ifdef __cplusplus

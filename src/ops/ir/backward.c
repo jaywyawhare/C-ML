@@ -21,7 +21,10 @@
 #include "alloc/cml_allocator.h"
 #endif
 
-/* Access the shared BLAS context from execution.c */
+/**
+ * Access the shared BLAS context from execution.c
+ * @return (CMLBlasContext*)
+ */
 extern CMLBlasContext* get_blas_context(void);
 
 /**
@@ -139,12 +142,17 @@ static void accumulate_grad(Tensor* t, float* grad_data, size_t numel) {
     }
 }
 
-/* Return a pointer to @a t's data as a CONTIGUOUS, numel-sized float buffer.
+/**
+ * Return a pointer to @a t's data as a CONTIGUOUS, numel-sized float buffer.
  * Broadcast/strided views (e.g. UOP_EXPAND output) have numel > their backing
  * storage and stride-0 dims; reading them linearly by numel over-reads the
  * small source buffer (heap overflow) and is numerically wrong.  For such
  * non-contiguous views we gather into a fresh buffer via the view's strides.
- * Sets *owned=true when the caller must cml_free the returned buffer. */
+ * Sets *owned=true when the caller must cml_free the returned buffer.
+ * @param t (Tensor*)
+ * @param owned (bool*)
+ * @return (float*)
+ */
 static float* backward_contiguous(Tensor* t, bool* owned) {
     *owned = false;
     if (!t || !t->data)

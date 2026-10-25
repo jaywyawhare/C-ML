@@ -15,9 +15,14 @@ static void tensor_free_executed(Tensor* t) {
     tensor_free(t);
 }
 
-/* The logits/targets pair every case in this file works on: a batch of 2 over
+/**
+ * The logits/targets pair every case in this file works on: a batch of 2 over
  * 3 classes, with the true class differing between rows. Returns 0 (having
- * cleaned up) if either allocation fails. */
+ * cleaned up) if either allocation fails.
+ * @param logits_out (Tensor**)
+ * @param targets_out (Tensor**)
+ * @return (int)
+ */
 static int make_logits_targets(Tensor** logits_out, Tensor** targets_out) {
     TensorConfig cfg = {cml_get_default_dtype(), cml_get_default_device(), true, true};
 

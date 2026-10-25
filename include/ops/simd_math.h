@@ -33,7 +33,13 @@ CMLSimdCaps cml_detect_simd_caps(void);
 const CMLSimdCaps* cml_get_simd_caps(void);
 void cml_print_simd_caps(void);
 
-/* out[i] = f(in[i]) */
+/**
+ * out[i] = f(in[i])
+ * @param in (const float*)
+ * @param out (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_exp_f32(const float* in, float* out, size_t n);
 void simd_log_f32(const float* in, float* out, size_t n);
 void simd_sqrt_f32(const float* in, float* out, size_t n);
@@ -47,7 +53,14 @@ void simd_tanh_f32(const float* in, float* out, size_t n);
 void simd_sigmoid_f32(const float* in, float* out, size_t n);
 void simd_neg_f32(const float* in, float* out, size_t n);
 
-/* out[i] = f(a[i], b[i]) */
+/**
+ * out[i] = f(a[i], b[i])
+ * @param a (const float*)
+ * @param b (const float*)
+ * @param out (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_pow_f32(const float* a, const float* b, float* out, size_t n);
 void simd_cmplt_f32(const float* a, const float* b, float* out, size_t n);
 void simd_cmpgt_f32(const float* a, const float* b, float* out, size_t n);
@@ -58,17 +71,48 @@ void simd_sub_f32(const float* a, const float* b, float* out, size_t n);
 void simd_mul_f32(const float* a, const float* b, float* out, size_t n);
 void simd_div_f32(const float* a, const float* b, float* out, size_t n);
 
-/* out[i] = cond[i] != 0 ? a[i] : b[i] */
+/**
+ * out[i] = cond[i] != 0 ? a[i] : b[i]
+ * @param cond (const float*)
+ * @param a (const float*)
+ * @param b (const float*)
+ * @param out (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_where_f32(const float* cond, const float* a, const float* b, float* out, size_t n);
 
 void simd_transpose_f32(const float* in, float* out, int rows, int cols);
 
-/* out[i] = a[i] + scalar */
+/**
+ * out[i] = a[i] + scalar
+ * @param a (const float*)
+ * @param scalar (float)
+ * @param out (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_add_scalar_f32(const float* a, float scalar, float* out, size_t n);
-/* out[i] = a[i] * scalar */
+/**
+ * out[i] = a[i] * scalar
+ * @param a (const float*)
+ * @param scalar (float)
+ * @param out (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_mul_scalar_f32(const float* a, float scalar, float* out, size_t n);
 
-/* out[i] = a[i % a_n] + b[i % b_n] */
+/**
+ * out[i] = a[i % a_n] + b[i % b_n]
+ * @param a (const float*)
+ * @param a_n (size_t)
+ * @param b (const float*)
+ * @param b_n (size_t)
+ * @param out (float*)
+ * @param out_n (size_t)
+ * @return (void)
+ */
 void simd_add_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b_n, float* out,
                             size_t out_n);
 void simd_mul_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b_n, float* out,

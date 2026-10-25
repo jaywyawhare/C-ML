@@ -22,7 +22,12 @@ typedef struct PixelUnshuffle {
 PixelShuffle* nn_pixel_shuffle(int upscale_factor);
 PixelUnshuffle* nn_pixel_unshuffle(int downscale_factor);
 
-/* Functional versions (stateless, no module required) */
+/**
+ * Functional versions (stateless, no module required)
+ * @param input (Tensor*)
+ * @param upscale_factor (int)
+ * @return (Tensor*)
+ */
 Tensor* f_pixel_shuffle(Tensor* input, int upscale_factor);
 Tensor* f_pixel_unshuffle(Tensor* input, int downscale_factor);
 

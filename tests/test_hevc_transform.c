@@ -12,7 +12,11 @@
 #include "core/hevc.h"
 #include "test_harness.h"
 
-/* exact: off-diagonal of M·Mᵀ (row dot products) must be 0. */
+/**
+ * exact: off-diagonal of M·Mᵀ (row dot products) must be 0.
+ * @param n (int)
+ * @return (int)
+ */
 static int check_row_orthogonal(int n) {
     const int16_t* m = cml_hevc_transform_matrix(n, 0);
     if (!m)
@@ -33,8 +37,12 @@ static int check_row_orthogonal(int n) {
     return 1;
 }
 
-/* forward C = M B Mᵀ, then reconstruct in double via the norm-normalized inverse
- * B'[i][j] = Σ_{p,q} (M[p][i]/Dp) C[p][q] (M[q][j]/Dq), require B' ≈ B. */
+/**
+ * forward C = M B Mᵀ, then reconstruct in double via the norm-normalized inverse
+ * B'[i][j] = Σ_{p,q} (M[p][i]/Dp) C[p][q] (M[q][j]/Dq), require B' ≈ B.
+ * @param n (int)
+ * @return (int)
+ */
 static int check_reconstructs(int n) {
     const int16_t* m = cml_hevc_transform_matrix(n, 0);
     if (!m)

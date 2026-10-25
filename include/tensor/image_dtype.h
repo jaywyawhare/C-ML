@@ -37,7 +37,11 @@ CMLImageFormat cml_image_dtype_select(const int* shape, int ndim);
 CMLImageTensor* cml_image_tensor_create(Tensor* tensor, CMLImageFormat format);
 Tensor* cml_image_tensor_to_regular(CMLImageTensor* img);
 
-/* Does NOT free underlying tensor */
+/**
+ * Does NOT free underlying tensor
+ * @param img (CMLImageTensor*)
+ * @return (void)
+ */
 void cml_image_tensor_free(CMLImageTensor* img);
 
 void cml_image_dtype_dims(const int* shape, int ndim, CMLImageFormat format, int* out_width,

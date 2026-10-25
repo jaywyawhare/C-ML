@@ -55,8 +55,15 @@ static int lifetimes_overlap(int a_first, int a_last, int b_first, int b_last) {
     return !(a_last < b_first || b_last < a_first);
 }
 
-/* Plan buffer placement: greedily color buffers (largest first) into reusable slots whose
- * lifetimes don't overlap, assign contiguous offsets, and compute total/peak/saved memory. */
+/**
+ * Plan buffer placement: greedily color buffers (largest first) into reusable slots whose
+ * lifetimes don't overlap, assign contiguous offsets, and compute total/peak/saved memory.
+ * @param num_buffers (int)
+ * @param sizes (size_t*)
+ * @param first_use (int*)
+ * @param last_use (int*)
+ * @return (CMLMemoryPlan*)
+ */
 CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes, int* first_use,
                                       int* last_use) {
     if (num_buffers <= 0 || !sizes || !first_use || !last_use)

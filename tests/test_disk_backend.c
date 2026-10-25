@@ -201,8 +201,11 @@ static int test_free_null(void) {
     return 1;
 }
 
-/* Async read + wait: identical contract whether io_uring is compiled in or the
- * synchronous fallback runs. */
+/**
+ * Async read + wait: identical contract whether io_uring is compiled in or the
+ * synchronous fallback runs.
+ * @return (int)
+ */
 static int test_async_read(void) {
     setup_test_dir();
     CMLDiskBackend* b = cml_disk_backend_create(TEST_DIR, CML_DISK_ASYNC);

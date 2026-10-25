@@ -55,8 +55,11 @@ static Optimizer* fresh_opt(void) {
     return g_opt;
 }
 
-/* Every scheduler: update across enough steps to cross every boundary,
- * LR must stay finite and non-negative. */
+/**
+ * Every scheduler: update across enough steps to cross every boundary,
+ * LR must stay finite and non-negative.
+ * @return (int)
+ */
 static int test_lr_schedulers_matrix(void) {
     if (!ensure_opt())
         return 0;
@@ -332,9 +335,12 @@ int main(void) {
     return TEST_SUMMARY();
 }
 
-/* Container models: parameter collection and architecture export used to
+/**
+ * Container models: parameter collection and architecture export used to
  * report total_params = 0 because Sequential stores children in its own
- * array, not the Module->next chain that module_collect_parameters walked. */
+ * array, not the Module->next chain that module_collect_parameters walked.
+ * @return (int)
+ */
 static int test_container_parameter_collection(void) {
     Linear* l1 = cml_nn_linear(4, 8, DTYPE_FLOAT32, DEVICE_CPU, true);
     Linear* l2 = cml_nn_linear(8, 2, DTYPE_FLOAT32, DEVICE_CPU, true);

@@ -23,7 +23,16 @@ static int check(const char* name, int ok) {
     return ok;
 }
 
-/* Deterministic mock: argmax(logits) = (last_input_token + 1) % vocab. */
+/**
+ * Deterministic mock: argmax(logits) = (last_input_token + 1) % vocab.
+ * @param model (void*)
+ * @param tokens (const int*)
+ * @param num_tokens (int)
+ * @param position (int)
+ * @param logits (float*)
+ * @param vocab (int)
+ * @return (int)
+ */
 static int mock_forward(void* model, const int* tokens, int num_tokens, int position, float* logits,
                         int vocab) {
     (void)model;

@@ -24,13 +24,16 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/* Fusion is an optimization, so it is off whenever optimization is off.
+/**
+ * Fusion is an optimization, so it is off whenever optimization is off.
  *
  * This lives at the entry to the fusers rather than at their call sites: the
  * execute paths reach them from three places, and gating each one separately
  * had already gone wrong -- NOOPT=1 skipped the passes in cml_ir_optimize but
  * the whole-graph execute paths fused anyway, so "optimization disabled" runs
- * still executed fused kernels. Gate the transform, not the callers. */
+ * still executed fused kernels. Gate the transform, not the callers.
+ * @return (int)
+ */
 int cml_ir_fusion_enabled(void) {
     static int checked = 0;
     static int enabled = 0;
@@ -43,7 +46,11 @@ int cml_ir_fusion_enabled(void) {
     return enabled;
 }
 
-/* Ops the fused elementwise kernel (fused_eval_block / fe_scalar_eval) can run. */
+/**
+ * Ops the fused elementwise kernel (fused_eval_block / fe_scalar_eval) can run.
+ * @param t (UOpType)
+ * @return (int)
+ */
 static int fe_supported(UOpType t) {
     switch (t) {
     case UOP_ADD:
@@ -90,7 +97,11 @@ static int find_idx(struct IRNode** nodes, int n, struct IRNode* p) {
     return -1;
 }
 
-/* The fused executor is float32-only. Only fuse nodes whose output tensor is f32. */
+/**
+ * The fused executor is float32-only. Only fuse nodes whose output tensor is f32.
+ * @param n (struct IRNode*)
+ * @return (int)
+ */
 static int node_is_f32(struct IRNode* n) { return n->output && n->output->dtype == DTYPE_FLOAT32; }
 
 /**
@@ -110,10 +121,15 @@ static size_t node_numel(struct IRNode* n) {
     return 0;
 }
 
-/* True if `in` broadcasts over `rootnode`'s output shape via contiguous
+/**
+ * True if `in` broadcasts over `rootnode`'s output shape via contiguous
  * trailing-dim tiling, so out[i] = in[i % in->numel] is the correct numpy
  * broadcast (e.g. a bias [N] over [M,N]). Requires in's dims to equal the
- * trailing dims of the output - every fused executor uses exactly i%numel. */
+ * trailing dims of the output - every fused executor uses exactly i%numel.
+ * @param rootnode (struct IRNode*)
+ * @param in (Tensor*)
+ * @return (int)
+ */
 static int is_trailing_bcast(struct IRNode* rootnode, Tensor* in) {
     if (!in || !in->shape || in->ndim <= 0)
         return 0;
@@ -141,8 +157,12 @@ static __thread int g_fe_allow_grad = 0;
  */
 void cml_ir_fuse_set_allow_grad(int on) { g_fe_allow_grad = on ? 1 : 0; }
 
-/* Collapse maximal single-use, same-shape f32 elementwise trees into UOP_FUSED_ELEMENTWISE
- * nodes (intermediates kept in registers), restarting until fixpoint. Returns #fusions. */
+/**
+ * Collapse maximal single-use, same-shape f32 elementwise trees into UOP_FUSED_ELEMENTWISE
+ * nodes (intermediates kept in registers), restarting until fixpoint. Returns #fusions.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_fuse_elementwise(CMLGraph_t ir) {
     if (!ir || !ir->head || !cml_ir_fusion_enabled())
         return 0;
@@ -495,14 +515,18 @@ int cml_ir_fuse_elementwise(CMLGraph_t ir) {
     return fused_count;
 }
 
-/* ── Matmul epilogue fusion ───────────────────────────────────────────────
+/**
+ * ── Matmul epilogue fusion ───────────────────────────────────────────────
  * Fold a bias-add + activation chain (already collapsed by the elementwise
  * fuser into ONE UOP_FUSED_ELEMENTWISE that reads the gemm output) INTO the
  * matmul node, so it is applied in-place to the M*N result - eliminating the
  * separate elementwise kernel's extra read+write pass over the output. The
  * epilogue is stored as a FusedElementwiseParams on the matmul node's params
  * (MATMUL_ACC_REF = the gemm result); every backend (BLAS, interpreter, JIT)
- * applies it. Runs AFTER cml_ir_fuse_elementwise. Returns #matmuls fused. */
+ * applies it. Runs AFTER cml_ir_fuse_elementwise. Returns #matmuls fused.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_fuse_matmul_epilogue(CMLGraph_t ir) {
     if (!ir || !ir->head || !cml_ir_fusion_enabled())
         return 0;

@@ -57,14 +57,26 @@ void cml_disk_backend_free(CMLDiskBackend* backend);
 int cml_disk_save_tensor(CMLDiskBackend* backend, const char* name, Tensor* tensor);
 Tensor* cml_disk_load_tensor(CMLDiskBackend* backend, const char* name);
 
-/* Memory-map tensor from disk (lazy, zero-copy) */
+/**
+ * Memory-map tensor from disk (lazy, zero-copy)
+ * @param backend (CMLDiskBackend*)
+ * @param name (const char*)
+ * @return (CMLDiskTensor*)
+ */
 CMLDiskTensor* cml_disk_mmap_tensor(CMLDiskBackend* backend, const char* name);
 int cml_disk_tensor_read(CMLDiskTensor* dt, void* buffer, size_t offset, size_t size);
 void cml_disk_tensor_unmap(CMLDiskTensor* dt);
 void cml_disk_tensor_free(CMLDiskTensor* dt);
 Tensor* cml_disk_tensor_to_tensor(CMLDiskTensor* dt);
 
-/* Returns immediately, use cml_disk_wait to complete */
+/**
+ * Returns immediately, use cml_disk_wait to complete
+ * @param backend (CMLDiskBackend*)
+ * @param name (const char*)
+ * @param buffer (void*)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_disk_async_read(CMLDiskBackend* backend, const char* name, void* buffer, size_t size);
 int cml_disk_wait(CMLDiskBackend* backend);
 

@@ -64,7 +64,11 @@ CML_API TorchTensorOptions torch_options_dtype(TorchTensorOptions opts, DType dt
 CML_API TorchTensorOptions torch_options_device(TorchTensorOptions opts, DeviceType device);
 CML_API TorchTensorOptions torch_options_requires_grad(TorchTensorOptions opts, bool requires_grad);
 
-/* Convert to internal TensorConfig for C-ML calls. */
+/**
+ * Convert to internal TensorConfig for C-ML calls.
+ * @param opts (const TorchTensorOptions*)
+ * @return (TensorConfig)
+ */
 CML_API TensorConfig torch_options_to_config(const TorchTensorOptions* opts);
 
 /* ------------------------------------------------------------------ */
@@ -93,8 +97,15 @@ CML_API Tensor* torch_eye(int n, const TorchTensorOptions* opts);
 CML_API Tensor* torch_arange(float start, float end, float step, const TorchTensorOptions* opts);
 CML_API Tensor* torch_linspace(float start, float end, int steps, const TorchTensorOptions* opts);
 
-/* Wrap caller-owned storage (not copied). `data` must be non-NULL; returns NULL on
- * invalid arguments. The tensor does not take ownership of `data`. */
+/**
+ * Wrap caller-owned storage (not copied). `data` must be non-NULL; returns NULL on
+ * invalid arguments. The tensor does not take ownership of `data`.
+ * @param data (void*)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param opts (const TorchTensorOptions*)
+ * @return (Tensor*)
+ */
 CML_API Tensor* torch_from_blob(void* data, int* shape, int ndim, const TorchTensorOptions* opts);
 
 CML_API Tensor* torch_zeros_like(Tensor* t);
@@ -113,25 +124,49 @@ CML_API bool torch_tensor_is_contiguous(const Tensor* t);
 CML_API bool torch_tensor_requires_grad(const Tensor* t);
 CML_API void torch_tensor_set_requires_grad(Tensor* t, bool requires_grad);
 
-/* Returns shape pointer (valid until tensor is freed; do not free). */
+/**
+ * Returns shape pointer (valid until tensor is freed; do not free).
+ * @param t (const Tensor*)
+ * @return (const int*)
+ */
 CML_API const int* torch_tensor_sizes(const Tensor* t);
 
-/* Materializes lazy tensor and returns raw data pointer.
+/**
+ * Materializes lazy tensor and returns raw data pointer.
  * Returns NULL on failure (OOM, device error, realize error); check
- * torch_has_error() / torch_get_last_error() for details. */
+ * torch_has_error() / torch_get_last_error() for details.
+ * @param t (Tensor*)
+ * @return (void*)
+ */
 CML_API void* torch_tensor_data_ptr(Tensor* t);
 
-/* Like torch_tensor_data_ptr but returns NULL unless dtype is DTYPE_FLOAT32. */
+/**
+ * Like torch_tensor_data_ptr but returns NULL unless dtype is DTYPE_FLOAT32.
+ * @param t (Tensor*)
+ * @return (float*)
+ */
 CML_API float* torch_tensor_data_ptr_f32(Tensor* t);
 
-/* True when the tensor is a materialized leaf (no pending IR node). */
+/**
+ * True when the tensor is a materialized leaf (no pending IR node).
+ * @param t (const Tensor*)
+ * @return (bool)
+ */
 CML_API bool torch_tensor_is_materialized(const Tensor* t);
 
-/* True when the tensor still references a lazy IR graph node. */
+/**
+ * True when the tensor still references a lazy IR graph node.
+ * @param t (const Tensor*)
+ * @return (bool)
+ */
 CML_API bool torch_tensor_has_lazy_ir(const Tensor* t);
 
-/* Scalar accessors: require numel()==1 and DTYPE_FLOAT32. Returns 0.0f / no-op on
- * invalid tensors; check torch_has_error() after failures. */
+/**
+ * Scalar accessors: require numel()==1 and DTYPE_FLOAT32. Returns 0.0f / no-op on
+ * invalid tensors; check torch_has_error() after failures.
+ * @param t (Tensor*)
+ * @return (float)
+ */
 CML_API float torch_tensor_item_float(Tensor* t);
 CML_API void torch_tensor_set_item_float(Tensor* t, float value);
 
@@ -171,7 +206,8 @@ CML_API Tensor* torch_contiguous(Tensor* a);
 /* Autograd                                                            */
 /* ------------------------------------------------------------------ */
 
-/* Backward pass, forwarded to tensor_backward().
+/**
+ * Backward pass, forwarded to tensor_backward().
  *
  * create_graph is honored under the graph autodiff engine: the backward pass is
  * emitted as differentiable graph nodes, so the result can be differentiated
@@ -181,7 +217,13 @@ CML_API Tensor* torch_contiguous(Tensor* a);
  * retain_graph is inert because retaining is already the behavior: backward does
  * not free the IR graph, so it can be re-run. Non-leaf gradients are still
  * released after the pass unless the tensor asked to keep them
- * (tensor_retain_grad). */
+ * (tensor_retain_grad).
+ * @param tensor (Tensor*)
+ * @param gradient (Tensor*)
+ * @param retain_graph (bool)
+ * @param create_graph (bool)
+ * @return (void)
+ */
 CML_API void torch_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph);
 CML_API void torch_zero_grad(Tensor* tensor);
 CML_API void torch_no_grad(void);
@@ -253,21 +295,44 @@ typedef struct TorchRuntimeModule {
     bool owns_memory;
 } TorchRuntimeModule;
 
-/* Prefer these accessors over reading struct fields directly. */
+/**
+ * Prefer these accessors over reading struct fields directly.
+ * @param runtime (const TorchRuntimeModule*)
+ * @return (TorchRuntimeKind)
+ */
 CML_API TorchRuntimeKind torch_runtime_get_kind(const TorchRuntimeModule* runtime);
 CML_API bool torch_runtime_has_memory(const TorchRuntimeModule* runtime);
 CML_API size_t torch_runtime_pte_arena_size(const TorchRuntimeModule* runtime);
 
-/* Wrap an existing eager Module (does not take ownership). */
+/**
+ * Wrap an existing eager Module (does not take ownership).
+ * @param module (Module*)
+ * @return (TorchRuntimeModule*)
+ */
 CML_API TorchRuntimeModule* torch_runtime_from_module(Module* module);
 
-/* Load an AOT-compiled shared library (ExecuTorch PTE analogue). */
+/**
+ * Load an AOT-compiled shared library (ExecuTorch PTE analogue).
+ * @param path (const char*)
+ * @return (TorchRuntimeModule*)
+ */
 CML_API TorchRuntimeModule* torch_runtime_load_aot(const char* path);
 
-/* Load a .cpte portable program (ExecuTorch PTE format). */
+/**
+ * Load a .cpte portable program (ExecuTorch PTE format).
+ * @param path (const char*)
+ * @return (TorchRuntimeModule*)
+ */
 CML_API TorchRuntimeModule* torch_runtime_load_pte(const char* path);
 
-/* Export a module to .cpte (ahead-of-time preparation). */
+/**
+ * Export a module to .cpte (ahead-of-time preparation).
+ * @param module (Module*)
+ * @param sample_input (Tensor*)
+ * @param path (const char*)
+ * @param opts (const TorchPTEExportOptions*)
+ * @return (int)
+ */
 CML_API int torch_runtime_export_pte(Module* module, Tensor* sample_input, const char* path,
                                      const TorchPTEExportOptions* opts);
 

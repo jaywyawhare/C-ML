@@ -35,7 +35,13 @@ static TensorConfig cfg = {
 
 #define NELT 8
 
-/* y = (x + x) * x */
+/**
+ * y = (x + x) * x
+ * @param x_out (Tensor**)
+ * @param n (int)
+ * @param base (float)
+ * @return (Tensor*)
+ */
 static Tensor* build_graph(Tensor** x_out, int n, float base) {
     int sh[1] = {n};
     Tensor* x = tensor_zeros(sh, 1, &cfg);
@@ -66,7 +72,10 @@ static int values_ok(Tensor* y, int n, float base) {
     return 1;
 }
 
-/* Going through the JIT must produce the same numbers as plain execution. */
+/**
+ * Going through the JIT must produce the same numbers as plain execution.
+ * @return (int)
+ */
 static int test_execute_is_correct(void) {
     cml_reset_ir_context();
     Tensor* x = NULL;
@@ -86,9 +95,12 @@ static int test_execute_is_correct(void) {
     return ok;
 }
 
-/* No CPU trace entries are recorded, so every call is a miss and nothing is ever
+/**
+ * No CPU trace entries are recorded, so every call is a miss and nothing is ever
  * replayed. A hit here would mean a trace got cached that cannot faithfully
- * reproduce the graph -- the stale-output bug this fallback exists to avoid. */
+ * reproduce the graph -- the stale-output bug this fallback exists to avoid.
+ * @return (int)
+ */
 static int test_never_replays_an_empty_trace(void) {
     cml_reset_ir_context();
     Tensor* x = NULL;
@@ -120,7 +132,10 @@ static int test_never_replays_an_empty_trace(void) {
     return ok;
 }
 
-/* Results must stay correct across repeated executions, whichever path is taken. */
+/**
+ * Results must stay correct across repeated executions, whichever path is taken.
+ * @return (int)
+ */
 static int test_repeated_execution_stays_correct(void) {
     cml_reset_ir_context();
     Tensor* x = NULL;
@@ -144,9 +159,12 @@ static int test_repeated_execution_stays_correct(void) {
     return ok;
 }
 
-/* A trace that hit the entry cap describes only part of the graph, so it must not
+/**
+ * A trace that hit the entry cap describes only part of the graph, so it must not
  * be marked complete -- replaying it would skip the tail and leave stale outputs.
- * Driven directly, since the CPU path records nothing. */
+ * Driven directly, since the CPU path records nothing.
+ * @return (int)
+ */
 static int test_truncated_trace_is_not_complete(void) {
     CMLTrace* t = cml_trace_create();
     REQUIRE(t);
@@ -175,7 +193,10 @@ static int test_truncated_trace_is_not_complete(void) {
     return ok;
 }
 
-/* A trace within the cap is complete and replayable. */
+/**
+ * A trace within the cap is complete and replayable.
+ * @return (int)
+ */
 static int test_untruncated_trace_is_complete(void) {
     CMLTrace* t = cml_trace_create();
     REQUIRE(t);
@@ -186,11 +207,14 @@ static int test_untruncated_trace_is_complete(void) {
     return ok;
 }
 
-/* A graph shape that records nothing is remembered as such, so later executes
+/**
+ * A graph shape that records nothing is remembered as such, so later executes
  * skip the record attempt instead of re-allocating a trace and re-hashing to
  * rediscover it every time. The saving is real -- that probe cost ~37% of a small
  * step -- but the shortcut must not change results, which is what this checks:
- * values stay correct across repeats, and it still never reports a replay. */
+ * values stay correct across repeats, and it still never reports a replay.
+ * @return (int)
+ */
 static int test_empty_trace_is_negatively_cached(void) {
     cml_reset_ir_context();
     Tensor* x = NULL;

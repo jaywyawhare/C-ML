@@ -42,7 +42,11 @@ static void set_weights(GRUCell* c) {
     }
 }
 
-/* MSE(gru_cell(x, h), target) as a plain scalar; resets the IR graph after. */
+/**
+ * MSE(gru_cell(x, h), target) as a plain scalar; resets the IR graph after.
+ * @param c (GRUCell*)
+ * @return (float)
+ */
 static float loss_value(GRUCell* c) {
     int xs[] = {1, IN}, hs[] = {1, HID}, ts[] = {1, HID};
     Tensor* x    = cml_tensor((float*)X0, xs, 2, &CFG);

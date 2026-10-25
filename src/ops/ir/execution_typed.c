@@ -58,15 +58,28 @@ static Tensor* in_at(struct IRNode* node, int i) {
     return node->inputs[i];
 }
 
-/* Resolve a possibly-negative axis against `ndim`; -1 if out of range. */
+/**
+ * Resolve a possibly-negative axis against `ndim`; -1 if out of range.
+ * @param dim (int)
+ * @param ndim (int)
+ * @return (int)
+ */
 static int axis_of(int dim, int ndim) {
     if (dim < 0)
         dim += ndim;
     return (dim < 0 || dim >= ndim) ? -1 : dim;
 }
 
-/* Split a tensor into (outer, count, inner) around `dim`: element (o,j,i) lives
- * at (o*count + j)*inner + i. Every axis-wise kernel below uses this. */
+/**
+ * Split a tensor into (outer, count, inner) around `dim`: element (o,j,i) lives
+ * at (o*count + j)*inner + i. Every axis-wise kernel below uses this.
+ * @param t (const Tensor*)
+ * @param dim (int)
+ * @param outer (size_t*)
+ * @param count (size_t*)
+ * @param inner (size_t*)
+ * @return (void)
+ */
 void cml_lanes_of(const Tensor* t, int dim, size_t* outer, size_t* count, size_t* inner) {
     size_t o = 1, n = 1;
     for (int d = 0; d < dim; d++)
@@ -78,11 +91,15 @@ void cml_lanes_of(const Tensor* t, int dim, size_t* outer, size_t* count, size_t
     *inner = n;
 }
 
-/* Ops that already implement "handle the dtype or fail cleanly" inside the main
+/**
+ * Ops that already implement "handle the dtype or fail cleanly" inside the main
  * switch. matmul/conv run cpu_matmul_generic / cpu_conv2d_generic; the fused
  * softmax/recurrent/layernorm family computes in f32 and casts half
  * inputs/outputs at the boundary. Routing them here would shadow working code,
- * so they stay on their own path. */
+ * so they stay on their own path.
+ * @param t (UOpType)
+ * @return (bool)
+ */
 static bool handles_own_dtype(UOpType t) {
     switch (t) {
     case UOP_MATMUL:
@@ -130,8 +147,12 @@ bool cml_exec_needs_typed(struct IRNode* node, Tensor* out) {
     return out && out->dtype != DTYPE_FLOAT32 && !cml_exec_out_dtype_is_role(node->type);
 }
 
-/* Output dtype is determined by the op's role rather than by its inputs, so an
- * f32-in/non-f32-out node is still a pure f32 kernel. */
+/**
+ * Output dtype is determined by the op's role rather than by its inputs, so an
+ * f32-in/non-f32-out node is still a pure f32 kernel.
+ * @param t (UOpType)
+ * @return (bool)
+ */
 static bool cml_exec_out_dtype_is_role(UOpType t) {
     switch (t) {
     case UOP_CMPLT:
@@ -160,9 +181,16 @@ static bool cml_exec_out_dtype_is_role(UOpType t) {
 
 /* -------------------------------------------------- elementwise: f64 domain */
 
-/* Every float-domain unary op, evaluated in double. Integer inputs promote to
+/**
+ * Every float-domain unary op, evaluated in double. Integer inputs promote to
  * double here and the result is stored back through the output dtype, which
- * matches the int->float promotion these ops imply mathematically. */
+ * matches the int->float promotion these ops imply mathematically.
+ * @param type (UOpType)
+ * @param x (double)
+ * @param r (double*)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int unary_f64(UOpType type, double x, double* r, struct IRNode* node) {
     ClampParams* cp = (ClampParams*)node->params;
     switch (type) {
@@ -433,8 +461,15 @@ static int binary_f64(UOpType type, double x, double y, double* r) {
 
 /* -------------------------------------------------- elementwise: i64 domain */
 
-/* Bit-level ops. These have no meaningful float representation, so they run on
- * the integer accessors and reject float dtypes at the dispatch site. */
+/**
+ * Bit-level ops. These have no meaningful float representation, so they run on
+ * the integer accessors and reject float dtypes at the dispatch site.
+ * @param type (UOpType)
+ * @param x (int64_t)
+ * @param y (int64_t)
+ * @param r (int64_t*)
+ * @return (int)
+ */
 static int binary_i64(UOpType type, int64_t x, int64_t y, int64_t* r) {
     switch (type) {
     case UOP_BITWISE_AND:
@@ -481,9 +516,14 @@ static int is_bitwise_op(UOpType t) {
            t == UOP_BITWISE_NOT || t == UOP_LSHIFT || t == UOP_RSHIFT;
 }
 
-/* Integer ops keep integer semantics on integer dtypes (C truncation for IDIV,
+/**
+ * Integer ops keep integer semantics on integer dtypes (C truncation for IDIV,
  * sign-following remainder for MOD); on float dtypes they fall to the f64
- * domain, where IDIV/MOD use trunc/fmod. Bitwise ops have no float form. */
+ * domain, where IDIV/MOD use trunc/fmod. Bitwise ops have no float form.
+ * @param t (UOpType)
+ * @param dt (DType)
+ * @return (int)
+ */
 static int prefers_i64(UOpType t, DType dt) {
     if (!cml_dtype_is_int(dt))
         return 0;
@@ -570,7 +610,13 @@ static int exec_binary(struct IRNode* node, Tensor* out) {
 #define ELEM_COPY(dst, di, src, si, esz)                                                           \
     memcpy((uint8_t*)(dst) + (di) * (esz), (const uint8_t*)(src) + (si) * (esz), (esz))
 
-/* Broadcast source index for `flat_i`, mirroring _broadcast_idx in execution.c. */
+/**
+ * Broadcast source index for `flat_i`, mirroring _broadcast_idx in execution.c.
+ * @param inp (const Tensor*)
+ * @param out (const Tensor*)
+ * @param flat_i (size_t)
+ * @return (size_t)
+ */
 static size_t bcast_idx(const Tensor* inp, const Tensor* out, size_t flat_i) {
     if (inp->numel == 1)
         return 0;
@@ -599,16 +645,28 @@ static size_t bcast_idx(const Tensor* inp, const Tensor* out, size_t flat_i) {
     return idx;
 }
 
-/* Read operand `i` element `j` as a number, whatever its dtype. */
+/**
+ * Read operand `i` element `j` as a number, whatever its dtype.
+ * @param node (struct IRNode*)
+ * @param i (int)
+ * @param j (size_t)
+ * @return (double)
+ */
 static double num_at(struct IRNode* node, int i, size_t j) {
     Tensor* t = in_at(node, i);
     return (t && t->data) ? cml_load_f64(t->data, j, t->dtype) : 0.0;
 }
 
-/* Rank-agnostic index math for the layout kernels below. These mirror
+/**
+ * Rank-agnostic index math for the layout kernels below. These mirror
  * pad_nd_f32/scatter_nd_f32/diagonal_nd_f32 in execution.c but move raw
  * elements, so one copy serves every dtype. Both paths were written with
- * ndim==1/2 special cases and no general arm; keep them general. */
+ * ndim==1/2 special cases and no general arm; keep them general.
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param st (size_t*)
+ * @return (void)
+ */
 static void strides_nd(const int* shape, int ndim, size_t* st) {
     size_t acc = 1;
     for (int d = ndim - 1; d >= 0; d--) {
@@ -1263,7 +1321,12 @@ static int exec_layout(struct IRNode* node, Tensor* out) {
  * kernels these mirror only implement the 2-D and global cases.
  */
 
-/* Reduce axis: the params' first dim, or -1 for a whole-tensor reduction. */
+/**
+ * Reduce axis: the params' first dim, or -1 for a whole-tensor reduction.
+ * @param node (struct IRNode*)
+ * @param a (const Tensor*)
+ * @return (int)
+ */
 static int reduce_dim_of(struct IRNode* node, const Tensor* a) {
     ReduceParams* rp = (ReduceParams*)node->params;
     if (!rp || !rp->dims || rp->num_dims <= 0)
@@ -1459,9 +1522,20 @@ static int exec_cumulative(struct IRNode* node, Tensor* out) {
     return 0;
 }
 
-/* Selection sort over one lane -- k passes for topk, full for sort. Matches the
+/**
+ * Selection sort over one lane -- k passes for topk, full for sort. Matches the
  * f32 kernels' tie-breaking (first occurrence wins, since comparisons are
- * strict). */
+ * strict).
+ * @param src (const void*)
+ * @param dt (DType)
+ * @param base (size_t)
+ * @param inner (size_t)
+ * @param cnt (size_t)
+ * @param k (size_t)
+ * @param desc (bool)
+ * @param ord (size_t*)
+ * @return (void)
+ */
 void cml_lane_order(const void* src, DType dt, size_t base, size_t inner, size_t cnt, size_t k,
                     bool desc, size_t* ord) {
     for (size_t j = 0; j < cnt; j++)
@@ -2086,11 +2160,15 @@ static int dispatch(struct IRNode* node, Tensor* out) {
     return -1;
 }
 
-/* An output tensor is frequently a view sharing an input's buffer. Writing such
+/**
+ * An output tensor is frequently a view sharing an input's buffer. Writing such
  * an output in place corrupts the source mid-kernel: a zero-fill of the
  * destination is a zero-fill of the input, and a sort writes lane elements it
  * has not read yet. Aliasing nodes are therefore computed into scratch and
- * copied back -- an extra copy on a path that is already the slow one. */
+ * copied back -- an extra copy on a path that is already the slow one.
+ * @param node (struct IRNode*)
+ * @return (bool)
+ */
 static bool writes_may_clobber_reads(struct IRNode* node) {
     switch (node->type) {
     case UOP_RESHAPE:

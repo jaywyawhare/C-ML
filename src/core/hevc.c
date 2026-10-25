@@ -561,9 +561,11 @@ static const int HEVC_INTRA_ANGLE[35] = {
     -32, -26, -21, -17, -13, -9, -5, -2, 0, 2, 5, 9,  13, 17, 21,  26,  32,
 };
 
-/** Spec Table 8-5 inverse angle for a negative intraPredAngle; 0 otherwise.
+/**
+ * Spec Table 8-5 inverse angle for a negative intraPredAngle; 0 otherwise.
  * @param angle (int)
- * @return (int) */
+ * @return (int)
+ */
 static int hevc_inv_angle(int angle) {
     switch (angle) {
     case -2:
@@ -587,14 +589,18 @@ static int hevc_inv_angle(int angle) {
     }
 }
 
-/** Clamp an integer sample to the 8-bit range.
+/**
+ * Clamp an integer sample to the 8-bit range.
  * @param v (int)
- * @return (uint8_t) */
+ * @return (uint8_t)
+ */
 static uint8_t hevc_clip8(int v) { return (uint8_t)(v < 0 ? 0 : (v > 255 ? 255 : v)); }
 
-/** Base-2 log of a power-of-two transform size (4->2 .. 32->5).
+/**
+ * Base-2 log of a power-of-two transform size (4->2 .. 32->5).
  * @param n (int)
- * @return (int) */
+ * @return (int)
+ */
 static int hevc_log2(int n) {
     int l = 0;
     while ((1 << l) < n)
@@ -602,7 +608,8 @@ static int hevc_log2(int n) {
     return l;
 }
 
-/** Angular intra prediction along `angle` using `main` as the projected reference
+/**
+ * Angular intra prediction along `angle` using `main` as the projected reference
  * row and `side` for the negative-angle extension; writes column-major when
  * `transpose` is set (the horizontal mode class). `main`/`side` hold 2n samples and
  * `corner` is p[-1][-1].
@@ -613,7 +620,8 @@ static int hevc_log2(int n) {
  * @param corner (uint8_t)
  * @param transpose (int)
  * @param out (uint8_t*)
- * @return (void) */
+ * @return (void)
+ */
 static void hevc_angular(int n, int angle, const uint8_t* main, const uint8_t* side, uint8_t corner,
                          int transpose, uint8_t* out) {
     int ref_buf[4 * 32 + 1]; /* indices [-2n, 2n], offset by 2n */

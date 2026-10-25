@@ -42,12 +42,16 @@ void cml_hevc_parser_free(CMLHEVCParser* parser);
 
 int cml_hevc_parser_feed(CMLHEVCParser* parser, const uint8_t* data, size_t size);
 
-/* Signal that no further bytes will be fed.
+/**
+ * Signal that no further bytes will be fed.
  *
  * A NAL unit is delimited by the start code that FOLLOWS it, so until the stream
  * ends the trailing NAL may still be incomplete and cannot be emitted. Call this
  * after the final cml_hevc_parser_feed() -- otherwise cml_hevc_next_nal() stops
- * one NAL early and the slice data is never returned. */
+ * one NAL early and the slice data is never returned.
+ * @param parser (CMLHEVCParser*)
+ * @return (void)
+ */
 void cml_hevc_parser_end_of_stream(CMLHEVCParser* parser);
 
 CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser);
@@ -65,19 +69,32 @@ void cml_hevc_frame_free(CMLHEVCFrame* frame);
 #endif /* CML_CORE_HEVC_H */
 
 /* ---- Inverse/forward core transforms (H.265 §8.6.4) -----------------------
- * The spec's integer DCT-II (4/8-point) and DST-VII (4-point) matrices, plus
- * the separable 1-D transforms. These are the standard's defined integer
- * constants (facts, not external reference data) and are self-verifiable: the
- * DCT matrices are exactly orthogonal and forward→inverse round-trips the block.
- * Larger (16/32) transforms and the CABAC/prediction stages still need verified
- * tables and reference streams (not yet wired up). */
+ * The spec's integer DCT-II and the separable 1-D transforms. These are the
+ * standard's defined integer constants (facts, not external reference data): the
+ * 4-point matrix is exactly orthogonal, so forward→inverse round-trips the block
+ * and it is self-verifiable without reference data. The 8/16/32-point matrices
+ * (only approximately orthogonal) and the CABAC/prediction stages still need
+ * verified tables and reference streams (not yet wired up). */
 
-/* Returns the size x size transform matrix (row-major), or NULL if unsupported.
- * dst=0 => DCT-II (size 4 or 8); dst=1 => DST-VII (size 4 only). */
+/**
+ * Return the size x size transform matrix (row-major); only the exactly
+ * row-orthogonal 4-point DCT-II is exposed, so other sizes and dst (DST-VII)
+ * return NULL.
+ * @param size (int)
+ * @param dst (int)
+ * @return (const int16_t*)
+ */
 const int16_t* cml_hevc_transform_matrix(int size, int dst);
 
-/* Separable 2-D forward/inverse transform of a size x size block (row-major
- * int32). `dst` selects DST-VII (size 4) vs DCT-II. Returns 0 on success. */
+/**
+ * Separable 2-D forward/inverse transform of a size x size block (row-major
+ * int32). `dst` selects DST-VII (size 4) vs DCT-II. Returns 0 on success.
+ * @param block (const int32_t*)
+ * @param coeffs (int32_t*)
+ * @param size (int)
+ * @param dst (int)
+ * @return (int)
+ */
 int cml_hevc_forward_transform(const int32_t* block, int32_t* coeffs, int size, int dst);
 int cml_hevc_inverse_transform(const int32_t* coeffs, int32_t* block, int size, int dst);
 

@@ -34,8 +34,11 @@ static Tensor* mk(int r, int c, const float* vals) {
     return t;
 }
 
-/* add -> relu: the smallest chain the fuser collapses, and the one whose fused
- * kernel was miscompiled. */
+/**
+ * add -> relu: the smallest chain the fuser collapses, and the one whose fused
+ * kernel was miscompiled.
+ * @return (int)
+ */
 static int run_probe(void) {
     cml_init();
     float x[4] = {58, 64, 139, 154};
@@ -58,10 +61,15 @@ static int run_probe(void) {
     return 0;
 }
 
-/* Every flag this test reasons about is pinned explicitly, never left to the
+/**
+ * Every flag this test reasons about is pinned explicitly, never left to the
  * ambient environment: the probes are children, so running the suite itself
  * under NOOPT=1 would otherwise silently turn the baseline into a second NOOPT
- * run. `on` names the one flag being switched to its non-default value. */
+ * run. `on` names the one flag being switched to its non-default value.
+ * @param on (const char*)
+ * @param p (Probe*)
+ * @return (int)
+ */
 static int probe_with(const char* on, Probe* p) {
     const char* noopt  = "0";
     const char* nofuse = "0";
@@ -104,8 +112,11 @@ static Probe g_on, g_noopt, g_nofuse, g_nosched;
 
 static int test_fusion_on_by_default(void) { return g_on.enabled == 1 && g_on.fused >= 1; }
 
-/* The point of the fix: NOOPT is documented as disabling optimization passes,
- * and fusion is one. */
+/**
+ * The point of the fix: NOOPT is documented as disabling optimization passes,
+ * and fusion is one.
+ * @return (int)
+ */
 static int test_noopt_disables_fusion(void) { return g_noopt.enabled == 0 && g_noopt.fused == 0; }
 
 static int test_disable_fusion_disables_fusion(void) {
@@ -116,8 +127,11 @@ static int test_fusion_scheduler_zero_disables_fusion(void) {
     return g_nosched.enabled == 0 && g_nosched.fused == 0;
 }
 
-/* Fusion is a performance transform; it must not move the numbers. This is the
- * assertion that catches a miscompiled fused kernel. */
+/**
+ * Fusion is a performance transform; it must not move the numbers. This is the
+ * assertion that catches a miscompiled fused kernel.
+ * @return (int)
+ */
 static int test_fusion_does_not_change_results(void) {
     return values_match(&g_on, &g_noopt) && values_match(&g_on, &g_nofuse) &&
            values_match(&g_on, &g_nosched);

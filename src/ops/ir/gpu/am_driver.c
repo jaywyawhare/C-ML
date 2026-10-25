@@ -315,7 +315,12 @@ static void am_free_and_unmap(CMLAMDriver* drv, uint64_t handle, void* cpu_addr,
     kfd_ioctl(drv->fd_kfd, AMDKFD_IOC_FREE_MEMORY_OF_GPU, &fr);
 }
 
-/* Read a uint64 property from a sysfs file. Returns 0 on success. */
+/**
+ * Read a uint64 property from a sysfs file. Returns 0 on success.
+ * @param path (const char*)
+ * @param val (uint64_t*)
+ * @return (int)
+ */
 static int sysfs_read_u64(const char* path, uint64_t* val) {
     FILE* f = fopen(path, "r");
     if (!f)
@@ -325,7 +330,12 @@ static int sysfs_read_u64(const char* path, uint64_t* val) {
     return ret;
 }
 
-/* Read a uint32 property from a sysfs file. */
+/**
+ * Read a uint32 property from a sysfs file.
+ * @param path (const char*)
+ * @param val (uint32_t*)
+ * @return (int)
+ */
 static int sysfs_read_u32(const char* path, uint32_t* val) {
     uint64_t v;
     int ret = sysfs_read_u64(path, &v);
@@ -2341,9 +2351,13 @@ int cml_am_synchronize(CMLAMDriver* drv) {
 
 /* Graph execution */
 
-/* Ops this CPU-side emulation genuinely implements. Anything else must not be
+/**
+ * Ops this CPU-side emulation genuinely implements. Anything else must not be
  * claimed: reporting success for an op it did not perform is how relu became a
- * copy on this path. */
+ * copy on this path.
+ * @param t (UOpType)
+ * @return (bool)
+ */
 static bool am_emu_unary_supported(UOpType t) {
     switch (t) {
     case UOP_NEG:

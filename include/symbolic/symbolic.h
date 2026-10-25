@@ -70,8 +70,12 @@ int64_t sym_expr_max(const SymExpr* e);
 int sym_eval(const SymExpr* e, const char** var_names, const int64_t* values, int num_vars,
              int64_t* out);
 
-/* Simplify: constant folding, identity removal.
- * Returns a new ref-counted expression (caller must release). */
+/**
+ * Simplify: constant folding, identity removal.
+ * Returns a new ref-counted expression (caller must release).
+ * @param e (SymExpr*)
+ * @return (SymExpr*)
+ */
 SymExpr* sym_simplify(SymExpr* e);
 
 void sym_expr_retain(SymExpr* e);

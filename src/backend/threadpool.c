@@ -101,7 +101,11 @@ typedef struct {
     uint32_t gen;
 } Batch;
 
-/* Snapshot the live batch. Caller must hold pool->mutex. */
+/**
+ * Snapshot the live batch. Caller must hold pool->mutex.
+ * @param pool (const ThreadPool*)
+ * @return (Batch)
+ */
 static Batch batch_snapshot(const ThreadPool* pool) {
     Batch b;
     b.func       = pool->func;
@@ -113,10 +117,16 @@ static Batch batch_snapshot(const ThreadPool* pool) {
     return b;
 }
 
-/* Run one chunk index against `b` (no-op for empty tail chunks), then record
+/**
+ * Run one chunk index against `b` (no-op for empty tail chunks), then record
  * the completion generation-tagged. A straggler whose batch has moved on finds
  * a done-word with a different generation and drops the increment - it must
- * not release a submitter waiting on a newer batch. */
+ * not release a submitter waiting on a newer batch.
+ * @param pool (ThreadPool*)
+ * @param b (const Batch*)
+ * @param c (size_t)
+ * @return (void)
+ */
 static void run_chunk(ThreadPool* pool, const Batch* b, size_t c) {
     size_t start = c * b->chunk;
     size_t end   = start + b->chunk;
@@ -139,12 +149,17 @@ static void run_chunk(ThreadPool* pool, const Batch* b, size_t c) {
     }
 }
 
-/* Claim and run chunks of batch `b` until it is exhausted.
+/**
+ * Claim and run chunks of batch `b` until it is exhausted.
  *
  * The generation test is what keeps a straggler from eating the next batch's
  * work: once the pool has moved on, this thread's claims no longer match and it
  * leaves without consuming an index. Every index it does claim is one it runs
- * and accounts for, so done_chunks always reaches num_chunks. */
+ * and accounts for, so done_chunks always reaches num_chunks.
+ * @param pool (ThreadPool*)
+ * @param b (const Batch*)
+ * @return (void)
+ */
 static void drain_chunks(ThreadPool* pool, const Batch* b) {
     uint64_t cur = atomic_load(&pool->claim);
     for (;;) {
@@ -314,8 +329,13 @@ void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t
     pthread_mutex_unlock(&pool->mutex);
 }
 
-/* Legacy API kept for source compatibility (no current external caller). submit
- * runs the task synchronously via the parallel machinery; wait is then a no-op. */
+/**
+ * Legacy API kept for source compatibility (no current external caller). submit
+ * runs the task synchronously via the parallel machinery; wait is then a no-op.
+ * @param pool (ThreadPool*)
+ * @param task (Task*)
+ * @return (int)
+ */
 int threadpool_submit(ThreadPool* pool, Task* task) {
     if (!task)
         return -1;

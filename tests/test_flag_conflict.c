@@ -11,8 +11,14 @@
 
 static const char* program_path(void);
 
-/* cml_init() latches process-global state, so each combination is exercised in
- * a fresh child rather than by re-initialising in place. */
+/**
+ * cml_init() latches process-global state, so each combination is exercised in
+ * a fresh child rather than by re-initialising in place.
+ * @param viz (const char*)
+ * @param no_export (const char*)
+ * @param probe (const char*)
+ * @return (int)
+ */
 static int init_rc_with(const char* viz, const char* no_export, const char* probe) {
     /* VIZ_LAUNCHED=1 in the child: VIZ=1 otherwise forks the dashboard launcher,
      * which binds a port and never returns, so the probe hangs instead of

@@ -213,8 +213,11 @@ static int test_loss_backward(void) {
     return ok;
 }
 
-/* backward(y, g) on a non-scalar y propagates g, not ones: the graph engine used to seed
- * every backward with ones and ignore the gradient argument. */
+/**
+ * backward(y, g) on a non-scalar y propagates g, not ones: the graph engine used to seed
+ * every backward with ones and ignore the gradient argument.
+ * @return (int)
+ */
 static int test_backward_explicit_gradient(void) {
     float x_data[] = {1.0f, 2.0f, 3.0f};
     float g_data[] = {1.0f, 10.0f, 100.0f};
@@ -236,9 +239,12 @@ static int test_backward_explicit_gradient(void) {
     return ok;
 }
 
-/* A second, unrelated backward on a graph that was never reset: the first pass's last node
+/**
+ * A second, unrelated backward on a graph that was never reset: the first pass's last node
  * was fused away during its execute, and the second pass resumed lowering from it. The first
- * pass's plain grads must also survive it, as they do in eager mode. */
+ * pass's plain grads must also survive it, as they do in eager mode.
+ * @return (int)
+ */
 static int test_backward_twice_without_reset(void) {
     cml_reset_ir_context();
     float one = 1.0f, two = 2.0f, half = 0.5f, tenth = 0.1f;

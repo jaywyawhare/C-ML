@@ -69,43 +69,127 @@ bool cml_blas_available(void);
 CMLBlasContext* cml_blas_init(void);
 void cml_blas_free(CMLBlasContext* ctx);
 
-/* Lazy initialized singleton */
+/**
+ * Lazy initialized singleton
+ * @return (CMLBlasContext*)
+ */
 CMLBlasContext* cml_blas_get_context(void);
 
-/* C = alpha * A @ B + beta * C */
+/**
+ * C = alpha * A @ B + beta * C
+ * @param ctx (CMLBlasContext*)
+ * @param A (const float*)
+ * @param B (const float*)
+ * @param C (float*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @param alpha (float)
+ * @param beta (float)
+ * @return (int)
+ */
 int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
                    int K, float alpha, float beta);
 
-/* C = alpha * op(A) @ op(B) + beta * C, where op(X) = X or X^T */
+/**
+ * C = alpha * op(A) @ op(B) + beta * C, where op(X) = X or X^T
+ * @param ctx (CMLBlasContext*)
+ * @param A (const float*)
+ * @param B (const float*)
+ * @param C (float*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @param alpha (float)
+ * @param beta (float)
+ * @param transA (bool)
+ * @param transB (bool)
+ * @return (int)
+ */
 int cml_blas_sgemm_ex(CMLBlasContext* ctx, const float* A, const float* B, float* C, int M, int N,
                       int K, float alpha, float beta, bool transA, bool transB);
 
-/* f64 GEMM through cblas_dgemm (row-major, no transposes). Returns -1 when
- * no BLAS is available - the caller falls back to the generic kernel. */
+/**
+ * f64 GEMM through cblas_dgemm (row-major, no transposes). Returns -1 when
+ * no BLAS is available - the caller falls back to the generic kernel.
+ * @param ctx (CMLBlasContext*)
+ * @param A (const double*)
+ * @param B (const double*)
+ * @param C (double*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @param alpha (double)
+ * @param beta (double)
+ * @return (int)
+ */
 int cml_blas_dgemm(CMLBlasContext* ctx, const double* A, const double* B, double* C, int M, int N,
                    int K, double alpha, double beta);
 
-/* y = alpha * A @ x + beta * y */
+/**
+ * y = alpha * A @ x + beta * y
+ * @param ctx (CMLBlasContext*)
+ * @param A (const float*)
+ * @param x (const float*)
+ * @param y (float*)
+ * @param M (int)
+ * @param N (int)
+ * @param alpha (float)
+ * @param beta (float)
+ * @return (int)
+ */
 int cml_blas_sgemv(CMLBlasContext* ctx, const float* A, const float* x, float* y, int M, int N,
                    float alpha, float beta);
 
-/* y = alpha * x + y */
+/**
+ * y = alpha * x + y
+ * @param ctx (CMLBlasContext*)
+ * @param x (const float*)
+ * @param y (float*)
+ * @param n (int)
+ * @param alpha (float)
+ * @return (int)
+ */
 int cml_blas_saxpy(CMLBlasContext* ctx, const float* x, float* y, int n, float alpha);
 
-/* x = alpha * x */
+/**
+ * x = alpha * x
+ * @param ctx (CMLBlasContext*)
+ * @param x (float*)
+ * @param n (int)
+ * @param alpha (float)
+ * @return (int)
+ */
 int cml_blas_sscal(CMLBlasContext* ctx, float* x, int n, float alpha);
 
-/* result = x . y */
+/**
+ * result = x . y
+ * @param ctx (CMLBlasContext*)
+ * @param x (const float*)
+ * @param y (const float*)
+ * @param n (int)
+ * @return (float)
+ */
 float cml_blas_sdot(CMLBlasContext* ctx, const float* x, const float* y, int n);
 
-/* result = ||x||_2 */
+/**
+ * result = ||x||_2
+ * @param ctx (CMLBlasContext*)
+ * @param x (const float*)
+ * @param n (int)
+ * @return (float)
+ */
 float cml_blas_snrm2(CMLBlasContext* ctx, const float* x, int n);
 
 const char* cml_blas_get_library_name(CMLBlasContext* ctx);
 
-/* Set/get the global BLAS thread count (MKL/OpenBLAS/BLIS/ILP64).
+/**
+ * Set/get the global BLAS thread count (MKL/OpenBLAS/BLIS/ILP64).
  * The underlying library thread pool is process-global, so this affects all
- * subsequent GEMM calls regardless of which CMLBlasContext issues them. */
+ * subsequent GEMM calls regardless of which CMLBlasContext issues them.
+ * @param n (int)
+ * @return (void)
+ */
 void cml_blas_set_num_threads(int n);
 int cml_blas_get_num_threads(void);
 

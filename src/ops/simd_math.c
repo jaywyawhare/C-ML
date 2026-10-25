@@ -64,9 +64,13 @@ void cml_print_simd_caps(void) {
         }                                                                                          \
     }
 
-/* Schraudolph-style polynomial exp: packs a linear function of x into the IEEE
+/**
+ * Schraudolph-style polynomial exp: packs a linear function of x into the IEEE
  * exponent field (~1e-3 relative error, no libm call). Used only when
- * TRANSCENDENTAL forces approximation (>=2); default keeps the accurate expf. */
+ * TRANSCENDENTAL forces approximation (>=2); default keeps the accurate expf.
+ * @param x (float)
+ * @return (float)
+ */
 static inline float fast_expf(float x) {
     if (x > 88.0f)
         x = 88.0f;
@@ -139,7 +143,15 @@ BINARY(simd_div_f32, x / y)
 
 #undef BINARY
 
-/* out[i] = cond[i] != 0 ? a[i] : b[i] */
+/**
+ * out[i] = cond[i] != 0 ? a[i] : b[i]
+ * @param cond (const float*)
+ * @param a (const float*)
+ * @param b (const float*)
+ * @param out (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_where_f32(const float* cond, const float* a, const float* b, float* out, size_t n) {
     if (!cond || !a || !b || !out || n == 0)
         return;

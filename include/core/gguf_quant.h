@@ -58,10 +58,26 @@ bool gguf_type_is_quantized(GGUFTensorType type);
 int gguf_quant_block_size(GGUFTensorType type);
 size_t gguf_quant_type_size(GGUFTensorType type);
 
-/* numel must be multiple of block size */
+/**
+ * numel must be multiple of block size
+ * @param type (GGUFTensorType)
+ * @param src (const void*)
+ * @param dst (float*)
+ * @param numel (size_t)
+ * @return (int)
+ */
 int gguf_dequantize(GGUFTensorType type, const void* src, float* dst, size_t numel);
 
-/* y[m,n] = x[m,k] @ W_q[k,n] where W_q is stored in GGUF block layout */
+/**
+ * y[m,n] = x[m,k] @ W_q[k,n] where W_q is stored in GGUF block layout
+ * @param x (const float*)
+ * @param w_q8 (const void*)
+ * @param y (float*)
+ * @param m (int)
+ * @param k (int)
+ * @param n (int)
+ * @return (int)
+ */
 int gguf_q8_0_matmul(const float* x, const void* w_q8, float* y, int m, int k, int n);
 int gguf_q4_0_matmul(const float* x, const void* w_q4, float* y, int m, int k, int n);
 

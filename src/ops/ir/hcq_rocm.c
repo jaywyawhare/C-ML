@@ -36,8 +36,12 @@ static CMLROCmBackend* rocm_backend_of(CMLHCQQueue* queue) {
     return qd ? qd->backend : NULL;
 }
 
-/* Public accessor so tests can reach the backend behind a queue (e.g. the
- * HIP mock driver's journal checks). */
+/**
+ * Public accessor so tests can reach the backend behind a queue (e.g. the
+ * HIP mock driver's journal checks).
+ * @param queue (CMLHCQQueue*)
+ * @return (CMLROCmBackend*)
+ */
 CMLROCmBackend* cml_hcq_rocm_queue_backend(CMLHCQQueue* queue) { return rocm_backend_of(queue); }
 
 /**

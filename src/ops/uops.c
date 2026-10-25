@@ -73,9 +73,15 @@ static Tensor* uop_binary(Tensor* a, Tensor* b, UOpType type) {
     return uop_binary_ex(a, b, type, true, BINARY_DTYPE_PROMOTE);
 }
 
-/* Set `node`'s output shape for a single-axis reduction of `a` per `params`
+/**
+ * Set `node`'s output shape for a single-axis reduction of `a` per `params`
  * (dim + keepdim); a negative/out-of-range dim collapses to [1]. Returns 0, or
- * -1 on allocation failure. */
+ * -1 on allocation failure.
+ * @param node (struct IRNode*)
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (int)
+ */
 static int set_reduce_output_shape(struct IRNode* node, Tensor* a, ReduceParams* params) {
     int dim      = params && params->dims && params->num_dims > 0 ? params->dims[0] : -1;
     bool keepdim = params ? params->keepdim : false;
@@ -124,8 +130,15 @@ static int set_reduce_output_shape(struct IRNode* node, Tensor* a, ReduceParams*
     return 0;
 }
 
-/* Finalize a single-input op: hand `out_shape` (ownership passes to the node)
- * to the tail node and propagate the input's grad flag. */
+/**
+ * Finalize a single-input op: hand `out_shape` (ownership passes to the node)
+ * to the tail node and propagate the input's grad flag.
+ * @param ir (CMLGraph_t)
+ * @param input (Tensor*)
+ * @param out_shape (int*)
+ * @param out_ndim (int)
+ * @return (Tensor*)
+ */
 static Tensor* finish_reshaped_unary(CMLGraph_t ir, Tensor* input, int* out_shape, int out_ndim) {
     if (!out_shape)
         return NULL;
@@ -138,15 +151,28 @@ static Tensor* finish_reshaped_unary(CMLGraph_t ir, Tensor* input, int* out_shap
     return tensor_from_ir_node(node, ir);
 }
 
-/* Finalize a unary op whose output shape equals its input's. */
+/**
+ * Finalize a unary op whose output shape equals its input's.
+ * @param ir (CMLGraph_t)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* finish_samesize_unary(CMLGraph_t ir, Tensor* input) {
     return finish_reshaped_unary(ir, input, tensor_shape_copy(input->shape, input->ndim),
                                  input->ndim);
 }
 
-/* Bind the tail node as a non-differentiable producer of `shape`/`ndim`: the
+/**
+ * Bind the tail node as a non-differentiable producer of `shape`/`ndim`: the
  * shape of every source op (fill, rand, alloc) and of the in-graph optimizer
- * steps, whose output mirrors the parameter they update. */
+ * steps, whose output mirrors the parameter they update.
+ * @param ir (CMLGraph_t)
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* cml_uop_finish_source_node(CMLGraph_t ir, const int* shape, int ndim, DType dtype,
                                    DeviceType device) {
     struct IRNode* node = cml_ir_get_tail(ir);
@@ -159,9 +185,15 @@ Tensor* cml_uop_finish_source_node(CMLGraph_t ir, const int* shape, int ndim, DT
     return tensor_from_ir_node(node, ir);
 }
 
-/* Build a param-less unary op whose output shape equals its input's (mirrors
+/**
+ * Build a param-less unary op whose output shape equals its input's (mirrors
  * uop_binary for the single-input, same-shape activations). `differentiable`
- * is false for the ops with no meaningful gradient (rounding, predicates). */
+ * is false for the ops with no meaningful gradient (rounding, predicates).
+ * @param x (Tensor*)
+ * @param type (UOpType)
+ * @param differentiable (bool)
+ * @return (Tensor*)
+ */
 static Tensor* uop_unary_noparam(Tensor* x, UOpType type, bool differentiable) {
     if (!x)
         return NULL;
@@ -180,9 +212,16 @@ static Tensor* uop_unary_noparam(Tensor* x, UOpType type, bool differentiable) {
     return finish_samesize_unary(ir, x);
 }
 
-/* Record a movement op (reshape/expand) that already produced `result` from
+/**
+ * Record a movement op (reshape/expand) that already produced `result` from
  * `a`: clone the shape params for the IR node and bind the node to `result`.
- * A failure here just leaves `result` outside the graph, as before. */
+ * A failure here just leaves `result` outside the graph, as before.
+ * @param a (Tensor*)
+ * @param result (Tensor*)
+ * @param type (UOpType)
+ * @param params (ShapeParams*)
+ * @return (void)
+ */
 static void attach_movement_op(Tensor* a, Tensor* result, UOpType type, ShapeParams* params) {
     if (!result)
         return;
@@ -256,7 +295,12 @@ Tensor* uop_div(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_DIV); }
  */
 Tensor* uop_max(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_MAX); }
 
-/* Comparisons return DTYPE_BOOL (numpy-style) and carry no gradient. */
+/**
+ * Comparisons return DTYPE_BOOL (numpy-style) and carry no gradient.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_cmplt(Tensor* a, Tensor* b) {
     return uop_binary_ex(a, b, UOP_CMPLT, false, BINARY_DTYPE_BOOL);
 }
@@ -369,8 +413,12 @@ Tensor* uop_tan(Tensor* a) { return uop_unary(a, UOP_TAN); }
  */
 Tensor* uop_pow(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_POW); }
 
-/* Deep-copy `params` for the IR node, which takes ownership of the clone.
- * Returns NULL on allocation failure. */
+/**
+ * Deep-copy `params` for the IR node, which takes ownership of the clone.
+ * Returns NULL on allocation failure.
+ * @param params (ReduceParams*)
+ * @return (ReduceParams*)
+ */
 static ReduceParams* clone_reduce_params(ReduceParams* params) {
     ReduceParams* copy = cml_malloc(sizeof(ReduceParams));
     if (!copy)
@@ -391,8 +439,15 @@ static ReduceParams* clone_reduce_params(ReduceParams* params) {
     return copy;
 }
 
-/* `differentiable` is false for the index/predicate reductions (argmax, any,
- * ...) whose output carries no gradient. */
+/**
+ * `differentiable` is false for the index/predicate reductions (argmax, any,
+ * ...) whose output carries no gradient.
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @param type (UOpType)
+ * @param differentiable (bool)
+ * @return (Tensor*)
+ */
 static Tensor* uop_reduce_ex(Tensor* a, ReduceParams* params, UOpType type, bool differentiable) {
     if (!a)
         return NULL;
@@ -493,9 +548,15 @@ Tensor* uop_max_reduce(Tensor* a, ReduceParams* params) {
  */
 Tensor* uop_mean(Tensor* a, ReduceParams* params) { return uop_reduce(a, params, UOP_MEAN); }
 
-/* The params structs are read-only here -- uop_reshape/uop_expand copy the
+/**
+ * The params structs are read-only here -- uop_reshape/uop_expand copy the
  * shape into the IR node -- so casting away const is safe and spares every
- * caller a non-const scratch array. */
+ * caller a non-const scratch array.
+ * @param a (Tensor*)
+ * @param new_shape (const int*)
+ * @param new_ndim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_reshape_to(Tensor* a, const int* new_shape, int new_ndim) {
     ReshapeParams params = {.new_shape = (int*)new_shape, .new_ndim = new_ndim};
     return uop_reshape(a, &params);
@@ -513,8 +574,15 @@ Tensor* uop_expand_to(Tensor* a, const int* new_shape, int new_ndim) {
     return uop_expand(a, &params);
 }
 
-/* A negative `dim` means "reduce everything": leave dims empty so consumers
- * that branch on num_dims see a full reduction rather than axis 0. */
+/**
+ * A negative `dim` means "reduce everything": leave dims empty so consumers
+ * that branch on num_dims see a full reduction rather than axis 0.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param keepdim (bool)
+ * @param type (UOpType)
+ * @return (Tensor*)
+ */
 static Tensor* uop_reduce_dim(Tensor* a, int dim, bool keepdim, UOpType type) {
     ReduceParams params = {
         .dims = dim >= 0 ? &dim : NULL, .num_dims = dim >= 0 ? 1 : 0, .keepdim = keepdim};
@@ -2309,8 +2377,17 @@ Tensor* uop_tril(Tensor* a, int diagonal) {
     return finish_samesize_unary(ir, a);
 }
 
-/* Record a UOP_PAD node with a private copy of `pad_widths`; the IR takes
- * ownership of the params on success. Returns 0, or -1 on allocation failure. */
+/**
+ * Record a UOP_PAD node with a private copy of `pad_widths`; the IR takes
+ * ownership of the params on success. Returns 0, or -1 on allocation failure.
+ * @param ir (CMLGraph_t)
+ * @param a (Tensor*)
+ * @param pad_widths (int*)
+ * @param num_dims (int)
+ * @param value (float)
+ * @param mode (PadMode)
+ * @return (int)
+ */
 static int add_pad_node(CMLGraph_t ir, Tensor* a, int* pad_widths, int num_dims, float value,
                         PadMode mode) {
     PadParams* params = cml_malloc(sizeof(PadParams));
@@ -3688,8 +3765,15 @@ Tensor* uop_unfold(Tensor* a, int kernel_size, int stride) {
     return tensor_from_ir_node(node, ir);
 }
 
-/* col2im: [..., num_windows, kernel_size] -> [..., output_len] (scatter-add,
- * the adjoint of uop_unfold). */
+/**
+ * col2im: [..., num_windows, kernel_size] -> [..., output_len] (scatter-add,
+ * the adjoint of uop_unfold).
+ * @param a (Tensor*)
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @param output_len (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_fold(Tensor* a, int kernel_size, int stride, int output_len) {
     if (!a || a->ndim < 2)
         return NULL;
@@ -3726,8 +3810,15 @@ Tensor* uop_fold(Tensor* a, int kernel_size, int stride, int output_len) {
     return tensor_from_ir_node(node, ir);
 }
 
-/* index_add (adjoint of gather): out = src with axis `dim` resized to dim_size,
- * out[index[i], ..] += src[i, ..].  inputs = [index, src]. */
+/**
+ * index_add (adjoint of gather): out = src with axis `dim` resized to dim_size,
+ * out[index[i], ..] += src[i, ..].  inputs = [index, src].
+ * @param index (Tensor*)
+ * @param src (Tensor*)
+ * @param dim (int)
+ * @param dim_size (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_scatter_add(Tensor* index, Tensor* src, int dim, int dim_size) {
     if (!index || !src)
         return NULL;
@@ -3763,12 +3854,25 @@ Tensor* uop_scatter_add(Tensor* index, Tensor* src, int dim, int dim_size) {
     return tensor_from_ir_node(node, ir);
 }
 
-/* out spatial extent for one axis of a conv/im2col window */
+/**
+ * out spatial extent for one axis of a conv/im2col window
+ * @param in (int)
+ * @param k (int)
+ * @param s (int)
+ * @param p (int)
+ * @param d (int)
+ * @return (int)
+ */
 static inline int im2col_out_dim(int in, int k, int s, int p, int d) {
     return (in + 2 * p - d * (k - 1) - 1) / (s > 0 ? s : 1) + 1;
 }
 
-/* Fused 2D im2col: x [N,C,H,W] -> [N*OH*OW, C*kh*kw]. */
+/**
+ * Fused 2D im2col: x [N,C,H,W] -> [N*OH*OW, C*kh*kw].
+ * @param x (Tensor*)
+ * @param params (Im2colParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_im2col(Tensor* x, Im2colParams* params) {
     if (!x || x->ndim != 4 || !params)
         return NULL;
@@ -3809,7 +3913,12 @@ Tensor* uop_im2col(Tensor* x, Im2colParams* params) {
     return tensor_from_ir_node(node, ir);
 }
 
-/* Adjoint of im2col (col2im): g [N*OH*OW, C*kh*kw] -> [N,C,H,W] by scatter-add. */
+/**
+ * Adjoint of im2col (col2im): g [N*OH*OW, C*kh*kw] -> [N,C,H,W] by scatter-add.
+ * @param g (Tensor*)
+ * @param params (Col2imParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_col2im(Tensor* g, Col2imParams* params) {
     if (!g || g->ndim != 2 || !params)
         return NULL;

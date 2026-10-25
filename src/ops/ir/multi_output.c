@@ -103,8 +103,14 @@ static int groups_have_distinct_outputs(const CMLFusionGroup* a, const CMLFusion
     return 1;
 }
 
-/* Find elementwise groups sharing the same inputs but distinct outputs; return them as
- * merge pairs so one kernel can produce several outputs. */
+/**
+ * Find elementwise groups sharing the same inputs but distinct outputs; return them as
+ * merge pairs so one kernel can produce several outputs.
+ * @param sched (CMLFusionSchedule*)
+ * @param merge_groups (int**)
+ * @param num_merges (int*)
+ * @return (int)
+ */
 int cml_multi_output_analyze(CMLFusionSchedule* sched, int** merge_groups, int* num_merges) {
     if (!sched || !merge_groups || !num_merges)
         return -1;
@@ -183,8 +189,14 @@ int cml_multi_output_analyze(CMLFusionSchedule* sched, int** merge_groups, int* 
     return count;
 }
 
-/* Merge each analyzed pair by absorbing the secondary group's nodes into the primary,
- * then compact the schedule's group list and rebuild the execution order. */
+/**
+ * Merge each analyzed pair by absorbing the secondary group's nodes into the primary,
+ * then compact the schedule's group list and rebuild the execution order.
+ * @param sched (CMLFusionSchedule*)
+ * @param merge_groups (int*)
+ * @param num_merges (int)
+ * @return (int)
+ */
 int cml_multi_output_fuse(CMLFusionSchedule* sched, int* merge_groups, int num_merges) {
     if (!sched || !merge_groups || num_merges <= 0)
         return -1;

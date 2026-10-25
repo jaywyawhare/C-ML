@@ -26,7 +26,10 @@ extern "C" {
  */
 int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, Tensor* seed, bool differentiable_grads);
 
-/* 1 if backward should use graph-level autodiff (GRAD_MODE=graph), else 0. */
+/**
+ * 1 if backward should use graph-level autodiff (GRAD_MODE=graph), else 0.
+ * @return (int)
+ */
 int cml_autodiff_use_graph(void);
 
 #ifdef __cplusplus

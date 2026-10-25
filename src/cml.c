@@ -167,9 +167,13 @@ void cml_track_dataset(Dataset* dataset) {
     g_tracked_datasets[g_num_datasets++] = dataset;
 }
 
-/* Counterpart to cml_track_dataset, called from dataset_free. Without it a
+/**
+ * Counterpart to cml_track_dataset, called from dataset_free. Without it a
  * dataset the caller frees itself stays in the tracking table, and the
- * at-exit sweep frees it a second time. */
+ * at-exit sweep frees it a second time.
+ * @param dataset (Dataset*)
+ * @return (void)
+ */
 void cml_untrack_dataset(Dataset* dataset) {
     if (!dataset || !g_tracked_datasets)
         return;
@@ -291,7 +295,10 @@ void cml_register_cleanup_context(CleanupContext* ctx) {
     g_cleanup_contexts[g_num_cleanup_contexts++] = ctx;
 }
 
-/* Constructor disabled: call check_and_launch_viz() from cml_init() instead */
+/**
+ * Constructor disabled: call check_and_launch_viz() from cml_init() instead
+ * @return (void)
+ */
 static void check_and_launch_viz(void) {
     if (!cml_flag_enabled(CML_FLAG_VIZ))
         return;
@@ -422,9 +429,12 @@ static void check_and_launch_viz(void) {
 static const char* g_build_info = "C-ML Library\n"
                                   "Features: autograd, nn, optim, logging, memory_management";
 
-/* Map the DEFAULT_FLOAT env var (FLOAT32/FLOAT/HALF/FLOAT16/BFLOAT16/FLOAT64/
+/**
+ * Map the DEFAULT_FLOAT env var (FLOAT32/FLOAT/HALF/FLOAT16/BFLOAT16/FLOAT64/
  * DOUBLE) to a DType, mirroring tinygrad's DEFAULT_FLOAT. Falls back to
- * DTYPE_FLOAT32 when unset or unrecognized. */
+ * DTYPE_FLOAT32 when unset or unrecognized.
+ * @return (DType)
+ */
 static DType cml_default_float_from_env(void) {
     const char* v = getenv("DEFAULT_FLOAT");
     if (!v || !*v)
@@ -1765,8 +1775,11 @@ void cml_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool crea
  * the loss each step; this gives the same guarantee explicitly and is safe for
  * language bindings that keep the loss object alive (it's detached first, so the
  * reset never frees a tensor the caller still references). */
-/* Declared in ops/ir/graph_cache.c - drops cached execution plans (whose tensor
- * pointers dangle once the graph is freed) without freeing the pooled buffers. */
+/**
+ * Declared in ops/ir/graph_cache.c - drops cached execution plans (whose tensor
+ * pointers dangle once the graph is freed) without freeing the pooled buffers.
+ * @return (void)
+ */
 void cml_graph_cache_reset_global(void);
 
 void cml_autograd_step_end(Tensor* keep) {
@@ -1775,18 +1788,25 @@ void cml_autograd_step_end(Tensor* keep) {
     cml_autograd_reset_after_step();
 }
 
-/* Post-optimizer-step graph reset. Frees the accumulated autograd graph AND
+/**
+ * Post-optimizer-step graph reset. Frees the accumulated autograd graph AND
  * drops the execution-plan cache, which would otherwise keep pointers into this
  * step's freed intermediate buffers and be replayed (crash) for a differently-
  * allocated tensor of the same shape - e.g. a second model in the same process.
  * The pooled buffers themselves and the parameters' realized data are kept, so
- * this is safe to call every step (unlike the full cml_reset_ir_context). */
+ * this is safe to call every step (unlike the full cml_reset_ir_context).
+ * @return (void)
+ */
 void cml_autograd_reset_after_step(void) { cml_ir_reset_graph_only(); }
 
-/* Materialize every parameter (and its gradient) into owned storage, so they no
+/**
+ * Materialize every parameter (and its gradient) into owned storage, so they no
  * longer borrow data from execution-plan buffers. Called before the plan cache
  * is dropped in a training step, which would otherwise free the buffers the
- * parameters point at. */
+ * parameters point at.
+ * @param opt (Optimizer*)
+ * @return (void)
+ */
 void cml_optim_realize_params(Optimizer* opt) {
     if (!opt)
         return;
@@ -2130,9 +2150,14 @@ Tensor* cml_std(Tensor* a, int dim, bool unbiased, bool keepdim) {
     return tensor_std(a, dim, unbiased, keepdim);
 }
 
-/* squeeze/unsqueeze are size-1-dim reshapes; route through cml_reshape so they
+/**
+ * squeeze/unsqueeze are size-1-dim reshapes; route through cml_reshape so they
  * build a differentiable graph node rather than a bare view (which severed the
- * backward graph, as raw reshape did before its fix). */
+ * backward graph, as raw reshape did before its fix).
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* cml_squeeze(Tensor* a, int dim) {
     if (!a || a->ndim < 1)
         return tensor_squeeze(a, dim);
@@ -2160,8 +2185,13 @@ Tensor* cml_unsqueeze(Tensor* a, int dim) {
         shape[i] = (i == dim) ? 1 : a->shape[j++];
     return cml_reshape(a, shape, nd + 1);
 }
-/* Route through uop_flip so flip is a differentiable graph node (grad = flip
- * back), not a bare tensor_flip view that severed the backward graph. */
+/**
+ * Route through uop_flip so flip is a differentiable graph node (grad = flip
+ * back), not a bare tensor_flip view that severed the backward graph.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* cml_flip(Tensor* a, int dim) { return uop_flip(a, dim); }
 /**
  * Public API: tile a tensor along each dim (-> tensor_repeat).
@@ -3319,8 +3349,13 @@ Tensor* cml_topk_with_indices(Tensor* a, int k, int dim, bool largest, Tensor** 
     *indices_out = NULL;
     return uop_topk(a, k, dim, largest, indices_out);
 }
-/* Route through uop_masked_select so it builds a differentiable node (VJP
- * scatters grad back to selected positions) rather than a bare non-diff copy. */
+/**
+ * Route through uop_masked_select so it builds a differentiable node (VJP
+ * scatters grad back to selected positions) rather than a bare non-diff copy.
+ * @param a (Tensor*)
+ * @param mask (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* cml_masked_select(Tensor* a, Tensor* mask) { return uop_masked_select(a, mask); }
 /**
  * Public API: coordinate grids from 1-D tensors (-> tensor_meshgrid).

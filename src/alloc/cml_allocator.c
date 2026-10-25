@@ -389,7 +389,12 @@ static bool g_initialized          = false;
 /* Thread local */
 static __thread ThreadCache tl_cache = {0};
 
-/* Forward */
+/**
+ * Forward
+ * @param cls (int)
+ * @param user_size (size_t)
+ * @return (void*)
+ */
 static void* alloc_from_class(int cls, size_t user_size);
 static void free_to_class(int cls, void* user_ptr, size_t user_size);
 static void* alloc_large(size_t size);

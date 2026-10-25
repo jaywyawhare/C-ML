@@ -11,9 +11,12 @@
 
 static AutocastContext g_autocast_ctx = {.enabled = false, .target_dtype = DTYPE_FLOAT16};
 
-/* Target-dtype selector: read once from CML_AMP_DTYPE ("bf16"/"bfloat16"
+/**
+ * Target-dtype selector: read once from CML_AMP_DTYPE ("bf16"/"bfloat16"
  * selects BFLOAT16), cached like GRAD_MODE in autodiff.c. Default stays
- * FLOAT16 for backward compatibility. */
+ * FLOAT16 for backward compatibility.
+ * @return (int)
+ */
 static int autocast_env_dtype(void) {
     static int cached = -1;
     if (cached < 0) {

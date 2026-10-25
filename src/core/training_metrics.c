@@ -64,10 +64,15 @@ void training_metrics_note_prediction(Tensor* prediction, Tensor* target) {
     g_acc_target = target;
 }
 
-/* Classification accuracy from a prediction/logit tensor and its target.
+/**
+ * Classification accuracy from a prediction/logit tensor and its target.
  * Last dim of `pred` is the class dimension. `target` may be one-hot ([..,C])
  * or class indices ([..]). C==1 is treated as binary (threshold 0.5).
- * Returns -1.0f when accuracy is not well-defined for the given tensors. */
+ * Returns -1.0f when accuracy is not well-defined for the given tensors.
+ * @param pred (Tensor*)
+ * @param target (Tensor*)
+ * @return (float)
+ */
 static float compute_classification_accuracy(Tensor* pred, Tensor* target) {
     if (!pred || !target)
         return -1.0f;
@@ -575,8 +580,16 @@ float* cml_tensor_float_buffer(Tensor* t, size_t* num_elements) {
  * estimate within ~0.2% of the value range while costing one int array. */
 #define DIST_BINS 512
 
-/* One pass over every parameter's data, applied by `visit`. Shared by the
- * weight and gradient summaries, which differ only in which tensor they read. */
+/**
+ * One pass over every parameter's data, applied by `visit`. Shared by the
+ * weight and gradient summaries, which differ only in which tensor they read.
+ * @param parameters (void**)
+ * @param num_parameters (int)
+ * @param want_grad (bool)
+ * @param visit (void (*)(const void*, size_t, DType, void*))
+ * @param ctx (void*)
+ * @return (void)
+ */
 static void dist_accumulate(void** parameters, int num_parameters, bool want_grad,
                             void (*visit)(const void*, size_t, DType, void*), void* ctx) {
     for (int i = 0; i < num_parameters; i++) {
@@ -650,7 +663,15 @@ static void dist_pass2(const void* data, size_t n, DType dt, void* ctx) {
     }
 }
 
-/* Value at the bin where the running count first crosses `target`. */
+/**
+ * Value at the bin where the running count first crosses `target`.
+ * @param bins (const int*)
+ * @param total (size_t)
+ * @param q (double)
+ * @param lo (float)
+ * @param bin_width (float)
+ * @return (float)
+ */
 static float dist_quantile(const int* bins, size_t total, double q, float lo, float bin_width) {
     size_t target = (size_t)(q * (double)total);
     size_t seen   = 0;
@@ -728,8 +749,15 @@ void training_metrics_record_distributions(TrainingMetrics* metrics, size_t epoc
     metrics->has_distributions = true;
 }
 
-/* Emit `"name": [...]` for an optional per-epoch series; absent arrays export
- * as [] so the dashboard can tell "not tracked" from "tracked and zero". */
+/**
+ * Emit `"name": [...]` for an optional per-epoch series; absent arrays export
+ * as [] so the dashboard can tell "not tracked" from "tracked and zero".
+ * @param f (FILE*)
+ * @param name (const char*)
+ * @param series (const float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 static void export_epoch_series(FILE* f, const char* name, const float* series, size_t n) {
     fprintf(f, "  \"%s\": [", name);
     if (series) {
@@ -743,9 +771,16 @@ static void export_epoch_series(FILE* f, const char* name, const float* series, 
     fputs("],\n", f);
 }
 
-/* Emit the percentile bands as parallel arrays -- one array per band rather
+/**
+ * Emit the percentile bands as parallel arrays -- one array per band rather
  * than an array of objects, so the chart can bind a band directly without
- * re-walking the epochs. */
+ * re-walking the epochs.
+ * @param f (FILE*)
+ * @param name (const char*)
+ * @param dist (const DistributionSummary*)
+ * @param n (size_t)
+ * @return (void)
+ */
 static void export_distribution_series(FILE* f, const char* name, const DistributionSummary* dist,
                                        size_t n) {
     static const char* fields[] = {"min", "p25", "p50", "p75", "max", "mean", "std", "frac_zero"};

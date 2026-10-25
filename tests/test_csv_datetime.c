@@ -33,8 +33,11 @@ static const char* csv_path(const char* name) {
     return path;
 }
 
-/* A header plus three numeric rows must yield three samples: the second row was
- * dropped before the data-offset anchor was fixed. */
+/**
+ * A header plus three numeric rows must yield three samples: the second row was
+ * dropped before the data-offset anchor was fixed.
+ * @return (int)
+ */
 static int test_header_keeps_every_row(void) {
     write_csv("num.csv", "x,y,z\n1,2,0\n3,4,1\n5,6,0\n");
     float *X = NULL, *y = NULL;
@@ -46,8 +49,11 @@ static int test_header_keeps_every_row(void) {
     return ok;
 }
 
-/* A headerless file whose first column is an ISO date must keep its first row,
- * rather than mistaking it for a header. */
+/**
+ * A headerless file whose first column is an ISO date must keep its first row,
+ * rather than mistaking it for a header.
+ * @return (int)
+ */
 static int test_leading_date_is_not_a_header(void) {
     write_csv("nohdr.csv", "2024-01-15,3.5,0\n2024-07-04,28.1,1\n");
     float *X = NULL, *y = NULL;
@@ -60,8 +66,11 @@ static int test_leading_date_is_not_a_header(void) {
     return ok;
 }
 
-/* A date column expands to year/month/day/dow with named features, and a text
- * feature column maps to class indices instead of becoming zero. */
+/**
+ * A date column expands to year/month/day/dow with named features, and a text
+ * feature column maps to class indices instead of becoming zero.
+ * @return (int)
+ */
 static int test_date_and_text_expansion(void) {
     write_csv("mix.csv", "date,temp,city,label\n2024-01-15,3.5,Paris,0\n2024-07-04,28.1,Rome,1\n"
                          "2023-12-31,-2.0,Oslo,0\n");
@@ -87,8 +96,11 @@ static int test_date_and_text_expansion(void) {
     return ok;
 }
 
-/* A datetime column splits into date and clock parts; a time-only column into
- * hour/minute/second. */
+/**
+ * A datetime column splits into date and clock parts; a time-only column into
+ * hour/minute/second.
+ * @return (int)
+ */
 static int test_datetime_and_time(void) {
     write_csv("dt.csv", "2024-07-04T14:45:30,3.5,1\n2024-01-15 08:30:00,2.0,0\n");
     float *X = NULL, *y = NULL;
@@ -109,7 +121,10 @@ static int test_datetime_and_time(void) {
     return okd && okt;
 }
 
-/* Cyclical encoding adds sin/cos pairs; disabling expansion keeps one column. */
+/**
+ * Cyclical encoding adds sin/cos pairs; disabling expansion keeps one column.
+ * @return (int)
+ */
 static int test_cyclical_and_disable(void) {
     write_csv("cyc.csv", "2024-01-15,0\n2024-02-15,1\n");
     float *X = NULL, *y = NULL;
@@ -133,8 +148,11 @@ static int test_cyclical_and_disable(void) {
     return okc && okr;
 }
 
-/* A `/`-separated date is auto-parsed only when a non-ISO order is chosen; under
- * the default ISO order it stays a single numeric column. */
+/**
+ * A `/`-separated date is auto-parsed only when a non-ISO order is chosen; under
+ * the default ISO order it stays a single numeric column.
+ * @return (int)
+ */
 static int test_date_order(void) {
     write_csv("slash.csv", "15/01/2024,10\n04/07/2024,20\n");
     float *Xi = NULL, *yi = NULL;

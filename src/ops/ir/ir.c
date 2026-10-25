@@ -4,7 +4,10 @@
 #endif
 #include "ops/ir/flamegraph.h"
 
-/* Defined below, next to the interning table it uses. */
+/**
+ * Defined below, next to the interning table it uses.
+ * @return (char*)
+ */
 static char* cml_capture_build_stack(void);
 static int cml_stack_is_internal(const char* folded);
 #include "ops/ir/ir.h"
@@ -908,12 +911,16 @@ static void free_ir_node(struct IRNode* node) {
     cml_free(node);
 }
 
-/* Canonical teardown of a node's owned storage, WITHOUT freeing the node
+/**
+ * Canonical teardown of a node's owned storage, WITHOUT freeing the node
  * itself and without ref_count accounting. This is the single source of
  * truth for which fields a node owns (params, scope, build_stack, per-input
  * shape arrays, ...); custom free paths must call this instead of open-coding
  * the field list - the DCE removal path used to hand-roll it and leaked
- * params/scope/build_stack/input_shapes on every removed node. */
+ * params/scope/build_stack/input_shapes on every removed node.
+ * @param node (struct IRNode*)
+ * @return (void)
+ */
 void cml_ir_release_node_storage(struct IRNode* node) {
     if (!node)
         return;
@@ -2002,12 +2009,18 @@ typedef struct {
 static BtEntry g_bt[64];
 static int g_bt_n = 0;
 
-/* "/path/bin(function+0x2e) [0x...]" -> "function", or empty when the frame has
+/**
+ * "/path/bin(function+0x2e) [0x...]" -> "function", or empty when the frame has
  * no symbol. Static functions are absent from the dynamic table even with
  * -rdynamic, and for those backtrace_symbols reports only the object path --
  * emitting that would put the binary's own name in the stack once per
  * unresolved frame, which reads like a real function and is not one. An empty
- * name drops the frame instead. */
+ * name drops the frame instead.
+ * @param raw (const char*)
+ * @param out (char*)
+ * @param cap (size_t)
+ * @return (void)
+ */
 static void bt_symbol(const char* raw, char* out, size_t cap) {
     out[0]           = '\0';
     const char* open = strchr(raw, '(');
@@ -2022,8 +2035,12 @@ static void bt_symbol(const char* raw, char* out, size_t cap) {
     out[n] = '\0';
 }
 
-/* Frames that are pure plumbing: they appear in every stack and say nothing
- * about which part of the model is being built. */
+/**
+ * Frames that are pure plumbing: they appear in every stack and say nothing
+ * about which part of the model is being built.
+ * @param fn (const char*)
+ * @return (int)
+ */
 static int bt_is_noise(const char* fn) {
     static const char* skip[] = {
         "cml_ir_add_uop",
@@ -2046,7 +2063,11 @@ static int bt_is_noise(const char* fn) {
     return 0;
 }
 
-/* True when a stack is rooted in the compiler rather than in model code. */
+/**
+ * True when a stack is rooted in the compiler rather than in model code.
+ * @param folded (const char*)
+ * @return (int)
+ */
 static int cml_stack_is_internal(const char* folded) {
     if (!folded || !*folded)
         return 1;

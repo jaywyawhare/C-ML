@@ -8,8 +8,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Beam-search timing callback: compile a variant's source, warm up, then time repeated
- * launches with CUDA events and return the average microseconds per launch (-1 on failure). */
+/**
+ * Beam-search timing callback: compile a variant's source, warm up, then time repeated
+ * launches with CUDA events and return the average microseconds per launch (-1 on failure).
+ * @param variant (const CMLBeamVariant*)
+ * @param user_data (void*)
+ * @return (double)
+ */
 double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data) {
     (void)user_data;
 

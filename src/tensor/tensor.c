@@ -503,8 +503,13 @@ int* tensor_shape_copy(int* shape, int ndim) {
     return new_shape;
 }
 
-/* Storage offset of flat element `idx`, walking the strides when the tensor is
- * a non-contiguous view. */
+/**
+ * Storage offset of flat element `idx`, walking the strides when the tensor is
+ * a non-contiguous view.
+ * @param t (const Tensor*)
+ * @param idx (size_t)
+ * @return (size_t)
+ */
 static size_t tensor_flat_offset(const Tensor* t, size_t idx) {
     size_t offset = t->storage_offset;
     if (t->is_contiguous)
@@ -912,10 +917,14 @@ Tensor* tensor_from_data(const void* data, int* shape, int ndim, const TensorCon
     return t;
 }
 
-/* Detach a tensor from the IR graph without freeing it: copy any borrowed
+/**
+ * Detach a tensor from the IR graph without freeing it: copy any borrowed
  * execution-plan data into an owned allocation so the tensor is self-contained,
  * then clear all links into the (possibly about-to-be-freed) graph. Used when a
- * graph teardown encounters a tensor an external owner still holds. */
+ * graph teardown encounters a tensor an external owner still holds.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_detach_keep(Tensor* t) {
     if (!t)
         return;
@@ -1041,9 +1050,13 @@ void tensor_storage_release(Tensor* t) {
     cml_free(s);
 }
 
-/* Call after the kernel stops reading: releasing may free the block the view
+/**
+ * Call after the kernel stops reading: releasing may free the block the view
  * aliased. Without this, tensor_free releases only the shared block and leaks
- * the private buffer a kernel materialized the view onto. */
+ * the private buffer a kernel materialized the view onto.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_storage_drop_if_detached(Tensor* t) {
     if (!t || !t->storage || !t->storage->data || !t->data)
         return;
@@ -1749,10 +1762,18 @@ Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out,
     return t;
 }
 
-/* Precision-preserving element-wise dtype conversion of a raw buffer.
+/**
+ * Precision-preserving element-wise dtype conversion of a raw buffer.
  * int->int goes via int64 (lossless for all integer widths); anything touching
  * a float goes via double. Returns 0 on success, -1 if a dtype isn't one of the
- * directly-supported types (f16/bf16/fp8 fall back to the caller). */
+ * directly-supported types (f16/bf16/fp8 fall back to the caller).
+ * @param src (const void*)
+ * @param from (DType)
+ * @param dst (void*)
+ * @param to (DType)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_cast_buffer(const void* src, DType from, void* dst, DType to, size_t n) {
     if (!src || !dst)
         return -1;

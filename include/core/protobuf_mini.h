@@ -48,7 +48,12 @@ float pb_read_float(PBReader* reader);
 double pb_read_double(PBReader* reader);
 PBReader pb_reader_sub(const PBField* field);
 
-/* Returned string is not null-terminated */
+/**
+ * Returned string is not null-terminated
+ * @param field (const PBField*)
+ * @param out_len (size_t*)
+ * @return (const char*)
+ */
 const char* pb_field_string(const PBField* field, size_t* out_len);
 
 bool pb_reader_has_data(const PBReader* reader);

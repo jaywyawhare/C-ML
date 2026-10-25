@@ -6,7 +6,11 @@
 #include <string.h>
 #include <stdint.h>
 
-/* FP16/BF16/FP8 encode helpers (aligned with tensor.c). */
+/**
+ * FP16/BF16/FP8 encode helpers (aligned with tensor.c).
+ * @param f (float)
+ * @return (uint16_t)
+ */
 static uint16_t lz_float_to_fp16(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
@@ -218,12 +222,16 @@ int cml_cpu_lazy_const(Tensor* out, const void* data, size_t data_size) {
     return 0;
 }
 
-/* These draw from the library's own counter-based RNG, not libc rand().
+/**
+ * These draw from the library's own counter-based RNG, not libc rand().
  *
  * cml_manual_seed() seeds the global CMLRNGState; rand() is never seeded by it,
  * so seeding silently had no effect on any of these ops and a "fixed seed" run
  * was not reproducible. Layer init already used this RNG, which is why only the
- * uop_rand_* paths were affected. */
+ * uop_rand_* paths were affected.
+ * @param out (Tensor*)
+ * @return (int)
+ */
 int cml_cpu_lazy_rand_uniform(Tensor* out) {
     if (!out || !out->data)
         return -1;

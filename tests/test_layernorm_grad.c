@@ -32,7 +32,14 @@ static float loss_value(LayerNorm* ln) {
     return v;
 }
 
-/* Central-difference numerical gradient over the buffer `buf` (n elements). */
+/**
+ * Central-difference numerical gradient over the buffer `buf` (n elements).
+ * @param ln (LayerNorm*)
+ * @param buf (float*)
+ * @param n (int)
+ * @param analytic (const float*)
+ * @return (float)
+ */
 static float max_grad_diff(LayerNorm* ln, float* buf, int n, const float* analytic) {
     const float eps = 1e-3f;
     float maxdiff   = 0.0f;

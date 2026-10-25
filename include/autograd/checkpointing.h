@@ -13,9 +13,11 @@ typedef struct Sequential Sequential;
 extern "C" {
 #endif
 
-/*
+/**
  * When enabled, activations are recomputed during backward pass
  * instead of being stored, trading computation for memory.
+ * @param enabled (bool)
+ * @return (void)
  */
 void autograd_set_checkpointing(bool enabled);
 bool autograd_is_checkpointing_enabled(void);

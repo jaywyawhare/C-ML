@@ -18,14 +18,24 @@ CMLGraphAllocator_t cml_graph_allocator_new_n(CMLBackendBufferType_t* bufts, int
 
 void cml_graph_allocator_free(CMLGraphAllocator_t galloc);
 
-/* Pre-allocates buffers from a worst-case graph to avoid reallocations. */
+/**
+ * Pre-allocates buffers from a worst-case graph to avoid reallocations.
+ * @param galloc (CMLGraphAllocator_t)
+ * @param graph (void*)
+ * @return (bool)
+ */
 bool cml_graph_allocator_reserve(CMLGraphAllocator_t galloc, void* graph);
 
 bool cml_graph_allocator_reserve_n(CMLGraphAllocator_t galloc, void* graph,
                                    const int* node_buffer_ids, const int* leaf_buffer_ids);
 
-/* Auto-reallocates if topology changes with single buffer.
- * Returns false if using multiple buffers and re-allocation is needed. */
+/**
+ * Auto-reallocates if topology changes with single buffer.
+ * Returns false if using multiple buffers and re-allocation is needed.
+ * @param galloc (CMLGraphAllocator_t)
+ * @param graph (void*)
+ * @return (bool)
+ */
 bool cml_graph_allocator_alloc_graph(CMLGraphAllocator_t galloc, void* graph);
 
 size_t cml_graph_allocator_get_buffer_size(CMLGraphAllocator_t galloc, int buffer_id);

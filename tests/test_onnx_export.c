@@ -37,7 +37,10 @@ static char* read_file(const char* path, size_t* len_out) {
     return buf;
 }
 
-/* matmul -> add bias -> relu : the canonical small graph */
+/**
+ * matmul -> add bias -> relu : the canonical small graph
+ * @return (void)
+ */
 static void test_roundtrip_matmul_add_relu(void) {
     printf("Test: export/import/run round-trip (MatMul+Add+Relu)\n");
 
@@ -110,7 +113,10 @@ static void test_roundtrip_matmul_add_relu(void) {
     cml_reset_ir_context();
 }
 
-/* Gemm export: UOP_LINEAR must become transB=1 Gemm with fused bias */
+/**
+ * Gemm export: UOP_LINEAR must become transB=1 Gemm with fused bias
+ * @return (void)
+ */
 static void test_roundtrip_linear(void) {
     printf("Test: export/import/run round-trip (Linear as Gemm)\n");
 
@@ -160,9 +166,12 @@ static void test_roundtrip_linear(void) {
     cml_reset_ir_context();
 }
 
-/* Flatten over a partial dim range has no single-op ONNX equivalent (ONNX
+/**
+ * Flatten over a partial dim range has no single-op ONNX equivalent (ONNX
  * Flatten always runs to the last dim), so the exporter lowers it to an explicit
- * Reshape. It used to fail the export outright. */
+ * Reshape. It used to fail the export outright.
+ * @return (void)
+ */
 static void test_partial_flatten_lowers_to_reshape(void) {
     printf("Test: partial-range Flatten exports as Reshape\n");
 
@@ -223,7 +232,10 @@ static void test_partial_flatten_lowers_to_reshape(void) {
     cml_reset_ir_context();
 }
 
-/* A flatten that does run to the last dim keeps the cheaper plain Flatten. */
+/**
+ * A flatten that does run to the last dim keeps the cheaper plain Flatten.
+ * @return (void)
+ */
 static void test_full_flatten_stays_flatten(void) {
     printf("Test: flatten-to-end still exports as Flatten\n");
 
@@ -258,12 +270,15 @@ static void test_full_flatten_stays_flatten(void) {
     cml_reset_ir_context();
 }
 
-/* Pooling round-trip. The importer used to reduce over the whole spatial extent
+/**
+ * Pooling round-trip. The importer used to reduce over the whole spatial extent
  * (a global pool), so this shape check is the thing that would have caught it.
  *
  * Note the graph is exported WITHOUT being executed first: execution runs the
  * decompose pass, which rewrites MAXPOOL2D into UNFOLD + a reduce, and UNFOLD has
- * no ONNX equivalent. Export the graph you built, not the lowered one. */
+ * no ONNX equivalent. Export the graph you built, not the lowered one.
+ * @return (void)
+ */
 static void test_roundtrip_maxpool(void) {
     printf("Test: export/import/run round-trip (MaxPool 2x2 stride 2)\n");
 

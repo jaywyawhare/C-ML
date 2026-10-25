@@ -20,7 +20,12 @@
 #define HAS_MMAP 0
 #endif
 
-/* Helper: construct file path for a tensor */
+/**
+ * Helper: construct file path for a tensor
+ * @param backend (const CMLDiskBackend*)
+ * @param name (const char*)
+ * @return (char*)
+ */
 static char* make_tensor_path(const CMLDiskBackend* backend, const char* name) {
     size_t len = strlen(backend->base_path) + strlen(name) + 16;
     char* path = (char*)cml_malloc(len);

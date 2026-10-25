@@ -11,7 +11,12 @@
 #include <float.h>
 #include "alloc/cml_allocator.h"
 
-/* Same-shape unary op recorded into the lazy graph. */
+/**
+ * Same-shape unary op recorded into the lazy graph.
+ * @param a (Tensor*)
+ * @param type (UOpType)
+ * @return (Tensor*)
+ */
 static Tensor* forward_unary(Tensor* a, UOpType type) {
     if (!a)
         return NULL;
@@ -207,7 +212,8 @@ Tensor* tensor_softmax(Tensor* a, int dim) {
     return uop_softmax(a, normalized_dim);
 }
 
-/* Resolve a reduction axis for the uop_*_dim family.
+/**
+ * Resolve a reduction axis for the uop_*_dim family.
  *
  * -1 is this API's long-standing sentinel for "reduce every axis" -- NOT "the
  * last axis" as in PyTorch. Callers depend on it (zoo/clip.c reduces a loss to a
@@ -218,7 +224,11 @@ Tensor* tensor_softmax(Tensor* a, int dim) {
  * reduce-all sentinel downstream. `sum(x, -2)` on a [2,3] tensor silently
  * returned a scalar instead of reducing axis 0. Those now count from the end,
  * and a genuinely out-of-range axis still falls back to reduce-all rather than
- * indexing past the shape. */
+ * indexing past the shape.
+ * @param a (const Tensor*)
+ * @param dim (int)
+ * @return (int)
+ */
 static int resolve_reduce_dim(const Tensor* a, int dim) {
     if (dim == -1)
         return -1; /* documented reduce-all sentinel */

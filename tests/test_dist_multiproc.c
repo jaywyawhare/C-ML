@@ -23,7 +23,12 @@
 #define N 7  /* elements per tensor (7 % 4 != 0 → tests chunk clamp) */
 #define EPS 1e-4f
 
-/* Build a heap-backed 1-D float tensor (avoids the lazy graph entirely). */
+/**
+ * Build a heap-backed 1-D float tensor (avoids the lazy graph entirely).
+ * @param buf (float*)
+ * @param n (int)
+ * @return (Tensor)
+ */
 static Tensor make_vec(float* buf, int n) {
     static int shape_store[64]; /* per-process; fine for a sequential test */
     (void)shape_store;
@@ -42,7 +47,11 @@ static Tensor make_vec(float* buf, int n) {
 
 static int approx(float a, float b) { return fabsf(a - b) <= EPS; }
 
-/* Returns 0 on success, non-zero on the first failed check. */
+/**
+ * Returns 0 on success, non-zero on the first failed check.
+ * @param rank (int)
+ * @return (int)
+ */
 static int run_rank(int rank) {
     if (cml_dist_init(DIST_BACKEND_GLOO, WS, rank) != 0) {
         fprintf(stderr, "[rank %d] dist_init failed\n", rank);

@@ -51,8 +51,11 @@ static bool test_enable_disable(void) {
     return off && on && !autograd_is_checkpointing_enabled();
 }
 
-/* Checkpointing while disabled must be a no-op that reports failure rather than
- * silently dropping an activation nothing will recompute. */
+/**
+ * Checkpointing while disabled must be a no-op that reports failure rather than
+ * silently dropping an activation nothing will recompute.
+ * @return (bool)
+ */
 static bool test_checkpoint_refused_when_disabled(void) {
     autograd_set_checkpointing(false);
 
@@ -70,7 +73,10 @@ static bool test_checkpoint_refused_when_disabled(void) {
     return ok;
 }
 
-/* The core claim: after checkpointing, the activation buffer is released. */
+/**
+ * The core claim: after checkpointing, the activation buffer is released.
+ * @return (bool)
+ */
 static bool test_checkpoint_releases_activation(void) {
     autograd_set_checkpointing(true);
 
@@ -103,7 +109,10 @@ static bool test_checkpoint_releases_activation(void) {
     return ok;
 }
 
-/* ...and recompute must bring the values back, from the saved graph alone. */
+/**
+ * ...and recompute must bring the values back, from the saved graph alone.
+ * @return (bool)
+ */
 static bool test_recompute_restores_values(void) {
     autograd_set_checkpointing(true);
 
@@ -129,8 +138,11 @@ static bool test_recompute_restores_values(void) {
     return ok;
 }
 
-/* A multiply, to show the recomputation follows the recorded op rather than
- * defaulting to something that happens to match. */
+/**
+ * A multiply, to show the recomputation follows the recorded op rather than
+ * defaulting to something that happens to match.
+ * @return (bool)
+ */
 static bool test_recompute_uses_the_recorded_op(void) {
     autograd_set_checkpointing(true);
 
@@ -153,7 +165,10 @@ static bool test_recompute_uses_the_recorded_op(void) {
     return ok;
 }
 
-/* Several checkpoints at once, each recomputed independently. */
+/**
+ * Several checkpoints at once, each recomputed independently.
+ * @return (bool)
+ */
 static bool test_multiple_checkpoints(void) {
     autograd_set_checkpointing(true);
 
@@ -181,8 +196,11 @@ static bool test_multiple_checkpoints(void) {
     return ok;
 }
 
-/* Recomputing something that was never checkpointed hands the tensor back
- * unchanged rather than inventing a value. */
+/**
+ * Recomputing something that was never checkpointed hands the tensor back
+ * unchanged rather than inventing a value.
+ * @return (bool)
+ */
 static bool test_recompute_unknown_tensor(void) {
     autograd_set_checkpointing(true);
 
@@ -199,8 +217,11 @@ static bool test_recompute_unknown_tensor(void) {
     return ok;
 }
 
-/* cleanup must be safe to call twice and with nothing registered -- it releases
- * the references autograd_checkpoint took on the saved inputs. */
+/**
+ * cleanup must be safe to call twice and with nothing registered -- it releases
+ * the references autograd_checkpoint took on the saved inputs.
+ * @return (bool)
+ */
 static bool test_cleanup_is_idempotent(void) {
     autograd_checkpointing_cleanup();
     autograd_checkpointing_cleanup();

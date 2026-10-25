@@ -246,10 +246,13 @@ static int test_lr_scheduler_step(void) {
     return ok;
 }
 
-/* optimizer_set_lr_scheduler() is the optimizer's own StepLR knob, separate from
+/**
+ * optimizer_set_lr_scheduler() is the optimizer's own StepLR knob, separate from
  * the LRScheduler subsystem above. It used to store step_size/gamma and never
  * read them, so the lr never moved while optimizer_supports_lr_scheduling()
- * reported the scheduler was active. */
+ * reported the scheduler was active.
+ * @return (int)
+ */
 static int test_builtin_step_lr_decays(void) {
     Sequential* model;
     Parameter** params;
@@ -279,7 +282,10 @@ static int test_builtin_step_lr_decays(void) {
     return ok;
 }
 
-/* step_size 0 means no schedule: the lr must stay put. */
+/**
+ * step_size 0 means no schedule: the lr must stay put.
+ * @return (int)
+ */
 static int test_builtin_step_lr_off_by_default(void) {
     Sequential* model;
     Parameter** params;
@@ -317,9 +323,12 @@ static int test_optim_for_model(void) {
     return 1;
 }
 
-/* FUSE_OPTIM changes only scheduling, not the math: identical models trained
+/**
+ * FUSE_OPTIM changes only scheduling, not the math: identical models trained
  * with and without it must reach identical weights. A double-applied momentum
- * update (the batched-realize risk) would diverge here. */
+ * update (the batched-realize risk) would diverge here.
+ * @return (int)
+ */
 static int test_fuse_optim_matches_default(void) {
     Sequential *ma, *mb;
     Parameter **pa, **pb;

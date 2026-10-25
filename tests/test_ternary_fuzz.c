@@ -69,7 +69,11 @@ static Tensor* make(const int* shape, int ndim, int seed, int lo, int hi) {
     return t;
 }
 
-/* opsel 0 = where(cond, a, b), 1 = lerp(a, b, t) */
+/**
+ * opsel 0 = where(cond, a, b), 1 = lerp(a, b, t)
+ * @param o (int)
+ * @return (const char*)
+ */
 static const char* op_label(int o) {
     return o == 0 ? "where(composed)" : o == 1 ? "lerp" : "UOP_WHERE(direct)";
 }

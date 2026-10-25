@@ -41,7 +41,15 @@ static int rng_int(int lo, int hi) { /* [lo, hi] */
 
 #define MAXD 4
 
-/* Row-major strides, with 0 for a stretched dim so indexing repeats it. */
+/**
+ * Row-major strides, with 0 for a stretched dim so indexing repeats it.
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param out_shape (const int*)
+ * @param out_ndim (int)
+ * @param strides (size_t*)
+ * @return (void)
+ */
 static void bcast_strides(const int* shape, int ndim, const int* out_shape, int out_ndim,
                           size_t* strides) {
     size_t acc = 1;
@@ -234,8 +242,16 @@ static float ref_op(int o, float x, float y) {
     }
 }
 
-/* Operand ranges chosen so each op is well defined: no division by zero, no
- * negative base for pow, small non-negative shift counts. */
+/**
+ * Operand ranges chosen so each op is well defined: no division by zero, no
+ * negative base for pow, small non-negative shift counts.
+ * @param o (int)
+ * @param alo (int*)
+ * @param ahi (int*)
+ * @param blo (int*)
+ * @param bhi (int*)
+ * @return (void)
+ */
 static void op_ranges(int o, int* alo, int* ahi, int* blo, int* bhi) {
     *alo = -5;
     *ahi = 5;

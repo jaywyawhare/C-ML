@@ -71,8 +71,13 @@ Sequential* sequential_add_chain(Sequential* seq, Module* module);
 
 Sequential* nn_sequentialv(int num_layers, ...);
 
-/* When enabled, first forward pass compiles the graph and caches it.
- * Subsequent passes with same input shapes reuse the cached graph. */
+/**
+ * When enabled, first forward pass compiles the graph and caches it.
+ * Subsequent passes with same input shapes reuse the cached graph.
+ * @param seq (Sequential*)
+ * @param enable (bool)
+ * @return (void)
+ */
 void sequential_enable_graph_cache(Sequential* seq, bool enable);
 
 void sequential_invalidate_cache(Sequential* seq);

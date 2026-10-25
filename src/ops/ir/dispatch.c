@@ -1188,7 +1188,11 @@ int cml_dispatch_execute_jit(CMLDispatchContext* ctx, CMLGraph_t ir, Tensor** in
     if (!ctx || !ir)
         return -1;
 
-    /* Try traced execution (capture-and-replay) */
+    /**
+     * Try traced execution (capture-and-replay)
+     * @param ir (CMLGraph_t)
+     * @return (int)
+     */
     extern int cml_ir_execute_traced(CMLGraph_t ir);
     int rc = cml_ir_execute_traced(ir);
     if (rc == 0) {

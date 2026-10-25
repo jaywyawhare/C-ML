@@ -175,8 +175,11 @@ static bool check_cuda_available(void) {
  */
 static bool check_metal_available(void) {
 #if defined(CML_HAS_METAL)
-    /* The backend caches its device; probing here created (and leaked) a new
-     * one on every detection pass. */
+    /**
+     * The backend caches its device; probing here created (and leaked) a new
+     * one on every detection pass.
+     * @return (return)
+     */
     return cml_metal_available();
 #elif defined(__APPLE__)
     // Try to load Metal framework dynamically

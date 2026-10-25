@@ -7,17 +7,31 @@
 extern "C" {
 #endif
 
-/* Traverses the forward graph in reverse and creates backward nodes for autograd.
-   Builds the graph structure but doesn't execute it. */
+/**
+ * Traverses the forward graph in reverse and creates backward nodes for autograd.
+ * Builds the graph structure but doesn't execute it.
+ * @param ir (CMLGraph_t)
+ * @param output_node (struct IRNode*)
+ * @return (int)
+ */
 int cml_ir_build_backward(CMLGraph_t ir, struct IRNode* output_node);
 
-/* Backward from the graph tail. */
+/**
+ * Backward from the graph tail.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_execute_backward(CMLGraph_t ir);
 
-/* Backward rooted at `loss_node` (need not be the tail): only the dependency
+/**
+ * Backward rooted at `loss_node` (need not be the tail): only the dependency
  * subgraph of loss_node runs. tensor_backward uses this so gradients are
  * computed for the tensor the caller named, not for whatever node happens to
- * have been built last. */
+ * have been built last.
+ * @param ir (CMLGraph_t)
+ * @param loss_node (struct IRNode*)
+ * @return (int)
+ */
 int cml_ir_execute_backward_from(CMLGraph_t ir, struct IRNode* loss_node);
 
 #ifdef __cplusplus

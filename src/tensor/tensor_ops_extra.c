@@ -636,8 +636,13 @@ int cml_fft_1d(float* re, float* im, int n, int inverse) {
     return 0;
 }
 
-/* Tensor FFT of a 1-D complex signal stored as [n, 2] (last dim = {real, imag}).
- * Returns a new [n, 2] tensor. inverse!=0 does the inverse transform. */
+/**
+ * Tensor FFT of a 1-D complex signal stored as [n, 2] (last dim = {real, imag}).
+ * Returns a new [n, 2] tensor. inverse!=0 does the inverse transform.
+ * @param x (Tensor*)
+ * @param inverse (int)
+ * @return (Tensor*)
+ */
 Tensor* cml_fft(Tensor* x, int inverse) {
     if (!x)
         return NULL;
@@ -682,8 +687,13 @@ Tensor* cml_fft(Tensor* x, int inverse) {
     return out;
 }
 
-/* 2-D FFT of a complex image stored as [H, W, 2] (last dim = {real, imag}):
- * FFT along W (each row) then along H (each column). Returns a new [H,W,2]. */
+/**
+ * 2-D FFT of a complex image stored as [H, W, 2] (last dim = {real, imag}):
+ * FFT along W (each row) then along H (each column). Returns a new [H,W,2].
+ * @param x (Tensor*)
+ * @param inverse (int)
+ * @return (Tensor*)
+ */
 Tensor* cml_fft2(Tensor* x, int inverse) {
     if (!x)
         return NULL;

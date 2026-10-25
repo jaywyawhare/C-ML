@@ -240,12 +240,15 @@ static int test_nal_free_null(void) {
     return 1;
 }
 
-/* A NAL unit is delimited by the start code that FOLLOWS it, so the trailing NAL
+/**
+ * A NAL unit is delimited by the start code that FOLLOWS it, so the trailing NAL
  * in a buffer could never be emitted -- cml_hevc_next_nal returned NULL as soon as
  * there was no second start code. For a whole-file feed that silently dropped the
  * last NAL, which is the slice: the only NAL a decoder actually consumes was
  * unreachable. cml_hevc_parser_end_of_stream() is how the caller says no more
- * bytes are coming. */
+ * bytes are coming.
+ * @return (int)
+ */
 static int test_final_nal_needs_end_of_stream(void) {
     /* Two NALs: VPS (type 32) then an IDR_N_LP (type 20). */
     const uint8_t stream[] = {
@@ -298,7 +301,10 @@ static int test_final_nal_needs_end_of_stream(void) {
     return ok;
 }
 
-/* Trailing zero bytes are start-code padding / cabac_zero_words, not payload. */
+/**
+ * Trailing zero bytes are start-code padding / cabac_zero_words, not payload.
+ * @return (int)
+ */
 static int test_final_nal_strips_trailing_zeros(void) {
     const uint8_t stream[] = {
         0x00, 0x00, 0x00, 0x01, 0x28, 0x01, 0x42, 0x00, 0x00, 0x00,

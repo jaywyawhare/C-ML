@@ -20,8 +20,13 @@
 #define OP_EXECUTION_MODE 16u
 #define EXEC_MODE_LOCAL_SIZE 17u
 
-/* Returns 1 if the word stream is a well-formed SPIR-V module with a correct
- * LocalSize OpExecutionMode; 0 otherwise. */
+/**
+ * Returns 1 if the word stream is a well-formed SPIR-V module with a correct
+ * LocalSize OpExecutionMode; 0 otherwise.
+ * @param w (const uint32_t*)
+ * @param nbytes (size_t)
+ * @return (int)
+ */
 static int validate_spirv(const uint32_t* w, size_t nbytes) {
     if (!w || nbytes < 5 * sizeof(uint32_t))
         return 0;

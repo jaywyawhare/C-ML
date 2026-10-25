@@ -181,8 +181,13 @@ static Tensor* inp(const CMLONNXNode* node, TensorMap* map, int idx) {
     return tensor_map_get(map, node->inputs[idx]);
 }
 
-/* Realized float32 payload of an optional input; NULL when absent or not float32, so a
- * narrower dtype is never read past its end through a float pointer. */
+/**
+ * Realized float32 payload of an optional input; NULL when absent or not float32, so a
+ * narrower dtype is never read past its end through a float pointer.
+ * @param t (Tensor*)
+ * @param count (int*)
+ * @return (const float*)
+ */
 static const float* tensor_floats(Tensor* t, int* count) {
     if (!t || t->dtype != DTYPE_FLOAT32)
         return NULL;
@@ -192,13 +197,18 @@ static const float* tensor_floats(Tensor* t, int* count) {
     return (const float*)tensor_data_ptr(t);
 }
 
-/* Read element `i` of an integer-valued operand.
+/**
+ * Read element `i` of an integer-valued operand.
  *
  * ONNX passes shapes, axes, indices, pads and slice bounds as INT64 tensors.
  * Reading those bytes through a float* does not merely lose precision -- the low
  * four bytes of a small little-endian int64 are a float32 denormal, so 2 reads
  * back as 2.8e-45, i.e. zero. Every integer operand must go through its own
- * dtype, which is what this does. */
+ * dtype, which is what this does.
+ * @param t (const Tensor*)
+ * @param i (int)
+ * @return (long long)
+ */
 static long long operand_int(const Tensor* t, int i) {
     const void* p = tensor_data_ptr((Tensor*)t);
     if (!p || i < 0 || (size_t)i >= t->numel)
@@ -228,8 +238,13 @@ static long long operand_int(const Tensor* t, int i) {
     }
 }
 
-/* Realize an integer operand and report its length. NULL-safe: returns false and
- * leaves *count at 0 when the operand is absent. */
+/**
+ * Realize an integer operand and report its length. NULL-safe: returns false and
+ * leaves *count at 0 when the operand is absent.
+ * @param t (Tensor*)
+ * @param count (int*)
+ * @return (bool)
+ */
 static bool operand_ints_ready(Tensor* t, int* count) {
     if (!t)
         return false;
@@ -241,10 +256,15 @@ static bool operand_ints_ready(Tensor* t, int* count) {
     return true;
 }
 
-/* Numeric value of element `i`, whatever the operand's dtype. Range's
+/**
+ * Numeric value of element `i`, whatever the operand's dtype. Range's
  * start/limit/delta are float in some models and INT64 in others, so they need
  * the dtype-aware read too -- read as float, an INT64 delta comes back as a
- * denormal and the op bails out as if the step were zero. */
+ * denormal and the op bails out as if the step were zero.
+ * @param t (const Tensor*)
+ * @param i (int)
+ * @return (double)
+ */
 static double operand_num(const Tensor* t, int i) {
     const void* p = tensor_data_ptr((Tensor*)t);
     if (!p || i < 0 || (size_t)i >= t->numel)
@@ -256,8 +276,14 @@ static double operand_num(const Tensor* t, int i) {
     return (double)operand_int(t, i);
 }
 
-/* Copy up to `max` elements of an integer operand into `out`, honouring its
- * dtype. Returns the number written, or -1 when the operand is absent. */
+/**
+ * Copy up to `max` elements of an integer operand into `out`, honouring its
+ * dtype. Returns the number written, or -1 when the operand is absent.
+ * @param t (Tensor*)
+ * @param out (int*)
+ * @param max (int)
+ * @return (int)
+ */
 static int operand_int_list(Tensor* t, int* out, int max) {
     int n = 0;
     if (!operand_ints_ready(t, &n))
@@ -685,7 +711,8 @@ static Tensor* op_batchnorm(const CMLONNXNode* n, TensorMap* m) {
     return uop_add(scaled, bias);
 }
 
-/* Fill Pool2DParams from a MaxPool/AveragePool node.
+/**
+ * Fill Pool2DParams from a MaxPool/AveragePool node.
  *
  * Both importers used to reduce over the whole spatial extent, which is
  * GlobalMaxPool/GlobalAveragePool, not a windowed pool: MaxPool(kernel=2,
@@ -694,7 +721,13 @@ static Tensor* op_batchnorm(const CMLONNXNode* n, TensorMap* m) {
  * dilations and ceil_mode are all honoured now.
  *
  * Returns false (having logged) when the node cannot be represented, rather than
- * pooling something other than what the model asked for. */
+ * pooling something other than what the model asked for.
+ * @param n (const CMLONNXNode*)
+ * @param x (const Tensor*)
+ * @param p (Pool2DParams*)
+ * @param who (const char*)
+ * @return (bool)
+ */
 static bool pool_params_from_node(const CMLONNXNode* n, const Tensor* x, Pool2DParams* p,
                                   const char* who) {
     int kcount                  = 0;
@@ -770,10 +803,15 @@ static bool pool_params_from_node(const CMLONNXNode* n, const Tensor* x, Pool2DP
     return true;
 }
 
-/* ConvTranspose: the exporter emits it, so the importer has to read it back.
+/**
+ * ConvTranspose: the exporter emits it, so the importer has to read it back.
  * ConvTranspose2DParams carries one pad per axis, so asymmetric `pads` and the
  * odd-split SAME cases are refused rather than approximated -- same rule as Conv
- * and the pooling ops. */
+ * and the pooling ops.
+ * @param n (const CMLONNXNode*)
+ * @param m (TensorMap*)
+ * @return (Tensor*)
+ */
 static Tensor* op_conv_transpose(const CMLONNXNode* n, TensorMap* m) {
     Tensor* x = inp(n, m, 0);
     Tensor* w = inp(n, m, 1);
@@ -1892,8 +1930,15 @@ static Tensor* op_resize(const CMLONNXNode* n, TensorMap* m) {
     return result;
 }
 
-/* Reduce-family axes: opset < 13 carried them in the "axes" attribute,
- * newer opsets pass them as an optional second input. */
+/**
+ * Reduce-family axes: opset < 13 carried them in the "axes" attribute,
+ * newer opsets pass them as an optional second input.
+ * @param n (const CMLONNXNode*)
+ * @param m (TensorMap*)
+ * @param ndim (int)
+ * @param axes (int*)
+ * @return (int)
+ */
 static int reduce_axes(const CMLONNXNode* n, TensorMap* m, int ndim, int* axes) {
     int count      = 0;
     Tensor* axes_t = inp(n, m, 1);
@@ -2063,8 +2108,13 @@ static Tensor* op_leaky_relu(const CMLONNXNode* n, TensorMap* m) {
     return uop_leaky_relu(inp(n, m, 0), attr_float(n, "alpha", 0.01f));
 }
 
-/* PReLU(x, slope) = max(x, 0) + slope * min(x, 0). The slope broadcasts
- * against x with its single axis on dim 1 (the channel axis). */
+/**
+ * PReLU(x, slope) = max(x, 0) + slope * min(x, 0). The slope broadcasts
+ * against x with its single axis on dim 1 (the channel axis).
+ * @param n (const CMLONNXNode*)
+ * @param m (TensorMap*)
+ * @return (Tensor*)
+ */
 static Tensor* op_prelu(const CMLONNXNode* n, TensorMap* m) {
     Tensor* x     = inp(n, m, 0);
     Tensor* slope = inp(n, m, 1);
@@ -2148,9 +2198,14 @@ static Tensor* split_piece(Tensor* x, int axis, int start, int end) {
     return uop_slice(x, &sp);
 }
 
-/* Multi-output: registers every piece in the tensor map itself and returns
+/**
+ * Multi-output: registers every piece in the tensor map itself and returns
  * output 0; cml_onnx_run skips its blanket single-result assignment when a
- * node declares more than one output. */
+ * node declares more than one output.
+ * @param n (const CMLONNXNode*)
+ * @param m (TensorMap*)
+ * @return (Tensor*)
+ */
 static Tensor* op_split(const CMLONNXNode* n, TensorMap* m) {
     Tensor* x = inp(n, m, 0);
     if (!x || n->num_outputs < 1)

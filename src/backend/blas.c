@@ -381,7 +381,18 @@ CMLBlasContext* cml_blas_get_context(void) {
 #if defined(__AVX2__) || defined(__AVX__)
 #include <immintrin.h>
 
-/* Small-matrix GEMM: avoids BLAS thread pool overhead for M,N,K < 64 */
+/**
+ * Small-matrix GEMM: avoids BLAS thread pool overhead for M,N,K < 64
+ * @param A (const float*)
+ * @param B (const float*)
+ * @param C (float*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @param alpha (float)
+ * @param beta (float)
+ * @return (void)
+ */
 static void sgemm_avx_small(const float* A, const float* B, float* C, int M, int N, int K,
                             float alpha, float beta) {
     /* Apply beta to C */
@@ -447,8 +458,16 @@ static void sgemm_avx_small(const float* A, const float* B, float* C, int M, int
 #define PACKED_KC 256  /* L2:    KC × NC B-panel ≤ ~256 KB */
 #define PACKED_NC 2048 /* L3:    NC multiple of NR for clean packing */
 
-/* Pack a (KC_cur × NR) column panel of B into sequential [k][n] order.
- * Columns beyond NR_cur are zero-padded so the microkernel always sees NR. */
+/**
+ * Pack a (KC_cur × NR) column panel of B into sequential [k][n] order.
+ * Columns beyond NR_cur are zero-padded so the microkernel always sees NR.
+ * @param src (const float*)
+ * @param dst (float*)
+ * @param KC_cur (int)
+ * @param NR_cur (int)
+ * @param ldb (int)
+ * @return (void)
+ */
 static void pack_B_panel(const float* src, float* dst, int KC_cur, int NR_cur, int ldb) {
     for (int k = 0; k < KC_cur; k++) {
         int n = 0;
@@ -459,8 +478,16 @@ static void pack_B_panel(const float* src, float* dst, int KC_cur, int NR_cur, i
     }
 }
 
-/* Pack a (MR_cur × KC_cur) row panel of A transposed to [k][m] order.
- * Rows beyond MR_cur are zero-padded. */
+/**
+ * Pack a (MR_cur × KC_cur) row panel of A transposed to [k][m] order.
+ * Rows beyond MR_cur are zero-padded.
+ * @param src (const float*)
+ * @param dst (float*)
+ * @param MR_cur (int)
+ * @param KC_cur (int)
+ * @param lda (int)
+ * @return (void)
+ */
 static void pack_A_panel(const float* src, float* dst, int MR_cur, int KC_cur, int lda) {
     for (int k = 0; k < KC_cur; k++) {
         int m = 0;
@@ -471,11 +498,21 @@ static void pack_A_panel(const float* src, float* dst, int MR_cur, int KC_cur, i
     }
 }
 
-/* 6×16 FMA micro-kernel.
+/**
+ * 6×16 FMA micro-kernel.
  * A_p: [KC × MR] packed, stride PACKED_MR per k.
  * B_p: [KC × NR] packed, stride PACKED_NR per k.
  * Both are fully sequential - L1 cache never misses in the hot loop.
- * k loop unrolled ×4 to hide 4-cycle FMA latency (Haswell/Skylake). */
+ * k loop unrolled ×4 to hide 4-cycle FMA latency (Haswell/Skylake).
+ * @param C (float*)
+ * @param ldc (int)
+ * @param A_p (const float*)
+ * @param B_p (const float*)
+ * @param KC (int)
+ * @param alpha (float)
+ * @param beta (float)
+ * @return (void)
+ */
 static void sgemm_ukr_6x16(float* C, int ldc, const float* A_p, const float* B_p, int KC,
                            float alpha, float beta) {
     __m256 c00, c01, c10, c11, c20, c21, c30, c31, c40, c41, c50, c51;
@@ -564,9 +601,21 @@ static void sgemm_ukr_6x16(float* C, int ldc, const float* A_p, const float* B_p
     }
 }
 
-/* Edge micro-kernel for tiles smaller than MR×NR (boundaries only).
+/**
+ * Edge micro-kernel for tiles smaller than MR×NR (boundaries only).
  * Routes through the full 6×16 kernel via a padded stack buffer to avoid
- * a separate scalar path. */
+ * a separate scalar path.
+ * @param C (float*)
+ * @param ldc (int)
+ * @param A_p (const float*)
+ * @param B_p (const float*)
+ * @param MR_cur (int)
+ * @param NR_cur (int)
+ * @param KC (int)
+ * @param alpha (float)
+ * @param beta (float)
+ * @return (void)
+ */
 static void sgemm_ukr_edge(float* C, int ldc, const float* A_p, const float* B_p, int MR_cur,
                            int NR_cur, int KC, float alpha, float beta) {
     float buf[PACKED_MR * PACKED_NR] __attribute__((aligned(32)));
@@ -581,10 +630,26 @@ static void sgemm_ukr_edge(float* C, int ldc, const float* A_p, const float* B_p
             C[r * ldc + c] = buf[r * PACKED_NR + c];
 }
 
-/* Three-level tiled GEMM: C = alpha*A*B + beta*C.
+/**
+ * Three-level tiled GEMM: C = alpha*A*B + beta*C.
  * a_pack: ≥ PACKED_MC * PACKED_KC floats (aligned to 32 bytes).
  * b_pack: ≥ ceil(N/NR)*NR * PACKED_KC floats (aligned to 32 bytes).
- * Caller owns allocation and lifetime of both scratch buffers. */
+ * Caller owns allocation and lifetime of both scratch buffers.
+ * @param A (const float*)
+ * @param B (const float*)
+ * @param C (float*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @param alpha (float)
+ * @param beta (float)
+ * @param a_pack (float*)
+ * @param b_pack (float*)
+ * @param mc (int)
+ * @param kc (int)
+ * @param nc (int)
+ * @return (void)
+ */
 static void sgemm_packed_avx(const float* A, const float* B, float* C, int M, int N, int K,
                              float alpha, float beta, float* a_pack, float* b_pack, int mc, int kc,
                              int nc) {
@@ -923,9 +988,21 @@ int cml_blas_sgemm(CMLBlasContext* ctx, const float* A, const float* B, float* C
     return -1;
 }
 
-/* f64 GEMM: straight cblas_dgemm, row-major no-transpose. The f32 packing
+/**
+ * f64 GEMM: straight cblas_dgemm, row-major no-transpose. The f32 packing
  * fast paths do not apply (they are float-only microkernels); dgemm itself is
- * compute-bound enough that BLAS threading wins at every size we see. */
+ * compute-bound enough that BLAS threading wins at every size we see.
+ * @param ctx (CMLBlasContext*)
+ * @param A (const double*)
+ * @param B (const double*)
+ * @param C (double*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @param alpha (double)
+ * @param beta (double)
+ * @return (int)
+ */
 int cml_blas_dgemm(CMLBlasContext* ctx, const double* A, const double* B, double* C, int M, int N,
                    int K, double alpha, double beta) {
     if (!ctx)

@@ -5,7 +5,10 @@
 #include "ops/ir/memory_planner.h"
 #include "test_harness.h"
 
-/* Two buffers with non-overlapping lifetimes should share a slot. */
+/**
+ * Two buffers with non-overlapping lifetimes should share a slot.
+ * @return (int)
+ */
 static int test_basic_reuse(void) {
     size_t sizes[]  = {1024, 1024};
     int first_use[] = {0, 2};
@@ -23,7 +26,10 @@ static int test_basic_reuse(void) {
     return ok;
 }
 
-/* Two buffers with overlapping lifetimes cannot share. */
+/**
+ * Two buffers with overlapping lifetimes cannot share.
+ * @return (int)
+ */
 static int test_no_reuse_overlap(void) {
     size_t sizes[]  = {512, 512};
     int first_use[] = {0, 1};
@@ -41,7 +47,10 @@ static int test_no_reuse_overlap(void) {
     return ok;
 }
 
-/* A small buffer can reuse a larger slot. */
+/**
+ * A small buffer can reuse a larger slot.
+ * @return (int)
+ */
 static int test_size_fitting(void) {
     size_t sizes[]  = {2048, 512};
     int first_use[] = {0, 2};
@@ -60,7 +69,10 @@ static int test_size_fitting(void) {
     return ok;
 }
 
-/* A large buffer reuses a smaller buffer's slot (slot grows to max). */
+/**
+ * A large buffer reuses a smaller buffer's slot (slot grows to max).
+ * @return (int)
+ */
 static int test_small_then_large(void) {
     size_t sizes[]  = {512, 2048};
     int first_use[] = {0, 2};
@@ -79,7 +91,10 @@ static int test_small_then_large(void) {
     return ok;
 }
 
-/* Pipeline pattern: A B C D where each is used only during its step. */
+/**
+ * Pipeline pattern: A B C D where each is used only during its step.
+ * @return (int)
+ */
 static int test_pipeline_reuse(void) {
     size_t sizes[]  = {1024, 1024, 1024, 1024};
     int first_use[] = {0, 1, 2, 3};
@@ -96,9 +111,12 @@ static int test_pipeline_reuse(void) {
     return ok;
 }
 
-/* All buffers alive simultaneously: no reuse possible. Slots are 256-byte
+/**
+ * All buffers alive simultaneously: no reuse possible. Slots are 256-byte
  * aligned and placed largest-first (300,200,100 at offsets 0,512,768), so the
- * padded total is 768+100=868 while peak (raw live bytes) stays 600. */
+ * padded total is 768+100=868 while peak (raw live bytes) stays 600.
+ * @return (int)
+ */
 static int test_all_alive(void) {
     size_t sizes[]  = {100, 200, 300};
     int first_use[] = {0, 0, 0};
@@ -119,7 +137,10 @@ static int test_all_alive(void) {
     return ok;
 }
 
-/* Peak memory tracks the maximum concurrent live size. */
+/**
+ * Peak memory tracks the maximum concurrent live size.
+ * @return (int)
+ */
 static int test_peak_memory(void) {
     /* Step 0: buf0(1000) alive
      * Step 1: buf0(1000) + buf1(2000) alive -> peak = 3000
@@ -139,7 +160,10 @@ static int test_peak_memory(void) {
     return ok;
 }
 
-/* Single buffer: trivial case. */
+/**
+ * Single buffer: trivial case.
+ * @return (int)
+ */
 static int test_single_buffer(void) {
     size_t sizes[]  = {4096};
     int first_use[] = {0};
@@ -158,7 +182,10 @@ static int test_single_buffer(void) {
     return ok;
 }
 
-/* NULL inputs return NULL. */
+/**
+ * NULL inputs return NULL.
+ * @return (int)
+ */
 static int test_null_inputs(void) {
     int ok = (cml_memory_plan_create(0, NULL, NULL, NULL) == NULL);
     ok     = ok && (cml_memory_plan_create(-1, NULL, NULL, NULL) == NULL);
@@ -172,7 +199,10 @@ static int test_null_inputs(void) {
     return ok;
 }
 
-/* Interleaved lifetimes with mixed sizes. */
+/**
+ * Interleaved lifetimes with mixed sizes.
+ * @return (int)
+ */
 static int test_interleaved(void) {
     /* buf0: [0,2] 1024
      * buf1: [1,3] 512

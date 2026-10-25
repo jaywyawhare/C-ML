@@ -36,13 +36,20 @@ void autocast_exit(void);
 bool autocast_is_enabled(void);
 AutocastContext* autocast_get_context(void);
 
-/* Target-dtype selection: defaults to DTYPE_FLOAT16; CML_AMP_DTYPE=bf16
- * (or autocast_set_dtype) opts into bfloat16. */
+/**
+ * Target-dtype selection: defaults to DTYPE_FLOAT16; CML_AMP_DTYPE=bf16
+ * (or autocast_set_dtype) opts into bfloat16.
+ * @return (DType)
+ */
 DType autocast_default_dtype(void);
 void autocast_set_dtype(DType dtype);
 DType autocast_get_dtype(void);
 
-/* Ops like softmax, layer norm, losses should stay in float32 */
+/**
+ * Ops like softmax, layer norm, losses should stay in float32
+ * @param op (OpType)
+ * @return (bool)
+ */
 bool autocast_should_keep_float32(OpType op);
 
 GradScaler* grad_scaler_create(float init_scale, float growth_factor, float backoff_factor,
@@ -51,7 +58,13 @@ void grad_scaler_free(GradScaler* scaler);
 Tensor* grad_scaler_scale(GradScaler* scaler, Tensor* loss);
 void grad_scaler_unscale(GradScaler* scaler, Parameter** params, int num_params);
 
-/* Calls step_fn only if no inf/nan gradients were found */
+/**
+ * Calls step_fn only if no inf/nan gradients were found
+ * @param scaler (GradScaler*)
+ * @param step_fn (void (*)(void*))
+ * @param optimizer (void*)
+ * @return (void)
+ */
 void grad_scaler_step(GradScaler* scaler, void (*step_fn)(void*), void* optimizer);
 
 void grad_scaler_update(GradScaler* scaler);

@@ -31,7 +31,11 @@
 extern "C" {
 #endif
 
-/* Human-readable name for a CM_* code (stable, never NULL). */
+/**
+ * Human-readable name for a CM_* code (stable, never NULL).
+ * @param code (int)
+ * @return (const char*)
+ */
 const char* cml_error_string(int code);
 
 #ifdef __cplusplus

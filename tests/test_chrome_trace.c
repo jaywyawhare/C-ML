@@ -56,7 +56,13 @@ static int braces_balanced(const char* s) {
     return depth == 0 && !in_str;
 }
 
-/* Value of `key` parsed as a number; 1 when present and fully numeric. */
+/**
+ * Value of `key` parsed as a number; 1 when present and fully numeric.
+ * @param obj (const char*)
+ * @param key (const char*)
+ * @param out (double*)
+ * @return (int)
+ */
 static int numeric_field(const char* obj, const char* key, double* out) {
     char pat[64];
     snprintf(pat, sizeof(pat), "\"%s\":", key);

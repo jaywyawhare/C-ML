@@ -944,8 +944,12 @@ int dataset_split_three(Dataset* dataset, float train_ratio, float val_ratio,
     return 0;
 }
 
-/* Materialised feature matrix of `dataset`, or NULL (already logged) when the
- * tensor is missing or cannot be realised. */
+/**
+ * Materialised feature matrix of `dataset`, or NULL (already logged) when the
+ * tensor is missing or cannot be realised.
+ * @param dataset (const Dataset*)
+ * @return (float*)
+ */
 static float* dataset_feature_data(const Dataset* dataset) {
     if (!dataset->X) {
         LOG_ERROR("Dataset tensor X is not available");

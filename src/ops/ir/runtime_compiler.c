@@ -115,8 +115,14 @@ static CMLCompiledKernel* cache_insert(CMLRuntimeCompiler* rc, uint64_t hash) {
     return k;
 }
 
-/* Compile (or return cached) a linear program: codegen for the preferred backend and move
- * the resulting source/binary and op copy into a cache entry. */
+/**
+ * Compile (or return cached) a linear program: codegen for the preferred backend and move
+ * the resulting source/binary and op copy into a cache entry.
+ * @param rc (CMLRuntimeCompiler*)
+ * @param prog (const CMLLinearProgram*)
+ * @param work_size (size_t)
+ * @return (const CMLCompiledKernel*)
+ */
 const CMLCompiledKernel* cml_runtime_compile_program(CMLRuntimeCompiler* rc,
                                                      const CMLLinearProgram* prog,
                                                      size_t work_size) {
@@ -208,8 +214,16 @@ const CMLCompiledKernel* cml_runtime_compile_group(CMLRuntimeCompiler* rc,
     return result;
 }
 
-/* Interpret a compiled C-backend kernel on the CPU: run its LOAD/COMPUTE/STORE ops over
- * every element with a small per-element vreg file. */
+/**
+ * Interpret a compiled C-backend kernel on the CPU: run its LOAD/COMPUTE/STORE ops over
+ * every element with a small per-element vreg file.
+ * @param kernel (const CMLCompiledKernel*)
+ * @param inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param outputs (Tensor**)
+ * @param num_outputs (int)
+ * @return (int)
+ */
 int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel, Tensor** inputs, int num_inputs,
                                  Tensor** outputs, int num_outputs) {
     if (!kernel || !inputs || !outputs)
@@ -354,8 +368,13 @@ int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel, Tensor** input
     return 0;
 }
 
-/* Schedule the graph into fusion groups and execute each, trying fused compilation first
- * and falling back to per-node CPU execution. */
+/**
+ * Schedule the graph into fusion groups and execute each, trying fused compilation first
+ * and falling back to per-node CPU execution.
+ * @param rc (CMLRuntimeCompiler*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir) {
     if (!rc || !ir)
         return -1;

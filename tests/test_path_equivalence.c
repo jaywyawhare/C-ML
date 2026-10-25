@@ -29,7 +29,13 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-/* Small integers, exactly representable, so any difference is a logic bug. */
+/**
+ * Small integers, exactly representable, so any difference is a logic bug.
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param seed (int)
+ * @return (Tensor*)
+ */
 static Tensor* mk(const int* shape, int ndim, int seed) {
     TensorConfig c = {
         .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
@@ -128,7 +134,11 @@ static const char* CONFIGS[] = {
 /* Path of this binary, from argv[0]: /proc/self/exe is Linux-only. */
 static const char* g_self;
 
-/* Re-exec self with `cfg` set, capturing stdout. */
+/**
+ * Re-exec self with `cfg` set, capturing stdout.
+ * @param cfg (const char*)
+ * @return (char*)
+ */
 static char* capture(const char* cfg) {
     int fds[2];
     if (pipe(fds) != 0)

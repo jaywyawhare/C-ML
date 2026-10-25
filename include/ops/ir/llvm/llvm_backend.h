@@ -21,11 +21,21 @@ typedef struct CMLLLVMBackend CMLLLVMBackend;
 CMLLLVMBackend* cml_llvm_backend_init(void);
 void cml_llvm_backend_destroy(CMLLLVMBackend* backend);
 
-/* Walks the IR node list, builds LLVM IR for un-executed nodes,
-   optimizes, JIT-compiles, and executes. */
+/**
+ * Walks the IR node list, builds LLVM IR for un-executed nodes,
+ * optimizes, JIT-compiles, and executes.
+ * @param backend (CMLLLVMBackend*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_llvm_execute(CMLLLVMBackend* backend, CMLGraph_t ir);
 int cml_llvm_execute_up_to(CMLLLVMBackend* backend, CMLGraph_t ir, struct IRNode* target_node);
-/* Execute one node via the JIT (falls back to the interpreter internally). */
+/**
+ * Execute one node via the JIT (falls back to the interpreter internally).
+ * @param backend (CMLLLVMBackend*)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 int cml_llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node);
 
 #ifdef __cplusplus

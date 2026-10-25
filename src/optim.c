@@ -161,9 +161,15 @@ static void* optim_ensure_state(ParameterGroup* group, size_t size, StateInitFn 
     return group->state;
 }
 
-/* Helper: create a realized zero tensor for optimizer state.
+/**
+ * Helper: create a realized zero tensor for optimizer state.
  * Optimizer state tensors are long-lived (must survive IR graph resets).
- * tensor_realize() both executes the lazy fill AND detaches from the IR graph. */
+ * tensor_realize() both executes the lazy fill AND detaches from the IR graph.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param config (TensorConfig*)
+ * @return (Tensor*)
+ */
 static Tensor* optim_zeros(int* shape, int ndim, TensorConfig* config) {
     Tensor* t = tensor_zeros(shape, ndim, config);
     tensor_realize(t);
@@ -275,9 +281,15 @@ static void muon_state_init(void* state, Tensor* tensor, TensorConfig* config) {
 /* Widest optimizer state block: Adam's exp_avg / exp_avg_sq / max_exp_avg_sq. */
 #define OPTIM_STATE_MAX_TENSORS 3
 
-/* Fill `ptrs` with the addresses of the Tensor* slots inside one parameter's
+/**
+ * Fill `ptrs` with the addresses of the Tensor* slots inside one parameter's
  * `state` block for optimizer `name` and return how many were written, or -1
- * when the name has no known state layout. */
+ * when the name has no known state layout.
+ * @param name (const char*)
+ * @param state (void*)
+ * @param ptrs (Tensor***)
+ * @return (int)
+ */
 static int optim_state_tensor_ptrs(const char* name, void* state, Tensor*** ptrs);
 
 /**
@@ -428,7 +440,13 @@ ParameterGroup* optimizer_get_param_group(Optimizer* optimizer, int index) {
  * The per-param state structs are private to this file, so the checkpoint
  * code in model_io.c delegates here. */
 
-/* Addresses of the tensor slots inside one per-param state struct. */
+/**
+ * Addresses of the tensor slots inside one per-param state struct.
+ * @param name (const char*)
+ * @param state (void*)
+ * @param ptrs (Tensor***)
+ * @return (int)
+ */
 static int optim_state_tensor_ptrs(const char* name, void* state, Tensor*** ptrs) {
     if (!state)
         return -1;
@@ -639,12 +657,16 @@ int optimizer_state_load(Optimizer* optimizer, FILE* f) {
     return 0;
 }
 
-/* StepLR decay for optimizer_set_lr_scheduler(): every `step_size` steps, scale
+/**
+ * StepLR decay for optimizer_set_lr_scheduler(): every `step_size` steps, scale
  * each group's lr by `gamma`. The two settings used to be stored and never read,
  * so the scheduler silently did nothing while
  * optimizer_supports_lr_scheduling() reported it was active. Applied after the
  * update so the step that triggers the decay still uses the old rate, matching
- * the usual step-then-decay convention. */
+ * the usual step-then-decay convention.
+ * @param optimizer (Optimizer*)
+ * @return (void)
+ */
 static void optimizer_apply_lr_schedule(Optimizer* optimizer) {
     if (optimizer->lr_scheduler_step_size <= 0)
         return;
@@ -940,9 +962,14 @@ bool optimizer_supports_grad_clipping(Optimizer* optimizer) {
     return optimizer->grad_clip_norm > 0.0f;
 }
 
-/* Move `updated`'s buffer into the live parameter tensor and hand the old one
+/**
+ * Move `updated`'s buffer into the live parameter tensor and hand the old one
  * back, so freeing `updated` releases it. The parameter keeps its identity --
- * modules and graph nodes still point at it. */
+ * modules and graph nodes still point at it.
+ * @param param (Tensor*)
+ * @param updated (Tensor*)
+ * @return (void)
+ */
 static void adopt_param_data(Tensor* param, Tensor* updated) {
     tensor_ensure_executed(updated);
 
@@ -958,8 +985,13 @@ static void adopt_param_data(Tensor* param, Tensor* updated) {
     tensor_free(updated);
 }
 
-/* Momentum buffers for `group`, allocated on first use; NULL when momentum is
- * off or the allocation failed (the caller then runs plain SGD). */
+/**
+ * Momentum buffers for `group`, allocated on first use; NULL when momentum is
+ * off or the allocation failed (the caller then runs plain SGD).
+ * @param group (ParameterGroup*)
+ * @param momentum (float)
+ * @return (SGDMomentumState**)
+ */
 static SGDMomentumState** sgd_momentum_states(ParameterGroup* group, float momentum) {
     if (momentum <= 0.0f)
         return NULL;
@@ -967,8 +999,14 @@ static SGDMomentumState** sgd_momentum_states(ParameterGroup* group, float momen
                                                   "SGD momentum");
 }
 
-/* Per-parameter Adam moments for `group`, allocated on first use along with the
- * amsgrad maxima. `name` only labels the failure log. */
+/**
+ * Per-parameter Adam moments for `group`, allocated on first use along with the
+ * amsgrad maxima. `name` only labels the failure log.
+ * @param optimizer (Optimizer*)
+ * @param group (ParameterGroup*)
+ * @param name (const char*)
+ * @return (AdamState**)
+ */
 static AdamState** adam_states(Optimizer* optimizer, ParameterGroup* group, const char* name) {
     if (group->state)
         return (AdamState**)group->state;
@@ -991,9 +1029,16 @@ static AdamState** adam_states(Optimizer* optimizer, ParameterGroup* group, cons
     return states;
 }
 
-/* Resolve the float buffers a hand-written optimizer step needs for parameter
+/**
+ * Resolve the float buffers a hand-written optimizer step needs for parameter
  * `i` of `group`, or NULL when the parameter has no gradient and should be
- * skipped. `grad_data` and `numel` are only written on success. */
+ * skipped. `grad_data` and `numel` are only written on success.
+ * @param group (ParameterGroup*)
+ * @param i (int)
+ * @param grad_data (float**)
+ * @param numel (size_t*)
+ * @return (float*)
+ */
 static float* optim_param_buffers(ParameterGroup* group, int i, float** grad_data, size_t* numel) {
     Parameter* param = group->parameters[i];
     if (!param || !param->tensor || !param->requires_grad)
@@ -1133,8 +1178,17 @@ static void sgd_step(Optimizer* optimizer) {
     }
 }
 
-/* One parameter's in-place SGD update (dampening=0, nesterov=false), reading
- * grad->data and writing the parameter (and momentum) buffer directly. */
+/**
+ * One parameter's in-place SGD update (dampening=0, nesterov=false), reading
+ * grad->data and writing the parameter (and momentum) buffer directly.
+ * @param t (Tensor*)
+ * @param grad (const Tensor*)
+ * @param mom (Tensor*)
+ * @param lr (float)
+ * @param weight_decay (float)
+ * @param momentum (float)
+ * @return (void)
+ */
 static void sgd_param_inplace(Tensor* t, const Tensor* grad, Tensor* mom, float lr,
                               float weight_decay, float momentum) {
     float* p        = (float*)t->data;
@@ -1151,8 +1205,12 @@ static void sgd_param_inplace(Tensor* t, const Tensor* grad, Tensor* mom, float 
     }
 }
 
-/* True if every requires_grad parameter already has a materialised f32 grad, so
- * the step can run in place without realising any IR node. */
+/**
+ * True if every requires_grad parameter already has a materialised f32 grad, so
+ * the step can run in place without realising any IR node.
+ * @param optimizer (Optimizer*)
+ * @return (bool)
+ */
 static bool grads_host_ready(Optimizer* optimizer) {
     for (int g = 0; g < optimizer->num_param_groups; g++) {
         ParameterGroup* group = &optimizer->param_groups[g];
@@ -1170,9 +1228,23 @@ static bool grads_host_ready(Optimizer* optimizer) {
     return true;
 }
 
-/* One parameter's in-place Adam update, mirroring the UOP_ADAM_STEP kernel
+/**
+ * One parameter's in-place Adam update, mirroring the UOP_ADAM_STEP kernel
  * (bias-corrected moments, optional amsgrad), writing the parameter and its
- * moment buffers directly. */
+ * moment buffers directly.
+ * @param t (Tensor*)
+ * @param grad (const Tensor*)
+ * @param exp_avg (Tensor*)
+ * @param exp_avg_sq (Tensor*)
+ * @param max_sq (Tensor*)
+ * @param lr (float)
+ * @param b1 (float)
+ * @param b2 (float)
+ * @param eps (float)
+ * @param wd (float)
+ * @param step (int)
+ * @return (void)
+ */
 static void adam_param_inplace(Tensor* t, const Tensor* grad, Tensor* exp_avg, Tensor* exp_avg_sq,
                                Tensor* max_sq, float lr, float b1, float b2, float eps, float wd,
                                int step) {
@@ -1200,8 +1272,13 @@ static void adam_param_inplace(Tensor* t, const Tensor* grad, Tensor* exp_avg, T
     }
 }
 
-/* True if grads are host-ready and every Adam moment buffer is allocated, so the
- * update can run in place without emitting a uop_adam_step per parameter. */
+/**
+ * True if grads are host-ready and every Adam moment buffer is allocated, so the
+ * update can run in place without emitting a uop_adam_step per parameter.
+ * @param optimizer (Optimizer*)
+ * @param amsgrad (bool)
+ * @return (bool)
+ */
 static bool adam_can_step_inplace(Optimizer* optimizer, bool amsgrad) {
     if (!grads_host_ready(optimizer))
         return false;
@@ -1224,13 +1301,17 @@ static bool adam_can_step_inplace(Optimizer* optimizer, bool amsgrad) {
     return true;
 }
 
-/* In-place SGD update (lr / momentum / weight_decay) applied directly to the
+/**
+ * In-place SGD update (lr / momentum / weight_decay) applied directly to the
  * parameter buffers from param->grad->data - allocates NO IR nodes. This is what
  * lets a static-graph training step stay zero-rebuild (the normal sgd_step emits
  * a uop_sgd_step per parameter each iteration). Matches sgd_step's math
  * (dampening=0, nesterov=false). Intended for SGD optimizers; other optimizers
  * fall back to their node-emitting step (so static mode isn't fully rebuild-free
- * for them yet). Returns 1 if it handled the step in-place, 0 otherwise. */
+ * for them yet). Returns 1 if it handled the step in-place, 0 otherwise.
+ * @param optimizer (Optimizer*)
+ * @return (int)
+ */
 int optimizer_step_inplace(Optimizer* optimizer) {
     if (!optimizer)
         return 0;
@@ -1599,9 +1680,19 @@ static void adadelta_step(Optimizer* optimizer) {
     }
 }
 
-/* Create optimizer `name` with a single parameter group at `lr`. Returns the
+/**
+ * Create optimizer `name` with a single parameter group at `lr`. Returns the
  * group so the caller can stamp its hyper-parameters; on failure `*out` is
- * already freed and set to NULL. */
+ * already freed and set to NULL.
+ * @param out (Optimizer**)
+ * @param name (const char*)
+ * @param step (StepFn)
+ * @param parameters (Parameter**)
+ * @param num_parameters (int)
+ * @param lr (float)
+ * @param weight_decay (float)
+ * @return (ParameterGroup*)
+ */
 static ParameterGroup* optim_new(Optimizer** out, const char* name, StepFn step,
                                  Parameter** parameters, int num_parameters, float lr,
                                  float weight_decay) {

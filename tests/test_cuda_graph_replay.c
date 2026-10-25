@@ -76,8 +76,11 @@ static int test_captured_graph_integration(void) {
     return ok;
 }
 
-/* Real state-machine coverage: IDLE -> begin -> CAPTURING -> end -> READY,
- * with the illegal transitions rejected at each stage. */
+/**
+ * Real state-machine coverage: IDLE -> begin -> CAPTURING -> end -> READY,
+ * with the illegal transitions rejected at each stage.
+ * @return (int)
+ */
 static int test_capture_state_machine(void) {
     CMLCapturedGraph* g = cml_graph_capture_create();
     if (!g)
@@ -102,8 +105,11 @@ static int test_capture_state_machine(void) {
     return ok;
 }
 
-/* Stub contract on machines without CUDA: the backend must refuse to
- * instantiate rather than hand back a fake handle. */
+/**
+ * Stub contract on machines without CUDA: the backend must refuse to
+ * instantiate rather than hand back a fake handle.
+ * @return (int)
+ */
 static int test_backend_unavailable_contract(void) {
     /* cml_cuda_graph_backend_create(NULL) covered above; here just confirm
      * repeated calls stay consistent (no lazily-created fake state). */

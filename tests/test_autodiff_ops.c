@@ -24,7 +24,8 @@ typedef Tensor* (*OpFn)(Tensor*);
 static int g_rows = 1, g_cols = 6;
 static float g_lo = 0.35f, g_hi = 0.95f;
 
-/* The test input, shaped [g_rows, g_cols] or [g_cols] when g_rows == 1.
+/**
+ * The test input, shaped [g_rows, g_cols] or [g_cols] when g_rows == 1.
  *
  * This used to be `tensor_zeros({g_rows, g_cols}, g_rows > 1 ? 2 : 1, ...)`,
  * which in the 1-D case passed ndim=1 against a {1, 6} shape array and so built a
@@ -33,7 +34,11 @@ static float g_lo = 0.35f, g_hi = 0.95f;
  * element 0 only, and the five out-of-range comparisons passed because the
  * numeric derivative of an absent element is 0 and the over-read usually landed
  * on zeroed heap. Under the eager engine it sometimes landed on dirty heap
- * instead, which is what made this suite flaky rather than merely weak. */
+ * instead, which is what made this suite flaky rather than merely weak.
+ * @param xs (const float*)
+ * @param n (int)
+ * @return (Tensor*)
+ */
 static Tensor* make_test_input(const float* xs, int n) {
     int sh2[2] = {g_rows, g_cols};
     int sh1[1] = {g_cols};
@@ -70,7 +75,11 @@ static float forward_sum(OpFn op, const float* xs, int n) {
     return v;
 }
 
-/* Returns 1 when the analytic gradient matches a central difference. */
+/**
+ * Returns 1 when the analytic gradient matches a central difference.
+ * @param op (OpFn)
+ * @return (int)
+ */
 static int grad_matches(OpFn op) {
     const int n = g_rows * g_cols;
     float xs[64];
@@ -126,7 +135,11 @@ static int grad_matches(OpFn op) {
     return 1;
 }
 
-/* Ops needing extra arguments get a wrapper with the sizes this test uses. */
+/**
+ * Ops needing extra arguments get a wrapper with the sizes this test uses.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* w_hard_tanh(Tensor* a) { return uop_hard_tanh(a); }
 static Tensor* w_relu6(Tensor* a) { return uop_relu6(a); }
 static Tensor* w_qgelu(Tensor* a) { return uop_quick_gelu(a); }
@@ -138,8 +151,12 @@ static Tensor* w_roll(Tensor* a) { return uop_roll(a, 1, 1); }
 static Tensor* w_cumsum(Tensor* a) { return uop_cumsum(a, 1); }
 static Tensor* w_cumprod(Tensor* a) { return uop_cumprod(a, 1); }
 static Tensor* w_lcse(Tensor* a) { return uop_logcumsumexp(a, 1); }
-/* Stepped slices: the graph rule used to cover step 1 only, so these returned
- * no gradient at all. */
+/**
+ * Stepped slices: the graph rule used to cover step 1 only, so these returned
+ * no gradient at all.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* w_slice_step(Tensor* a) {
     SliceParams p = {
         .start = (int[]){0, 0}, .end = (int[]){3, 3}, .step = (int[]){2, 2}, .num_dims = 2};
@@ -234,9 +251,13 @@ MATRIX(topk, w_topk)
 MATRIX(slice_step, w_slice_step)
 MATRIX(slice_offset_step, w_slice_offset_step)
 
-/* Derivative is zero almost everywhere. What matters is that the chain
+/**
+ * Derivative is zero almost everywhere. What matters is that the chain
  * terminates with zeros rather than breaking: returning no gradient leaves
- * every parameter upstream of a rounded value silently untrained. */
+ * every parameter upstream of a rounded value silently untrained.
+ * @param op (OpFn)
+ * @return (int)
+ */
 static int zero_grad_op(OpFn op) {
     cml_reset_ir_context();
     int sh[1] = {6};
@@ -266,9 +287,12 @@ static int test_ceil_zero_grad(void) { return zero_grad_op(uop_ceil); }
 static int test_round_zero_grad(void) { return zero_grad_op(uop_round); }
 static int test_sign_zero_grad(void) { return zero_grad_op(uop_sign); }
 
-/* Multi-axis reduce: both the shape inference and the kernels read only
+/**
+ * Multi-axis reduce: both the shape inference and the kernels read only
  * dims[0], so a two-axis request used to reduce one axis and return a shape
- * claiming exactly that -- wrong numbers under a plausible shape. */
+ * claiming exactly that -- wrong numbers under a plausible shape.
+ * @return (int)
+ */
 static int test_reduce_multi_axis(void) {
     cml_reset_ir_context();
     int sh[3] = {2, 2, 2};
@@ -294,8 +318,11 @@ static int test_reduce_multi_axis(void) {
     return ok;
 }
 
-/* top-k over more than one dimension used to copy the first k values of the
- * flat buffer, ignoring the axis and leaving later lanes uninitialised. */
+/**
+ * top-k over more than one dimension used to copy the first k values of the
+ * flat buffer, ignoring the axis and leaving later lanes uninitialised.
+ * @return (int)
+ */
 static int test_topk_values_and_indices(void) {
     cml_reset_ir_context();
     int sh[2] = {2, 3};
@@ -320,7 +347,8 @@ static int test_topk_values_and_indices(void) {
     return ok;
 }
 
-/* Backward through a rank-increasing reshape followed by an axis reduce.
+/**
+ * Backward through a rank-increasing reshape followed by an axis reduce.
  *
  * This used to be a heap-use-after-free. uop_reshape() could only return a view
  * for a contiguous input; otherwise it fell back to tensor_contiguous(), which
@@ -328,7 +356,11 @@ static int test_topk_values_and_indices(void) {
  * quietly executed the graph. In the backward pass that graph is still being
  * assembled and the incoming gradient is routinely a non-contiguous expand
  * output, so the partial execution read buffers whose producers had not run or
- * had already been recycled. Every rank and every axis crashed. */
+ * had already been recycled. Every rank and every axis crashed.
+ * @param rank (int)
+ * @param axis (int)
+ * @return (int)
+ */
 static int reshape_then_reduce_backward(int rank, int axis) {
     cml_reset_ir_context();
     int sh[2] = {3, 9};
@@ -377,11 +409,14 @@ static int test_reshape3_reduce_axis2(void) { return reshape_then_reduce_backwar
 static int test_reshape4_reduce_axis0(void) { return reshape_then_reduce_backward(4, 0); }
 static int test_reshape4_reduce_axis2(void) { return reshape_then_reduce_backward(4, 2); }
 
-/* GATHER's VJP is a SCATTER_ADD whose FIRST input is an integer index tensor.
+/**
+ * GATHER's VJP is a SCATTER_ADD whose FIRST input is an integer index tensor.
  * The output tensor used to inherit inputs[0]'s dtype, so every embedding
  * gradient came back as an INT32 buffer: float grads stored into it read back
  * as denormal garbage ≈ 0 - silent zero gradients, grad_check embedding 17/18.
- * The output must take the dtype of the DATA operand (inputs[1]). */
+ * The output must take the dtype of the DATA operand (inputs[1]).
+ * @return (int)
+ */
 static int test_gather_grad_dtype_and_value(void) {
     cml_reset_ir_context();
     int wsh[2] = {4, 2};
@@ -430,12 +465,15 @@ static int test_gather_grad_dtype_and_value(void) {
     return ok;
 }
 
-/* masked_select compacts the set positions in order, so its VJP hands element k
+/**
+ * masked_select compacts the set positions in order, so its VJP hands element k
  * of the output gradient to the k-th set position and leaves the rest at zero.
  * The graph engine always had this rule; the eager one lumped the op in with the
  * non-differentiable cases and returned nothing, so the same model trained under
  * one engine and silently did not under the other. Runs in whichever engine
- * GRAD_MODE selects, so ctest covers both. */
+ * GRAD_MODE selects, so ctest covers both.
+ * @return (int)
+ */
 static int test_masked_select_grad(void) {
     cml_reset_ir_context();
 

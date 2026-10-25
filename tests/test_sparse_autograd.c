@@ -63,9 +63,16 @@ static void fixture_free(SpmmFixture* fx) {
     memset(fx, 0, sizeof(*fx));
 }
 
-/* Build A(indices, values) @ B and run backward on sum(C). Values and B are
+/**
+ * Build A(indices, values) @ B and run backward on sum(C). Values and B are
  * marked requires_grad. Returns 0 on any failure. Grads are left LAZY under
- * the graph engine - realize them with tensor_ensure_executed before reading. */
+ * the graph engine - realize them with tensor_ensure_executed before reading.
+ * @param fx (SpmmFixture*)
+ * @param xs (const float*)
+ * @param bs (const float*)
+ * @param create_graph (bool)
+ * @return (int)
+ */
 static int run_spmm_backward(SpmmFixture* fx, const float* xs, const float* bs, bool create_graph) {
     memset(fx, 0, sizeof(*fx));
     int idx_shape[2] = {NNZ, 2};
@@ -106,7 +113,12 @@ static int run_spmm_backward(SpmmFixture* fx, const float* xs, const float* bs, 
     return 1;
 }
 
-/* Reference forward: plain triple loop, independent of the IR machinery. */
+/**
+ * Reference forward: plain triple loop, independent of the IR machinery.
+ * @param xs (const float*)
+ * @param bs (const float*)
+ * @return (float)
+ */
 static float ref_sum_spmm(const float* xs, const float* bs) {
     float total = 0.0f;
     for (int m = 0; m < NNZ; m++) {
@@ -129,7 +141,11 @@ static int vec_close(const float* got, const float* want, size_t n, float tol) {
     return 1;
 }
 
-/* ── shared numeric checks (run under both engines) ────────────────────── */
+/**
+ * ── shared numeric checks (run under both engines) ──────────────────────
+ * @param tol (float)
+ * @return (int)
+ */
 static int check_grad_b(float tol) {
     float xs[NNZ], bs[K * N];
     for (int i = 0; i < NNZ; i++)
@@ -228,7 +244,10 @@ static int check_grad_values(float tol) {
     return ok;
 }
 
-/* ── tests ─────────────────────────────────────────────────────────────── */
+/**
+ * ── tests ───────────────────────────────────────────────────────────────
+ * @return (int)
+ */
 static int test_grad_b_analytic_and_fd(void) { return check_grad_b(1e-3f); }
 static int test_grad_values_analytic_and_fd(void) { return check_grad_values(1e-3f); }
 
@@ -300,8 +319,11 @@ static int test_zero_density(void) {
     return ok;
 }
 
-/* Eager-engine spot check: GRAD_MODE is cached process-wide, so verify the
- * cpu_backward_node path in a forked child. */
+/**
+ * Eager-engine spot check: GRAD_MODE is cached process-wide, so verify the
+ * cpu_backward_node path in a forked child.
+ * @return (int)
+ */
 static int test_eager_engine_child(void) {
     pid_t pid = fork();
     if (pid < 0)

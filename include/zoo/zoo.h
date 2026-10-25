@@ -159,21 +159,46 @@ typedef struct {
     Sequential* mlp;
 } ZooPreNormBlock;
 
-/* Build a pre-norm block named `name` with a GELU MLP of width `mlp_dim` and
- * layer norms at `norm_eps`. Returns NULL on allocation failure. */
+/**
+ * Build a pre-norm block named `name` with a GELU MLP of width `mlp_dim` and
+ * layer norms at `norm_eps`. Returns NULL on allocation failure.
+ * @param name (const char*)
+ * @param dim (int)
+ * @param n_head (int)
+ * @param mlp_dim (int)
+ * @param norm_eps (float)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (ZooPreNormBlock*)
+ */
 ZooPreNormBlock* zoo_prenorm_block(const char* name, int dim, int n_head, int mlp_dim,
                                    float norm_eps, DType dtype, DeviceType device);
 
-/* GPT-2-style residual init scale, 1/sqrt(2 * n_layer); 1.0 for a single
+/**
+ * GPT-2-style residual init scale, 1/sqrt(2 * n_layer); 1.0 for a single
  * layer. Applied to the output projections on a block's residual paths so
- * activations don't explode through a deep residual stack. */
+ * activations don't explode through a deep residual stack.
+ * @param n_layer (int)
+ * @return (float)
+ */
 float zoo_residual_scale(int n_layer);
 
-/* Multiply `param`'s float data in place by `scale`; a NULL param is a no-op. */
+/**
+ * Multiply `param`'s float data in place by `scale`; a NULL param is a no-op.
+ * @param param (Parameter*)
+ * @param scale (float)
+ * @return (void)
+ */
 void zoo_scale_param(Parameter* param, float scale);
 
-/* One FPN top-down step: the lateral 1x1 conv of this level's backbone feature
- * plus the coarser pyramid level, nearest-upsampled to this level's size. */
+/**
+ * One FPN top-down step: the lateral 1x1 conv of this level's backbone feature
+ * plus the coarser pyramid level, nearest-upsampled to this level's size.
+ * @param lateral (Module*)
+ * @param c (Tensor*)
+ * @param p_coarser (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* zoo_fpn_topdown_add(Module* lateral, Tensor* c, Tensor* p_coarser);
 
 Module* cml_zoo_create(CMLZooModel model, const CMLZooConfig* config);

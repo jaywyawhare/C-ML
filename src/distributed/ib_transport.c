@@ -607,7 +607,12 @@ static int mock_query_qp(ibv_qp* q, ibv_qp_attr* a, int m, ibv_qp_init_attr* ia)
     return 0;
 }
 
-/* Gloo-style mesh: connect to higher ranks, accept from lower ones. */
+/**
+ * Gloo-style mesh: connect to higher ranks, accept from lower ones.
+ * @param rank (int)
+ * @param ws (int)
+ * @return (int)
+ */
 static int mock_build_mesh(int rank, int ws) {
     mock_fds = (int*)cml_calloc((size_t)ws, sizeof(int));
     if (!mock_fds)
@@ -1238,13 +1243,24 @@ int cml_ib_recv(CMLIBTransport* ib, int peer, void* buf, size_t size) {
     return rc;
 }
 
-/* Deadlock-free paired send/recv for a ring step. cml_ib_send blocks until its
+/**
+ * Deadlock-free paired send/recv for a ring step. cml_ib_send blocks until its
  * RC send is acked, which requires the receiver to already have a recv posted -
  * so every rank sending first (the old order) deadlocks with no receives up.
  * Ordering by rank parity guarantees a pre-posted receive for each send. Since
  * each call blocks to completion, only one WR is outstanding at a time, so the
  * shared completion queue is unambiguous. Return codes are checked (they were
- * previously ignored, silently reducing garbage). */
+ * previously ignored, silently reducing garbage).
+ * @param ib (CMLIBTransport*)
+ * @param right (int)
+ * @param sbuf (const void*)
+ * @param sbytes (size_t)
+ * @param left (int)
+ * @param rbuf (void*)
+ * @param rbytes (size_t)
+ * @param rank (int)
+ * @return (int)
+ */
 static int ib_ring_sendrecv(CMLIBTransport* ib, int right, const void* sbuf, size_t sbytes,
                             int left, void* rbuf, size_t rbytes, int rank) {
     if ((rank & 1) == 0) {

@@ -38,9 +38,14 @@ typedef struct CMLGPUCodegen {
 CMLGPUCodegen* cml_gpu_codegen_create(GPUTarget target, void* backend);
 void cml_gpu_codegen_destroy(CMLGPUCodegen* cg);
 
-/* Walks the IR node list, builds GPU kernels, emits PTX/HSACO,
-   uploads data, launches kernels, downloads results.
-   Falls back to CPU for unsupported ops. */
+/**
+ * Walks the IR node list, builds GPU kernels, emits PTX/HSACO,
+ * uploads data, launches kernels, downloads results.
+ * Falls back to CPU for unsupported ops.
+ * @param cg (CMLGPUCodegen*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_gpu_execute(CMLGPUCodegen* cg, CMLGraph_t ir);
 int cml_gpu_execute_up_to(CMLGPUCodegen* cg, CMLGraph_t ir, struct IRNode* target);
 

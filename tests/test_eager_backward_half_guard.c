@@ -19,7 +19,10 @@
 static TensorConfig F32 = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
-/* f32 eager backward still works: d/dx sum(x*x) = 2x. */
+/**
+ * f32 eager backward still works: d/dx sum(x*x) = 2x.
+ * @return (int)
+ */
 static int check_f32(void) {
     float xd[D]      = {0.5f, -1.0f, 2.0f, 0.25f};
     int s[]          = {1, D};
@@ -42,7 +45,10 @@ static int check_f32(void) {
     return ok;
 }
 
-/* A bf16 grad node must be refused: no grad produced, no crash/corruption. */
+/**
+ * A bf16 grad node must be refused: no grad produced, no crash/corruption.
+ * @return (int)
+ */
 static int check_half_refused(void) {
     float xd[D]       = {0.5f, -1.0f, 2.0f, 0.25f};
     int s[]           = {1, D};

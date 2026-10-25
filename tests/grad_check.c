@@ -103,9 +103,17 @@ static float layer_loss(void* vctx) {
     return tensor_sum_all(module_forward(c->layer, c->input));
 }
 
-/* Forward `layer` over `x`, backpropagate, then finite-difference `weight` and
+/**
+ * Forward `layer` over `x`, backpropagate, then finite-difference `weight` and
  * `bias` (either may be absent). Frees the forward output; the layer and input
- * stay the caller's to free, including when this returns false. */
+ * stay the caller's to free, including when this returns false.
+ * @param label (const char*)
+ * @param layer (Module*)
+ * @param x (Tensor*)
+ * @param weight (Parameter*)
+ * @param bias (Parameter*)
+ * @return (bool)
+ */
 static bool check_layer_grads(const char* label, Module* layer, Tensor* x, Parameter* weight,
                               Parameter* bias) {
     module_set_training(layer, true);

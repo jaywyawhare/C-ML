@@ -31,7 +31,10 @@ static float max_abs_diff(float* a, float* b, int n) {
     return mx;
 }
 
-/* Run an op on CPU, then on GPU (via BACKEND=opencl), compare results */
+/**
+ * Run an op on CPU, then on GPU (via BACKEND=opencl), compare results
+ * @return (void)
+ */
 static void test_matmul(void) {
     printf("Testing MATMUL on GPU...\n");
     int M = 64, K = 128, N = 64;
@@ -128,8 +131,11 @@ static void test_batched_matmul(void) {
     cml_free(ref);
 }
 
-/* Validate each GPU-supported unary op numerically against the CPU path on the
- * real device (extends coverage beyond RELU). sqrt/log get positive inputs. */
+/**
+ * Validate each GPU-supported unary op numerically against the CPU path on the
+ * real device (extends coverage beyond RELU). sqrt/log get positive inputs.
+ * @return (void)
+ */
 static void test_gpu_unary_validation(void) {
     printf("Testing GPU unary ops vs CPU...\n");
     int n = 1024, shape[] = {n};

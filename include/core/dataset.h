@@ -130,7 +130,13 @@ int dataloader_for_each(DataLoader* loader, BatchCallback callback, void* user_d
 Dataset* dataset_xor(void);
 Dataset* dataset_random_classification(int num_samples, int num_features, int num_classes);
 
-/* mean/std NULL for auto-compute */
+/**
+ * mean/std NULL for auto-compute
+ * @param dataset (Dataset*)
+ * @param mean (float*)
+ * @param std (float*)
+ * @return (int)
+ */
 int transform_normalize(Dataset* dataset, float* mean, float* std);
 
 #ifdef __cplusplus

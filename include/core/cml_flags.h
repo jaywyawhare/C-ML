@@ -71,18 +71,33 @@ typedef enum {
         CML_FLAG_COUNT
 } CmlFlag;
 
-/* Read all flags from the environment. Idempotent and thread-safe; called
- * automatically on first cml_flag() access, and explicitly from cml_init(). */
+/**
+ * Read all flags from the environment. Idempotent and thread-safe; called
+ * automatically on first cml_flag() access, and explicitly from cml_init().
+ * @return (void)
+ */
 void cml_flags_init(void);
 
-/* Current integer value of a flag. */
+/**
+ * Current integer value of a flag.
+ * @param id (CmlFlag)
+ * @return (int)
+ */
 int cml_flag(CmlFlag id);
 
-/* Convenience: true when the flag is non-zero. */
+/**
+ * Convenience: true when the flag is non-zero.
+ * @param id (CmlFlag)
+ * @return (bool)
+ */
 bool cml_flag_enabled(CmlFlag id);
 
-/* True if the flag was explicitly set via the environment (vs. left at default).
- * Useful for tri-state overrides such as WINO. */
+/**
+ * True if the flag was explicitly set via the environment (vs. left at default).
+ * Useful for tri-state overrides such as WINO.
+ * @param id (CmlFlag)
+ * @return (bool)
+ */
 bool cml_flag_was_set(CmlFlag id);
 
 /**
@@ -91,16 +106,29 @@ bool cml_flag_was_set(CmlFlag id);
  */
 bool cml_viz_enabled(void);
 
-/* The environment-variable name / description for a flag. */
+/**
+ * The environment-variable name / description for a flag.
+ * @param id (CmlFlag)
+ * @return (const char*)
+ */
 const char* cml_flag_name(CmlFlag id);
 const char* cml_flag_desc(CmlFlag id);
 
-/* Scoped override, mirroring tinygrad `with Context(FLAG=value):`.
- * cml_flag_push() returns the previous value; pass it back to cml_flag_pop(). */
+/**
+ * Scoped override, mirroring tinygrad `with Context(FLAG=value):`.
+ * cml_flag_push() returns the previous value; pass it back to cml_flag_pop().
+ * @param id (CmlFlag)
+ * @param value (int)
+ * @return (int)
+ */
 int cml_flag_push(CmlFlag id, int value);
 void cml_flag_pop(CmlFlag id, int previous);
 
-/* Print every flag whose value differs from its default (used by DEBUG>=1). */
+/**
+ * Print every flag whose value differs from its default (used by DEBUG>=1).
+ * @param out (FILE*)
+ * @return (void)
+ */
 void cml_flags_dump(FILE* out);
 
 #ifdef __cplusplus

@@ -252,8 +252,11 @@ extern int cml_hcq_am_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal);
 extern int cml_hcq_am_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal);
 extern int cml_hcq_am_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms);
 
-/* ROCm adapter (hcq_rocm.c): compiles everywhere, fails gracefully without
- * libamdhip64 - same contract as the NV/AM adapters. */
+/**
+ * ROCm adapter (hcq_rocm.c): compiles everywhere, fails gracefully without
+ * libamdhip64 - same contract as the NV/AM adapters.
+ * @return (CMLHCQQueue*)
+ */
 extern CMLHCQQueue* cml_hcq_rocm_queue_create(void);
 extern void cml_hcq_rocm_queue_destroy(CMLHCQQueue* queue);
 extern int cml_hcq_rocm_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc);
@@ -281,8 +284,11 @@ static const CMLHCQBackendOps g_hcq_rocm_ops = {
     .signal_wait_cpu   = cml_hcq_rocm_signal_wait_cpu,
 };
 
-/* WebGPU adapter (hcq_webgpu.c): real implementation under CML_HAS_WEBGPU,
- * graceful stubs otherwise - same contract as the NV adapter. */
+/**
+ * WebGPU adapter (hcq_webgpu.c): real implementation under CML_HAS_WEBGPU,
+ * graceful stubs otherwise - same contract as the NV adapter.
+ * @return (CMLHCQQueue*)
+ */
 extern CMLHCQQueue* cml_hcq_webgpu_queue_create(void);
 extern void cml_hcq_webgpu_queue_destroy(CMLHCQQueue* queue);
 extern int cml_hcq_webgpu_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc);

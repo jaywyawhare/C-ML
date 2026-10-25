@@ -116,8 +116,12 @@ CML_API int torch_pte_execute(CMLPTEModel* model, Tensor** inputs, int num_input
                               int num_outputs);
 CML_API size_t torch_pte_get_required_arena_size(const CMLPTEModel* model);
 
-/* True if the PTE linear interpreter has a kernel for this op. Export refuses
- * programs containing unsupported ops so failures surface at export time. */
+/**
+ * True if the PTE linear interpreter has a kernel for this op. Export refuses
+ * programs containing unsupported ops so failures surface at export time.
+ * @param op (UOpType)
+ * @return (bool)
+ */
 CML_API bool torch_pte_runtime_supports(UOpType op);
 
 #ifdef __cplusplus

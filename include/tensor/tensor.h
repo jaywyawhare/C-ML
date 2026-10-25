@@ -114,27 +114,61 @@ typedef struct Tensor {
 } Tensor;
 
 size_t cml_dtype_size(DType dtype);
-/* Human-readable dtype name (e.g. "float32"); "unknown" if unrecognized. */
+/**
+ * Human-readable dtype name (e.g. "float32"); "unknown" if unrecognized.
+ * @param dtype (DType)
+ * @return (const char*)
+ */
 const char* cml_dtype_to_string(DType dtype);
 DType cml_promote_dtype(DType dtype1, DType dtype2);
 
-/* Overflow-checked shape product: returns false if any dim is negative or
- * the product exceeds SIZE_MAX (*out untouched then). */
+/**
+ * Overflow-checked shape product: returns false if any dim is negative or
+ * the product exceeds SIZE_MAX (*out untouched then).
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param out (size_t*)
+ * @return (bool)
+ */
 bool tensor_numel_checked(const int* shape, int ndim, size_t* out);
 
-/* Unchecked legacy wrapper: partial product if a dim is negative. Prefer
- * tensor_numel_checked on unvalidated shapes. */
+/**
+ * Unchecked legacy wrapper: partial product if a dim is negative. Prefer
+ * tensor_numel_checked on unvalidated shapes.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @return (size_t)
+ */
 size_t tensor_numel(int* shape, int ndim);
 
-/* numel * cml_dtype_size(dtype), checked against SIZE_MAX overflow. */
+/**
+ * numel * cml_dtype_size(dtype), checked against SIZE_MAX overflow.
+ * @param numel (size_t)
+ * @param dtype (DType)
+ * @param out (size_t*)
+ * @return (bool)
+ */
 bool tensor_nbytes_checked(size_t numel, DType dtype, size_t* out);
 
-/* Precision-preserving element-wise dtype conversion of a raw buffer of n
+/**
+ * Precision-preserving element-wise dtype conversion of a raw buffer of n
  * elements (int->int lossless via int64, else via double). Returns 0 on
- * success, -1 if a dtype isn't directly supported (f16/bf16/fp8). */
+ * success, -1 if a dtype isn't directly supported (f16/bf16/fp8).
+ * @param src (const void*)
+ * @param from (DType)
+ * @param dst (void*)
+ * @param to (DType)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_cast_buffer(const void* src, DType from, void* dst, DType to, size_t n);
 
-/* Returns allocated strides array (caller must free) */
+/**
+ * Returns allocated strides array (caller must free)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @return (size_t*)
+ */
 size_t* compute_contiguous_strides(int* shape, int ndim);
 
 bool tensor_check_is_contiguous(int* shape, size_t* strides, int ndim);
@@ -173,23 +207,36 @@ Tensor* tensor_from_data(const void* data, int* shape, int ndim, const TensorCon
 
 void tensor_free(Tensor* t);
 
-/* External-ownership refcount (for language bindings). tensor_pin() records that
+/**
+ * External-ownership refcount (for language bindings). tensor_pin() records that
  * an external owner holds this tensor; tensor_release() drops that hold and frees
  * the tensor if nothing else references it. While pinned, a graph teardown detaches
- * the tensor instead of freeing it, so the owner's later free is always safe. */
+ * the tensor instead of freeing it, so the owner's later free is always safe.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_pin(Tensor* t);
 void tensor_release(Tensor* t);
 
-/* Detach a tensor from the IR graph without freeing it: copy any borrowed
+/**
+ * Detach a tensor from the IR graph without freeing it: copy any borrowed
  * execution-plan data into an owned allocation and clear all links into the
- * graph. Graph teardown uses this for tensors an external owner still holds. */
+ * graph. Graph teardown uses this for tensors an external owner still holds.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_detach_keep(Tensor* t);
 
-/* Shared-storage lifetime for views. tensor_storage_share() links `view` to
+/**
+ * Shared-storage lifetime for views. tensor_storage_share() links `view` to
  * the storage block behind `src` (attaching one to src's root if needed), so
  * the block outlives the base temporary; call it once at view creation.
  * tensor_storage_release() drops a tensor's hold and frees the block when the
- * last reference goes - use it wherever owned data is freed or replaced. */
+ * last reference goes - use it wherever owned data is freed or replaced.
+ * @param view (Tensor*)
+ * @param src (Tensor*)
+ * @return (void)
+ */
 void tensor_storage_share(Tensor* view, Tensor* src);
 void tensor_storage_release(Tensor* t);
 /**
@@ -244,7 +291,12 @@ Tensor* tensor_rand_like(Tensor* a);
 Tensor* tensor_randn_like(Tensor* a);
 Tensor* tensor_full_like(Tensor* a, float value);
 
-/* dim=-1 to squeeze all */
+/**
+ * dim=-1 to squeeze all
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_squeeze(Tensor* a, int dim);
 Tensor* tensor_unsqueeze(Tensor* a, int dim);
 Tensor* tensor_flip(Tensor* a, int dim);
@@ -262,7 +314,14 @@ Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out,
 Tensor* tensor_cast(Tensor* a, DType dtype);
 Tensor* tensor_contiguous(Tensor* a);
 
-/* Caller retains ownership of data */
+/**
+ * Caller retains ownership of data
+ * @param data (void*)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_from_blob(void* data, int* shape, int ndim, const TensorConfig* config);
 
 Tensor* tensor_randperm(int n, const TensorConfig* config);
@@ -282,7 +341,14 @@ typedef enum {
     INTERP_BILINEAR,
 } InterpMode;
 
-/* 4D input: [N,C,H,W] */
+/**
+ * 4D input: [N,C,H,W]
+ * @param a (Tensor*)
+ * @param output_size (int*)
+ * @param num_dims (int)
+ * @param mode (InterpMode)
+ * @return (Tensor*)
+ */
 Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode);
 
 Tensor* tensor_dot(Tensor* a, Tensor* b);
@@ -295,11 +361,24 @@ typedef enum {
     SCATTER_REDUCE_AMIN,
 } ScatterReduceMode;
 
-/* self[index[i]] = reduce(self[index[i]], src[i]) */
+/**
+ * self[index[i]] = reduce(self[index[i]], src[i])
+ * @param self (Tensor*)
+ * @param dim (int)
+ * @param index (Tensor*)
+ * @param src (Tensor*)
+ * @param mode (ScatterReduceMode)
+ * @return (Tensor*)
+ */
 Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
                               ScatterReduceMode mode);
 
-/* Reinterpret bits, no conversion */
+/**
+ * Reinterpret bits, no conversion
+ * @param a (Tensor*)
+ * @param target_dtype (DType)
+ * @return (Tensor*)
+ */
 Tensor* tensor_bitcast(Tensor* a, DType target_dtype);
 
 typedef struct {
@@ -307,7 +386,11 @@ typedef struct {
     Tensor* R; // Upper triangular [m, n] or [k, n] (reduced)
 } QRResult;
 
-/* Householder reflections, reduced form: Q=[m,k], R=[k,n], k=min(m,n) */
+/**
+ * Householder reflections, reduced form: Q=[m,k], R=[k,n], k=min(m,n)
+ * @param a (Tensor*)
+ * @return (QRResult)
+ */
 QRResult tensor_qr(Tensor* a);
 
 typedef struct {
@@ -316,7 +399,11 @@ typedef struct {
     Tensor* Vt; // Right singular vectors transposed [k, n]
 } SVDResult;
 
-/* One-sided Jacobi, reduced form, k=min(m,n) */
+/**
+ * One-sided Jacobi, reduced form, k=min(m,n)
+ * @param a (Tensor*)
+ * @return (SVDResult)
+ */
 SVDResult tensor_svd(Tensor* a);
 
 Tensor* tensor_from_url(const char* url);

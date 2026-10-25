@@ -37,13 +37,21 @@ static Tensor* mk(const float* v, int n) {
     return t;
 }
 
-/* Pure relative comparison, no absolute floor.
+/**
+ * Pure relative comparison, no absolute floor.
  *
  * expect() adds "+ 2e-5" so that values near zero do not demand absurd
  * precision. That floor also makes every small-magnitude error invisible: a
  * kernel returning 0 for tanh(1e-8) is off by 100%% yet lands 1e-8 from the
  * reference, far inside the floor. Checks aimed at cancellation must compare
- * relatively or they prove nothing. */
+ * relatively or they prove nothing.
+ * @param name (const char*)
+ * @param r (Tensor*)
+ * @param want (const double*)
+ * @param n (int)
+ * @param rel (double)
+ * @return (void)
+ */
 static void expect_rel(const char* name, Tensor* r, const double* want, int n, double rel) {
     checks++;
     if (!r) {

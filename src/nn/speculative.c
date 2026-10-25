@@ -51,7 +51,14 @@ CMLSpeculativeConfig cml_speculative_default_config(void) {
     return cfg;
 }
 
-/* Temperature softmax of one logits row into probs[vocab]. */
+/**
+ * Temperature softmax of one logits row into probs[vocab].
+ * @param row (const float*)
+ * @param vocab (int)
+ * @param temperature (float)
+ * @param probs (float*)
+ * @return (void)
+ */
 static void softmax_row(const float* row, int vocab, float temperature, float* probs) {
     float t = temperature > 1e-6f ? temperature : 1.0f;
     cml_softmax_row_temp(row, vocab, t, probs);

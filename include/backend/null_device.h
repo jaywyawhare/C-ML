@@ -42,19 +42,35 @@ CMLNullDevice* cml_null_device_create_with_spec(size_t memory_bytes, double band
                                                 double tflops);
 void cml_null_device_free(CMLNullDevice* dev);
 
-/* Simulate memory allocation (tracks stats, allocates nothing) */
+/**
+ * Simulate memory allocation (tracks stats, allocates nothing)
+ * @param dev (CMLNullDevice*)
+ * @param size (size_t)
+ * @return (void*)
+ */
 void* cml_null_device_alloc(CMLNullDevice* dev, size_t size);
 void cml_null_device_free_mem(CMLNullDevice* dev, void* ptr, size_t size);
 void cml_null_device_copy(CMLNullDevice* dev, void* dst, const void* src, size_t size);
 int cml_null_device_launch_kernel(CMLNullDevice* dev, const char* kernel_name, size_t grid[3],
                                   size_t block[3]);
 
-/* Measures dispatch overhead only */
+/**
+ * Measures dispatch overhead only
+ * @param dev (CMLNullDevice*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_null_device_execute(CMLNullDevice* dev, CMLGraph_t ir);
 CMLNullDeviceStats cml_null_device_get_stats(const CMLNullDevice* dev);
 void cml_null_device_reset_stats(CMLNullDevice* dev);
 
-/* Estimate execution time based on simulated specs */
+/**
+ * Estimate execution time based on simulated specs
+ * @param dev (const CMLNullDevice*)
+ * @param flops (size_t)
+ * @param memory_bytes (size_t)
+ * @return (double)
+ */
 double cml_null_device_estimate_time_ms(const CMLNullDevice* dev, size_t flops,
                                         size_t memory_bytes);
 void cml_null_device_print(const CMLNullDevice* dev);

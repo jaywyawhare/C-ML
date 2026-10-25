@@ -118,7 +118,14 @@ static AotBuf* aot_map_add(AotBufMap* m, Tensor* t, int kind, int index) {
     return &m->items[m->count++];
 }
 
-/* Writes the C pointer expression for tensor t into buf. */
+/**
+ * Writes the C pointer expression for tensor t into buf.
+ * @param m (AotBufMap*)
+ * @param t (Tensor*)
+ * @param buf (char*)
+ * @param n (size_t)
+ * @return (void)
+ */
 static void aot_ptr_expr(AotBufMap* m, Tensor* t, char* buf, size_t n) {
     AotBuf* b = t ? aot_map_find(m, t) : NULL;
     if (!b) {
@@ -139,14 +146,20 @@ static void aot_ptr_expr(AotBufMap* m, Tensor* t, char* buf, size_t n) {
 }
 
 /* Emit `for (i) { float x = A[i]; O[i] = <expr>; }` */
-/* Format a float as a valid C literal.
+/**
+ * Format a float as a valid C literal.
  *
  * "%.9gf" is wrong for any value that %g renders without a decimal point or
  * exponent: 0 becomes "0f" and 1 becomes "1f", neither of which is a C
  * constant, so the generated file failed to compile. Non-finite values are
  * worse -- "inff"/"nanf" are bare identifiers, not literals.
  *
- * Returns buf so the result can be used directly as a printf argument. */
+ * Returns buf so the result can be used directly as a printf argument.
+ * @param buf (char*)
+ * @param cap (size_t)
+ * @param v (float)
+ * @return (const char*)
+ */
 static const char* aot_f32(char* buf, size_t cap, float v) {
     if (isnan(v)) {
         snprintf(buf, cap, "(0.0f/0.0f)");
@@ -191,8 +204,20 @@ static void aot_emit_unary(FILE* cf, const char* name, const char* O, const char
             (long long)n, A, O, expr);
 }
 
-/* Emit an elementwise binary op with numpy-style scalar broadcasting: a
- * numel-1 operand is read as [0], otherwise as [i]. */
+/**
+ * Emit an elementwise binary op with numpy-style scalar broadcasting: a
+ * numel-1 operand is read as [0], otherwise as [i].
+ * @param cf (FILE*)
+ * @param name (const char*)
+ * @param O (const char*)
+ * @param A (const char*)
+ * @param B (const char*)
+ * @param na (int64_t)
+ * @param nb (int64_t)
+ * @param n (int64_t)
+ * @param expr (const char*)
+ * @return (void)
+ */
 static void aot_emit_binary(FILE* cf, const char* name, const char* O, const char* A, const char* B,
                             int64_t na, int64_t nb, int64_t n, const char* expr) {
     const char* ai = (na == 1) ? "0" : "i";
@@ -204,7 +229,20 @@ static void aot_emit_binary(FILE* cf, const char* name, const char* O, const cha
             (long long)n, A, ai, B, bi, O, expr);
 }
 
-/* Emit a reduction over `outer x dim x inner` (contiguous input). */
+/**
+ * Emit a reduction over `outer x dim x inner` (contiguous input).
+ * @param cf (FILE*)
+ * @param name (const char*)
+ * @param O (const char*)
+ * @param A (const char*)
+ * @param outer (int64_t)
+ * @param dim (int64_t)
+ * @param inner (int64_t)
+ * @param init (const char*)
+ * @param acc (const char*)
+ * @param final_ (const char*)
+ * @return (void)
+ */
 static void aot_emit_reduce(FILE* cf, const char* name, const char* O, const char* A, int64_t outer,
                             int64_t dim, int64_t inner, const char* init, const char* acc,
                             const char* final_) {
@@ -223,8 +261,14 @@ static void aot_emit_reduce(FILE* cf, const char* name, const char* O, const cha
 #endif /* CML_HAS_LLVM_BACKEND */
 
 #ifdef CML_HAS_LLVM_BACKEND
-/* Run `cmd`, echoing its output under `tool`, then delete `cleanup_path`.
- * Returns 0 on success, -1 when the tool could not run or exited non-zero. */
+/**
+ * Run `cmd`, echoing its output under `tool`, then delete `cleanup_path`.
+ * Returns 0 on success, -1 when the tool could not run or exited non-zero.
+ * @param tool (const char*)
+ * @param cmd (const char*)
+ * @param cleanup_path (const char*)
+ * @return (int)
+ */
 static int aot_run_tool(const char* tool, const char* cmd, const char* cleanup_path) {
     FILE* proc = popen(cmd, "r");
     if (!proc) {

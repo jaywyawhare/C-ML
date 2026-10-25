@@ -11,8 +11,13 @@
 #include "alloc/cml_allocator.h"
 #include "test_harness.h"
 
-/* MSE backward scales by FILL(2), which the optimizer rewrites to an ADD with no input
- * tensors; optimizing the graph the step then ran made this loop crash under VIZ. */
+/**
+ * MSE backward scales by FILL(2), which the optimizer rewrites to an ADD with no input
+ * tensors; optimizing the graph the step then ran made this loop crash under VIZ.
+ * @param losses (float*)
+ * @param steps (int)
+ * @return (void)
+ */
 static void train_losses(float* losses, int steps) {
     cml_seed(11);
     Sequential* model = cml_nn_sequential();
@@ -71,8 +76,13 @@ static Sequential* gan_net(int in, int out) {
     return m;
 }
 
-/* GAN-style steps run two backward passes in one graph: the second replaces grads the first
- * published, and the dashboard copy then read inputs that replacement had freed. */
+/**
+ * GAN-style steps run two backward passes in one graph: the second replaces grads the first
+ * published, and the dashboard copy then read inputs that replacement had freed.
+ * @param losses (float*)
+ * @param steps (int)
+ * @return (void)
+ */
 static void gan_losses(float* losses, int steps) {
     cml_seed(42);
     Sequential* g = gan_net(8, 8);

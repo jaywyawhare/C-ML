@@ -189,25 +189,46 @@ typedef struct CMLAMDriver {
     uint64_t va_end;
 } CMLAMDriver;
 
-/* Driver lifecycle */
+/**
+ * Driver lifecycle
+ * @return (bool)
+ */
 bool cml_am_driver_available(void);
 CMLAMDriver* cml_am_driver_create(void);
 int cml_am_driver_init(CMLAMDriver* drv);
 void cml_am_driver_free(CMLAMDriver* drv);
 
-/* GPU discovery */
+/**
+ * GPU discovery
+ * @param gpus (CMLAMGPUInfo**)
+ * @param count (int*)
+ * @return (int)
+ */
 int cml_am_enumerate_gpus(CMLAMGPUInfo** gpus, int* count);
 CMLAMChipletConfig cml_am_get_chiplet_config(const char* gfx_version);
 int cml_am_sdma_copy_nearest_xcd(CMLAMDriver* drv, int xcd_idx, uint64_t dst_va, uint64_t src_va,
                                  size_t size);
 
-/* Buffer management */
+/**
+ * Buffer management
+ * @param drv (CMLAMDriver*)
+ * @param size (size_t)
+ * @param vram (bool)
+ * @return (CMLAMBuffer*)
+ */
 CMLAMBuffer* cml_am_buffer_create(CMLAMDriver* drv, size_t size, bool vram);
 void cml_am_buffer_free(CMLAMDriver* drv, CMLAMBuffer* buf);
 int cml_am_buffer_upload(CMLAMDriver* drv, CMLAMBuffer* dst, const void* src, size_t n);
 int cml_am_buffer_download(CMLAMDriver* drv, CMLAMBuffer* src, void* dst, size_t n);
 
-/* Kernel loading and dispatch */
+/**
+ * Kernel loading and dispatch
+ * @param drv (CMLAMDriver*)
+ * @param code_object (const void*)
+ * @param code_size (size_t)
+ * @param kernel_name (const char*)
+ * @return (CMLAMKernel*)
+ */
 CMLAMKernel* cml_am_kernel_load(CMLAMDriver* drv, const void* code_object, size_t code_size,
                                 const char* kernel_name);
 void cml_am_kernel_free(CMLAMDriver* drv, CMLAMKernel* kernel);
@@ -217,39 +238,80 @@ int cml_am_kernel_launch_on_queue(CMLAMDriver* drv, int queue_idx, CMLAMKernel* 
                                   uint32_t grid[3], uint32_t block[3], void* kernarg,
                                   uint32_t kernarg_size, CMLAMSignal* completion);
 
-/* Multi-queue */
+/**
+ * Multi-queue
+ * @param drv (CMLAMDriver*)
+ * @param queue_index (int)
+ * @return (int)
+ */
 int cml_am_create_compute_queue(CMLAMDriver* drv, int queue_index);
 
-/* SDMA (DMA engine) */
+/**
+ * SDMA (DMA engine)
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_am_sdma_queue_create(CMLAMDriver* drv);
 int cml_am_sdma_copy(CMLAMDriver* drv, uint64_t dst_va, uint64_t src_va, size_t size);
 int cml_am_sdma_fence(CMLAMDriver* drv, uint64_t signal_va, uint64_t value);
 int cml_am_sdma_synchronize(CMLAMDriver* drv);
 
-/* Signal system */
+/**
+ * Signal system
+ * @param drv (CMLAMDriver*)
+ * @param initial_value (uint64_t)
+ * @return (CMLAMSignal*)
+ */
 CMLAMSignal* cml_am_signal_create(CMLAMDriver* drv, uint64_t initial_value);
 void cml_am_signal_free(CMLAMDriver* drv, CMLAMSignal* signal);
 int cml_am_signal_wait(CMLAMSignal* signal, uint64_t expected, uint64_t timeout_ns);
 
-/* Barrier packets */
+/**
+ * Barrier packets
+ * @param drv (CMLAMDriver*)
+ * @param queue_idx (int)
+ * @param deps (CMLAMSignal**)
+ * @param num_deps (int)
+ * @param completion (CMLAMSignal*)
+ * @return (int)
+ */
 int cml_am_barrier_and(CMLAMDriver* drv, int queue_idx, CMLAMSignal** deps, int num_deps,
                        CMLAMSignal* completion);
 int cml_am_barrier_or(CMLAMDriver* drv, int queue_idx, CMLAMSignal** deps, int num_deps,
                       CMLAMSignal* completion);
 
-/* Synchronization */
+/**
+ * Synchronization
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_am_synchronize(CMLAMDriver* drv);
 
-/* Scratch and LDS */
+/**
+ * Scratch and LDS
+ * @param drv (CMLAMDriver*)
+ * @param per_thread_size (size_t)
+ * @param max_waves (uint32_t)
+ * @return (int)
+ */
 int cml_am_alloc_scratch(CMLAMDriver* drv, size_t per_thread_size, uint32_t max_waves);
 bool cml_am_validate_lds(CMLAMDriver* drv, uint32_t requested_bytes);
 
-/* Error recovery */
+/**
+ * Error recovery
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_am_check_gpu_hang(CMLAMDriver* drv);
 int cml_am_gpu_reset(CMLAMDriver* drv);
 int cml_am_dump_wave_status(CMLAMDriver* drv);
 
-/* Graph execution */
+/**
+ * Graph execution
+ * @param drv (CMLAMDriver*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_am_execute_graph(CMLAMDriver* drv, CMLGraph_t ir);
 
 #ifdef __cplusplus

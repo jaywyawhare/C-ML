@@ -18,7 +18,11 @@ typedef struct {
     size_t total_size;
 } Task;
 
-/* @param num_threads Number of threads (0 for auto-detect) */
+/**
+ *
+ * @param num_threads (size_t)
+ * @return (ThreadPool*)
+ */
 ThreadPool* threadpool_create(size_t num_threads);
 void threadpool_destroy(ThreadPool* pool);
 int threadpool_submit(ThreadPool* pool, Task* task);
@@ -27,7 +31,14 @@ size_t threadpool_get_num_threads(ThreadPool* pool);
 ThreadPool* threadpool_get_global(void);
 void threadpool_set_global(ThreadPool* pool);
 
-/* @param pool Thread pool (NULL for global) */
+/**
+ *
+ * @param pool (ThreadPool*)
+ * @param func (TaskFunc)
+ * @param data (void*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t n);
 
 #ifdef __cplusplus

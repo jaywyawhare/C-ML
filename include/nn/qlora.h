@@ -45,13 +45,25 @@ void cml_nf4_tensor_free(CMLNF4Tensor* nf4);
 
 Tensor* cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4);
 
-/* Quantizes base_weight to NF4, initializes lora_A (Xavier) and lora_B (zeros). */
+/**
+ * Quantizes base_weight to NF4, initializes lora_A (Xavier) and lora_B (zeros).
+ * @param base_weight (Tensor*)
+ * @param rank (int)
+ * @param alpha (float)
+ * @param block_size (int)
+ * @return (CMLQLoRALinear*)
+ */
 CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank, float alpha, int block_size);
 
 void cml_qlora_linear_free(CMLQLoRALinear* qlora);
 
-/* output = input @ dequant(W_nf4)^T + scaling * input @ A^T @ B^T
- * Base weight is dequantized to a temporary for the matmul, then freed. */
+/**
+ * output = input @ dequant(W_nf4)^T + scaling * input @ A^T @ B^T
+ * Base weight is dequantized to a temporary for the matmul, then freed.
+ * @param qlora (CMLQLoRALinear*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input);
 
 size_t cml_qlora_memory_usage(const CMLQLoRALinear* qlora);

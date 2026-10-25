@@ -7,7 +7,11 @@
 #include "core/gguf_quant.h"
 #include "core/gguf.h"
 
-/* Helper: convert float to fp16 (IEEE 754 half-precision) stored as uint16_t */
+/**
+ * Helper: convert float to fp16 (IEEE 754 half-precision) stored as uint16_t
+ * @param value (float)
+ * @return (uint16_t)
+ */
 static uint16_t float_to_fp16(float value) {
     /* Simple conversion for small positive values */
     union {

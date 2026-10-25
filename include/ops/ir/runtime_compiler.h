@@ -53,17 +53,35 @@ typedef struct CMLRuntimeCompiler {
 CMLRuntimeCompiler* cml_runtime_compiler_create(void);
 void cml_runtime_compiler_free(CMLRuntimeCompiler* rc);
 
-/* Returns compiled kernel (owned by cache), or NULL on failure. */
+/**
+ * Returns compiled kernel (owned by cache), or NULL on failure.
+ * @param rc (CMLRuntimeCompiler*)
+ * @param group (const CMLFusionGroup*)
+ * @return (const CMLCompiledKernel*)
+ */
 const CMLCompiledKernel* cml_runtime_compile_group(CMLRuntimeCompiler* rc,
                                                    const CMLFusionGroup* group);
 const CMLCompiledKernel*
 cml_runtime_compile_program(CMLRuntimeCompiler* rc, const CMLLinearProgram* prog, size_t work_size);
 
-/* CPU fallback: interprets the LinearProgram operations directly. */
+/**
+ * CPU fallback: interprets the LinearProgram operations directly.
+ * @param kernel (const CMLCompiledKernel*)
+ * @param inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param outputs (Tensor**)
+ * @param num_outputs (int)
+ * @return (int)
+ */
 int cml_runtime_execute_compiled(const CMLCompiledKernel* kernel, Tensor** inputs, int num_inputs,
                                  Tensor** outputs, int num_outputs);
 
-/* fusion schedule -> linearize groups -> fused codegen -> execute */
+/**
+ * fusion schedule -> linearize groups -> fused codegen -> execute
+ * @param rc (CMLRuntimeCompiler*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_runtime_execute_graph(CMLRuntimeCompiler* rc, CMLGraph_t ir);
 
 void cml_runtime_compiler_stats(const CMLRuntimeCompiler* rc, size_t* hits, size_t* misses,

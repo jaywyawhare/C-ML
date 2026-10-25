@@ -21,9 +21,16 @@
 #include "test_harness.h"
 #include "test_require.h"
 
-/* Walk a schedule and check it is a valid execution order: every unit appears
+/**
+ * Walk a schedule and check it is a valid execution order: every unit appears
  * exactly once, and each runs only after the units it depends on
- * (F(s,m) after F(s-1,m); B(s,m) after F(s,m) and after B(s+1,m)). */
+ * (F(s,m) after F(s-1,m); B(s,m) after F(s,m) and after B(s+1,m)).
+ * @param sched (const PipeUnit*)
+ * @param n (int)
+ * @param P (int)
+ * @param M (int)
+ * @return (bool)
+ */
 static bool schedule_is_valid(const PipeUnit* sched, int n, int P, int M) {
     if (!sched || n != 2 * P * M)
         return false;
@@ -69,9 +76,16 @@ static bool schedule_is_valid(const PipeUnit* sched, int n, int P, int M) {
     return ok;
 }
 
-/* Peak number of micro-batches whose activations are live at once: a forward
+/**
+ * Peak number of micro-batches whose activations are live at once: a forward
  * makes (s,m) live, the backward at stage 0 retires m everywhere. This is the
- * property 1F1B exists to bound. */
+ * property 1F1B exists to bound.
+ * @param sched (const PipeUnit*)
+ * @param n (int)
+ * @param P (int)
+ * @param M (int)
+ * @return (int)
+ */
 static int schedule_peak_live(const PipeUnit* sched, int n, int P, int M) {
     bool* live = calloc((size_t)M, sizeof(bool));
     REQUIRE(live);
@@ -129,9 +143,12 @@ static bool test_interleaved_schedule_valid(void) {
     return true;
 }
 
-/* GPipe holds every micro-batch at once; 1F1B must hold strictly fewer as soon
+/**
+ * GPipe holds every micro-batch at once; 1F1B must hold strictly fewer as soon
  * as there are more micro-batches than stages -- that gap is the whole reason
- * the schedule exists. */
+ * the schedule exists.
+ * @return (bool)
+ */
 static bool test_interleaved_bounds_live_activations(void) {
     const int P = 4, M = 8;
 
@@ -158,9 +175,12 @@ static bool test_interleaved_bounds_live_activations(void) {
     return peak_i < peak_g;
 }
 
-/* With one micro-batch there is no room to interleave, so both schedules must
+/**
+ * With one micro-batch there is no room to interleave, so both schedules must
  * agree -- a guard against the 1F1B generator inventing an order in the
- * degenerate case. */
+ * degenerate case.
+ * @return (bool)
+ */
 static bool test_single_micro_batch_orders_match(void) {
     const int P = 3;
     int ng = 0, ni = 0;
@@ -183,7 +203,10 @@ static bool test_schedule_rejects_bad_input(void) {
     return ok;
 }
 
-/* The schedules differ in order for a realistic shape. */
+/**
+ * The schedules differ in order for a realistic shape.
+ * @return (bool)
+ */
 static bool test_schedules_differ(void) {
     const int P = 3, M = 4;
     int ng = 0, ni = 0;
@@ -212,9 +235,16 @@ static Tensor* make_input(int rows, int cols, float bias) {
     return t;
 }
 
-/* Run one forward+backward of a 2-stage pipeline under `interleaved` and return
+/**
+ * Run one forward+backward of a 2-stage pipeline under `interleaved` and return
  * stage 0's accumulated weight gradient. The two stages' weights are seeded
- * identically across calls so the two runs are comparable. */
+ * identically across calls so the two runs are comparable.
+ * @param interleaved (bool)
+ * @param M (int)
+ * @param out (float*)
+ * @param out_len (int)
+ * @return (bool)
+ */
 static bool run_pipeline_grads(bool interleaved, int M, float* out, int out_len) {
     Linear* l0 = nn_linear(4, 4, DTYPE_FLOAT32, DEVICE_CPU, false);
     Linear* l1 = nn_linear(4, 2, DTYPE_FLOAT32, DEVICE_CPU, false);

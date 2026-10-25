@@ -27,32 +27,60 @@
 extern "C" {
 #endif
 
-/* Enable/disable zero-IR eager execution of hot ops (process-global). */
+/**
+ * Enable/disable zero-IR eager execution of hot ops (process-global).
+ * @param enabled (bool)
+ * @return (void)
+ */
 CML_API void torch_set_eager_mode(bool enabled);
 CML_API bool torch_is_eager_mode(void);
 
-/* Convenience: eager + no_grad on enable; restore prior grad state on disable
- * when the outermost nesting level exits (nested calls are depth-tracked). */
+/**
+ * Convenience: eager + no_grad on enable; restore prior grad state on disable
+ * when the outermost nesting level exits (nested calls are depth-tracked).
+ * @param enabled (bool)
+ * @return (void)
+ */
 CML_API void torch_inference_mode(bool enabled);
 
-/* GEMM backend thread tuning (MKL/OpenBLAS/BLIS/ILP64; process-global).
- * Concurrent calls race; typical usage is once at startup. */
+/**
+ * GEMM backend thread tuning (MKL/OpenBLAS/BLIS/ILP64; process-global).
+ * Concurrent calls race; typical usage is once at startup.
+ * @param n (int)
+ * @return (void)
+ */
 CML_API void torch_set_num_threads(int n);
 CML_API int torch_get_num_threads(void);
 
-/* Materialize a lazy tensor and detach it from the IR graph so it survives
- * torch_reset_ir(). Returns 0 on success, -1 if t is NULL or realize fails. */
+/**
+ * Materialize a lazy tensor and detach it from the IR graph so it survives
+ * torch_reset_ir(). Returns 0 on success, -1 if t is NULL or realize fails.
+ * @param t (Tensor*)
+ * @return (int)
+ */
 CML_API int torch_realize(Tensor* t);
 
-/* Fused functional ops: out = input @ weight^T (+ bias) [+ relu].
+/**
+ * Fused functional ops: out = input @ weight^T (+ bias) [+ relu].
  * Always available (independent of eager-mode flag); compute immediately when
  * inputs are materializable float32 CPU tensors that do not require grad,
- * otherwise fall back to the lazy IR path. */
+ * otherwise fall back to the lazy IR path.
+ * @param input (Tensor*)
+ * @param weight (Tensor*)
+ * @param bias (Tensor*)
+ * @return (Tensor*)
+ */
 CML_API Tensor* torch_linear(Tensor* input, Tensor* weight, Tensor* bias);
 CML_API Tensor* torch_linear_relu(Tensor* input, Tensor* weight, Tensor* bias);
 
-/* Internal: attempt eager compute; return NULL to signal "use lazy path".
- * `uop` is a UOpType value (UOP_ADD, UOP_MUL, UOP_MATMUL, UOP_RELU, ...). */
+/**
+ * Internal: attempt eager compute; return NULL to signal "use lazy path".
+ * `uop` is a UOpType value (UOP_ADD, UOP_MUL, UOP_MATMUL, UOP_RELU, ...).
+ * @param uop (int)
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* torch_eager_binary(int uop, Tensor* a, Tensor* b);
 Tensor* torch_eager_unary(int uop, Tensor* a);
 

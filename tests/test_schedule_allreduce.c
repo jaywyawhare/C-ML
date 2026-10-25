@@ -26,7 +26,10 @@ static Tensor* mk1d(const float* d, int n) {
     return tensor_from_data(d, shape, 1, &cfg);
 }
 
-/* run(SUM) over N identical replicas → each element scaled by N (not doubled). */
+/**
+ * run(SUM) over N identical replicas → each element scaled by N (not doubled).
+ * @return (int)
+ */
 static int test_run_sum_scales_by_device_count(void) {
     float d[8]  = {1, 2, 3, 4, 5, 6, 7, 8};
     Tensor* t   = mk1d(d, 8);
@@ -52,7 +55,10 @@ static int test_run_sum_scales_by_device_count(void) {
     return ok;
 }
 
-/* inject appends one SCHED_COPY item per all-reduce step; free stays consistent. */
+/**
+ * inject appends one SCHED_COPY item per all-reduce step; free stays consistent.
+ * @return (int)
+ */
 static int test_inject_appends_copy_items(void) {
     CMLGraph_t g   = cml_ir_new(IR_TARGET_C);
     CMLSchedule* s = cml_schedule_create(g, NULL); /* empty → num_items == 0 */

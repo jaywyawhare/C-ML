@@ -34,7 +34,12 @@
 #undef TEST
 #define TEST(label, cond) CHECK(label, cond)
 
-/* Walk the instruction stream; returns 1 if the module is well formed. */
+/**
+ * Walk the instruction stream; returns 1 if the module is well formed.
+ * @param w (const uint32_t*)
+ * @param n (int)
+ * @return (int)
+ */
 static int spirv_walk_ok(const uint32_t* w, int n) {
     if (!w || n < 5 || w[0] != SPIRV_MAGIC)
         return 0;
@@ -48,7 +53,13 @@ static int spirv_walk_ok(const uint32_t* w, int n) {
     return i == n;
 }
 
-/* Does the module contain a core opcode with the given number? */
+/**
+ * Does the module contain a core opcode with the given number?
+ * @param w (const uint32_t*)
+ * @param n (int)
+ * @param opcode (uint32_t)
+ * @return (int)
+ */
 static int has_opcode(const uint32_t* w, int n, uint32_t opcode) {
     int i = 5;
     while (i < n) {
@@ -62,8 +73,14 @@ static int has_opcode(const uint32_t* w, int n, uint32_t opcode) {
     return 0;
 }
 
-/* Does the module contain an OpExtInst selecting the given GLSL.std.450 op?
- * Layout: [OpExtInst | resultType | resultId | set | instruction | operands...] */
+/**
+ * Does the module contain an OpExtInst selecting the given GLSL.std.450 op?
+ * Layout: [OpExtInst | resultType | resultId | set | instruction | operands...]
+ * @param w (const uint32_t*)
+ * @param n (int)
+ * @param glsl_op (uint32_t)
+ * @return (int)
+ */
 static int has_glsl_inst(const uint32_t* w, int n, uint32_t glsl_op) {
     int i = 5;
     while (i < n) {
@@ -77,7 +94,13 @@ static int has_glsl_inst(const uint32_t* w, int n, uint32_t glsl_op) {
     return 0;
 }
 
-/* One compute op with `n_src` sources, plus the loads and the store. */
+/**
+ * One compute op with `n_src` sources, plus the loads and the store.
+ * @param uop (UOpType)
+ * @param n_src (int)
+ * @param out_words (int*)
+ * @return (uint32_t*)
+ */
 static uint32_t* gen_for_op(UOpType uop, int n_src, int* out_words) {
     CMLLinearOp ops[4];
     memset(ops, 0, sizeof(ops));
@@ -104,9 +127,17 @@ static uint32_t* gen_for_op(UOpType uop, int n_src, int* out_words) {
     return cml_spirv_gen_fused_kernel(&prog, 256, out_words);
 }
 
-/* `expect_glsl` != 0 -> require that GLSL.std.450 instruction;
+/**
+ * `expect_glsl` != 0 -> require that GLSL.std.450 instruction;
  * otherwise require the core `expect_core` opcode. Both also assert the module
- * does NOT contain the instruction the old default would have substituted. */
+ * does NOT contain the instruction the old default would have substituted.
+ * @param name (const char*)
+ * @param uop (UOpType)
+ * @param n_src (int)
+ * @param expect_core (uint32_t)
+ * @param expect_glsl (uint32_t)
+ * @return (void)
+ */
 static void check_op(const char* name, UOpType uop, int n_src, uint32_t expect_core,
                      uint32_t expect_glsl) {
     int n       = 0;
@@ -125,9 +156,14 @@ static void check_op(const char* name, UOpType uop, int n_src, uint32_t expect_c
     cml_free(w);
 }
 
-/* OpExtInstImport must name the set exactly. A single transposed byte in the
+/**
+ * OpExtInstImport must name the set exactly. A single transposed byte in the
  * literal ("GLLS.std.450") made every module this backend emitted invalid --
- * structurally well formed, so only a real validator or driver would reject it. */
+ * structurally well formed, so only a real validator or driver would reject it.
+ * @param w (const uint32_t*)
+ * @param n (int)
+ * @return (int)
+ */
 static int import_string_ok(const uint32_t* w, int n) {
     int i = 5;
     while (i < n) {
@@ -164,7 +200,15 @@ static char* ptx_for(UOpType uop, int n_src) {
     return cml_ptx_gen_fused_kernel(&prog, 256);
 }
 
-/* Require both marker instructions/constants to appear in the emitted PTX. */
+/**
+ * Require both marker instructions/constants to appear in the emitted PTX.
+ * @param name (const char*)
+ * @param uop (UOpType)
+ * @param n_src (int)
+ * @param need1 (const char*)
+ * @param need2 (const char*)
+ * @return (void)
+ */
 static void check_ptx(const char* name, UOpType uop, int n_src, const char* need1,
                       const char* need2) {
     char* p = ptx_for(uop, n_src);

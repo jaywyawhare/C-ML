@@ -47,7 +47,8 @@ MultiDeviceSchedule* multi_schedule_build(CMLSchedule* sched, const int* device_
 
 void multi_schedule_free(MultiDeviceSchedule* ms);
 
-/* Walk the schedule's steps.
+/**
+ * Walk the schedule's steps.
  *
  * This is an analysis/cost structure, not a runnable program: CMLSchedule has no
  * executor, and the planner keeps a single buffer per tensor so a cross-device
@@ -59,7 +60,10 @@ void multi_schedule_free(MultiDeviceSchedule* ms);
  * malformed schedule, and -2 when the schedule contains compute steps that would
  * need an executor -- rather than reporting success for work it never ran. Use
  * multi_schedule_xfer_bytes / multi_schedule_total_kernels for the cost figures,
- * which are computed for real. */
+ * which are computed for real.
+ * @param ms (MultiDeviceSchedule*)
+ * @return (int)
+ */
 int multi_schedule_run(MultiDeviceSchedule* ms);
 
 size_t multi_schedule_xfer_bytes(const MultiDeviceSchedule* ms);

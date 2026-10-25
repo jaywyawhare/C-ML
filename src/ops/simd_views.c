@@ -11,7 +11,14 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
-/* Cache-blocked scalar transpose. */
+/**
+ * Cache-blocked scalar transpose.
+ * @param src (const float*)
+ * @param dst (float*)
+ * @param rows (int)
+ * @param cols (int)
+ * @return (void)
+ */
 void simd_transpose_2d_f32(const float* src, float* dst, int rows, int cols) {
     const int BLOCK = 32;
     for (int i = 0; i < rows; i += BLOCK) {

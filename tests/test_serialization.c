@@ -146,12 +146,16 @@ static int test_checkpoint_save_load(void) {
     return ok;
 }
 
-/* Non-trainable module state has to survive a save/load, and neither format used
+/**
+ * Non-trainable module state has to survive a save/load, and neither format used
  * to carry it: both walked parameters only, so a trained BatchNorm reloaded with
  * running_mean 0 / running_var 1 and eval-mode inference silently normalized
  * against the fresh module's stats. Both calls reported success.
  *
- * `safetensors` selects the format so the two paths share one body. */
+ * `safetensors` selects the format so the two paths share one body.
+ * @param safetensors (bool)
+ * @return (int)
+ */
 static int buffers_round_trip(bool safetensors) {
     const char* path   = safetensors ? "/tmp/cml_test_buffers.st" : "/tmp/cml_test_buffers.bin";
     const float marker = 7.0f;

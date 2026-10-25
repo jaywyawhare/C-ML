@@ -11,9 +11,14 @@ Tensor* tensor_add(Tensor* a, Tensor* b);
 Tensor* tensor_sub(Tensor* a, Tensor* b);
 Tensor* tensor_mul(Tensor* a, Tensor* b);
 Tensor* tensor_div(Tensor* a, Tensor* b);
-/* In-place elementwise (eager): a op= b, mutating a's realized buffer directly
+/**
+ * In-place elementwise (eager): a op= b, mutating a's realized buffer directly
  * (no IR node, no allocation). f32 only; b may match a, be a scalar, or a
- * trailing broadcast. Returns a. Does not participate in autograd. */
+ * trailing broadcast. Returns a. Does not participate in autograd.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_add_(Tensor* a, Tensor* b);
 Tensor* tensor_sub_(Tensor* a, Tensor* b);
 Tensor* tensor_mul_(Tensor* a, Tensor* b);
@@ -33,9 +38,15 @@ Tensor* tensor_tan(Tensor* a);
 Tensor* tensor_softmax(Tensor* a, int dim);
 
 /* dim=-1 reduces all dimensions */
-/* Reductions. `dim == -1` reduces EVERY axis (this API's sentinel, unlike
+/**
+ * Reductions. `dim == -1` reduces EVERY axis (this API's sentinel, unlike
  * PyTorch where -1 is the last axis); other negative axes count from the end,
- * and an out-of-range axis also reduces everything. */
+ * and an out-of-range axis also reduces everything.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param keepdim (bool)
+ * @return (Tensor*)
+ */
 Tensor* tensor_sum(Tensor* a, int dim, bool keepdim);
 Tensor* tensor_mean(Tensor* a, int dim, bool keepdim);
 Tensor* tensor_max(Tensor* a, int dim, bool keepdim);
@@ -44,7 +55,14 @@ Tensor* tensor_min(Tensor* a, int dim, bool keepdim);
 Tensor* tensor_matmul(Tensor* a, Tensor* b);
 Tensor* tensor_transpose(Tensor* a, int dim1, int dim2);
 
-/* unbiased=true uses Bessel's correction (N-1) */
+/**
+ * unbiased=true uses Bessel's correction (N-1)
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param unbiased (bool)
+ * @param keepdim (bool)
+ * @return (Tensor*)
+ */
 Tensor* tensor_std(Tensor* a, int dim, bool unbiased, bool keepdim);
 Tensor* tensor_var(Tensor* a, int dim, bool unbiased, bool keepdim);
 
@@ -52,12 +70,25 @@ Tensor* tensor_argmax(Tensor* a, int dim);
 Tensor* tensor_argmin(Tensor* a, int dim);
 bool tensor_has_grad(Tensor* a);
 
-/* ELU: x > 0 ? x : alpha*(exp(x)-1) */
+/**
+ * ELU: x > 0 ? x : alpha*(exp(x)-1)
+ * @param a (Tensor*)
+ * @param alpha (float)
+ * @return (Tensor*)
+ */
 Tensor* tensor_elu(Tensor* a, float alpha);
 Tensor* tensor_selu(Tensor* a);
-/* x * tanh(softplus(x)) */
+/**
+ * x * tanh(softplus(x))
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_mish(Tensor* a);
-/* x * sigmoid(x) */
+/**
+ * x * sigmoid(x)
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_silu(Tensor* a);
 Tensor* tensor_hardswish(Tensor* a);
 
@@ -66,7 +97,13 @@ Tensor* tensor_topk(Tensor* a, int k, int dim, bool largest, bool sorted);
 Tensor* tensor_masked_select(Tensor* a, Tensor* mask);
 Tensor** tensor_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs);
 Tensor* tensor_diagonal(Tensor* a, int offset, int dim1, int dim2);
-/* a + weight*(b-a) */
+/**
+ * a + weight*(b-a)
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param weight (float)
+ * @return (Tensor*)
+ */
 Tensor* tensor_lerp(Tensor* a, Tensor* b, float weight);
 Tensor* tensor_idiv(Tensor* a, Tensor* b);
 Tensor* tensor_mod(Tensor* a, Tensor* b);

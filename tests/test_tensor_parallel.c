@@ -12,7 +12,16 @@
 
 static bool float_eq(float a, float b) { return fabsf(a - b) < EPSILON; }
 
-/* C = A @ B^T: A is [M, K], B is [N, K], C is [M, N] */
+/**
+ * C = A @ B^T: A is [M, K], B is [N, K], C is [M, N]
+ * @param A (const float*)
+ * @param M (int)
+ * @param K (int)
+ * @param B (const float*)
+ * @param N (int)
+ * @param C (float*)
+ * @return (void)
+ */
 static void ref_matmul_transposed(const float* A, int M, int K, const float* B, int N, float* C) {
     for (int i = 0; i < M; i++) {
         for (int j = 0; j < N; j++) {

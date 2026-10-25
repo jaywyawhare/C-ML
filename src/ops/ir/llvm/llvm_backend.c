@@ -51,7 +51,15 @@ struct CMLLLVMBackend {
     KernelCacheSlot op_cache[OP_CACHE_SIZE]; /* keyed by shape signature */
 };
 
-/* FNV-1a over (type, up to four shape dims). key 0 is reserved for "empty". */
+/**
+ * FNV-1a over (type, up to four shape dims). key 0 is reserved for "empty".
+ * @param type (UOpType)
+ * @param a (int64_t)
+ * @param b (int64_t)
+ * @param c (int64_t)
+ * @param d (int64_t)
+ * @return (uint64_t)
+ */
 static uint64_t shape_key(UOpType type, int64_t a, int64_t b, int64_t c, int64_t d) {
     uint64_t h    = 1469598103934665603ULL;
     uint64_t v[5] = {(uint64_t)type, (uint64_t)a, (uint64_t)b, (uint64_t)c, (uint64_t)d};
@@ -62,9 +70,15 @@ static uint64_t shape_key(UOpType type, int64_t a, int64_t b, int64_t c, int64_t
     return h ? h : 1;
 }
 
-/* Find the cached fn for key, or the slot index to insert into.
+/**
+ * Find the cached fn for key, or the slot index to insert into.
  * Returns the fn (non-NULL) on hit; on miss returns NULL and sets *slot to the
- * slot to populate (an empty slot within the probe window, else evict home). */
+ * slot to populate (an empty slot within the probe window, else evict home).
+ * @param b (struct CMLLLVMBackend*)
+ * @param key (uint64_t)
+ * @param slot (unsigned*)
+ * @return (kernel_fn_t)
+ */
 static kernel_fn_t cache_lookup(struct CMLLLVMBackend* b, uint64_t key, unsigned* slot) {
     unsigned home = (unsigned)(key % OP_CACHE_SIZE);
     for (unsigned p = 0; p < OP_CACHE_PROBE; p++) {
@@ -161,7 +175,13 @@ void cml_llvm_backend_destroy(CMLLLVMBackend* backend) {
  * Attribute helpers
  * ---------------------------------------------------------------------- */
 
-/* Add noalias to the first n_ptrs pointer parameters (0-indexed). */
+/**
+ * Add noalias to the first n_ptrs pointer parameters (0-indexed).
+ * @param ctx (LLVMContextRef)
+ * @param fn (LLVMValueRef)
+ * @param n_ptrs (unsigned)
+ * @return (void)
+ */
 static void add_noalias(LLVMContextRef ctx, LLVMValueRef fn, unsigned n_ptrs) {
     unsigned kind = LLVMGetEnumAttributeKindForName("noalias", 7);
     if (!kind)
@@ -184,9 +204,18 @@ typedef struct {
     LLVMBasicBlockRef header;
 } LoopInfo;
 
-/* Emit a counted loop with i in [start, end).  For threaded kernels start is a
+/**
+ * Emit a counted loop with i in [start, end).  For threaded kernels start is a
  * runtime parameter (= chunk offset), so bcast_index(i, ...) sees the global
- * element index and the modulo broadcast is correct even when chunked. */
+ * element index and the modulo broadcast is correct even when chunked.
+ * @param bld (LLVMBuilderRef)
+ * @param ctx (LLVMContextRef)
+ * @param fn (LLVMValueRef)
+ * @param start (LLVMValueRef)
+ * @param end (LLVMValueRef)
+ * @param name (const char*)
+ * @return (LoopInfo)
+ */
 static LoopInfo emit_loop(LLVMBuilderRef bld, LLVMContextRef ctx, LLVMValueRef fn,
                           LLVMValueRef start, LLVMValueRef end, const char* name) {
     LoopInfo info;
@@ -231,7 +260,12 @@ static void close_loop(LLVMBuilderRef bld, LoopInfo* info, LLVMBasicBlockRef ent
     LLVMAddIncoming(info->i, in_vals, in_bbs, 2);
 }
 
-/* Element LLVM type for a tensor dtype the JIT emits kernels for (f32/f64/int). */
+/**
+ * Element LLVM type for a tensor dtype the JIT emits kernels for (f32/f64/int).
+ * @param ctx (LLVMContextRef)
+ * @param dt (DType)
+ * @return (LLVMTypeRef)
+ */
 static LLVMTypeRef elem_type(LLVMContextRef ctx, DType dt) {
     switch (dt) {
     case DTYPE_FLOAT64:
@@ -251,11 +285,19 @@ static LLVMTypeRef elem_type(LLVMContextRef ctx, DType dt) {
  */
 static int dtype_is_int_jit(DType dt) { return dt == DTYPE_INT32 || dt == DTYPE_INT64; }
 
-/* Resolve an input's element index at loop position i for a shape known at
+/**
+ * Resolve an input's element index at loop position i for a shape known at
  * codegen time.  Broadcasting collapses to a constant here: in_n == out_n is a
  * straight index (no arithmetic), in_n == 1 is a constant-0 splat, and only the
  * genuinely-broadcast case emits a urem.  This is what lets LLVM vectorize the
- * common contiguous/scalar cases with no runtime broadcast branch. */
+ * common contiguous/scalar cases with no runtime broadcast branch.
+ * @param bld (LLVMBuilderRef)
+ * @param ctx (LLVMContextRef)
+ * @param i (LLVMValueRef)
+ * @param in_n (int64_t)
+ * @param out_n (int64_t)
+ * @return (LLVMValueRef)
+ */
 static LLVMValueRef bcast_index(LLVMBuilderRef bld, LLVMContextRef ctx, LLVMValueRef i,
                                 int64_t in_n, int64_t out_n) {
     LLVMTypeRef i64 = LLVMInt64TypeInContext(ctx);
@@ -266,7 +308,8 @@ static LLVMValueRef bcast_index(LLVMBuilderRef bld, LLVMContextRef ctx, LLVMValu
     return LLVMBuildURem(bld, i, LLVMConstInt(i64, (unsigned long long)in_n, 0), "bidx");
 }
 
-/* Is `urem` by the operand's element count the correct broadcast mapping?
+/**
+ * Is `urem` by the operand's element count the correct broadcast mapping?
  *
  * These kernels are shape-blind -- they receive element counts, not shapes -- so
  * the only broadcast they can express is "the operand tiles the output". That is
@@ -275,7 +318,11 @@ static LLVMValueRef bcast_index(LLVMBuilderRef bld, LLVMContextRef ctx, LLVMValu
  * a dimension has to stretch: for [2,3] + [2,1] the modulo walks the operand
  * 0,1,0,1,0,1 when it must be 0,0,0,1,1,1, so `x - mean(x, dim=1, keepdim=True)`
  * -- the shape at the centre of layernorm and softmax -- silently mixed rows.
- * Those nodes go to the interpreter, whose _broadcast_idx is shape-aware. */
+ * Those nodes go to the interpreter, whose _broadcast_idx is shape-aware.
+ * @param in (const Tensor*)
+ * @param out (const Tensor*)
+ * @return (bool)
+ */
 static bool jit_bcast_is_exact(const Tensor* in, const Tensor* out) {
     if (!in || !out)
         return false;
@@ -313,11 +360,18 @@ static LLVMValueRef call1(LLVMBuilderRef bld, LLVMTypeRef f32, LLVMValueRef intr
 }
 
 /* Declare an external C libm function: float name(float) */
-/* Declare a libm scalar function matching the kernel's element type: `erff` for
+/**
+ * Declare a libm scalar function matching the kernel's element type: `erff` for
  * float32, `erf` for float64. Declaring the float form while the call site types
  * the argument as double is an ABI mismatch -- the callee reads a garbage float
  * and the caller reads a garbage double back, which is how f64 erf/asin/acos/
- * atan returned zeros. `base` is the double-precision name. */
+ * atan returned zeros. `base` is the double-precision name.
+ * @param mod (LLVMModuleRef)
+ * @param ctx (LLVMContextRef)
+ * @param base (const char*)
+ * @param dt (DType)
+ * @return (LLVMValueRef)
+ */
 static LLVMValueRef extern_libm(LLVMModuleRef mod, LLVMContextRef ctx, const char* base, DType dt) {
     char name[32];
     int is_f32 = (dt != DTYPE_FLOAT64);
@@ -1338,12 +1392,16 @@ static LLVMModuleRef build_matmul_kernel(LLVMContextRef ctx, const char* fn_name
 #endif
 #endif
 
-/* Open a per-kernel LLVM context to build a module in, plus the ThreadSafeContext
+/**
+ * Open a per-kernel LLVM context to build a module in, plus the ThreadSafeContext
  * ORC will own. The ORC C-API for pairing an externally-built module with a TSC
  * differs across LLVM versions (see the CMake feature detection): the adopt call
  * LLVMOrcCreateNewThreadSafeContextFromLLVMContext builds in a plain context and
  * adopts it later; otherwise create the TSC up front and build in its own
- * context via LLVMOrcThreadSafeContextGetContext. */
+ * context via LLVMOrcThreadSafeContextGetContext.
+ * @param out_tsc (LLVMOrcThreadSafeContextRef*)
+ * @return (LLVMContextRef)
+ */
 static LLVMContextRef open_kernel_ctx(LLVMOrcThreadSafeContextRef* out_tsc) {
 #if defined(CML_HAVE_ORC_FROM_LLVM_CONTEXT)
     *out_tsc = NULL; /* created in compile_and_lookup from the module ctx */
@@ -1368,9 +1426,14 @@ static LLVMContextRef open_kernel_ctx(LLVMOrcThreadSafeContextRef* out_tsc) {
 #endif
 }
 
-/* Dispose an unused per-kernel context (module build failed before ORC adopted
+/**
+ * Dispose an unused per-kernel context (module build failed before ORC adopted
  * it). Mirrors open_kernel_ctx's ownership: LLVM >= 19 owns the plain context
- * directly; LLVM 18's context is owned by the TSC. */
+ * directly; LLVM 18's context is owned by the TSC.
+ * @param ctx (LLVMContextRef)
+ * @param tsc (LLVMOrcThreadSafeContextRef)
+ * @return (void)
+ */
 static void dispose_kernel_ctx(LLVMContextRef ctx, LLVMOrcThreadSafeContextRef tsc) {
 #if defined(CML_HAVE_ORC_FROM_LLVM_CONTEXT)
     (void)tsc;
@@ -1471,8 +1534,19 @@ static kernel_fn_t compile_and_lookup(CMLLLVMBackend* backend, LLVMModuleRef mod
  * ---------------------------------------------------------------------- */
 #define FE_UNUSED_REF FUSED_UNUSED_REF
 
-/* Emit the scalar result of one primitive elementwise op. Mirrors fused_eval_block
- * (execution.c) and the per-op emission in build_binary_op/build_unary_op. */
+/**
+ * Emit the scalar result of one primitive elementwise op. Mirrors fused_eval_block
+ * (execution.c) and the per-op emission in build_binary_op/build_unary_op.
+ * @param bld (LLVMBuilderRef)
+ * @param mod (LLVMModuleRef)
+ * @param f32 (LLVMTypeRef)
+ * @param op (UOpType)
+ * @param a (LLVMValueRef)
+ * @param b (LLVMValueRef)
+ * @param c (LLVMValueRef)
+ * @param konst (float)
+ * @return (LLVMValueRef)
+ */
 static LLVMValueRef fe_emit_op(LLVMBuilderRef bld, LLVMModuleRef mod, LLVMTypeRef f32, UOpType op,
                                LLVMValueRef a, LLVMValueRef b, LLVMValueRef c, float konst) {
     LLVMValueRef zero = LLVMConstReal(f32, 0.0);
@@ -2294,8 +2368,13 @@ static int llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
 /* -------------------------------------------------------------------------
  * Public graph execution
  * ---------------------------------------------------------------------- */
-/* Execute a single node via the JIT (falls back to the interpreter internally
- * for unsupported ops / shapes). Public entry for the default execution path. */
+/**
+ * Execute a single node via the JIT (falls back to the interpreter internally
+ * for unsupported ops / shapes). Public entry for the default execution path.
+ * @param backend (CMLLLVMBackend*)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 int cml_llvm_execute_node(CMLLLVMBackend* backend, struct IRNode* node) {
     if (!backend || !node)
         return -1;

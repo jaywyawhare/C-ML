@@ -24,9 +24,12 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/* Backward-mode selector: graph-level autodiff is now the DEFAULT (gradients
+/**
+ * Backward-mode selector: graph-level autodiff is now the DEFAULT (gradients
  * emitted as UOPs into the same lazy graph). The eager cpu_backward_node engine
- * remains available as a fallback via GRAD_MODE=eager (or =0). Cached. */
+ * remains available as a fallback via GRAD_MODE=eager (or =0). Cached.
+ * @return (int)
+ */
 int cml_autodiff_use_graph(void) {
     static int cached = -1;
     if (cached < 0) {
@@ -36,11 +39,14 @@ int cml_autodiff_use_graph(void) {
     return cached;
 }
 
-/* Strict-gradient policy: when CML_STRICT_GRAD=1, a backward walk that
+/**
+ * Strict-gradient policy: when CML_STRICT_GRAD=1, a backward walk that
  * reaches an op with no VJP records an error and fails the backward instead
  * of silently producing no gradient - silent zero-flow is the single most
  * dangerous correctness class for users. Default off for backwards
- * compatibility with graphs that intentionally detach exotic ops. */
+ * compatibility with graphs that intentionally detach exotic ops.
+ * @return (int)
+ */
 static int autodiff_strict_grad(void) {
     static int cached = -1;
     if (cached < 0) {
@@ -93,7 +99,13 @@ static void gm_put(GradMap* m, Tensor* v, Tensor* g) {
     m->items[m->count].grad = g;
     m->count++;
 }
-/* accumulate: grad[v] += contrib (sum on fan-out) */
+/**
+ * accumulate: grad[v] += contrib (sum on fan-out)
+ * @param m (GradMap*)
+ * @param v (Tensor*)
+ * @param contrib (Tensor*)
+ * @return (void)
+ */
 static void gm_accum(GradMap* m, Tensor* v, Tensor* contrib) {
     if (!contrib)
         return;
@@ -102,7 +114,12 @@ static void gm_accum(GradMap* m, Tensor* v, Tensor* contrib) {
 }
 
 /* ── param'd movement builders ────────────────────────────────────────── */
-/* A constant shaped like `t`, for gradient expressions that need one. */
+/**
+ * A constant shaped like `t`, for gradient expressions that need one.
+ * @param t (Tensor*)
+ * @param v (float)
+ * @return (Tensor*)
+ */
 static Tensor* ad_k(Tensor* t, float v) { return uop_fill(t->shape, t->ndim, v); }
 
 /**
@@ -135,11 +152,16 @@ static Tensor* ad_expand(Tensor* x, const int* shape, int ndim) {
     p.new_ndim  = ndim;
     return uop_expand(x, &p);
 }
-/* Reverse cumulative sum along `dim`: revcum(x)[i] = sum over j >= i of x[j].
+/**
+ * Reverse cumulative sum along `dim`: revcum(x)[i] = sum over j >= i of x[j].
  *
  * The cumulative ops all need it and there is no flip primitive, so it is built
  * from the identity revcum = total - cumsum + x, which needs only a reduction
- * and a forward cumsum. */
+ * and a forward cumsum.
+ * @param x (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 static Tensor* ad_revcumsum(Tensor* x, int dim) {
     if (!x)
         return NULL;
@@ -191,11 +213,17 @@ static Tensor* ad_sum(Tensor* x, const int* dims, int ndims, bool keepdim) {
     return uop_sum(x, &p);
 }
 /* transpose the last two axes of an ndim tensor */
-/* Sum over several axes.
+/**
+ * Sum over several axes.
  *
  * The reduce kernels only implement num_dims == 1 -- a ReduceParams naming two
  * axes does not reduce both -- so this peels them one at a time. Highest axis
- * first, because dropping an axis shifts every index above it. */
+ * first, because dropping an axis shifts every index above it.
+ * @param x (Tensor*)
+ * @param axes (int*)
+ * @param n (int)
+ * @return (Tensor*)
+ */
 static Tensor* ad_sum_axes(Tensor* x, int* axes, int n) {
     if (!x || n <= 0)
         return x;
@@ -233,8 +261,14 @@ static Tensor* ad_transpose(Tensor* x, int ndim) {
     return ad_permute(x, perm, ndim);
 }
 
-/* Reduce `g` (whose shape == some broadcast of `tshape`) back down to tshape:
- * sum over any leading extra axes and any axis where the target size is 1. */
+/**
+ * Reduce `g` (whose shape == some broadcast of `tshape`) back down to tshape:
+ * sum over any leading extra axes and any axis where the target size is 1.
+ * @param g (Tensor*)
+ * @param tshape (const int*)
+ * @param tndim (int)
+ * @return (Tensor*)
+ */
 static Tensor* unbroadcast(Tensor* g, const int* tshape, int tndim) {
     if (!g)
         return NULL;
@@ -265,7 +299,14 @@ static Tensor* unbroadcast(Tensor* g, const int* tshape, int tndim) {
     return g;
 }
 
-/* ── the reverse pass ─────────────────────────────────────────────────── */
+/**
+ * ── the reverse pass ───────────────────────────────────────────────────
+ * @param ir (CMLGraph_t)
+ * @param loss_node (struct IRNode*)
+ * @param seed (Tensor*)
+ * @param differentiable_grads (bool)
+ * @return (int)
+ */
 int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, Tensor* seed, bool differentiable_grads) {
     if (!ir || !loss_node || !loss_node->output)
         return -1;

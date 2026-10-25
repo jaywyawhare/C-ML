@@ -60,7 +60,13 @@ static void bw_f32(Buf* b, int field, float v) {
 
 static void bw_str(Buf* b, int field, const char* s) { bw_len(b, field, s, strlen(s)); }
 
-/* packed float payload (no tag) */
+/**
+ * packed float payload (no tag)
+ * @param b (Buf*)
+ * @param v (const float*)
+ * @param count (int)
+ * @return (void)
+ */
 static void bw_packed_f32(Buf* b, const float* v, int count) {
     for (int i = 0; i < count; i++) {
         memcpy(b->d + b->n, &v[i], 4);
@@ -68,14 +74,28 @@ static void bw_packed_f32(Buf* b, const float* v, int count) {
     }
 }
 
-/* packed varint payload (no tag); two's-complement keeps negatives intact
- * across the reader's uint64 -> int64 cast */
+/**
+ * packed varint payload (no tag); two's-complement keeps negatives intact
+ * across the reader's uint64 -> int64 cast
+ * @param b (Buf*)
+ * @param v (const int64_t*)
+ * @param count (int)
+ * @return (void)
+ */
 static void bw_packed_i64(Buf* b, const int64_t* v, int count) {
     for (int i = 0; i < count; i++)
         bw_varint(b, (uint64_t)v[i]);
 }
 
-/* TensorProto initializer carrying float_data (field 4) */
+/**
+ * TensorProto initializer carrying float_data (field 4)
+ * @param name (const char*)
+ * @param dims (const int64_t*)
+ * @param ndim (int)
+ * @param data (const float*)
+ * @param count (int)
+ * @return (Buf)
+ */
 static Buf init_f32(const char* name, const int64_t* dims, int ndim, const float* data, int count) {
     Buf b = {.n = 0}, tmp = {.n = 0};
     bw_packed_i64(&tmp, dims, ndim);
@@ -88,8 +108,16 @@ static Buf init_f32(const char* name, const int64_t* dims, int ndim, const float
     return b;
 }
 
-/* TensorProto initializer carrying int64_data (field 7) -- the importer
- * decodes these element-wise into its float-centric buffers */
+/**
+ * TensorProto initializer carrying int64_data (field 7) -- the importer
+ * decodes these element-wise into its float-centric buffers
+ * @param name (const char*)
+ * @param dims (const int64_t*)
+ * @param ndim (int)
+ * @param data (const int64_t*)
+ * @param count (int)
+ * @return (Buf)
+ */
 static Buf init_i64(const char* name, const int64_t* dims, int ndim, const int64_t* data,
                     int count) {
     Buf b = {.n = 0}, tmp = {.n = 0};
@@ -145,7 +173,11 @@ static Buf make_node(const char* op_type, const char** ins, int nin, const char*
     return b;
 }
 
-/* ValueInfoProto; the importer tolerates a missing type payload */
+/**
+ * ValueInfoProto; the importer tolerates a missing type payload
+ * @param name (const char*)
+ * @return (Buf)
+ */
 static Buf make_vi(const char* name) {
     Buf b = {.n = 0};
     bw_str(&b, 1, name);
@@ -158,7 +190,16 @@ typedef struct {
     int rc;
 } RunResult;
 
-/* Assemble a ModelProto whose graph reads a single input "X". */
+/**
+ * Assemble a ModelProto whose graph reads a single input "X".
+ * @param nodes (Buf*)
+ * @param nn (int)
+ * @param inits (Buf*)
+ * @param ni (int)
+ * @param out_names (const char**)
+ * @param nout (int)
+ * @return (Buf)
+ */
 static Buf make_model(Buf* nodes, int nn, Buf* inits, int ni, const char** out_names, int nout) {
     Buf g = {.n = 0};
     for (int i = 0; i < nn; i++)
@@ -179,7 +220,19 @@ static Buf make_model(Buf* nodes, int nn, Buf* inits, int ni, const char** out_n
     return mm;
 }
 
-/* Assemble graph -> model bytes, load, execute with a single input "X". */
+/**
+ * Assemble graph -> model bytes, load, execute with a single input "X".
+ * @param nodes (Buf*)
+ * @param nn (int)
+ * @param inits (Buf*)
+ * @param ni (int)
+ * @param in_dims (const int64_t*)
+ * @param in_ndim (int)
+ * @param in_data (const float*)
+ * @param out_names (const char**)
+ * @param nout (int)
+ * @return (RunResult)
+ */
 static RunResult run_model(Buf* nodes, int nn, Buf* inits, int ni, const int64_t* in_dims,
                            int in_ndim, const float* in_data, const char** out_names, int nout) {
     RunResult rr = {.m = NULL, .rc = -100};
@@ -229,7 +282,13 @@ static bool out_matches(Tensor* t, const float* ref, int count) {
     return ok;
 }
 
-/* Compare a BOOL-dtype output against 0/1 expectations. */
+/**
+ * Compare a BOOL-dtype output against 0/1 expectations.
+ * @param t (Tensor*)
+ * @param ref (const float*)
+ * @param count (int)
+ * @return (bool)
+ */
 static bool out_matches_bool(Tensor* t, const float* ref, int count) {
     if (!t || tensor_ensure_executed(t) != 0)
         return false;
@@ -1032,9 +1091,12 @@ static void test_slice_steps_axes(void) {
     FREE_MODEL(rr);
 }
 
-/* MaxPool/AveragePool used to reduce over the whole spatial extent -- that is
+/**
+ * MaxPool/AveragePool used to reduce over the whole spatial extent -- that is
  * GlobalMaxPool, not a 2x2 window. A [1,1,4,4] input came back [1,1,1,1] instead
- * of [1,1,2,2], and every downstream layer then saw the wrong shape. */
+ * of [1,1,2,2], and every downstream layer then saw the wrong shape.
+ * @return (void)
+ */
 static void test_maxpool_is_windowed(void) {
     printf("Test: MaxPool windowed (not global)\n");
 
@@ -1092,7 +1154,10 @@ static void test_avgpool_is_windowed(void) {
     FREE_MODEL(rr);
 }
 
-/* A pool with no kernel_shape used to silently return the input unchanged. */
+/**
+ * A pool with no kernel_shape used to silently return the input unchanged.
+ * @return (void)
+ */
 static void test_pool_without_kernel_rejected(void) {
     printf("Test: MaxPool without kernel_shape is refused\n");
 
@@ -1108,8 +1173,11 @@ static void test_pool_without_kernel_rejected(void) {
     FREE_MODEL(rr);
 }
 
-/* These ops are emitted by the exporter but the importer could not parse them,
- * so a CML-exported model failed to load back. */
+/**
+ * These ops are emitted by the exporter but the importer could not parse them,
+ * so a CML-exported model failed to load back.
+ * @return (void)
+ */
 static void test_roundtrip_ops_importable(void) {
     printf("Test: ops the exporter emits are importable\n");
 
@@ -1138,7 +1206,10 @@ static void test_roundtrip_ops_importable(void) {
     FREE_MODEL(rs);
 }
 
-/* Comparison ops: exporter emits Less/Greater/Equal/LessOrEqual/GreaterOrEqual. */
+/**
+ * Comparison ops: exporter emits Less/Greater/Equal/LessOrEqual/GreaterOrEqual.
+ * @return (void)
+ */
 static void test_comparison_ops(void) {
     printf("Test: comparison ops importable\n");
 

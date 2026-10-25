@@ -30,12 +30,28 @@ typedef struct {
 bool cml_wmma_available(void);
 int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config);
 
-/* Returns a complete CUDA kernel using nvcuda::wmma intrinsics,
-   compilable with NVRTC. Caller frees. */
+/**
+ * Returns a complete CUDA kernel using nvcuda::wmma intrinsics,
+ * compilable with NVRTC. Caller frees.
+ * @param config (const WMMAConfig*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @return (char*)
+ */
 char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K);
 
-/* C = A * B. A is [M,K] fp16, B is [K,N] fp16, C is [M,N] fp32.
-   Falls back to regular matmul if WMMA not available. */
+/**
+ * C = A * B. A is [M,K] fp16, B is [K,N] fp16, C is [M,N] fp32.
+ * Falls back to regular matmul if WMMA not available.
+ * @param A (const void*)
+ * @param B (const void*)
+ * @param C (void*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @return (int)
+ */
 int cml_wmma_matmul(const void* A, const void* B, void* C, int M, int N, int K);
 
 #ifdef __cplusplus

@@ -234,8 +234,13 @@ static struct IRNode* create_wmma_node(const char* a_name, const char* b_name, i
     return wmma;
 }
 
-/* Replace a plain MATMUL with a padded WMMA node (plus pad/shrink nodes when the dims
- * are not 16-aligned), rewiring downstream refs. Returns 1 if rewritten, 0 otherwise. */
+/**
+ * Replace a plain MATMUL with a padded WMMA node (plus pad/shrink nodes when the dims
+ * are not 16-aligned), rewiring downstream refs. Returns 1 if rewritten, 0 otherwise.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
     int m, n, k;
     extract_matmul_dims(node, &m, &n, &k);
@@ -350,8 +355,15 @@ static int rewrite_matmul_to_wmma(CMLGraph_t ir, struct IRNode* node) {
     return 1;
 }
 
-/* Recognize the SUM(MUL(EXPAND a, EXPAND b)) decomposition of a matmul and return its
- * two source operands via out_a/out_b. */
+/**
+ * Recognize the SUM(MUL(EXPAND a, EXPAND b)) decomposition of a matmul and return its
+ * two source operands via out_a/out_b.
+ * @param ir (CMLGraph_t)
+ * @param reduce_node (struct IRNode*)
+ * @param out_a (struct IRNode**)
+ * @param out_b (struct IRNode**)
+ * @return (bool)
+ */
 static bool is_fused_matmul_pattern(CMLGraph_t ir, struct IRNode* reduce_node,
                                     struct IRNode** out_a, struct IRNode** out_b) {
     if (!reduce_node || reduce_node->type != UOP_SUM || reduce_node->num_inputs != 1)
@@ -383,7 +395,14 @@ static bool is_fused_matmul_pattern(CMLGraph_t ir, struct IRNode* reduce_node,
     return true;
 }
 
-/* Replace a recognized SUM(MUL(EXPAND,EXPAND)) matmul decomposition with a WMMA node. */
+/**
+ * Replace a recognized SUM(MUL(EXPAND,EXPAND)) matmul decomposition with a WMMA node.
+ * @param ir (CMLGraph_t)
+ * @param reduce_node (struct IRNode*)
+ * @param src_a (struct IRNode*)
+ * @param src_b (struct IRNode*)
+ * @return (int)
+ */
 static int rewrite_fused_matmul(CMLGraph_t ir, struct IRNode* reduce_node, struct IRNode* src_a,
                                 struct IRNode* src_b) {
     int ndim_a = src_a->output_ndim;
@@ -430,8 +449,12 @@ static int rewrite_fused_matmul(CMLGraph_t ir, struct IRNode* reduce_node, struc
     return 1;
 }
 
-/* Rewrite eligible matmuls (direct and decomposed) in the graph onto tensor cores,
- * applying the TC_OPT aggressiveness level. Returns the number of matmuls rewritten. */
+/**
+ * Rewrite eligible matmuls (direct and decomposed) in the graph onto tensor cores,
+ * applying the TC_OPT aggressiveness level. Returns the number of matmuls rewritten.
+ * @param graph (CMLGraph_t)
+ * @return (int)
+ */
 int cml_tc_optimize(CMLGraph_t graph) {
     if (!graph || !graph->head)
         return 0;

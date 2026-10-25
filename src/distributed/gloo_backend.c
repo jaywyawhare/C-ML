@@ -90,10 +90,23 @@ static int recv_all(int fd, void* buf, size_t len) {
     return 0;
 }
 
-/* Forward declaration so async can call allreduce */
+/**
+ * Forward declaration so async can call allreduce
+ * @param tensor (Tensor*)
+ * @param op (DistReduceOp)
+ * @param ctx (void*)
+ * @return (int)
+ */
 static int gloo_allreduce(Tensor* tensor, DistReduceOp op, void* ctx);
 
-/* Protocol: send tag (int), then data size (size_t), then raw data bytes */
+/**
+ * Protocol: send tag (int), then data size (size_t), then raw data bytes
+ * @param tensor (Tensor*)
+ * @param dst_rank (int)
+ * @param tag (int)
+ * @param ctx (void*)
+ * @return (int)
+ */
 static int gloo_send(Tensor* tensor, int dst_rank, int tag, void* ctx) {
     GlooContext* gctx = get_gloo_ctx(ctx);
     if (!tensor || !tensor->data)
@@ -132,7 +145,14 @@ static int gloo_send(Tensor* tensor, int dst_rank, int tag, void* ctx) {
     return 0;
 }
 
-/* Protocol: recv tag (int), then data size (size_t), then raw data bytes */
+/**
+ * Protocol: recv tag (int), then data size (size_t), then raw data bytes
+ * @param tensor (Tensor*)
+ * @param src_rank (int)
+ * @param tag (int)
+ * @param ctx (void*)
+ * @return (int)
+ */
 static int gloo_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
     GlooContext* gctx = get_gloo_ctx(ctx);
     if (!tensor || !tensor->data)
@@ -185,7 +205,13 @@ static int gloo_recv(Tensor* tensor, int src_rank, int tag, void* ctx) {
     return 0;
 }
 
-/* Synchronous fallback; wraps result in a completed DistWork handle */
+/**
+ * Synchronous fallback; wraps result in a completed DistWork handle
+ * @param tensor (Tensor*)
+ * @param op (DistReduceOp)
+ * @param ctx (void*)
+ * @return (DistWork*)
+ */
 static DistWork* gloo_allreduce_async(Tensor* tensor, DistReduceOp op, void* ctx) {
     DistWork* work = cml_calloc(1, sizeof(DistWork));
     if (!work)

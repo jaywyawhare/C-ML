@@ -71,12 +71,20 @@ CML_API int torch_delegate_unregister(const char* name);
 CML_API TorchDelegate* torch_delegate_find(const char* name);
 CML_API TorchDelegate* torch_delegate_find_by_backend(CMLBackendType backend);
 
-/* Built-in delegates wrapping C-ML dispatch backends */
+/**
+ * Built-in delegates wrapping C-ML dispatch backends
+ * @return (TorchDelegate*)
+ */
 CML_API TorchDelegate* torch_delegate_cpu(void);
 CML_API TorchDelegate* torch_delegate_cuda(void);
 CML_API TorchDelegate* torch_delegate_vulkan(void);
 
-/* Returns false when d is NULL. When supported_ops is NULL/empty, all ops match. */
+/**
+ * Returns false when d is NULL. When supported_ops is NULL/empty, all ops match.
+ * @param d (const TorchDelegate*)
+ * @param op (UOpType)
+ * @return (bool)
+ */
 CML_API bool torch_delegate_supports_op(const TorchDelegate* d, UOpType op);
 
 CML_API TorchDelegatePlan* torch_delegate_partition_graph(CMLGraph_t ir, CMLBackendType preferred);

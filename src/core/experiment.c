@@ -138,7 +138,14 @@ static void write_meta(CMLRun* run, const char* status) {
     fclose(f);
 }
 
-/* Append `frag` (already formatted) to a growing buffer. */
+/**
+ * Append `frag` (already formatted) to a growing buffer.
+ * @param buf (char**)
+ * @param len (size_t*)
+ * @param cap (size_t*)
+ * @param frag (const char*)
+ * @return (void)
+ */
 static void sappend(char** buf, size_t* len, size_t* cap, const char* frag) {
     size_t fl   = strlen(frag);
     size_t need = *len + fl + 1;
@@ -173,7 +180,12 @@ static void config_append(CMLRun* run, const char* key, const char* value_json) 
     sappend(&run->config_pairs, &run->config_len, &run->config_cap, pair);
 }
 
-/* Read the current git commit (short) from .git; empty on failure. */
+/**
+ * Read the current git commit (short) from .git; empty on failure.
+ * @param out (char*)
+ * @param n (size_t)
+ * @return (void)
+ */
 static void read_git(char* out, size_t n) {
     out[0]  = '\0';
     FILE* h = fopen(".git/HEAD", "r");

@@ -95,7 +95,10 @@ static void check_unary(const char* name, unary_fn op, float lo, float hi) {
     tensor_free(L);
 }
 
-/* matmul grad: L = sum(x @ W), check dL/dx */
+/**
+ * matmul grad: L = sum(x @ W), check dL/dx
+ * @return (void)
+ */
 static void check_matmul(void) {
     tests_run++;
     int xs[] = {2, 3}, ws[] = {3, 2};

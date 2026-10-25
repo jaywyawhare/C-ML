@@ -63,8 +63,11 @@ void augmentation_config_free(AugmentationConfig* config) {
     cml_free(config);
 }
 
-/* Draws from the process-wide threefry RNG so cml_rng_set_global_seed()
- * controls augmentation reproducibility like every other consumer. */
+/**
+ * Draws from the process-wide threefry RNG so cml_rng_set_global_seed()
+ * controls augmentation reproducibility like every other consumer.
+ * @return (float)
+ */
 static float rand_float(void) {
     float v = 0.0f;
     cml_rng_uniform(cml_rng_get_global(), &v, 1);
@@ -126,8 +129,14 @@ Tensor* augment_random_crop(Tensor* input, int crop_height, int crop_width) {
 
 /* Random 4D [N,C,H,W] flip with probability `prob`; `horizontal` mirrors width,
  * else height. Returns a clone when the flip doesn't fire. */
-/* Allocate an output matching `input`'s shape/dtype and hand back both data
- * pointers -- the opening move of every augmentation. */
+/**
+ * Allocate an output matching `input`'s shape/dtype and hand back both data
+ * pointers -- the opening move of every augmentation.
+ * @param input (Tensor*)
+ * @param in_data (float**)
+ * @param out_data (float**)
+ * @return (Tensor*)
+ */
 static Tensor* aug_alloc_like(Tensor* input, float** in_data, float** out_data) {
     TensorConfig config = {
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};

@@ -105,8 +105,12 @@ int cml_flame_enabled(void) {
     return cml_viz_enabled() && !cml_flag_was_set(CML_FLAG_FLAMEGRAPH);
 }
 
-/* Coarse kernel class. Fusion wins first: a fused node is what we most want to
- * see as a single wide bar. Otherwise classify by op family. */
+/**
+ * Coarse kernel class. Fusion wins first: a fused node is what we most want to
+ * see as a single wide bar. Otherwise classify by op family.
+ * @param n (const struct IRNode*)
+ * @return (const char*)
+ */
 static const char* flame_kind(const struct IRNode* n) {
     /* A fused chain is emitted as a UOP_FUSED_ELEMENTWISE node (its identity is
      * in the type); some paths also set the is_fused/fusion_type markers. */
@@ -282,7 +286,11 @@ static const char* flame_kind(const struct IRNode* n) {
     }
 }
 
-/* A node produced by autodiff carries a link back to its forward node. */
+/**
+ * A node produced by autodiff carries a link back to its forward node.
+ * @param n (const struct IRNode*)
+ * @return (const char*)
+ */
 static const char* flame_phase(const struct IRNode* n) {
     return n->forward_node ? "backward" : "forward";
 }
@@ -324,17 +332,29 @@ void cml_flame_reset(void) {
     g_t_origin        = -1.0;
 }
 
-/* Flush accumulated spans to flamegraph.json when the process exits, so any
+/**
+ * Flush accumulated spans to flamegraph.json when the process exits, so any
  * program that executed a graph under FLAMEGRAPH=1 produces a profile without
- * needing an explicit export call. Registered once, lazily, on first record. */
+ * needing an explicit export call. Registered once, lazily, on first record.
+ * @return (void)
+ */
 static void flame_atexit_flush(void) {
     if (g_count > 0)
         cml_flame_export("flamegraph.json");
 }
 
-/* Linear scan over the signature table. It stays short (tens of entries) and is
+/**
+ * Linear scan over the signature table. It stays short (tens of entries) and is
  * walked once per executed node, so it beats hashing on both simplicity and
- * cache behaviour at this size. */
+ * cache behaviour at this size.
+ * @param op (const char*)
+ * @param kind (const char*)
+ * @param phase (const char*)
+ * @param numel (long long)
+ * @param scope (const char*)
+ * @param stack (const char*)
+ * @return (FlameEntry*)
+ */
 static FlameEntry* flame_find_or_add(const char* op, const char* kind, const char* phase,
                                      long long numel, const char* scope, const char* stack) {
     for (int i = 0; i < g_nentries; i++) {
@@ -484,11 +504,15 @@ int cml_flame_export(const char* path) {
     return 0;
 }
 
-/* One complete ("X") event per recorded execution. The timeline spans are the
+/**
+ * One complete ("X") event per recorded execution. The timeline spans are the
  * source: they already carry per-execution start/duration relative to
  * g_t_origin, so converting to Chrome's microsecond axis is a x1000 on both.
  * pid/tid are constant because capture runs on the dispatching thread of one
- * process; the interesting breakdown lives in cat/kind and args instead. */
+ * process; the interesting breakdown lives in cat/kind and args instead.
+ * @param path (const char*)
+ * @return (int)
+ */
 int cml_flame_export_chrome_trace(const char* path) {
     if (!cml_flame_enabled() || g_count == 0 || !path)
         return -1;

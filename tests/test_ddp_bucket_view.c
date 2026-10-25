@@ -35,8 +35,12 @@ static Tensor* make_2d(const float* d, int rows, int cols) {
     return tensor_from_data(d, shape, 2, &cfg);
 }
 
-/* Build a Linear with deterministic weights, run forward+backward so every
- * parameter has a gradient, and hand back the live module. */
+/**
+ * Build a Linear with deterministic weights, run forward+backward so every
+ * parameter has a gradient, and hand back the live module.
+ * @param f (Fixture*)
+ * @return (bool)
+ */
 static bool fixture_init(Fixture* f) {
     memset(f, 0, sizeof(*f));
 
@@ -80,8 +84,13 @@ static void fixture_free(Fixture* f) {
     memset(f, 0, sizeof(*f));
 }
 
-/* Cumulative offset of param `idx` within its bucket. Bucket-view implies the
- * reserved layout, so every parameter counts whether or not it has a gradient. */
+/**
+ * Cumulative offset of param `idx` within its bucket. Bucket-view implies the
+ * reserved layout, so every parameter counts whether or not it has a gradient.
+ * @param ddp (CMLDataParallel*)
+ * @param idx (int)
+ * @return (size_t)
+ */
 static size_t expected_offset(CMLDataParallel* ddp, int idx) {
     size_t off = 0;
     for (int i = 0; i < idx; i++)
@@ -91,7 +100,13 @@ static size_t expected_offset(CMLDataParallel* ddp, int idx) {
     return off;
 }
 
-/* Snapshot every parameter's gradient into a flat buffer. Returns the count. */
+/**
+ * Snapshot every parameter's gradient into a flat buffer. Returns the count.
+ * @param ddp (CMLDataParallel*)
+ * @param out (float*)
+ * @param cap (int)
+ * @return (int)
+ */
 static int snapshot_grads(CMLDataParallel* ddp, float* out, int cap) {
     int n = 0;
     for (int i = 0; i < ddp->num_params; i++) {
@@ -107,8 +122,11 @@ static int snapshot_grads(CMLDataParallel* ddp, float* out, int cap) {
     return n;
 }
 
-/* The core claim: after a sync with the option on, each gradient's data pointer
- * IS its bucket slot, and the gradient no longer owns that memory. */
+/**
+ * The core claim: after a sync with the option on, each gradient's data pointer
+ * IS its bucket slot, and the gradient no longer owns that memory.
+ * @return (bool)
+ */
 static bool test_grads_alias_bucket_slots(void) {
     REQUIRE(cml_dist_init(DIST_BACKEND_GLOO, 1, 0) == 0);
 
@@ -159,8 +177,11 @@ static bool test_grads_alias_bucket_slots(void) {
     return ok;
 }
 
-/* Without the option the gradients must keep their own storage -- a guard
- * against the aliasing leaking into the default path. */
+/**
+ * Without the option the gradients must keep their own storage -- a guard
+ * against the aliasing leaking into the default path.
+ * @return (bool)
+ */
 static bool test_default_config_does_not_alias(void) {
     REQUIRE(cml_dist_init(DIST_BACKEND_GLOO, 1, 0) == 0);
 
@@ -198,8 +219,11 @@ static bool test_default_config_does_not_alias(void) {
     return ok;
 }
 
-/* Aliasing must not disturb the values: the gradient read back through the view
- * has to match what the option-off path produces. */
+/**
+ * Aliasing must not disturb the values: the gradient read back through the view
+ * has to match what the option-off path produces.
+ * @return (bool)
+ */
 static bool test_alias_preserves_gradient_values(void) {
     float base[64], viewed[64];
     int n_base = 0, n_view = 0;
@@ -246,10 +270,13 @@ static bool test_alias_preserves_gradient_values(void) {
     return true;
 }
 
-/* cml_ddp_free releases the buckets the gradients were pointing into, so it must
+/**
+ * cml_ddp_free releases the buckets the gradients were pointing into, so it must
  * hand each aliased gradient its own storage back first -- otherwise reading a
  * gradient after teardown is a use-after-free, and freeing the module is a
- * double-free. */
+ * double-free.
+ * @return (bool)
+ */
 static bool test_grads_survive_ddp_free(void) {
     REQUIRE(cml_dist_init(DIST_BACKEND_GLOO, 1, 0) == 0);
 
@@ -308,8 +335,11 @@ static bool test_grads_survive_ddp_free(void) {
     return ok;
 }
 
-/* Re-syncing must be idempotent: the second pass sees gradients that already
- * alias their slots and must leave both the pointers and the values alone. */
+/**
+ * Re-syncing must be idempotent: the second pass sees gradients that already
+ * alias their slots and must leave both the pointers and the values alone.
+ * @return (bool)
+ */
 static bool test_repeated_sync_is_stable(void) {
     REQUIRE(cml_dist_init(DIST_BACKEND_GLOO, 1, 0) == 0);
 
@@ -358,7 +388,10 @@ static bool test_repeated_sync_is_stable(void) {
     return ok;
 }
 
-/* The option no longer advertises itself as inert. */
+/**
+ * The option no longer advertises itself as inert.
+ * @return (bool)
+ */
 static bool test_default_config_leaves_option_off(void) {
     DDPConfig cfg = cml_ddp_default_config();
     return cfg.gradient_as_bucket_view == 0;

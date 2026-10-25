@@ -36,7 +36,13 @@ typedef struct AugmentationConfig {
 AugmentationConfig* augmentation_config_create(void);
 void augmentation_config_free(AugmentationConfig* config);
 
-/* All augmentation functions expect input shape [batch, channels, height, width] */
+/**
+ * All augmentation functions expect input shape [batch, channels, height, width]
+ * @param input (Tensor*)
+ * @param crop_height (int)
+ * @param crop_width (int)
+ * @return (Tensor*)
+ */
 Tensor* augment_random_crop(Tensor* input, int crop_height, int crop_width);
 Tensor* augment_random_horizontal_flip(Tensor* input, float prob);
 Tensor* augment_random_vertical_flip(Tensor* input, float prob);

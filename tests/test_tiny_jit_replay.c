@@ -18,8 +18,12 @@
 static TensorConfig cfg = {
     .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
 
-/* y = (x + x) * x, realized through the normal execute path (which routes to the
- * global TinyJit). Returns 1 iff every element equals its reference. */
+/**
+ * y = (x + x) * x, realized through the normal execute path (which routes to the
+ * global TinyJit). Returns 1 iff every element equals its reference.
+ * @param base (float)
+ * @return (int)
+ */
 static int run_once(float base) {
     int sh[1] = {NELT};
     float xd[NELT];

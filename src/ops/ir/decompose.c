@@ -592,8 +592,13 @@ static int decompose_silu(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/* GELU(x) = x * sigmoid(1.702 * x)  (tanh-approximation, matches QUICK_GELU).
- * Decomposed so autodiff inherits VJPs for MUL + SIGMOID for free. */
+/**
+ * GELU(x) = x * sigmoid(1.702 * x)  (tanh-approximation, matches QUICK_GELU).
+ * Decomposed so autodiff inherits VJPs for MUL + SIGMOID for free.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_gelu(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x           = node->inputs[0];
     int* shape          = x->shape;

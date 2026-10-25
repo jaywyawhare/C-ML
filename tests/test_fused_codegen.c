@@ -9,7 +9,10 @@
 #include "alloc/cml_allocator.h"
 #include "test_assert.h"
 
-/* Helper: create a minimal LinearProgram manually */
+/**
+ * Helper: create a minimal LinearProgram manually
+ * @return (CMLLinearProgram*)
+ */
 static CMLLinearProgram* make_test_program(void) {
     CMLLinearProgram* prog = cml_calloc(1, sizeof(CMLLinearProgram));
     if (!prog)

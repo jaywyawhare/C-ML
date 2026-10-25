@@ -25,8 +25,11 @@ static int check(const char* name, int ok) {
     return ok;
 }
 
-/* Every enum value resolves to ops or NULL - never a crash - and any ops
- * table it does return has a name and the mandatory entry points. */
+/**
+ * Every enum value resolves to ops or NULL - never a crash - and any ops
+ * table it does return has a name and the mandatory entry points.
+ * @return (int)
+ */
 static int test_registry_complete(void) {
     for (int b = 0; b < CML_HCQ_BACKEND_COUNT; b++) {
         const CMLHCQBackendOps* ops = cml_hcq_backend_ops((CMLHCQBackendType)b);
@@ -42,8 +45,13 @@ static int test_registry_complete(void) {
            cml_hcq_backend_ops(CML_HCQ_BACKEND_COUNT) == NULL;
 }
 
-/* Exercise one backend end-to-end when its hardware/library is present;
- * otherwise verify the graceful failure contract. */
+/**
+ * Exercise one backend end-to-end when its hardware/library is present;
+ * otherwise verify the graceful failure contract.
+ * @param type (CMLHCQBackendType)
+ * @param ok (int*)
+ * @return (void)
+ */
 static void exercise_backend(CMLHCQBackendType type, int* ok) {
     CMLHCQQueue* q = cml_hcq_queue_create(type);
     if (!q) {

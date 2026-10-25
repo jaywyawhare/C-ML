@@ -2,7 +2,11 @@
 #include <string.h>
 #include <stdlib.h>
 
-/* fp16 -> fp32: pure bit manipulation, no HW intrinsics */
+/**
+ * fp16 -> fp32: pure bit manipulation, no HW intrinsics
+ * @param h (uint16_t)
+ * @return (float)
+ */
 static float fp16_to_fp32(uint16_t h) {
     const uint32_t sign = (uint32_t)(h & 0x8000u) << 16; /* bit 31          */
     const uint32_t exp  = (h >> 10) & 0x1Fu;             /* 5-bit exponent  */
@@ -151,9 +155,15 @@ static void dequantize_q8_0(const void* src, float* dst, size_t num_blocks) {
  *
  *   value = quant * (d * sc) - dmin * mn
  */
-/* Unpack the 6-bit per-sub-block scales and mins that the K-quant families
+/**
+ * Unpack the 6-bit per-sub-block scales and mins that the K-quant families
  * pack into 12 bytes: the first four pairs sit in the low 6 bits, the last four
- * are split between a nibble and the spare top bits of the first four. */
+ * are split between a nibble and the spare top bits of the first four.
+ * @param sc_raw (const uint8_t*)
+ * @param sc (uint8_t*)
+ * @param mn (uint8_t*)
+ * @return (void)
+ */
 static void unpack_k_scales(const uint8_t* sc_raw, uint8_t* sc, uint8_t* mn) {
     for (int i = 0; i < 4; i++) {
         sc[i] = sc_raw[i] & 0x3Fu;

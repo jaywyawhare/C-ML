@@ -164,10 +164,14 @@ static void act_case(int op, int iter) {
     cml_reset_ir_context();
 }
 
-/* A NaN reaching a clamping activation must come out the other side. An
+/**
+ * A NaN reaching a clamping activation must come out the other side. An
  * ordered compare -- and equally fmaxf/fminf, which return the *non*-NaN
  * operand per IEEE minNum/maxNum -- silently replaces it with a plausible
- * finite number, which is the failure mode that hides a diverged tensor. */
+ * finite number, which is the failure mode that hides a diverged tensor.
+ * @param op (int)
+ * @return (void)
+ */
 static void act_nan_case(int op) {
     int shape[1] = {3};
     Tensor* a    = mk(shape, 1, 1);

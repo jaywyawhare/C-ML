@@ -187,11 +187,16 @@ static void state_add_rule(CMLAutomaton* aut, int state_id, int rule_idx) {
     s->num_matched++;
 }
 
-/*
+/**
  * Build a state for a pattern subtree. Returns the state id that the
  * subtree transitions into. For CML_PAT_OP nodes this creates transitions
  * from child states to a new state; CML_PAT_ANY and CML_PAT_CAPTURE both
  * map to the wildcard state.
+ * @param aut (CMLAutomaton*)
+ * @param pat (const CMLPatternNode*)
+ * @param rule_idx (int)
+ * @param is_root (bool)
+ * @return (int)
  */
 static int compile_pattern_node(CMLAutomaton* aut, const CMLPatternNode* pat, int rule_idx,
                                 bool is_root) {
@@ -306,8 +311,12 @@ static void expand_wildcard_transitions(CMLAutomaton* aut, PendingWildcard* pend
     }
 }
 
-/* Compile a rewrite registry's patterns into a bottom-up tree automaton, building the state
- * table and expanding wildcard transitions. */
+/**
+ * Compile a rewrite registry's patterns into a bottom-up tree automaton, building the state
+ * table and expanding wildcard transitions.
+ * @param registry (CMLRewriteRegistry*)
+ * @return (CMLAutomaton*)
+ */
 CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
     if (!registry || registry->num_rules == 0)
         return NULL;
@@ -379,11 +388,16 @@ void cml_automaton_free(CMLAutomaton* automaton) {
     cml_free(automaton);
 }
 
-/*
+/**
  * Compute the automaton state for a single IR node given its children's
  * states. Tries the exact (op, child_states) key first. If that misses
  * and some children have the wildcard state, falls back to wildcard
  * expansion by trying the wildcard state in each child position.
+ * @param aut (const CMLAutomaton*)
+ * @param node (struct IRNode*)
+ * @param child_states (const int*)
+ * @param arity (int)
+ * @return (int)
  */
 static int compute_node_state(const CMLAutomaton* aut, struct IRNode* node, const int* child_states,
                               int arity) {
@@ -414,8 +428,13 @@ static int compute_node_state(const CMLAutomaton* aut, struct IRNode* node, cons
     return transition_lookup(aut, key);
 }
 
-/* Drive rewriting to a fixpoint: bottom-up assign automaton states, then for accepting
- * states confirm the match and splice in each rule's replacement. Returns total rewrites. */
+/**
+ * Drive rewriting to a fixpoint: bottom-up assign automaton states, then for accepting
+ * states confirm the match and splice in each rule's replacement. Returns total rewrites.
+ * @param automaton (CMLAutomaton*)
+ * @param graph (struct CMLGraph*)
+ * @return (int)
+ */
 int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
     if (!automaton || !graph)
         return -1;

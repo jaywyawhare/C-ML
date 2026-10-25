@@ -21,16 +21,30 @@ typedef struct Upsample {
     bool align_corners;
 } Upsample;
 
-/*
+/**
  * One of scale_factor or output_size must be specified.
  * If scale_factor > 0, output_size is ignored.
+ * @param scale_factor (float)
+ * @param output_size (const int*)
+ * @param num_output_dims (int)
+ * @param mode (UpsampleMode)
+ * @param align_corners (bool)
+ * @return (Upsample*)
  */
 Upsample* nn_upsample(float scale_factor, const int* output_size, int num_output_dims,
                       UpsampleMode mode, bool align_corners);
 
 Tensor* upsample_forward(Module* module, Tensor* input);
 
-/* Functional interpolation (stateless, no module required) */
+/**
+ * Functional interpolation (stateless, no module required)
+ * @param input (Tensor*)
+ * @param output_size (const int*)
+ * @param num_dims (int)
+ * @param mode (UpsampleMode)
+ * @param align_corners (bool)
+ * @return (Tensor*)
+ */
 Tensor* f_interpolate(Tensor* input, const int* output_size, int num_dims, UpsampleMode mode,
                       bool align_corners);
 

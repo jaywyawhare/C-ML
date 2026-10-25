@@ -34,7 +34,13 @@ static float loss_value(void) {
     return v;
 }
 
-/* Central-difference numerical gradient over buffer `buf` (n elements). */
+/**
+ * Central-difference numerical gradient over buffer `buf` (n elements).
+ * @param buf (float*)
+ * @param n (int)
+ * @param analytic (const float*)
+ * @return (float)
+ */
 static float max_grad_diff(float* buf, int n, const float* analytic) {
     const float eps = 1e-3f;
     float maxdiff   = 0.0f;

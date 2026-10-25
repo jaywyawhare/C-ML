@@ -45,7 +45,12 @@ static void expect_value(const char* name, Tensor* r, double want) {
     cml_reset_ir_context();
 }
 
-/* The op must not report success: a reduction with no identity has no answer. */
+/**
+ * The op must not report success: a reduction with no identity has no answer.
+ * @param name (const char*)
+ * @param r (Tensor*)
+ * @return (void)
+ */
 static void expect_rejected(const char* name, Tensor* r) {
     checks++;
     if (r) {

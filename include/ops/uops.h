@@ -372,51 +372,136 @@ Tensor* uop_slice(Tensor* a, SliceParams* params);
 Tensor* uop_matmul(Tensor* a, Tensor* b);
 Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias);
 
-/* Fused GRU cell gate math (f32). h_new = (1-z)*n + z*hidden with
- * r=sigmoid(ih_r+hh_r), z=sigmoid(ih_z+hh_z), n=tanh(ih_n+r*hh_n). */
+/**
+ * Fused GRU cell gate math (f32). h_new = (1-z)*n + z*hidden with
+ * r=sigmoid(ih_r+hh_r), z=sigmoid(ih_z+hh_z), n=tanh(ih_n+r*hh_n).
+ * @param ih (Tensor*)
+ * @param hh (Tensor*)
+ * @param hidden (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_gru_cell(Tensor* ih, Tensor* hh, Tensor* hidden);
-/* Adjoint of uop_gru_cell: packs [dih(3H) | dhh(3H) | dhidden(H)] into [B,7H]. */
+/**
+ * Adjoint of uop_gru_cell: packs [dih(3H) | dhh(3H) | dhidden(H)] into [B,7H].
+ * @param grad_h (Tensor*)
+ * @param ih (Tensor*)
+ * @param hh (Tensor*)
+ * @param hidden (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_gru_cell_bwd(Tensor* grad_h, Tensor* ih, Tensor* hh, Tensor* hidden);
 
-/* Fused LSTM cell gate math (f32). gates [B,4H] = (i,f,g,o); c_new = f*c_prev +
- * i*g, h_new = o*tanh(c_new). Returns packed [B,2H] = [h_new | c_new]. */
+/**
+ * Fused LSTM cell gate math (f32). gates [B,4H] = (i,f,g,o); c_new = f*c_prev +
+ * i*g, h_new = o*tanh(c_new). Returns packed [B,2H] = [h_new | c_new].
+ * @param gates (Tensor*)
+ * @param c_prev (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_lstm_cell(Tensor* gates, Tensor* c_prev);
-/* Adjoint of uop_lstm_cell: packs [dgates(4H) | dc_prev(H)] into [B,5H].
- * grad_packed is [B,2H] = [grad_h_new | grad_c_new]. */
+/**
+ * Adjoint of uop_lstm_cell: packs [dgates(4H) | dc_prev(H)] into [B,5H].
+ * grad_packed is [B,2H] = [grad_h_new | grad_c_new].
+ * @param grad_packed (Tensor*)
+ * @param gates (Tensor*)
+ * @param c_prev (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_lstm_cell_bwd(Tensor* grad_packed, Tensor* gates, Tensor* c_prev);
 
-/* Fused RNN (tanh) cell: h_new = tanh(ih + hh), all [B,H]. */
+/**
+ * Fused RNN (tanh) cell: h_new = tanh(ih + hh), all [B,H].
+ * @param ih (Tensor*)
+ * @param hh (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_rnn_cell(Tensor* ih, Tensor* hh);
-/* Adjoint: da = grad_h * (1 - h_new^2) [B,H], the shared grad for ih and hh. */
+/**
+ * Adjoint: da = grad_h * (1 - h_new^2) [B,H], the shared grad for ih and hh.
+ * @param grad_h (Tensor*)
+ * @param h_new (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_rnn_cell_bwd(Tensor* grad_h, Tensor* h_new);
 
-/* Fused LayerNorm over the last dim (f32). gamma/beta may be NULL (no affine).
- * y = (x - mean) / sqrt(var + eps) * gamma + beta. */
+/**
+ * Fused LayerNorm over the last dim (f32). gamma/beta may be NULL (no affine).
+ * y = (x - mean) / sqrt(var + eps) * gamma + beta.
+ * @param x (Tensor*)
+ * @param gamma (Tensor*)
+ * @param beta (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_layernorm(Tensor* x, Tensor* gamma, Tensor* beta, float eps);
-/* Adjoint of uop_layernorm: packs [dx (rows*D) | dgamma (D) | dbeta (D)] into a
- * flat [rows*D + 2D] buffer. gamma may be NULL. */
+/**
+ * Adjoint of uop_layernorm: packs [dx (rows*D) | dgamma (D) | dbeta (D)] into a
+ * flat [rows*D + 2D] buffer. gamma may be NULL.
+ * @param grad_y (Tensor*)
+ * @param x (Tensor*)
+ * @param gamma (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_layernorm_bwd(Tensor* grad_y, Tensor* x, Tensor* gamma, float eps);
 
-/* Fused RMSNorm over the last dim: y = x * rsqrt(mean(x^2) + eps) * weight.
- * Computes in f32; half inputs/outputs are cast at the boundary. */
+/**
+ * Fused RMSNorm over the last dim: y = x * rsqrt(mean(x^2) + eps) * weight.
+ * Computes in f32; half inputs/outputs are cast at the boundary.
+ * @param x (Tensor*)
+ * @param weight (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_rmsnorm(Tensor* x, Tensor* weight, float eps);
-/* Adjoint of uop_rmsnorm: packs [dx (rows*D) | dweight (D)] into a flat
- * [rows*D + D] buffer. */
+/**
+ * Adjoint of uop_rmsnorm: packs [dx (rows*D) | dweight (D)] into a flat
+ * [rows*D + D] buffer.
+ * @param grad_y (Tensor*)
+ * @param x (Tensor*)
+ * @param weight (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_rmsnorm_bwd(Tensor* grad_y, Tensor* x, Tensor* weight, float eps);
 
-/* Fused softmax over the last dim (f32). */
+/**
+ * Fused softmax over the last dim (f32).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_softmax_lastdim(Tensor* x);
-/* Adjoint of uop_softmax_lastdim: dx = y*(grad_y - rowsum(grad_y*y)) [.,D]. */
+/**
+ * Adjoint of uop_softmax_lastdim: dx = y*(grad_y - rowsum(grad_y*y)) [.,D].
+ * @param grad_y (Tensor*)
+ * @param y (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_softmax_bwd(Tensor* grad_y, Tensor* y);
 
-/* Fused log-softmax over the last dim (f32): y = x - max - log(sum exp(x-max)). */
+/**
+ * Fused log-softmax over the last dim (f32): y = x - max - log(sum exp(x-max)).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_log_softmax_lastdim(Tensor* x);
-/* Adjoint of uop_log_softmax_lastdim: dx = grad_y - exp(y)*rowsum(grad_y). */
+/**
+ * Adjoint of uop_log_softmax_lastdim: dx = grad_y - exp(y)*rowsum(grad_y).
+ * @param grad_y (Tensor*)
+ * @param y (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_log_softmax_bwd(Tensor* grad_y, Tensor* y);
 
-/* Shorthands for the shape/reduce ops whose params struct is otherwise rebuilt
+/**
+ * Shorthands for the shape/reduce ops whose params struct is otherwise rebuilt
  * by hand at every call site. Each is a NULL-propagating pass-through, so a
- * chain of them only needs one check at the end. */
+ * chain of them only needs one check at the end.
+ * @param a (Tensor*)
+ * @param new_shape (const int*)
+ * @param new_ndim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_reshape_to(Tensor* a, const int* new_shape, int new_ndim);
 Tensor* uop_expand_to(Tensor* a, const int* new_shape, int new_ndim);
 Tensor* uop_mean_dim(Tensor* a, int dim, bool keepdim);
@@ -588,32 +673,115 @@ typedef struct {
     bool amsgrad;
 } AdamStepParams;
 
-/* Lazy - data filled on execution */
+/**
+ * Lazy - data filled on execution
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param value (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_fill(int* shape, int ndim, float value);
-/* Like uop_fill but with explicit dtype and device */
+/**
+ * Like uop_fill but with explicit dtype and device
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param value (float)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_fill_ex(int* shape, int ndim, float value, DType dtype, DeviceType device);
-/* Constant tensor from existing data (data is copied) */
+/**
+ * Constant tensor from existing data (data is copied)
+ * @param data (const void*)
+ * @param data_size (size_t)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_const(const void* data, size_t data_size, int* shape, int ndim, DType dtype,
                   DeviceType device);
-/* Random uniform [0, 1) */
+/**
+ * Random uniform [0, 1)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_rand_uniform(int* shape, int ndim, DType dtype, DeviceType device);
-/* Random normal N(0, 1) */
+/**
+ * Random normal N(0, 1)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_rand_normal(int* shape, int ndim, DType dtype, DeviceType device);
-/* Range tensor: values start, start+step, ... < end */
+/**
+ * Range tensor: values start, start+step, ... < end
+ * @param start (float)
+ * @param end (float)
+ * @param step (float)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_arange_op(float start, float end, float step, DType dtype, DeviceType device);
-/* n×n identity matrix */
+/**
+ * n×n identity matrix
+ * @param n (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_eye_op(int n, DType dtype, DeviceType device);
-/* Random integers in [low, high) */
+/**
+ * Random integers in [low, high)
+ * @param low (int)
+ * @param high (int)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_rand_int(int low, int high, int* shape, int ndim, DType dtype, DeviceType device);
 
-/* Lazy uninitialized allocation (shape/dtype deferred to execution) */
+/**
+ * Lazy uninitialized allocation (shape/dtype deferred to execution)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_alloc(int* shape, int ndim, DType dtype, DeviceType device);
 
-/* In-graph SGD update: outputs updated param (inputs: param, grad[, momentum_buf]) */
+/**
+ * In-graph SGD update: outputs updated param (inputs: param, grad[, momentum_buf])
+ * @param param (Tensor*)
+ * @param grad (Tensor*)
+ * @param momentum_buf (Tensor*)
+ * @param p (SgdStepParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_sgd_step(Tensor* param, Tensor* grad, Tensor* momentum_buf, SgdStepParams* p);
 
-/* In-graph Adam update: outputs updated param (inputs: param, grad, exp_avg,
- * exp_avg_sq[, max_exp_avg_sq for amsgrad]) */
+/**
+ * In-graph Adam update: outputs updated param (inputs: param, grad, exp_avg,
+ * exp_avg_sq[, max_exp_avg_sq for amsgrad])
+ * @param param (Tensor*)
+ * @param grad (Tensor*)
+ * @param exp_avg (Tensor*)
+ * @param exp_avg_sq (Tensor*)
+ * @param max_exp_avg_sq (Tensor*)
+ * @param p (AdamStepParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_adam_step(Tensor* param, Tensor* grad, Tensor* exp_avg, Tensor* exp_avg_sq,
                       Tensor* max_exp_avg_sq, AdamStepParams* p);
 Tensor* uop_conv2d(Tensor* input, Tensor* weight, Tensor* bias, Conv2DParams* params);
@@ -626,10 +794,14 @@ Tensor* uop_conv_transpose3d(Tensor* input, Tensor* weight, Tensor* bias,
                              ConvTranspose3DParams* params);
 Tensor* uop_where(WhereParams* params);
 
-/*
+/**
  * indices must be 1D. Output shape is indices.shape plus input.shape[dim+1:].
  * For 2D input [N, C], indices [N], dim=1: out[i] = input[i, indices[i]] (shape [N]).
  * For 2D input [V, D], indices [N], dim=0: embedding rows (shape [N, D]).
+ * @param input (Tensor*)
+ * @param indices (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
  */
 Tensor* uop_gather(Tensor* input, Tensor* indices, int dim);
 
@@ -639,7 +811,12 @@ Tensor* uop_tanh(Tensor* x);
 Tensor* uop_gelu(Tensor* x);
 Tensor* uop_softmax(Tensor* x, int dim);
 
-/* max(x, alpha * x) = x if x > 0, else alpha * x */
+/**
+ * max(x, alpha * x) = x if x > 0, else alpha * x
+ * @param x (Tensor*)
+ * @param negative_slope (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_leaky_relu(Tensor* x, float negative_slope);
 
 Tensor* uop_sign(Tensor* a);
@@ -671,7 +848,11 @@ Tensor* uop_bitwise_or(Tensor* a, Tensor* b);
 Tensor* uop_bitwise_xor(Tensor* a, Tensor* b);
 Tensor* uop_bitwise_not(Tensor* a);
 
-/* Returns indices of non-zero elements as [N, ndim] tensor */
+/**
+ * Returns indices of non-zero elements as [N, ndim] tensor
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_nonzero(Tensor* a);
 Tensor* uop_masked_fill(Tensor* a, Tensor* mask, float value);
 Tensor* uop_log10(Tensor* a);
@@ -690,7 +871,12 @@ Tensor* uop_mod(Tensor* a, Tensor* b);
 Tensor* uop_minimum(Tensor* a, Tensor* b);
 Tensor* uop_copysign(Tensor* a, Tensor* b);
 
-/* log(exp(a) + exp(b)) numerically stable */
+/**
+ * log(exp(a) + exp(b)) numerically stable
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_logaddexp(Tensor* a, Tensor* b);
 Tensor* uop_lshift(Tensor* a, Tensor* b);
 Tensor* uop_rshift(Tensor* a, Tensor* b);
@@ -707,7 +893,12 @@ Tensor* uop_std(Tensor* a, ReduceParams* params);
 Tensor* uop_any(Tensor* a, ReduceParams* params);
 Tensor* uop_all(Tensor* a, ReduceParams* params);
 
-/* log(sum(exp(a))) along dimension(s) */
+/**
+ * log(sum(exp(a))) along dimension(s)
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_logsumexp(Tensor* a, ReduceParams* params);
 Tensor* uop_cummax(Tensor* a, int dim);
 Tensor* uop_cummin(Tensor* a, int dim);
@@ -764,14 +955,34 @@ Tensor* uop_flip(Tensor* a, int dim);
 Tensor* uop_flatten(Tensor* a, int start_dim, int end_dim);
 Tensor* uop_unflatten(Tensor* a, int dim, int* sizes, int num_sizes);
 
-/* For 1D: creates diagonal matrix. For 2D: extracts diagonal. */
+/**
+ * For 1D: creates diagonal matrix. For 2D: extracts diagonal.
+ * @param a (Tensor*)
+ * @param offset (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_diag(Tensor* a, int offset);
 Tensor* uop_one_hot(Tensor* a, int num_classes);
 
-/* softmax(Q*K^T / sqrt(d)) * V */
+/**
+ * softmax(Q*K^T / sqrt(d)) * V
+ * @param q (Tensor*)
+ * @param k (Tensor*)
+ * @param v (Tensor*)
+ * @param mask (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_scaled_dot_product_attention(Tensor* q, Tensor* k, Tensor* v, Tensor* mask);
-/* SDPA with an additive attention bias (e.g. T5 relative position bias) added
- * to the scaled logits before masking/softmax; bias shape must match scores. */
+/**
+ * SDPA with an additive attention bias (e.g. T5 relative position bias) added
+ * to the scaled logits before masking/softmax; bias shape must match scores.
+ * @param q (Tensor*)
+ * @param k (Tensor*)
+ * @param v (Tensor*)
+ * @param mask (Tensor*)
+ * @param attn_bias (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_scaled_dot_product_attention_bias(Tensor* q, Tensor* k, Tensor* v, Tensor* mask,
                                               Tensor* attn_bias);
 
@@ -791,41 +1002,89 @@ typedef struct {
     int num_dims;
 } ShrinkParams;
 
-/* erfc(a) = 1 - erf(a) */
+/**
+ * erfc(a) = 1 - erf(a)
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_erfc(Tensor* a);
 
-/* a + t*(b-a) */
+/**
+ * a + t*(b-a)
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param t (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_lerp(Tensor* a, Tensor* b, Tensor* t);
 Tensor* uop_tile(Tensor* a, int* repeats, int num_dims);
 Tensor* uop_repeat_interleave(Tensor* a, int repeats, int dim);
 Tensor* uop_trace(Tensor* a);
 Tensor* uop_shrink(Tensor* a, int* starts, int* ends, int num_dims);
 
-/* log(cumsum(exp(a))) along dimension */
+/**
+ * log(cumsum(exp(a))) along dimension
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_logcumsumexp(Tensor* a, int dim);
 
-/* min(max(x, 0), 6) */
+/**
+ * min(max(x, 0), 6)
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_relu6(Tensor* x);
 
-/* clamp((x + 3) / 6, 0, 1) */
+/**
+ * clamp((x + 3) / 6, 0, 1)
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_hard_sigmoid(Tensor* x);
 
-/* clamp(x, -1, 1) */
+/**
+ * clamp(x, -1, 1)
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_hard_tanh(Tensor* x);
 
-/* max(0,x) + min(0, alpha*(exp(x/alpha)-1)) */
+/**
+ * max(0,x) + min(0, alpha*(exp(x/alpha)-1))
+ * @param x (Tensor*)
+ * @param alpha (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_celu(Tensor* x, float alpha);
 
-/* x * sigmoid(1.702 * x) */
+/**
+ * x * sigmoid(1.702 * x)
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_quick_gelu(Tensor* x);
 
-/* log(1 + exp(x)) */
+/**
+ * log(1 + exp(x))
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_softplus(Tensor* x);
 
-/* x / (1 + |x|) */
+/**
+ * x / (1 + |x|)
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_softsign(Tensor* x);
 
-/* log(sigmoid(x)) = -softplus(-x) */
+/**
+ * log(sigmoid(x)) = -softplus(-x)
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_logsigmoid(Tensor* x);
 
 /* Epsilon for the fused normalization ops (UOP_LAYERNORM / UOP_LAYERNORM_BWD and
@@ -842,9 +1101,18 @@ typedef struct {
     bool has_bias;
 } SDPAUOpParams;
 
-/* Fused scaled-dot-product attention over a 4D [B,H,S,D] layout. mask/bias may be
+/**
+ * Fused scaled-dot-product attention over a 4D [B,H,S,D] layout. mask/bias may be
  * NULL; mask follows masked_fill semantics (fill -1e9 where mask != 0), bias is
- * added to the scaled logits. Computes in f32; half is cast at the boundary. */
+ * added to the scaled logits. Computes in f32; half is cast at the boundary.
+ * @param q (Tensor*)
+ * @param k (Tensor*)
+ * @param v (Tensor*)
+ * @param mask (Tensor*)
+ * @param bias (Tensor*)
+ * @param scale (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_sdpa(Tensor* q, Tensor* k, Tensor* v, Tensor* mask, Tensor* bias, float scale);
 
 typedef struct {
@@ -914,33 +1182,78 @@ typedef struct {
 #define MATMUL_ACC_REF (-2000000)
 
 Tensor* uop_unfold(Tensor* a, int kernel_size, int stride);
-/* col2im: [..., num_windows, kernel_size] -> [..., output_len] by scatter-add. */
+/**
+ * col2im: [..., num_windows, kernel_size] -> [..., output_len] by scatter-add.
+ * @param a (Tensor*)
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @param output_len (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_fold(Tensor* a, int kernel_size, int stride, int output_len);
-/* index_add (adjoint of gather): out[index[i], ..] += src[i, ..] along `dim`;
- * out has `src` shape with axis `dim` resized to `dim_size`. */
+/**
+ * index_add (adjoint of gather): out[index[i], ..] += src[i, ..] along `dim`;
+ * out has `src` shape with axis `dim` resized to `dim_size`.
+ * @param index (Tensor*)
+ * @param src (Tensor*)
+ * @param dim (int)
+ * @param dim_size (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_scatter_add(Tensor* index, Tensor* src, int dim, int dim_size);
-/* Fused 2D im2col / its adjoint col2im (see Im2colParams / Col2imParams). */
+/**
+ * Fused 2D im2col / its adjoint col2im (see Im2colParams / Col2imParams).
+ * @param x (Tensor*)
+ * @param params (Im2colParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_im2col(Tensor* x, Im2colParams* params);
 Tensor* uop_col2im(Tensor* g, Col2imParams* params);
 void uop_var_mean(Tensor* a, ReduceParams* params, Tensor** out_var, Tensor** out_mean);
 void uop_std_mean(Tensor* a, ReduceParams* params, Tensor** out_std, Tensor** out_mean);
 
-/* x > 0 ? x : alpha*(exp(x)-1) */
+/**
+ * x > 0 ? x : alpha*(exp(x)-1)
+ * @param x (Tensor*)
+ * @param alpha (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_elu(Tensor* x, float alpha);
 
-/* scale * elu(x, alpha), scale=1.0507, alpha=1.6733 */
+/**
+ * scale * elu(x, alpha), scale=1.0507, alpha=1.6733
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_selu(Tensor* x);
 
-/* x * tanh(softplus(x)) = x * tanh(ln(1+exp(x))) */
+/**
+ * x * tanh(softplus(x)) = x * tanh(ln(1+exp(x)))
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_mish(Tensor* x);
 
-/* x * sigmoid(x) */
+/**
+ * x * sigmoid(x)
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_silu(Tensor* x);
 
-/* x > 3 ? x : x < -3 ? 0 : x*(x+3)/6 */
+/**
+ * x > 3 ? x : x < -3 ? 0 : x*(x+3)/6
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_hardswish(Tensor* x);
 
-/* Returns 1D tensor of elements where mask is true */
+/**
+ * Returns 1D tensor of elements where mask is true
+ * @param a (Tensor*)
+ * @param mask (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_masked_select(Tensor* a, Tensor* mask);
 Tensor** uop_split(Tensor* a, int split_size, int dim, int* num_splits);
 Tensor** uop_chunk(Tensor* a, int chunks, int dim, int* num_chunks);

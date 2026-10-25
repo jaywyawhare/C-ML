@@ -466,9 +466,14 @@ static void estimate_item_cost(CMLScheduleItem* item) {
     item->arithmetic_intensity = (total_mem > 0) ? (float)total_flops / (float)total_mem : 0.0f;
 }
 
-/* Append `item` to the schedule, growing the array as needed. A failed grow
+/**
+ * Append `item` to the schedule, growing the array as needed. A failed grow
  * silently drops the item rather than overrunning, matching the previous
- * inline behaviour. */
+ * inline behaviour.
+ * @param sched (CMLSchedule*)
+ * @param item (CMLScheduleItem*)
+ * @return (void)
+ */
 static void sched_push(CMLSchedule* sched, CMLScheduleItem* item) {
     if (sched->num_items >= sched->item_capacity) {
         int nc                = sched->item_capacity * 2;
@@ -481,7 +486,13 @@ static void sched_push(CMLSchedule* sched, CMLScheduleItem* item) {
     sched->items[sched->num_items++] = item;
 }
 
-/* Schedule `node` on its own as a `kind` item. */
+/**
+ * Schedule `node` on its own as a `kind` item.
+ * @param sched (CMLSchedule*)
+ * @param kind (CMLScheduleItemType)
+ * @param node (struct IRNode*)
+ * @return (void)
+ */
 static void sched_push_single(CMLSchedule* sched, CMLScheduleItemType kind, struct IRNode* node) {
     CMLScheduleItem* item = sched_item_create(kind);
     if (!item)

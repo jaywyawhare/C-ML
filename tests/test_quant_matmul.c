@@ -39,7 +39,10 @@ static int check(const char* name, int ok) {
     return ok;
 }
 
-/* Exact hand check of the GEMM primitive with a nonzero zero_point. */
+/**
+ * Exact hand check of the GEMM primitive with a nonzero zero_point.
+ * @return (int)
+ */
 static int test_gemm_primitive(void) {
     int M = 2, K = 3, N = 2;
     float x[]   = {1, 2, 3, 4, 5, 6};   /* [M,K] */
@@ -66,7 +69,13 @@ static int test_gemm_primitive(void) {
     return 1;
 }
 
-/* End-to-end: quantize weight, matmul via tensor API, compare to f32 ref. */
+/**
+ * End-to-end: quantize weight, matmul via tensor API, compare to f32 ref.
+ * @param M (int)
+ * @param K (int)
+ * @param N (int)
+ * @return (int)
+ */
 static int test_end_to_end(int M, int K, int N) {
     float* xd = malloc(sizeof(float) * M * K);
     float* wd = malloc(sizeof(float) * K * N);
@@ -120,7 +129,10 @@ static int test_end_to_end(int M, int K, int N) {
     return ok;
 }
 
-/* Confirm int8 storage is 4x smaller than the f32 weight it replaces. */
+/**
+ * Confirm int8 storage is 4x smaller than the f32 weight it replaces.
+ * @return (int)
+ */
 static int test_memory_footprint(void) {
     int K = 64, N = 128;
     float* wd = malloc(sizeof(float) * K * N);
@@ -139,7 +151,10 @@ static int test_memory_footprint(void) {
 
 /* ---- packed 4-bit ---- */
 
-/* Exact hand check of the packed-int4 GEMM primitive. */
+/**
+ * Exact hand check of the packed-int4 GEMM primitive.
+ * @return (int)
+ */
 static int test_int4_gemm_primitive(void) {
     int M = 2, K = 3, N = 2;
     float x[] = {1, 2, 3, 4, 5, 6}; /* [M,K] */
@@ -170,8 +185,14 @@ static int test_int4_gemm_primitive(void) {
     return 1;
 }
 
-/* End-to-end int4: quantize weight, matmul via tensor API vs f32 ref within
- * the rigorous bound |Δy| <= 0.5 * scale * Σ_k |x[m,k]| (|Δw| <= scale/2). */
+/**
+ * End-to-end int4: quantize weight, matmul via tensor API vs f32 ref within
+ * the rigorous bound |Δy| <= 0.5 * scale * Σ_k |x[m,k]| (|Δw| <= scale/2).
+ * @param M (int)
+ * @param K (int)
+ * @param N (int)
+ * @return (int)
+ */
 static int test_int4_end_to_end(int M, int K, int N) {
     float* xd = malloc(sizeof(float) * M * K);
     float* wd = malloc(sizeof(float) * K * N);
@@ -226,8 +247,15 @@ static int test_int4_end_to_end(int M, int K, int N) {
     return ok;
 }
 
-/* NF4 GEMM must match a plain matmul over the dequantized weights exactly
- * (same table, same scales), and stay near the f32 reference overall. */
+/**
+ * NF4 GEMM must match a plain matmul over the dequantized weights exactly
+ * (same table, same scales), and stay near the f32 reference overall.
+ * @param M (int)
+ * @param K (int)
+ * @param N (int)
+ * @param block_size (int)
+ * @return (int)
+ */
 static int test_nf4_end_to_end(int M, int K, int N, int block_size) {
     float* xd = malloc(sizeof(float) * M * K);
     float* wd = malloc(sizeof(float) * K * N);
@@ -317,7 +345,10 @@ static int test_nf4_end_to_end(int M, int K, int N, int block_size) {
     return ok;
 }
 
-/* Footprint: int4 payload is 8x smaller than the f32 weight it replaces. */
+/**
+ * Footprint: int4 payload is 8x smaller than the f32 weight it replaces.
+ * @return (int)
+ */
 static int test_int4_memory_footprint(void) {
     int K = 64, N = 128;
     float* wd = malloc(sizeof(float) * K * N);

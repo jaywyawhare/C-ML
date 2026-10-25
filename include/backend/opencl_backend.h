@@ -7,7 +7,10 @@
 extern "C" {
 #endif
 
-/* Discovers OpenCL platforms/devices and creates context + command queue. */
+/**
+ * Discovers OpenCL platforms/devices and creates context + command queue.
+ * @return (int)
+ */
 int opencl_backend_init(void);
 void opencl_backend_cleanup(void);
 bool opencl_backend_is_available(void);

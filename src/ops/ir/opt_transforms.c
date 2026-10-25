@@ -151,8 +151,14 @@ static int prog_get_axis_extent(const LinearProgram* prog, int axis) {
 
 /* ── Individual transform implementations ── */
 
-/* Tile `axis` into local/shared memory: split the axis and emit the alloc + barrier,
- * honouring NOLOCALS and the shared-memory budget. */
+/**
+ * Tile `axis` into local/shared memory: split the axis and emit the alloc + barrier,
+ * honouring NOLOCALS and the shared-memory budget.
+ * @param axis (int)
+ * @param amount (int)
+ * @param prog (LinearProgram*)
+ * @return (int)
+ */
 static int apply_local(int axis, int amount, LinearProgram* prog) {
     /* NOLOCALS suppresses all local/shared-memory tiling. */
     if (cml_flag_enabled(CML_FLAG_NOLOCALS))
@@ -199,7 +205,13 @@ static int apply_local(int axis, int amount, LinearProgram* prog) {
     return 0;
 }
 
-/* Split `axis` into a global/local pair and bind the local part to a free workgroup dim. */
+/**
+ * Split `axis` into a global/local pair and bind the local part to a free workgroup dim.
+ * @param axis (int)
+ * @param amount (int)
+ * @param prog (LinearProgram*)
+ * @return (int)
+ */
 static int apply_group(int axis, int amount, LinearProgram* prog) {
     int extent = prog_get_axis_extent(prog, axis);
     if (extent <= 0) {
@@ -243,7 +255,13 @@ static int apply_group(int axis, int amount, LinearProgram* prog) {
     return 0;
 }
 
-/* Unroll `axis` by `amount`: shrink its extent and replicate the loop body with fresh vregs. */
+/**
+ * Unroll `axis` by `amount`: shrink its extent and replicate the loop body with fresh vregs.
+ * @param axis (int)
+ * @param amount (int)
+ * @param prog (LinearProgram*)
+ * @return (int)
+ */
 static int apply_unroll(int axis, int amount, LinearProgram* prog) {
     int extent = prog_get_axis_extent(prog, axis);
     if (extent <= 0) {
@@ -307,7 +325,13 @@ static int apply_unroll(int axis, int amount, LinearProgram* prog) {
     return 0;
 }
 
-/* Vectorize `axis` by a power-of-two width, tagging loads/stores/computes with vec_width. */
+/**
+ * Vectorize `axis` by a power-of-two width, tagging loads/stores/computes with vec_width.
+ * @param axis (int)
+ * @param amount (int)
+ * @param prog (LinearProgram*)
+ * @return (int)
+ */
 static int apply_upcast(int axis, int amount, LinearProgram* prog) {
     int extent = prog_get_axis_extent(prog, axis);
     if (extent <= 0) {
@@ -437,8 +461,15 @@ int cml_opt_apply(CMLOptList* opts, struct LinearProgram* prog) {
 
 /* ── Enumeration ── */
 
-/* Enumerate candidate opt lists (baseline, per-axis single transforms, selected two-opt
- * pairs, and a NOLOCALS variant) up to max_combinations, for the autotuner to search. */
+/**
+ * Enumerate candidate opt lists (baseline, per-axis single transforms, selected two-opt
+ * pairs, and a NOLOCALS variant) up to max_combinations, for the autotuner to search.
+ * @param prog (struct LinearProgram*)
+ * @param out_lists (CMLOptList***)
+ * @param out_count (int*)
+ * @param max_combinations (int)
+ * @return (int)
+ */
 int cml_opt_enumerate(struct LinearProgram* prog, CMLOptList*** out_lists, int* out_count,
                       int max_combinations) {
     if (!prog || !out_lists || !out_count || max_combinations <= 0)

@@ -183,8 +183,13 @@ int cml_tinyfs_delete(CMLTinyFS* fs, const char* name) {
     return remove(path);
 }
 
-/* Returns the stored tensor names (the ".tfs" suffix stripped). Caller frees
- * each string and the array with cml_free. NULL with *count==0 when empty. */
+/**
+ * Returns the stored tensor names (the ".tfs" suffix stripped). Caller frees
+ * each string and the array with cml_free. NULL with *count==0 when empty.
+ * @param fs (CMLTinyFS*)
+ * @param count (int*)
+ * @return (char**)
+ */
 char** cml_tinyfs_list(CMLTinyFS* fs, int* count) {
     if (count)
         *count = 0;
