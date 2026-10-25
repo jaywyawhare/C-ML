@@ -1126,8 +1126,8 @@ CMLGraph_t cml_ir_view(CMLGraph_t ir) {
         n->requires_grad = src->requires_grad;
         n->is_executed   = src->is_executed;
         memcpy(n->needs_input_grad, src->needs_input_grad, sizeof(n->needs_input_grad));
-        n->output_name = src->output_name ? cml_strdup(src->output_name) : NULL;
-        n->scope       = src->scope ? cml_strdup(src->scope) : NULL;
+        n->output_name = cml_strdup(src->output_name);
+        n->scope       = cml_strdup(src->scope);
         if (src->output_shape) {
             n->output_shape = tensor_shape_copy(src->output_shape, src->output_ndim);
             n->output_ndim  = src->output_ndim;
@@ -1135,7 +1135,7 @@ CMLGraph_t cml_ir_view(CMLGraph_t ir) {
         if (src->num_inputs > 0 && src->input_names) {
             n->input_names = cml_calloc((size_t)src->num_inputs, sizeof(char*));
             for (int i = 0; n->input_names && i < src->num_inputs; i++)
-                n->input_names[i] = src->input_names[i] ? cml_strdup(src->input_names[i]) : NULL;
+                n->input_names[i] = cml_strdup(src->input_names[i]);
         }
         if (src->type == UOP_FILL && src->params) {
             FillParams* fp = cml_malloc(sizeof(FillParams));
