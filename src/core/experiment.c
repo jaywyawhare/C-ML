@@ -1,5 +1,6 @@
 /* experiment.c - see experiment.h. Dependency-free append-only run logger. */
 #include "core/experiment.h"
+#include "core/logging.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,40 +75,6 @@ static void mkdirs(const char* path) {
     mkdir(tmp, 0755);
 }
 
-/* Append a JSON-escaped copy of `s` to file. */
-static void json_escape(FILE* f, const char* s) {
-    if (!s) {
-        fputs("null", f);
-        return;
-    }
-    fputc('"', f);
-    for (const unsigned char* p = (const unsigned char*)s; *p; p++) {
-        switch (*p) {
-        case '"':
-            fputs("\\\"", f);
-            break;
-        case '\\':
-            fputs("\\\\", f);
-            break;
-        case '\n':
-            fputs("\\n", f);
-            break;
-        case '\r':
-            fputs("\\r", f);
-            break;
-        case '\t':
-            fputs("\\t", f);
-            break;
-        default:
-            if (*p < 0x20)
-                fprintf(f, "\\u%04x", *p);
-            else
-                fputc(*p, f);
-        }
-    }
-    fputc('"', f);
-}
-
 /** Rewrite the run's meta.json with the given status, filling in end/duration
  * once the run is no longer "running". */
 static void write_meta(CMLRun* run, const char* status) {
@@ -120,34 +87,34 @@ static void write_meta(CMLRun* run, const char* status) {
     int done   = !(strcmp(status, "running") == 0);
     fputs("{\n", f);
     fputs("  \"id\": ", f);
-    json_escape(f, run->id);
+    cml_json_write_escaped(f, run->id);
     fputs(",\n", f);
     fputs("  \"project\": ", f);
-    json_escape(f, run->project);
+    cml_json_write_escaped(f, run->project);
     fputs(",\n", f);
     fputs("  \"name\": ", f);
-    json_escape(f, run->name);
+    cml_json_write_escaped(f, run->name);
     fputs(",\n", f);
     fputs("  \"sweep\": ", f);
-    json_escape(f, run->sweep[0] ? run->sweep : NULL);
+    cml_json_write_escaped(f, run->sweep[0] ? run->sweep : NULL);
     fputs(",\n", f);
     fputs("  \"status\": ", f);
-    json_escape(f, status);
+    cml_json_write_escaped(f, status);
     fputs(",\n", f);
     fputs("  \"host\": ", f);
-    json_escape(f, run->host);
+    cml_json_write_escaped(f, run->host);
     fputs(",\n", f);
     fputs("  \"os\": ", f);
-    json_escape(f, run->os);
+    cml_json_write_escaped(f, run->os);
     fputs(",\n", f);
     fputs("  \"git\": ", f);
-    json_escape(f, run->git[0] ? run->git : NULL);
+    cml_json_write_escaped(f, run->git[0] ? run->git : NULL);
     fputs(",\n", f);
     fputs("  \"cmd\": ", f);
-    json_escape(f, run->cmd[0] ? run->cmd : NULL);
+    cml_json_write_escaped(f, run->cmd[0] ? run->cmd : NULL);
     fputs(",\n", f);
     fputs("  \"notes\": ", f);
-    json_escape(f, run->notes);
+    cml_json_write_escaped(f, run->notes);
     fputs(",\n", f);
     fprintf(f, "  \"tags\": [%s],\n", run->tags ? run->tags : "");
     fprintf(f, "  \"start\": %.3f,\n", run->start_time);
@@ -333,7 +300,7 @@ void cml_exp_log_scalar(CMLRun* run, const char* name, long step, double value) 
         return;
     pthread_mutex_lock(&run->lock);
     fprintf(run->events, "{\"t\":\"scalar\",\"name\":");
-    json_escape(run->events, name);
+    cml_json_write_escaped(run->events, name);
     fprintf(run->events, ",\"step\":%ld,\"value\":%.9g,\"wall\":%.3f}\n", step, value, now_sec());
     fflush(run->events);
     pthread_mutex_unlock(&run->lock);
@@ -372,7 +339,7 @@ void cml_exp_log_histogram(CMLRun* run, const char* name, long step, const float
     }
     pthread_mutex_lock(&run->lock);
     fprintf(run->events, "{\"t\":\"histogram\",\"name\":");
-    json_escape(run->events, name);
+    cml_json_write_escaped(run->events, name);
     fprintf(run->events, ",\"step\":%ld,\"min\":%.6g,\"max\":%.6g,\"counts\":[", step, mn, mx);
     for (int b = 0; b < bins; b++)
         fprintf(run->events, "%s%ld", b ? "," : "", counts[b]);
@@ -456,9 +423,9 @@ void cml_exp_log_image(CMLRun* run, const char* name, long step, const unsigned 
     }
     pthread_mutex_lock(&run->lock);
     fprintf(run->events, "{\"t\":\"image\",\"name\":");
-    json_escape(run->events, name);
+    cml_json_write_escaped(run->events, name);
     fprintf(run->events, ",\"step\":%ld,\"w\":%d,\"h\":%d,\"path\":", step, width, height);
-    json_escape(run->events, fname);
+    cml_json_write_escaped(run->events, fname);
     fprintf(run->events, ",\"wall\":%.3f}\n", now_sec());
     fflush(run->events);
     pthread_mutex_unlock(&run->lock);
@@ -470,9 +437,9 @@ void cml_exp_log_table(CMLRun* run, const char* name, long step, const char* csv
         return;
     pthread_mutex_lock(&run->lock);
     fprintf(run->events, "{\"t\":\"table\",\"name\":");
-    json_escape(run->events, name);
+    cml_json_write_escaped(run->events, name);
     fprintf(run->events, ",\"step\":%ld,\"csv\":", step);
-    json_escape(run->events, csv);
+    cml_json_write_escaped(run->events, csv);
     fprintf(run->events, ",\"wall\":%.3f}\n", now_sec());
     fflush(run->events);
     pthread_mutex_unlock(&run->lock);
@@ -498,13 +465,13 @@ void cml_exp_log_artifact(CMLRun* run, const char* name, const char* type, const
     }
     pthread_mutex_lock(&run->lock);
     fprintf(run->events, "{\"t\":\"artifact\",\"name\":");
-    json_escape(run->events, name);
+    cml_json_write_escaped(run->events, name);
     fprintf(run->events, ",\"atype\":");
-    json_escape(run->events, type);
+    cml_json_write_escaped(run->events, type);
     fprintf(run->events, ",\"path\":");
-    json_escape(run->events, path);
+    cml_json_write_escaped(run->events, path);
     fprintf(run->events, ",\"aliases\":");
-    json_escape(run->events, aliases);
+    cml_json_write_escaped(run->events, aliases);
     fprintf(run->events, ",\"size\":%ld,\"hash\":\"%016llx\",\"wall\":%.3f}\n", size, hash,
             now_sec());
     fflush(run->events);
@@ -561,9 +528,9 @@ void cml_exp_alert(CMLRun* run, const char* level, const char* message) {
         return;
     pthread_mutex_lock(&run->lock);
     fprintf(run->events, "{\"t\":\"alert\",\"level\":");
-    json_escape(run->events, level ? level : "info");
+    cml_json_write_escaped(run->events, level ? level : "info");
     fprintf(run->events, ",\"message\":");
-    json_escape(run->events, message);
+    cml_json_write_escaped(run->events, message);
     fprintf(run->events, ",\"wall\":%.3f}\n", now_sec());
     fflush(run->events);
     pthread_mutex_unlock(&run->lock);
@@ -580,11 +547,11 @@ void cml_exp_log_curve(CMLRun* run, const char* name, const char* xlabel, const 
         return;
     pthread_mutex_lock(&run->lock);
     fprintf(run->events, "{\"t\":\"curve\",\"name\":");
-    json_escape(run->events, name);
+    cml_json_write_escaped(run->events, name);
     fprintf(run->events, ",\"xlabel\":");
-    json_escape(run->events, xlabel);
+    cml_json_write_escaped(run->events, xlabel);
     fprintf(run->events, ",\"ylabel\":");
-    json_escape(run->events, ylabel);
+    cml_json_write_escaped(run->events, ylabel);
     fprintf(run->events, ",\"xs\":[");
     for (size_t i = 0; i < n; i++)
         fprintf(run->events, "%s%.5g", i ? "," : "", xs[i]);
