@@ -22,7 +22,11 @@ static int cml_stack_is_internal(const char* folded);
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** Human-readable name for a UOp type; used in profiles, graph export and logs. */
+/**
+ * Human-readable name for a UOp type; used in profiles, graph export and logs.
+ * @param type (UOpType)
+ * @return (const char*)
+ */
 const char* uop_type_to_string(UOpType type) {
     switch (type) {
     case UOP_ADD:
@@ -339,8 +343,12 @@ const char* uop_type_to_string(UOpType type) {
     }
 }
 
-/** Allocate an empty IR graph for @p target, explicitly zeroing every field
- *  (the pool allocator recycles blocks without clearing them). */
+/**
+ * Allocate an empty IR graph for @p target, explicitly zeroing every field
+ * (the pool allocator recycles blocks without clearing them).
+ * @param target (IRTarget)
+ * @return (CMLGraph_t)
+ */
 CMLGraph_t cml_ir_new(IRTarget target) {
     CMLGraph_t ir = cml_malloc(sizeof(struct CMLGraph));
     if (!ir)
@@ -385,7 +393,11 @@ CMLGraph_t cml_ir_new(IRTarget target) {
     return ir;
 }
 
-/** Free the op-specific params struct owned by @p node, dispatching on node type. */
+/**
+ * Free the op-specific params struct owned by @p node, dispatching on node type.
+ * @param node (struct IRNode*)
+ * @return (void)
+ */
 void cml_ir_free_node_params(struct IRNode* node) {
     if (!node || !node->params)
         return;
@@ -878,7 +890,11 @@ void cml_ir_free_node_params(struct IRNode* node) {
     node->params = NULL;
 }
 
-/** Drop one reference to @p node, releasing its storage and the node when it hits zero. */
+/**
+ * Drop one reference to @p node, releasing its storage and the node when it hits zero.
+ * @param node (struct IRNode*)
+ * @return (void)
+ */
 static void free_ir_node(struct IRNode* node) {
     if (!node)
         return;
@@ -984,10 +1000,15 @@ void cml_ir_release_node_storage(struct IRNode* node) {
     cml_ir_free_node_params(node);
 }
 
-/** Free @p node after it was unlinked from @p ir: drop it from the CSE table (it keys on node
- *  identity, so a stale entry is dereferenced by the next lookup), move the graph's last-result
- *  and lowering-frontier pointers off it, detach any output tensor still bound to it, and release
- *  everything it owns. */
+/**
+ * Free @p node after it was unlinked from @p ir: drop it from the CSE table (it keys on node
+ * identity, so a stale entry is dereferenced by the next lookup), move the graph's last-result
+ * and lowering-frontier pointers off it, detach any output tensor still bound to it, and release
+ * everything it owns.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (void)
+ */
 void cml_ir_destroy_node(CMLGraph_t ir, struct IRNode* node) {
     if (!node)
         return;
@@ -1019,7 +1040,12 @@ typedef struct {
     int n, cap;
 } FreedSet;
 
-/** Append @p t to the freed-tensor set, growing the backing array on demand. */
+/**
+ * Append @p t to the freed-tensor set, growing the backing array on demand.
+ * @param fs (FreedSet*)
+ * @param t (Tensor*)
+ * @return (void)
+ */
 static void freed_set_add(FreedSet* fs, Tensor* t) {
     if (!t || !fs->p)
         return;
@@ -1039,14 +1065,24 @@ static void freed_set_add(FreedSet* fs, Tensor* t) {
     fs->p[fs->n++] = t;
 }
 
-/** qsort comparator ordering tensors by pointer address. */
+/**
+ * qsort comparator ordering tensors by pointer address.
+ * @param a (const void*)
+ * @param b (const void*)
+ * @return (int)
+ */
 static int freed_set_cmp(const void* a, const void* b) {
     Tensor* x = *(Tensor* const*)a;
     Tensor* y = *(Tensor* const*)b;
     return (x > y) - (x < y);
 }
 
-/** Binary-search the (sorted) freed set for @p t. */
+/**
+ * Binary-search the (sorted) freed set for @p t.
+ * @param fs (const FreedSet*)
+ * @param t (Tensor*)
+ * @return (bool)
+ */
 static bool freed_set_contains(const FreedSet* fs, Tensor* t) {
     if (!fs->p || fs->n == 0)
         return false;
@@ -1063,10 +1099,15 @@ static bool freed_set_contains(const FreedSet* fs, Tensor* t) {
     return false;
 }
 
-/** Release a graph-owned output during teardown. A pinned tensor (external owner, or a value
- *  holding its published grad) is detached and kept, with ref_count matched to the pin count so
- *  each owner's tensor_release lands at zero; this graph's consumer refs (cml_ir_add_uop) are
- *  never returned in teardown and would otherwise leak a parameter grad per step. */
+/**
+ * Release a graph-owned output during teardown. A pinned tensor (external owner, or a value
+ * holding its published grad) is detached and kept, with ref_count matched to the pin count so
+ * each owner's tensor_release lands at zero; this graph's consumer refs (cml_ir_add_uop) are
+ * never returned in teardown and would otherwise leak a parameter grad per step.
+ * @param freed (FreedSet*)
+ * @param out (Tensor*)
+ * @return (void)
+ */
 static void release_graph_output(FreedSet* freed, Tensor* out) {
     freed_set_add(freed, out);
     if (out->external_refs > 0) {
@@ -1078,8 +1119,13 @@ static void release_graph_output(FreedSet* freed, Tensor* out) {
     }
 }
 
-/** Hand the output of a node the fuser folded away to @p ir, which then frees it at teardown
- *  like any node output. On OOM the tensor is simply left unowned. */
+/**
+ * Hand the output of a node the fuser folded away to @p ir, which then frees it at teardown
+ * like any node output. On OOM the tensor is simply left unowned.
+ * @param ir (CMLGraph_t)
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void cml_ir_adopt_detached(CMLGraph_t ir, Tensor* t) {
     if (ir->detached_count == ir->detached_cap) {
         int cap        = ir->detached_cap ? ir->detached_cap * 2 : 16;
@@ -1092,11 +1138,15 @@ void cml_ir_adopt_detached(CMLGraph_t ir, Tensor* t) {
     ir->detached_outputs[ir->detached_count++] = t;
 }
 
-/** Copy @p ir's node list for passes that rewrite a graph in place (cml_ir_optimize's rewrites
- *  emit nodes the executor cannot run, and its DCE detaches live tensors). The copy owns its
- *  names, shapes and FILL constants (the only params the rewrite rules read), links nodes by
- *  name only (an executed node's input tensors may already be freed), and borrows output tensors
- *  read-only. */
+/**
+ * Copy @p ir's node list for passes that rewrite a graph in place (cml_ir_optimize's rewrites
+ * emit nodes the executor cannot run, and its DCE detaches live tensors). The copy owns its
+ * names, shapes and FILL constants (the only params the rewrite rules read), links nodes by
+ * name only (an executed node's input tensors may already be freed), and borrows output tensors
+ * read-only.
+ * @param ir (CMLGraph_t)
+ * @return (CMLGraph_t)
+ */
 CMLGraph_t cml_ir_view(CMLGraph_t ir) {
     CMLGraph_t view = ir ? cml_ir_new(ir->target) : NULL;
     if (!view)
@@ -1149,9 +1199,13 @@ CMLGraph_t cml_ir_view(CMLGraph_t ir) {
     return view;
 }
 
-/** Tear down an IR graph: free forward/backward output tensors, tensor refs,
- *  nodes, intern table and bookkeeping, guarding tensors reachable twice from
- *  being freed a second time. */
+/**
+ * Tear down an IR graph: free forward/backward output tensors, tensor refs,
+ * nodes, intern table and bookkeeping, guarding tensors reachable twice from
+ * being freed a second time.
+ * @param ir (CMLGraph_t)
+ * @return (void)
+ */
 void cml_ir_free(CMLGraph_t ir) {
     if (!ir)
         return;
@@ -1310,7 +1364,13 @@ void cml_ir_free(CMLGraph_t ir) {
     cml_free(ir);
 }
 
-/** Undo refcount bumps on inputs wired as lazy tensors in this IR graph. */
+/**
+ * Undo refcount bumps on inputs wired as lazy tensors in this IR graph.
+ * @param ir (CMLGraph_t)
+ * @param inputs (Tensor**)
+ * @param n (int)
+ * @return (void)
+ */
 static void cml_ir_release_same_graph_input_refs(CMLGraph_t ir, Tensor** inputs, int n) {
     for (int j = 0; j < n; j++) {
         Tensor* u = inputs[j];
@@ -1319,8 +1379,16 @@ static void cml_ir_release_same_graph_input_refs(CMLGraph_t ir, Tensor** inputs,
     }
 }
 
-/** Append a uop node to @p ir (or reuse an interned equivalent), naming inputs
- *  and output and taking input refcounts. Returns 0 on success, -1 on failure. */
+/**
+ * Append a uop node to @p ir (or reuse an interned equivalent), naming inputs
+ * and output and taking input refcounts. Returns 0 on success, -1 on failure.
+ * @param ir (CMLGraph_t)
+ * @param type (UOpType)
+ * @param inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param params (void*)
+ * @return (int)
+ */
 int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs, void* params) {
     if (!ir || (num_inputs > 0 && !inputs) || num_inputs < 0) {
         LOG_ERROR("Invalid parameters for cml_ir_add_uop");
@@ -1604,7 +1672,12 @@ struct IRNode* cml_ir_get_tail(CMLGraph_t ir) {
     return ir->last_result ? ir->last_result : ir->tail;
 }
 
-/** Legacy codegen entry point, now removed; always logs an error and returns NULL. */
+/**
+ * Legacy codegen entry point, now removed; always logs an error and returns NULL.
+ * @param ir (CMLGraph_t)
+ * @param output_file (const char*)
+ * @return (char*)
+ */
 char* cml_ir_compile(CMLGraph_t ir, const char* output_file) {
     if (!ir)
         return NULL;
@@ -1614,7 +1687,11 @@ char* cml_ir_compile(CMLGraph_t ir, const char* output_file) {
     return NULL;
 }
 
-/** Render the graph as a human-readable listing of numbered ops. Caller frees. */
+/**
+ * Render the graph as a human-readable listing of numbered ops. Caller frees.
+ * @param ir (CMLGraph_t)
+ * @return (char*)
+ */
 char* cml_ir_to_string(CMLGraph_t ir) {
     if (!ir)
         return NULL;
@@ -1650,7 +1727,13 @@ char* cml_ir_to_string(CMLGraph_t ir) {
 
 #define IR_TENSOR_MAX_NDIM 16
 
-/** Resolve a tensor's effective shape, preferring its IR node's output shape. */
+/**
+ * Resolve a tensor's effective shape, preferring its IR node's output shape.
+ * @param t (const Tensor*)
+ * @param out_shape (const int**)
+ * @param out_ndim (int*)
+ * @return (bool)
+ */
 static bool ir_tensor_resolve_shape(const Tensor* t, const int** out_shape, int* out_ndim) {
     if (!t || !out_shape || !out_ndim)
         return false;
@@ -1671,16 +1754,26 @@ static bool ir_tensor_resolve_shape(const Tensor* t, const int** out_shape, int*
     return false;
 }
 
-/** Hand @p shape to @p node, freeing any shape it already owns: an interned node comes back
- *  from cml_ir_add_uop already shaped, and its builder sets the shape again. */
+/**
+ * Hand @p shape to @p node, freeing any shape it already owns: an interned node comes back
+ * from cml_ir_add_uop already shaped, and its builder sets the shape again.
+ * @param node (struct IRNode*)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @return (void)
+ */
 void cml_ir_set_output_shape(struct IRNode* node, int* shape, int ndim) {
     cml_free(node->output_shape);
     node->output_shape = shape;
     node->output_ndim  = ndim;
 }
 
-/** Compute and store the broadcasted output shape for a multi-input node;
- *  returns -1 on shape mismatch or allocation failure. */
+/**
+ * Compute and store the broadcasted output shape for a multi-input node;
+ * returns -1 on shape mismatch or allocation failure.
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 int cml_ir_compute_broadcast_shape(struct IRNode* node) {
     if (!node || node->num_inputs < 2)
         return -1;
@@ -1783,7 +1876,12 @@ struct IRNode* cml_ir_find_by_output(CMLGraph_t ir, const char* output_name) {
     return NULL;
 }
 
-/** Remove @p node from the graph's linked list without freeing it. */
+/**
+ * Remove @p node from the graph's linked list without freeing it.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (void)
+ */
 void cml_ir_unlink_node(CMLGraph_t ir, struct IRNode* node) {
     if (!ir || !node)
         return;
@@ -1807,7 +1905,13 @@ void cml_ir_unlink_node(CMLGraph_t ir, struct IRNode* node) {
     }
 }
 
-/** Rewrite every input reference to @p old_name so it points at @p new_name. */
+/**
+ * Rewrite every input reference to @p old_name so it points at @p new_name.
+ * @param ir (CMLGraph_t)
+ * @param old_name (const char*)
+ * @param new_name (const char*)
+ * @return (void)
+ */
 void cml_ir_replace_refs(CMLGraph_t ir, const char* old_name, const char* new_name) {
     if (!ir || !old_name || !new_name)
         return;
@@ -1821,7 +1925,13 @@ void cml_ir_replace_refs(CMLGraph_t ir, const char* old_name, const char* new_na
     }
 }
 
-/** Splice @p new_node into the list just ahead of @p before (appends if @p before is NULL). */
+/**
+ * Splice @p new_node into the list just ahead of @p before (appends if @p before is NULL).
+ * @param ir (CMLGraph_t)
+ * @param new_node (struct IRNode*)
+ * @param before (struct IRNode*)
+ * @return (void)
+ */
 void cml_ir_insert_before(CMLGraph_t ir, struct IRNode* new_node, struct IRNode* before) {
     if (!ir || !new_node)
         return;
@@ -1958,8 +2068,11 @@ static int cml_stack_is_internal(const char* folded) {
     return 0;
 }
 
-/** Capture and fold the current build-time call stack, interning identical
- *  stacks so each distinct call path is symbolized only once. */
+/**
+ * Capture and fold the current build-time call stack, interning identical
+ * stacks so each distinct call path is symbolized only once.
+ * @return (char*)
+ */
 static char* cml_capture_build_stack(void) {
 #ifdef _WIN32
     return NULL; /* no execinfo/backtrace on Windows; flame graph omits stacks */
@@ -2009,8 +2122,12 @@ static char* cml_capture_build_stack(void) {
 #endif /* _WIN32 */
 }
 
-/** Push @p name onto the thread-local module scope path (for graph grouping). Every push counts
- *  toward the depth, even one too deep or too long to name, so each pop undoes exactly one. */
+/**
+ * Push @p name onto the thread-local module scope path (for graph grouping). Every push counts
+ * toward the depth, even one too deep or too long to name, so each pop undoes exactly one.
+ * @param name (const char*)
+ * @return (void)
+ */
 void cml_ir_scope_push(const char* name) {
     if (!cml_viz_enabled())
         return;
@@ -2027,7 +2144,10 @@ void cml_ir_scope_push(const char* name) {
     g_scope_depth++;
 }
 
-/** Pop the innermost module scope, truncating the path back to its parent. */
+/**
+ * Pop the innermost module scope, truncating the path back to its parent.
+ * @return (void)
+ */
 void cml_ir_scope_pop(void) {
     if (!cml_viz_enabled() || g_scope_depth <= 0)
         return;
@@ -2035,7 +2155,10 @@ void cml_ir_scope_pop(void) {
         g_scope_path[g_scope_depth > 0 ? g_scope_ends[g_scope_depth - 1] : 0] = '\0';
 }
 
-/** Current module scope path, or NULL when scoping is disabled or empty. */
+/**
+ * Current module scope path, or NULL when scoping is disabled or empty.
+ * @return (const char*)
+ */
 const char* cml_ir_scope_current(void) {
     return (cml_viz_enabled() && g_scope_path[0]) ? g_scope_path : NULL;
 }

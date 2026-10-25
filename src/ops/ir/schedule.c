@@ -6,7 +6,11 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
-/** True for unary/binary element-wise UOps (the fuseable per-element kernels). */
+/**
+ * True for unary/binary element-wise UOps (the fuseable per-element kernels).
+ * @param type (UOpType)
+ * @return (bool)
+ */
 bool cml_schedule_is_elementwise(UOpType type) {
     switch (type) {
 
@@ -103,7 +107,11 @@ bool cml_schedule_is_elementwise(UOpType type) {
     }
 }
 
-/** True for reduction UOps (sum/mean/max/argmax/var/...). */
+/**
+ * True for reduction UOps (sum/mean/max/argmax/var/...).
+ * @param type (UOpType)
+ * @return (bool)
+ */
 bool cml_schedule_is_reduction(UOpType type) {
     switch (type) {
     case UOP_SUM:
@@ -124,7 +132,11 @@ bool cml_schedule_is_reduction(UOpType type) {
     }
 }
 
-/** True for view/movement UOps (reshape/permute/slice/cat/...). */
+/**
+ * True for view/movement UOps (reshape/permute/slice/cat/...).
+ * @param type (UOpType)
+ * @return (bool)
+ */
 bool cml_schedule_is_movement(UOpType type) {
     switch (type) {
     case UOP_RESHAPE:
@@ -143,7 +155,11 @@ bool cml_schedule_is_movement(UOpType type) {
     }
 }
 
-/** Classify a UOp into its schedule item category (matmul/conv/elem/reduce/movement/custom). */
+/**
+ * Classify a UOp into its schedule item category (matmul/conv/elem/reduce/movement/custom).
+ * @param type (UOpType)
+ * @return (CMLScheduleItemType)
+ */
 static CMLScheduleItemType classify_op(UOpType type) {
     if (type == UOP_MATMUL)
         return SCHED_MATMUL;
@@ -158,7 +174,12 @@ static CMLScheduleItemType classify_op(UOpType type) {
     return SCHED_CUSTOM;
 }
 
-/** Fusion policy between op categories: elem+elem, elem->reduce, matmul/conv+elem, move free. */
+/**
+ * Fusion policy between op categories: elem+elem, elem->reduce, matmul/conv+elem, move free.
+ * @param a (UOpType)
+ * @param b (UOpType)
+ * @return (bool)
+ */
 bool cml_schedule_can_fuse(UOpType a, UOpType b) {
     CMLScheduleItemType ta = classify_op(a);
     CMLScheduleItemType tb = classify_op(b);
@@ -181,7 +202,10 @@ bool cml_schedule_can_fuse(UOpType a, UOpType b) {
     return false;
 }
 
-/** Default scheduling options: fusion and movement folding on, topo order, cost estimation. */
+/**
+ * Default scheduling options: fusion and movement folding on, topo order, cost estimation.
+ * @return (CMLScheduleOptions)
+ */
 CMLScheduleOptions cml_schedule_default_options(void) {
     CMLScheduleOptions opts;
     opts.enable_fusion            = true;
@@ -193,7 +217,11 @@ CMLScheduleOptions cml_schedule_default_options(void) {
     return opts;
 }
 
-/** Allocate a schedule item of the given type with an initial op array. */
+/**
+ * Allocate a schedule item of the given type with an initial op array.
+ * @param type (CMLScheduleItemType)
+ * @return (CMLScheduleItem*)
+ */
 static CMLScheduleItem* sched_item_create(CMLScheduleItemType type) {
     CMLScheduleItem* item = cml_calloc(1, sizeof(CMLScheduleItem));
     if (!item)
@@ -215,7 +243,12 @@ static CMLScheduleItem* sched_item_create(CMLScheduleItemType type) {
     return item;
 }
 
-/** Append an IR node to a schedule item, growing its op array as needed. */
+/**
+ * Append an IR node to a schedule item, growing its op array as needed.
+ * @param item (CMLScheduleItem*)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int sched_item_add_op(CMLScheduleItem* item, struct IRNode* node) {
     if (!item || !node)
         return -1;
@@ -231,7 +264,11 @@ static int sched_item_add_op(CMLScheduleItem* item, struct IRNode* node) {
     return 0;
 }
 
-/** Free a schedule item's op/input/output arrays and the item itself. */
+/**
+ * Free a schedule item's op/input/output arrays and the item itself.
+ * @param item (CMLScheduleItem*)
+ * @return (void)
+ */
 static void sched_item_free(CMLScheduleItem* item) {
     if (!item)
         return;
@@ -241,8 +278,12 @@ static void sched_item_free(CMLScheduleItem* item) {
     cml_free(item);
 }
 
-/** Compute an item's external inputs and produced outputs (tensors made inside the item are
- *  treated as local). */
+/**
+ * Compute an item's external inputs and produced outputs (tensors made inside the item are
+ * treated as local).
+ * @param item (CMLScheduleItem*)
+ * @return (void)
+ */
 static void compute_item_io(CMLScheduleItem* item) {
     if (!item || item->num_ops == 0)
         return;
@@ -317,7 +358,11 @@ static void compute_item_io(CMLScheduleItem* item) {
     item->num_outputs = num_produced;
 }
 
-/** Product of a tensor's shape, or 0 if its shape is unset/degenerate. */
+/**
+ * Product of a tensor's shape, or 0 if its shape is unset/degenerate.
+ * @param t (const Tensor*)
+ * @return (size_t)
+ */
 static size_t tensor_total_elements(const Tensor* t) {
     if (!t || !t->shape || t->ndim <= 0)
         return 0;
@@ -330,7 +375,11 @@ static size_t tensor_total_elements(const Tensor* t) {
     return n;
 }
 
-/** Estimate an item's flops, memory traffic, and arithmetic intensity per op category. */
+/**
+ * Estimate an item's flops, memory traffic, and arithmetic intensity per op category.
+ * @param item (CMLScheduleItem*)
+ * @return (void)
+ */
 static void estimate_item_cost(CMLScheduleItem* item) {
     if (!item)
         return;
@@ -441,7 +490,11 @@ static void sched_push_single(CMLSchedule* sched, CMLScheduleItemType kind, stru
     sched_push(sched, item);
 }
 
-/** Build per-item dependency lists by matching each item's inputs to earlier items' outputs. */
+/**
+ * Build per-item dependency lists by matching each item's inputs to earlier items' outputs.
+ * @param sched (CMLSchedule*)
+ * @return (void)
+ */
 static void build_dependencies(CMLSchedule* sched) {
     if (!sched || sched->num_items == 0)
         return;
@@ -492,8 +545,13 @@ static void build_dependencies(CMLSchedule* sched) {
     }
 }
 
-/** Build an execution schedule from a graph: group ops into fuseable kernels, compute I/O and
- *  cost estimates, and derive inter-item dependencies. */
+/**
+ * Build an execution schedule from a graph: group ops into fuseable kernels, compute I/O and
+ * cost estimates, and derive inter-item dependencies.
+ * @param graph (CMLGraph_t)
+ * @param opts (const CMLScheduleOptions*)
+ * @return (CMLSchedule*)
+ */
 CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opts) {
     CMLScheduleOptions default_opts;
     if (!opts) {
@@ -663,17 +721,30 @@ CMLSchedule* cml_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opt
     return sched;
 }
 
-/** Number of scheduled kernels (items). */
+/**
+ * Number of scheduled kernels (items).
+ * @param sched (const CMLSchedule*)
+ * @return (int)
+ */
 int cml_schedule_num_kernels(const CMLSchedule* sched) { return sched ? sched->num_items : 0; }
 
-/** Return item at `index`, or NULL if out of range. */
+/**
+ * Return item at `index`, or NULL if out of range.
+ * @param sched (const CMLSchedule*)
+ * @param index (int)
+ * @return (const CMLScheduleItem*)
+ */
 const CMLScheduleItem* cml_schedule_get_item(const CMLSchedule* sched, int index) {
     if (!sched || index < 0 || index >= sched->num_items)
         return NULL;
     return sched->items[index];
 }
 
-/** Human-readable name for a schedule item type. */
+/**
+ * Human-readable name for a schedule item type.
+ * @param type (CMLScheduleItemType)
+ * @return (const char*)
+ */
 static const char* sched_type_name(CMLScheduleItemType type) {
     switch (type) {
     case SCHED_ELEMENTWISE:
@@ -695,7 +766,11 @@ static const char* sched_type_name(CMLScheduleItemType type) {
     }
 }
 
-/** Print schedule statistics and each item's ops/dependencies to stdout. */
+/**
+ * Print schedule statistics and each item's ops/dependencies to stdout.
+ * @param sched (const CMLSchedule*)
+ * @return (void)
+ */
 void cml_schedule_print(const CMLSchedule* sched) {
     if (!sched) {
         printf("Schedule: (null)\n");
@@ -741,7 +816,11 @@ void cml_schedule_print(const CMLSchedule* sched) {
     printf("\n");
 }
 
-/** Render the schedule to a newly allocated string (caller frees). */
+/**
+ * Render the schedule to a newly allocated string (caller frees).
+ * @param sched (const CMLSchedule*)
+ * @return (char*)
+ */
 char* cml_schedule_to_string(const CMLSchedule* sched) {
     if (!sched)
         return NULL;
@@ -789,7 +868,11 @@ char* cml_schedule_to_string(const CMLSchedule* sched) {
     return buf;
 }
 
-/** Free a schedule, its items, and dependency arrays. */
+/**
+ * Free a schedule, its items, and dependency arrays.
+ * @param sched (CMLSchedule*)
+ * @return (void)
+ */
 void cml_schedule_free(CMLSchedule* sched) {
     if (!sched)
         return;

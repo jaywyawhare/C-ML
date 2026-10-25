@@ -24,13 +24,20 @@ typedef struct {
     uint64_t submit_count;
 } WebGPUQueueData;
 
-/** Unwrap the WebGPU backend stored in a queue's native handle (NULL-safe). */
+/**
+ * Unwrap the WebGPU backend stored in a queue's native handle (NULL-safe).
+ * @param queue (CMLHCQQueue*)
+ * @return (CMLWebGPUBackend*)
+ */
 static CMLWebGPUBackend* webgpu_backend_of(CMLHCQQueue* queue) {
     WebGPUQueueData* qd = (WebGPUQueueData*)(queue ? queue->native_handle : NULL);
     return qd ? qd->backend : NULL;
 }
 
-/** Create and init a WebGPU backend and wrap it in a queue (NULL if unavailable). */
+/**
+ * Create and init a WebGPU backend and wrap it in a queue (NULL if unavailable).
+ * @return (CMLHCQQueue*)
+ */
 CMLHCQQueue* cml_hcq_webgpu_queue_create(void) {
     if (!cml_webgpu_available())
         return NULL;
@@ -59,7 +66,11 @@ CMLHCQQueue* cml_hcq_webgpu_queue_create(void) {
     return queue;
 }
 
-/** Free the WebGPU backend behind the queue, then the queue wrapper. */
+/**
+ * Free the WebGPU backend behind the queue, then the queue wrapper.
+ * @param queue (CMLHCQQueue*)
+ * @return (void)
+ */
 void cml_hcq_webgpu_queue_destroy(CMLHCQQueue* queue) {
     if (!queue)
         return;
@@ -73,7 +84,12 @@ void cml_hcq_webgpu_queue_destroy(CMLHCQQueue* queue) {
     cml_free(queue);
 }
 
-/** Launch a compiled WGSL kernel with the descriptor's workgroup counts. */
+/**
+ * Launch a compiled WGSL kernel with the descriptor's workgroup counts.
+ * @param queue (CMLHCQQueue*)
+ * @param desc (const CMLHCQKernelDesc*)
+ * @return (int)
+ */
 int cml_hcq_webgpu_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     if (!queue || !desc || !desc->compiled_kernel || !desc->args)
         return -1;
@@ -91,21 +107,39 @@ int cml_hcq_webgpu_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* des
     return rc;
 }
 
-/** Host-to-device upload delegated to the WebGPU backend. */
+/**
+ * Host-to-device upload delegated to the WebGPU backend.
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_webgpu_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src || bytes == 0)
         return -1;
     return cml_webgpu_upload(webgpu_backend_of(queue), dst, src, bytes);
 }
 
-/** Device-to-host download delegated to the WebGPU backend (synchronous). */
+/**
+ * Device-to-host download delegated to the WebGPU backend (synchronous).
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_webgpu_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src || bytes == 0)
         return -1;
     return cml_webgpu_download(webgpu_backend_of(queue), dst, (void*)(uintptr_t)src, bytes);
 }
 
-/** Drain the queue by submitting an empty batch and polling the device fence. */
+/**
+ * Drain the queue by submitting an empty batch and polling the device fence.
+ * @param queue (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_webgpu_queue_synchronize(CMLHCQQueue* queue) {
     CMLWebGPUBackend* backend = webgpu_backend_of(queue);
     if (!backend || !backend->initialized)
@@ -128,7 +162,10 @@ int cml_hcq_webgpu_queue_synchronize(CMLHCQQueue* queue) {
     return -1;
 }
 
-/** Allocate a WebGPU signal; it carries no native handle (signals are synchronous). */
+/**
+ * Allocate a WebGPU signal; it carries no native handle (signals are synchronous).
+ * @return (CMLHCQSignal*)
+ */
 CMLHCQSignal* cml_hcq_webgpu_signal_create(void) {
     /* Must use the CML allocator: hcq.c frees signal wrappers with cml_free,
      * so system calloc here would corrupt the heap (see the Vulkan adapter). */
@@ -140,14 +177,23 @@ CMLHCQSignal* cml_hcq_webgpu_signal_create(void) {
     return signal;
 }
 
-/** Free a WebGPU signal wrapper. */
+/**
+ * Free a WebGPU signal wrapper.
+ * @param signal (CMLHCQSignal*)
+ * @return (void)
+ */
 void cml_hcq_webgpu_signal_destroy(CMLHCQSignal* signal) {
     if (!signal)
         return;
     cml_free(signal);
 }
 
-/** Drain the queue (synchronous) and mark the signal ready. */
+/**
+ * Drain the queue (synchronous) and mark the signal ready.
+ * @param queue (CMLHCQQueue*)
+ * @param signal (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_webgpu_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal)
         return -1;
@@ -160,14 +206,24 @@ int cml_hcq_webgpu_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return 0;
 }
 
-/** No-op: work is already ordered through the single WGPUQueue. */
+/**
+ * No-op: work is already ordered through the single WGPUQueue.
+ * @param queue (CMLHCQQueue*)
+ * @param signal (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_webgpu_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     (void)queue;
     (void)signal; /* work is already ordered through the single WGPUQueue */
     return 0;
 }
 
-/** Succeed if the signal was recorded (drained); fail otherwise. */
+/**
+ * Succeed if the signal was recorded (drained); fail otherwise.
+ * @param signal (CMLHCQSignal*)
+ * @param timeout_ms (uint64_t)
+ * @return (int)
+ */
 int cml_hcq_webgpu_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     (void)timeout_ms;
     if (!signal)
@@ -177,19 +233,38 @@ int cml_hcq_webgpu_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
 
 #else /* !CML_HAS_WEBGPU */
 
-/** Stub: WebGPU not compiled in, so no queue can be created. */
+/**
+ * Stub: WebGPU not compiled in, so no queue can be created.
+ * @return (CMLHCQQueue*)
+ */
 CMLHCQQueue* cml_hcq_webgpu_queue_create(void) { return NULL; }
-/** Stub: nothing to tear down without WebGPU. */
+/**
+ * Stub: nothing to tear down without WebGPU.
+ * @param q (CMLHCQQueue*)
+ * @return (void)
+ */
 void cml_hcq_webgpu_queue_destroy(CMLHCQQueue* q) { (void)q; }
 
-/** Stub: kernel submission unavailable without WebGPU. */
+/**
+ * Stub: kernel submission unavailable without WebGPU.
+ * @param q (CMLHCQQueue*)
+ * @param d (const CMLHCQKernelDesc*)
+ * @return (int)
+ */
 int cml_hcq_webgpu_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* d) {
     (void)q;
     (void)d;
     return -1;
 }
 
-/** Stub: H2D copy unavailable without WebGPU. */
+/**
+ * Stub: H2D copy unavailable without WebGPU.
+ * @param q (CMLHCQQueue*)
+ * @param d (void*)
+ * @param s (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_hcq_webgpu_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -198,7 +273,14 @@ int cml_hcq_webgpu_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) 
     return -1;
 }
 
-/** Stub: D2H copy unavailable without WebGPU. */
+/**
+ * Stub: D2H copy unavailable without WebGPU.
+ * @param q (CMLHCQQueue*)
+ * @param d (void*)
+ * @param s (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_hcq_webgpu_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -207,33 +289,59 @@ int cml_hcq_webgpu_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) 
     return -1;
 }
 
-/** Stub: no WebGPU, so no signal can be created. */
+/**
+ * Stub: no WebGPU, so no signal can be created.
+ * @return (CMLHCQSignal*)
+ */
 CMLHCQSignal* cml_hcq_webgpu_signal_create(void) { return NULL; }
-/** Stub: nothing to free without WebGPU. */
+/**
+ * Stub: nothing to free without WebGPU.
+ * @param s (CMLHCQSignal*)
+ * @return (void)
+ */
 void cml_hcq_webgpu_signal_destroy(CMLHCQSignal* s) { (void)s; }
 
-/** Stub: signal recording unavailable without WebGPU. */
+/**
+ * Stub: signal recording unavailable without WebGPU.
+ * @param q (CMLHCQQueue*)
+ * @param s (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_webgpu_signal_record(CMLHCQQueue* q, CMLHCQSignal* s) {
     (void)q;
     (void)s;
     return -1;
 }
 
-/** Stub: queue wait unavailable without WebGPU. */
+/**
+ * Stub: queue wait unavailable without WebGPU.
+ * @param q (CMLHCQQueue*)
+ * @param s (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_webgpu_queue_wait(CMLHCQQueue* q, CMLHCQSignal* s) {
     (void)q;
     (void)s;
     return -1;
 }
 
-/** Stub: host wait unavailable without WebGPU. */
+/**
+ * Stub: host wait unavailable without WebGPU.
+ * @param s (CMLHCQSignal*)
+ * @param t (uint64_t)
+ * @return (int)
+ */
 int cml_hcq_webgpu_signal_wait_cpu(CMLHCQSignal* s, uint64_t t) {
     (void)s;
     (void)t;
     return -1;
 }
 
-/** Stub: nothing to synchronize without WebGPU. */
+/**
+ * Stub: nothing to synchronize without WebGPU.
+ * @param q (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_webgpu_queue_synchronize(CMLHCQQueue* q) {
     (void)q;
     return -1;

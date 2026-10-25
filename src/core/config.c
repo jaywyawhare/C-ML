@@ -12,7 +12,11 @@ static uint64_t g_rng_seed            = 0;
 static bool g_rng_seeded              = false;
 static pthread_mutex_t g_config_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-/** Set the global default device for new tensors and propagate it to the backend. */
+/**
+ * Set the global default device for new tensors and propagate it to the backend.
+ * @param device (DeviceType)
+ * @return (void)
+ */
 void cml_set_default_device(DeviceType device) {
     pthread_mutex_lock(&g_config_mutex);
     g_default_device = device;
@@ -20,7 +24,10 @@ void cml_set_default_device(DeviceType device) {
     device_set_default(device);
 }
 
-/** Return the current global default device. */
+/**
+ * Return the current global default device.
+ * @return (DeviceType)
+ */
 DeviceType cml_get_default_device(void) {
     pthread_mutex_lock(&g_config_mutex);
     DeviceType d = g_default_device;
@@ -28,14 +35,21 @@ DeviceType cml_get_default_device(void) {
     return d;
 }
 
-/** Set the global default dtype for new tensors. */
+/**
+ * Set the global default dtype for new tensors.
+ * @param dtype (DType)
+ * @return (void)
+ */
 void cml_set_default_dtype(DType dtype) {
     pthread_mutex_lock(&g_config_mutex);
     g_default_dtype = dtype;
     pthread_mutex_unlock(&g_config_mutex);
 }
 
-/** Return the current global default dtype. */
+/**
+ * Return the current global default dtype.
+ * @return (DType)
+ */
 DType cml_get_default_dtype(void) {
     pthread_mutex_lock(&g_config_mutex);
     DType d = g_default_dtype;
@@ -43,7 +57,11 @@ DType cml_get_default_dtype(void) {
     return d;
 }
 
-/** Seed all RNGs (libc rand, threefry global) for reproducible runs. */
+/**
+ * Seed all RNGs (libc rand, threefry global) for reproducible runs.
+ * @param seed (uint64_t)
+ * @return (void)
+ */
 void cml_seed(uint64_t seed) {
     pthread_mutex_lock(&g_config_mutex);
     g_rng_seed   = seed;
@@ -53,7 +71,10 @@ void cml_seed(uint64_t seed) {
     cml_rng_set_global_seed(seed);
 }
 
-/** Return the active seed, deriving one from the clock on first use if unseeded. */
+/**
+ * Return the active seed, deriving one from the clock on first use if unseeded.
+ * @return (uint64_t)
+ */
 uint64_t cml_random_seed(void) {
     pthread_mutex_lock(&g_config_mutex);
     if (!g_rng_seeded) {

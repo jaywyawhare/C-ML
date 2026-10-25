@@ -12,7 +12,12 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
-/** torch.nn.ReLU forward: elementwise max(0, x). */
+/**
+ * torch.nn.ReLU forward: elementwise max(0, x).
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* relu_forward(Module* module, Tensor* input) {
     (void)module;
     if (!input)
@@ -20,10 +25,18 @@ static Tensor* relu_forward(Module* module, Tensor* input) {
     return uop_relu(input);
 }
 
-/** Free the ReLU module (no owned parameters). */
+/**
+ * Free the ReLU module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void relu_free(Module* module) { cml_free(module); }
 
-/** Construct a ReLU layer. Returns NULL on allocation/init failure. */
+/**
+ * Construct a ReLU layer. Returns NULL on allocation/init failure.
+ * @param inplace (bool)
+ * @return (ReLU*)
+ */
 ReLU* nn_relu(bool inplace) {
     ReLU* relu = cml_malloc(sizeof(ReLU));
     if (!relu) {
@@ -43,17 +56,31 @@ ReLU* nn_relu(bool inplace) {
     return relu;
 }
 
-/** torch.nn.LeakyReLU forward: x for x >= 0, negative_slope * x below. */
+/**
+ * torch.nn.LeakyReLU forward: x for x >= 0, negative_slope * x below.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* leaky_relu_forward(Module* module, Tensor* input) {
     LeakyReLU* leaky_relu = (LeakyReLU*)module;
 
     return uop_leaky_relu(input, leaky_relu->negative_slope);
 }
 
-/** Free the LeakyReLU module (no owned parameters). */
+/**
+ * Free the LeakyReLU module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void leaky_relu_free(Module* module) { cml_free(module); }
 
-/** Construct a LeakyReLU layer with the given negative_slope. NULL on failure. */
+/**
+ * Construct a LeakyReLU layer with the given negative_slope. NULL on failure.
+ * @param negative_slope (float)
+ * @param inplace (bool)
+ * @return (LeakyReLU*)
+ */
 LeakyReLU* nn_leaky_relu(float negative_slope, bool inplace) {
     LeakyReLU* leaky_relu = cml_malloc(sizeof(LeakyReLU));
     if (!leaky_relu) {
@@ -75,7 +102,12 @@ LeakyReLU* nn_leaky_relu(float negative_slope, bool inplace) {
     return leaky_relu;
 }
 
-/** torch.nn.Sigmoid forward: elementwise 1/(1+exp(-x)). */
+/**
+ * torch.nn.Sigmoid forward: elementwise 1/(1+exp(-x)).
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* sigmoid_forward(Module* module, Tensor* input) {
     (void)module;
     if (!input)
@@ -83,10 +115,17 @@ static Tensor* sigmoid_forward(Module* module, Tensor* input) {
     return uop_sigmoid(input);
 }
 
-/** Free the Sigmoid module (no owned parameters). */
+/**
+ * Free the Sigmoid module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void sigmoid_free(Module* module) { cml_free(module); }
 
-/** Construct a Sigmoid layer. Returns NULL on failure. */
+/**
+ * Construct a Sigmoid layer. Returns NULL on failure.
+ * @return (Sigmoid*)
+ */
 Sigmoid* nn_sigmoid(void) {
     Sigmoid* sigmoid = cml_malloc(sizeof(Sigmoid));
     if (!sigmoid) {
@@ -105,7 +144,12 @@ Sigmoid* nn_sigmoid(void) {
     return sigmoid;
 }
 
-/** torch.nn.Tanh forward: elementwise hyperbolic tangent. */
+/**
+ * torch.nn.Tanh forward: elementwise hyperbolic tangent.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* tanh_forward(Module* module, Tensor* input) {
     (void)module;
     if (!input)
@@ -113,10 +157,17 @@ static Tensor* tanh_forward(Module* module, Tensor* input) {
     return uop_tanh(input);
 }
 
-/** Free the Tanh module (no owned parameters). */
+/**
+ * Free the Tanh module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void tanh_free(Module* module) { cml_free(module); }
 
-/** Construct a Tanh layer. Returns NULL on failure. */
+/**
+ * Construct a Tanh layer. Returns NULL on failure.
+ * @return (Tanh*)
+ */
 Tanh* nn_tanh(void) {
     Tanh* tanh = cml_malloc(sizeof(Tanh));
     if (!tanh) {
@@ -135,8 +186,13 @@ Tanh* nn_tanh(void) {
     return tanh;
 }
 
-/** torch.nn.GELU forward: the tanh approximation 0.5*x*(1+tanh(sqrt(2/pi)*x)). NULL on failure
- *  of any intermediate op. */
+/**
+ * torch.nn.GELU forward: the tanh approximation 0.5*x*(1+tanh(sqrt(2/pi)*x)). NULL on failure
+ * of any intermediate op.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* gelu_forward(Module* module, Tensor* input) {
     GELU* gelu = (GELU*)module;
 
@@ -208,10 +264,18 @@ static Tensor* gelu_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Free the GELU module (no owned parameters). */
+/**
+ * Free the GELU module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void gelu_free(Module* module) { cml_free(module); }
 
-/** Construct a GELU layer. Returns NULL on failure. */
+/**
+ * Construct a GELU layer. Returns NULL on failure.
+ * @param approximate (bool)
+ * @return (GELU*)
+ */
 GELU* nn_gelu(bool approximate) {
     GELU* gelu = cml_malloc(sizeof(GELU));
     if (!gelu) {
@@ -231,7 +295,12 @@ GELU* nn_gelu(bool approximate) {
     return gelu;
 }
 
-/** torch.nn.Softmax forward: normalize to a probability distribution along dim. */
+/**
+ * torch.nn.Softmax forward: normalize to a probability distribution along dim.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* softmax_forward(Module* module, Tensor* input) {
     Softmax* softmax = (Softmax*)module;
 
@@ -241,10 +310,18 @@ static Tensor* softmax_forward(Module* module, Tensor* input) {
     return tensor_softmax(input, softmax->dim);
 }
 
-/** Free the Softmax module (no owned parameters). */
+/**
+ * Free the Softmax module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void softmax_free(Module* module) { cml_free(module); }
 
-/** Construct a Softmax layer over the given dim. Returns NULL on failure. */
+/**
+ * Construct a Softmax layer over the given dim. Returns NULL on failure.
+ * @param dim (int)
+ * @return (Softmax*)
+ */
 Softmax* nn_softmax(int dim) {
     Softmax* softmax = cml_malloc(sizeof(Softmax));
     if (!softmax) {
@@ -264,7 +341,12 @@ Softmax* nn_softmax(int dim) {
     return softmax;
 }
 
-/** torch.nn.LogSoftmax forward: log of the softmax along dim. NULL on op failure. */
+/**
+ * torch.nn.LogSoftmax forward: log of the softmax along dim. NULL on op failure.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* log_softmax_forward(Module* module, Tensor* input) {
     LogSoftmax* log_softmax = (LogSoftmax*)module;
 
@@ -281,10 +363,18 @@ static Tensor* log_softmax_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Free the LogSoftmax module (no owned parameters). */
+/**
+ * Free the LogSoftmax module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void log_softmax_free(Module* module) { cml_free(module); }
 
-/** Construct a LogSoftmax layer over the given dim. Returns NULL on failure. */
+/**
+ * Construct a LogSoftmax layer over the given dim. Returns NULL on failure.
+ * @param dim (int)
+ * @return (LogSoftmax*)
+ */
 LogSoftmax* nn_log_softmax(int dim) {
     LogSoftmax* log_softmax = cml_malloc(sizeof(LogSoftmax));
     if (!log_softmax) {
@@ -306,7 +396,11 @@ LogSoftmax* nn_log_softmax(int dim) {
     return log_softmax;
 }
 
-/** Functional ReLU: build a transient ReLU module, run it, and free it. NULL on failure. */
+/**
+ * Functional ReLU: build a transient ReLU module, run it, and free it. NULL on failure.
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* f_relu(Tensor* input) {
     if (!input) {
         return NULL;
@@ -320,7 +414,11 @@ Tensor* f_relu(Tensor* input) {
     return output;
 }
 
-/** Functional Sigmoid: transient module applied to input. NULL on failure. */
+/**
+ * Functional Sigmoid: transient module applied to input. NULL on failure.
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* f_sigmoid(Tensor* input) {
     if (!input) {
         return NULL;
@@ -334,7 +432,11 @@ Tensor* f_sigmoid(Tensor* input) {
     return output;
 }
 
-/** Functional Tanh: transient module applied to input. NULL on failure. */
+/**
+ * Functional Tanh: transient module applied to input. NULL on failure.
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* f_tanh(Tensor* input) {
     if (!input) {
         return NULL;
@@ -348,7 +450,11 @@ Tensor* f_tanh(Tensor* input) {
     return output;
 }
 
-/** Functional GELU: transient module applied to input. NULL on failure. */
+/**
+ * Functional GELU: transient module applied to input. NULL on failure.
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* f_gelu(Tensor* input) {
     if (!input) {
         return NULL;
@@ -362,8 +468,13 @@ Tensor* f_gelu(Tensor* input) {
     return output;
 }
 
-/** The ELU curve: x where x >= 0, alpha * (exp(x) - 1) below. SELU is this
- *  same curve rescaled, so both share it. */
+/**
+ * The ELU curve: x where x >= 0, alpha * (exp(x) - 1) below. SELU is this
+ * same curve rescaled, so both share it.
+ * @param input (Tensor*)
+ * @param alpha (float)
+ * @return (Tensor*)
+ */
 static Tensor* elu_curve(Tensor* input, float alpha) {
     TensorConfig config = {
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
@@ -382,7 +493,12 @@ static Tensor* elu_curve(Tensor* input, float alpha) {
     return uop_where(&wp);
 }
 
-/** torch.nn.ELU forward: the ELU curve with the layer's alpha. */
+/**
+ * torch.nn.ELU forward: the ELU curve with the layer's alpha.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* elu_forward(Module* module, Tensor* input) {
     ELU* elu = (ELU*)module;
 
@@ -392,10 +508,19 @@ static Tensor* elu_forward(Module* module, Tensor* input) {
     return elu_curve(input, elu->alpha);
 }
 
-/** Free the ELU module (no owned parameters). */
+/**
+ * Free the ELU module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void elu_free(Module* module) { cml_free(module); }
 
-/** Construct an ELU layer with the given alpha. Returns NULL on failure. */
+/**
+ * Construct an ELU layer with the given alpha. Returns NULL on failure.
+ * @param alpha (float)
+ * @param inplace (bool)
+ * @return (ELU*)
+ */
 ELU* nn_elu(float alpha, bool inplace) {
     ELU* elu = cml_malloc(sizeof(ELU));
     if (!elu) {
@@ -416,7 +541,12 @@ ELU* nn_elu(float alpha, bool inplace) {
     return elu;
 }
 
-/** torch.nn.SELU forward: scaled ELU, lambda * elu_curve(x, alpha) with the SELU constants. */
+/**
+ * torch.nn.SELU forward: scaled ELU, lambda * elu_curve(x, alpha) with the SELU constants.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* selu_forward(Module* module, Tensor* input) {
     (void)module;
 
@@ -434,10 +564,17 @@ static Tensor* selu_forward(Module* module, Tensor* input) {
     return uop_mul(lambda_tensor, elu_result);
 }
 
-/** Free the SELU module (no owned parameters). */
+/**
+ * Free the SELU module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void selu_free(Module* module) { cml_free(module); }
 
-/** Construct a SELU layer. Returns NULL on failure. */
+/**
+ * Construct a SELU layer. Returns NULL on failure.
+ * @return (SELU*)
+ */
 SELU* nn_selu(void) {
     SELU* selu = cml_malloc(sizeof(SELU));
     if (!selu) {
@@ -456,7 +593,12 @@ SELU* nn_selu(void) {
     return selu;
 }
 
-/** torch.nn.SiLU/Swish forward: x * sigmoid(x). */
+/**
+ * torch.nn.SiLU/Swish forward: x * sigmoid(x).
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* silu_forward(Module* module, Tensor* input) {
     (void)module;
     if (!input)
@@ -464,10 +606,17 @@ static Tensor* silu_forward(Module* module, Tensor* input) {
     return uop_mul(input, uop_sigmoid(input));
 }
 
-/** Free the SiLU module (no owned parameters). */
+/**
+ * Free the SiLU module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void silu_free(Module* module) { cml_free(module); }
 
-/** Construct a SiLU layer. Returns NULL on failure. */
+/**
+ * Construct a SiLU layer. Returns NULL on failure.
+ * @return (SiLU*)
+ */
 SiLU* nn_silu(void) {
     SiLU* silu = cml_malloc(sizeof(SiLU));
     if (!silu) {
@@ -486,7 +635,12 @@ SiLU* nn_silu(void) {
     return silu;
 }
 
-/** torch.nn.Mish forward: x * tanh(softplus(x)), softplus = log(1 + exp(x)). */
+/**
+ * torch.nn.Mish forward: x * tanh(softplus(x)), softplus = log(1 + exp(x)).
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* mish_forward(Module* module, Tensor* input) {
     (void)module;
     if (!input)
@@ -503,10 +657,17 @@ static Tensor* mish_forward(Module* module, Tensor* input) {
     return uop_mul(input, tanh_sp);
 }
 
-/** Free the Mish module (no owned parameters). */
+/**
+ * Free the Mish module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void mish_free(Module* module) { cml_free(module); }
 
-/** Construct a Mish layer. Returns NULL on failure. */
+/**
+ * Construct a Mish layer. Returns NULL on failure.
+ * @return (Mish*)
+ */
 Mish* nn_mish(void) {
     Mish* mish = cml_malloc(sizeof(Mish));
     if (!mish) {
@@ -525,7 +686,12 @@ Mish* nn_mish(void) {
     return mish;
 }
 
-/** torch.nn.Hardswish forward: x * clamp(x + 3, 0, 6) / 6. */
+/**
+ * torch.nn.Hardswish forward: x * clamp(x + 3, 0, 6) / 6.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* hardswish_forward(Module* module, Tensor* input) {
     (void)module;
     if (!input)
@@ -549,10 +715,17 @@ static Tensor* hardswish_forward(Module* module, Tensor* input) {
     return uop_mul(input, scaled);
 }
 
-/** Free the HardSwish module (no owned parameters). */
+/**
+ * Free the HardSwish module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void hardswish_free(Module* module) { cml_free(module); }
 
-/** Construct a HardSwish layer. Returns NULL on failure. */
+/**
+ * Construct a HardSwish layer. Returns NULL on failure.
+ * @return (HardSwish*)
+ */
 HardSwish* nn_hardswish(void) {
     HardSwish* hardswish = cml_malloc(sizeof(HardSwish));
     if (!hardswish) {
@@ -572,7 +745,12 @@ HardSwish* nn_hardswish(void) {
     return hardswish;
 }
 
-/** Functional ELU: transient module applied to input with the given alpha. NULL on failure. */
+/**
+ * Functional ELU: transient module applied to input with the given alpha. NULL on failure.
+ * @param input (Tensor*)
+ * @param alpha (float)
+ * @return (Tensor*)
+ */
 Tensor* f_elu(Tensor* input, float alpha) {
     if (!input) {
         return NULL;
@@ -586,7 +764,11 @@ Tensor* f_elu(Tensor* input, float alpha) {
     return output;
 }
 
-/** Functional SELU: transient module applied to input. NULL on failure. */
+/**
+ * Functional SELU: transient module applied to input. NULL on failure.
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* f_selu(Tensor* input) {
     if (!input) {
         return NULL;
@@ -600,7 +782,11 @@ Tensor* f_selu(Tensor* input) {
     return output;
 }
 
-/** Functional SiLU: transient module applied to input. NULL on failure. */
+/**
+ * Functional SiLU: transient module applied to input. NULL on failure.
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* f_silu(Tensor* input) {
     if (!input) {
         return NULL;
@@ -614,7 +800,11 @@ Tensor* f_silu(Tensor* input) {
     return output;
 }
 
-/** Functional Mish: transient module applied to input. NULL on failure. */
+/**
+ * Functional Mish: transient module applied to input. NULL on failure.
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* f_mish(Tensor* input) {
     if (!input) {
         return NULL;
@@ -628,7 +818,11 @@ Tensor* f_mish(Tensor* input) {
     return output;
 }
 
-/** Functional HardSwish: transient module applied to input. NULL on failure. */
+/**
+ * Functional HardSwish: transient module applied to input. NULL on failure.
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* f_hardswish(Tensor* input) {
     if (!input) {
         return NULL;

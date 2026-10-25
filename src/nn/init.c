@@ -5,7 +5,13 @@
 #include "alloc/cml_allocator.h"
 #include <math.h>
 
-/** Fill `tensor` in-place with U(low, high) samples from the global RNG; no-op on bad args. */
+/**
+ * Fill `tensor` in-place with U(low, high) samples from the global RNG; no-op on bad args.
+ * @param tensor (Tensor*)
+ * @param low (float)
+ * @param high (float)
+ * @return (void)
+ */
 void nn_init_uniform(Tensor* tensor, float low, float high) {
     if (!tensor || low > high)
         return;
@@ -39,7 +45,13 @@ void nn_init_uniform(Tensor* tensor, float low, float high) {
     cml_free(samples);
 }
 
-/** Xavier/Glorot uniform init: uniform in +/-sqrt(6/(fan_in+fan_out)). */
+/**
+ * Xavier/Glorot uniform init: uniform in +/-sqrt(6/(fan_in+fan_out)).
+ * @param tensor (Tensor*)
+ * @param fan_in (int)
+ * @param fan_out (int)
+ * @return (void)
+ */
 void nn_init_xavier(Tensor* tensor, int fan_in, int fan_out) {
     if (fan_in <= 0 || fan_out <= 0)
         return;
@@ -47,7 +59,13 @@ void nn_init_xavier(Tensor* tensor, int fan_in, int fan_out) {
     nn_init_uniform(tensor, -scale, scale);
 }
 
-/** Kaiming/He uniform init for conv-style layers: uniform in +/-sqrt(6/(fan_in*kernel_volume)). */
+/**
+ * Kaiming/He uniform init for conv-style layers: uniform in +/-sqrt(6/(fan_in*kernel_volume)).
+ * @param tensor (Tensor*)
+ * @param fan_in (int)
+ * @param kernel_volume (int)
+ * @return (void)
+ */
 void nn_init_kaiming(Tensor* tensor, int fan_in, int kernel_volume) {
     if (fan_in <= 0 || kernel_volume <= 0)
         return;

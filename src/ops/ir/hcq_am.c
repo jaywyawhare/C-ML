@@ -17,13 +17,20 @@
 
 extern CMLAMDriver* cml_dispatch_get_am_driver(void);
 
-/** Build the AQL barrier-AND packet header (type, barrier bit, fence scopes). */
+/**
+ * Build the AQL barrier-AND packet header (type, barrier bit, fence scopes).
+ * @return (uint16_t)
+ */
 static uint16_t am_barrier_header(void) {
     uint16_t header = (2 << 0) | (1 << 8) | (3 << 9) | (3 << 11);
     return header;
 }
 
-/** Bind the queue to the AM driver's shared AQL ring. */
+/**
+ * Bind the queue to the AM driver's shared AQL ring.
+ * @param queue (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_am_queue_init(CMLHCQQueue* queue) {
     CMLAMDriver* drv = cml_dispatch_get_am_driver();
     if (!drv || !drv->initialized) {
@@ -36,7 +43,11 @@ int cml_hcq_am_queue_init(CMLHCQQueue* queue) {
     return 0;
 }
 
-/** Detach the queue from the shared ring (the ring itself is driver-owned). */
+/**
+ * Detach the queue from the shared ring (the ring itself is driver-owned).
+ * @param queue (CMLHCQQueue*)
+ * @return (void)
+ */
 void cml_hcq_am_queue_destroy(CMLHCQQueue* queue) {
     if (!queue)
         return;
@@ -44,7 +55,12 @@ void cml_hcq_am_queue_destroy(CMLHCQQueue* queue) {
     queue->active        = false;
 }
 
-/** Launch a compiled AM kernel with the descriptor's grid/block geometry. */
+/**
+ * Launch a compiled AM kernel with the descriptor's grid/block geometry.
+ * @param queue (CMLHCQQueue*)
+ * @param desc (const CMLHCQKernelDesc*)
+ * @return (int)
+ */
 int cml_hcq_am_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     if (!queue || !desc)
         return -1;
@@ -65,7 +81,14 @@ int cml_hcq_am_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
                                 (uint32_t)(desc->num_args * sizeof(void*)));
 }
 
-/** H2D copy via a GTT staging buffer and SDMA engine (requires SDMA support). */
+/**
+ * H2D copy via a GTT staging buffer and SDMA engine (requires SDMA support).
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_am_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     (void)queue;
 
@@ -97,7 +120,14 @@ int cml_hcq_am_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t
     return -1;
 }
 
-/** D2H copy via SDMA into a GTT staging buffer, then memcpy to host. */
+/**
+ * D2H copy via SDMA into a GTT staging buffer, then memcpy to host.
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_am_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     (void)queue;
 
@@ -129,7 +159,11 @@ int cml_hcq_am_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t
     return -1;
 }
 
-/** Create an AM signal, falling back to the shared driver signal on failure. */
+/**
+ * Create an AM signal, falling back to the shared driver signal on failure.
+ * @param signal (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_am_signal_create(CMLHCQSignal* signal) {
     if (!signal)
         return -1;
@@ -155,7 +189,11 @@ int cml_hcq_am_signal_create(CMLHCQSignal* signal) {
     return 0;
 }
 
-/** Free a per-signal AM handle; never frees the shared driver signal. */
+/**
+ * Free a per-signal AM handle; never frees the shared driver signal.
+ * @param signal (CMLHCQSignal*)
+ * @return (void)
+ */
 void cml_hcq_am_signal_destroy(CMLHCQSignal* signal) {
     if (!signal)
         return;
@@ -173,7 +211,12 @@ void cml_hcq_am_signal_destroy(CMLHCQSignal* signal) {
     signal->native_handle = NULL;
 }
 
-/** Enqueue a barrier-AND packet that signals the target value, then ring the doorbell. */
+/**
+ * Enqueue a barrier-AND packet that signals the target value, then ring the doorbell.
+ * @param queue (CMLHCQQueue*)
+ * @param signal (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_am_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal)
         return -1;
@@ -222,7 +265,12 @@ int cml_hcq_am_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return 0;
 }
 
-/** Enqueue a barrier-AND packet that blocks the ring on the signal's dependency VA. */
+/**
+ * Enqueue a barrier-AND packet that blocks the ring on the signal's dependency VA.
+ * @param queue (CMLHCQQueue*)
+ * @param signal (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_am_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal)
         return -1;
@@ -264,7 +312,12 @@ int cml_hcq_am_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return 0;
 }
 
-/** Block the host on the AM signal, or poll the shared driver signal as a fallback. */
+/**
+ * Block the host on the AM signal, or poll the shared driver signal as a fallback.
+ * @param signal (CMLHCQSignal*)
+ * @param timeout_ms (uint64_t)
+ * @return (int)
+ */
 int cml_hcq_am_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms) {
     if (!signal)
         return -1;
@@ -309,7 +362,11 @@ int cml_hcq_am_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms) {
     return -1;
 }
 
-/** Block until all submitted AM work completes (full driver synchronize). */
+/**
+ * Block until all submitted AM work completes (full driver synchronize).
+ * @param queue (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_am_synchronize(CMLHCQQueue* queue) {
     (void)queue;
 
@@ -325,20 +382,40 @@ int cml_hcq_am_synchronize(CMLHCQQueue* queue) {
 #include <stddef.h>
 #include <stdint.h>
 
-/** Stub: no AM driver compiled in, so the queue cannot bind to a ring. */
+/**
+ * Stub: no AM driver compiled in, so the queue cannot bind to a ring.
+ * @param q (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_am_queue_init(CMLHCQQueue* q) {
     (void)q;
     return -1;
 }
-/** Stub: nothing to detach without the AM driver. */
+/**
+ * Stub: nothing to detach without the AM driver.
+ * @param q (CMLHCQQueue*)
+ * @return (void)
+ */
 void cml_hcq_am_queue_destroy(CMLHCQQueue* q) { (void)q; }
-/** Stub: kernel submission unavailable without the AM driver. */
+/**
+ * Stub: kernel submission unavailable without the AM driver.
+ * @param q (CMLHCQQueue*)
+ * @param d (const CMLHCQKernelDesc*)
+ * @return (int)
+ */
 int cml_hcq_am_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* d) {
     (void)q;
     (void)d;
     return -1;
 }
-/** Stub: H2D copy unavailable without the AM driver. */
+/**
+ * Stub: H2D copy unavailable without the AM driver.
+ * @param q (CMLHCQQueue*)
+ * @param d (void*)
+ * @param s (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_hcq_am_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -346,7 +423,14 @@ int cml_hcq_am_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)n;
     return -1;
 }
-/** Stub: D2H copy unavailable without the AM driver. */
+/**
+ * Stub: D2H copy unavailable without the AM driver.
+ * @param q (CMLHCQQueue*)
+ * @param d (void*)
+ * @param s (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_hcq_am_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -354,32 +438,59 @@ int cml_hcq_am_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)n;
     return -1;
 }
-/** Stub: no AM driver, so no signal can be created. */
+/**
+ * Stub: no AM driver, so no signal can be created.
+ * @param s (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_am_signal_create(CMLHCQSignal* s) {
     (void)s;
     return -1;
 }
-/** Stub: nothing to free without the AM driver. */
+/**
+ * Stub: nothing to free without the AM driver.
+ * @param s (CMLHCQSignal*)
+ * @return (void)
+ */
 void cml_hcq_am_signal_destroy(CMLHCQSignal* s) { (void)s; }
-/** Stub: signal recording unavailable without the AM driver. */
+/**
+ * Stub: signal recording unavailable without the AM driver.
+ * @param q (CMLHCQQueue*)
+ * @param s (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_am_signal_record(CMLHCQQueue* q, CMLHCQSignal* s) {
     (void)q;
     (void)s;
     return -1;
 }
-/** Stub: queue wait unavailable without the AM driver. */
+/**
+ * Stub: queue wait unavailable without the AM driver.
+ * @param q (CMLHCQQueue*)
+ * @param s (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_am_queue_wait(CMLHCQQueue* q, CMLHCQSignal* s) {
     (void)q;
     (void)s;
     return -1;
 }
-/** Stub: host wait unavailable without the AM driver. */
+/**
+ * Stub: host wait unavailable without the AM driver.
+ * @param s (CMLHCQSignal*)
+ * @param t (uint64_t)
+ * @return (int)
+ */
 int cml_hcq_am_signal_wait(CMLHCQSignal* s, uint64_t t) {
     (void)s;
     (void)t;
     return -1;
 }
-/** Stub: nothing to synchronize without the AM driver. */
+/**
+ * Stub: nothing to synchronize without the AM driver.
+ * @param q (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_am_synchronize(CMLHCQQueue* q) {
     (void)q;
     return -1;

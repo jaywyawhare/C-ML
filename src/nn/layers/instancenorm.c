@@ -5,8 +5,13 @@
 #include "core/logging.h"
 #include "alloc/cml_allocator.h"
 
-/** torch.nn.InstanceNorm2d forward: normalize each (sample, channel) over its H*W plane, then
- *  apply the optional per-channel affine. Expects 4D [N,C,H,W]; NULL on shape/channel mismatch. */
+/**
+ * torch.nn.InstanceNorm2d forward: normalize each (sample, channel) over its H*W plane, then
+ * apply the optional per-channel affine. Expects 4D [N,C,H,W]; NULL on shape/channel mismatch.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* instancenorm2d_forward(Module* module, Tensor* input) {
     InstanceNorm2d* in = (InstanceNorm2d*)module;
 
@@ -34,14 +39,26 @@ static Tensor* instancenorm2d_forward(Module* module, Tensor* input) {
     return nn_norm_affine(output, in->weight, in->bias, input->shape, 4, 1);
 }
 
-/** Free the InstanceNorm2d module; affine parameters are released by module_free. */
+/**
+ * Free the InstanceNorm2d module; affine parameters are released by module_free.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void instancenorm2d_free(Module* module) {
     if (module)
         cml_free(module);
 }
 
-/** Construct an InstanceNorm2d layer over num_features channels; allocates weight/bias when
- *  affine. eps falls back to 1e-5 if non-positive. Returns NULL on failure. */
+/**
+ * Construct an InstanceNorm2d layer over num_features channels; allocates weight/bias when
+ * affine. eps falls back to 1e-5 if non-positive. Returns NULL on failure.
+ * @param num_features (int)
+ * @param eps (float)
+ * @param affine (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (InstanceNorm2d*)
+ */
 InstanceNorm2d* nn_instancenorm2d(int num_features, float eps, bool affine, DType dtype,
                                   DeviceType device) {
     InstanceNorm2d* in = cml_malloc(sizeof(InstanceNorm2d));

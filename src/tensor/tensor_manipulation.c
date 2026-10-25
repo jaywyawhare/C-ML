@@ -9,18 +9,37 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** Concatenate tensors along existing dimension `dim` (lazy, via uop_cat). */
+/**
+ * Concatenate tensors along existing dimension `dim` (lazy, via uop_cat).
+ * @param tensors (Tensor**)
+ * @param num_tensors (int)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_concat(Tensor** tensors, int num_tensors, int dim) {
     return uop_cat(tensors, num_tensors, dim);
 }
 
-/** Stack tensors along a new dimension `dim` (lazy, via uop_stack). */
+/**
+ * Stack tensors along a new dimension `dim` (lazy, via uop_stack).
+ * @param tensors (Tensor**)
+ * @param num_tensors (int)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_stack(Tensor** tensors, int num_tensors, int dim) {
     return uop_stack(tensors, num_tensors, dim);
 }
 
-/** Split `tensor` along `dim` into `num_splits` slice views (explicit `split_sizes`
- *  or near-equal chunks). Returns a newly allocated array of tensors, or NULL. */
+/**
+ * Split `tensor` along `dim` into `num_splits` slice views (explicit `split_sizes`
+ * or near-equal chunks). Returns a newly allocated array of tensors, or NULL.
+ * @param tensor (Tensor*)
+ * @param num_splits (int)
+ * @param dim (int)
+ * @param split_sizes (int*)
+ * @return (Tensor**)
+ */
 Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes) {
     if (!tensor || num_splits <= 0) {
         LOG_ERROR("tensor_split: invalid input");
@@ -107,8 +126,14 @@ Tensor** tensor_split(Tensor* tensor, int num_splits, int dim, int* split_sizes)
     return results;
 }
 
-/** Gather along `dim` by `indices`. 1-D indices use the lazy uop_gather; multi-dim
- *  indices take an eager path and must match `input`'s rank. NULL on error. */
+/**
+ * Gather along `dim` by `indices`. 1-D indices use the lazy uop_gather; multi-dim
+ * indices take an eager path and must match `input`'s rank. NULL on error.
+ * @param input (Tensor*)
+ * @param indices (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     if (!input || !indices) {
         LOG_ERROR("tensor_gather: invalid input");
@@ -201,7 +226,14 @@ Tensor* tensor_gather(Tensor* input, Tensor* indices, int dim) {
     return output;
 }
 
-/** Scatter `src` into a copy of `input` at `index` positions along `dim` (lazy). */
+/**
+ * Scatter `src` into a copy of `input` at `index` positions along `dim` (lazy).
+ * @param input (Tensor*)
+ * @param dim (int)
+ * @param index (Tensor*)
+ * @param src (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_scatter(Tensor* input, int dim, Tensor* index, Tensor* src) {
     return uop_scatter(input, dim, index, src);
 }

@@ -8,14 +8,22 @@
 #include <time.h>
 #include "alloc/cml_allocator.h"
 
-/** Monotonic clock reading in milliseconds, for request timing stats. */
+/**
+ * Monotonic clock reading in milliseconds, for request timing stats.
+ * @return (double)
+ */
 static double serving_time_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1.0e6;
 }
 
-/** Find a request by id across both the pending queue and the active batch. */
+/**
+ * Find a request by id across both the pending queue and the active batch.
+ * @param ctx (CMLServingContext*)
+ * @param request_id (int)
+ * @return (CMLSequenceRequest*)
+ */
 static CMLSequenceRequest* find_request(CMLServingContext* ctx, int request_id) {
     if (!ctx)
         return NULL;
@@ -38,7 +46,11 @@ static CMLSequenceRequest* find_request(CMLServingContext* ctx, int request_id) 
     return NULL;
 }
 
-/** Free a request and its prompt/generated token buffers. */
+/**
+ * Free a request and its prompt/generated token buffers.
+ * @param req (CMLSequenceRequest*)
+ * @return (void)
+ */
 static void free_request(CMLSequenceRequest* req) {
     if (!req)
         return;
@@ -47,7 +59,10 @@ static void free_request(CMLSequenceRequest* req) {
     cml_free(req);
 }
 
-/** Default serving config (batch 8, queue 256, 2048 ctx, temp 0.8, top-p 0.9). */
+/**
+ * Default serving config (batch 8, queue 256, 2048 ctx, temp 0.8, top-p 0.9).
+ * @return (CMLServingConfig)
+ */
 CMLServingConfig cml_serving_default_config(void) {
     CMLServingConfig config = {
         .max_batch_size         = 8,
@@ -60,8 +75,12 @@ CMLServingConfig cml_serving_default_config(void) {
     return config;
 }
 
-/** Create a serving context: allocate the request queue and active-batch arrays, clamping
- * limits. */
+/**
+ * Create a serving context: allocate the request queue and active-batch arrays, clamping
+ * limits.
+ * @param config (const CMLServingConfig*)
+ * @return (CMLServingContext*)
+ */
 CMLServingContext* cml_serving_create(const CMLServingConfig* config) {
     if (!config) {
         LOG_ERROR("cml_serving_create: NULL config");
@@ -120,7 +139,11 @@ CMLServingContext* cml_serving_create(const CMLServingConfig* config) {
     return ctx;
 }
 
-/** Free the context and every queued or active request it still holds. */
+/**
+ * Free the context and every queued or active request it still holds.
+ * @param ctx (CMLServingContext*)
+ * @return (void)
+ */
 void cml_serving_free(CMLServingContext* ctx) {
     if (!ctx)
         return;
@@ -145,7 +168,12 @@ void cml_serving_free(CMLServingContext* ctx) {
     cml_free(ctx);
 }
 
-/** Attach a paged KV cache (not owned) to the serving context. */
+/**
+ * Attach a paged KV cache (not owned) to the serving context.
+ * @param ctx (CMLServingContext*)
+ * @param cache (CMLPagedKVCache*)
+ * @return (void)
+ */
 void cml_serving_set_kv_cache(CMLServingContext* ctx, CMLPagedKVCache* cache) {
     if (!ctx)
         return;
@@ -153,7 +181,15 @@ void cml_serving_set_kv_cache(CMLServingContext* ctx, CMLPagedKVCache* cache) {
     LOG_INFO("Paged KV cache set on serving context");
 }
 
-/** Attach the model forward callback plus its vocab size and EOS id used during decoding. */
+/**
+ * Attach the model forward callback plus its vocab size and EOS id used during decoding.
+ * @param ctx (CMLServingContext*)
+ * @param forward_fn (CMLServingForwardFn)
+ * @param model (void*)
+ * @param vocab_size (int)
+ * @param eos_token_id (int)
+ * @return (void)
+ */
 void cml_serving_set_model(CMLServingContext* ctx, CMLServingForwardFn forward_fn, void* model,
                            int vocab_size, int eos_token_id) {
     if (!ctx)
@@ -168,7 +204,10 @@ void cml_serving_set_model(CMLServingContext* ctx, CMLServingForwardFn forward_f
 /* xorshift RNG for stochastic sampling (per-context determinism not required;
  * greedy decoding - temperature <= 0 - is fully deterministic). */
 static uint32_t serving_rng_state = 0x2545F491u;
-/** Next uniform float in [0,1) from the xorshift state. */
+/**
+ * Next uniform float in [0,1) from the xorshift state.
+ * @return (float)
+ */
 static float serving_rand_uniform(void) {
     uint32_t x = serving_rng_state;
     x ^= x << 13;
@@ -178,7 +217,12 @@ static float serving_rand_uniform(void) {
     return (float)(x & 0xffffff) / (float)0x1000000;
 }
 
-/** Index of the largest logit among `n` values. */
+/**
+ * Index of the largest logit among `n` values.
+ * @param logits (const float*)
+ * @param n (int)
+ * @return (int)
+ */
 static int serving_argmax(const float* logits, int n) {
     int best = 0;
     float bv = logits[0];
@@ -304,7 +348,14 @@ static int serving_generate_one(CMLServingContext* ctx, CMLSequenceRequest* req)
     return 0;
 }
 
-/** Enqueue a new generation request (prompt copied in); returns its request id or -1. */
+/**
+ * Enqueue a new generation request (prompt copied in); returns its request id or -1.
+ * @param ctx (CMLServingContext*)
+ * @param prompt_tokens (const int*)
+ * @param num_tokens (int)
+ * @param max_new_tokens (int)
+ * @return (int)
+ */
 int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens, int num_tokens,
                        int max_new_tokens) {
     if (!ctx) {
@@ -379,6 +430,8 @@ int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens, int num
  * Advance one scheduler step: admit queued requests into the batch, move them
  * through prefill to decoding, and generate one token per active sequence
  * (continuous batching). Returns the current batch size.
+ * @param ctx (CMLServingContext*)
+ * @return (int)
  */
 int cml_serving_step(CMLServingContext* ctx) {
     if (!ctx)
@@ -429,7 +482,12 @@ int cml_serving_step(CMLServingContext* ctx) {
     return ctx->batch_size;
 }
 
-/** Current status of a request, or CML_SEQ_STATUS_ERROR if unknown. */
+/**
+ * Current status of a request, or CML_SEQ_STATUS_ERROR if unknown.
+ * @param ctx (CMLServingContext*)
+ * @param request_id (int)
+ * @return (CMLSequenceStatus)
+ */
 CMLSequenceStatus cml_serving_get_status(CMLServingContext* ctx, int request_id) {
     CMLSequenceRequest* req = find_request(ctx, request_id);
     if (!req)
@@ -437,7 +495,13 @@ CMLSequenceStatus cml_serving_get_status(CMLServingContext* ctx, int request_id)
     return req->status;
 }
 
-/** Borrowed pointer to a request's generated tokens; count returned via `out_count`. */
+/**
+ * Borrowed pointer to a request's generated tokens; count returned via `out_count`.
+ * @param ctx (CMLServingContext*)
+ * @param request_id (int)
+ * @param out_count (int*)
+ * @return (const int*)
+ */
 const int* cml_serving_get_tokens(CMLServingContext* ctx, int request_id, int* out_count) {
     if (out_count)
         *out_count = 0;
@@ -449,8 +513,13 @@ const int* cml_serving_get_tokens(CMLServingContext* ctx, int request_id, int* o
     return req->generated_tokens;
 }
 
-/** Finalize an active request: update timing/throughput stats, free it, and evict it from
- * the batch. */
+/**
+ * Finalize an active request: update timing/throughput stats, free it, and evict it from
+ * the batch.
+ * @param ctx (CMLServingContext*)
+ * @param request_id (int)
+ * @return (int)
+ */
 int cml_serving_finish_request(CMLServingContext* ctx, int request_id) {
     if (!ctx)
         return -1;
@@ -508,7 +577,11 @@ int cml_serving_finish_request(CMLServingContext* ctx, int request_id) {
     return 0;
 }
 
-/** Snapshot of the context's aggregate serving statistics (zeroed if ctx is NULL). */
+/**
+ * Snapshot of the context's aggregate serving statistics (zeroed if ctx is NULL).
+ * @param ctx (const CMLServingContext*)
+ * @return (CMLServingStats)
+ */
 CMLServingStats cml_serving_get_stats(const CMLServingContext* ctx) {
     if (!ctx) {
         CMLServingStats empty = {0};

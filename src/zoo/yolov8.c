@@ -8,7 +8,11 @@
 #include <string.h>
 #include <math.h>
 
-/** Default YOLOv8-n config: 640 input, 0.25 conf / 0.45 NMS thresholds, FP32 on CPU. */
+/**
+ * Default YOLOv8-n config: 640 input, 0.25 conf / 0.45 NMS thresholds, FP32 on CPU.
+ * @param num_classes (int)
+ * @return (YOLOv8Config)
+ */
 YOLOv8Config yolov8n_config(int num_classes) {
     YOLOv8Config cfg = {.num_classes    = num_classes > 0 ? num_classes : 80,
                         .input_size     = 640,
@@ -19,7 +23,17 @@ YOLOv8Config yolov8n_config(int num_classes) {
     return cfg;
 }
 
-/** Append a Conv2d -> BatchNorm2d -> SiLU unit (same-size padding) to @p seq. */
+/**
+ * Append a Conv2d -> BatchNorm2d -> SiLU unit (same-size padding) to @p seq.
+ * @param seq (Sequential*)
+ * @param in_ch (int)
+ * @param out_ch (int)
+ * @param kernel (int)
+ * @param stride (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (void)
+ */
 static void add_conv_bn_silu(Sequential* seq, int in_ch, int out_ch, int kernel, int stride,
                              DType dtype, DeviceType device) {
     int pad = kernel / 2;
@@ -29,7 +43,15 @@ static void add_conv_bn_silu(Sequential* seq, int in_ch, int out_ch, int kernel,
     sequential_add(seq, (Module*)nn_silu());
 }
 
-/** Append a YOLOv8 bottleneck (1x1 reduce then 3x3) to @p seq. */
+/**
+ * Append a YOLOv8 bottleneck (1x1 reduce then 3x3) to @p seq.
+ * @param seq (Sequential*)
+ * @param channels (int)
+ * @param shortcut (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (void)
+ */
 static void add_bottleneck(Sequential* seq, int channels, bool shortcut, DType dtype,
                            DeviceType device) {
     int hidden = channels / 2;
@@ -42,7 +64,16 @@ static void add_bottleneck(Sequential* seq, int channels, bool shortcut, DType d
     (void)shortcut;
 }
 
-/** Append a C2f block to @p seq: 1x1 conv, @p n_bottlenecks bottlenecks, then a 1x1 fuse conv. */
+/**
+ * Append a C2f block to @p seq: 1x1 conv, @p n_bottlenecks bottlenecks, then a 1x1 fuse conv.
+ * @param seq (Sequential*)
+ * @param in_ch (int)
+ * @param out_ch (int)
+ * @param n_bottlenecks (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (void)
+ */
 static void add_c2f_block(Sequential* seq, int in_ch, int out_ch, int n_bottlenecks, DType dtype,
                           DeviceType device) {
     sequential_add(seq, (Module*)nn_conv2d(in_ch, out_ch, 1, 1, 0, 1, false, dtype, device));
@@ -57,7 +88,14 @@ static void add_c2f_block(Sequential* seq, int in_ch, int out_ch, int n_bottlene
     sequential_add(seq, (Module*)nn_silu());
 }
 
-/** Append an SPPF block (three cascaded 5x5 maxpools between 1x1 convs) to @p seq. */
+/**
+ * Append an SPPF block (three cascaded 5x5 maxpools between 1x1 convs) to @p seq.
+ * @param seq (Sequential*)
+ * @param channels (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (void)
+ */
 static void add_sppf(Sequential* seq, int channels, DType dtype, DeviceType device) {
     int hidden = channels / 2;
     sequential_add(seq, (Module*)nn_conv2d(channels, hidden, 1, 1, 0, 1, false, dtype, device));
@@ -71,7 +109,16 @@ static void add_sppf(Sequential* seq, int channels, DType dtype, DeviceType devi
     sequential_add(seq, (Module*)nn_silu());
 }
 
-/** Append a decoupled detect head to @p seq: parallel DFL box (4*reg_max) and class branches. */
+/**
+ * Append a decoupled detect head to @p seq: parallel DFL box (4*reg_max) and class branches.
+ * @param seq (Sequential*)
+ * @param in_ch (int)
+ * @param num_classes (int)
+ * @param reg_max (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (void)
+ */
 static void add_detect_head(Sequential* seq, int in_ch, int num_classes, int reg_max, DType dtype,
                             DeviceType device) {
     int bbox_ch = 4 * reg_max;
@@ -87,7 +134,11 @@ static void add_detect_head(Sequential* seq, int in_ch, int num_classes, int reg
     sequential_add(seq, (Module*)nn_conv2d(in_ch, num_classes, 1, 1, 0, 1, true, dtype, device));
 }
 
-/** Build YOLOv8-n: CSPDarknet-nano backbone, PAN-FPN neck and three-scale detect heads. */
+/**
+ * Build YOLOv8-n: CSPDarknet-nano backbone, PAN-FPN neck and three-scale detect heads.
+ * @param config (const YOLOv8Config*)
+ * @return (Module*)
+ */
 Module* cml_zoo_yolov8n(const YOLOv8Config* config) {
     YOLOv8Config cfg = config ? *config : yolov8n_config(80);
     DType dt         = cfg.dtype;
@@ -135,7 +186,11 @@ Module* cml_zoo_yolov8n(const YOLOv8Config* config) {
     return (Module*)model;
 }
 
-/** Default YOLOv8-s config (640 input, FP32/CPU); scaling is applied in build_yolov8. */
+/**
+ * Default YOLOv8-s config (640 input, FP32/CPU); scaling is applied in build_yolov8.
+ * @param num_classes (int)
+ * @return (YOLOv8Config)
+ */
 YOLOv8Config yolov8s_config(int num_classes) {
     YOLOv8Config cfg = {.num_classes    = num_classes > 0 ? num_classes : 80,
                         .input_size     = 640,
@@ -146,7 +201,11 @@ YOLOv8Config yolov8s_config(int num_classes) {
     return cfg;
 }
 
-/** Default YOLOv8-m config (640 input, FP32/CPU); scaling is applied in build_yolov8. */
+/**
+ * Default YOLOv8-m config (640 input, FP32/CPU); scaling is applied in build_yolov8.
+ * @param num_classes (int)
+ * @return (YOLOv8Config)
+ */
 YOLOv8Config yolov8m_config(int num_classes) {
     YOLOv8Config cfg = {.num_classes    = num_classes > 0 ? num_classes : 80,
                         .input_size     = 640,
@@ -157,7 +216,11 @@ YOLOv8Config yolov8m_config(int num_classes) {
     return cfg;
 }
 
-/** Default YOLOv8-l config (640 input, FP32/CPU); scaling is applied in build_yolov8. */
+/**
+ * Default YOLOv8-l config (640 input, FP32/CPU); scaling is applied in build_yolov8.
+ * @param num_classes (int)
+ * @return (YOLOv8Config)
+ */
 YOLOv8Config yolov8l_config(int num_classes) {
     YOLOv8Config cfg = {.num_classes    = num_classes > 0 ? num_classes : 80,
                         .input_size     = 640,
@@ -168,7 +231,11 @@ YOLOv8Config yolov8l_config(int num_classes) {
     return cfg;
 }
 
-/** Default YOLOv8-x config (640 input, FP32/CPU); scaling is applied in build_yolov8. */
+/**
+ * Default YOLOv8-x config (640 input, FP32/CPU); scaling is applied in build_yolov8.
+ * @param num_classes (int)
+ * @return (YOLOv8Config)
+ */
 YOLOv8Config yolov8x_config(int num_classes) {
     YOLOv8Config cfg = {.num_classes    = num_classes > 0 ? num_classes : 80,
                         .input_size     = 640,
@@ -179,19 +246,37 @@ YOLOv8Config yolov8x_config(int num_classes) {
     return cfg;
 }
 
-/** Scaled channel count: round(base * width) to nearest multiple of 8, capped at max_ch. */
+/**
+ * Scaled channel count: round(base * width) to nearest multiple of 8, capped at max_ch.
+ * @param base (int)
+ * @param width (float)
+ * @param max_ch (int)
+ * @return (int)
+ */
 static int scale_ch(int base, float width, int max_ch) {
     int v = (int)(fminf((float)base * width, (float)max_ch) / 8.0f + 0.5f) * 8;
     return v < 8 ? 8 : v;
 }
 
-/** Scaled bottleneck repeat count: round(base_n * depth), clamped to at least 1. */
+/**
+ * Scaled bottleneck repeat count: round(base_n * depth), clamped to at least 1.
+ * @param base_n (int)
+ * @param depth (float)
+ * @return (int)
+ */
 static int scale_depth(int base_n, float depth) {
     int n = (int)((float)base_n * depth + 0.5f);
     return n < 1 ? 1 : n;
 }
 
-/** Build a YOLOv8 model with channels/depth scaled by @p width_mult / @p depth_mult (s/m/l/x). */
+/**
+ * Build a YOLOv8 model with channels/depth scaled by @p width_mult / @p depth_mult (s/m/l/x).
+ * @param depth_mult (float)
+ * @param width_mult (float)
+ * @param max_ch (int)
+ * @param cfg (const YOLOv8Config*)
+ * @return (Module*)
+ */
 static Module* build_yolov8(float depth_mult, float width_mult, int max_ch,
                             const YOLOv8Config* cfg) {
     DType dt       = cfg->dtype;
@@ -253,7 +338,11 @@ static Module* build_yolov8(float depth_mult, float width_mult, int max_ch,
     return (Module*)model;
 }
 
-/** Build YOLOv8-s (depth 0.33, width 0.50, max 1024 channels). */
+/**
+ * Build YOLOv8-s (depth 0.33, width 0.50, max 1024 channels).
+ * @param config (const YOLOv8Config*)
+ * @return (Module*)
+ */
 Module* cml_zoo_yolov8s(const YOLOv8Config* config) {
     YOLOv8Config cfg = config ? *config : yolov8s_config(80);
     Module* model    = build_yolov8(0.33f, 0.50f, 1024, &cfg);
@@ -262,7 +351,11 @@ Module* cml_zoo_yolov8s(const YOLOv8Config* config) {
     return model;
 }
 
-/** Build YOLOv8-m (depth 0.67, width 0.75, max 768 channels). */
+/**
+ * Build YOLOv8-m (depth 0.67, width 0.75, max 768 channels).
+ * @param config (const YOLOv8Config*)
+ * @return (Module*)
+ */
 Module* cml_zoo_yolov8m(const YOLOv8Config* config) {
     YOLOv8Config cfg = config ? *config : yolov8m_config(80);
     Module* model    = build_yolov8(0.67f, 0.75f, 768, &cfg);
@@ -271,7 +364,11 @@ Module* cml_zoo_yolov8m(const YOLOv8Config* config) {
     return model;
 }
 
-/** Build YOLOv8-l (depth 1.00, width 1.00, max 512 channels). */
+/**
+ * Build YOLOv8-l (depth 1.00, width 1.00, max 512 channels).
+ * @param config (const YOLOv8Config*)
+ * @return (Module*)
+ */
 Module* cml_zoo_yolov8l(const YOLOv8Config* config) {
     YOLOv8Config cfg = config ? *config : yolov8l_config(80);
     Module* model    = build_yolov8(1.00f, 1.00f, 512, &cfg);
@@ -280,7 +377,11 @@ Module* cml_zoo_yolov8l(const YOLOv8Config* config) {
     return model;
 }
 
-/** Build YOLOv8-x (depth 1.00, width 1.25, max 640 channels). */
+/**
+ * Build YOLOv8-x (depth 1.00, width 1.25, max 640 channels).
+ * @param config (const YOLOv8Config*)
+ * @return (Module*)
+ */
 Module* cml_zoo_yolov8x(const YOLOv8Config* config) {
     YOLOv8Config cfg = config ? *config : yolov8x_config(80);
     Module* model    = build_yolov8(1.00f, 1.25f, 640, &cfg);

@@ -25,12 +25,18 @@
 static pthread_mutex_t g_device_lock;
 static bool g_device_lock_initialized = false;
 
-/** Acquire the device-state lock if it has been initialized. */
+/**
+ * Acquire the device-state lock if it has been initialized.
+ * @return (void)
+ */
 static inline void device_lock(void) {
     if (g_device_lock_initialized)
         pthread_mutex_lock(&g_device_lock);
 }
-/** Release the device-state lock if it has been initialized. */
+/**
+ * Release the device-state lock if it has been initialized.
+ * @return (void)
+ */
 static inline void device_unlock(void) {
     if (g_device_lock_initialized)
         pthread_mutex_unlock(&g_device_lock);
@@ -89,7 +95,10 @@ static void* g_rocm_lib       = NULL;
 #define hipMemcpyDeviceToHost 2
 #define hipMemcpyDeviceToDevice 3
 
-/** Dynamically load the CUDA runtime and resolve its entry points; false if absent. */
+/**
+ * Dynamically load the CUDA runtime and resolve its entry points; false if absent.
+ * @return (bool)
+ */
 static bool try_load_cuda(void) {
     const char* lib_paths[] = {
 #ifdef __linux__
@@ -129,7 +138,10 @@ static bool try_load_cuda(void) {
     return true;
 }
 
-/** Load CUDA and confirm at least one device is present. */
+/**
+ * Load CUDA and confirm at least one device is present.
+ * @return (bool)
+ */
 static bool check_cuda_available(void) {
     if (!try_load_cuda()) {
         return false;
@@ -156,8 +168,11 @@ static bool check_cuda_available(void) {
     return false;
 }
 
-/** True if a Metal device is present. Delegates to the backend's cached probe
- *  when Metal is compiled in, else dynamically loads the framework once. */
+/**
+ * True if a Metal device is present. Delegates to the backend's cached probe
+ * when Metal is compiled in, else dynamically loads the framework once.
+ * @return (bool)
+ */
 static bool check_metal_available(void) {
 #if defined(CML_HAS_METAL)
     /* The backend caches its device; probing here created (and leaked) a new
@@ -188,7 +203,10 @@ static bool check_metal_available(void) {
     return false;
 }
 
-/** Dynamically load the ROCm/HIP runtime and resolve its entry points; false if absent. */
+/**
+ * Dynamically load the ROCm/HIP runtime and resolve its entry points; false if absent.
+ * @return (bool)
+ */
 static bool try_load_rocm(void) {
     const char* lib_paths[] = {
 #ifdef __linux__
@@ -226,7 +244,10 @@ static bool try_load_rocm(void) {
     }
 }
 
-/** True if ROCm is already loaded or can be loaded now. */
+/**
+ * True if ROCm is already loaded or can be loaded now.
+ * @return (bool)
+ */
 static bool check_rocm_available(void) {
     if (g_rocm_lib) {
         return true; // Already loaded
@@ -234,10 +255,16 @@ static bool check_rocm_available(void) {
     return try_load_rocm();
 }
 
-/** Cached result of CUDA detection. */
+/**
+ * Cached result of CUDA detection.
+ * @return (bool)
+ */
 bool device_cuda_available(void) { return g_cuda_available; }
 
-/** Number of CUDA devices, or 0 when CUDA is unavailable. */
+/**
+ * Number of CUDA devices, or 0 when CUDA is unavailable.
+ * @return (int)
+ */
 int device_cuda_get_count(void) {
     if (!g_cuda_available || !cudaGetDeviceCount)
         return 0;
@@ -248,16 +275,28 @@ int device_cuda_get_count(void) {
     return 0;
 }
 
-/** Cached result of Metal detection. */
+/**
+ * Cached result of Metal detection.
+ * @return (bool)
+ */
 bool device_metal_available(void) { return g_metal_available; }
 
-/** Cached result of ROCm detection. */
+/**
+ * Cached result of ROCm detection.
+ * @return (bool)
+ */
 bool device_rocm_available(void) { return g_rocm_available; }
 
-/** Number of ROCm devices (1 when available, else 0). */
+/**
+ * Number of ROCm devices (1 when available, else 0).
+ * @return (int)
+ */
 int device_rocm_get_count(void) { return g_rocm_available ? 1 : 0; }
 
-/** Preferred accelerator device: CUDA, then Metal, then ROCm, else CPU. */
+/**
+ * Preferred accelerator device: CUDA, then Metal, then ROCm, else CPU.
+ * @return (DeviceType)
+ */
 DeviceType device_get_best_available(void) {
     if (g_cuda_available) {
         return DEVICE_CUDA;
@@ -270,7 +309,10 @@ DeviceType device_get_best_available(void) {
     }
 }
 
-/** Probe all accelerators, cache their availability, and set the default device. */
+/**
+ * Probe all accelerators, cache their availability, and set the default device.
+ * @return (bool)
+ */
 bool device_detect_available(void) {
     g_cuda_available  = check_cuda_available();
     g_metal_available = check_metal_available();
@@ -285,7 +327,10 @@ bool device_detect_available(void) {
     return true;
 }
 
-/** Initialize the device lock and run detection once, idempotently. */
+/**
+ * Initialize the device lock and run detection once, idempotently.
+ * @return (void)
+ */
 void device_init(void) {
     if (g_device_initialized) {
         return;
@@ -300,7 +345,10 @@ void device_init(void) {
     g_device_initialized = true;
 }
 
-/** Unload the CUDA library, reset availability flags, and destroy the device lock. */
+/**
+ * Unload the CUDA library, reset availability flags, and destroy the device lock.
+ * @return (void)
+ */
 void device_cleanup(void) {
     device_lock();
     if (g_cuda_lib) {
@@ -319,7 +367,10 @@ void device_cleanup(void) {
     }
 }
 
-/** Default device, resolving DEVICE_AUTO to the best available accelerator. */
+/**
+ * Default device, resolving DEVICE_AUTO to the best available accelerator.
+ * @return (DeviceType)
+ */
 DeviceType device_get_default(void) {
     if (!g_device_initialized) {
         device_init();
@@ -333,7 +384,11 @@ DeviceType device_get_default(void) {
     return result;
 }
 
-/** Set the default (and current) device, running detection first if needed. */
+/**
+ * Set the default (and current) device, running detection first if needed.
+ * @param device (DeviceType)
+ * @return (void)
+ */
 void device_set_default(DeviceType device) {
     if (!g_device_initialized) {
         if (!g_device_lock_initialized) {
@@ -352,7 +407,10 @@ void device_set_default(DeviceType device) {
     LOG_INFO("Default device set to %s", device_get_name(device));
 }
 
-/** The current device selection. */
+/**
+ * The current device selection.
+ * @return (DeviceType)
+ */
 DeviceType device_get_current(void) {
     device_lock();
     DeviceType result = g_current_device;
@@ -360,14 +418,22 @@ DeviceType device_get_current(void) {
     return result;
 }
 
-/** Set the current device without changing the default. */
+/**
+ * Set the current device without changing the default.
+ * @param device (DeviceType)
+ * @return (void)
+ */
 void device_set_current(DeviceType device) {
     device_lock();
     g_current_device = device;
     device_unlock();
 }
 
-/** Human-readable name for a device type. */
+/**
+ * Human-readable name for a device type.
+ * @param device (DeviceType)
+ * @return (const char*)
+ */
 const char* device_get_name(DeviceType device) {
     switch (device) {
     case DEVICE_CPU:
@@ -389,7 +455,10 @@ const char* device_get_name(DeviceType device) {
     }
 }
 
-/** Print default/current devices and the availability of every accelerator. */
+/**
+ * Print default/current devices and the availability of every accelerator.
+ * @return (void)
+ */
 void device_print_info(void) {
     printf("\nDevice Information\n");
     printf("Default device: %s\n", device_get_name(device_get_default()));
@@ -427,7 +496,13 @@ void device_print_info(void) {
     printf("\n");
 }
 
-/** tensor_empty placed on the default device. */
+/**
+ * tensor_empty placed on the default device.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_empty_auto(int* shape, int ndim, int dtype) {
     TensorConfig config = {.dtype      = (DType)dtype,
                            .device     = device_get_default(),
@@ -436,7 +511,13 @@ Tensor* tensor_empty_auto(int* shape, int ndim, int dtype) {
     return tensor_empty(shape, ndim, &config);
 }
 
-/** tensor_zeros placed on the default device. */
+/**
+ * tensor_zeros placed on the default device.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_zeros_auto(int* shape, int ndim, int dtype) {
     TensorConfig config = {.dtype      = (DType)dtype,
                            .device     = device_get_default(),
@@ -445,7 +526,13 @@ Tensor* tensor_zeros_auto(int* shape, int ndim, int dtype) {
     return tensor_zeros(shape, ndim, &config);
 }
 
-/** tensor_ones placed on the default device. */
+/**
+ * tensor_ones placed on the default device.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_ones_auto(int* shape, int ndim, int dtype) {
     TensorConfig config = {.dtype      = (DType)dtype,
                            .device     = device_get_default(),
@@ -454,8 +541,13 @@ Tensor* tensor_ones_auto(int* shape, int ndim, int dtype) {
     return tensor_ones(shape, ndim, &config);
 }
 
-/** Allocate memory on the given device, honoring MAX_BUFFER_SIZE and falling
- *  back to host memory when the accelerator is unavailable. */
+/**
+ * Allocate memory on the given device, honoring MAX_BUFFER_SIZE and falling
+ * back to host memory when the accelerator is unavailable.
+ * @param size (size_t)
+ * @param device (DeviceType)
+ * @return (void*)
+ */
 void* device_alloc(size_t size, DeviceType device) {
     if (size == 0) {
         LOG_ERROR("Cannot allocate zero bytes");
@@ -576,7 +668,12 @@ void* device_alloc(size_t size, DeviceType device) {
     return ptr;
 }
 
-/** Free a pointer previously returned by device_alloc for the given device. */
+/**
+ * Free a pointer previously returned by device_alloc for the given device.
+ * @param ptr (void*)
+ * @param device (DeviceType)
+ * @return (void)
+ */
 void device_free(void* ptr, DeviceType device) {
     if (!ptr) {
         return;
@@ -642,14 +739,30 @@ void device_free(void* ptr, DeviceType device) {
     }
 }
 
-/** Allocate on the default device. */
+/**
+ * Allocate on the default device.
+ * @param size (size_t)
+ * @return (void*)
+ */
 void* device_alloc_default(size_t size) { return device_alloc(size, device_get_default()); }
 
-/** Free memory from the default device. */
+/**
+ * Free memory from the default device.
+ * @param ptr (void*)
+ * @return (void)
+ */
 void device_free_default(void* ptr) { device_free(ptr, device_get_default()); }
 
-/** Copy bytes between (possibly different) devices, staging through host memory
- *  for device-to-device transfers that have no direct path. */
+/**
+ * Copy bytes between (possibly different) devices, staging through host memory
+ * for device-to-device transfers that have no direct path.
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param size (size_t)
+ * @param dst_device (DeviceType)
+ * @param src_device (DeviceType)
+ * @return (int)
+ */
 int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
                 DeviceType src_device) {
     if (!dst || !src || size == 0) {
@@ -749,18 +862,37 @@ int device_copy(void* dst, const void* src, size_t size, DeviceType dst_device,
     }
 }
 
-/** Copy from host memory to a device buffer. */
+/**
+ * Copy from host memory to a device buffer.
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param size (size_t)
+ * @param device (DeviceType)
+ * @return (int)
+ */
 int device_copy_to_device(void* dst, const void* src, size_t size, DeviceType device) {
     return device_copy(dst, src, size, device, DEVICE_CPU);
 }
 
-/** Copy from a device buffer to host memory. */
+/**
+ * Copy from a device buffer to host memory.
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param size (size_t)
+ * @param device (DeviceType)
+ * @return (int)
+ */
 int device_copy_from_device(void* dst, const void* src, size_t size, DeviceType device) {
     return device_copy(dst, src, size, DEVICE_CPU, device);
 }
 
-/** Relocate a tensor's data to another device, reallocating and freeing the old
- *  buffer; no-op if already on the target device. */
+/**
+ * Relocate a tensor's data to another device, reallocating and freeing the old
+ * buffer; no-op if already on the target device.
+ * @param tensor (Tensor*)
+ * @param device (DeviceType)
+ * @return (int)
+ */
 int device_move_tensor(Tensor* tensor, DeviceType device) {
     if (!tensor) {
         LOG_ERROR("Cannot move NULL tensor");
@@ -796,13 +928,22 @@ int device_move_tensor(Tensor* tensor, DeviceType device) {
     return 0;
 }
 
-/** Move a tensor to the default device. */
+/**
+ * Move a tensor to the default device.
+ * @param tensor (Tensor*)
+ * @return (int)
+ */
 int device_move_tensor_to_default(Tensor* tensor) {
     return device_move_tensor(tensor, device_get_default());
 }
 
-/** Enable the simulated-GPU backend with the given device count and per-device
- *  memory budget, replacing any existing simulation. */
+/**
+ * Enable the simulated-GPU backend with the given device count and per-device
+ * memory budget, replacing any existing simulation.
+ * @param num_devices (int)
+ * @param memory_per_device (size_t)
+ * @return (int)
+ */
 int device_sim_gpu_enable(int num_devices, size_t memory_per_device) {
     if (num_devices <= 0 || num_devices > SIM_GPU_MAX_DEVICES) {
         LOG_ERROR("SimGPU: invalid device count %d (must be 1-%d)", num_devices,
@@ -836,7 +977,10 @@ int device_sim_gpu_enable(int num_devices, size_t memory_per_device) {
     return 0;
 }
 
-/** Disable the simulated-GPU backend and clear its device state. */
+/**
+ * Disable the simulated-GPU backend and clear its device state.
+ * @return (void)
+ */
 void device_sim_gpu_disable(void) {
     device_lock();
     for (int i = 0; i < g_sim_gpu_count; i++) {
@@ -850,7 +994,10 @@ void device_sim_gpu_disable(void) {
     LOG_INFO("SimGPU: disabled");
 }
 
-/** True if the simulated-GPU backend is enabled with at least one device. */
+/**
+ * True if the simulated-GPU backend is enabled with at least one device.
+ * @return (bool)
+ */
 bool device_sim_gpu_available(void) {
     device_lock();
     bool result = g_sim_gpu_enabled && g_sim_gpu_count > 0;
@@ -858,7 +1005,10 @@ bool device_sim_gpu_available(void) {
     return result;
 }
 
-/** Number of simulated GPUs, or 0 when disabled. */
+/**
+ * Number of simulated GPUs, or 0 when disabled.
+ * @return (int)
+ */
 int device_sim_gpu_get_count(void) {
     device_lock();
     int result = g_sim_gpu_enabled ? g_sim_gpu_count : 0;
@@ -866,7 +1016,11 @@ int device_sim_gpu_get_count(void) {
     return result;
 }
 
-/** Select the active simulated GPU by index. */
+/**
+ * Select the active simulated GPU by index.
+ * @param device_id (int)
+ * @return (int)
+ */
 int device_sim_gpu_set_device(int device_id) {
     device_lock();
     if (!g_sim_gpu_enabled || device_id < 0 || device_id >= g_sim_gpu_count) {
@@ -880,7 +1034,10 @@ int device_sim_gpu_set_device(int device_id) {
     return 0;
 }
 
-/** Index of the active simulated GPU. */
+/**
+ * Index of the active simulated GPU.
+ * @return (int)
+ */
 int device_sim_gpu_get_device(void) {
     device_lock();
     int result = g_sim_gpu_current;
@@ -888,7 +1045,12 @@ int device_sim_gpu_get_device(void) {
     return result;
 }
 
-/** Fill a DeviceInfo with a simulated GPU's memory and status. */
+/**
+ * Fill a DeviceInfo with a simulated GPU's memory and status.
+ * @param device_id (int)
+ * @param info (DeviceInfo*)
+ * @return (int)
+ */
 int device_sim_gpu_get_info(int device_id, DeviceInfo* info) {
     if (!info || !g_sim_gpu_enabled || device_id < 0 || device_id >= g_sim_gpu_count) {
         return -1;

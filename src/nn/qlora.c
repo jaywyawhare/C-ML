@@ -13,6 +13,9 @@
 /**
  * Quantize a float tensor to blockwise NF4, retaining per-block scales and the
  * original shape so it can be dequantized later. `block_size` sets the scale granularity.
+ * @param float_tensor (Tensor*)
+ * @param block_size (int)
+ * @return (CMLNF4Tensor*)
  */
 CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size) {
     if (!float_tensor) {
@@ -67,7 +70,11 @@ CMLNF4Tensor* cml_nf4_tensor_create(Tensor* float_tensor, int block_size) {
     return nf4;
 }
 
-/** Free the packed NF4 data, scales and shape copy. */
+/**
+ * Free the packed NF4 data, scales and shape copy.
+ * @param nf4 (CMLNF4Tensor*)
+ * @return (void)
+ */
 void cml_nf4_tensor_free(CMLNF4Tensor* nf4) {
     if (!nf4)
         return;
@@ -87,7 +94,11 @@ void cml_nf4_tensor_free(CMLNF4Tensor* nf4) {
     cml_free(nf4);
 }
 
-/** Reconstruct a float32 tensor from NF4, restored to the original shape. */
+/**
+ * Reconstruct a float32 tensor from NF4, restored to the original shape.
+ * @param nf4 (const CMLNF4Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4) {
     if (!nf4) {
         LOG_ERROR("cml_nf4_tensor_dequantize: NULL NF4 tensor");
@@ -141,6 +152,11 @@ Tensor* cml_nf4_tensor_dequantize(const CMLNF4Tensor* nf4) {
 /**
  * QLoRA layer: quantize `base_weight` to NF4 and add a trainable rank-`r` LoRA
  * adapter (A Gaussian-init, B zero) on top of the frozen quantized base.
+ * @param base_weight (Tensor*)
+ * @param rank (int)
+ * @param alpha (float)
+ * @param block_size (int)
+ * @return (CMLQLoRALinear*)
  */
 CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank, float alpha,
                                         int block_size) {
@@ -224,7 +240,11 @@ CMLQLoRALinear* cml_qlora_linear_create(Tensor* base_weight, int rank, float alp
     return qlora;
 }
 
-/** Free the NF4 base weight and the LoRA A/B tensors. */
+/**
+ * Free the NF4 base weight and the LoRA A/B tensors.
+ * @param qlora (CMLQLoRALinear*)
+ * @return (void)
+ */
 void cml_qlora_linear_free(CMLQLoRALinear* qlora) {
     if (!qlora)
         return;
@@ -247,6 +267,9 @@ void cml_qlora_linear_free(CMLQLoRALinear* qlora) {
 /**
  * QLoRA forward: out = x·Wᵀ + scaling·(x·Aᵀ)·Bᵀ, dequantizing W from NF4 one row
  * at a time so the full float weight is never materialized.
+ * @param qlora (CMLQLoRALinear*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
  */
 Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
     if (!qlora || !input) {
@@ -385,7 +408,11 @@ Tensor* cml_qlora_linear_forward(CMLQLoRALinear* qlora, Tensor* input) {
     return output;
 }
 
-/** Bytes held by the layer: NF4 packed base + scales plus the two LoRA matrices. */
+/**
+ * Bytes held by the layer: NF4 packed base + scales plus the two LoRA matrices.
+ * @param qlora (const CMLQLoRALinear*)
+ * @return (size_t)
+ */
 size_t cml_qlora_memory_usage(const CMLQLoRALinear* qlora) {
     if (!qlora)
         return 0;
@@ -407,7 +434,12 @@ size_t cml_qlora_memory_usage(const CMLQLoRALinear* qlora) {
     return mem;
 }
 
-/** Bytes a full float32 weight of this shape would use, for comparison against QLoRA. */
+/**
+ * Bytes a full float32 weight of this shape would use, for comparison against QLoRA.
+ * @param in_features (int)
+ * @param out_features (int)
+ * @return (size_t)
+ */
 size_t cml_qlora_full_memory_usage(int in_features, int out_features) {
     return (size_t)in_features * (size_t)out_features * sizeof(float);
 }

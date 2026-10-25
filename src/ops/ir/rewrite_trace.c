@@ -39,8 +39,11 @@ static char* dup_cstr(const char* s) {
     return out;
 }
 
-/** Whether rule firings are recorded: VIZ (the rewrite stepper) or REWRITE_TRACE, never under
- *  NO_EXPORT. */
+/**
+ * Whether rule firings are recorded: VIZ (the rewrite stepper) or REWRITE_TRACE, never under
+ * NO_EXPORT.
+ * @return (bool)
+ */
 bool cml_rewrite_trace_enabled(void) {
     return cml_viz_enabled() ||
            (cml_flag_enabled(CML_FLAG_REWRITE_TRACE) && !cml_flag_enabled(CML_FLAG_NO_EXPORT));
@@ -130,7 +133,12 @@ static void buf_puts(Buf* b, const char* s) {
     b->buf[b->len] = '\0';
 }
 
-/** Append `s` as a quoted, JSON-escaped string. */
+/**
+ * Append `s` as a quoted, JSON-escaped string.
+ * @param b (Buf*)
+ * @param s (const char*)
+ * @return (void)
+ */
 static void buf_json_str(Buf* b, const char* s) {
     if (!s)
         s = "";

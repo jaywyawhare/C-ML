@@ -5,31 +5,49 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
-/** Config for ConvNeXt-Tiny (dims 96-192-384-768, depths 3-3-9-3). */
+/**
+ * Config for ConvNeXt-Tiny (dims 96-192-384-768, depths 3-3-9-3).
+ * @return (ConvNeXtConfig)
+ */
 ConvNeXtConfig cml_zoo_convnext_config_tiny(void) {
     ConvNeXtConfig cfg = {.dims = {96, 192, 384, 768}, .depths = {3, 3, 9, 3}};
     return cfg;
 }
 
-/** Config for ConvNeXt-Small (dims 96-192-384-768, depths 3-3-27-3). */
+/**
+ * Config for ConvNeXt-Small (dims 96-192-384-768, depths 3-3-27-3).
+ * @return (ConvNeXtConfig)
+ */
 ConvNeXtConfig cml_zoo_convnext_config_small(void) {
     ConvNeXtConfig cfg = {.dims = {96, 192, 384, 768}, .depths = {3, 3, 27, 3}};
     return cfg;
 }
 
-/** Config for ConvNeXt-Base (dims 128-256-512-1024, depths 3-3-27-3). */
+/**
+ * Config for ConvNeXt-Base (dims 128-256-512-1024, depths 3-3-27-3).
+ * @return (ConvNeXtConfig)
+ */
 ConvNeXtConfig cml_zoo_convnext_config_base(void) {
     ConvNeXtConfig cfg = {.dims = {128, 256, 512, 1024}, .depths = {3, 3, 27, 3}};
     return cfg;
 }
 
-/** Config for ConvNeXt-Large (dims 192-384-768-1536, depths 3-3-27-3). */
+/**
+ * Config for ConvNeXt-Large (dims 192-384-768-1536, depths 3-3-27-3).
+ * @return (ConvNeXtConfig)
+ */
 ConvNeXtConfig cml_zoo_convnext_config_large(void) {
     ConvNeXtConfig cfg = {.dims = {192, 384, 768, 1536}, .depths = {3, 3, 27, 3}};
     return cfg;
 }
 
-/** Build a 7x7 depthwise conv (groups == channels) with same-size padding. */
+/**
+ * Build a 7x7 depthwise conv (groups == channels) with same-size padding.
+ * @param channels (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Conv2d*)
+ */
 static Conv2d* depthwise_conv7x7(int channels, DType dtype, DeviceType device) {
     Conv2d* conv = nn_conv2d(channels, channels, 7, 1, 3, 1, true, dtype, device);
     if (conv)
@@ -42,7 +60,12 @@ typedef struct {
     Sequential* path;
 } ConvNeXtBlock;
 
-/** Forward for a ConvNeXt block: residual add of the block path onto its input. */
+/**
+ * Forward for a ConvNeXt block: residual add of the block path onto its input.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* convnext_block_forward(Module* module, Tensor* input) {
     ConvNeXtBlock* block = (ConvNeXtBlock*)module;
     if (!block || !input)
@@ -55,7 +78,11 @@ static Tensor* convnext_block_forward(Module* module, Tensor* input) {
     return tensor_add(out, input);
 }
 
-/** Free a ConvNeXt block and its inner path module. */
+/**
+ * Free a ConvNeXt block and its inner path module.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void convnext_block_free(Module* module) {
     ConvNeXtBlock* block = (ConvNeXtBlock*)module;
     if (!block)
@@ -65,7 +92,13 @@ static void convnext_block_free(Module* module) {
     cml_free(block);
 }
 
-/** Build one ConvNeXt block: depthwise 7x7 -> LN -> 1x1 expand -> GELU -> 1x1 project. */
+/**
+ * Build one ConvNeXt block: depthwise 7x7 -> LN -> 1x1 expand -> GELU -> 1x1 project.
+ * @param dim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_convnext_block(int dim, DType dtype, DeviceType device) {
     ConvNeXtBlock* block = cml_malloc(sizeof(ConvNeXtBlock));
     if (!block)
@@ -94,7 +127,14 @@ static Module* create_convnext_block(int dim, DType dtype, DeviceType device) {
     return (Module*)block;
 }
 
-/** Build a stage-transition downsampler: LN2d then a stride-2 2x2 conv (in_dim -> out_dim). */
+/**
+ * Build a stage-transition downsampler: LN2d then a stride-2 2x2 conv (in_dim -> out_dim).
+ * @param in_dim (int)
+ * @param out_dim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_downsample(int in_dim, int out_dim, DType dtype, DeviceType device) {
     Sequential* ds = nn_sequential();
     if (!ds)
@@ -109,6 +149,11 @@ static Module* create_downsample(int in_dim, int out_dim, DType dtype, DeviceTyp
 /**
  * Assemble a full ConvNeXt classifier from @p cfg: patchify stem, four stages of blocks
  * with downsampling, then global pool and a linear head over @p num_classes (default 1000).
+ * @param cfg (const ConvNeXtConfig*)
+ * @param num_classes (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
  */
 Module* cml_zoo_convnext_create(const ConvNeXtConfig* cfg, int num_classes, DType dtype,
                                 DeviceType device) {

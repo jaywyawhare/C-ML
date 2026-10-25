@@ -13,8 +13,13 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** torch.nn.Linear forward: output = input @ weight^T + bias as a single fused IR node.
- *  Returns NULL on NULL args or a missing weight parameter. */
+/**
+ * torch.nn.Linear forward: output = input @ weight^T + bias as a single fused IR node.
+ * Returns NULL on NULL args or a missing weight parameter.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* linear_forward(Module* module, Tensor* input) {
     Linear* linear = (Linear*)module;
 
@@ -44,7 +49,11 @@ Tensor* linear_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Free the Linear module; owned parameters are released by module_free. */
+/**
+ * Free the Linear module; owned parameters are released by module_free.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void linear_free_fn(Module* module) {
     Linear* linear = (Linear*)module;
     if (!linear)
@@ -53,12 +62,23 @@ static void linear_free_fn(Module* module) {
     cml_free(linear);
 }
 
-/** Default weight initializer: Xavier/Glorot uniform. */
+/**
+ * Default weight initializer: Xavier/Glorot uniform.
+ * @param tensor (Tensor*)
+ * @param in_features (int)
+ * @param out_features (int)
+ * @return (void)
+ */
 static void xavier_init(Tensor* tensor, int in_features, int out_features) {
     nn_init_xavier(tensor, in_features, out_features);
 }
 
-/** Default bias initializer: fill with zeros. */
+/**
+ * Default bias initializer: fill with zeros.
+ * @param tensor (Tensor*)
+ * @param out_features (int)
+ * @return (void)
+ */
 static void zeros_init(Tensor* tensor, int out_features) {
     (void)out_features;
     if (!tensor)
@@ -74,7 +94,15 @@ static void zeros_init(Tensor* tensor, int out_features) {
     }
 }
 
-/** Construct a Linear layer with default init (Xavier weight, zero bias). NULL on failure. */
+/**
+ * Construct a Linear layer with default init (Xavier weight, zero bias). NULL on failure.
+ * @param in_features (int)
+ * @param out_features (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @param use_bias (bool)
+ * @return (Linear*)
+ */
 Linear* nn_linear(int in_features, int out_features, DType dtype, DeviceType device,
                   bool use_bias) {
     return nn_linear_with_init(in_features, out_features, dtype, device, use_bias,
@@ -82,8 +110,18 @@ Linear* nn_linear(int in_features, int out_features, DType dtype, DeviceType dev
                                (void (*)(Tensor*, int))zeros_init);
 }
 
-/** Construct a Linear layer with caller-supplied weight/bias initializers (NULL falls
- *  back to Xavier/zeros). Weight has shape [out_features, in_features]. NULL on failure. */
+/**
+ * Construct a Linear layer with caller-supplied weight/bias initializers (NULL falls
+ * back to Xavier/zeros). Weight has shape [out_features, in_features]. NULL on failure.
+ * @param in_features (int)
+ * @param out_features (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @param use_bias (bool)
+ * @param weight_init (void (*)(Tensor*, int, int))
+ * @param bias_init (void (*)(Tensor*, int))
+ * @return (Linear*)
+ */
 Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, DeviceType device,
                             bool use_bias, void (*weight_init)(Tensor*, int, int),
                             void (*bias_init)(Tensor*, int)) {
@@ -136,19 +174,40 @@ Linear* nn_linear_with_init(int in_features, int out_features, DType dtype, Devi
     return linear;
 }
 
-/** Number of input features, or 0 if linear is NULL. */
+/**
+ * Number of input features, or 0 if linear is NULL.
+ * @param linear (Linear*)
+ * @return (int)
+ */
 int linear_get_in_features(Linear* linear) { return linear ? linear->in_features : 0; }
 
-/** Number of output features, or 0 if linear is NULL. */
+/**
+ * Number of output features, or 0 if linear is NULL.
+ * @param linear (Linear*)
+ * @return (int)
+ */
 int linear_get_out_features(Linear* linear) { return linear ? linear->out_features : 0; }
 
-/** Weight parameter, or NULL if linear is NULL. */
+/**
+ * Weight parameter, or NULL if linear is NULL.
+ * @param linear (Linear*)
+ * @return (Parameter*)
+ */
 Parameter* linear_get_weight(Linear* linear) { return linear ? linear->weight : NULL; }
 
-/** Bias parameter, or NULL if unused or linear is NULL. */
+/**
+ * Bias parameter, or NULL if unused or linear is NULL.
+ * @param linear (Linear*)
+ * @return (Parameter*)
+ */
 Parameter* linear_get_bias(Linear* linear) { return linear ? linear->bias : NULL; }
 
-/** Replace the weight parameter tensor. Returns -1 on NULL args or set failure. */
+/**
+ * Replace the weight parameter tensor. Returns -1 on NULL args or set failure.
+ * @param linear (Linear*)
+ * @param weight (Tensor*)
+ * @return (int)
+ */
 int linear_set_weight(Linear* linear, Tensor* weight) {
     if (!linear || !weight)
         return -1;
@@ -161,8 +220,13 @@ int linear_set_weight(Linear* linear, Tensor* weight) {
     return 0;
 }
 
-/** Replace the bias parameter tensor. Returns -1 on NULL args, if bias is disabled,
- *  or on set failure. */
+/**
+ * Replace the bias parameter tensor. Returns -1 on NULL args, if bias is disabled,
+ * or on set failure.
+ * @param linear (Linear*)
+ * @param bias (Tensor*)
+ * @return (int)
+ */
 int linear_set_bias(Linear* linear, Tensor* bias) {
     if (!linear || !bias)
         return -1;
@@ -180,12 +244,21 @@ int linear_set_bias(Linear* linear, Tensor* bias) {
     return 0;
 }
 
-/** Toggle whether the layer applies its bias term. No-op if linear is NULL. */
+/**
+ * Toggle whether the layer applies its bias term. No-op if linear is NULL.
+ * @param linear (Linear*)
+ * @param use_bias (bool)
+ * @return (void)
+ */
 void linear_set_use_bias(Linear* linear, bool use_bias) {
     if (linear) {
         linear->use_bias = use_bias;
     }
 }
 
-/** Whether the bias term is active, or false if linear is NULL. */
+/**
+ * Whether the bias term is active, or false if linear is NULL.
+ * @param linear (Linear*)
+ * @return (bool)
+ */
 bool linear_get_use_bias(Linear* linear) { return linear ? linear->use_bias : false; }

@@ -13,7 +13,10 @@
 #include <time.h>
 #include "alloc/cml_allocator.h"
 
-/** Standard hyperparameters for LLaMA-7B (32 layers, hidden 4096, MHA). */
+/**
+ * Standard hyperparameters for LLaMA-7B (32 layers, hidden 4096, MHA).
+ * @return (CMLLLaMAConfig)
+ */
 CMLLLaMAConfig cml_llama_config_7b(void) {
     CMLLLaMAConfig config = {.vocab_size        = 32000,
                              .hidden_size       = 4096,
@@ -27,7 +30,10 @@ CMLLLaMAConfig cml_llama_config_7b(void) {
     return config;
 }
 
-/** Standard hyperparameters for LLaMA-13B (40 layers, hidden 5120, MHA). */
+/**
+ * Standard hyperparameters for LLaMA-13B (40 layers, hidden 5120, MHA).
+ * @return (CMLLLaMAConfig)
+ */
 CMLLLaMAConfig cml_llama_config_13b(void) {
     CMLLLaMAConfig config = {.vocab_size        = 32000,
                              .hidden_size       = 5120,
@@ -41,7 +47,10 @@ CMLLLaMAConfig cml_llama_config_13b(void) {
     return config;
 }
 
-/** Standard hyperparameters for LLaMA-70B (80 layers, hidden 8192, GQA with 8 KV heads). */
+/**
+ * Standard hyperparameters for LLaMA-70B (80 layers, hidden 8192, GQA with 8 KV heads).
+ * @return (CMLLLaMAConfig)
+ */
 CMLLLaMAConfig cml_llama_config_70b(void) {
     CMLLLaMAConfig config = {.vocab_size        = 32000,
                              .hidden_size       = 8192,
@@ -55,7 +64,10 @@ CMLLLaMAConfig cml_llama_config_70b(void) {
     return config;
 }
 
-/** Default sampling config for generation (temp 0.8, top-p 0.9, top-k 40). */
+/**
+ * Default sampling config for generation (temp 0.8, top-p 0.9, top-k 40).
+ * @return (CMLGenerationConfig)
+ */
 CMLGenerationConfig cml_generation_default_config(void) {
     CMLGenerationConfig config = {.temperature    = 0.8f,
                                   .top_p          = 0.9f,
@@ -66,16 +78,29 @@ CMLGenerationConfig cml_generation_default_config(void) {
     return config;
 }
 
-/** RMSNorm over the last dim: x * rsqrt(mean(x^2) + eps), scaled by `weight`.
+/**
+ * RMSNorm over the last dim: x * rsqrt(mean(x^2) + eps), scaled by `weight`.
  * One fused kernel (UOP_RMSNORM) instead of a materialized mul/mean/rsqrt chain,
- * so the lazy graph fuses it and realizes a single output. */
+ * so the lazy graph fuses it and realizes a single output.
+ * @param x (Tensor*)
+ * @param weight (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 static Tensor* rms_norm(Tensor* x, Tensor* weight, float eps) {
     if (!x || !weight)
         return NULL;
     return uop_rmsnorm(x, weight, eps);
 }
 
-/** SwiGLU feed-forward block: down_proj(silu(x·gate_proj) * (x·up_proj)). */
+/**
+ * SwiGLU feed-forward block: down_proj(silu(x·gate_proj) * (x·up_proj)).
+ * @param x (Tensor*)
+ * @param gate_proj (Tensor*)
+ * @param up_proj (Tensor*)
+ * @param down_proj (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* swiglu_ffn(Tensor* x, Tensor* gate_proj, Tensor* up_proj, Tensor* down_proj) {
     if (!x || !gate_proj || !up_proj || !down_proj)
         return NULL;
@@ -110,7 +135,11 @@ static Tensor* swiglu_ffn(Tensor* x, Tensor* gate_proj, Tensor* up_proj, Tensor*
     return output;
 }
 
-/** Allocate one transformer layer with its own KV cache; weight tensors start NULL. */
+/**
+ * Allocate one transformer layer with its own KV cache; weight tensors start NULL.
+ * @param config (const CMLLLaMAConfig*)
+ * @return (CMLLLaMALayer*)
+ */
 static CMLLLaMALayer* llama_layer_create(const CMLLLaMAConfig* config) {
     CMLLLaMALayer* layer = (CMLLLaMALayer*)cml_calloc(1, sizeof(CMLLLaMALayer));
     if (!layer)
@@ -131,7 +160,11 @@ static CMLLLaMALayer* llama_layer_create(const CMLLLaMAConfig* config) {
     return layer;
 }
 
-/** Free a layer's weight tensors and KV cache. */
+/**
+ * Free a layer's weight tensors and KV cache.
+ * @param layer (CMLLLaMALayer*)
+ * @return (void)
+ */
 static void llama_layer_free(CMLLLaMALayer* layer) {
     if (!layer)
         return;
@@ -160,7 +193,11 @@ static void llama_layer_free(CMLLLaMALayer* layer) {
     cml_free(layer);
 }
 
-/** Allocate a LLaMA model and all its layers from `config`; weights loaded separately. */
+/**
+ * Allocate a LLaMA model and all its layers from `config`; weights loaded separately.
+ * @param config (const CMLLLaMAConfig*)
+ * @return (CMLLLaMAModel*)
+ */
 CMLLLaMAModel* cml_llama_create(const CMLLLaMAConfig* config) {
     if (!config) {
         LOG_ERROR("cml_llama_create: NULL config");
@@ -207,7 +244,11 @@ CMLLLaMAModel* cml_llama_create(const CMLLLaMAConfig* config) {
     return model;
 }
 
-/** Free the model: all layers, embedding/norm/head weights and the tokenizer. */
+/**
+ * Free the model: all layers, embedding/norm/head weights and the tokenizer.
+ * @param model (CMLLLaMAModel*)
+ * @return (void)
+ */
 void cml_llama_free(CMLLLaMAModel* model) {
     if (!model)
         return;
@@ -238,6 +279,10 @@ void cml_llama_free(CMLLLaMAModel* model) {
 /**
  * Read one GGUF tensor and bind it to the matching model/layer weight slot,
  * accepting both HF (model.layers.N.*) and llama.cpp (blk.N.*) naming.
+ * @param model (CMLLLaMAModel*)
+ * @param ctx (GGUFContext*)
+ * @param name (const char*)
+ * @return (int)
  */
 static int load_tensor_by_name(CMLLLaMAModel* model, GGUFContext* ctx, const char* name) {
     Tensor* t = gguf_read_tensor(ctx, name);
@@ -363,6 +408,9 @@ static int load_tensor_by_name(CMLLLaMAModel* model, GGUFContext* ctx, const cha
 /**
  * Load all weights and tokenizer metadata from a GGUF file into `model`, tying
  * lm_head to the embeddings when the file omits an output projection.
+ * @param model (CMLLLaMAModel*)
+ * @param filepath (const char*)
+ * @return (int)
  */
 int cml_llama_load_gguf(CMLLLaMAModel* model, const char* filepath) {
     if (!model || !filepath) {
@@ -427,7 +475,13 @@ int cml_llama_load_gguf(CMLLLaMAModel* model, const char* filepath) {
     return 0;
 }
 
-/** Gather embedding rows for `token_ids` into a [seq_len, hidden_size] tensor. */
+/**
+ * Gather embedding rows for `token_ids` into a [seq_len, hidden_size] tensor.
+ * @param embed (Tensor*)
+ * @param token_ids (const int*)
+ * @param seq_len (int)
+ * @return (Tensor*)
+ */
 static Tensor* embed_tokens_lookup(Tensor* embed, const int* token_ids, int seq_len) {
     if (!embed || !token_ids || seq_len <= 0)
         return NULL;
@@ -465,6 +519,11 @@ static Tensor* embed_tokens_lookup(Tensor* embed, const int* token_ids, int seq_
 /**
  * One decoder layer: RMSNorm -> RoPE'd QKV -> cached causal GQA -> output proj with
  * residual, then RMSNorm -> SwiGLU FFN with residual. `start_pos` indexes the KV cache.
+ * @param model (CMLLLaMAModel*)
+ * @param layer (CMLLLaMALayer*)
+ * @param hidden (Tensor*)
+ * @param start_pos (int)
+ * @return (Tensor*)
  */
 Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer, Tensor* hidden,
                                 int start_pos) {
@@ -568,6 +627,10 @@ Tensor* cml_llama_layer_forward(CMLLLaMAModel* model, CMLLLaMALayer* layer, Tens
 /**
  * Full forward pass over `token_ids`: embed, run every layer, final norm and
  * lm_head projection to logits. Advances current_seq_len for KV-cached decoding.
+ * @param model (CMLLLaMAModel*)
+ * @param token_ids (const int*)
+ * @param seq_len (int)
+ * @return (Tensor*)
  */
 Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_len) {
     if (!model || !token_ids || seq_len <= 0) {
@@ -637,7 +700,12 @@ typedef struct {
     int index;
 } LogitEntry;
 
-/** qsort comparator ordering LogitEntry by value, descending. */
+/**
+ * qsort comparator ordering LogitEntry by value, descending.
+ * @param a (const void*)
+ * @param b (const void*)
+ * @return (int)
+ */
 static int logit_entry_cmp_desc(const void* a, const void* b) {
     float va = ((const LogitEntry*)a)->value;
     float vb = ((const LogitEntry*)b)->value;
@@ -651,6 +719,9 @@ static int logit_entry_cmp_desc(const void* a, const void* b) {
 /**
  * Pick the next token from the last position's logits: greedy argmax, or
  * temperature scaling followed by top-k then top-p (nucleus) sampling.
+ * @param logits (Tensor*)
+ * @param config (const CMLGenerationConfig*)
+ * @return (int)
  */
 int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
     if (!logits || !config)
@@ -778,6 +849,10 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
 /**
  * Tokenize `prompt`, prefill, then autoregressively decode up to max_new_tokens
  * (stopping on EOS or context limit), returning the token ids, decoded text and timing.
+ * @param model (CMLLLaMAModel*)
+ * @param prompt (const char*)
+ * @param config (const CMLGenerationConfig*)
+ * @return (CMLGenerationResult*)
  */
 CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt,
                                         const CMLGenerationConfig* config) {
@@ -898,7 +973,11 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
     return result;
 }
 
-/** Free a generation result's token array and decoded text. */
+/**
+ * Free a generation result's token array and decoded text.
+ * @param result (CMLGenerationResult*)
+ * @return (void)
+ */
 void cml_generation_result_free(CMLGenerationResult* result) {
     if (!result)
         return;
@@ -909,7 +988,11 @@ void cml_generation_result_free(CMLGenerationResult* result) {
     cml_free(result);
 }
 
-/** Clear every layer's KV cache and reset the current sequence position to 0. */
+/**
+ * Clear every layer's KV cache and reset the current sequence position to 0.
+ * @param model (CMLLLaMAModel*)
+ * @return (void)
+ */
 void cml_llama_reset(CMLLLaMAModel* model) {
     if (!model)
         return;
@@ -923,7 +1006,11 @@ void cml_llama_reset(CMLLLaMAModel* model) {
     model->current_seq_len = 0;
 }
 
-/** Print the config fields and an estimated parameter count to stdout. */
+/**
+ * Print the config fields and an estimated parameter count to stdout.
+ * @param config (const CMLLLaMAConfig*)
+ * @return (void)
+ */
 void cml_llama_print_config(const CMLLLaMAConfig* config) {
     if (!config)
         return;

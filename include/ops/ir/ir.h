@@ -24,8 +24,12 @@ typedef struct CMLGraph* CMLGraph_t;
 struct IRNode;
 
 CMLGraph_t cml_ir_new(IRTarget target);
-/** Copy of @p ir that cml_ir_optimize can rewrite without changing what @p ir executes; release
- *  it with cml_ir_free. */
+/**
+ * Copy of @p ir that cml_ir_optimize can rewrite without changing what @p ir executes; release
+ * it with cml_ir_free.
+ * @param ir (CMLGraph_t)
+ * @return (CMLGraph_t)
+ */
 CMLGraph_t cml_ir_view(CMLGraph_t ir);
 void cml_ir_free(CMLGraph_t ir);
 int cml_ir_add_uop(CMLGraph_t ir, UOpType type, Tensor** inputs, int num_inputs, void* params);

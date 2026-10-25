@@ -6,7 +6,12 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
-/** True if the group marked this node's buffer as eliminated (fused away, no STORE). */
+/**
+ * True if the group marked this node's buffer as eliminated (fused away, no STORE).
+ * @param g (const CMLFusionGroup*)
+ * @param node_idx (int)
+ * @return (bool)
+ */
 static bool is_eliminated(const CMLFusionGroup* g, int node_idx) {
     if (!g)
         return false;
@@ -17,7 +22,10 @@ static bool is_eliminated(const CMLFusionGroup* g, int node_idx) {
     return false;
 }
 
-/** Allocate an empty linear program with default op/axis capacity and 1x1x1 dims. */
+/**
+ * Allocate an empty linear program with default op/axis capacity and 1x1x1 dims.
+ * @return (LinearProgram*)
+ */
 LinearProgram* linear_program_create(void) {
     LinearProgram* prog = cml_calloc(1, sizeof(LinearProgram));
     if (!prog)
@@ -42,7 +50,11 @@ LinearProgram* linear_program_create(void) {
     return prog;
 }
 
-/** Free a linear program and its op and loop-axis arrays. */
+/**
+ * Free a linear program and its op and loop-axis arrays.
+ * @param prog (LinearProgram*)
+ * @return (void)
+ */
 void linear_program_free(LinearProgram* prog) {
     if (!prog)
         return;
@@ -51,7 +63,12 @@ void linear_program_free(LinearProgram* prog) {
     cml_free(prog);
 }
 
-/** Append an op to the program, growing the op array as needed. */
+/**
+ * Append an op to the program, growing the op array as needed.
+ * @param prog (LinearProgram*)
+ * @param op (LinearOp)
+ * @return (int)
+ */
 int linear_program_emit(LinearProgram* prog, LinearOp op) {
     if (!prog)
         return -1;
@@ -67,7 +84,11 @@ int linear_program_emit(LinearProgram* prog, LinearOp op) {
     return 0;
 }
 
-/** Hand out the next virtual register id, or -1 if the register file is exhausted. */
+/**
+ * Hand out the next virtual register id, or -1 if the register file is exhausted.
+ * @param prog (LinearProgram*)
+ * @return (int)
+ */
 int alloc_vreg(LinearProgram* prog) {
     if (!prog)
         return -1;
@@ -82,6 +103,8 @@ int alloc_vreg(LinearProgram* prog) {
  * Lower a fusion group to a linear LOAD/COMPUTE/STORE program, reusing vregs
  * for already-produced or already-loaded tensors and skipping STOREs for
  * eliminated (fused-away) buffers.
+ * @param g (const CMLFusionGroup*)
+ * @return (LinearProgram*)
  */
 LinearProgram* linearize_group(const CMLFusionGroup* g) {
     if (!g || g->num_nodes == 0)
@@ -182,7 +205,11 @@ LinearProgram* linearize_group(const CMLFusionGroup* g) {
     return prog;
 }
 
-/** Short mnemonic for a linear op kind, used when printing programs. */
+/**
+ * Short mnemonic for a linear op kind, used when printing programs.
+ * @param k (LinearOpKind)
+ * @return (const char*)
+ */
 const char* linop_name(LinearOpKind k) {
     switch (k) {
     case LINOP_LOAD:
@@ -208,7 +235,11 @@ const char* linop_name(LinearOpKind k) {
     }
 }
 
-/** Pretty-print each op with its destination register, sources, and loop info. */
+/**
+ * Pretty-print each op with its destination register, sources, and loop info.
+ * @param prog (const LinearProgram*)
+ * @return (void)
+ */
 void linear_program_print(const LinearProgram* prog) {
     if (!prog) {
         printf("LinearProgram: (null)\n");
@@ -239,7 +270,11 @@ void linear_program_print(const LinearProgram* prog) {
     }
 }
 
-/** Linearize a group and print the resulting program (debug helper). */
+/**
+ * Linearize a group and print the resulting program (debug helper).
+ * @param g (const CMLFusionGroup*)
+ * @return (void)
+ */
 void cml_linearize_group_print(const CMLFusionGroup* g) {
     if (!g)
         return;
@@ -250,7 +285,11 @@ void cml_linearize_group_print(const CMLFusionGroup* g) {
     }
 }
 
-/** Linearize a group and return its op count, or -1 on failure. */
+/**
+ * Linearize a group and return its op count, or -1 on failure.
+ * @param g (const CMLFusionGroup*)
+ * @return (int)
+ */
 int cml_linearize_group_count(const CMLFusionGroup* g) {
     if (!g)
         return -1;

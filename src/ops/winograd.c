@@ -41,7 +41,16 @@ static const float BT_4x4[6][6] = {{4, 0, -5, 0, 1, 0},  {0, -4, -4, 1, 1, 0}, {
 static const float AT_4x4[4][6] = {
     {1, 1, 1, 1, 1, 0}, {0, 1, -1, 2, -2, 0}, {0, 1, 1, 4, 4, 0}, {0, 1, -1, 8, -8, 1}};
 
-/** Naive row-major matrix multiply C(m x n) = A(m x k) * B(k x n) for small transforms. */
+/**
+ * Naive row-major matrix multiply C(m x n) = A(m x k) * B(k x n) for small transforms.
+ * @param A (const float*)
+ * @param B (const float*)
+ * @param C (float*)
+ * @param m (int)
+ * @param k (int)
+ * @param n (int)
+ * @return (void)
+ */
 static void mat_mul_small(const float* A, const float* B, float* C, int m, int k, int n) {
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
@@ -54,14 +63,33 @@ static void mat_mul_small(const float* A, const float* B, float* C, int m, int k
     }
 }
 
-/** Chained multiply D = (A * B) * C via a caller-supplied `tmp` scratch buffer. */
+/**
+ * Chained multiply D = (A * B) * C via a caller-supplied `tmp` scratch buffer.
+ * @param A (const float*)
+ * @param B (const float*)
+ * @param C (const float*)
+ * @param D (float*)
+ * @param m (int)
+ * @param k1 (int)
+ * @param k2 (int)
+ * @param n (int)
+ * @param tmp (float*)
+ * @return (void)
+ */
 static void mat_mul_triple(const float* A, const float* B, const float* C, float* D, int m, int k1,
                            int k2, int n, float* tmp) {
     mat_mul_small(A, B, tmp, m, k1, k2);
     mat_mul_small(tmp, C, D, m, k2, n);
 }
 
-/** Transpose A(m x n) into B(n x m), row-major. */
+/**
+ * Transpose A(m x n) into B(n x m), row-major.
+ * @param A (const float*)
+ * @param B (float*)
+ * @param m (int)
+ * @param n (int)
+ * @return (void)
+ */
 static void mat_transpose(const float* A, float* B, int m, int n) {
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
@@ -70,7 +98,19 @@ static void mat_transpose(const float* A, float* B, int m, int n) {
     }
 }
 
-/** Copy a `tile_size` x `tile_size` patch out of `src`, zero-padding out-of-bounds positions. */
+/**
+ * Copy a `tile_size` x `tile_size` patch out of `src`, zero-padding out-of-bounds positions.
+ * @param src (const float*)
+ * @param tile (float*)
+ * @param tile_row (int)
+ * @param tile_col (int)
+ * @param src_h (int)
+ * @param src_w (int)
+ * @param pad_h (int)
+ * @param pad_w (int)
+ * @param tile_size (int)
+ * @return (void)
+ */
 static void extract_tile(const float* src, float* tile, int tile_row, int tile_col, int src_h,
                          int src_w, int pad_h, int pad_w, int tile_size) {
     for (int i = 0; i < tile_size; i++) {
@@ -98,7 +138,17 @@ static void transform_output_tile(const float* AT_flat, const float* A_flat, con
     mat_mul_triple(AT_flat, M, A_flat, Y, out_tile, ts, ts, out_tile, tmp);
 }
 
-/** Accumulate an `out_tile` x `out_tile` result into `dst`, clipping at the output borders. */
+/**
+ * Accumulate an `out_tile` x `out_tile` result into `dst`, clipping at the output borders.
+ * @param dst (float*)
+ * @param tile (const float*)
+ * @param out_row (int)
+ * @param out_col (int)
+ * @param dst_h (int)
+ * @param dst_w (int)
+ * @param out_tile (int)
+ * @return (void)
+ */
 static void write_output_tile(float* dst, const float* tile, int out_row, int out_col, int dst_h,
                               int dst_w, int out_tile) {
     for (int i = 0; i < out_tile; i++) {
@@ -114,19 +164,40 @@ static void write_output_tile(float* dst, const float* tile, int out_row, int ou
     }
 }
 
-/** Copy a 2-D static transform matrix into a flat row-major buffer. */
+/**
+ * Copy a 2-D static transform matrix into a flat row-major buffer.
+ * @param src (const float*)
+ * @param dst (float*)
+ * @param rows (int)
+ * @param cols (int)
+ * @return (void)
+ */
 static void flatten_G(const float* src, float* dst, int rows, int cols) {
     memcpy(dst, src, (size_t)rows * cols * sizeof(float));
 }
 
-/** True only for 3x3, stride-1, dilation-1 convolutions (the shapes Winograd supports here). */
+/**
+ * True only for 3x3, stride-1, dilation-1 convolutions (the shapes Winograd supports here).
+ * @param kernel_h (int)
+ * @param kernel_w (int)
+ * @param stride_h (int)
+ * @param stride_w (int)
+ * @param dilation_h (int)
+ * @param dilation_w (int)
+ * @return (bool)
+ */
 bool winograd_applicable(int kernel_h, int kernel_w, int stride_h, int stride_w, int dilation_h,
                          int dilation_w) {
     return (kernel_h == 3 && kernel_w == 3 && stride_h == 1 && stride_w == 1 && dilation_h == 1 &&
             dilation_w == 1);
 }
 
-/** Pick F(2x2,3x3) for small spatial sizes (h<=8 or w<=8), else F(4x4,3x3). */
+/**
+ * Pick F(2x2,3x3) for small spatial sizes (h<=8 or w<=8), else F(4x4,3x3).
+ * @param height (int)
+ * @param width (int)
+ * @return (WinogradConfig)
+ */
 WinogradConfig winograd_select_variant(int height, int width) {
     WinogradConfig cfg;
     cfg.kernel_size = 3;
@@ -181,9 +252,25 @@ int winograd_transform_weight(const float* weight, int out_channels, int in_chan
     return 0;
 }
 
-/** Full grouped Winograd conv2d: transforms weights and input tiles, does the element-wise
- *  product in the transform domain, inverse-transforms, adds bias, and writes `output`.
- *  Returns 0 on success or -1 on bad args / allocation failure. */
+/**
+ * Full grouped Winograd conv2d: transforms weights and input tiles, does the element-wise
+ * product in the transform domain, inverse-transforms, adds bias, and writes `output`.
+ * Returns 0 on success or -1 on bad args / allocation failure.
+ * @param input (const float*)
+ * @param weight (const float*)
+ * @param bias (const float*)
+ * @param output (float*)
+ * @param batch (int)
+ * @param in_channels (int)
+ * @param out_channels (int)
+ * @param height (int)
+ * @param width (int)
+ * @param padding_h (int)
+ * @param padding_w (int)
+ * @param groups (int)
+ * @param config (const WinogradConfig*)
+ * @return (int)
+ */
 int winograd_conv2d(const float* input, const float* weight, const float* bias, float* output,
                     int batch, int in_channels, int out_channels, int height, int width,
                     int padding_h, int padding_w, int groups, const WinogradConfig* config) {

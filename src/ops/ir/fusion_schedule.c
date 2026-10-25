@@ -21,7 +21,11 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
-/** Classify a UOp into a schedule item type (mirrors schedule.c) */
+/**
+ * Classify a UOp into a schedule item type (mirrors schedule.c)
+ * @param type (UOpType)
+ * @return (CMLScheduleItemType)
+ */
 static CMLScheduleItemType classify_fusion_op(UOpType type) {
     if (type == UOP_MATMUL)
         return SCHED_MATMUL;
@@ -36,8 +40,13 @@ static CMLScheduleItemType classify_fusion_op(UOpType type) {
     return SCHED_CUSTOM;
 }
 
-/** Determine the dominant type for a fusion group.
- *  Priority: MATMUL/CONV > REDUCE > ELEMENTWISE > MOVEMENT */
+/**
+ * Determine the dominant type for a fusion group.
+ * Priority: MATMUL/CONV > REDUCE > ELEMENTWISE > MOVEMENT
+ * @param a (CMLScheduleItemType)
+ * @param b (CMLScheduleItemType)
+ * @return (CMLScheduleItemType)
+ */
 static CMLScheduleItemType dominant_type(CMLScheduleItemType a, CMLScheduleItemType b) {
     if (a == SCHED_MATMUL || b == SCHED_MATMUL)
         return SCHED_MATMUL;
@@ -50,7 +59,11 @@ static CMLScheduleItemType dominant_type(CMLScheduleItemType a, CMLScheduleItemT
     return a;
 }
 
-/** Estimate element count from a tensor (0 if unknown). */
+/**
+ * Estimate element count from a tensor (0 if unknown).
+ * @param t (const Tensor*)
+ * @return (size_t)
+ */
 static size_t tensor_elems(const Tensor* t) {
     if (!t || !t->shape || t->ndim <= 0)
         return 0;
@@ -63,7 +76,10 @@ static size_t tensor_elems(const Tensor* t) {
     return n;
 }
 
-/** Allocate an empty fusion group (weakest MOVEMENT type until nodes promote it). */
+/**
+ * Allocate an empty fusion group (weakest MOVEMENT type until nodes promote it).
+ * @return (CMLFusionGroup*)
+ */
 static CMLFusionGroup* fusion_group_create(void) {
     CMLFusionGroup* g = cml_calloc(1, sizeof(CMLFusionGroup));
     if (!g)
@@ -87,7 +103,12 @@ static CMLFusionGroup* fusion_group_create(void) {
     return g;
 }
 
-/** Append a node to the group, promoting its dominant type and accumulating flop/memory cost. */
+/**
+ * Append a node to the group, promoting its dominant type and accumulating flop/memory cost.
+ * @param g (CMLFusionGroup*)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int fusion_group_add_node(CMLFusionGroup* g, struct IRNode* node) {
     if (!g || !node)
         return -1;
@@ -144,7 +165,12 @@ static int fusion_group_add_node(CMLFusionGroup* g, struct IRNode* node) {
     return 0;
 }
 
-/** Record a buffer index whose materialization is eliminated by fusion. */
+/**
+ * Record a buffer index whose materialization is eliminated by fusion.
+ * @param g (CMLFusionGroup*)
+ * @param buffer_idx (int)
+ * @return (void)
+ */
 static void fusion_group_add_eliminated(CMLFusionGroup* g, int buffer_idx) {
     if (!g)
         return;
@@ -173,7 +199,11 @@ static void fusion_push_group(CMLFusionSchedule* sched, CMLFusionGroup* group) {
     sched->groups[sched->num_groups++] = group;
 }
 
-/** Free a fusion group's node and eliminated-buffer arrays. */
+/**
+ * Free a fusion group's node and eliminated-buffer arrays.
+ * @param g (CMLFusionGroup*)
+ * @return (void)
+ */
 static void fusion_group_free(CMLFusionGroup* g) {
     if (!g)
         return;
@@ -182,8 +212,13 @@ static void fusion_group_free(CMLFusionGroup* g) {
     cml_free(g);
 }
 
-/** Analyze fusing producer `a` into consumer `b`: fuseability, buffer eliminated, and a
- *  memory-saving-based benefit estimate. */
+/**
+ * Analyze fusing producer `a` into consumer `b`: fuseability, buffer eliminated, and a
+ * memory-saving-based benefit estimate.
+ * @param a (struct IRNode*)
+ * @param b (struct IRNode*)
+ * @return (CMLFusionAnalysis)
+ */
 CMLFusionAnalysis cml_schedule_analyze_fusion(struct IRNode* a, struct IRNode* b) {
     CMLFusionAnalysis result = {0};
     if (!a || !b)
@@ -210,8 +245,13 @@ CMLFusionAnalysis cml_schedule_analyze_fusion(struct IRNode* a, struct IRNode* b
     return result;
 }
 
-/** Build a fusion schedule by greedily grouping fuseable ops (movement is free, reduce->elem
- *  guarded), then order groups (BFS or sequential) and derive a memory plan. */
+/**
+ * Build a fusion schedule by greedily grouping fuseable ops (movement is free, reduce->elem
+ * guarded), then order groups (BFS or sequential) and derive a memory plan.
+ * @param graph (CMLGraph_t)
+ * @param opts (const CMLScheduleOptions*)
+ * @return (CMLFusionSchedule*)
+ */
 CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph, const CMLScheduleOptions* opts) {
     CMLScheduleOptions default_opts;
     if (!opts) {
@@ -535,7 +575,11 @@ CMLFusionSchedule* cml_fusion_schedule_create(CMLGraph_t graph, const CMLSchedul
     return sched;
 }
 
-/** Free a fusion schedule, its groups, execution order, and memory plan. */
+/**
+ * Free a fusion schedule, its groups, execution order, and memory plan.
+ * @param sched (CMLFusionSchedule*)
+ * @return (void)
+ */
 void cml_fusion_schedule_free(CMLFusionSchedule* sched) {
     if (!sched)
         return;
@@ -549,7 +593,11 @@ void cml_fusion_schedule_free(CMLFusionSchedule* sched) {
     cml_free(sched);
 }
 
-/** Human-readable name for a schedule item type. */
+/**
+ * Human-readable name for a schedule item type.
+ * @param type (CMLScheduleItemType)
+ * @return (const char*)
+ */
 static const char* fusion_sched_type_name(CMLScheduleItemType type) {
     switch (type) {
     case SCHED_ELEMENTWISE:
@@ -571,7 +619,11 @@ static const char* fusion_sched_type_name(CMLScheduleItemType type) {
     }
 }
 
-/** Print fusion statistics and each group's nodes (and memory plan) to stdout. */
+/**
+ * Print fusion statistics and each group's nodes (and memory plan) to stdout.
+ * @param sched (const CMLFusionSchedule*)
+ * @return (void)
+ */
 void cml_fusion_schedule_print(const CMLFusionSchedule* sched) {
     if (!sched) {
         printf("FusionSchedule: (null)\n");
@@ -605,8 +657,12 @@ void cml_fusion_schedule_print(const CMLFusionSchedule* sched) {
         cml_memory_plan_print(sched->memory_plan);
 }
 
-/** Execute a graph through real fusion: decompose inference composites, collapse single-use
- *  elementwise chains and matmul epilogues, then run on the CPU. */
+/**
+ * Execute a graph through real fusion: decompose inference composites, collapse single-use
+ * elementwise chains and matmul epilogues, then run on the CPU.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_execute_fusion(CMLGraph_t ir) {
     if (!ir)
         return -1;

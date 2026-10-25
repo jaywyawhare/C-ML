@@ -30,14 +30,22 @@ typedef struct {
     size_t cap;
 } PBBuf;
 
-/** Initialize an empty, unallocated growable protobuf output buffer. */
+/**
+ * Initialize an empty, unallocated growable protobuf output buffer.
+ * @param b (PBBuf*)
+ * @return (void)
+ */
 static void pb_init(PBBuf* b) {
     b->data = NULL;
     b->len  = 0;
     b->cap  = 0;
 }
 
-/** Release a buffer's storage and reset it to the empty state. */
+/**
+ * Release a buffer's storage and reset it to the empty state.
+ * @param b (PBBuf*)
+ * @return (void)
+ */
 static void pb_free(PBBuf* b) {
     free(b->data);
     b->data = NULL;
@@ -45,7 +53,12 @@ static void pb_free(PBBuf* b) {
     b->cap  = 0;
 }
 
-/** Ensure room for @p extra more bytes, doubling capacity as needed. */
+/**
+ * Ensure room for @p extra more bytes, doubling capacity as needed.
+ * @param b (PBBuf*)
+ * @param extra (size_t)
+ * @return (bool)
+ */
 static bool pb_reserve(PBBuf* b, size_t extra) {
     if (b->len + extra <= b->cap)
         return true;
@@ -60,7 +73,13 @@ static bool pb_reserve(PBBuf* b, size_t extra) {
     return true;
 }
 
-/** Append @p n raw bytes to the buffer. */
+/**
+ * Append @p n raw bytes to the buffer.
+ * @param b (PBBuf*)
+ * @param p (const void*)
+ * @param n (size_t)
+ * @return (bool)
+ */
 static bool pb_put(PBBuf* b, const void* p, size_t n) {
     if (!pb_reserve(b, n))
         return false;
@@ -70,7 +89,12 @@ static bool pb_put(PBBuf* b, const void* p, size_t n) {
     return true;
 }
 
-/** Append @p v as a base-128 varint. */
+/**
+ * Append @p v as a base-128 varint.
+ * @param b (PBBuf*)
+ * @param v (uint64_t)
+ * @return (bool)
+ */
 static bool pb_varint(PBBuf* b, uint64_t v) {
     uint8_t tmp[10];
     int n = 0;
@@ -84,7 +108,13 @@ static bool pb_varint(PBBuf* b, uint64_t v) {
     return pb_put(b, tmp, (size_t)n);
 }
 
-/** Append a field key: the field number shifted with its wire type. */
+/**
+ * Append a field key: the field number shifted with its wire type.
+ * @param b (PBBuf*)
+ * @param field (int)
+ * @param wt (int)
+ * @return (bool)
+ */
 static bool pb_tag(PBBuf* b, int field, int wt) {
     return pb_varint(b, ((uint64_t)field << 3) | (uint64_t)wt);
 }
@@ -93,32 +123,70 @@ static bool pb_tag(PBBuf* b, int field, int wt) {
 #define PB_WT_LEN 2
 #define PB_WT_FIXED32 5
 
-/** Write a varint-typed field (tag + value). */
+/**
+ * Write a varint-typed field (tag + value).
+ * @param b (PBBuf*)
+ * @param field (int)
+ * @param v (uint64_t)
+ * @return (bool)
+ */
 static bool pb_field_varint(PBBuf* b, int field, uint64_t v) {
     return pb_tag(b, field, PB_WT_VARINT) && pb_varint(b, v);
 }
 
-/** Write a float field as a fixed32 (tag + 4 little-endian bytes). */
+/**
+ * Write a float field as a fixed32 (tag + 4 little-endian bytes).
+ * @param b (PBBuf*)
+ * @param field (int)
+ * @param f (float)
+ * @return (bool)
+ */
 static bool pb_field_float(PBBuf* b, int field, float f) {
     return pb_tag(b, field, PB_WT_FIXED32) && pb_put(b, &f, 4);
 }
 
-/** Write a length-delimited field: tag, byte count, then @p n bytes of payload. */
+/**
+ * Write a length-delimited field: tag, byte count, then @p n bytes of payload.
+ * @param b (PBBuf*)
+ * @param field (int)
+ * @param p (const void*)
+ * @param n (size_t)
+ * @return (bool)
+ */
 static bool pb_field_len(PBBuf* b, int field, const void* p, size_t n) {
     return pb_tag(b, field, PB_WT_LEN) && pb_varint(b, n) && pb_put(b, p, n);
 }
 
-/** Write a sub-message field by embedding another buffer as its payload. */
+/**
+ * Write a sub-message field by embedding another buffer as its payload.
+ * @param b (PBBuf*)
+ * @param field (int)
+ * @param child (const PBBuf*)
+ * @return (bool)
+ */
 static bool pb_field_buf(PBBuf* b, int field, const PBBuf* child) {
     return pb_field_len(b, field, child->data, child->len);
 }
 
-/** Write a C string as a length-delimited field (no NUL stored). */
+/**
+ * Write a C string as a length-delimited field (no NUL stored).
+ * @param b (PBBuf*)
+ * @param field (int)
+ * @param s (const char*)
+ * @return (bool)
+ */
 static bool pb_field_str(PBBuf* b, int field, const char* s) {
     return pb_field_len(b, field, s, strlen(s));
 }
 
-/** Write @p n int64 values as one packed-repeated varint field. */
+/**
+ * Write @p n int64 values as one packed-repeated varint field.
+ * @param b (PBBuf*)
+ * @param field (int)
+ * @param v (const int64_t*)
+ * @param n (int)
+ * @return (bool)
+ */
 static bool pb_field_packed_int64(PBBuf* b, int field, const int64_t* v, int n) {
     PBBuf payload;
     pb_init(&payload);
@@ -167,7 +235,13 @@ typedef struct {
 static const char* ctx_error(ExportCtx* c, const char* fmt, ...)
     __attribute__((format(printf, 2, 3)));
 
-/** Record a printf-style error message in the context and return it for logging. */
+/**
+ * Record a printf-style error message in the context and return it for logging.
+ * @param c (ExportCtx*)
+ * @param fmt (const char*)
+ * @param ... variadic arguments
+ * @return (const char*)
+ */
 static const char* ctx_error(ExportCtx* c, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -197,7 +271,12 @@ static const char* intern_name(ExportCtx* c, Tensor* t, const char* name) {
     return e->name;
 }
 
-/** Return the interned export name for tensor @p t, or NULL if not registered. */
+/**
+ * Return the interned export name for tensor @p t, or NULL if not registered.
+ * @param c (ExportCtx*)
+ * @param t (Tensor*)
+ * @return (const char*)
+ */
 static const char* lookup_name(ExportCtx* c, Tensor* t) {
     for (int i = 0; i < c->num_names; i++)
         if (c->names[i].t == t)
@@ -205,7 +284,12 @@ static const char* lookup_name(ExportCtx* c, Tensor* t) {
     return NULL;
 }
 
-/** True if @p t is one of the caller-declared graph inputs (vs. an initializer). */
+/**
+ * True if @p t is one of the caller-declared graph inputs (vs. an initializer).
+ * @param c (ExportCtx*)
+ * @param t (Tensor*)
+ * @return (bool)
+ */
 static bool is_user_input(ExportCtx* c, Tensor* t) {
     for (int i = 0; i < c->num_user_inputs; i++)
         if (c->user_inputs[i] == t)
@@ -313,7 +397,12 @@ typedef struct {
     int n;
 } AttrList;
 
-/** Move a built AttributeProto buffer into the list; frees it if the list is full. */
+/**
+ * Move a built AttributeProto buffer into the list; frees it if the list is full.
+ * @param l (AttrList*)
+ * @param msg (PBBuf*)
+ * @return (bool)
+ */
 static bool attr_push(AttrList* l, PBBuf* msg) {
     if (l->n >= ATTR_MAX) {
         pb_free(msg);
@@ -324,7 +413,13 @@ static bool attr_push(AttrList* l, PBBuf* msg) {
     return true;
 }
 
-/** Append an INT AttributeProto (name + i value) to the list. */
+/**
+ * Append an INT AttributeProto (name + i value) to the list.
+ * @param l (AttrList*)
+ * @param name (const char*)
+ * @param v (int64_t)
+ * @return (bool)
+ */
 static bool attr_int(AttrList* l, const char* name, int64_t v) {
     PBBuf a;
     pb_init(&a);
@@ -333,7 +428,13 @@ static bool attr_int(AttrList* l, const char* name, int64_t v) {
     return ok && attr_push(l, &a);
 }
 
-/** Append a FLOAT AttributeProto (name + f value) to the list. */
+/**
+ * Append a FLOAT AttributeProto (name + f value) to the list.
+ * @param l (AttrList*)
+ * @param name (const char*)
+ * @param v (float)
+ * @return (bool)
+ */
 static bool attr_float_attr(AttrList* l, const char* name, float v) {
     PBBuf a;
     pb_init(&a);
@@ -342,7 +443,14 @@ static bool attr_float_attr(AttrList* l, const char* name, float v) {
     return ok && attr_push(l, &a);
 }
 
-/** Append an INTS AttributeProto (name + packed int64 list) to the list. */
+/**
+ * Append an INTS AttributeProto (name + packed int64 list) to the list.
+ * @param l (AttrList*)
+ * @param name (const char*)
+ * @param v (const int64_t*)
+ * @param count (int)
+ * @return (bool)
+ */
 static bool attr_ints(AttrList* l, const char* name, const int64_t* v, int count) {
     PBBuf a;
     pb_init(&a);
@@ -351,7 +459,16 @@ static bool attr_ints(AttrList* l, const char* name, const int64_t* v, int count
     return ok && attr_push(l, &a);
 }
 
-/** Serialize one NodeProto (inputs, single output, generated name, op_type, attrs). */
+/**
+ * Serialize one NodeProto (inputs, single output, generated name, op_type, attrs).
+ * @param c (ExportCtx*)
+ * @param op_type (const char*)
+ * @param ins (const char* const*)
+ * @param nin (int)
+ * @param out_name (const char*)
+ * @param attrs (AttrList*)
+ * @return (bool)
+ */
 static bool emit_node_full(ExportCtx* c, const char* op_type, const char* const* ins, int nin,
                            const char* out_name, AttrList* attrs) {
     PBBuf nd;
@@ -377,7 +494,12 @@ static bool emit_node_full(ExportCtx* c, const char* op_type, const char* const*
     return ok;
 }
 
-/** Normalize a possibly-negative axis into [0, rank), clamping out-of-range values. */
+/**
+ * Normalize a possibly-negative axis into [0, rank), clamping out-of-range values.
+ * @param axis (int)
+ * @param rank (int)
+ * @return (int)
+ */
 static int norm_axis(int axis, int rank) {
     if (axis < 0)
         axis += rank;
@@ -390,7 +512,11 @@ static int norm_axis(int axis, int rank) {
 
 /* ── op mapping ───────────────────────────────────────────────────────────── */
 
-/** Map an IR UOp type to its ONNX op name; NULL for ops with no direct equivalent. */
+/**
+ * Map an IR UOp type to its ONNX op name; NULL for ops with no direct equivalent.
+ * @param n (struct IRNode*)
+ * @return (const char*)
+ */
 static const char* map_uop(struct IRNode* n) {
     switch (n->type) {
     /* elementwise binary */
@@ -766,7 +892,16 @@ static int export_special(ExportCtx* c, struct IRNode* n, const char* const* in_
     }
 }
 
-/** Serialize an IR graph to an .onnx file (opset 12). Returns 0 on success, -1 on error. */
+/**
+ * Serialize an IR graph to an .onnx file (opset 12). Returns 0 on success, -1 on error.
+ * @param ir_handle (struct CMLGraph*)
+ * @param graph_inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param graph_outputs (Tensor**)
+ * @param num_outputs (int)
+ * @param filepath (const char*)
+ * @return (int)
+ */
 int cml_onnx_export_graph(struct CMLGraph* ir_handle, Tensor** graph_inputs, int num_inputs,
                           Tensor** graph_outputs, int num_outputs, const char* filepath) {
     if (!ir_handle || !graph_outputs || num_outputs <= 0 || !filepath ||

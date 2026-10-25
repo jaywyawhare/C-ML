@@ -22,7 +22,12 @@
 
 /* Minimal JSON helpers */
 
-/** Point just past "key": in a flat JSON string, at the start of its value; NULL if absent. */
+/**
+ * Point just past "key": in a flat JSON string, at the start of its value; NULL if absent.
+ * @param json (const char*)
+ * @param key (const char*)
+ * @return (const char*)
+ */
 static const char* json_find_key(const char* json, const char* key) {
     char pattern[256];
     snprintf(pattern, sizeof(pattern), "\"%s\"", key);
@@ -35,7 +40,13 @@ static const char* json_find_key(const char* json, const char* key) {
     return p;
 }
 
-/** Read a quoted JSON string at `p` into `out`, decoding common backslash escapes. */
+/**
+ * Read a quoted JSON string at `p` into `out`, decoding common backslash escapes.
+ * @param p (const char*)
+ * @param out (char*)
+ * @param out_size (size_t)
+ * @return (int)
+ */
 static int json_read_string(const char* p, char* out, size_t out_size) {
     if (!p || *p != '"')
         return -1;
@@ -70,7 +81,12 @@ static int json_read_string(const char* p, char* out, size_t out_size) {
     return 0;
 }
 
-/** Parse a float at `p`, falling back to `def` if `p` is NULL or non-numeric. */
+/**
+ * Parse a float at `p`, falling back to `def` if `p` is NULL or non-numeric.
+ * @param p (const char*)
+ * @param def (float)
+ * @return (float)
+ */
 static float json_read_float(const char* p, float def) {
     if (!p)
         return def;
@@ -79,7 +95,12 @@ static float json_read_float(const char* p, float def) {
     return (end != p) ? v : def;
 }
 
-/** Parse an int at `p`, falling back to `def` if `p` is NULL or non-numeric. */
+/**
+ * Parse an int at `p`, falling back to `def` if `p` is NULL or non-numeric.
+ * @param p (const char*)
+ * @param def (int)
+ * @return (int)
+ */
 static int json_read_int(const char* p, int def) {
     if (!p)
         return def;
@@ -88,7 +109,12 @@ static int json_read_int(const char* p, int def) {
     return (end != p) ? (int)v : def;
 }
 
-/** Parse a JSON true/false at `p`, falling back to `def` otherwise. */
+/**
+ * Parse a JSON true/false at `p`, falling back to `def` otherwise.
+ * @param p (const char*)
+ * @param def (bool)
+ * @return (bool)
+ */
 static bool json_read_bool(const char* p, bool def) {
     if (!p)
         return def;
@@ -104,7 +130,13 @@ typedef struct {
     char content[8192];
 } ChatMessage;
 
-/** Parse the "messages" array into `msgs` (role/content per object); returns the count. */
+/**
+ * Parse the "messages" array into `msgs` (role/content per object); returns the count.
+ * @param json (const char*)
+ * @param msgs (ChatMessage*)
+ * @param max_msgs (int)
+ * @return (int)
+ */
 static int parse_messages(const char* json, ChatMessage* msgs, int max_msgs) {
     const char* arr = json_find_key(json, "messages");
     if (!arr || *arr != '[')
@@ -143,7 +175,13 @@ static int parse_messages(const char* json, ChatMessage* msgs, int max_msgs) {
 
 /* HTTP helpers */
 
-/** Read an HTTP request into `buf`, continuing until the body satisfies Content-Length. */
+/**
+ * Read an HTTP request into `buf`, continuing until the body satisfies Content-Length.
+ * @param fd (int)
+ * @param buf (char*)
+ * @param buf_size (size_t)
+ * @return (int)
+ */
 static int recv_http_request(int fd, char* buf, size_t buf_size) {
     size_t total = 0;
     while (total < buf_size - 1) {
@@ -175,7 +213,15 @@ static int recv_http_request(int fd, char* buf, size_t buf_size) {
     return (int)total;
 }
 
-/** Send a complete HTTP response (status line, CORS headers and body) on `fd`. */
+/**
+ * Send a complete HTTP response (status line, CORS headers and body) on `fd`.
+ * @param fd (int)
+ * @param status_code (int)
+ * @param status_text (const char*)
+ * @param content_type (const char*)
+ * @param body (const char*)
+ * @return (void)
+ */
 static void send_http_response(int fd, int status_code, const char* status_text,
                                const char* content_type, const char* body) {
     char header[1024];
@@ -194,7 +240,12 @@ static void send_http_response(int fd, int status_code, const char* status_text,
     }
 }
 
-/** Write one server-sent-events "data:" frame for streaming responses. */
+/**
+ * Write one server-sent-events "data:" frame for streaming responses.
+ * @param fd (int)
+ * @param data (const char*)
+ * @return (void)
+ */
 static void send_sse_chunk(int fd, const char* data) {
     char buf[16384];
     int n = snprintf(buf, sizeof(buf), "data: %s\n\n", data);
@@ -203,7 +254,12 @@ static void send_sse_chunk(int fd, const char* data) {
 
 /* Chat completion ID generator */
 
-/** Format a unique "chatcmpl-<time>-<counter>" completion id into `buf`. */
+/**
+ * Format a unique "chatcmpl-<time>-<counter>" completion id into `buf`.
+ * @param buf (char*)
+ * @param size (size_t)
+ * @return (void)
+ */
 static void generate_id(char* buf, size_t size) {
     static int counter = 0;
     snprintf(buf, size, "chatcmpl-%ld-%d", (long)time(NULL), counter++);
@@ -211,12 +267,21 @@ static void generate_id(char* buf, size_t size) {
 
 /* Route handlers */
 
-/** GET /health: respond with a small JSON ok status. */
+/**
+ * GET /health: respond with a small JSON ok status.
+ * @param fd (int)
+ * @return (void)
+ */
 static void handle_health(int fd) {
     send_http_response(fd, 200, "OK", "application/json", "{\"status\":\"ok\"}");
 }
 
-/** GET /v1/models: respond with the single loaded model in OpenAI list format. */
+/**
+ * GET /v1/models: respond with the single loaded model in OpenAI list format.
+ * @param fd (int)
+ * @param srv (CMLOpenAIServer*)
+ * @return (void)
+ */
 static void handle_models(int fd, CMLOpenAIServer* srv) {
     char body[1024];
     snprintf(body, sizeof(body),
@@ -229,6 +294,12 @@ static void handle_models(int fd, CMLOpenAIServer* srv) {
 /**
  * Core chat-completions handler: build a prompt from the messages, generate with
  * the model, and reply either as SSE token chunks (stream) or one JSON completion.
+ * @param fd (int)
+ * @param srv (CMLOpenAIServer*)
+ * @param body_json (const char*)
+ * @param msgs (const ChatMessage*)
+ * @param num_msgs (int)
+ * @return (void)
  */
 static void chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json,
                              const ChatMessage* msgs, int num_msgs) {
@@ -412,7 +483,13 @@ static void handle_chat_completions(int fd, CMLOpenAIServer* srv, const char* bo
 
 /* Request dispatch */
 
-/** Route a raw HTTP request to the health, models, chat-completions or CORS/404 handler. */
+/**
+ * Route a raw HTTP request to the health, models, chat-completions or CORS/404 handler.
+ * @param fd (int)
+ * @param srv (CMLOpenAIServer*)
+ * @param request (const char*)
+ * @return (void)
+ */
 static void handle_request(int fd, CMLOpenAIServer* srv, const char* request) {
     const char* body = strstr(request, "\r\n\r\n");
     if (body)
@@ -448,7 +525,11 @@ static void handle_request(int fd, CMLOpenAIServer* srv, const char* request) {
 
 /* Server lifecycle */
 
-/** Allocate an OpenAI-compatible server bound to `port` with default sampling settings. */
+/**
+ * Allocate an OpenAI-compatible server bound to `port` with default sampling settings.
+ * @param port (int)
+ * @return (CMLOpenAIServer*)
+ */
 CMLOpenAIServer* cml_openai_server_create(int port) {
     if (port <= 0)
         return NULL;
@@ -466,7 +547,12 @@ CMLOpenAIServer* cml_openai_server_create(int port) {
     return srv;
 }
 
-/** Load a GGUF LLaMA model from `model_path` and wire up the serving scheduler and KV cache. */
+/**
+ * Load a GGUF LLaMA model from `model_path` and wire up the serving scheduler and KV cache.
+ * @param srv (CMLOpenAIServer*)
+ * @param model_path (const char*)
+ * @return (int)
+ */
 int cml_openai_server_load_model(CMLOpenAIServer* srv, const char* model_path) {
     if (!srv || !model_path)
         return -1;
@@ -512,6 +598,8 @@ int cml_openai_server_load_model(CMLOpenAIServer* srv, const char* model_path) {
 /**
  * Bind, listen and serve requests until stopped. Uses poll() with a timeout so
  * cml_openai_server_stop reliably wakes the accept loop on all platforms.
+ * @param srv (CMLOpenAIServer*)
+ * @return (int)
  */
 int cml_openai_server_run(CMLOpenAIServer* srv) {
     if (!srv)
@@ -597,7 +685,11 @@ int cml_openai_server_run(CMLOpenAIServer* srv) {
     return 0;
 }
 
-/** Signal the run loop to exit and shut down the listening socket. */
+/**
+ * Signal the run loop to exit and shut down the listening socket.
+ * @param srv (CMLOpenAIServer*)
+ * @return (void)
+ */
 void cml_openai_server_stop(CMLOpenAIServer* srv) {
     if (!srv)
         return;
@@ -607,7 +699,11 @@ void cml_openai_server_stop(CMLOpenAIServer* srv) {
     }
 }
 
-/** Stop the server and free the model, serving context, KV cache and socket. */
+/**
+ * Stop the server and free the model, serving context, KV cache and socket.
+ * @param srv (CMLOpenAIServer*)
+ * @return (void)
+ */
 void cml_openai_server_free(CMLOpenAIServer* srv) {
     if (!srv)
         return;

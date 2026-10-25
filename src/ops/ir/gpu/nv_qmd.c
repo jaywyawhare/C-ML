@@ -9,7 +9,15 @@
  * Fields are packed into 32-bit words at specific bit offsets.
  */
 
-/** Pack val into the [lo:hi] bit range of the given QMD word, preserving other bits. */
+/**
+ * Pack val into the [lo:hi] bit range of the given QMD word, preserving other bits.
+ * @param data (uint32_t*)
+ * @param word (int)
+ * @param lo (int)
+ * @param hi (int)
+ * @param val (uint32_t)
+ * @return (void)
+ */
 static void qmd_set_field(uint32_t* data, int word, int lo, int hi, uint32_t val) {
     int width = hi - lo + 1;
     /* 1U << 32 is undefined behaviour, so build the field mask without it when
@@ -19,7 +27,13 @@ static void qmd_set_field(uint32_t* data, int word, int lo, int hi, uint32_t val
     data[word]          = (data[word] & ~mask) | ((val << lo) & mask);
 }
 
-/** Overwrite a full 32-bit QMD word. */
+/**
+ * Overwrite a full 32-bit QMD word.
+ * @param data (uint32_t*)
+ * @param word (int)
+ * @param val (uint32_t)
+ * @return (void)
+ */
 static void qmd_set_word(uint32_t* data, int word, uint32_t val) { data[word] = val; }
 
 /*
@@ -128,7 +142,12 @@ static void qmd_set_word(uint32_t* data, int word, uint32_t val) { data[word] = 
 #define QMD5_MIN_SM_SMEM_WORD 32
 #define QMD5_MAX_SM_SMEM_WORD 33
 
-/** Zero the QMD and populate version/default fields for the target GPU architecture. */
+/**
+ * Zero the QMD and populate version/default fields for the target GPU architecture.
+ * @param qmd (NVQmd*)
+ * @param arch (uint32_t)
+ * @return (void)
+ */
 void nv_qmd_init(NVQmd* qmd, uint32_t arch) {
     memset(qmd, 0, NV_QMD_BYTES);
 
@@ -165,33 +184,64 @@ void nv_qmd_init(NVQmd* qmd, uint32_t arch) {
     nv_qmd_set_barrier_count(qmd, 1);
 }
 
-/** Write the 64-bit kernel code address as low/high QMD words. */
+/**
+ * Write the 64-bit kernel code address as low/high QMD words.
+ * @param qmd (NVQmd*)
+ * @param addr (uint64_t)
+ * @return (void)
+ */
 void nv_qmd_set_program_address(NVQmd* qmd, uint64_t addr) {
     qmd_set_word(qmd->data, QMD3_PROGRAM_ADDR_LO_WORD, (uint32_t)(addr & 0xFFFFFFFF));
     qmd_set_word(qmd->data, QMD3_PROGRAM_ADDR_HI_WORD, (uint32_t)(addr >> 32));
 }
 
-/** Set the grid (CTA) dimensions. */
+/**
+ * Set the grid (CTA) dimensions.
+ * @param qmd (NVQmd*)
+ * @param x (uint32_t)
+ * @param y (uint32_t)
+ * @param z (uint32_t)
+ * @return (void)
+ */
 void nv_qmd_set_grid_dim(NVQmd* qmd, uint32_t x, uint32_t y, uint32_t z) {
     qmd_set_word(qmd->data, QMD3_GRID_DIM_X_WORD, x);
     qmd_set_word(qmd->data, QMD3_GRID_DIM_Y_WORD, y);
     qmd_set_word(qmd->data, QMD3_GRID_DIM_Z_WORD, z);
 }
 
-/** Set the per-CTA thread block dimensions. */
+/**
+ * Set the per-CTA thread block dimensions.
+ * @param qmd (NVQmd*)
+ * @param x (uint32_t)
+ * @param y (uint32_t)
+ * @param z (uint32_t)
+ * @return (void)
+ */
 void nv_qmd_set_block_dim(NVQmd* qmd, uint32_t x, uint32_t y, uint32_t z) {
     qmd_set_field(qmd->data, QMD3_BLOCK_DIM_X_WORD, QMD3_BLOCK_DIM_X_LO, QMD3_BLOCK_DIM_X_HI, x);
     qmd_set_field(qmd->data, QMD3_BLOCK_DIM_Y_WORD, QMD3_BLOCK_DIM_Y_LO, QMD3_BLOCK_DIM_Y_HI, y);
     qmd_set_field(qmd->data, QMD3_BLOCK_DIM_Z_WORD, QMD3_BLOCK_DIM_Z_LO, QMD3_BLOCK_DIM_Z_HI, z);
 }
 
-/** Set shared memory size, rounding up to the 256-byte QMD granularity. */
+/**
+ * Set shared memory size, rounding up to the 256-byte QMD granularity.
+ * @param qmd (NVQmd*)
+ * @param bytes (uint32_t)
+ * @return (void)
+ */
 void nv_qmd_set_shared_memory(NVQmd* qmd, uint32_t bytes) {
     uint32_t aligned = (bytes + 255) & ~255U;
     qmd_set_word(qmd->data, QMD3_SHARED_MEM_SIZE_WORD, aligned);
 }
 
-/** Bind constant buffer `index` (0-7), marking it valid and writing its address/size. */
+/**
+ * Bind constant buffer `index` (0-7), marking it valid and writing its address/size.
+ * @param qmd (NVQmd*)
+ * @param index (int)
+ * @param addr (uint64_t)
+ * @param size (uint32_t)
+ * @return (void)
+ */
 void nv_qmd_set_constant_buffer(NVQmd* qmd, int index, uint64_t addr, uint32_t size) {
     if (index < 0 || index > 7)
         return;
@@ -207,7 +257,12 @@ void nv_qmd_set_constant_buffer(NVQmd* qmd, int index, uint64_t addr, uint32_t s
     qmd_set_word(qmd->data, base + 2, size);
 }
 
-/** Set the per-thread register count, clamped to the 8-bit field maximum. */
+/**
+ * Set the per-thread register count, clamped to the 8-bit field maximum.
+ * @param qmd (NVQmd*)
+ * @param count (uint32_t)
+ * @return (void)
+ */
 void nv_qmd_set_register_count(NVQmd* qmd, uint32_t count) {
     if (count > 255)
         count = 255;
@@ -215,7 +270,12 @@ void nv_qmd_set_register_count(NVQmd* qmd, uint32_t count) {
                   QMD3_REGISTER_COUNT_HI, count);
 }
 
-/** Set the barrier count, clamped to the 6-bit field maximum. */
+/**
+ * Set the barrier count, clamped to the 6-bit field maximum.
+ * @param qmd (NVQmd*)
+ * @param count (uint32_t)
+ * @return (void)
+ */
 void nv_qmd_set_barrier_count(NVQmd* qmd, uint32_t count) {
     if (count > 31)
         count = 31;
@@ -223,7 +283,13 @@ void nv_qmd_set_barrier_count(NVQmd* qmd, uint32_t count) {
                   count);
 }
 
-/** Record the SASS ISA major/minor version in the QMD. */
+/**
+ * Record the SASS ISA major/minor version in the QMD.
+ * @param qmd (NVQmd*)
+ * @param major (uint32_t)
+ * @param minor (uint32_t)
+ * @return (void)
+ */
 void nv_qmd_set_sass_version(NVQmd* qmd, uint32_t major, uint32_t minor) {
     qmd_set_field(qmd->data, QMD3_SASS_VERSION_WORD, QMD3_SASS_MAJOR_LO, QMD3_SASS_MAJOR_HI, major);
     qmd_set_field(qmd->data, QMD3_SASS_VERSION_WORD, QMD3_SASS_MINOR_LO, QMD3_SASS_MINOR_HI, minor);
@@ -287,7 +353,13 @@ typedef struct {
 #define EIATTR_SMEM_SIZE 0x0F
 #define EIATTR_BAR_COUNT 0x1F
 
-/** Return a pointer to the ELF section-header string table, or NULL if out of bounds. */
+/**
+ * Return a pointer to the ELF section-header string table, or NULL if out of bounds.
+ * @param data (const uint8_t*)
+ * @param size (size_t)
+ * @param ehdr (const Elf64_Ehdr_t*)
+ * @return (const char*)
+ */
 static const char* elf_get_shstrtab(const uint8_t* data, size_t size, const Elf64_Ehdr_t* ehdr) {
     if (ehdr->e_shstrndx == 0 || ehdr->e_shstrndx >= ehdr->e_shnum)
         return NULL;
@@ -303,7 +375,15 @@ static const char* elf_get_shstrtab(const uint8_t* data, size_t size, const Elf6
     return (const char*)(data + shstr->sh_offset);
 }
 
-/** Find an ELF section header by name, or NULL if absent. */
+/**
+ * Find an ELF section header by name, or NULL if absent.
+ * @param data (const uint8_t*)
+ * @param size (size_t)
+ * @param ehdr (const Elf64_Ehdr_t*)
+ * @param shstrtab (const char*)
+ * @param name (const char*)
+ * @return (const Elf64_Shdr_t*)
+ */
 static const Elf64_Shdr_t* elf_find_section(const uint8_t* data, size_t size,
                                             const Elf64_Ehdr_t* ehdr, const char* shstrtab,
                                             const char* name) {
@@ -320,7 +400,14 @@ static const Elf64_Shdr_t* elf_find_section(const uint8_t* data, size_t size,
     return NULL;
 }
 
-/** Parse a CUBIN ELF, extracting code location and kernel attributes for `kernel_name`. */
+/**
+ * Parse a CUBIN ELF, extracting code location and kernel attributes for `kernel_name`.
+ * @param cubin (const void*)
+ * @param size (size_t)
+ * @param kernel_name (const char*)
+ * @param meta (NVKernelMeta*)
+ * @return (int)
+ */
 int nv_parse_cubin(const void* cubin, size_t size, const char* kernel_name, NVKernelMeta* meta) {
     if (!cubin || size < sizeof(Elf64_Ehdr_t) || !kernel_name || !meta)
         return -1;

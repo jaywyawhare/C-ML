@@ -160,7 +160,12 @@ static bool output_only_consumed_by_backward(struct IRNode* fwd_node) {
     return fwd_node->use_count > 0;
 }
 
-/** Locate a node in the schedule, encoding its position as group*1000 + node index. */
+/**
+ * Locate a node in the schedule, encoding its position as group*1000 + node index.
+ * @param sched (CMLFusionSchedule*)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int find_node_index_in_schedule(CMLFusionSchedule* sched, struct IRNode* node) {
     for (int g = 0; g < sched->num_groups; g++) {
         CMLFusionGroup* group = sched->groups[g];
@@ -334,10 +339,19 @@ int cml_cross_boundary_fuse(CMLFusionSchedule* sched, CMLCrossBoundaryFusion* fu
     return applied;
 }
 
-/** Free the cross-boundary fusion array. */
+/**
+ * Free the cross-boundary fusion array.
+ * @param fusions (CMLCrossBoundaryFusion*)
+ * @return (void)
+ */
 void cml_cross_boundary_fusions_free(CMLCrossBoundaryFusion* fusions) { cml_free(fusions); }
 
-/** Estimate memory and FLOP savings across the fusions, by pattern type. */
+/**
+ * Estimate memory and FLOP savings across the fusions, by pattern type.
+ * @param fusions (const CMLCrossBoundaryFusion*)
+ * @param count (int)
+ * @return (CMLCrossBoundaryStats)
+ */
 CMLCrossBoundaryStats cml_cross_boundary_stats(const CMLCrossBoundaryFusion* fusions, int count) {
     CMLCrossBoundaryStats stats = {0};
     if (!fusions || count <= 0)

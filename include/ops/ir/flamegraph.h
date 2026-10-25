@@ -23,28 +23,50 @@ extern "C" {
 
 struct IRNode;
 
-/** Whether span capture is on: FLAMEGRAPH or PROFILE, or VIZ unless FLAMEGRAPH=0; never under
- * NO_EXPORT. */
+/**
+ * Whether span capture is on: FLAMEGRAPH or PROFILE, or VIZ unless FLAMEGRAPH=0; never under
+ * NO_EXPORT.
+ * @return (int)
+ */
 int cml_flame_enabled(void);
 
-/** Clear the accumulated spans (call at the start of a step you want to profile). */
+/**
+ * Clear the accumulated spans (call at the start of a step you want to profile).
+ * @return (void)
+ */
 void cml_flame_reset(void);
 
-/** Append one kernel span. `ms` is the measured wall time for this node. No-op
- * when disabled. Op/kind strings are static; `node` is only read, not retained. */
+/**
+ * Append one kernel span. `ms` is the measured wall time for this node. No-op
+ * when disabled. Op/kind strings are static; `node` is only read, not retained.
+ * @param node (const struct IRNode*)
+ * @param ms (double)
+ * @return (void)
+ */
 void cml_flame_record(const struct IRNode* node, double ms);
 
-/** Write the accumulated spans to `path` as flamegraph.json. Returns 0 on success,
- * -1 on error or when disabled / no spans. Does not clear the buffer. */
+/**
+ * Write the accumulated spans to `path` as flamegraph.json. Returns 0 on success,
+ * -1 on error or when disabled / no spans. Does not clear the buffer.
+ * @param path (const char*)
+ * @return (int)
+ */
 int cml_flame_export(const char* path);
 
-/** Write the same spans to `path` in Chrome Trace Event format (complete "X"
+/**
+ * Write the same spans to `path` in Chrome Trace Event format (complete "X"
  * events, ts/dur in microseconds) so a profile opens directly in
  * chrome://tracing or the Perfetto UI. Returns 0 on success, -1 on error or
- * when disabled / no spans. Does not clear the buffer. */
+ * when disabled / no spans. Does not clear the buffer.
+ * @param path (const char*)
+ * @return (int)
+ */
 int cml_flame_export_chrome_trace(const char* path);
 
-/** Total number of recorded node executions, including any the timeline dropped. */
+/**
+ * Total number of recorded node executions, including any the timeline dropped.
+ * @return (long long)
+ */
 long long cml_flame_num_spans(void);
 
 #ifdef __cplusplus

@@ -21,8 +21,11 @@ static pthread_mutex_t g_autograd_init_mutex = PTHREAD_MUTEX_INITIALIZER;
 static bool g_autograd_initialized           = false;
 static pthread_mutex_t g_hook_lock           = PTHREAD_MUTEX_INITIALIZER;
 
-/** Allocate and default-initialize the global engine exactly once; caller holds the init
- * mutex. Leaves global_autograd_engine NULL on OOM. */
+/**
+ * Allocate and default-initialize the global engine exactly once; caller holds the init
+ * mutex. Leaves global_autograd_engine NULL on OOM.
+ * @return (void)
+ */
 static void autograd_init_once(void) {
     if (global_autograd_engine)
         return;
@@ -45,7 +48,10 @@ static void autograd_init_once(void) {
     global_autograd_engine->lock_initialized = true;
 }
 
-/** Thread-safe, idempotent initialization of the global autograd engine. */
+/**
+ * Thread-safe, idempotent initialization of the global autograd engine.
+ * @return (void)
+ */
 void autograd_init(void) {
     pthread_mutex_lock(&g_autograd_init_mutex);
     if (!g_autograd_initialized) {
@@ -55,7 +61,10 @@ void autograd_init(void) {
     pthread_mutex_unlock(&g_autograd_init_mutex);
 }
 
-/** Destroy the engine lock and free the global engine, resetting init state. */
+/**
+ * Destroy the engine lock and free the global engine, resetting init state.
+ * @return (void)
+ */
 void autograd_shutdown(void) {
     pthread_mutex_lock(&g_autograd_init_mutex);
     if (global_autograd_engine) {
@@ -70,13 +79,20 @@ void autograd_shutdown(void) {
     pthread_mutex_unlock(&g_autograd_init_mutex);
 }
 
-/** Return the global engine, initializing it on first use. */
+/**
+ * Return the global engine, initializing it on first use.
+ * @return (AutogradEngine*)
+ */
 AutogradEngine* autograd_get_engine(void) {
     autograd_init();
     return global_autograd_engine;
 }
 
-/** Set grad-tracking mode under the engine lock. */
+/**
+ * Set grad-tracking mode under the engine lock.
+ * @param enabled (bool)
+ * @return (void)
+ */
 void autograd_set_grad_mode(bool enabled) {
     AutogradEngine* engine = autograd_get_engine();
     if (engine->lock_initialized)
@@ -86,19 +102,32 @@ void autograd_set_grad_mode(bool enabled) {
         pthread_mutex_unlock(&engine->lock);
 }
 
-/** True only when both grad mode and the engine itself are enabled. */
+/**
+ * True only when both grad mode and the engine itself are enabled.
+ * @return (bool)
+ */
 bool autograd_is_grad_enabled(void) {
     AutogradEngine* engine = autograd_get_engine();
     return engine->grad_mode && engine->enabled;
 }
 
-/** Enter a no-grad region by disabling grad mode (pair with autograd_no_grad_exit). */
+/**
+ * Enter a no-grad region by disabling grad mode (pair with autograd_no_grad_exit).
+ * @return (void)
+ */
 void autograd_no_grad_enter(void) { autograd_set_grad_mode(false); }
 
-/** Leave a no-grad region by re-enabling grad mode. */
+/**
+ * Leave a no-grad region by re-enabling grad mode.
+ * @return (void)
+ */
 void autograd_no_grad_exit(void) { autograd_set_grad_mode(true); }
 
-/** Toggle anomaly detection, which scans gradients for NaN/Inf during backward. */
+/**
+ * Toggle anomaly detection, which scans gradients for NaN/Inf during backward.
+ * @param enabled (bool)
+ * @return (void)
+ */
 void autograd_set_anomaly_detection(bool enabled) {
     AutogradEngine* engine = autograd_get_engine();
     if (engine->lock_initialized)
@@ -109,17 +138,30 @@ void autograd_set_anomaly_detection(bool enabled) {
     LOG_INFO("Anomaly detection %s", enabled ? "enabled" : "disabled");
 }
 
-/** Whether the tensor is flagged to accumulate gradients (NULL-safe). */
+/**
+ * Whether the tensor is flagged to accumulate gradients (NULL-safe).
+ * @param t (Tensor*)
+ * @return (bool)
+ */
 bool tensor_requires_grad(Tensor* t) { return t && t->requires_grad; }
 
-/** Set the tensor's requires_grad flag; NULL-safe no-op. */
+/**
+ * Set the tensor's requires_grad flag; NULL-safe no-op.
+ * @param t (Tensor*)
+ * @param requires_grad (bool)
+ * @return (void)
+ */
 void tensor_set_requires_grad(Tensor* t, bool requires_grad) {
     if (!t)
         return;
     t->requires_grad = requires_grad;
 }
 
-/** A leaf has no producing op: either no IR node, or a zero-input creation op. */
+/**
+ * A leaf has no producing op: either no IR node, or a zero-input creation op.
+ * @param t (Tensor*)
+ * @return (bool)
+ */
 bool tensor_is_leaf(Tensor* t) {
     if (!t)
         return false;
@@ -131,7 +173,11 @@ bool tensor_is_leaf(Tensor* t) {
     return node->num_inputs == 0;
 }
 
-/** Return a clone cut from the graph: no requires_grad, no IR linkage, no grad. */
+/**
+ * Return a clone cut from the graph: no requires_grad, no IR linkage, no grad.
+ * @param t (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_detach(Tensor* t) {
     if (!t)
         return NULL;
@@ -148,8 +194,12 @@ Tensor* tensor_detach(Tensor* t) {
     return detached;
 }
 
-/** Detach a tensor in place, materializing any pending lazy value first so the data
- * survives, then clearing requires_grad and its IR linkage. */
+/**
+ * Detach a tensor in place, materializing any pending lazy value first so the data
+ * survives, then clearing requires_grad and its IR linkage.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_detach_inplace(Tensor* t) {
     if (!t)
         return;
@@ -167,7 +217,11 @@ void tensor_detach_inplace(Tensor* t) {
     t->ir_context    = NULL;
 }
 
-/** Mark a non-leaf tensor to keep its gradient after backward instead of freeing it. */
+/**
+ * Mark a non-leaf tensor to keep its gradient after backward instead of freeing it.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_retain_grad(Tensor* t) {
     if (!t)
         return;
@@ -187,7 +241,11 @@ typedef struct {
     int capacity;
 } ModuleHookList;
 
-/** Return the tensor's backward-hook list, lazily allocating it; NULL on OOM. */
+/**
+ * Return the tensor's backward-hook list, lazily allocating it; NULL on OOM.
+ * @param t (Tensor*)
+ * @return (TensorHookList*)
+ */
 static TensorHookList* get_tensor_hooks(Tensor* t) {
     if (!t->backward_hooks) {
         t->backward_hooks = calloc(1, sizeof(TensorHookList));
@@ -199,7 +257,11 @@ static TensorHookList* get_tensor_hooks(Tensor* t) {
     return (TensorHookList*)t->backward_hooks;
 }
 
-/** Return the module's backward-hook list, lazily allocating it; NULL on OOM. */
+/**
+ * Return the module's backward-hook list, lazily allocating it; NULL on OOM.
+ * @param module (Module*)
+ * @return (ModuleHookList*)
+ */
 static ModuleHookList* get_module_hooks(Module* module) {
     if (!module->backward_hooks) {
         module->backward_hooks = calloc(1, sizeof(ModuleHookList));
@@ -211,7 +273,12 @@ static ModuleHookList* get_module_hooks(Module* module) {
     return (ModuleHookList*)module->backward_hooks;
 }
 
-/** Append a hook, doubling capacity as needed; returns 0, or -1 on realloc failure. */
+/**
+ * Append a hook, doubling capacity as needed; returns 0, or -1 on realloc failure.
+ * @param list (TensorHookList*)
+ * @param hook (TensorBackwardHook)
+ * @return (int)
+ */
 static int hook_list_append_tensor(TensorHookList* list, TensorBackwardHook hook) {
     if (list->num_hooks >= list->capacity) {
         int new_cap = list->capacity == 0 ? 4 : list->capacity * 2;
@@ -228,7 +295,12 @@ static int hook_list_append_tensor(TensorHookList* list, TensorBackwardHook hook
     return 0;
 }
 
-/** Append a hook, doubling capacity as needed; returns 0, or -1 on realloc failure. */
+/**
+ * Append a hook, doubling capacity as needed; returns 0, or -1 on realloc failure.
+ * @param list (ModuleHookList*)
+ * @param hook (ModuleBackwardHook)
+ * @return (int)
+ */
 static int hook_list_append_module(ModuleHookList* list, ModuleBackwardHook hook) {
     if (list->num_hooks >= list->capacity) {
         int new_cap = list->capacity == 0 ? 4 : list->capacity * 2;
@@ -245,8 +317,13 @@ static int hook_list_append_module(ModuleHookList* list, ModuleBackwardHook hook
     return 0;
 }
 
-/** Register a hook fired on this tensor's gradient during backward; returns 0, or -1 on
- * invalid args or allocation failure. */
+/**
+ * Register a hook fired on this tensor's gradient during backward; returns 0, or -1 on
+ * invalid args or allocation failure.
+ * @param t (Tensor*)
+ * @param hook (TensorBackwardHook)
+ * @return (int)
+ */
 int tensor_register_backward_hook(Tensor* t, TensorBackwardHook hook) {
     if (!t || !hook) {
         LOG_ERROR("Invalid arguments to tensor_register_backward_hook");
@@ -260,7 +337,11 @@ int tensor_register_backward_hook(Tensor* t, TensorBackwardHook hook) {
     return hook_list_append_tensor(hooks, hook);
 }
 
-/** Clear all registered backward hooks on a tensor, keeping the allocated list. */
+/**
+ * Clear all registered backward hooks on a tensor, keeping the allocated list.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_remove_hooks(Tensor* t) {
     if (!t || !t->backward_hooks)
         return;
@@ -269,7 +350,12 @@ void tensor_remove_hooks(Tensor* t) {
     hooks->num_hooks      = 0;
 }
 
-/** Register a module backward hook; returns 0, or -1 on invalid args or allocation failure. */
+/**
+ * Register a module backward hook; returns 0, or -1 on invalid args or allocation failure.
+ * @param module (struct Module*)
+ * @param hook (ModuleBackwardHook)
+ * @return (int)
+ */
 int module_register_backward_hook(struct Module* module, ModuleBackwardHook hook) {
     if (!module || !hook) {
         LOG_ERROR("Invalid arguments to module_register_backward_hook");
@@ -283,7 +369,11 @@ int module_register_backward_hook(struct Module* module, ModuleBackwardHook hook
     return hook_list_append_module(hooks, hook);
 }
 
-/** Free a tensor's backward-hook list and null the handle. */
+/**
+ * Free a tensor's backward-hook list and null the handle.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void autograd_free_tensor_hooks(Tensor* t) {
     if (!t || !t->backward_hooks)
         return;
@@ -294,7 +384,11 @@ void autograd_free_tensor_hooks(Tensor* t) {
     t->backward_hooks = NULL;
 }
 
-/** Free a module's backward-hook list and null the handle. */
+/**
+ * Free a module's backward-hook list and null the handle.
+ * @param module (Module*)
+ * @return (void)
+ */
 void autograd_free_module_hooks(Module* module) {
     if (!module || !module->backward_hooks)
         return;
@@ -305,8 +399,12 @@ void autograd_free_module_hooks(Module* module) {
     module->backward_hooks = NULL;
 }
 
-/** Zero a tensor's gradient, in place when a buffer exists (to avoid reallocation in
- * backward), otherwise freeing the grad tensor. */
+/**
+ * Zero a tensor's gradient, in place when a buffer exists (to avoid reallocation in
+ * backward), otherwise freeing the grad tensor.
+ * @param tensor (Tensor*)
+ * @return (void)
+ */
 void tensor_zero_grad(Tensor* tensor) {
     if (!tensor)
         return;
@@ -320,9 +418,14 @@ void tensor_zero_grad(Tensor* tensor) {
     }
 }
 
-/** Add new_grad into the tensor's gradient (cloning on first contribution), with optional
+/**
+ * Add new_grad into the tensor's gradient (cloning on first contribution), with optional
  * anomaly checking, then mirror the result onto the producing node's output so the next
- * backward node can read it. No-op unless the tensor requires grad. */
+ * backward node can read it. No-op unless the tensor requires grad.
+ * @param tensor (Tensor*)
+ * @param new_grad (Tensor*)
+ * @return (void)
+ */
 void tensor_accumulate_grad(Tensor* tensor, Tensor* new_grad) {
     if (!tensor || !new_grad)
         return;
@@ -352,13 +455,24 @@ void tensor_accumulate_grad(Tensor* tensor, Tensor* new_grad) {
     }
 }
 
-/** Return the tensor's accumulated gradient, or NULL. */
+/**
+ * Return the tensor's accumulated gradient, or NULL.
+ * @param tensor (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_get_grad(Tensor* tensor) { return tensor ? tensor->grad : NULL; }
 
-/** Entry point for reverse-mode autodiff from a (usually scalar) tensor: seeds the gradient
+/**
+ * Entry point for reverse-mode autodiff from a (usually scalar) tensor: seeds the gradient
  * (defaulting to ones), builds and runs the backward pass via either the graph or eager
  * engine, fires backward hooks, frees non-retained intermediate grads, and optionally
- * exports the graph for visualization. create_graph is honored only by the graph engine. */
+ * exports the graph for visualization. create_graph is honored only by the graph engine.
+ * @param tensor (Tensor*)
+ * @param gradient (Tensor*)
+ * @param retain_graph (bool)
+ * @param create_graph (bool)
+ * @return (void)
+ */
 void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool create_graph) {
     /* The eager engine writes gradients as plain data, not graph nodes -
      * there is nothing to differentiate through a second time. */
@@ -615,9 +729,17 @@ bool tensor_can_broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2)
     return true;
 }
 
-/** Compute the broadcast shape of two shapes (each dim the max of the aligned pair).
+/**
+ * Compute the broadcast shape of two shapes (each dim the max of the aligned pair).
  * Returns a newly allocated shape and writes its rank to out_ndim; NULL for the 0-D/0-D
- * case or on error. Caller frees the result. */
+ * case or on error. Caller frees the result.
+ * @param shape1 (int*)
+ * @param ndim1 (int)
+ * @param shape2 (int*)
+ * @param ndim2 (int)
+ * @param out_ndim (int*)
+ * @return (int*)
+ */
 int* broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2, int* out_ndim) {
     if (!shape1 || !shape2 || !out_ndim)
         return NULL;
@@ -658,8 +780,15 @@ int* broadcast_shapes(int* shape1, int ndim1, int* shape2, int ndim2, int* out_n
     return result;
 }
 
-/** Left-fold broadcast_shapes over several shapes. Returns a newly allocated result shape
- * and writes its rank to out_ndim; NULL on error. Caller frees the result. */
+/**
+ * Left-fold broadcast_shapes over several shapes. Returns a newly allocated result shape
+ * and writes its rank to out_ndim; NULL on error. Caller frees the result.
+ * @param shapes (int**)
+ * @param ndims (int*)
+ * @param num_shapes (int)
+ * @param out_ndim (int*)
+ * @return (int*)
+ */
 int* broadcast_multi_shapes(int** shapes, int* ndims, int num_shapes, int* out_ndim) {
     if (!shapes || !ndims || num_shapes <= 0 || !out_ndim)
         return NULL;
@@ -689,8 +818,15 @@ int* broadcast_multi_shapes(int** shapes, int* ndims, int num_shapes, int* out_n
     return result;
 }
 
-/** VJP of broadcasting: reduce grad_output back to original_shape by summing over the axes
- * that were expanded, writing the result to *grad_input (a clone when shapes already match). */
+/**
+ * VJP of broadcasting: reduce grad_output back to original_shape by summing over the axes
+ * that were expanded, writing the result to *grad_input (a clone when shapes already match).
+ * @param grad_output (Tensor*)
+ * @param original_shape (int*)
+ * @param ndim (int)
+ * @param grad_input (Tensor**)
+ * @return (void)
+ */
 void tensor_compute_grad_for_broadcast(Tensor* grad_output, int* original_shape, int ndim,
                                        Tensor** grad_input) {
     if (!grad_output || !original_shape || !grad_input)
@@ -769,7 +905,12 @@ void tensor_compute_grad_for_broadcast(Tensor* grad_output, int* original_shape,
     cml_free(in_strides);
 }
 
-/** Scan a tensor for NaN/Inf values and log an error naming the operation if any are found. */
+/**
+ * Scan a tensor for NaN/Inf values and log an error naming the operation if any are found.
+ * @param tensor (Tensor*)
+ * @param operation (const char*)
+ * @return (void)
+ */
 void autograd_check_anomaly(Tensor* tensor, const char* operation) {
     if (!tensor || !tensor->data)
         return;
@@ -793,7 +934,11 @@ void autograd_check_anomaly(Tensor* tensor, const char* operation) {
     }
 }
 
-/** Print a one-tensor summary (requires_grad, leaf status, producing op) to stdout for debug. */
+/**
+ * Print a one-tensor summary (requires_grad, leaf status, producing op) to stdout for debug.
+ * @param tensor (Tensor*)
+ * @return (void)
+ */
 void autograd_print_graph(Tensor* tensor) {
     if (!tensor)
         return;
@@ -823,21 +968,35 @@ typedef struct {
     int cap;
 } PtrIdMap;
 
-/** Initialize an empty pointer-to-id map. */
+/**
+ * Initialize an empty pointer-to-id map.
+ * @param m (PtrIdMap*)
+ * @return (void)
+ */
 static void map_init(PtrIdMap* m) {
     m->keys = NULL;
     m->ids  = NULL;
     m->size = 0;
     m->cap  = 0;
 }
-/** Free a pointer-to-id map's backing arrays. */
+/**
+ * Free a pointer-to-id map's backing arrays.
+ * @param m (PtrIdMap*)
+ * @return (void)
+ */
 static void map_free(PtrIdMap* m) {
     if (m->keys)
         cml_free(m->keys);
     if (m->ids)
         cml_free(m->ids);
 }
-/** Look up key, inserting it with next_id if absent; returns the stored id, or -1 on OOM. */
+/**
+ * Look up key, inserting it with next_id if absent; returns the stored id, or -1 on OOM.
+ * @param m (PtrIdMap*)
+ * @param key (const void*)
+ * @param next_id (int)
+ * @return (int)
+ */
 static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
     for (int i = 0; i < m->size; i++)
         if (m->keys[i] == key)
@@ -860,9 +1019,14 @@ static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
     return next_id;
 }
 
-/** Export the IR graph reachable from root as JSON (nodes with labels, dead/fused flags, and
+/**
+ * Export the IR graph reachable from root as JSON (nodes with labels, dead/fused flags, and
  * input edges) to path. Dead nodes are detected via optimizer flags, or a reachability walk
- * when the graph is unoptimized. Returns 0, or a negative code on error. */
+ * when the graph is unoptimized. Returns 0, or a negative code on error.
+ * @param root (Tensor*)
+ * @param path (const char*)
+ * @return (int)
+ */
 int autograd_export_json(Tensor* root, const char* path) {
     if (!root || !path)
         return -1;
@@ -1012,8 +1176,13 @@ typedef struct TensorHookEntry {
 static TensorHookEntry g_tensor_hooks[MAX_TENSOR_HOOKS];
 static int g_tensor_hook_count = 0;
 
-/** Register a tensor hook in the fixed-size global table under the hook lock; warns and drops
- * the registration once MAX_TENSOR_HOOKS is reached. */
+/**
+ * Register a tensor hook in the fixed-size global table under the hook lock; warns and drops
+ * the registration once MAX_TENSOR_HOOKS is reached.
+ * @param tensor (Tensor*)
+ * @param hook_fn (TensorHookFn)
+ * @return (void)
+ */
 void tensor_register_hook(Tensor* tensor, TensorHookFn hook_fn) {
     if (!tensor || !hook_fn) {
         LOG_ERROR("Cannot register hook: NULL tensor or hook function");

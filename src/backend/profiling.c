@@ -9,12 +9,20 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
-/** Convert a timespec to milliseconds. */
+/**
+ * Convert a timespec to milliseconds.
+ * @param ts (struct timespec*)
+ * @return (double)
+ */
 static double timespec_to_ms(struct timespec* ts) {
     return (double)ts->tv_sec * 1000.0 + (double)ts->tv_nsec / 1000000.0;
 }
 
-/** Allocate a zeroed timer, copying the optional name. */
+/**
+ * Allocate a zeroed timer, copying the optional name.
+ * @param name (const char*)
+ * @return (Timer*)
+ */
 Timer* profiler_timer_create(const char* name) {
     Timer* timer = cml_malloc(sizeof(Timer));
     if (!timer)
@@ -39,7 +47,11 @@ Timer* profiler_timer_create(const char* name) {
     return timer;
 }
 
-/** Free a timer and its name string. */
+/**
+ * Free a timer and its name string.
+ * @param timer (Timer*)
+ * @return (void)
+ */
 void profiler_timer_free(Timer* timer) {
     if (!timer)
         return;
@@ -50,7 +62,11 @@ void profiler_timer_free(Timer* timer) {
     cml_free(timer);
 }
 
-/** Start (or restart) a timer from the monotonic clock. */
+/**
+ * Start (or restart) a timer from the monotonic clock.
+ * @param timer (Timer*)
+ * @return (int)
+ */
 int profiler_timer_start(Timer* timer) {
     if (!timer)
         return -1;
@@ -65,7 +81,11 @@ int profiler_timer_start(Timer* timer) {
     return 0;
 }
 
-/** Stop a running timer and return the elapsed milliseconds. */
+/**
+ * Stop a running timer and return the elapsed milliseconds.
+ * @param timer (Timer*)
+ * @return (double)
+ */
 double profiler_timer_stop(Timer* timer) {
     if (!timer || !timer->is_running)
         return -1.0;
@@ -83,7 +103,11 @@ double profiler_timer_stop(Timer* timer) {
     return timer->elapsed_ms;
 }
 
-/** Elapsed milliseconds: live time if still running, else the recorded total. */
+/**
+ * Elapsed milliseconds: live time if still running, else the recorded total.
+ * @param timer (Timer*)
+ * @return (double)
+ */
 double profiler_timer_elapsed(Timer* timer) {
     if (!timer)
         return -1.0;
@@ -102,7 +126,11 @@ double profiler_timer_elapsed(Timer* timer) {
     return current_ms - start_ms;
 }
 
-/** Clear a timer's times and running state. */
+/**
+ * Clear a timer's times and running state.
+ * @param timer (Timer*)
+ * @return (void)
+ */
 void profiler_timer_reset(Timer* timer) {
     if (!timer)
         return;
@@ -115,7 +143,10 @@ void profiler_timer_reset(Timer* timer) {
     timer->is_running         = false;
 }
 
-/** Allocate an empty, enabled profiler with no timers. */
+/**
+ * Allocate an empty, enabled profiler with no timers.
+ * @return (Profiler*)
+ */
 Profiler* profiler_create(void) {
     Profiler* profiler = cml_malloc(sizeof(Profiler));
     if (!profiler)
@@ -134,7 +165,11 @@ Profiler* profiler_create(void) {
     return profiler;
 }
 
-/** Free a profiler and all timers it owns. */
+/**
+ * Free a profiler and all timers it owns.
+ * @param profiler (Profiler*)
+ * @return (void)
+ */
 void profiler_free(Profiler* profiler) {
     if (!profiler)
         return;
@@ -157,14 +192,24 @@ void profiler_free(Profiler* profiler) {
     cml_free(profiler);
 }
 
-/** Enable or disable timing collection on the profiler. */
+/**
+ * Enable or disable timing collection on the profiler.
+ * @param profiler (Profiler*)
+ * @param enabled (bool)
+ * @return (void)
+ */
 void profiler_set_enabled(Profiler* profiler, bool enabled) {
     if (!profiler)
         return;
     profiler->enabled = enabled;
 }
 
-/** Start a named timer, growing the timer array as needed; returns its id. */
+/**
+ * Start a named timer, growing the timer array as needed; returns its id.
+ * @param profiler (Profiler*)
+ * @param name (const char*)
+ * @return (int)
+ */
 int profiler_start(Profiler* profiler, const char* name) {
     if (!profiler || !name || !profiler->enabled)
         return -1;
@@ -196,7 +241,12 @@ int profiler_start(Profiler* profiler, const char* name) {
     return timer_id;
 }
 
-/** Stop the timer with the given id and return its elapsed milliseconds. */
+/**
+ * Stop the timer with the given id and return its elapsed milliseconds.
+ * @param profiler (Profiler*)
+ * @param timer_id (int)
+ * @return (double)
+ */
 double profiler_stop(Profiler* profiler, int timer_id) {
     if (!profiler || timer_id < 0 || timer_id >= profiler->num_timers) {
         return -1.0;
@@ -209,9 +259,13 @@ double profiler_stop(Profiler* profiler, int timer_id) {
     return profiler_timer_stop(timer);
 }
 
-/** Print the aggregated scope table (when scopes were used) and/or the flat
- *  per-timer table. The scope table is sorted by self (exclusive) time, since
- *  that is what points at the real hot spot. */
+/**
+ * Print the aggregated scope table (when scopes were used) and/or the flat
+ * per-timer table. The scope table is sorted by self (exclusive) time, since
+ * that is what points at the real hot spot.
+ * @param profiler (Profiler*)
+ * @return (void)
+ */
 void profiler_print_report(Profiler* profiler) {
     if (!profiler)
         return;
@@ -269,7 +323,12 @@ void profiler_print_report(Profiler* profiler) {
     }
 }
 
-/** Sum the elapsed time of every timer matching the given name. */
+/**
+ * Sum the elapsed time of every timer matching the given name.
+ * @param profiler (Profiler*)
+ * @param name (const char*)
+ * @return (double)
+ */
 double profiler_get_total_time(Profiler* profiler, const char* name) {
     if (!profiler || !name)
         return -1.0;
@@ -295,8 +354,13 @@ double cml_monotonic_ms(void) {
     return timespec_to_ms(&ts);
 }
 
-/** Index of the stat named `name`, creating a zeroed entry if absent; -1 on OOM.
- *  Linear scan: the scope-name set is small and this is off the timed path. */
+/**
+ * Index of the stat named `name`, creating a zeroed entry if absent; -1 on OOM.
+ * Linear scan: the scope-name set is small and this is off the timed path.
+ * @param profiler (Profiler*)
+ * @param name (const char*)
+ * @return (int)
+ */
 static int profiler_stat_index(Profiler* profiler, const char* name) {
     for (int i = 0; i < profiler->num_stats; i++)
         if (profiler->stats[i].name && strcmp(profiler->stats[i].name, name) == 0)

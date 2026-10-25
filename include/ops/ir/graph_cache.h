@@ -54,10 +54,17 @@ void cml_free_execution_plan(CMLExecutionPlan* plan);
 CMLGraphCache* cml_get_graph_cache(void);
 void cml_graph_cache_print_stats(CMLGraphCache* cache);
 
-/** Drop all cached plans (call when the IR graph is torn down). */
+/**
+ * Drop all cached plans (call when the IR graph is torn down).
+ * @return (void)
+ */
 void cml_graph_cache_reset_global(void);
 
-/** Clear cached references to @a t (call when @a t is about to be destroyed). */
+/**
+ * Clear cached references to @a t (call when @a t is about to be destroyed).
+ * @param t (struct Tensor*)
+ * @return (void)
+ */
 void cml_graph_cache_forget_tensor(struct Tensor* t);
 
 int cml_execute_node_fast(struct IRNode* node, float* out_buf);

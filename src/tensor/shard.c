@@ -5,8 +5,16 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/** Allocate a sharded-tensor container with owned copies of `shape` and `devices`
- *  and a zeroed shard array. Returns NULL on OOM (partial state is freed). */
+/**
+ * Allocate a sharded-tensor container with owned copies of `shape` and `devices`
+ * and a zeroed shard array. Returns NULL on OOM (partial state is freed).
+ * @param num_shards (int)
+ * @param ndim (int)
+ * @param shape (int*)
+ * @param devices (DeviceType*)
+ * @param axis (int)
+ * @return (CMLShardedTensor*)
+ */
 static CMLShardedTensor* sharded_tensor_alloc(int num_shards, int ndim, int* shape,
                                               DeviceType* devices, int axis) {
     CMLShardedTensor* st = (CMLShardedTensor*)cml_calloc(1, sizeof(CMLShardedTensor));
@@ -43,8 +51,15 @@ static CMLShardedTensor* sharded_tensor_alloc(int num_shards, int ndim, int* sha
     return st;
 }
 
-/** Split `t` across `devices` along `axis` (negative indexes from the end) into
- *  near-equal contiguous chunks. Returns NULL on bad args. */
+/**
+ * Split `t` across `devices` along `axis` (negative indexes from the end) into
+ * near-equal contiguous chunks. Returns NULL on bad args.
+ * @param t (Tensor*)
+ * @param devices (DeviceType*)
+ * @param num_devices (int)
+ * @param axis (int)
+ * @return (CMLShardedTensor*)
+ */
 CMLShardedTensor* tensor_shard(Tensor* t, DeviceType* devices, int num_devices, int axis) {
     if (!t || !devices || num_devices <= 0) {
         LOG_ERROR("tensor_shard: invalid arguments");
@@ -73,8 +88,16 @@ CMLShardedTensor* tensor_shard(Tensor* t, DeviceType* devices, int num_devices, 
     return st;
 }
 
-/** Split `t` along `axis` into explicitly-sized chunks (must sum to the axis
- *  length), copying each shard to its device. Returns NULL on mismatch or OOM. */
+/**
+ * Split `t` along `axis` into explicitly-sized chunks (must sum to the axis
+ * length), copying each shard to its device. Returns NULL on mismatch or OOM.
+ * @param t (Tensor*)
+ * @param devices (DeviceType*)
+ * @param num_devices (int)
+ * @param axis (int)
+ * @param sizes (int*)
+ * @return (CMLShardedTensor*)
+ */
 CMLShardedTensor* tensor_shard_with_sizes(Tensor* t, DeviceType* devices, int num_devices, int axis,
                                           int* sizes) {
     if (!t || !devices || !sizes || num_devices <= 0) {
@@ -166,8 +189,12 @@ CMLShardedTensor* tensor_shard_with_sizes(Tensor* t, DeviceType* devices, int nu
     return st;
 }
 
-/** Concatenate the shards back along their split axis into one dense tensor on
- *  the CPU. Returns NULL on bad args or OOM. */
+/**
+ * Concatenate the shards back along their split axis into one dense tensor on
+ * the CPU. Returns NULL on bad args or OOM.
+ * @param st (CMLShardedTensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_unshard(CMLShardedTensor* st) {
     if (!st || !st->shards || st->num_shards <= 0) {
         LOG_ERROR("tensor_unshard: invalid arguments");
@@ -222,7 +249,11 @@ Tensor* tensor_unshard(CMLShardedTensor* st) {
     return result;
 }
 
-/** Free a sharded tensor: every shard tensor plus the shape/device arrays. */
+/**
+ * Free a sharded tensor: every shard tensor plus the shape/device arrays.
+ * @param st (CMLShardedTensor*)
+ * @return (void)
+ */
 void sharded_tensor_free(CMLShardedTensor* st) {
     if (!st)
         return;
@@ -238,8 +269,13 @@ void sharded_tensor_free(CMLShardedTensor* st) {
     cml_free(st);
 }
 
-/** Element-wise add two identically-sharded tensors shard by shard, keeping each
- *  shard on its own device. Returns NULL on a layout mismatch or OOM. */
+/**
+ * Element-wise add two identically-sharded tensors shard by shard, keeping each
+ * shard on its own device. Returns NULL on a layout mismatch or OOM.
+ * @param a (CMLShardedTensor*)
+ * @param b (CMLShardedTensor*)
+ * @return (CMLShardedTensor*)
+ */
 CMLShardedTensor* sharded_add(CMLShardedTensor* a, CMLShardedTensor* b) {
     if (!a || !b) {
         LOG_ERROR("sharded_add: NULL argument");
@@ -297,8 +333,12 @@ CMLShardedTensor* sharded_add(CMLShardedTensor* a, CMLShardedTensor* b) {
     return result;
 }
 
-/** Sum all shards element-wise and replicate the result back to every device
- *  (NCCL-style all-reduce). Returns NULL on bad args or OOM. */
+/**
+ * Sum all shards element-wise and replicate the result back to every device
+ * (NCCL-style all-reduce). Returns NULL on bad args or OOM.
+ * @param st (CMLShardedTensor*)
+ * @return (CMLShardedTensor*)
+ */
 CMLShardedTensor* sharded_allreduce_sum(CMLShardedTensor* st) {
     if (!st || st->num_shards <= 0) {
         LOG_ERROR("sharded_allreduce_sum: invalid arguments");
@@ -349,7 +389,16 @@ CMLShardedTensor* sharded_allreduce_sum(CMLShardedTensor* st) {
     return result;
 }
 
-/** Naive row-major [M,K] x [K,N] -> [M,N] matmul into `out`. */
+/**
+ * Naive row-major [M,K] x [K,N] -> [M,N] matmul into `out`.
+ * @param a (const float*)
+ * @param M (int)
+ * @param K (int)
+ * @param b (const float*)
+ * @param N (int)
+ * @param out (float*)
+ * @return (void)
+ */
 static void matmul_2d(const float* a, int M, int K, const float* b, int N, float* out) {
     for (int i = 0; i < M; i++) {
         for (int j = 0; j < N; j++) {
@@ -362,9 +411,14 @@ static void matmul_2d(const float* a, int M, int K, const float* b, int N, float
     }
 }
 
-/** Distributed 2-D matmul. a.axis==1 with b.axis==0 does partial products plus an
- *  all-reduce; a.axis==0 does independent row-sharded matmuls. Other sharding
- *  configurations are unsupported and return NULL. */
+/**
+ * Distributed 2-D matmul. a.axis==1 with b.axis==0 does partial products plus an
+ * all-reduce; a.axis==0 does independent row-sharded matmuls. Other sharding
+ * configurations are unsupported and return NULL.
+ * @param a (CMLShardedTensor*)
+ * @param b (CMLShardedTensor*)
+ * @return (CMLShardedTensor*)
+ */
 CMLShardedTensor* sharded_matmul(CMLShardedTensor* a, CMLShardedTensor* b) {
     if (!a || !b) {
         LOG_ERROR("sharded_matmul: NULL argument");
@@ -483,8 +537,14 @@ CMLShardedTensor* sharded_matmul(CMLShardedTensor* a, CMLShardedTensor* b) {
     }
 }
 
-/** Copy `t` in full onto each device, producing a replicated (unsharded) tensor.
- *  Returns NULL on bad args or OOM. */
+/**
+ * Copy `t` in full onto each device, producing a replicated (unsharded) tensor.
+ * Returns NULL on bad args or OOM.
+ * @param t (Tensor*)
+ * @param devices (DeviceType*)
+ * @param num_devices (int)
+ * @return (CMLShardedTensor*)
+ */
 CMLShardedTensor* tensor_replicate(Tensor* t, DeviceType* devices, int num_devices) {
     if (!t || !devices || num_devices <= 0) {
         LOG_ERROR("tensor_replicate: invalid arguments");

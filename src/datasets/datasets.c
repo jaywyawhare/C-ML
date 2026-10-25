@@ -13,6 +13,8 @@
 /**
  * Compute per-feature mean, std, min, and max over the dataset's X matrix and
  * store them on the Dataset (allocating the stat arrays). No-op if X is empty.
+ * @param ds (Dataset*)
+ * @return (void)
  */
 void cml_dataset_compute_stats(Dataset* ds) {
     if (!ds || !ds->X || ds->num_samples == 0 || ds->input_size == 0)
@@ -66,6 +68,7 @@ static char g_cache_dir[512] = "";
 /**
  * Return the dataset cache directory, lazily defaulting to $HOME/.cml/datasets
  * (or /tmp when HOME is unset). Points to a static buffer.
+ * @return (const char*)
  */
 const char* cml_dataset_cache_dir(void) {
     if (g_cache_dir[0] == '\0') {
@@ -79,6 +82,8 @@ const char* cml_dataset_cache_dir(void) {
 
 /**
  * Override the dataset cache directory used by subsequent downloads.
+ * @param dir (const char*)
+ * @return (void)
  */
 void cml_dataset_set_cache_dir(const char* dir) {
     if (dir)
@@ -88,6 +93,8 @@ void cml_dataset_set_cache_dir(const char* dir) {
 /**
  * Create the directory (and parents) if it does not already exist, shelling out to
  * `mkdir -p`. Returns 0 if it already exists, else the mkdir exit status.
+ * @param path (const char*)
+ * @return (int)
  */
 static int ensure_dir(const char* path) {
     struct stat st;
@@ -102,6 +109,9 @@ static int ensure_dir(const char* path) {
  * Download url into the cache as filename unless already cached, using curl with a
  * wget fallback. Returns the cached path (thread-local buffer; copy before the next
  * call) or NULL on failure; partial/empty files are removed.
+ * @param url (const char*)
+ * @param filename (const char*)
+ * @return (const char*)
  */
 const char* cml_dataset_download(const char* url, const char* filename) {
     const char* dir = cml_dataset_cache_dir();
@@ -179,6 +189,7 @@ static const char* download_and_gunzip(const char* url, const char* gz_name, con
 /**
  * Download and parse the UCI Iris dataset (last column is the class label).
  * Returns NULL on download or parse failure.
+ * @return (Dataset*)
  */
 static Dataset* load_iris(void) {
     const char* path = cml_dataset_download(
@@ -207,6 +218,7 @@ static Dataset* load_iris(void) {
 /**
  * Download and parse the UCI Wine dataset (first column is the class label).
  * Returns NULL on failure.
+ * @return (Dataset*)
  */
 static Dataset* load_wine(void) {
     const char* path = cml_dataset_download(
@@ -234,6 +246,7 @@ static Dataset* load_wine(void) {
  * Download and parse the Wisconsin breast-cancer (wdbc) data. Parsed by hand: the
  * ID column is skipped, the M/B diagnosis becomes the target (M=1, B=0), and the
  * remaining 30 columns are features. Returns NULL on failure.
+ * @return (Dataset*)
  */
 static Dataset* load_breast_cancer(void) {
     const char* path =
@@ -308,6 +321,7 @@ static Dataset* load_breast_cancer(void) {
 /**
  * Download and parse the Boston Housing CSV as a regression dataset (last column
  * is the target; num_classes stays 0). Returns NULL on failure.
+ * @return (Dataset*)
  */
 static Dataset* load_boston(void) {
     const char* path = cml_dataset_download(
@@ -337,6 +351,9 @@ static Dataset* load_boston(void) {
  * preferring a local data/ directory and otherwise downloading and gunzipping from
  * base_url. Train and test splits are concatenated into one dataset when both are
  * available. Returns NULL if training data cannot be obtained.
+ * @param name (const char*)
+ * @param base_url (const char*)
+ * @return (Dataset*)
  */
 static Dataset* load_mnist_dataset(const char* name, const char* base_url) {
     struct stat st;
@@ -454,6 +471,7 @@ static Dataset* load_mnist_dataset(const char* name, const char* base_url) {
 
 /**
  * Load the MNIST handwritten-digit dataset.
+ * @return (Dataset*)
  */
 static Dataset* load_mnist(void) {
     return load_mnist_dataset("mnist", "https://storage.googleapis.com/cvdf-datasets/mnist");
@@ -461,6 +479,7 @@ static Dataset* load_mnist(void) {
 
 /**
  * Load the Fashion-MNIST dataset (same IDX format as MNIST).
+ * @return (Dataset*)
  */
 static Dataset* load_fashion_mnist(void) {
     return load_mnist_dataset("fashion_mnist",
@@ -471,6 +490,7 @@ static Dataset* load_fashion_mnist(void) {
  * Download, extract, and load CIFAR-10 from the binary distribution, concatenating
  * the five training batches and the test batch (3072 features per image,
  * normalized to [0,1]). Missing batches are skipped. Returns NULL on failure.
+ * @return (Dataset*)
  */
 static Dataset* load_cifar10(void) {
     const char* path = cml_dataset_download(
@@ -545,6 +565,7 @@ static Dataset* load_cifar10(void) {
  * Build the airline-passengers time series dataset from the built-in data, with X
  * and y both set to the series values (regression). Returns NULL on allocation
  * failure.
+ * @return (Dataset*)
  */
 static Dataset* load_airline(void) {
     int n;
@@ -575,6 +596,7 @@ static Dataset* load_airline(void) {
 /**
  * Build the 8x8 digits dataset from the built-in generated data, copying it into
  * mutable buffers for the Dataset. Returns NULL on allocation failure.
+ * @return (Dataset*)
  */
 static Dataset* load_digits(void) {
     int n, feat;
@@ -625,6 +647,8 @@ static const DatasetEntry g_registry[] = {{"iris", load_iris},
 /**
  * Load a built-in dataset by name (case-insensitive) via the registry, computing
  * feature stats on success. Returns NULL for a NULL or unknown name.
+ * @param name (const char*)
+ * @return (Dataset*)
  */
 Dataset* cml_dataset_load(const char* name) {
     if (!name) {

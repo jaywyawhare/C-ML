@@ -11,7 +11,10 @@
 #include "ops/ir/dispatch.h"
 #include "alloc/cml_allocator.h"
 
-/** Fetch the active CUDA backend from the global dispatch context, or NULL. */
+/**
+ * Fetch the active CUDA backend from the global dispatch context, or NULL.
+ * @return (CMLCUDABackend*)
+ */
 static CMLCUDABackend* wmma_get_cuda_backend(void) {
     CMLDispatchContext* ctx = cml_dispatch_get_global();
     if (!ctx)
@@ -19,7 +22,10 @@ static CMLCUDABackend* wmma_get_cuda_backend(void) {
     return (CMLCUDABackend*)ctx->backend_contexts[CML_BACKEND_CUDA];
 }
 
-/** True when a CUDA backend is live and its compute capability supports WMMA (SM >= 7.0). */
+/**
+ * True when a CUDA backend is live and its compute capability supports WMMA (SM >= 7.0).
+ * @return (bool)
+ */
 bool cml_wmma_available(void) {
     CMLCUDABackend* backend = wmma_get_cuda_backend();
     if (!backend || !backend->initialized) {
@@ -31,8 +37,15 @@ bool cml_wmma_available(void) {
     return (major > 7) || (major == 7 && minor >= 0);
 }
 
-/** Pick WMMA fragment and warp-tiling parameters for an MxNxK matmul; returns -1 when
- *  WMMA is unavailable or the problem is too small for any fragment shape. */
+/**
+ * Pick WMMA fragment and warp-tiling parameters for an MxNxK matmul; returns -1 when
+ * WMMA is unavailable or the problem is too small for any fragment shape.
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @param config (WMMAConfig*)
+ * @return (int)
+ */
 int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
     if (!config)
         return -1;
@@ -91,7 +104,15 @@ int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
 
 #define WMMA_SRC_MAX 8192
 
-/** printf-append into a growable heap buffer, doubling capacity as needed. */
+/**
+ * printf-append into a growable heap buffer, doubling capacity as needed.
+ * @param buf (char**)
+ * @param cap (size_t*)
+ * @param len (size_t*)
+ * @param fmt (const char*)
+ * @param ... variadic arguments
+ * @return (void)
+ */
 static void src_appendf(char** buf, size_t* cap, size_t* len, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -116,8 +137,15 @@ static void src_appendf(char** buf, size_t* cap, size_t* len, const char* fmt, .
     *len += (size_t)needed;
 }
 
-/** Emit CUDA/mma.h source for a one-warp-per-tile Tensor-Core matmul using `config`'s
- *  fragment shape; caller owns the returned string. */
+/**
+ * Emit CUDA/mma.h source for a one-warp-per-tile Tensor-Core matmul using `config`'s
+ * fragment shape; caller owns the returned string.
+ * @param config (const WMMAConfig*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @return (char*)
+ */
 char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
     if (!config)
         return NULL;
@@ -205,8 +233,17 @@ char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
     return src;
 }
 
-/** Run a Tensor-Core matmul: select a config, generate and JIT the kernel, launch it
- *  on the CUDA backend, and synchronize. Returns -1 on any failure. */
+/**
+ * Run a Tensor-Core matmul: select a config, generate and JIT the kernel, launch it
+ * on the CUDA backend, and synchronize. Returns -1 on any failure.
+ * @param A (const void*)
+ * @param B (const void*)
+ * @param C (void*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @return (int)
+ */
 int cml_wmma_matmul(const void* A, const void* B, void* C, int M, int N, int K) {
     if (!A || !B || !C)
         return -1;
@@ -275,10 +312,20 @@ int cml_wmma_matmul(const void* A, const void* B, void* C, int M, int N, int K) 
 
 #else /* !CML_HAS_CUDA */
 
-/** Stub when CUDA is unavailable: WMMA never supported. */
+/**
+ * Stub when CUDA is unavailable: WMMA never supported.
+ * @return (bool)
+ */
 bool cml_wmma_available(void) { return false; }
 
-/** Stub config selection: always fails without CUDA. */
+/**
+ * Stub config selection: always fails without CUDA.
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @param config (WMMAConfig*)
+ * @return (int)
+ */
 int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
     (void)M;
     (void)N;
@@ -287,7 +334,14 @@ int cml_wmma_select_config(int M, int N, int K, WMMAConfig* config) {
     return -1;
 }
 
-/** Stub kernel generation: returns NULL without CUDA. */
+/**
+ * Stub kernel generation: returns NULL without CUDA.
+ * @param config (const WMMAConfig*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @return (char*)
+ */
 char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
     (void)config;
     (void)M;
@@ -296,7 +350,16 @@ char* cml_wmma_generate_kernel(const WMMAConfig* config, int M, int N, int K) {
     return NULL;
 }
 
-/** Stub matmul: always fails (-1) without CUDA. */
+/**
+ * Stub matmul: always fails (-1) without CUDA.
+ * @param A (const void*)
+ * @param B (const void*)
+ * @param C (void*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @return (int)
+ */
 int cml_wmma_matmul(const void* A, const void* B, void* C, int M, int N, int K) {
     (void)A;
     (void)B;

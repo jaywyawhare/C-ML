@@ -49,7 +49,12 @@ typedef struct {
 } usb3_dev_desc_t;
 #pragma pack(pop)
 
-/** Read a USB device descriptor from the start of a usbfs device file. */
+/**
+ * Read a USB device descriptor from the start of a usbfs device file.
+ * @param fd (int)
+ * @param desc (usb3_dev_desc_t*)
+ * @return (int)
+ */
 static int read_dev_descriptor(int fd, usb3_dev_desc_t* desc) {
     /* usbfs exposes the descriptor at the start of the device file */
     if (lseek(fd, 0, SEEK_SET) != 0)
@@ -60,17 +65,35 @@ static int read_dev_descriptor(int fd, usb3_dev_desc_t* desc) {
     return 0;
 }
 
-/** Claim a USB interface for exclusive access via usbfs ioctl. */
+/**
+ * Claim a USB interface for exclusive access via usbfs ioctl.
+ * @param fd (int)
+ * @param iface (int)
+ * @return (int)
+ */
 static int usb3_claim_interface(int fd, int iface) {
     return ioctl(fd, USBDEVFS_CLAIMINTERFACE, &iface);
 }
 
-/** Release a previously claimed USB interface via usbfs ioctl. */
+/**
+ * Release a previously claimed USB interface via usbfs ioctl.
+ * @param fd (int)
+ * @param iface (int)
+ * @return (int)
+ */
 static int usb3_release_interface(int fd, int iface) {
     return ioctl(fd, USBDEVFS_RELEASEINTERFACE, &iface);
 }
 
-/** Perform a USB bulk transfer on an endpoint via usbfs ioctl. */
+/**
+ * Perform a USB bulk transfer on an endpoint via usbfs ioctl.
+ * @param fd (int)
+ * @param ep (int)
+ * @param data (void*)
+ * @param size (size_t)
+ * @param timeout_ms (int)
+ * @return (int)
+ */
 static int usb3_bulk_xfer(int fd, int ep, void* data, size_t size, int timeout_ms) {
     struct usbdevfs_bulktransfer bulk = {
         .ep      = (unsigned int)ep,
@@ -82,7 +105,12 @@ static int usb3_bulk_xfer(int fd, int ep, void* data, size_t size, int timeout_m
     return ret;
 }
 
-/** Walk /dev/bus/usb for the ASM2464PD bridge, writing its device path on a match. */
+/**
+ * Walk /dev/bus/usb for the ASM2464PD bridge, writing its device path on a match.
+ * @param path (char*)
+ * @param path_size (size_t)
+ * @return (int)
+ */
 static int scan_usb_bus(char* path, size_t path_size) {
     DIR* buses = opendir("/dev/bus/usb");
     if (!buses)
@@ -127,13 +155,19 @@ static int scan_usb_bus(char* path, size_t path_size) {
     return -1;
 }
 
-/** True if an ASM2464PD PCIe-USB3 bridge is present on the bus. */
+/**
+ * True if an ASM2464PD PCIe-USB3 bridge is present on the bus.
+ * @return (bool)
+ */
 bool cml_usb3_gpu_available(void) {
     char path[512];
     return scan_usb_bus(path, sizeof(path)) == 0;
 }
 
-/** Open the ASM2464PD bridge: claim its interface and set up the bulk buffer. */
+/**
+ * Open the ASM2464PD bridge: claim its interface and set up the bulk buffer.
+ * @return (CMLUSB3GPU*)
+ */
 CMLUSB3GPU* cml_usb3_gpu_open(void) {
     char path[512];
     if (scan_usb_bus(path, sizeof(path)) != 0) {
@@ -192,7 +226,11 @@ CMLUSB3GPU* cml_usb3_gpu_open(void) {
     return dev;
 }
 
-/** Unmap BAR0, release the interface, close the fd, and free the device. */
+/**
+ * Unmap BAR0, release the interface, close the fd, and free the device.
+ * @param dev (CMLUSB3GPU*)
+ * @return (void)
+ */
 void cml_usb3_gpu_close(CMLUSB3GPU* dev) {
     if (!dev)
         return;
@@ -211,8 +249,17 @@ void cml_usb3_gpu_close(CMLUSB3GPU* dev) {
     cml_free(dev);
 }
 
-/** Issue a vendor SCSI command over the bulk endpoints, streaming data in or out
- *  in packet-sized chunks. */
+/**
+ * Issue a vendor SCSI command over the bulk endpoints, streaming data in or out
+ * in packet-sized chunks.
+ * @param dev (CMLUSB3GPU*)
+ * @param cdb (const uint8_t*)
+ * @param cdb_len (int)
+ * @param data (void*)
+ * @param data_size (size_t)
+ * @param is_write (bool)
+ * @return (int)
+ */
 int cml_usb3_gpu_scsi_cmd(CMLUSB3GPU* dev, const uint8_t* cdb, int cdb_len, void* data,
                           size_t data_size, bool is_write) {
     if (!dev || !dev->connected || dev->fd < 0)
@@ -268,7 +315,13 @@ int cml_usb3_gpu_scsi_cmd(CMLUSB3GPU* dev, const uint8_t* cdb, int cdb_len, void
     return 0;
 }
 
-/** Read a 32-bit BAR register at offset via a vendor SCSI command. */
+/**
+ * Read a 32-bit BAR register at offset via a vendor SCSI command.
+ * @param dev (CMLUSB3GPU*)
+ * @param offset (uint64_t)
+ * @param value (uint32_t*)
+ * @return (int)
+ */
 int cml_usb3_gpu_read32(CMLUSB3GPU* dev, uint64_t offset, uint32_t* value) {
     if (!dev || !dev->connected || !value)
         return -1;
@@ -295,7 +348,13 @@ int cml_usb3_gpu_read32(CMLUSB3GPU* dev, uint64_t offset, uint32_t* value) {
     return 0;
 }
 
-/** Write a 32-bit BAR register at offset via a vendor SCSI command. */
+/**
+ * Write a 32-bit BAR register at offset via a vendor SCSI command.
+ * @param dev (CMLUSB3GPU*)
+ * @param offset (uint64_t)
+ * @param value (uint32_t)
+ * @return (int)
+ */
 int cml_usb3_gpu_write32(CMLUSB3GPU* dev, uint64_t offset, uint32_t value) {
     if (!dev || !dev->connected)
         return -1;
@@ -329,7 +388,14 @@ static void usb3_build_pcie_cdb(uint8_t* cdb, uint8_t sub_cmd, uint64_t addr, ui
         cdb[10 + i] = (uint8_t)((len >> (24 - 8 * i)) & 0xFF);
 }
 
-/** Upload host data to a GPU PCIe address, chunked through the bulk buffer. */
+/**
+ * Upload host data to a GPU PCIe address, chunked through the bulk buffer.
+ * @param dev (CMLUSB3GPU*)
+ * @param gpu_addr (uint64_t)
+ * @param data (const void*)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_usb3_gpu_upload(CMLUSB3GPU* dev, uint64_t gpu_addr, const void* data, size_t size) {
     if (!dev || !dev->connected || !data || size == 0)
         return -1;
@@ -357,7 +423,14 @@ int cml_usb3_gpu_upload(CMLUSB3GPU* dev, uint64_t gpu_addr, const void* data, si
     return 0;
 }
 
-/** Download from a GPU PCIe address into host data, chunked through the bulk buffer. */
+/**
+ * Download from a GPU PCIe address into host data, chunked through the bulk buffer.
+ * @param dev (CMLUSB3GPU*)
+ * @param gpu_addr (uint64_t)
+ * @param data (void*)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_usb3_gpu_download(CMLUSB3GPU* dev, uint64_t gpu_addr, void* data, size_t size) {
     if (!dev || !dev->connected || !data || size == 0)
         return -1;
@@ -387,14 +460,30 @@ int cml_usb3_gpu_download(CMLUSB3GPU* dev, uint64_t gpu_addr, void* data, size_t
 
 #else /* !__linux__ */
 
-/** Non-Linux stub: USB3 GPU bridge unavailable. */
+/**
+ * Non-Linux stub: USB3 GPU bridge unavailable.
+ * @return (bool)
+ */
 bool cml_usb3_gpu_available(void) { return false; }
-/** Non-Linux stub: no USB3 GPU bridge to open. */
+/**
+ * Non-Linux stub: no USB3 GPU bridge to open.
+ * @return (CMLUSB3GPU*)
+ */
 CMLUSB3GPU* cml_usb3_gpu_open(void) { return NULL; }
-/** Non-Linux stub: nothing to close. */
+/**
+ * Non-Linux stub: nothing to close.
+ * @param dev (CMLUSB3GPU*)
+ * @return (void)
+ */
 void cml_usb3_gpu_close(CMLUSB3GPU* dev) { (void)dev; }
 
-/** Non-Linux stub for register read; always fails. */
+/**
+ * Non-Linux stub for register read; always fails.
+ * @param dev (CMLUSB3GPU*)
+ * @param offset (uint64_t)
+ * @param value (uint32_t*)
+ * @return (int)
+ */
 int cml_usb3_gpu_read32(CMLUSB3GPU* dev, uint64_t offset, uint32_t* value) {
     (void)dev;
     (void)offset;
@@ -402,7 +491,13 @@ int cml_usb3_gpu_read32(CMLUSB3GPU* dev, uint64_t offset, uint32_t* value) {
     return -1;
 }
 
-/** Non-Linux stub for register write; always fails. */
+/**
+ * Non-Linux stub for register write; always fails.
+ * @param dev (CMLUSB3GPU*)
+ * @param offset (uint64_t)
+ * @param value (uint32_t)
+ * @return (int)
+ */
 int cml_usb3_gpu_write32(CMLUSB3GPU* dev, uint64_t offset, uint32_t value) {
     (void)dev;
     (void)offset;
@@ -410,7 +505,14 @@ int cml_usb3_gpu_write32(CMLUSB3GPU* dev, uint64_t offset, uint32_t value) {
     return -1;
 }
 
-/** Non-Linux stub for upload; always fails. */
+/**
+ * Non-Linux stub for upload; always fails.
+ * @param dev (CMLUSB3GPU*)
+ * @param gpu_addr (uint64_t)
+ * @param data (const void*)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_usb3_gpu_upload(CMLUSB3GPU* dev, uint64_t gpu_addr, const void* data, size_t size) {
     (void)dev;
     (void)gpu_addr;
@@ -419,7 +521,14 @@ int cml_usb3_gpu_upload(CMLUSB3GPU* dev, uint64_t gpu_addr, const void* data, si
     return -1;
 }
 
-/** Non-Linux stub for download; always fails. */
+/**
+ * Non-Linux stub for download; always fails.
+ * @param dev (CMLUSB3GPU*)
+ * @param gpu_addr (uint64_t)
+ * @param data (void*)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_usb3_gpu_download(CMLUSB3GPU* dev, uint64_t gpu_addr, void* data, size_t size) {
     (void)dev;
     (void)gpu_addr;
@@ -428,7 +537,16 @@ int cml_usb3_gpu_download(CMLUSB3GPU* dev, uint64_t gpu_addr, void* data, size_t
     return -1;
 }
 
-/** Non-Linux stub for SCSI command; always fails. */
+/**
+ * Non-Linux stub for SCSI command; always fails.
+ * @param dev (CMLUSB3GPU*)
+ * @param cdb (const uint8_t*)
+ * @param cdb_len (int)
+ * @param data (void*)
+ * @param data_size (size_t)
+ * @param is_write (bool)
+ * @return (int)
+ */
 int cml_usb3_gpu_scsi_cmd(CMLUSB3GPU* dev, const uint8_t* cdb, int cdb_len, void* data,
                           size_t data_size, bool is_write) {
     (void)dev;

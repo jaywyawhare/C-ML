@@ -6,12 +6,22 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
-/** Default 3D U-Net config: 1 input channel, 3 classes, depth 4, 32 base filters. */
+/**
+ * Default 3D U-Net config: 1 input channel, 3 classes, depth 4, 32 base filters.
+ * @return (CMLUNet3DConfig)
+ */
 CMLUNet3DConfig cml_zoo_unet3d_config_default(void) {
     return (CMLUNet3DConfig){.in_channels = 1, .num_classes = 3, .depth = 4, .base_filters = 32};
 }
 
-/** Single 3D conv unit: Conv3d3x3x3 -> BatchNorm3d -> ReLU (in_ch -> out_ch). */
+/**
+ * Single 3D conv unit: Conv3d3x3x3 -> BatchNorm3d -> ReLU (in_ch -> out_ch).
+ * @param in_ch (int)
+ * @param out_ch (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Sequential*)
+ */
 static Sequential* conv3d_instnorm_relu(int in_ch, int out_ch, DType dtype, DeviceType device) {
     Sequential* block = nn_sequential();
     sequential_add(block, (Module*)nn_conv3d(in_ch, out_ch, 3, 1, 1, 1, false, dtype, device));
@@ -20,7 +30,14 @@ static Sequential* conv3d_instnorm_relu(int in_ch, int out_ch, DType dtype, Devi
     return block;
 }
 
-/** Stack two conv3d-norm-relu units to form one encoder/decoder stage block. */
+/**
+ * Stack two conv3d-norm-relu units to form one encoder/decoder stage block.
+ * @param in_ch (int)
+ * @param out_ch (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Sequential*)
+ */
 static Sequential* double_conv3d_block(int in_ch, int out_ch, DType dtype, DeviceType device) {
     Sequential* block = nn_sequential();
     sequential_add(block, (Module*)conv3d_instnorm_relu(in_ch, out_ch, dtype, device));
@@ -41,7 +58,12 @@ typedef struct {
     int depth;
 } UNet3DModel;
 
-/** Forward pass over volumetric input: encoder with skips, bottleneck, decoder with concat. */
+/**
+ * Forward pass over volumetric input: encoder with skips, bottleneck, decoder with concat.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* unet3d_forward(Module* module, Tensor* input) {
     UNet3DModel* net = (UNet3DModel*)module;
     if (!net || !input)
@@ -82,7 +104,11 @@ static Tensor* unet3d_forward(Module* module, Tensor* input) {
     return module_forward((Module*)net->final_conv, x);
 }
 
-/** Free all 3D encoder/decoder blocks, pools, upsamplers, bottleneck and final conv. */
+/**
+ * Free all 3D encoder/decoder blocks, pools, upsamplers, bottleneck and final conv.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void unet3d_free(Module* module) {
     UNet3DModel* net = (UNet3DModel*)module;
     if (!net)
@@ -105,7 +131,13 @@ static void unet3d_free(Module* module) {
     cml_free(net);
 }
 
-/** Build a 3D U-Net from @p config for volumetric segmentation with skip connections. */
+/**
+ * Build a 3D U-Net from @p config for volumetric segmentation with skip connections.
+ * @param config (const CMLUNet3DConfig*)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 Module* cml_zoo_unet3d_create(const CMLUNet3DConfig* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;

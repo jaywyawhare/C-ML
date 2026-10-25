@@ -20,14 +20,22 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/** Find-last-set: index of the most significant set bit (floor(log2 x)), or -1 if x is 0. */
+/**
+ * Find-last-set: index of the most significant set bit (floor(log2 x)), or -1 if x is 0.
+ * @param x (size_t)
+ * @return (int)
+ */
 static inline int tlsf_fls(size_t x) {
     if (x == 0)
         return -1;
     return 63 - __builtin_clzll((unsigned long long)x);
 }
 
-/** Find-first-set: index of the least significant set bit, or -1 if x is 0. */
+/**
+ * Find-first-set: index of the least significant set bit, or -1 if x is 0.
+ * @param x (uint32_t)
+ * @return (int)
+ */
 static inline int tlsf_ffs(uint32_t x) {
     if (x == 0)
         return -1;
@@ -43,54 +51,115 @@ static inline int tlsf_ffs(uint32_t x) {
 #define FLAG_PREVFREE ((size_t)2)
 #define FLAG_MASK (FLAG_FREE | FLAG_PREVFREE)
 
-/** Block payload size with the two flag bits masked off. */
+/**
+ * Block payload size with the two flag bits masked off.
+ * @param b (const TLSFBlock*)
+ * @return (size_t)
+ */
 static inline size_t block_get_size(const TLSFBlock* b) { return b->size & ~FLAG_MASK; }
 
-/** Set the block's payload size while preserving its flag bits. */
+/**
+ * Set the block's payload size while preserving its flag bits.
+ * @param b (TLSFBlock*)
+ * @param sz (size_t)
+ * @return (void)
+ */
 static inline void block_set_size(TLSFBlock* b, size_t sz) { b->size = sz | (b->size & FLAG_MASK); }
 
-/** True if this block is marked free. */
+/**
+ * True if this block is marked free.
+ * @param b (const TLSFBlock*)
+ * @return (bool)
+ */
 static inline bool block_is_free(const TLSFBlock* b) { return (b->size & FLAG_FREE) != 0; }
 
-/** Set this block's free flag. */
+/**
+ * Set this block's free flag.
+ * @param b (TLSFBlock*)
+ * @return (void)
+ */
 static inline void block_mark_free(TLSFBlock* b) { b->size |= FLAG_FREE; }
 
-/** Clear this block's free flag (mark it allocated). */
+/**
+ * Clear this block's free flag (mark it allocated).
+ * @param b (TLSFBlock*)
+ * @return (void)
+ */
 static inline void block_mark_used(TLSFBlock* b) { b->size &= ~FLAG_FREE; }
 
-/** True if the physically-previous block is free (used to drive coalescing). */
+/**
+ * True if the physically-previous block is free (used to drive coalescing).
+ * @param b (const TLSFBlock*)
+ * @return (bool)
+ */
 static inline bool block_prev_is_free(const TLSFBlock* b) { return (b->size & FLAG_PREVFREE) != 0; }
 
-/** Record that the physically-previous block is free. */
+/**
+ * Record that the physically-previous block is free.
+ * @param b (TLSFBlock*)
+ * @return (void)
+ */
 static inline void block_set_prev_free(TLSFBlock* b) { b->size |= FLAG_PREVFREE; }
 
-/** Record that the physically-previous block is allocated. */
+/**
+ * Record that the physically-previous block is allocated.
+ * @param b (TLSFBlock*)
+ * @return (void)
+ */
 static inline void block_set_prev_used(TLSFBlock* b) { b->size &= ~FLAG_PREVFREE; }
 
-/** User data pointer for a block (just past its header). */
+/**
+ * User data pointer for a block (just past its header).
+ * @param b (TLSFBlock*)
+ * @return (void*)
+ */
 static inline void* block_to_user(TLSFBlock* b) { return (char*)b + BLOCK_HEADER_SIZE; }
 
-/** Recover the block header from a user pointer handed out by this allocator. */
+/**
+ * Recover the block header from a user pointer handed out by this allocator.
+ * @param ptr (void*)
+ * @return (TLSFBlock*)
+ */
 static inline TLSFBlock* user_to_block(void* ptr) {
     return (TLSFBlock*)((char*)ptr - BLOCK_HEADER_SIZE);
 }
 
-/** The physically adjacent next block (header + payload bytes after `b`); may be the sentinel. */
+/**
+ * The physically adjacent next block (header + payload bytes after `b`); may be the sentinel.
+ * @param b (TLSFBlock*)
+ * @return (TLSFBlock*)
+ */
 static inline TLSFBlock* block_next_phys(TLSFBlock* b) {
     return (TLSFBlock*)((char*)b + BLOCK_HEADER_SIZE + block_get_size(b));
 }
 
-/** True if `b` lies within the allocator's managed pool (used to stop physical-chain walks). */
+/**
+ * True if `b` lies within the allocator's managed pool (used to stop physical-chain walks).
+ * @param a (const CMLTLSFAllocator*)
+ * @param b (const TLSFBlock*)
+ * @return (bool)
+ */
 static inline bool block_in_pool(const CMLTLSFAllocator* a, const TLSFBlock* b) {
     return (const char*)b >= (const char*)a->pool &&
            (const char*)b < (const char*)a->pool + a->pool_size;
 }
 
-/** Round `x` up to the next multiple of power-of-two `a`. */
+/**
+ * Round `x` up to the next multiple of power-of-two `a`.
+ * @param x (size_t)
+ * @param a (size_t)
+ * @return (size_t)
+ */
 static inline size_t align_up(size_t x, size_t a) { return (x + a - 1) & ~(a - 1); }
 
-/** Map a size to its two-level index: first level fl = floor(log2 size), second level sl the
- *  subdivision within that power-of-two range. Used to place a block in blocks[fl][sl]. */
+/**
+ * Map a size to its two-level index: first level fl = floor(log2 size), second level sl the
+ * subdivision within that power-of-two range. Used to place a block in blocks[fl][sl].
+ * @param size (size_t)
+ * @param fl (int*)
+ * @param sl (int*)
+ * @return (void)
+ */
 static void mapping_insert(size_t size, int* fl, int* sl) {
     int f;
     if (size < (size_t)(1 << (TLSF_FL_INDEX_SHIFT + 1))) {
@@ -109,8 +178,14 @@ static void mapping_insert(size_t size, int* fl, int* sl) {
     *sl = s;
 }
 
-/** Like mapping_insert but rounds the request up first, so the chosen (fl, sl) bucket is
- *  guaranteed to hold blocks large enough to satisfy an allocation of `size`. */
+/**
+ * Like mapping_insert but rounds the request up first, so the chosen (fl, sl) bucket is
+ * guaranteed to hold blocks large enough to satisfy an allocation of `size`.
+ * @param size (size_t)
+ * @param fl (int*)
+ * @param sl (int*)
+ * @return (void)
+ */
 static void mapping_search(size_t size, int* fl, int* sl) {
     if (size >= (size_t)(1 << (TLSF_FL_INDEX_SHIFT + 1))) {
         int f        = tlsf_fls(size);
@@ -120,8 +195,13 @@ static void mapping_search(size_t size, int* fl, int* sl) {
     mapping_insert(size, fl, sl);
 }
 
-/** Push a free block onto the head of its (fl, sl) free list, set the matching bitmap bits, and
- *  mark the block free. */
+/**
+ * Push a free block onto the head of its (fl, sl) free list, set the matching bitmap bits, and
+ * mark the block free.
+ * @param a (CMLTLSFAllocator*)
+ * @param block (TLSFBlock*)
+ * @return (void)
+ */
 static void freelist_insert(CMLTLSFAllocator* a, TLSFBlock* block) {
     int fl, sl;
     mapping_insert(block_get_size(block), &fl, &sl);
@@ -139,7 +219,12 @@ static void freelist_insert(CMLTLSFAllocator* a, TLSFBlock* block) {
     block_mark_free(block);
 }
 
-/** Unlink a block from its (fl, sl) free list, clearing the bitmap bits when the list empties. */
+/**
+ * Unlink a block from its (fl, sl) free list, clearing the bitmap bits when the list empties.
+ * @param a (CMLTLSFAllocator*)
+ * @param block (TLSFBlock*)
+ * @return (void)
+ */
 static void freelist_remove(CMLTLSFAllocator* a, TLSFBlock* block) {
     int fl, sl;
     mapping_insert(block_get_size(block), &fl, &sl);
@@ -164,8 +249,14 @@ static void freelist_remove(CMLTLSFAllocator* a, TLSFBlock* block) {
     block->prev_free = NULL;
 }
 
-/** Split `block` down to `wanted` bytes when the remainder can hold a minimum block, returning
- *  the new remainder block (not yet inserted into a free list), or NULL if it does not fit. */
+/**
+ * Split `block` down to `wanted` bytes when the remainder can hold a minimum block, returning
+ * the new remainder block (not yet inserted into a free list), or NULL if it does not fit.
+ * @param a (CMLTLSFAllocator*)
+ * @param block (TLSFBlock*)
+ * @param wanted (size_t)
+ * @return (TLSFBlock*)
+ */
 static TLSFBlock* try_split(CMLTLSFAllocator* a, TLSFBlock* block, size_t wanted) {
     size_t cur = block_get_size(block);
     if (cur < wanted + MIN_BLOCK_TOTAL) {
@@ -196,8 +287,13 @@ static TLSFBlock* try_split(CMLTLSFAllocator* a, TLSFBlock* block, size_t wanted
     return rest;
 }
 
-/** Coalesce `block` with its physically-previous block if that one is free, returning the merged
- *  block (the previous one) or `block` unchanged when no merge happens. */
+/**
+ * Coalesce `block` with its physically-previous block if that one is free, returning the merged
+ * block (the previous one) or `block` unchanged when no merge happens.
+ * @param a (CMLTLSFAllocator*)
+ * @param block (TLSFBlock*)
+ * @return (TLSFBlock*)
+ */
 static TLSFBlock* merge_prev(CMLTLSFAllocator* a, TLSFBlock* block) {
     if (!block_prev_is_free(block))
         return block;
@@ -219,8 +315,13 @@ static TLSFBlock* merge_prev(CMLTLSFAllocator* a, TLSFBlock* block) {
     return prev;
 }
 
-/** Coalesce `block` with its physically-next block if that one is free; returns `block` (now
- *  possibly larger). */
+/**
+ * Coalesce `block` with its physically-next block if that one is free; returns `block` (now
+ * possibly larger).
+ * @param a (CMLTLSFAllocator*)
+ * @param block (TLSFBlock*)
+ * @return (TLSFBlock*)
+ */
 static TLSFBlock* merge_next(CMLTLSFAllocator* a, TLSFBlock* block) {
     TLSFBlock* next = block_next_phys(block);
     if (!block_in_pool(a, next))
@@ -242,8 +343,13 @@ static TLSFBlock* merge_next(CMLTLSFAllocator* a, TLSFBlock* block) {
     return block;
 }
 
-/** Locate a free block of at least `size` bytes using the two-level bitmaps to jump to the first
- *  non-empty bucket at or above the needed class in O(1); returns NULL if none exists. */
+/**
+ * Locate a free block of at least `size` bytes using the two-level bitmaps to jump to the first
+ * non-empty bucket at or above the needed class in O(1); returns NULL if none exists.
+ * @param a (CMLTLSFAllocator*)
+ * @param size (size_t)
+ * @return (TLSFBlock*)
+ */
 static TLSFBlock* find_suitable(CMLTLSFAllocator* a, size_t size) {
     int fl, sl;
     mapping_search(size, &fl, &sl);
@@ -270,9 +376,13 @@ static TLSFBlock* find_suitable(CMLTLSFAllocator* a, size_t size) {
     return block;
 }
 
-/** Lay out a fresh pool: clear bitmaps and free lists, create one large free block spanning the
- *  pool plus a zero-size used sentinel at the end, and insert the block. Returns -1 if the pool
- *  is too small to hold a block and the sentinel. */
+/**
+ * Lay out a fresh pool: clear bitmaps and free lists, create one large free block spanning the
+ * pool plus a zero-size used sentinel at the end, and insert the block. Returns -1 if the pool
+ * is too small to hold a block and the sentinel.
+ * @param a (CMLTLSFAllocator*)
+ * @return (int)
+ */
 static int init_pool(CMLTLSFAllocator* a) {
     /* We need at least: one real block (header + min user) + sentinel (header only) */
     if (a->pool_size < MIN_BLOCK_TOTAL + BLOCK_HEADER_SIZE) {
@@ -317,8 +427,12 @@ static int init_pool(CMLTLSFAllocator* a) {
     return 0;
 }
 
-/** Create a TLSF allocator owning a freshly allocated `pool_size`-byte pool. Returns NULL if the
- *  size is too small or on OOM. Destroy with cml_tlsf_destroy. */
+/**
+ * Create a TLSF allocator owning a freshly allocated `pool_size`-byte pool. Returns NULL if the
+ * size is too small or on OOM. Destroy with cml_tlsf_destroy.
+ * @param pool_size (size_t)
+ * @return (CMLTLSFAllocator*)
+ */
 CMLTLSFAllocator* cml_tlsf_create(size_t pool_size) {
     if (pool_size < MIN_BLOCK_TOTAL + BLOCK_HEADER_SIZE) {
         return NULL;
@@ -348,8 +462,13 @@ CMLTLSFAllocator* cml_tlsf_create(size_t pool_size) {
     return a;
 }
 
-/** Create a TLSF allocator over a caller-supplied `pool` buffer (not owned, not freed on
- *  destroy). Returns NULL on bad args or OOM for the metadata. */
+/**
+ * Create a TLSF allocator over a caller-supplied `pool` buffer (not owned, not freed on
+ * destroy). Returns NULL on bad args or OOM for the metadata.
+ * @param pool (void*)
+ * @param pool_size (size_t)
+ * @return (CMLTLSFAllocator*)
+ */
 CMLTLSFAllocator* cml_tlsf_create_with_pool(void* pool, size_t pool_size) {
     if (!pool || pool_size < MIN_BLOCK_TOTAL + BLOCK_HEADER_SIZE) {
         return NULL;
@@ -371,8 +490,12 @@ CMLTLSFAllocator* cml_tlsf_create_with_pool(void* pool, size_t pool_size) {
     return a;
 }
 
-/** Destroy a TLSF allocator, freeing the pool only if it was created with cml_tlsf_create.
- *  NULL-safe. */
+/**
+ * Destroy a TLSF allocator, freeing the pool only if it was created with cml_tlsf_create.
+ * NULL-safe.
+ * @param a (CMLTLSFAllocator*)
+ * @return (void)
+ */
 void cml_tlsf_destroy(CMLTLSFAllocator* a) {
     if (!a)
         return;
@@ -382,9 +505,14 @@ void cml_tlsf_destroy(CMLTLSFAllocator* a) {
     cml_free(a);
 }
 
-/** O(1) allocation of at least `size` bytes (rounded to TLSF_ALIGN): find a fitting free block,
- *  split off any excess, and return its user pointer. Returns NULL if size is 0 or the pool is
- *  exhausted. Not thread-safe; the caller must serialize access to one allocator. */
+/**
+ * O(1) allocation of at least `size` bytes (rounded to TLSF_ALIGN): find a fitting free block,
+ * split off any excess, and return its user pointer. Returns NULL if size is 0 or the pool is
+ * exhausted. Not thread-safe; the caller must serialize access to one allocator.
+ * @param a (CMLTLSFAllocator*)
+ * @param size (size_t)
+ * @return (void*)
+ */
 void* cml_tlsf_alloc(CMLTLSFAllocator* a, size_t size) {
     if (!a || size == 0)
         return NULL;
@@ -431,9 +559,15 @@ void* cml_tlsf_alloc(CMLTLSFAllocator* a, size_t size) {
     return block_to_user(block);
 }
 
-/** Allocate `size` bytes whose user pointer is aligned to `alignment` (raised to a power of two,
- *  at least TLSF_ALIGN). Over-allocates and carves a free gap block before the aligned block when
- *  needed. Returns NULL on failure. Not thread-safe. */
+/**
+ * Allocate `size` bytes whose user pointer is aligned to `alignment` (raised to a power of two,
+ * at least TLSF_ALIGN). Over-allocates and carves a free gap block before the aligned block when
+ * needed. Returns NULL on failure. Not thread-safe.
+ * @param a (CMLTLSFAllocator*)
+ * @param size (size_t)
+ * @param alignment (size_t)
+ * @return (void*)
+ */
 void* cml_tlsf_alloc_aligned(CMLTLSFAllocator* a, size_t size, size_t alignment) {
     if (!a || size == 0)
         return NULL;
@@ -533,8 +667,13 @@ void* cml_tlsf_alloc_aligned(CMLTLSFAllocator* a, size_t size, size_t alignment)
     return block_to_user(block);
 }
 
-/** Free a TLSF allocation, coalescing with free neighbors and returning it to the free lists.
- *  NULL ptr is ignored and an already-free block is detected and skipped (double-free guard). */
+/**
+ * Free a TLSF allocation, coalescing with free neighbors and returning it to the free lists.
+ * NULL ptr is ignored and an already-free block is detected and skipped (double-free guard).
+ * @param a (CMLTLSFAllocator*)
+ * @param ptr (void*)
+ * @return (void)
+ */
 void cml_tlsf_free(CMLTLSFAllocator* a, void* ptr) {
     if (!a || !ptr)
         return;
@@ -570,9 +709,15 @@ void cml_tlsf_free(CMLTLSFAllocator* a, void* ptr) {
     a->num_frees++;
 }
 
-/** Resize an allocation: NULL ptr acts as alloc, size 0 frees. Shrinks in place (splitting off
- *  the tail), grows in place by absorbing a free next block when possible, else falls back to
- *  allocate-copy-free. Returns NULL on failure, leaving the original block intact. */
+/**
+ * Resize an allocation: NULL ptr acts as alloc, size 0 frees. Shrinks in place (splitting off
+ * the tail), grows in place by absorbing a free next block when possible, else falls back to
+ * allocate-copy-free. Returns NULL on failure, leaving the original block intact.
+ * @param a (CMLTLSFAllocator*)
+ * @param ptr (void*)
+ * @param new_size (size_t)
+ * @return (void*)
+ */
 void* cml_tlsf_realloc(CMLTLSFAllocator* a, void* ptr, size_t new_size) {
     if (!a)
         return NULL;
@@ -645,8 +790,13 @@ void* cml_tlsf_realloc(CMLTLSFAllocator* a, void* ptr, size_t new_size) {
     return new_ptr;
 }
 
-/** Usable byte size of an allocation (may exceed the requested size due to rounding/splitting);
- *  0 for NULL args. */
+/**
+ * Usable byte size of an allocation (may exceed the requested size due to rounding/splitting);
+ * 0 for NULL args.
+ * @param a (CMLTLSFAllocator*)
+ * @param ptr (void*)
+ * @return (size_t)
+ */
 size_t cml_tlsf_alloc_size(CMLTLSFAllocator* a, void* ptr) {
     if (!a || !ptr)
         return 0;
@@ -654,8 +804,16 @@ size_t cml_tlsf_alloc_size(CMLTLSFAllocator* a, void* ptr) {
     return block_get_size(block);
 }
 
-/** Copy the allocator's running counters (currently used bytes, peak bytes, alloc/free counts)
- *  into any non-NULL out params. No-op if `a` is NULL. */
+/**
+ * Copy the allocator's running counters (currently used bytes, peak bytes, alloc/free counts)
+ * into any non-NULL out params. No-op if `a` is NULL.
+ * @param a (const CMLTLSFAllocator*)
+ * @param used (size_t*)
+ * @param peak (size_t*)
+ * @param num_allocs (size_t*)
+ * @param num_frees (size_t*)
+ * @return (void)
+ */
 void cml_tlsf_stats(const CMLTLSFAllocator* a, size_t* used, size_t* peak, size_t* num_allocs,
                     size_t* num_frees) {
     if (!a)
@@ -670,8 +828,12 @@ void cml_tlsf_stats(const CMLTLSFAllocator* a, size_t* used, size_t* peak, size_
         *num_frees = a->num_frees;
 }
 
-/** Integrity check: walk the physical block chain verifying prev_phys links and prev-free flags,
- *  then verify the two-level bitmaps agree with the free lists. Returns true if consistent. */
+/**
+ * Integrity check: walk the physical block chain verifying prev_phys links and prev-free flags,
+ * then verify the two-level bitmaps agree with the free lists. Returns true if consistent.
+ * @param a (const CMLTLSFAllocator*)
+ * @return (bool)
+ */
 bool cml_tlsf_check(const CMLTLSFAllocator* a) {
     if (!a || !a->pool)
         return false;
@@ -727,8 +889,12 @@ bool cml_tlsf_check(const CMLTLSFAllocator* a) {
     return true;
 }
 
-/** Create a timeline memory planner with room for `initial_capacity` records (defaulted to 16 if
- *  non-positive). Returns NULL on OOM. Destroy with cml_timeline_planner_destroy. */
+/**
+ * Create a timeline memory planner with room for `initial_capacity` records (defaulted to 16 if
+ * non-positive). Returns NULL on OOM. Destroy with cml_timeline_planner_destroy.
+ * @param initial_capacity (int)
+ * @return (CMLTimelinePlanner*)
+ */
 CMLTimelinePlanner* cml_timeline_planner_create(int initial_capacity) {
     if (initial_capacity <= 0)
         initial_capacity = 16;
@@ -748,7 +914,11 @@ CMLTimelinePlanner* cml_timeline_planner_create(int initial_capacity) {
     return p;
 }
 
-/** Free a timeline planner and its record array. NULL-safe. */
+/**
+ * Free a timeline planner and its record array. NULL-safe.
+ * @param p (CMLTimelinePlanner*)
+ * @return (void)
+ */
 void cml_timeline_planner_destroy(CMLTimelinePlanner* p) {
     if (!p)
         return;
@@ -756,8 +926,16 @@ void cml_timeline_planner_destroy(CMLTimelinePlanner* p) {
     cml_free(p);
 }
 
-/** Record a tensor's lifetime [alloc_time, free_time] and size (rounded to TLSF_ALIGN), growing
- *  the record array as needed. Returns -1 on NULL planner, an inverted interval, or OOM. */
+/**
+ * Record a tensor's lifetime [alloc_time, free_time] and size (rounded to TLSF_ALIGN), growing
+ * the record array as needed. Returns -1 on NULL planner, an inverted interval, or OOM.
+ * @param p (CMLTimelinePlanner*)
+ * @param tensor_id (int)
+ * @param size (size_t)
+ * @param alloc_time (int)
+ * @param free_time (int)
+ * @return (int)
+ */
 int cml_timeline_planner_add(CMLTimelinePlanner* p, int tensor_id, size_t size, int alloc_time,
                              int free_time) {
     if (!p)
@@ -789,7 +967,12 @@ int cml_timeline_planner_add(CMLTimelinePlanner* p, int tensor_id, size_t size, 
     return 0;
 }
 
-/** qsort comparator ordering records by alloc_time ascending, then by size descending. */
+/**
+ * qsort comparator ordering records by alloc_time ascending, then by size descending.
+ * @param a (const void*)
+ * @param b (const void*)
+ * @return (int)
+ */
 static int timeline_cmp(const void* a, const void* b) {
     const CMLTimelineRecord* ra = (const CMLTimelineRecord*)a;
     const CMLTimelineRecord* rb = (const CMLTimelineRecord*)b;
@@ -802,12 +985,23 @@ static int timeline_cmp(const void* a, const void* b) {
     return 0;
 }
 
-/** True if two records' lifetime intervals overlap (so they cannot share memory). */
+/**
+ * True if two records' lifetime intervals overlap (so they cannot share memory).
+ * @param a (const CMLTimelineRecord*)
+ * @param b (const CMLTimelineRecord*)
+ * @return (bool)
+ */
 static bool time_overlaps(const CMLTimelineRecord* a, const CMLTimelineRecord* b) {
     return a->alloc_time <= b->free_time && b->alloc_time <= a->free_time;
 }
 
-/** True if placing `rec` at `offset` would overlap `placed` both in time and in its byte range. */
+/**
+ * True if placing `rec` at `offset` would overlap `placed` both in time and in its byte range.
+ * @param rec (const CMLTimelineRecord*)
+ * @param offset (size_t)
+ * @param placed (const CMLTimelineRecord*)
+ * @return (bool)
+ */
 static bool space_conflicts(const CMLTimelineRecord* rec, size_t offset,
                             const CMLTimelineRecord* placed) {
     if (!time_overlaps(rec, placed))
@@ -815,9 +1009,13 @@ static bool space_conflicts(const CMLTimelineRecord* rec, size_t offset,
     return offset < placed->offset + placed->size && placed->offset < offset + rec->size;
 }
 
-/** Pack all recorded tensors into a single arena with greedy first-fit-by-offset: assign each
- *  record the lowest offset that avoids space conflicts with already-placed records, then compute
- *  total_required and peak_usage. Returns -1 if there is nothing to plan. */
+/**
+ * Pack all recorded tensors into a single arena with greedy first-fit-by-offset: assign each
+ * record the lowest offset that avoids space conflicts with already-placed records, then compute
+ * total_required and peak_usage. Returns -1 if there is nothing to plan.
+ * @param p (CMLTimelinePlanner*)
+ * @return (int)
+ */
 int cml_timeline_planner_solve(CMLTimelinePlanner* p) {
     if (!p || p->num_records == 0)
         return -1;
@@ -868,8 +1066,13 @@ int cml_timeline_planner_solve(CMLTimelinePlanner* p) {
     return 0;
 }
 
-/** Find the planned record for a tensor id (including its solved offset), or NULL if absent.
- *  The pointer aliases the planner's record array and is invalidated by further adds/solves. */
+/**
+ * Find the planned record for a tensor id (including its solved offset), or NULL if absent.
+ * The pointer aliases the planner's record array and is invalidated by further adds/solves.
+ * @param p (const CMLTimelinePlanner*)
+ * @param tensor_id (int)
+ * @return (const CMLTimelineRecord*)
+ */
 const CMLTimelineRecord* cml_timeline_planner_get(const CMLTimelinePlanner* p, int tensor_id) {
     if (!p)
         return NULL;
@@ -880,19 +1083,31 @@ const CMLTimelineRecord* cml_timeline_planner_get(const CMLTimelinePlanner* p, i
     return NULL;
 }
 
-/** Total arena bytes the solved plan needs (valid after solve), or 0 if p is NULL. */
+/**
+ * Total arena bytes the solved plan needs (valid after solve), or 0 if p is NULL.
+ * @param p (const CMLTimelinePlanner*)
+ * @return (size_t)
+ */
 size_t cml_timeline_planner_total_memory(const CMLTimelinePlanner* p) {
     return p ? p->total_required : 0;
 }
 
-/** Peak concurrently-live bytes across the timeline (the lower bound the packing aims for), or 0
- *  if p is NULL. */
+/**
+ * Peak concurrently-live bytes across the timeline (the lower bound the packing aims for), or 0
+ * if p is NULL.
+ * @param p (const CMLTimelinePlanner*)
+ * @return (size_t)
+ */
 size_t cml_timeline_planner_peak_usage(const CMLTimelinePlanner* p) {
     return p ? p->peak_usage : 0;
 }
 
-/** Print the plan to stdout: summary stats, a per-record table, and (for small timelines) an
- *  ASCII occupancy chart. Diagnostic only; NULL-safe. */
+/**
+ * Print the plan to stdout: summary stats, a per-record table, and (for small timelines) an
+ * ASCII occupancy chart. Diagnostic only; NULL-safe.
+ * @param p (const CMLTimelinePlanner*)
+ * @return (void)
+ */
 void cml_timeline_planner_print(const CMLTimelinePlanner* p) {
     if (!p) {
         printf("Timeline planner: (null)\n");

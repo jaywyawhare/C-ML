@@ -21,8 +21,15 @@ extern "C" {
 /** Compile the @p index-th kernel; return 0 on success, non-zero on failure. */
 typedef int (*CMLKernelCompileFn)(int index, void* user);
 
-/** Run @p fn over [0, n): concurrently when @p parallel, else serially. Returns
- *  0 if all succeeded, or the first non-zero status otherwise. */
+/**
+ * Run @p fn over [0, n): concurrently when @p parallel, else serially. Returns
+ * 0 if all succeeded, or the first non-zero status otherwise.
+ * @param n (int)
+ * @param fn (CMLKernelCompileFn)
+ * @param user (void*)
+ * @param parallel (bool)
+ * @return (int)
+ */
 int cml_compile_kernels(int n, CMLKernelCompileFn fn, void* user, bool parallel);
 
 #ifdef __cplusplus

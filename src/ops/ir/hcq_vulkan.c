@@ -203,7 +203,11 @@ static int vk_create_staging_buffer(CMLVulkanBackend* vk, size_t bytes, uint32_t
     return 0;
 }
 
-/** Bind the queue to the Vulkan backend's shared compute queue. */
+/**
+ * Bind the queue to the Vulkan backend's shared compute queue.
+ * @param queue (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_vulkan_queue_init(CMLHCQQueue* queue) {
     CMLVulkanBackend* vk = cml_dispatch_get_vulkan_backend();
     if (!vk || !vk->initialized)
@@ -215,7 +219,11 @@ int cml_hcq_vulkan_queue_init(CMLHCQQueue* queue) {
     return 0;
 }
 
-/** Detach the queue from the shared compute queue (backend-owned, not freed here). */
+/**
+ * Detach the queue from the shared compute queue (backend-owned, not freed here).
+ * @param queue (CMLHCQQueue*)
+ * @return (void)
+ */
 void cml_hcq_vulkan_queue_destroy(CMLHCQQueue* queue) {
     if (!queue)
         return;
@@ -223,7 +231,12 @@ void cml_hcq_vulkan_queue_destroy(CMLHCQQueue* queue) {
     queue->active        = false;
 }
 
-/** Record and submit a compute dispatch (bind pipeline + descriptors), then wait. */
+/**
+ * Record and submit a compute dispatch (bind pipeline + descriptors), then wait.
+ * @param queue (CMLHCQQueue*)
+ * @param desc (const CMLHCQKernelDesc*)
+ * @return (int)
+ */
 int cml_hcq_vulkan_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     if (!queue || !desc || !desc->compiled_kernel)
         return -1;
@@ -255,7 +268,14 @@ int cml_hcq_vulkan_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* des
     return rc;
 }
 
-/** H2D copy via a mapped host-visible staging buffer copied into the device buffer. */
+/**
+ * H2D copy via a mapped host-visible staging buffer copied into the device buffer.
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_vulkan_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src || bytes == 0)
         return -1;
@@ -304,7 +324,14 @@ int cml_hcq_vulkan_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, si
     return rc;
 }
 
-/** D2H copy into a host-visible staging buffer, then mapped and copied to host. */
+/**
+ * D2H copy into a host-visible staging buffer, then mapped and copied to host.
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_vulkan_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src || bytes == 0)
         return -1;
@@ -359,7 +386,11 @@ int cml_hcq_vulkan_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, si
     return 0;
 }
 
-/** Create a signal backed by a VkFence as the sync primitive. */
+/**
+ * Create a signal backed by a VkFence as the sync primitive.
+ * @param signal (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_vulkan_signal_create(CMLHCQSignal* signal) {
     CMLVulkanBackend* vk = cml_dispatch_get_vulkan_backend();
     if (!vk || !vk->initialized || !signal)
@@ -383,7 +414,11 @@ int cml_hcq_vulkan_signal_create(CMLHCQSignal* signal) {
     return 0;
 }
 
-/** Destroy the backing VkFence (the wrapper is freed by the caller in hcq.c). */
+/**
+ * Destroy the backing VkFence (the wrapper is freed by the caller in hcq.c).
+ * @param signal (CMLHCQSignal*)
+ * @return (void)
+ */
 void cml_hcq_vulkan_signal_destroy(CMLHCQSignal* signal) {
     if (!signal || !signal->native_handle)
         return;
@@ -395,7 +430,12 @@ void cml_hcq_vulkan_signal_destroy(CMLHCQSignal* signal) {
     signal->native_handle = NULL;
 }
 
-/** Block the host on the fence until it signals or @p timeout_ms elapses. */
+/**
+ * Block the host on the fence until it signals or @p timeout_ms elapses.
+ * @param signal (CMLHCQSignal*)
+ * @param timeout_ms (uint64_t)
+ * @return (int)
+ */
 int cml_hcq_vulkan_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms) {
     if (!signal || !signal->native_handle)
         return -1;
@@ -414,7 +454,11 @@ int cml_hcq_vulkan_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms) {
     return -1;
 }
 
-/** Block until all submitted Vulkan work completes (device/queue idle). */
+/**
+ * Block until all submitted Vulkan work completes (device/queue idle).
+ * @param queue (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_vulkan_synchronize(CMLHCQQueue* queue) {
     (void)queue;
     CMLVulkanBackend* vk = cml_dispatch_get_vulkan_backend();
@@ -426,20 +470,40 @@ int cml_hcq_vulkan_synchronize(CMLHCQQueue* queue) {
 #else /* !CML_HAS_VULKAN */
 
 /* Stubs when Vulkan is not compiled in */
-/** Stub: no Vulkan backend, so the queue cannot bind. */
+/**
+ * Stub: no Vulkan backend, so the queue cannot bind.
+ * @param q (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_vulkan_queue_init(CMLHCQQueue* q) {
     (void)q;
     return -1;
 }
-/** Stub: nothing to detach without Vulkan. */
+/**
+ * Stub: nothing to detach without Vulkan.
+ * @param q (CMLHCQQueue*)
+ * @return (void)
+ */
 void cml_hcq_vulkan_queue_destroy(CMLHCQQueue* q) { (void)q; }
-/** Stub: kernel submission unavailable without Vulkan. */
+/**
+ * Stub: kernel submission unavailable without Vulkan.
+ * @param q (CMLHCQQueue*)
+ * @param d (const CMLHCQKernelDesc*)
+ * @return (int)
+ */
 int cml_hcq_vulkan_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* d) {
     (void)q;
     (void)d;
     return -1;
 }
-/** Stub: H2D copy unavailable without Vulkan. */
+/**
+ * Stub: H2D copy unavailable without Vulkan.
+ * @param q (CMLHCQQueue*)
+ * @param d (void*)
+ * @param s (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_hcq_vulkan_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -447,7 +511,14 @@ int cml_hcq_vulkan_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) 
     (void)n;
     return -1;
 }
-/** Stub: D2H copy unavailable without Vulkan. */
+/**
+ * Stub: D2H copy unavailable without Vulkan.
+ * @param q (CMLHCQQueue*)
+ * @param d (void*)
+ * @param s (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_hcq_vulkan_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -455,20 +526,37 @@ int cml_hcq_vulkan_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) 
     (void)n;
     return -1;
 }
-/** Stub: no Vulkan, so no signal (fence) can be created. */
+/**
+ * Stub: no Vulkan, so no signal (fence) can be created.
+ * @param s (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_vulkan_signal_create(CMLHCQSignal* s) {
     (void)s;
     return -1;
 }
-/** Stub: nothing to free without Vulkan. */
+/**
+ * Stub: nothing to free without Vulkan.
+ * @param s (CMLHCQSignal*)
+ * @return (void)
+ */
 void cml_hcq_vulkan_signal_destroy(CMLHCQSignal* s) { (void)s; }
-/** Stub: host wait unavailable without Vulkan. */
+/**
+ * Stub: host wait unavailable without Vulkan.
+ * @param s (CMLHCQSignal*)
+ * @param t (uint64_t)
+ * @return (int)
+ */
 int cml_hcq_vulkan_signal_wait(CMLHCQSignal* s, uint64_t t) {
     (void)s;
     (void)t;
     return -1;
 }
-/** Stub: nothing to synchronize without Vulkan. */
+/**
+ * Stub: nothing to synchronize without Vulkan.
+ * @param q (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_vulkan_synchronize(CMLHCQQueue* q) {
     (void)q;
     return -1;

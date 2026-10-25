@@ -16,14 +16,26 @@
 #define CUDA_SRC_BUF_SIZE 16384
 #define PTX_BLOCK_SIZE 256
 
-/** Convert float to PTX hex literal (0fHHHHHHHH) */
+/**
+ * Convert float to PTX hex literal (0fHHHHHHHH)
+ * @param val (float)
+ * @param buf (char*)
+ * @param buf_size (int)
+ * @return (void)
+ */
 static void float_to_ptx_hex(float val, char* buf, int buf_size) {
     uint32_t bits;
     memcpy(&bits, &val, sizeof(bits));
     snprintf(buf, (size_t)buf_size, "0f%08X", bits);
 }
 
-/** Write the PTX module header (.version/.target sm_N/.address_size); returns bytes written. */
+/**
+ * Write the PTX module header (.version/.target sm_N/.address_size); returns bytes written.
+ * @param buf (char*)
+ * @param buf_size (int)
+ * @param sm_version (int)
+ * @return (int)
+ */
 static int ptx_write_header(char* buf, int buf_size, int sm_version) {
     return snprintf(buf, (size_t)buf_size,
                     ".version 7.0\n"
@@ -35,8 +47,12 @@ static int ptx_write_header(char* buf, int buf_size, int sm_version) {
 /**
  * Write standard kernel prologue: entry point, register decls, thread ID calculation,
  * bounds check. Uses these registers:
- *   %%r0 = tid.x, %%r1 = ctaid.x, %%r2 = ntid.x, %%r3 = gid
- *   %%r4 = n (loaded from param), %%p0 = bounds predicate
+ * %%r0 = tid.x, %%r1 = ctaid.x, %%r2 = ntid.x, %%r3 = gid
+ * %%r4 = n (loaded from param), %%p0 = bounds predicate
+ * @param buf (char*)
+ * @param buf_size (int)
+ * @param kernel_name (const char*)
+ * @return (int)
  */
 static int ptx_write_prologue_unary(char* buf, int buf_size, const char* kernel_name) {
     return snprintf(buf, (size_t)buf_size,
@@ -59,8 +75,14 @@ static int ptx_write_prologue_unary(char* buf, int buf_size, const char* kernel_
                     kernel_name);
 }
 
-/** Write the binary-kernel prologue (two input params, entry, reg decls, gid, bounds check);
- *  returns bytes written. */
+/**
+ * Write the binary-kernel prologue (two input params, entry, reg decls, gid, bounds check);
+ * returns bytes written.
+ * @param buf (char*)
+ * @param buf_size (int)
+ * @param kernel_name (const char*)
+ * @return (int)
+ */
 static int ptx_write_prologue_binary(char* buf, int buf_size, const char* kernel_name) {
     return snprintf(buf, (size_t)buf_size,
                     ".visible .entry %s(\n"
@@ -83,7 +105,12 @@ static int ptx_write_prologue_binary(char* buf, int buf_size, const char* kernel
                     kernel_name);
 }
 
-/** Write PTX that loads the unary input element into %%f0; returns bytes written. */
+/**
+ * Write PTX that loads the unary input element into %%f0; returns bytes written.
+ * @param buf (char*)
+ * @param buf_size (int)
+ * @return (int)
+ */
 static int ptx_write_load_unary(char* buf, int buf_size) {
     return snprintf(buf, (size_t)buf_size,
                     "    // Load input\n"
@@ -94,7 +121,12 @@ static int ptx_write_load_unary(char* buf, int buf_size) {
                     "    ld.global.f32 %%f0, [%%rd3];\n\n");
 }
 
-/** Write PTX that stores %%f1 to the unary output and returns; returns bytes written. */
+/**
+ * Write PTX that stores %%f1 to the unary output and returns; returns bytes written.
+ * @param buf (char*)
+ * @param buf_size (int)
+ * @return (int)
+ */
 static int ptx_write_store_unary(char* buf, int buf_size) {
     return snprintf(buf, (size_t)buf_size,
                     "    // Store output\n"
@@ -105,7 +137,12 @@ static int ptx_write_store_unary(char* buf, int buf_size) {
                     "}\n");
 }
 
-/** Write PTX that loads both binary inputs into %%f0/%%f1; returns bytes written. */
+/**
+ * Write PTX that loads both binary inputs into %%f0/%%f1; returns bytes written.
+ * @param buf (char*)
+ * @param buf_size (int)
+ * @return (int)
+ */
 static int ptx_write_load_binary(char* buf, int buf_size) {
     return snprintf(buf, (size_t)buf_size,
                     "    // Load inputs\n"
@@ -119,7 +156,12 @@ static int ptx_write_load_binary(char* buf, int buf_size) {
                     "    ld.global.f32 %%f1, [%%rd5];\n\n");
 }
 
-/** Write PTX that stores %%f2 to the binary output and returns; returns bytes written. */
+/**
+ * Write PTX that stores %%f2 to the binary output and returns; returns bytes written.
+ * @param buf (char*)
+ * @param buf_size (int)
+ * @return (int)
+ */
 static int ptx_write_store_binary(char* buf, int buf_size) {
     return snprintf(buf, (size_t)buf_size,
                     "    // Store output\n"
@@ -130,7 +172,11 @@ static int ptx_write_store_binary(char* buf, int buf_size) {
                     "}\n");
 }
 
-/** True for unary ops the PTX generator can emit. */
+/**
+ * True for unary ops the PTX generator can emit.
+ * @param t (UOpType)
+ * @return (bool)
+ */
 static bool ptx_is_unary_op(UOpType t) {
     switch (t) {
     case UOP_NEG:
@@ -168,7 +214,11 @@ static bool ptx_is_unary_op(UOpType t) {
     }
 }
 
-/** True for binary ops the PTX generator can emit. */
+/**
+ * True for binary ops the PTX generator can emit.
+ * @param t (UOpType)
+ * @return (bool)
+ */
 static bool ptx_is_binary_op(UOpType t) {
     switch (t) {
     case UOP_ADD:
@@ -192,7 +242,11 @@ static bool ptx_is_binary_op(UOpType t) {
     }
 }
 
-/** True for reduction ops the PTX generator can emit. */
+/**
+ * True for reduction ops the PTX generator can emit.
+ * @param t (UOpType)
+ * @return (bool)
+ */
 static bool ptx_is_reduction(UOpType t) {
     switch (t) {
     case UOP_SUM:
@@ -206,7 +260,12 @@ static bool ptx_is_reduction(UOpType t) {
     }
 }
 
-/** Allocate a PTX codegen context targeting the given SM version and CUDA backend. */
+/**
+ * Allocate a PTX codegen context targeting the given SM version and CUDA backend.
+ * @param sm_version (int)
+ * @param cuda (struct CMLCUDABackend*)
+ * @return (CMLPTXCodegen*)
+ */
 CMLPTXCodegen* cml_ptx_codegen_create(int sm_version, struct CMLCUDABackend* cuda) {
     CMLPTXCodegen* cg = (CMLPTXCodegen*)cml_calloc(1, sizeof(CMLPTXCodegen));
     if (!cg)
@@ -218,11 +277,21 @@ CMLPTXCodegen* cml_ptx_codegen_create(int sm_version, struct CMLCUDABackend* cud
     return cg;
 }
 
-/** Free the PTX codegen context. */
+/**
+ * Free the PTX codegen context.
+ * @param cg (CMLPTXCodegen*)
+ * @return (void)
+ */
 void cml_ptx_codegen_destroy(CMLPTXCodegen* cg) { cml_free(cg); }
 
-/** Generate PTX source for an element-wise unary-op kernel; NULL for unsupported ops.
- *  Caller owns the returned string. */
+/**
+ * Generate PTX source for an element-wise unary-op kernel; NULL for unsupported ops.
+ * Caller owns the returned string.
+ * @param cg (CMLPTXCodegen*)
+ * @param op (UOpType)
+ * @param kernel_name (const char*)
+ * @return (char*)
+ */
 char* cml_ptx_gen_unary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) {
     if (!cg || !kernel_name)
         return NULL;
@@ -488,8 +557,14 @@ char* cml_ptx_gen_unary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) 
     return ptx;
 }
 
-/** Generate PTX source for an element-wise binary-op kernel; NULL for unsupported ops.
- *  Caller owns the returned string. */
+/**
+ * Generate PTX source for an element-wise binary-op kernel; NULL for unsupported ops.
+ * Caller owns the returned string.
+ * @param cg (CMLPTXCodegen*)
+ * @param op (UOpType)
+ * @param kernel_name (const char*)
+ * @return (char*)
+ */
 char* cml_ptx_gen_binary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) {
     if (!cg || !kernel_name)
         return NULL;
@@ -595,7 +670,13 @@ char* cml_ptx_gen_binary(CMLPTXCodegen* cg, UOpType op, const char* kernel_name)
     return ptx;
 }
 
-/** Generate PTX source for a kernel that fills the output with a constant value. */
+/**
+ * Generate PTX source for a kernel that fills the output with a constant value.
+ * @param cg (CMLPTXCodegen*)
+ * @param value (float)
+ * @param kernel_name (const char*)
+ * @return (char*)
+ */
 char* cml_ptx_gen_fill(CMLPTXCodegen* cg, float value, const char* kernel_name) {
     if (!cg || !kernel_name)
         return NULL;
@@ -641,7 +722,12 @@ char* cml_ptx_gen_fill(CMLPTXCodegen* cg, float value, const char* kernel_name) 
     return ptx;
 }
 
-/** Generate PTX source for an element-wise where/select kernel (cond ? a : b). */
+/**
+ * Generate PTX source for an element-wise where/select kernel (cond ? a : b).
+ * @param cg (CMLPTXCodegen*)
+ * @param kernel_name (const char*)
+ * @return (char*)
+ */
 char* cml_ptx_gen_where(CMLPTXCodegen* cg, const char* kernel_name) {
     if (!cg || !kernel_name)
         return NULL;
@@ -699,7 +785,13 @@ char* cml_ptx_gen_where(CMLPTXCodegen* cg, const char* kernel_name) {
     return ptx;
 }
 
-/** Generate PTX source for a whole-tensor reduction kernel; NULL for unsupported ops. */
+/**
+ * Generate PTX source for a whole-tensor reduction kernel; NULL for unsupported ops.
+ * @param cg (CMLPTXCodegen*)
+ * @param op (UOpType)
+ * @param kernel_name (const char*)
+ * @return (char*)
+ */
 char* cml_ptx_gen_reduction(CMLPTXCodegen* cg, UOpType op, const char* kernel_name) {
     if (!cg || !kernel_name)
         return NULL;
@@ -817,7 +909,12 @@ char* cml_ptx_gen_reduction(CMLPTXCodegen* cg, UOpType op, const char* kernel_na
     return ptx;
 }
 
-/** Generate PTX source for a naive (one-thread-per-output) matmul kernel. */
+/**
+ * Generate PTX source for a naive (one-thread-per-output) matmul kernel.
+ * @param cg (CMLPTXCodegen*)
+ * @param kernel_name (const char*)
+ * @return (char*)
+ */
 char* cml_ptx_gen_matmul(CMLPTXCodegen* cg, const char* kernel_name) {
     if (!cg || !kernel_name)
         return NULL;
@@ -903,7 +1000,12 @@ char* cml_ptx_gen_matmul(CMLPTXCodegen* cg, const char* kernel_name) {
     return ptx;
 }
 
-/** Generate PTX source for a shared-memory tiled matmul kernel. */
+/**
+ * Generate PTX source for a shared-memory tiled matmul kernel.
+ * @param cg (CMLPTXCodegen*)
+ * @param kernel_name (const char*)
+ * @return (char*)
+ */
 char* cml_ptx_gen_tiled_matmul(CMLPTXCodegen* cg, const char* kernel_name) {
     if (!cg || !kernel_name)
         return NULL;
@@ -969,7 +1071,12 @@ char* cml_ptx_gen_tiled_matmul(CMLPTXCodegen* cg, const char* kernel_name) {
     return src;
 }
 
-/** Generate PTX source for a direct 2D convolution kernel with padding. */
+/**
+ * Generate PTX source for a direct 2D convolution kernel with padding.
+ * @param cg (CMLPTXCodegen*)
+ * @param kernel_name (const char*)
+ * @return (char*)
+ */
 char* cml_ptx_gen_conv2d(CMLPTXCodegen* cg, const char* kernel_name) {
     if (!cg || !kernel_name)
         return NULL;
@@ -1045,8 +1152,13 @@ char* cml_ptx_gen_conv2d(CMLPTXCodegen* cg, const char* kernel_name) {
     return src;
 }
 
-/** Execute one IR node via PTX: generate the kernel, JIT it on the CUDA backend, upload
- *  inputs, launch, and download the result. Returns -1 for unsupported ops (CPU fallback). */
+/**
+ * Execute one IR node via PTX: generate the kernel, JIT it on the CUDA backend, upload
+ * inputs, launch, and download the result. Returns -1 for unsupported ops (CPU fallback).
+ * @param cg (CMLPTXCodegen*)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
     if (!node || !node->output || !cg->cuda || !cg->cuda->initialized)
         return -1;
@@ -1386,8 +1498,13 @@ static int ptx_execute_node(CMLPTXCodegen* cg, struct IRNode* node) {
     return -1;
 }
 
-/** Execute every unexecuted node of an IR graph via PTX, falling back to CPU per node
- *  on failure. */
+/**
+ * Execute every unexecuted node of an IR graph via PTX, falling back to CPU per node
+ * on failure.
+ * @param cg (CMLPTXCodegen*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ptx_execute_graph(CMLPTXCodegen* cg, CMLGraph_t ir) {
     if (!cg || !ir || !cg->initialized)
         return -1;

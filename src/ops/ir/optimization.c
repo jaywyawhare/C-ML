@@ -12,7 +12,11 @@
 #include <stdbool.h>
 #include "alloc/cml_allocator.h"
 
-/** Recompute each node's consumer (users) list from the graph's input references. */
+/**
+ * Recompute each node's consumer (users) list from the graph's input references.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 static int build_dependency_graph(CMLGraph_t ir) {
     if (!ir)
         return -1;
@@ -139,7 +143,11 @@ static void mark_reachable_nodes(CMLGraph_t ir) {
     cml_free(stack);
 }
 
-/** Unlink and free unmarked, unused nodes, keeping the CSE table and node count in sync. */
+/**
+ * Unlink and free unmarked, unused nodes, keeping the CSE table and node count in sync.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 static int remove_dead_nodes(CMLGraph_t ir) {
     if (!ir)
         return -1;
@@ -174,7 +182,12 @@ static int remove_dead_nodes(CMLGraph_t ir) {
     return 0;
 }
 
-/** True if node2 consumes node1's output tensor. */
+/**
+ * True if node2 consumes node1's output tensor.
+ * @param node1 (struct IRNode*)
+ * @param node2 (struct IRNode*)
+ * @return (bool)
+ */
 static bool node_uses_output(struct IRNode* node1, struct IRNode* node2) {
     if (!node1 || !node2 || !node1->output_name)
         return false;
@@ -299,7 +312,13 @@ static bool can_fuse_operations(struct IRNode* node1, struct IRNode* node2,
     return false;
 }
 
-/** Allocate a FusedKernel owning a copy of the `ops` list for the given fusion type. */
+/**
+ * Allocate a FusedKernel owning a copy of the `ops` list for the given fusion type.
+ * @param ops (struct IRNode**)
+ * @param num_ops (int)
+ * @param fusion_type (FusionType)
+ * @return (FusedKernel*)
+ */
 static FusedKernel* create_fused_kernel(struct IRNode** ops, int num_ops, FusionType fusion_type) {
     if (!ops || num_ops < 2)
         return NULL;
@@ -323,7 +342,11 @@ static FusedKernel* create_fused_kernel(struct IRNode** ops, int num_ops, Fusion
     return kernel;
 }
 
-/** Free a fused kernel, clearing the back-pointer on each member node first. */
+/**
+ * Free a fused kernel, clearing the back-pointer on each member node first.
+ * @param kernel (FusedKernel*)
+ * @return (void)
+ */
 void free_fused_kernel(FusedKernel* kernel) {
     if (!kernel)
         return;
@@ -340,7 +363,12 @@ void free_fused_kernel(FusedKernel* kernel) {
     cml_free(kernel);
 }
 
-/** Return the consumer input name that is not the producer's output (the other operand). */
+/**
+ * Return the consumer input name that is not the producer's output (the other operand).
+ * @param producer (struct IRNode*)
+ * @param consumer (struct IRNode*)
+ * @return (char*)
+ */
 static char* find_other_input(struct IRNode* producer, struct IRNode* consumer) {
     if (!producer || !consumer || !producer->output_name)
         return NULL;
@@ -472,7 +500,13 @@ static int apply_fusion(struct IRNode* node1, struct IRNode* node2, FusionType f
     return 0;
 }
 
-/** Follow single-use elementwise edges from `start` to collect the longest fusable chain. */
+/**
+ * Follow single-use elementwise edges from `start` to collect the longest fusable chain.
+ * @param start (struct IRNode*)
+ * @param chain (struct IRNode**)
+ * @param max_chain (int)
+ * @return (int)
+ */
 static int find_fusable_chain(struct IRNode* start, struct IRNode** chain, int max_chain) {
     if (!start || !chain || max_chain < 1)
         return 0;

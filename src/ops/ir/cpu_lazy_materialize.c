@@ -20,14 +20,22 @@ static uint16_t lz_float_to_fp16(float f) {
     return (uint16_t)(sign | ((uint32_t)exp << 10) | mant);
 }
 
-/** Convert fp32 to bfloat16 by truncating the low 16 mantissa bits. */
+/**
+ * Convert fp32 to bfloat16 by truncating the low 16 mantissa bits.
+ * @param f (float)
+ * @return (uint16_t)
+ */
 static uint16_t lz_float_to_bf16(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
     return (uint16_t)(x >> 16);
 }
 
-/** Convert fp32 to the fp8 E4M3 format (4-bit exponent, 3-bit mantissa). */
+/**
+ * Convert fp32 to the fp8 E4M3 format (4-bit exponent, 3-bit mantissa).
+ * @param f (float)
+ * @return (uint8_t)
+ */
 static uint8_t lz_float_to_fp8_e4m3(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
@@ -41,7 +49,11 @@ static uint8_t lz_float_to_fp8_e4m3(float f) {
     return (uint8_t)(sign | ((uint8_t)exp << 3) | (uint8_t)mant);
 }
 
-/** Convert fp32 to the fp8 E5M2 format (5-bit exponent, 2-bit mantissa). */
+/**
+ * Convert fp32 to the fp8 E5M2 format (5-bit exponent, 2-bit mantissa).
+ * @param f (float)
+ * @return (uint8_t)
+ */
 static uint8_t lz_float_to_fp8_e5m2(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
@@ -55,7 +67,11 @@ static uint8_t lz_float_to_fp8_e5m2(float f) {
     return (uint8_t)(sign | ((uint8_t)exp << 2) | (uint8_t)mant);
 }
 
-/** Convert fp32 to fp8 E4M3 FNUZ (no infinities, single NaN; flushes zeros). */
+/**
+ * Convert fp32 to fp8 E4M3 FNUZ (no infinities, single NaN; flushes zeros).
+ * @param f (float)
+ * @return (uint8_t)
+ */
 static uint8_t lz_float_to_fp8e4m3fnuz(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
@@ -75,7 +91,11 @@ static uint8_t lz_float_to_fp8e4m3fnuz(float f) {
     return (uint8_t)((sign_bit << 7) | ((uint8_t)exp << 3) | (uint8_t)mant);
 }
 
-/** Convert fp32 to fp8 E5M2 FNUZ (no infinities, single NaN; flushes zeros). */
+/**
+ * Convert fp32 to fp8 E5M2 FNUZ (no infinities, single NaN; flushes zeros).
+ * @param f (float)
+ * @return (uint8_t)
+ */
 static uint8_t lz_float_to_fp8e5m2fnuz(float f) {
     uint32_t x;
     memcpy(&x, &f, sizeof(x));
@@ -95,7 +115,14 @@ static uint8_t lz_float_to_fp8e5m2fnuz(float f) {
     return (uint8_t)((sign_bit << 7) | ((uint8_t)exp << 2) | (uint8_t)mant);
 }
 
-/** Store float `v` at element `i` of `base`, converting to the tensor's dtype. */
+/**
+ * Store float `v` at element `i` of `base`, converting to the tensor's dtype.
+ * @param base (void*)
+ * @param i (size_t)
+ * @param dt (DType)
+ * @param v (float)
+ * @return (void)
+ */
 void cml_cpu_lazy_store_float_elem(void* base, size_t i, DType dt, float v) {
     switch (dt) {
     case DTYPE_FLOAT32:
@@ -155,7 +182,12 @@ void cml_cpu_lazy_store_float_elem(void* base, size_t i, DType dt, float v) {
     }
 }
 
-/** Materialize a FILL: write `value` to every element of `out` in its dtype. */
+/**
+ * Materialize a FILL: write `value` to every element of `out` in its dtype.
+ * @param out (Tensor*)
+ * @param value (float)
+ * @return (int)
+ */
 int cml_cpu_lazy_fill(Tensor* out, float value) {
     if (!out || !out->data || out->numel == 0)
         return -1;
@@ -165,7 +197,13 @@ int cml_cpu_lazy_fill(Tensor* out, float value) {
     return 0;
 }
 
-/** Materialize a CONST: copy up to numel*esz bytes of raw data, zero-padding the rest. */
+/**
+ * Materialize a CONST: copy up to numel*esz bytes of raw data, zero-padding the rest.
+ * @param out (Tensor*)
+ * @param data (const void*)
+ * @param data_size (size_t)
+ * @return (int)
+ */
 int cml_cpu_lazy_const(Tensor* out, const void* data, size_t data_size) {
     if (!out || !out->data || !data)
         return -1;
@@ -202,7 +240,11 @@ int cml_cpu_lazy_rand_uniform(Tensor* out) {
     return 0;
 }
 
-/** Fill `out` with standard-normal samples from the library's global RNG. */
+/**
+ * Fill `out` with standard-normal samples from the library's global RNG.
+ * @param out (Tensor*)
+ * @return (int)
+ */
 int cml_cpu_lazy_rand_normal(Tensor* out) {
     if (!out || !out->data)
         return -1;
@@ -219,7 +261,13 @@ int cml_cpu_lazy_rand_normal(Tensor* out) {
     return 0;
 }
 
-/** Fill `out` with an arithmetic sequence starting at `start` with stride `step`. */
+/**
+ * Fill `out` with an arithmetic sequence starting at `start` with stride `step`.
+ * @param out (Tensor*)
+ * @param start (float)
+ * @param step (float)
+ * @return (int)
+ */
 int cml_cpu_lazy_arange(Tensor* out, float start, float step) {
     if (!out || !out->data)
         return -1;
@@ -229,7 +277,12 @@ int cml_cpu_lazy_arange(Tensor* out, float start, float step) {
     return 0;
 }
 
-/** Fill `out` as an n x n identity matrix (ones on the diagonal, zeros elsewhere). */
+/**
+ * Fill `out` as an n x n identity matrix (ones on the diagonal, zeros elsewhere).
+ * @param out (Tensor*)
+ * @param n (int)
+ * @return (int)
+ */
 int cml_cpu_lazy_eye(Tensor* out, int n) {
     if (!out || !out->data || n <= 0)
         return -1;
@@ -240,7 +293,13 @@ int cml_cpu_lazy_eye(Tensor* out, int n) {
     return 0;
 }
 
-/** Fill `out` with uniform random integers in [low, high) from the global RNG. */
+/**
+ * Fill `out` with uniform random integers in [low, high) from the global RNG.
+ * @param out (Tensor*)
+ * @param low (int)
+ * @param high (int)
+ * @return (int)
+ */
 int cml_cpu_lazy_rand_int(Tensor* out, int low, int high) {
     if (!out || !out->data || high <= low)
         return -1;

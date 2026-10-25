@@ -7,7 +7,14 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/** Append a JSON-escaped, quoted string to the growable buffer. */
+/**
+ * Append a JSON-escaped, quoted string to the growable buffer.
+ * @param buffer (char**)
+ * @param offset (size_t*)
+ * @param capacity (size_t*)
+ * @param str (const char*)
+ * @return (void)
+ */
 static void append_json_string(char** buffer, size_t* offset, size_t* capacity, const char* str) {
     if (!str)
         str = "";
@@ -61,7 +68,15 @@ static void append_json_string(char** buffer, size_t* offset, size_t* capacity, 
     (*buffer)[(*offset)++] = '"';
 }
 
-/** printf-style append to the growable buffer, resizing to fit the result. */
+/**
+ * printf-style append to the growable buffer, resizing to fit the result.
+ * @param buffer (char**)
+ * @param offset (size_t*)
+ * @param capacity (size_t*)
+ * @param fmt (const char*)
+ * @param ... variadic arguments
+ * @return (void)
+ */
 static void append_format(char** buffer, size_t* offset, size_t* capacity, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -96,7 +111,11 @@ static void append_format(char** buffer, size_t* offset, size_t* capacity, const
     va_end(args);
 }
 
-/** Generate an illustrative C code snippet for a single node's op (caller frees). */
+/**
+ * Generate an illustrative C code snippet for a single node's op (caller frees).
+ * @param node (struct IRNode*)
+ * @return (char*)
+ */
 static char* generate_kernel_code_snippet(struct IRNode* node) {
     if (!node)
         return NULL;
@@ -312,7 +331,11 @@ static char* generate_kernel_code_snippet(struct IRNode* node) {
     return code;
 }
 
-/** Generate a C code snippet for a fused kernel per its fusion type (caller frees). */
+/**
+ * Generate a C code snippet for a fused kernel per its fusion type (caller frees).
+ * @param kernel (FusedKernel*)
+ * @return (char*)
+ */
 static char* generate_fused_kernel_code(FusedKernel* kernel) {
     if (!kernel || kernel->num_ops == 0)
         return NULL;
@@ -404,7 +427,11 @@ static struct IRNode* input_producer(CMLGraph_t ir, const struct IRNode* node, i
     return node->input_names ? cml_ir_find_by_output(ir, node->input_names[i]) : NULL;
 }
 
-/** Compute per-node use counts and liveness flags for dead-code reporting. */
+/**
+ * Compute per-node use counts and liveness flags for dead-code reporting.
+ * @param ir (CMLGraph_t)
+ * @return (void)
+ */
 static void analyze_usage(CMLGraph_t ir) {
     if (!ir || !ir->head)
         return;
@@ -456,6 +483,9 @@ static void analyze_usage(CMLGraph_t ir) {
 /**
  * Export a JSON report of the graph's kernel structure (node/fusion/dead-code
  * stats and generated code snippets) as a freshly allocated string (caller frees).
+ * @param ir (CMLGraph_t)
+ * @param optimized (bool)
+ * @return (char*)
  */
 char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
     if (!ir)
@@ -686,7 +716,11 @@ char* cml_ir_export_kernel_analysis(CMLGraph_t ir, bool optimized) {
     return buffer;
 }
 
-/** Serialize the full IR graph (nodes and edges) to a JSON string (caller frees). */
+/**
+ * Serialize the full IR graph (nodes and edges) to a JSON string (caller frees).
+ * @param ir (CMLGraph_t)
+ * @return (char*)
+ */
 char* cml_ir_export_graph_json(CMLGraph_t ir) {
     if (!ir)
         return NULL;

@@ -22,14 +22,26 @@
 #define WHISPER_HOP 160
 #define WHISPER_SAMPLE_RATE 16000
 
-/** Convert a frequency in Hz to the HTK mel scale. */
+/**
+ * Convert a frequency in Hz to the HTK mel scale.
+ * @param hz (float)
+ * @return (float)
+ */
 static float hz_to_mel(float hz) { return 2595.0f * log10f(1.0f + hz / 700.0f); }
-/** Convert an HTK mel-scale value back to frequency in Hz. */
+/**
+ * Convert an HTK mel-scale value back to frequency in Hz.
+ * @param mel (float)
+ * @return (float)
+ */
 static float mel_to_hz(float mel) { return 700.0f * (powf(10.0f, mel / 2595.0f) - 1.0f); }
 
 /**
  * Compute the Whisper log-mel spectrogram for @p audio: STFT with a Hann window, triangular
  * mel filterbank, log10 and normalization. Returns an [n_mels, frames] CPU float tensor.
+ * @param audio (const float*)
+ * @param num_samples (int)
+ * @param n_mels (int)
+ * @return (Tensor*)
  */
 Tensor* cml_whisper_log_mel(const float* audio, int num_samples, int n_mels) {
     if (!audio || num_samples < WHISPER_N_FFT || n_mels <= 0) {
@@ -139,7 +151,10 @@ Tensor* cml_whisper_log_mel(const float* audio, int num_samples, int n_mels) {
     return mel;
 }
 
-/** Whisper-tiny config: 80 mels, 384-dim, 6 heads, 4 encoder + 4 decoder layers. */
+/**
+ * Whisper-tiny config: 80 mels, 384-dim, 6 heads, 4 encoder + 4 decoder layers.
+ * @return (WhisperConfig)
+ */
 WhisperConfig whisper_tiny_config(void) {
     WhisperConfig cfg = {.size          = WHISPER_TINY,
                          .n_mels        = 80,
@@ -157,7 +172,10 @@ WhisperConfig whisper_tiny_config(void) {
     return cfg;
 }
 
-/** Whisper-base config: 80 mels, 512-dim, 8 heads, 6 encoder + 6 decoder layers. */
+/**
+ * Whisper-base config: 80 mels, 512-dim, 8 heads, 6 encoder + 6 decoder layers.
+ * @return (WhisperConfig)
+ */
 WhisperConfig whisper_base_config(void) {
     WhisperConfig cfg = {.size          = WHISPER_BASE,
                          .n_mels        = 80,
@@ -175,7 +193,10 @@ WhisperConfig whisper_base_config(void) {
     return cfg;
 }
 
-/** Whisper-small config: 80 mels, 768-dim, 12 heads, 12 encoder + 12 decoder layers. */
+/**
+ * Whisper-small config: 80 mels, 768-dim, 12 heads, 12 encoder + 12 decoder layers.
+ * @return (WhisperConfig)
+ */
 WhisperConfig whisper_small_config(void) {
     WhisperConfig cfg = {.size          = WHISPER_SMALL,
                          .n_mels        = 80,
@@ -193,7 +214,10 @@ WhisperConfig whisper_small_config(void) {
     return cfg;
 }
 
-/** Whisper-medium config: 80 mels, 1024-dim, 16 heads, 24 encoder + 24 decoder layers. */
+/**
+ * Whisper-medium config: 80 mels, 1024-dim, 16 heads, 24 encoder + 24 decoder layers.
+ * @return (WhisperConfig)
+ */
 WhisperConfig whisper_medium_config(void) {
     WhisperConfig cfg = {.size          = WHISPER_MEDIUM,
                          .n_mels        = 80,
@@ -211,7 +235,10 @@ WhisperConfig whisper_medium_config(void) {
     return cfg;
 }
 
-/** Whisper-large config: 128 mels, 1280-dim, 20 heads, 32 encoder + 32 decoder layers. */
+/**
+ * Whisper-large config: 128 mels, 1280-dim, 20 heads, 32 encoder + 32 decoder layers.
+ * @return (WhisperConfig)
+ */
 WhisperConfig whisper_large_config(void) {
     WhisperConfig cfg = {.size          = WHISPER_LARGE,
                          .n_mels        = 128,
@@ -229,7 +256,12 @@ WhisperConfig whisper_large_config(void) {
     return cfg;
 }
 
-/** Append the Whisper audio encoder to @p model: two conv stem layers then N transformer blocks. */
+/**
+ * Append the Whisper audio encoder to @p model: two conv stem layers then N transformer blocks.
+ * @param model (Sequential*)
+ * @param cfg (const WhisperConfig*)
+ * @return (void)
+ */
 static void build_audio_encoder(Sequential* model, const WhisperConfig* cfg) {
     DType dt       = cfg->dtype;
     DeviceType dev = cfg->device;
@@ -253,7 +285,12 @@ static void build_audio_encoder(Sequential* model, const WhisperConfig* cfg) {
     sequential_add(model, (Module*)nn_layernorm(d, 1e-5f, true, dt, dev));
 }
 
-/** Append the Whisper text decoder to @p model: token embedding, N self/cross-attn blocks, head. */
+/**
+ * Append the Whisper text decoder to @p model: token embedding, N self/cross-attn blocks, head.
+ * @param model (Sequential*)
+ * @param cfg (const WhisperConfig*)
+ * @return (void)
+ */
 static void build_text_decoder(Sequential* model, const WhisperConfig* cfg) {
     DType dt       = cfg->dtype;
     DeviceType dev = cfg->device;
@@ -279,7 +316,11 @@ static void build_text_decoder(Sequential* model, const WhisperConfig* cfg) {
     sequential_add(model, (Module*)nn_linear(d, cfg->n_vocab, dt, dev, false));
 }
 
-/** Build a full Whisper encoder-decoder speech model from @p config (defaults to base). */
+/**
+ * Build a full Whisper encoder-decoder speech model from @p config (defaults to base).
+ * @param config (const WhisperConfig*)
+ * @return (Module*)
+ */
 Module* cml_zoo_whisper(const WhisperConfig* config) {
     WhisperConfig cfg = config ? *config : whisper_base_config();
 

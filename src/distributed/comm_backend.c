@@ -4,8 +4,13 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
-/** Tear down a backend: run its destroy hook on @p backend_ctx (if any), then
- * free the ops table itself. Safe to call with a NULL ops. */
+/**
+ * Tear down a backend: run its destroy hook on @p backend_ctx (if any), then
+ * free the ops table itself. Safe to call with a NULL ops.
+ * @param ops (DistCommOps*)
+ * @param backend_ctx (void*)
+ * @return (void)
+ */
 void cml_dist_free_backend(DistCommOps* ops, void* backend_ctx) {
     if (!ops)
         return;
@@ -16,8 +21,11 @@ void cml_dist_free_backend(DistCommOps* ops, void* backend_ctx) {
     cml_free(ops);
 }
 
-/** Probe backends in descending preference (NCCL, then MPI, then Gloo) and
- * return the first that is usable, or NULL if none can be created. */
+/**
+ * Probe backends in descending preference (NCCL, then MPI, then Gloo) and
+ * return the first that is usable, or NULL if none can be created.
+ * @return (DistCommOps*)
+ */
 DistCommOps* cml_dist_auto_select_backend(void) {
     DistCommOps* ops = NULL;
 
@@ -46,7 +54,11 @@ DistCommOps* cml_dist_auto_select_backend(void) {
     return NULL;
 }
 
-/** Human-readable name for a backend type; "Unknown" for unrecognized values. */
+/**
+ * Human-readable name for a backend type; "Unknown" for unrecognized values.
+ * @param type (DistBackendType)
+ * @return (const char*)
+ */
 const char* cml_dist_backend_name(DistBackendType type) {
     switch (type) {
     case DIST_BACKEND_NCCL:

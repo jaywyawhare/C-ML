@@ -29,14 +29,24 @@ typedef struct {
     size_t bit_pos;
 } BitstreamReader;
 
-/** Initialize an MSB-first bitstream reader over a byte buffer. */
+/**
+ * Initialize an MSB-first bitstream reader over a byte buffer.
+ * @param bs (BitstreamReader*)
+ * @param data (const uint8_t*)
+ * @param size (size_t)
+ * @return (void)
+ */
 static void bs_init(BitstreamReader* bs, const uint8_t* data, size_t size) {
     bs->data    = data;
     bs->size    = size;
     bs->bit_pos = 0;
 }
 
-/** Read one bit (MSB first); -1 past end of buffer. */
+/**
+ * Read one bit (MSB first); -1 past end of buffer.
+ * @param bs (BitstreamReader*)
+ * @return (int)
+ */
 static int bs_read_bit(BitstreamReader* bs) {
     if (bs->bit_pos / 8 >= bs->size)
         return -1;
@@ -46,7 +56,12 @@ static int bs_read_bit(BitstreamReader* bs) {
     return (bs->data[byte_idx] >> bit_idx) & 1;
 }
 
-/** Read an n-bit big-endian unsigned value from the bitstream. */
+/**
+ * Read an n-bit big-endian unsigned value from the bitstream.
+ * @param bs (BitstreamReader*)
+ * @param n (int)
+ * @return (uint32_t)
+ */
 static uint32_t bs_read_bits(BitstreamReader* bs, int n) {
     uint32_t val = 0;
     for (int i = 0; i < n; i++) {
@@ -58,7 +73,11 @@ static uint32_t bs_read_bits(BitstreamReader* bs, int n) {
     return val;
 }
 
-/** Decode an unsigned Exp-Golomb (ue(v)) code, as used throughout H.265 headers. */
+/**
+ * Decode an unsigned Exp-Golomb (ue(v)) code, as used throughout H.265 headers.
+ * @param bs (BitstreamReader*)
+ * @return (uint32_t)
+ */
 static uint32_t bs_read_ue(BitstreamReader* bs) {
     int leading_zeros = 0;
     while (bs_read_bit(bs) == 0 && leading_zeros < 31)
@@ -69,8 +88,14 @@ static uint32_t bs_read_ue(BitstreamReader* bs) {
     return (1u << leading_zeros) - 1 + val;
 }
 
-/** Strip emulation-prevention bytes (00 00 03) to recover the RBSP from a NAL
- *  payload; returns a newly allocated buffer the caller frees. */
+/**
+ * Strip emulation-prevention bytes (00 00 03) to recover the RBSP from a NAL
+ * payload; returns a newly allocated buffer the caller frees.
+ * @param nal (const uint8_t*)
+ * @param nal_size (size_t)
+ * @param rbsp_size (size_t*)
+ * @return (uint8_t*)
+ */
 static uint8_t* rbsp_from_nal(const uint8_t* nal, size_t nal_size, size_t* rbsp_size) {
     uint8_t* rbsp = (uint8_t*)cml_malloc(nal_size);
     if (!rbsp)
@@ -91,8 +116,16 @@ static uint8_t* rbsp_from_nal(const uint8_t* nal, size_t nal_size, size_t* rbsp_
     return rbsp;
 }
 
-/** Scan for the next Annex-B start code (00 00 01 or 00 00 00 01) from `start`;
- *  reports its position and length. Returns 1 if found, 0 otherwise. */
+/**
+ * Scan for the next Annex-B start code (00 00 01 or 00 00 00 01) from `start`;
+ * reports its position and length. Returns 1 if found, 0 otherwise.
+ * @param buf (const uint8_t*)
+ * @param len (size_t)
+ * @param start (size_t)
+ * @param sc_pos (size_t*)
+ * @param sc_len (int*)
+ * @return (int)
+ */
 static int find_start_code(const uint8_t* buf, size_t len, size_t start, size_t* sc_pos,
                            int* sc_len) {
     for (size_t i = start; i + 2 < len; i++) {
@@ -112,7 +145,10 @@ static int find_start_code(const uint8_t* buf, size_t len, size_t start, size_t*
     return 0;
 }
 
-/** Allocate an HEVC Annex-B parser with an initial ring buffer. */
+/**
+ * Allocate an HEVC Annex-B parser with an initial ring buffer.
+ * @return (CMLHEVCParser*)
+ */
 CMLHEVCParser* cml_hevc_parser_create(void) {
     CMLHEVCParser* p = (CMLHEVCParser*)cml_calloc(1, sizeof(CMLHEVCParser));
     if (!p)
@@ -130,7 +166,11 @@ CMLHEVCParser* cml_hevc_parser_create(void) {
     return p;
 }
 
-/** Free the parser and its ring buffer. */
+/**
+ * Free the parser and its ring buffer.
+ * @param parser (CMLHEVCParser*)
+ * @return (void)
+ */
 void cml_hevc_parser_free(CMLHEVCParser* parser) {
     if (!parser)
         return;
@@ -138,7 +178,13 @@ void cml_hevc_parser_free(CMLHEVCParser* parser) {
     cml_free(parser);
 }
 
-/** Append bitstream bytes to the ring buffer, growing it as needed; -1 on error. */
+/**
+ * Append bitstream bytes to the ring buffer, growing it as needed; -1 on error.
+ * @param parser (CMLHEVCParser*)
+ * @param data (const uint8_t*)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_hevc_parser_feed(CMLHEVCParser* parser, const uint8_t* data, size_t size) {
     if (!parser || !data || size == 0)
         return -1;
@@ -162,7 +208,11 @@ int cml_hevc_parser_feed(CMLHEVCParser* parser, const uint8_t* data, size_t size
     return 0;
 }
 
-/** Signal that no more bytes will be fed, so the final NAL may be emitted. */
+/**
+ * Signal that no more bytes will be fed, so the final NAL may be emitted.
+ * @param parser (CMLHEVCParser*)
+ * @return (void)
+ */
 void cml_hevc_parser_end_of_stream(CMLHEVCParser* parser) {
     if (parser)
         parser->eos = true;
@@ -172,6 +222,8 @@ void cml_hevc_parser_end_of_stream(CMLHEVCParser* parser) {
  * Extract the next complete NAL unit from the buffered stream, parsing its header
  * (type, temporal id). Consumed bytes are dropped from the ring buffer. Returns
  * NULL when no full NAL is available yet (or at end of stream).
+ * @param parser (CMLHEVCParser*)
+ * @return (CMLHEVCNalUnit*)
  */
 CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser) {
     if (!parser || parser->ring_len < 4)
@@ -241,7 +293,11 @@ CMLHEVCNalUnit* cml_hevc_next_nal(CMLHEVCParser* parser) {
     return nal;
 }
 
-/** Free a NAL unit and its copied payload. */
+/**
+ * Free a NAL unit and its copied payload.
+ * @param nal (CMLHEVCNalUnit*)
+ * @return (void)
+ */
 void cml_hevc_nal_free(CMLHEVCNalUnit* nal) {
     if (!nal)
         return;
@@ -249,8 +305,15 @@ void cml_hevc_nal_free(CMLHEVCNalUnit* nal) {
     cml_free(nal);
 }
 
-/** Parse an SPS NAL far enough to recover the coded picture width/height,
- *  applying the conformance-window crop; -1 on malformed input. */
+/**
+ * Parse an SPS NAL far enough to recover the coded picture width/height,
+ * applying the conformance-window crop; -1 on malformed input.
+ * @param sps_data (const uint8_t*)
+ * @param sps_size (size_t)
+ * @param width (int*)
+ * @param height (int*)
+ * @return (int)
+ */
 int cml_hevc_parse_sps(const uint8_t* sps_data, size_t sps_size, int* width, int* height) {
     if (!sps_data || sps_size < 4 || !width || !height)
         return -1;
@@ -332,8 +395,13 @@ int cml_hevc_parse_sps(const uint8_t* sps_data, size_t sps_size, int* width, int
     return 0;
 }
 
-/** Decode an IDR (intra) frame to pixels. Currently unimplemented: parses the
- *  NAL but fails with CM_NOT_IMPLEMENTED rather than returning a fake frame. */
+/**
+ * Decode an IDR (intra) frame to pixels. Currently unimplemented: parses the
+ * NAL but fails with CM_NOT_IMPLEMENTED rather than returning a fake frame.
+ * @param parser (CMLHEVCParser*)
+ * @param nal (CMLHEVCNalUnit*)
+ * @return (CMLHEVCFrame*)
+ */
 CMLHEVCFrame* cml_hevc_decode_iframe(CMLHEVCParser* parser, CMLHEVCNalUnit* nal) {
     if (!parser || !nal)
         return NULL;
@@ -362,7 +430,11 @@ CMLHEVCFrame* cml_hevc_decode_iframe(CMLHEVCParser* parser, CMLHEVCNalUnit* nal)
     CML_ERR_RET(CM_NOT_IMPLEMENTED, "hevc: frame decoding not implemented", NULL);
 }
 
-/** Free a decoded frame and its pixel buffer. */
+/**
+ * Free a decoded frame and its pixel buffer.
+ * @param frame (CMLHEVCFrame*)
+ * @return (void)
+ */
 void cml_hevc_frame_free(CMLHEVCFrame* frame) {
     if (!frame)
         return;
@@ -379,8 +451,13 @@ static const int16_t HEVC_DCT4[16] = {
     64, 64, 64, 64, 83, 36, -36, -83, 64, -64, -64, 64, 36, -83, 83, -36,
 };
 
-/** Return the integer transform matrix for a given size. Only the exactly
- *  row-orthogonal 4-point DCT is exposed; DST-VII and larger DCTs return NULL. */
+/**
+ * Return the integer transform matrix for a given size. Only the exactly
+ * row-orthogonal 4-point DCT is exposed; DST-VII and larger DCTs return NULL.
+ * @param size (int)
+ * @param dst (int)
+ * @return (const int16_t*)
+ */
 const int16_t* cml_hevc_transform_matrix(int size, int dst) {
     if (dst)
         return NULL; /* DST-VII is not exactly orthogonal; needs reference vectors */
@@ -393,7 +470,16 @@ const int16_t* cml_hevc_transform_matrix(int size, int dst) {
 }
 
 /* out = A x B over int64 (A, B are n x n row-major). at/bt transpose flags. */
-/** n x n integer matrix multiply over int64 with optional transpose of A or B. */
+/**
+ * n x n integer matrix multiply over int64 with optional transpose of A or B.
+ * @param A (const int64_t*)
+ * @param at (int)
+ * @param B (const int64_t*)
+ * @param bt (int)
+ * @param out (int64_t*)
+ * @param n (int)
+ * @return (void)
+ */
 static void hevc_mm(const int64_t* A, int at, const int64_t* B, int bt, int64_t* out, int n) {
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
@@ -408,7 +494,15 @@ static void hevc_mm(const int64_t* A, int at, const int64_t* B, int bt, int64_t*
     }
 }
 
-/** Apply the 2-D separable integer transform: forward M*B*M^T or inverse M^T*C*M. */
+/**
+ * Apply the 2-D separable integer transform: forward M*B*M^T or inverse M^T*C*M.
+ * @param in (const int32_t*)
+ * @param out (int32_t*)
+ * @param size (int)
+ * @param dst (int)
+ * @param inverse (int)
+ * @return (int)
+ */
 static int hevc_transform(const int32_t* in, int32_t* out, int size, int dst, int inverse) {
     const int16_t* m = cml_hevc_transform_matrix(size, dst);
     if (!m || !in || !out)
@@ -432,12 +526,26 @@ static int hevc_transform(const int32_t* in, int32_t* out, int size, int dst, in
     return 0;
 }
 
-/** Forward 2-D integer transform of a residual block into coefficients. */
+/**
+ * Forward 2-D integer transform of a residual block into coefficients.
+ * @param block (const int32_t*)
+ * @param coeffs (int32_t*)
+ * @param size (int)
+ * @param dst (int)
+ * @return (int)
+ */
 int cml_hevc_forward_transform(const int32_t* block, int32_t* coeffs, int size, int dst) {
     return hevc_transform(block, coeffs, size, dst, 0);
 }
 
-/** Inverse 2-D integer transform of coefficients back into a residual block. */
+/**
+ * Inverse 2-D integer transform of coefficients back into a residual block.
+ * @param coeffs (const int32_t*)
+ * @param block (int32_t*)
+ * @param size (int)
+ * @param dst (int)
+ * @return (int)
+ */
 int cml_hevc_inverse_transform(const int32_t* coeffs, int32_t* block, int size, int dst) {
     return hevc_transform(coeffs, block, size, dst, 1);
 }

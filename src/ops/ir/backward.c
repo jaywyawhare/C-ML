@@ -28,6 +28,9 @@ extern CMLBlasContext* get_blas_context(void);
  * Forward-scan from head to output_node, propagating requires_grad and setting
  * each node's needs_input_grad flags so the reverse pass can skip gradient-free
  * nodes (backward DCE).
+ * @param ir (CMLGraph_t)
+ * @param output_node (struct IRNode*)
+ * @return (int)
  */
 int cml_ir_build_backward(CMLGraph_t ir, struct IRNode* output_node) {
     if (!ir || !output_node) {
@@ -64,6 +67,8 @@ int cml_ir_build_backward(CMLGraph_t ir, struct IRNode* output_node) {
 /**
  * Return `t`'s gradient tensor, eagerly allocating and zeroing it on first use.
  * Deliberately avoids lazy tensor_zeros to not re-trigger the forward graph.
+ * @param t (Tensor*)
+ * @return (Tensor*)
  */
 static Tensor* ensure_grad(Tensor* t) {
     if (!t)
@@ -87,6 +92,10 @@ static Tensor* ensure_grad(Tensor* t) {
 /**
  * Add `grad_data` into `t`'s gradient, handling the equal-size (SIMD), scalar
  * (sum-reduce), and broadcast (modulo accumulate) cases.
+ * @param t (Tensor*)
+ * @param grad_data (float*)
+ * @param numel (size_t)
+ * @return (void)
  */
 static void accumulate_grad(Tensor* t, float* grad_data, size_t numel) {
     if (!t || !grad_data)
@@ -166,9 +175,13 @@ static float* backward_contiguous(Tensor* t, bool* owned) {
     return buf;
 }
 
-/** Accumulate the vector-Jacobian product for one IR node into its inputs'
+/**
+ * Accumulate the vector-Jacobian product for one IR node into its inputs'
  * gradients (the CPU eager backward). Dispatches on node->type; each case adds
- * this node's contribution to grad of the inputs that require it. Returns 0/-1. */
+ * this node's contribution to grad of the inputs that require it. Returns 0/-1.
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int cpu_backward_node(struct IRNode* node) {
     if (!node || !node->output)
         return 0;
@@ -3956,6 +3969,9 @@ static int cpu_backward_node(struct IRNode* node) {
  * Run the reverse pass on the CPU: compute reachability of the loss-rooted
  * subgraph, then walk nodes in reverse applying each per-op VJP rule, skipping
  * unreachable or gradient-free nodes.
+ * @param ir (CMLGraph_t)
+ * @param loss_node (struct IRNode*)
+ * @return (int)
  */
 static int cpu_execute_backward(CMLGraph_t ir, struct IRNode* loss_node) {
     if (!ir || !loss_node)
@@ -4075,7 +4091,11 @@ static int cpu_execute_backward(CMLGraph_t ir, struct IRNode* loss_node) {
     return 0;
 }
 
-/** Run the backward pass rooted at the graph tail. */
+/**
+ * Run the backward pass rooted at the graph tail.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_execute_backward(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("NULL IR passed to cml_ir_execute_backward");
@@ -4090,6 +4110,8 @@ int cml_ir_execute_backward(CMLGraph_t ir) {
  * half elements: garbage math plus out-of-bounds access. Reject that up front
  * with a clear error. The default graph autodiff path handles half natively;
  * this limitation is specific to GRAD_MODE=eager.
+ * @param ir (CMLGraph_t)
+ * @return (bool)
  */
 static bool eager_backward_is_f32(CMLGraph_t ir) {
     for (struct IRNode* n = ir->head; n; n = n->next) {
@@ -4105,6 +4127,9 @@ static bool eager_backward_is_f32(CMLGraph_t ir) {
 /**
  * Populate backward DCE flags, seed the loss node's gradient with 1.0 (eagerly
  * allocated), and execute the reverse pass from that loss node.
+ * @param ir (CMLGraph_t)
+ * @param loss_node (struct IRNode*)
+ * @return (int)
  */
 int cml_ir_execute_backward_from(CMLGraph_t ir, struct IRNode* loss_node) {
     if (!ir) {

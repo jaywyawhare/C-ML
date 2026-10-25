@@ -47,7 +47,10 @@ typedef struct {
     uint64_t total_size;
 } PTEFileHeader;
 
-/** Default .cpte export options: method "forward", CPU backend, weights and memory plan on. */
+/**
+ * Default .cpte export options: method "forward", CPU backend, weights and memory plan on.
+ * @return (TorchPTEExportOptions)
+ */
 TorchPTEExportOptions torch_pte_default_export_options(void) {
     TorchPTEExportOptions opts = {0};
     opts.method_name           = "forward";
@@ -58,7 +61,11 @@ TorchPTEExportOptions torch_pte_default_export_options(void) {
     return opts;
 }
 
-/** Byte width of a dtype's scalar element, used to size constant/arena buffers. */
+/**
+ * Byte width of a dtype's scalar element, used to size constant/arena buffers.
+ * @param dtype (DType)
+ * @return (size_t)
+ */
 static size_t pte_dtype_nbytes(DType dtype) {
     switch (dtype) {
     case DTYPE_FLOAT64:
@@ -79,8 +86,16 @@ static size_t pte_dtype_nbytes(DType dtype) {
     }
 }
 
-/** Lower the IR graph to the flat PTE instruction list, resolving each arg to an
- *  input/intermediate/constant slot; fails if any op lacks a PTE runtime kernel. */
+/**
+ * Lower the IR graph to the flat PTE instruction list, resolving each arg to an
+ * input/intermediate/constant slot; fails if any op lacks a PTE runtime kernel.
+ * @param ir (CMLGraph_t)
+ * @param out_instrs (CMLPTEInstruction**)
+ * @param out_count (int*)
+ * @param plan (CMLPTEMemoryPlan*)
+ * @param module (Module*)
+ * @return (int)
+ */
 static int pte_collect_ir(CMLGraph_t ir, CMLPTEInstruction** out_instrs, int* out_count,
                           CMLPTEMemoryPlan* plan, Module* module) {
     if (!ir || !out_instrs || !out_count)
@@ -202,7 +217,15 @@ static int pte_collect_ir(CMLGraph_t ir, CMLPTEInstruction** out_instrs, int* ou
     return 0;
 }
 
-/** Flatten a module's state dict into the PTE constant table plus a packed weight blob. */
+/**
+ * Flatten a module's state dict into the PTE constant table plus a packed weight blob.
+ * @param module (Module*)
+ * @param out_consts (CMLPTEConstant**)
+ * @param out_data (uint8_t**)
+ * @param out_data_size (size_t*)
+ * @param out_count (int*)
+ * @return (int)
+ */
 static int pte_collect_constants(Module* module, CMLPTEConstant** out_consts, uint8_t** out_data,
                                  size_t* out_data_size, int* out_count) {
     StateDict* sd = nn_get_state_dict(module, "");
@@ -261,9 +284,16 @@ static int pte_collect_constants(Module* module, CMLPTEConstant** out_consts, ui
     return 0;
 }
 
-/** Trace a module's forward on a sample input and serialize it to a .cpte program
- *  (program, constants, memory plan, metadata) plus a selective-build manifest.
- *  Returns 0 on success, -1 on failure. */
+/**
+ * Trace a module's forward on a sample input and serialize it to a .cpte program
+ * (program, constants, memory plan, metadata) plus a selective-build manifest.
+ * Returns 0 on success, -1 on failure.
+ * @param module (Module*)
+ * @param sample_input (Tensor*)
+ * @param path (const char*)
+ * @param opts (const TorchPTEExportOptions*)
+ * @return (int)
+ */
 int torch_pte_export_module(Module* module, Tensor* sample_input, const char* path,
                             const TorchPTEExportOptions* opts) {
     if (!module || !sample_input || !path)
@@ -413,8 +443,12 @@ int torch_pte_export_module(Module* module, Tensor* sample_input, const char* pa
     return 0;
 }
 
-/** Load a .cpte file into an in-memory model, materializing constants and applying its
- *  selective-build set; returns NULL on a bad file or allocation failure. */
+/**
+ * Load a .cpte file into an in-memory model, materializing constants and applying its
+ * selective-build set; returns NULL on a bad file or allocation failure.
+ * @param path (const char*)
+ * @return (CMLPTEModel*)
+ */
 CMLPTEModel* torch_pte_load(const char* path) {
     if (!path)
         return NULL;
@@ -529,7 +563,11 @@ CMLPTEModel* torch_pte_load(const char* path) {
     return model;
 }
 
-/** Rebuild the model's constant tensors from the packed weight blob at load time. */
+/**
+ * Rebuild the model's constant tensors from the packed weight blob at load time.
+ * @param model (CMLPTEModel*)
+ * @return (int)
+ */
 static int pte_materialize_constants(CMLPTEModel* model) {
     int nc = (int)model->meta.num_constants;
     if (nc <= 0)
@@ -563,7 +601,11 @@ static int pte_materialize_constants(CMLPTEModel* model) {
     return 0;
 }
 
-/** Free a loaded PTE model and all of its instructions, constants, and tensors. */
+/**
+ * Free a loaded PTE model and all of its instructions, constants, and tensors.
+ * @param model (CMLPTEModel*)
+ * @return (void)
+ */
 void torch_pte_free(CMLPTEModel* model) {
     if (!model)
         return;
@@ -581,7 +623,11 @@ void torch_pte_free(CMLPTEModel* model) {
     free(model);
 }
 
-/** Arena size a caller must provide to run the model (memory plan peak, else metadata). */
+/**
+ * Arena size a caller must provide to run the model (memory plan peak, else metadata).
+ * @param model (const CMLPTEModel*)
+ * @return (size_t)
+ */
 size_t torch_pte_get_required_arena_size(const CMLPTEModel* model) {
     if (!model)
         return 0;
@@ -590,8 +636,15 @@ size_t torch_pte_get_required_arena_size(const CMLPTEModel* model) {
     return (size_t)model->meta.arena_size;
 }
 
-/** Dispatch one PTE instruction: map its UOpType to the matching tensor op for the
- *  linear interpreter. Returns NULL for disabled or unsupported ops. */
+/**
+ * Dispatch one PTE instruction: map its UOpType to the matching tensor op for the
+ * linear interpreter. Returns NULL for disabled or unsupported ops.
+ * @param op (UOpType)
+ * @param args (Tensor**)
+ * @param num_args (int)
+ * @param ins (const CMLPTEInstruction*)
+ * @return (Tensor*)
+ */
 static Tensor* pte_exec_kernel(UOpType op, Tensor** args, int num_args,
                                const CMLPTEInstruction* ins) {
     if (!torch_selective_build_is_op_enabled(op))
@@ -669,8 +722,12 @@ static Tensor* pte_exec_kernel(UOpType op, Tensor** args, int num_args,
     }
 }
 
-/** Report whether the linear interpreter has a kernel for this op. Export uses this to
- *  fail fast instead of writing a .cpte that only errors at execution time. */
+/**
+ * Report whether the linear interpreter has a kernel for this op. Export uses this to
+ * fail fast instead of writing a .cpte that only errors at execution time.
+ * @param op (UOpType)
+ * @return (bool)
+ */
 bool torch_pte_runtime_supports(UOpType op) {
     switch (op) {
     case UOP_ADD:

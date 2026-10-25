@@ -26,14 +26,18 @@ void cml_ir_set_global_context(CMLGraph_t ir);
 
 /**
  * @brief If @a ir is the current global IR pointer, clear that pointer (and auto-capture).
- *        Called from cml_ir_free so freeing a graph cannot leave a dangling global reference.
+ * Called from cml_ir_free so freeing a graph cannot leave a dangling global reference.
+ * @param ir (CMLGraph_t)
+ * @return (void)
  */
 void cml_ir_clear_global_if_current(CMLGraph_t ir);
 
 /**
  * @brief Drop @a t from every per-context registry that borrows it (grad-publish logs,
- *        detached fused outputs) so a tensor freed between graph passes is never revisited.
- *        Called from tensor_free.
+ * detached fused outputs) so a tensor freed between graph passes is never revisited.
+ * Called from tensor_free.
+ * @param t (Tensor*)
+ * @return (void)
  */
 void cml_ir_forget_tensor(Tensor* t);
 

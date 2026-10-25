@@ -8,7 +8,10 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
-/** Allocate an idle captured graph with an initial node buffer. */
+/**
+ * Allocate an idle captured graph with an initial node buffer.
+ * @return (CMLCapturedGraph*)
+ */
 CMLCapturedGraph* cml_graph_capture_create(void) {
     CMLCapturedGraph* g = (CMLCapturedGraph*)cml_calloc(1, sizeof(CMLCapturedGraph));
     if (!g)
@@ -25,7 +28,11 @@ CMLCapturedGraph* cml_graph_capture_create(void) {
     return g;
 }
 
-/** Free a captured graph and all per-node and binding storage. */
+/**
+ * Free a captured graph and all per-node and binding storage.
+ * @param graph (CMLCapturedGraph*)
+ * @return (void)
+ */
 void cml_graph_capture_free(CMLCapturedGraph* graph) {
     if (!graph)
         return;
@@ -42,7 +49,11 @@ void cml_graph_capture_free(CMLCapturedGraph* graph) {
     cml_free(graph);
 }
 
-/** Start recording, discarding any previously captured nodes. */
+/**
+ * Start recording, discarding any previously captured nodes.
+ * @param graph (CMLCapturedGraph*)
+ * @return (int)
+ */
 int cml_graph_capture_begin(CMLCapturedGraph* graph) {
     if (!graph)
         return -1;
@@ -58,8 +69,19 @@ int cml_graph_capture_begin(CMLCapturedGraph* graph) {
     return 0;
 }
 
-/** Append a kernel launch (grid/block/args) to the recording, growing capacity
- *  up to the node cap. */
+/**
+ * Append a kernel launch (grid/block/args) to the recording, growing capacity
+ * up to the node cap.
+ * @param graph (CMLCapturedGraph*)
+ * @param op (UOpType)
+ * @param kernel_handle (void*)
+ * @param grid (const size_t[3])
+ * @param block (const size_t[3])
+ * @param args (void**)
+ * @param num_args (int)
+ * @param shared_mem (size_t)
+ * @return (int)
+ */
 int cml_graph_capture_record(CMLCapturedGraph* graph, UOpType op, void* kernel_handle,
                              const size_t grid[3], const size_t block[3], void** args, int num_args,
                              size_t shared_mem) {
@@ -106,7 +128,11 @@ int cml_graph_capture_record(CMLCapturedGraph* graph, UOpType op, void* kernel_h
     return 0;
 }
 
-/** Finish recording and mark the graph ready for replay. */
+/**
+ * Finish recording and mark the graph ready for replay.
+ * @param graph (CMLCapturedGraph*)
+ * @return (int)
+ */
 int cml_graph_capture_end(CMLCapturedGraph* graph) {
     if (!graph || graph->state != CML_CAPTURE_RECORDING)
         return -1;
@@ -119,7 +145,11 @@ int cml_graph_capture_end(CMLCapturedGraph* graph) {
     return 0;
 }
 
-/** Replay a ready graph, dispatching each captured node and accumulating timing. */
+/**
+ * Replay a ready graph, dispatching each captured node and accumulating timing.
+ * @param graph (CMLCapturedGraph*)
+ * @return (int)
+ */
 int cml_graph_capture_replay(CMLCapturedGraph* graph) {
     if (!graph || graph->state != CML_CAPTURE_READY)
         return -1;
@@ -165,7 +195,13 @@ int cml_graph_capture_replay(CMLCapturedGraph* graph) {
     return 0;
 }
 
-/** Bind @p tensor as input @p index, growing the binding array as needed. */
+/**
+ * Bind @p tensor as input @p index, growing the binding array as needed.
+ * @param graph (CMLCapturedGraph*)
+ * @param index (int)
+ * @param tensor (Tensor*)
+ * @return (int)
+ */
 int cml_graph_capture_bind_input(CMLCapturedGraph* graph, int index, Tensor* tensor) {
     if (!graph || index < 0)
         return -1;
@@ -185,7 +221,13 @@ int cml_graph_capture_bind_input(CMLCapturedGraph* graph, int index, Tensor* ten
     return 0;
 }
 
-/** Bind @p tensor as output @p index, growing the binding array as needed. */
+/**
+ * Bind @p tensor as output @p index, growing the binding array as needed.
+ * @param graph (CMLCapturedGraph*)
+ * @param index (int)
+ * @param tensor (Tensor*)
+ * @return (int)
+ */
 int cml_graph_capture_bind_output(CMLCapturedGraph* graph, int index, Tensor* tensor) {
     if (!graph || index < 0)
         return -1;
@@ -205,7 +247,13 @@ int cml_graph_capture_bind_output(CMLCapturedGraph* graph, int index, Tensor* te
     return 0;
 }
 
-/** Install the per-node dispatch callback replay invokes. */
+/**
+ * Install the per-node dispatch callback replay invokes.
+ * @param graph (CMLCapturedGraph*)
+ * @param dispatch_fn (int (*)(const struct CMLCapturedNode*, void*))
+ * @param user (void*)
+ * @return (int)
+ */
 int cml_graph_capture_set_dispatch(CMLCapturedGraph* graph,
                                    int (*dispatch_fn)(const struct CMLCapturedNode*, void*),
                                    void* user) {
@@ -216,7 +264,14 @@ int cml_graph_capture_set_dispatch(CMLCapturedGraph* graph,
     return 0;
 }
 
-/** Map a captured argument to an input binding so replay substitutes its buffer. */
+/**
+ * Map a captured argument to an input binding so replay substitutes its buffer.
+ * @param graph (CMLCapturedGraph*)
+ * @param node_index (int)
+ * @param arg_index (int)
+ * @param input_index (int)
+ * @return (int)
+ */
 int cml_graph_capture_map_input_arg(CMLCapturedGraph* graph, int node_index, int arg_index,
                                     int input_index) {
     if (!graph || node_index < 0 || arg_index < 0 || input_index < 0)
@@ -244,7 +299,11 @@ int cml_graph_capture_map_input_arg(CMLCapturedGraph* graph, int node_index, int
     return 0;
 }
 
-/** Discard captured nodes and timing, returning the graph to idle. */
+/**
+ * Discard captured nodes and timing, returning the graph to idle.
+ * @param graph (CMLCapturedGraph*)
+ * @return (int)
+ */
 int cml_graph_capture_reset(CMLCapturedGraph* graph) {
     if (!graph)
         return -1;
@@ -260,17 +319,31 @@ int cml_graph_capture_reset(CMLCapturedGraph* graph) {
     return 0;
 }
 
-/** Current capture state (IDLE when @p graph is NULL). */
+/**
+ * Current capture state (IDLE when @p graph is NULL).
+ * @param graph (const CMLCapturedGraph*)
+ * @return (CMLCaptureState)
+ */
 CMLCaptureState cml_graph_capture_state(const CMLCapturedGraph* graph) {
     return graph ? graph->state : CML_CAPTURE_IDLE;
 }
 
-/** Number of captured nodes. */
+/**
+ * Number of captured nodes.
+ * @param graph (const CMLCapturedGraph*)
+ * @return (int)
+ */
 int cml_graph_capture_num_nodes(const CMLCapturedGraph* graph) {
     return graph ? graph->num_nodes : 0;
 }
 
-/** Report replay count and average replay time (out-params may be NULL). */
+/**
+ * Report replay count and average replay time (out-params may be NULL).
+ * @param graph (const CMLCapturedGraph*)
+ * @param replay_count (int*)
+ * @param avg_replay_ms (double*)
+ * @return (void)
+ */
 void cml_graph_capture_stats(const CMLCapturedGraph* graph, int* replay_count,
                              double* avg_replay_ms) {
     if (!graph)
@@ -283,7 +356,11 @@ void cml_graph_capture_stats(const CMLCapturedGraph* graph, int* replay_count,
     }
 }
 
-/** Print a human-readable summary of the captured graph. */
+/**
+ * Print a human-readable summary of the captured graph.
+ * @param graph (const CMLCapturedGraph*)
+ * @return (void)
+ */
 void cml_graph_capture_print(const CMLCapturedGraph* graph) {
     if (!graph) {
         printf("CapturedGraph: NULL\n");

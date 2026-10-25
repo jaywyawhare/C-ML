@@ -25,6 +25,8 @@ static char* cml_strndup_(const char* s, size_t n) {
 /**
  * Return non-zero if the filename has a recognized image extension (case-insensitive
  * ppm/pgm/raw/bmp/jpg/jpeg/png).
+ * @param name (const char*)
+ * @return (int)
  */
 static int is_image_file(const char* name) {
     const char* ext = strrchr(name, '.');
@@ -40,6 +42,8 @@ static int is_image_file(const char* name) {
 /**
  * Return non-zero if the filename has a recognized audio extension (case-insensitive
  * flac/wav).
+ * @param name (const char*)
+ * @return (int)
  */
 static int is_audio_file(const char* name) {
     const char* ext = strrchr(name, '.');
@@ -51,6 +55,9 @@ static int is_audio_file(const char* name) {
 
 /**
  * qsort comparator giving lexicographic order over an array of C strings.
+ * @param a (const void*)
+ * @param b (const void*)
+ * @return (int)
  */
 static int cmp_str(const void* a, const void* b) {
     return strcmp(*(const char**)a, *(const char**)b);
@@ -59,6 +66,9 @@ static int cmp_str(const void* a, const void* b) {
 /**
  * Count entries in a directory, skipping dotfiles and any name rejected by the
  * optional filter. Returns 0 if the directory cannot be opened.
+ * @param path (const char*)
+ * @param filter (int (*)(const char*))
+ * @return (int)
  */
 static int count_dir_entries(const char* path, int (*filter)(const char*)) {
     DIR* d = opendir(path);
@@ -79,6 +89,8 @@ static int count_dir_entries(const char* path, int (*filter)(const char*)) {
 
 /**
  * Return non-zero if the path exists and is a directory.
+ * @param path (const char*)
+ * @return (int)
  */
 static int is_directory(const char* path) {
     struct stat st;
@@ -89,6 +101,9 @@ static int is_directory(const char* path) {
  * Return a sorted, cml_malloc array of immediate subdirectory names (dotfiles
  * excluded), writing the count to *count. Caller frees each entry and the array;
  * returns NULL on allocation failure.
+ * @param path (const char*)
+ * @param count (int*)
+ * @return (char**)
  */
 static char** list_subdirs(const char* path, int* count) {
     DIR* d = opendir(path);
@@ -133,6 +148,10 @@ static char** list_subdirs(const char* path, int* count) {
  * Return a sorted, cml_malloc array of full paths to regular files in a directory
  * that pass the optional filter, writing the count to *count. Caller frees each
  * entry and the array; returns NULL on allocation failure.
+ * @param path (const char*)
+ * @param filter (int (*)(const char*))
+ * @param count (int*)
+ * @return (char**)
  */
 static char** list_files_in_dir(const char* path, int (*filter)(const char*), int* count) {
     DIR* d = opendir(path);
@@ -181,6 +200,10 @@ static char** list_files_in_dir(const char* path, int (*filter)(const char*), in
  * resizing to target_size x target_size (target_size <= 0 keeps native height) and
  * normalizing by maxval. Writes channel count to *out_channels; returns a cml_malloc
  * buffer the caller frees, or NULL on an unsupported/malformed file.
+ * @param path (const char*)
+ * @param target_size (int)
+ * @param out_channels (int*)
+ * @return (float*)
  */
 static float* load_ppm_image(const char* path, int target_size, int* out_channels) {
     FILE* f = fopen(path, "rb");
@@ -270,6 +293,9 @@ static float* load_ppm_image(const char* path, int target_size, int* out_channel
  * image file into a loader (labels assigned by sorted class order; image_size <= 0
  * defaults to 224). Returns NULL if no classes or images are found; caller frees via
  * cml_imagenet_free.
+ * @param dir_path (const char*)
+ * @param image_size (int)
+ * @return (CMLImageNetLoader*)
  */
 CMLImageNetLoader* cml_imagenet_open(const char* dir_path, int image_size) {
     if (!dir_path)
@@ -346,6 +372,10 @@ CMLImageNetLoader* cml_imagenet_open(const char* dir_path, int image_size) {
  * Decode up to batch_size images starting at offset into a Dataset (clamped to the
  * remaining samples). Unreadable images are left as zeros. Returns NULL for an
  * out-of-range offset or on allocation failure; caller owns the Dataset.
+ * @param loader (CMLImageNetLoader*)
+ * @param offset (int)
+ * @param batch_size (int)
+ * @return (Dataset*)
  */
 Dataset* cml_imagenet_load_batch(CMLImageNetLoader* loader, int offset, int batch_size) {
     if (!loader || offset < 0 || offset >= loader->num_samples)
@@ -394,6 +424,8 @@ Dataset* cml_imagenet_load_batch(CMLImageNetLoader* loader, int offset, int batc
 
 /**
  * Free an ImageNet loader and all of its owned path strings and arrays.
+ * @param loader (CMLImageNetLoader*)
+ * @return (void)
  */
 void cml_imagenet_free(CMLImageNetLoader* loader) {
     if (!loader)
@@ -414,6 +446,12 @@ void cml_imagenet_free(CMLImageNetLoader* loader) {
  * from a sibling .txt, else from a LibriSpeech-style <base>.trans.txt line keyed by
  * the file id; missing transcripts become empty strings. Arrays use cml_malloc and
  * are freed by the caller.
+ * @param dir (const char*)
+ * @param paths (char***)
+ * @param transcripts (char***)
+ * @param count (int*)
+ * @param cap (int*)
+ * @return (void)
  */
 static void collect_audio_recursive(const char* dir, char*** paths, char*** transcripts, int* count,
                                     int* cap) {
@@ -524,6 +562,8 @@ static void collect_audio_recursive(const char* dir, char*** paths, char*** tran
  * Open a LibriSpeech-style directory, recursively indexing audio files and their
  * transcripts (sample rate assumed 16 kHz). Returns NULL if no audio is found;
  * caller frees via cml_librispeech_free.
+ * @param dir_path (const char*)
+ * @return (CMLLibriSpeechLoader*)
  */
 CMLLibriSpeechLoader* cml_librispeech_open(const char* dir_path) {
     if (!dir_path)
@@ -555,6 +595,8 @@ CMLLibriSpeechLoader* cml_librispeech_open(const char* dir_path) {
 
 /**
  * Free a LibriSpeech loader and all of its owned path and transcript strings.
+ * @param loader (CMLLibriSpeechLoader*)
+ * @return (void)
  */
 void cml_librispeech_free(CMLLibriSpeechLoader* loader) {
     if (!loader)
@@ -570,6 +612,8 @@ void cml_librispeech_free(CMLLibriSpeechLoader* loader) {
 
 /**
  * Advance past JSON whitespace (space, tab, CR, LF) and return the new position.
+ * @param p (char*)
+ * @return (char*)
  */
 static char* json_skip_ws(char* p) {
     while (*p && (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t'))
@@ -581,6 +625,9 @@ static char* json_skip_ws(char* p) {
  * Parse a JSON string literal at p into a freshly allocated *out (escape sequences
  * are passed through verbatim, not unescaped). Returns the position after the closing
  * quote, or NULL if no valid string is present.
+ * @param p (char*)
+ * @param out (char**)
+ * @return (char*)
  */
 static char* json_parse_string(char* p, char** out) {
     p = json_skip_ws(p);
@@ -602,6 +649,8 @@ static char* json_parse_string(char* p, char** out) {
 /**
  * Skip one JSON value (string, brace/bracket-balanced object or array, or a bare
  * literal) and return the position just past it, respecting quotes and escapes.
+ * @param p (char*)
+ * @return (char*)
  */
 static char* json_skip_value(char* p) {
     p = json_skip_ws(p);
@@ -662,6 +711,9 @@ static char* json_skip_value(char* p) {
 /**
  * Skip whitespace and consume the expected character c, returning the position after
  * it, or NULL if the next non-space character does not match.
+ * @param p (char*)
+ * @param c (char)
+ * @return (char*)
  */
 static char* json_expect(char* p, char c) {
     p = json_skip_ws(p);
@@ -673,6 +725,8 @@ static char* json_expect(char* p, char c) {
  * lightweight hand-rolled scan over data[].paragraphs[].qas[] (first answer only).
  * Returns NULL on read error or if no QA pairs are found; caller frees via
  * cml_squad_free.
+ * @param json_path (const char*)
+ * @return (CMLSQuADLoader*)
  */
 CMLSQuADLoader* cml_squad_open(const char* json_path) {
     if (!json_path)
@@ -944,6 +998,8 @@ done:
 /**
  * Free a SQuAD loader and all of its owned context/question/answer strings and
  * arrays.
+ * @param loader (CMLSQuADLoader*)
+ * @return (void)
  */
 void cml_squad_free(CMLSQuADLoader* loader) {
     if (!loader)
@@ -980,6 +1036,10 @@ typedef struct {
  * UINT8, or INT32 voxel types. Writes per-axis sizes to dims_out and the rank to
  * *ndim_out. Returns a cml_malloc buffer the caller frees, or NULL on a bad header
  * or unsupported datatype.
+ * @param path (const char*)
+ * @param dims_out (int*)
+ * @param ndim_out (int*)
+ * @return (float*)
  */
 static float* nifti_read_volume(const char* path, int* dims_out, int* ndim_out) {
     FILE* f = fopen(path, "rb");
@@ -1073,6 +1133,8 @@ static float* nifti_read_volume(const char* path, int* dims_out, int* ndim_out) 
 /**
  * Return non-zero if the name matches a KiTS19 case directory ("case_XXXXX", exactly
  * 10 characters).
+ * @param name (const char*)
+ * @return (int)
  */
 static int is_kits19_case(const char* name) {
     return (strncmp(name, "case_", 5) == 0 && strlen(name) == 10);
@@ -1081,6 +1143,8 @@ static int is_kits19_case(const char* name) {
 /**
  * Open a KiTS19 dataset directory, collecting and sorting its case_* subdirectories.
  * Returns NULL if none are found; caller frees via cml_kits19_free.
+ * @param data_dir (const char*)
+ * @return (CMLKiTS19Loader*)
  */
 CMLKiTS19Loader* cml_kits19_open(const char* data_dir) {
     if (!data_dir)
@@ -1129,6 +1193,8 @@ CMLKiTS19Loader* cml_kits19_open(const char* data_dir) {
 
 /**
  * Free a KiTS19 loader and its owned case-directory path strings.
+ * @param loader (CMLKiTS19Loader*)
+ * @return (void)
  */
 void cml_kits19_free(CMLKiTS19Loader* loader) {
     if (!loader)
@@ -1143,6 +1209,11 @@ void cml_kits19_free(CMLKiTS19Loader* loader) {
  * Load one KiTS19 case's imaging.nii and segmentation.nii into newly created tensors
  * (*volume, *segmentation). Returns 0 on success, -1 on bad arguments or a read
  * failure.
+ * @param loader (CMLKiTS19Loader*)
+ * @param case_idx (int)
+ * @param volume (Tensor**)
+ * @param segmentation (Tensor**)
+ * @return (int)
  */
 int cml_kits19_load_case(CMLKiTS19Loader* loader, int case_idx, Tensor** volume,
                          Tensor** segmentation) {
@@ -1184,6 +1255,8 @@ int cml_kits19_load_case(CMLKiTS19Loader* loader, int case_idx, Tensor** volume,
 /**
  * Return non-zero if the filename has a recognized text extension (case-insensitive
  * txt/text/article).
+ * @param name (const char*)
+ * @return (int)
  */
 static int is_text_file(const char* name) {
     const char* ext = strrchr(name, '.');
@@ -1198,6 +1271,9 @@ static int is_text_file(const char* name) {
  * Open an OpenImages dataset, indexing image files by their extension-stripped IDs and
  * stashing the images directory and annotations CSV path for later lookup. Returns
  * NULL if no images are found; caller frees via cml_openimages_free.
+ * @param images_dir (const char*)
+ * @param annotations_csv (const char*)
+ * @return (CMLOpenImagesLoader*)
  */
 CMLOpenImagesLoader* cml_openimages_open(const char* images_dir, const char* annotations_csv) {
     if (!images_dir || !annotations_csv)
@@ -1243,6 +1319,8 @@ CMLOpenImagesLoader* cml_openimages_open(const char* images_dir, const char* ann
 
 /**
  * Free an OpenImages loader and its owned image IDs and path strings.
+ * @param loader (CMLOpenImagesLoader*)
+ * @return (void)
  */
 void cml_openimages_free(CMLOpenImagesLoader* loader) {
     if (!loader)
@@ -1259,6 +1337,8 @@ void cml_openimages_free(CMLOpenImagesLoader* loader) {
  * Open a Wikipedia dump directory, indexing its text article files and summing their
  * total byte size. Returns NULL if no text files are found; caller frees via
  * cml_wikipedia_free.
+ * @param dump_dir (const char*)
+ * @return (CMLWikipediaLoader*)
  */
 CMLWikipediaLoader* cml_wikipedia_open(const char* dump_dir) {
     if (!dump_dir)
@@ -1291,6 +1371,8 @@ CMLWikipediaLoader* cml_wikipedia_open(const char* dump_dir) {
 
 /**
  * Free a Wikipedia loader and its owned article path strings.
+ * @param loader (CMLWikipediaLoader*)
+ * @return (void)
  */
 void cml_wikipedia_free(CMLWikipediaLoader* loader) {
     if (!loader)
@@ -1305,6 +1387,12 @@ void cml_wikipedia_free(CMLWikipediaLoader* loader) {
  * Read up to buf_size-1 bytes of an article into buf, NUL-terminating it and writing
  * the byte count to *bytes_read. Returns 0 on success, -1 on bad arguments or if the
  * file cannot be opened.
+ * @param loader (CMLWikipediaLoader*)
+ * @param article_idx (int)
+ * @param buf (char*)
+ * @param buf_size (size_t)
+ * @param bytes_read (size_t*)
+ * @return (int)
  */
 int cml_wikipedia_read_chunk(CMLWikipediaLoader* loader, int article_idx, char* buf,
                              size_t buf_size, size_t* bytes_read) {
@@ -1326,6 +1414,9 @@ int cml_wikipedia_read_chunk(CMLWikipediaLoader* loader, int article_idx, char* 
 /**
  * Convenience loader that opens an ImageNet-style folder and decodes every image into
  * a single Dataset. Returns NULL on failure; caller owns the Dataset.
+ * @param dir_path (const char*)
+ * @param image_size (int)
+ * @return (Dataset*)
  */
 Dataset* cml_load_image_folder(const char* dir_path, int image_size) {
     CMLImageNetLoader* loader = cml_imagenet_open(dir_path, image_size);

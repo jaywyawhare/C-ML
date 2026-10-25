@@ -25,19 +25,28 @@
  * Capability reporting.  No hand-rolled SIMD remains, so nothing is reported
  * as available; the compiler and the JIT handle vectorization.
  * ---------------------------------------------------------------------- */
-/** Report available SIMD capabilities; always empty since no hand-rolled SIMD remains. */
+/**
+ * Report available SIMD capabilities; always empty since no hand-rolled SIMD remains.
+ * @return (CMLSimdCaps)
+ */
 CMLSimdCaps cml_detect_simd_caps(void) {
     CMLSimdCaps caps = {0};
     return caps;
 }
 
-/** Return the process-wide (empty) capability record. */
+/**
+ * Return the process-wide (empty) capability record.
+ * @return (const CMLSimdCaps*)
+ */
 const CMLSimdCaps* cml_get_simd_caps(void) {
     static CMLSimdCaps caps = {0};
     return &caps;
 }
 
-/** Print a one-line note that vectorization is delegated to the compiler/JIT. */
+/**
+ * Print a one-line note that vectorization is delegated to the compiler/JIT.
+ * @return (void)
+ */
 void cml_print_simd_caps(void) {
     printf("SIMD: portable scalar kernels (vectorized by the compiler / LLVM JIT)\n");
 }
@@ -71,7 +80,13 @@ static inline float fast_expf(float x) {
     return v.f;
 }
 
-/** Element-wise expf; switches to the polynomial fast_expf when CML_FLAG_TRANSCENDENTAL >= 2. */
+/**
+ * Element-wise expf; switches to the polynomial fast_expf when CML_FLAG_TRANSCENDENTAL >= 2.
+ * @param in (const float*)
+ * @param out (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_exp_f32(const float* in, float* out, size_t n) {
     if (!in || !out || n == 0)
         return;
@@ -154,7 +169,14 @@ void simd_transpose_f32(const float* in, float* out, int rows, int cols) {
 /* -------------------------------------------------------------------------
  * Scalar-broadcast helpers.
  * ---------------------------------------------------------------------- */
-/** Add a broadcast scalar to every element: out[i] = a[i] + scalar. */
+/**
+ * Add a broadcast scalar to every element: out[i] = a[i] + scalar.
+ * @param a (const float*)
+ * @param scalar (float)
+ * @param out (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_add_scalar_f32(const float* a, float scalar, float* out, size_t n) {
     if (!a || !out || n == 0)
         return;
@@ -162,7 +184,14 @@ void simd_add_scalar_f32(const float* a, float scalar, float* out, size_t n) {
         out[i] = a[i] + scalar;
 }
 
-/** Multiply every element by a broadcast scalar: out[i] = a[i] * scalar. */
+/**
+ * Multiply every element by a broadcast scalar: out[i] = a[i] * scalar.
+ * @param a (const float*)
+ * @param scalar (float)
+ * @param out (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_mul_scalar_f32(const float* a, float scalar, float* out, size_t n) {
     if (!a || !out || n == 0)
         return;
@@ -173,8 +202,17 @@ void simd_mul_scalar_f32(const float* a, float scalar, float* out, size_t n) {
 /* -------------------------------------------------------------------------
  * Broadcasting elementwise (out[i] = a[i%a_n] op b[i%b_n]).
  * ---------------------------------------------------------------------- */
-/** Broadcasting add with fast paths for scalar, equal-length, and tiled operands;
- *  falls back to modulo indexing (out[i] = a[i%a_n] + b[i%b_n]). */
+/**
+ * Broadcasting add with fast paths for scalar, equal-length, and tiled operands;
+ * falls back to modulo indexing (out[i] = a[i%a_n] + b[i%b_n]).
+ * @param a (const float*)
+ * @param a_n (size_t)
+ * @param b (const float*)
+ * @param b_n (size_t)
+ * @param out (float*)
+ * @param out_n (size_t)
+ * @return (void)
+ */
 void simd_add_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b_n, float* out,
                             size_t out_n) {
     if (!a || !b || !out || out_n == 0)
@@ -204,7 +242,16 @@ void simd_add_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b
     }
 }
 
-/** Broadcasting multiply with the same fast paths as simd_add_broadcast_f32. */
+/**
+ * Broadcasting multiply with the same fast paths as simd_add_broadcast_f32.
+ * @param a (const float*)
+ * @param a_n (size_t)
+ * @param b (const float*)
+ * @param b_n (size_t)
+ * @param out (float*)
+ * @param out_n (size_t)
+ * @return (void)
+ */
 void simd_mul_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b_n, float* out,
                             size_t out_n) {
     if (!a || !b || !out || out_n == 0)
@@ -234,7 +281,16 @@ void simd_mul_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b
     }
 }
 
-/** Broadcasting element-wise maximum with scalar/equal-length/tiled fast paths. */
+/**
+ * Broadcasting element-wise maximum with scalar/equal-length/tiled fast paths.
+ * @param a (const float*)
+ * @param a_n (size_t)
+ * @param b (const float*)
+ * @param b_n (size_t)
+ * @param out (float*)
+ * @param out_n (size_t)
+ * @return (void)
+ */
 void simd_max_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b_n, float* out,
                             size_t out_n) {
     if (!a || !b || !out || out_n == 0)
@@ -272,7 +328,11 @@ void simd_max_broadcast_f32(const float* a, size_t a_n, const float* b, size_t b
 
 static size_t g_parallel_threshold = 10000;
 
-/** Set the element count below which parallel kernels run serially. */
+/**
+ * Set the element count below which parallel kernels run serially.
+ * @param threshold (size_t)
+ * @return (void)
+ */
 void simd_set_parallel_threshold(size_t threshold) { g_parallel_threshold = threshold; }
 
 typedef struct {
@@ -352,7 +412,13 @@ typedef struct {
     size_t chunk;
 } ParallelSumData;
 
-/** Threadpool trampoline: sum one chunk and store it in the thread's partial-sum slot. */
+/**
+ * Threadpool trampoline: sum one chunk and store it in the thread's partial-sum slot.
+ * @param data (void*)
+ * @param start (size_t)
+ * @param end (size_t)
+ * @return (void)
+ */
 static void parallel_sum_task(void* data, size_t start, size_t end) {
     ParallelSumData* d = (ParallelSumData*)data;
     float sum          = simd_sum_float(&d->data[start], end - start);
@@ -364,8 +430,13 @@ static void parallel_sum_task(void* data, size_t start, size_t end) {
         d->partial_sums[idx] = sum;
 }
 
-/** Parallel reduction: per-thread partial sums combined serially; falls back to
- *  simd_sum_float below the threshold or when no threadpool is available. */
+/**
+ * Parallel reduction: per-thread partial sums combined serially; falls back to
+ * simd_sum_float below the threshold or when no threadpool is available.
+ * @param data (const float*)
+ * @param n (size_t)
+ * @return (float)
+ */
 float simd_sum_f32_parallel(const float* data, size_t n) {
     if (!data || n == 0)
         return 0.0f;

@@ -20,13 +20,21 @@ static const int VEC_WIDTHS[]     = {1, 2, 4};
 
 /**
  * Map a kernel hash to a cache slot index (simple modular hash).
+ * @param hash (uint64_t)
+ * @return (int)
  */
 static int cache_slot(uint64_t hash) { return (int)(hash % 256); }
 
-/** True when the BEAM autotuning flag is set to a positive width. */
+/**
+ * True when the BEAM autotuning flag is set to a positive width.
+ * @return (bool)
+ */
 bool cml_beam_search_enabled(void) { return cml_flag(CML_FLAG_BEAM) > 0; }
 
-/** Allocate a beam-search context, taking beam width from the BEAM flag and clearing the cache. */
+/**
+ * Allocate a beam-search context, taking beam width from the BEAM flag and clearing the cache.
+ * @return (CMLBeamSearchCtx*)
+ */
 CMLBeamSearchCtx* cml_beam_search_create(void) {
     CMLBeamSearchCtx* ctx = (CMLBeamSearchCtx*)cml_calloc(1, sizeof(CMLBeamSearchCtx));
     if (!ctx) {
@@ -53,14 +61,24 @@ CMLBeamSearchCtx* cml_beam_search_create(void) {
     return ctx;
 }
 
-/** Free a beam-search context. */
+/**
+ * Free a beam-search context.
+ * @param ctx (CMLBeamSearchCtx*)
+ * @return (void)
+ */
 void cml_beam_search_free(CMLBeamSearchCtx* ctx) {
     if (!ctx)
         return;
     cml_free(ctx);
 }
 
-/** Probe the cache for a tuned config by kernel hash; returns 0 on hit, -1 on miss. */
+/**
+ * Probe the cache for a tuned config by kernel hash; returns 0 on hit, -1 on miss.
+ * @param ctx (CMLBeamSearchCtx*)
+ * @param kernel_hash (uint64_t)
+ * @param best_out (CMLBeamConfig*)
+ * @return (int)
+ */
 int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, CMLBeamConfig* best_out) {
     if (!ctx || !best_out)
         return -1;
@@ -92,7 +110,14 @@ int cml_beam_search_lookup(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, CMLBeamC
     return -1; /* Cache full and key not found. */
 }
 
-/** Cache a tuned config for a kernel hash, overwriting an existing entry only if faster. */
+/**
+ * Cache a tuned config for a kernel hash, overwriting an existing entry only if faster.
+ * @param ctx (CMLBeamSearchCtx*)
+ * @param kernel_hash (uint64_t)
+ * @param config (const CMLBeamConfig*)
+ * @param time_us (double)
+ * @return (int)
+ */
 int cml_beam_search_store(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, const CMLBeamConfig* config,
                           double time_us) {
     if (!ctx || !config)
@@ -145,6 +170,9 @@ int cml_beam_search_store(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, const CML
  * sqrt(total_elements) (a reasonable initial approximation for occupancy),
  * multiplied by penalties for excessively large unroll or vec_width
  * relative to the problem size.
+ * @param cfg (const CMLBeamConfig*)
+ * @param total_elements (size_t)
+ * @return (double)
  */
 static double heuristic_score(const CMLBeamConfig* cfg, size_t total_elements) {
     double ideal_block = sqrt((double)total_elements);
@@ -174,9 +202,12 @@ static double heuristic_score(const CMLBeamConfig* cfg, size_t total_elements) {
  * Estimate execution time for a candidate on the CPU.
  *
  * Since there is no actual GPU to time, we use a simple throughput model:
- *   time ~ total_elements / (block_size * vec_width * unroll_factor)
+ * time ~ total_elements / (block_size * vec_width * unroll_factor)
  *
  * The result is in arbitrary units -- only the *relative* ordering matters.
+ * @param cfg (const CMLBeamConfig*)
+ * @param total_elements (size_t)
+ * @return (double)
  */
 static double estimate_time_cpu(const CMLBeamConfig* cfg, size_t total_elements) {
     double throughput =
@@ -189,6 +220,9 @@ static double estimate_time_cpu(const CMLBeamConfig* cfg, size_t total_elements)
 /**
  * Sort helper -- used to rank candidates by their heuristic score.
  * We stash the score in time_us temporarily during candidate generation.
+ * @param a (const void*)
+ * @param b (const void*)
+ * @return (int)
  */
 static int cmp_beam_result(const void* a, const void* b) {
     const CMLBeamResult* ra = (const CMLBeamResult*)a;
@@ -381,7 +415,12 @@ int cml_beam_search_tune_hw(CMLBeamSearchCtx* ctx, uint64_t kernel_hash, size_t 
     return 0;
 }
 
-/** Serialize the tuning cache (magic header + occupied entries) to `path`. */
+/**
+ * Serialize the tuning cache (magic header + occupied entries) to `path`.
+ * @param ctx (CMLBeamSearchCtx*)
+ * @param path (const char*)
+ * @return (int)
+ */
 int cml_beam_cache_save(CMLBeamSearchCtx* ctx, const char* path) {
     if (!ctx || !path)
         return -1;
@@ -411,7 +450,12 @@ int cml_beam_cache_save(CMLBeamSearchCtx* ctx, const char* path) {
     return 0;
 }
 
-/** Load a previously saved tuning cache from `path`, validating the magic header. */
+/**
+ * Load a previously saved tuning cache from `path`, validating the magic header.
+ * @param ctx (CMLBeamSearchCtx*)
+ * @param path (const char*)
+ * @return (int)
+ */
 int cml_beam_cache_load(CMLBeamSearchCtx* ctx, const char* path) {
     if (!ctx || !path)
         return -1;

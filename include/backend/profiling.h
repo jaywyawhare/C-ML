@@ -63,8 +63,11 @@ double profiler_timer_stop(Timer* timer);
 double profiler_timer_elapsed(Timer* timer);
 void profiler_timer_reset(Timer* timer);
 
-/** Monotonic clock reading in milliseconds (CLOCK_MONOTONIC); 0.0 if the clock
- *  read fails. Shared wall-clock source for timing across subsystems. */
+/**
+ * Monotonic clock reading in milliseconds (CLOCK_MONOTONIC); 0.0 if the clock
+ * read fails. Shared wall-clock source for timing across subsystems.
+ * @return (double)
+ */
 double cml_monotonic_ms(void);
 
 Profiler* profiler_create(void);
@@ -77,28 +80,53 @@ double profiler_get_total_time(Profiler* profiler, const char* name);
 
 /* --- Nestable aggregated scopes (inclusive vs self time + memory) --------- */
 
-/** Open a scope named `name`. Every begin must be matched by one end; scopes
- *  may nest up to CML_PROF_MAX_DEPTH. Stats accumulate per name. Returns 0, or
- *  -1 if the profiler is disabled, the stack is full, or on allocation failure. */
+/**
+ * Open a scope named `name`. Every begin must be matched by one end; scopes
+ * may nest up to CML_PROF_MAX_DEPTH. Stats accumulate per name. Returns 0, or
+ * -1 if the profiler is disabled, the stack is full, or on allocation failure.
+ * @param profiler (Profiler*)
+ * @param name (const char*)
+ * @return (int)
+ */
 int profiler_scope_begin(Profiler* profiler, const char* name);
 
-/** Close the innermost open scope, folding its inclusive time into its parent's
- *  child time and updating the named stat (count, inclusive/self time, min/max,
- *  and allocator activity recorded between its begin and end). */
+/**
+ * Close the innermost open scope, folding its inclusive time into its parent's
+ * child time and updating the named stat (count, inclusive/self time, min/max,
+ * and allocator activity recorded between its begin and end).
+ * @param profiler (Profiler*)
+ * @return (void)
+ */
 void profiler_scope_end(Profiler* profiler);
 
-/** Aggregated stat for `name`, or NULL if no scope by that name has closed. */
+/**
+ * Aggregated stat for `name`, or NULL if no scope by that name has closed.
+ * @param profiler (const Profiler*)
+ * @param name (const char*)
+ * @return (const ProfileStat*)
+ */
 const ProfileStat* profiler_find_stat(const Profiler* profiler, const char* name);
 
-/** Write the aggregated scope stats to `path` as JSON. Returns 0, or -1. */
+/**
+ * Write the aggregated scope stats to `path` as JSON. Returns 0, or -1.
+ * @param profiler (Profiler*)
+ * @param path (const char*)
+ * @return (int)
+ */
 int profiler_write_json(Profiler* profiler, const char* path);
 
-/** Process-global profiler, created on first use. Enabled iff $CML_PROFILE is
- *  set to a non-zero value (or profiler_set_enabled is called on it). Intended
- *  for the main thread. */
+/**
+ * Process-global profiler, created on first use. Enabled iff $CML_PROFILE is
+ * set to a non-zero value (or profiler_set_enabled is called on it). Intended
+ * for the main thread.
+ * @return (Profiler*)
+ */
 Profiler* cml_profiler_default(void);
 
-/** Print the default profiler's report (no-op if it was never used). */
+/**
+ * Print the default profiler's report (no-op if it was never used).
+ * @return (void)
+ */
 void cml_profiler_report(void);
 
 /** Scope the default profiler around a block: CML_PROFILE_BEGIN("x"); ...; CML_PROFILE_END(); */

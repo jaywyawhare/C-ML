@@ -5,7 +5,13 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
-/** Create an IndexMap holding a (retained) flat-index expression and optional validity mask. */
+/**
+ * Create an IndexMap holding a (retained) flat-index expression and optional validity mask.
+ * @param flat_index (SymExpr*)
+ * @param valid (SymExpr*)
+ * @param num_vars (int)
+ * @return (IndexMap*)
+ */
 IndexMap* index_map_create(SymExpr* flat_index, SymExpr* valid, int num_vars) {
     if (!flat_index)
         return NULL;
@@ -22,7 +28,11 @@ IndexMap* index_map_create(SymExpr* flat_index, SymExpr* valid, int num_vars) {
     return im;
 }
 
-/** Release the index/validity expressions and free the IndexMap. */
+/**
+ * Release the index/validity expressions and free the IndexMap.
+ * @param im (IndexMap*)
+ * @return (void)
+ */
 void index_map_free(IndexMap* im) {
     if (!im)
         return;
@@ -32,14 +42,23 @@ void index_map_free(IndexMap* im) {
     cml_free(im);
 }
 
-/** Shallow copy that re-retains the shared symbolic expressions. */
+/**
+ * Shallow copy that re-retains the shared symbolic expressions.
+ * @param im (const IndexMap*)
+ * @return (IndexMap*)
+ */
 IndexMap* index_map_copy(const IndexMap* im) {
     if (!im)
         return NULL;
     return index_map_create(im->flat_index, im->valid, im->num_vars);
 }
 
-/** Build `n` loop variables idx0..idx(n-1), each ranging over its axis extent. */
+/**
+ * Build `n` loop variables idx0..idx(n-1), each ranging over its axis extent.
+ * @param shape (const int*)
+ * @param n (int)
+ * @return (LoopVar*)
+ */
 LoopVar* loop_vars_create(const int* shape, int n) {
     if (!shape || n <= 0)
         return NULL;
@@ -62,7 +81,12 @@ LoopVar* loop_vars_create(const int* shape, int n) {
     return vars;
 }
 
-/** Release each loop variable's symbolic expression and free the array. */
+/**
+ * Release each loop variable's symbolic expression and free the array.
+ * @param vars (LoopVar*)
+ * @param n (int)
+ * @return (void)
+ */
 void loop_vars_free(LoopVar* vars, int n) {
     if (!vars)
         return;
@@ -71,7 +95,13 @@ void loop_vars_free(LoopVar* vars, int n) {
     cml_free(vars);
 }
 
-/** Symbolic flat offset for a view: offset + sum(idx_i * stride_i) over its dims. */
+/**
+ * Symbolic flat offset for a view: offset + sum(idx_i * stride_i) over its dims.
+ * @param v (const STView*)
+ * @param vars (const LoopVar*)
+ * @param nvars (int)
+ * @return (SymExpr*)
+ */
 static SymExpr* view_flat_index(const STView* v, const LoopVar* vars, int nvars) {
     SymExpr* acc = sym_const((int64_t)v->offset);
     for (int i = 0; i < v->ndim && i < nvars; ++i) {
@@ -88,7 +118,13 @@ static SymExpr* view_flat_index(const STView* v, const LoopVar* vars, int nvars)
     return acc;
 }
 
-/** Symbolic validity mask for a masked view: min of per-axis in-bounds guards, or NULL. */
+/**
+ * Symbolic validity mask for a masked view: min of per-axis in-bounds guards, or NULL.
+ * @param v (const STView*)
+ * @param vars (const LoopVar*)
+ * @param nvars (int)
+ * @return (SymExpr*)
+ */
 static SymExpr* view_valid_expr(const STView* v, const LoopVar* vars, int nvars) {
     if (!v->has_mask)
         return NULL;
@@ -136,7 +172,13 @@ static SymExpr* view_valid_expr(const STView* v, const LoopVar* vars, int nvars)
     return acc;
 }
 
-/** Build the index map for a ShapeTracker's final view from the given loop vars. */
+/**
+ * Build the index map for a ShapeTracker's final view from the given loop vars.
+ * @param st (const ShapeTracker*)
+ * @param loop_vars (const LoopVar*)
+ * @param num_vars (int)
+ * @return (IndexMap*)
+ */
 IndexMap* schedule_build_index_map(const ShapeTracker* st, const LoopVar* loop_vars, int num_vars) {
     if (!st || !loop_vars || num_vars <= 0)
         return NULL;
@@ -153,7 +195,13 @@ IndexMap* schedule_build_index_map(const ShapeTracker* st, const LoopVar* loop_v
     return im;
 }
 
-/** Like schedule_build_index_map but algebraically simplifies the flat/valid expressions. */
+/**
+ * Like schedule_build_index_map but algebraically simplifies the flat/valid expressions.
+ * @param st (const ShapeTracker*)
+ * @param loop_vars (const LoopVar*)
+ * @param num_vars (int)
+ * @return (IndexMap*)
+ */
 IndexMap* schedule_build_index_map_simplified(const ShapeTracker* st, const LoopVar* loop_vars,
                                               int num_vars) {
     IndexMap* im = schedule_build_index_map(st, loop_vars, num_vars);
@@ -170,7 +218,17 @@ IndexMap* schedule_build_index_map_simplified(const ShapeTracker* st, const Loop
     return im;
 }
 
-/** Render the flat-index and validity (default "1") expressions as C strings; 0 on success. */
+/**
+ * Render the flat-index and validity (default "1") expressions as C strings; 0 on success.
+ * @param im (const IndexMap*)
+ * @param var_names (const char* const*)
+ * @param num_vars (int)
+ * @param index_buf (char*)
+ * @param index_buf_size (size_t)
+ * @param valid_buf (char*)
+ * @param valid_buf_size (size_t)
+ * @return (int)
+ */
 int index_map_to_c(const IndexMap* im, const char* const* var_names, int num_vars, char* index_buf,
                    size_t index_buf_size, char* valid_buf, size_t valid_buf_size) {
     if (!im || !var_names || !index_buf || index_buf_size == 0)
@@ -193,7 +251,12 @@ int index_map_to_c(const IndexMap* im, const char* const* var_names, int num_var
     return 0;
 }
 
-/** Compose two index maps by adding their offsets and anding their validity masks. */
+/**
+ * Compose two index maps by adding their offsets and anding their validity masks.
+ * @param outer (const IndexMap*)
+ * @param inner (const IndexMap*)
+ * @return (IndexMap*)
+ */
 IndexMap* index_map_compose(const IndexMap* outer, const IndexMap* inner) {
     if (!outer || !inner)
         return NULL;
@@ -215,7 +278,11 @@ IndexMap* index_map_compose(const IndexMap* outer, const IndexMap* inner) {
     return im;
 }
 
-/** Debug-print an IndexMap's flat/valid expressions and variable count to stderr. */
+/**
+ * Debug-print an IndexMap's flat/valid expressions and variable count to stderr.
+ * @param im (const IndexMap*)
+ * @return (void)
+ */
 void index_map_print(const IndexMap* im) {
     if (!im) {
         fprintf(stderr, "IndexMap(NULL)\n");

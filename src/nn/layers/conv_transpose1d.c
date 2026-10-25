@@ -9,8 +9,13 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** torch.nn.ConvTranspose1d forward: fractionally-strided conv of a 3D input [N, C_in, L],
- *  lowered to a height-1 ConvTranspose2d. NULL on rank/channel mismatch or non-positive output. */
+/**
+ * torch.nn.ConvTranspose1d forward: fractionally-strided conv of a 3D input [N, C_in, L],
+ * lowered to a height-1 ConvTranspose2d. NULL on rank/channel mismatch or non-positive output.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
     ConvTranspose1d* layer = (ConvTranspose1d*)module;
 
@@ -87,7 +92,11 @@ static Tensor* conv_transpose1d_forward(Module* module, Tensor* input) {
     return uop_reshape(y4, &ro);
 }
 
-/** Free the ConvTranspose1d module; owned parameters are released by module_free. */
+/**
+ * Free the ConvTranspose1d module; owned parameters are released by module_free.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void conv_transpose1d_free(Module* module) {
     ConvTranspose1d* layer = (ConvTranspose1d*)module;
     if (!layer)
@@ -95,8 +104,20 @@ static void conv_transpose1d_free(Module* module) {
     cml_free(layer);
 }
 
-/** Construct a ConvTranspose1d; weight [in_channels, out_channels, kernel_size] is Kaiming-init,
- *  bias (zeros) added when use_bias. Returns NULL on failure. */
+/**
+ * Construct a ConvTranspose1d; weight [in_channels, out_channels, kernel_size] is Kaiming-init,
+ * bias (zeros) added when use_bias. Returns NULL on failure.
+ * @param in_channels (int)
+ * @param out_channels (int)
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @param padding (int)
+ * @param output_padding (int)
+ * @param use_bias (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (ConvTranspose1d*)
+ */
 ConvTranspose1d* nn_conv_transpose1d(int in_channels, int out_channels, int kernel_size, int stride,
                                      int padding, int output_padding, bool use_bias, DType dtype,
                                      DeviceType device) {

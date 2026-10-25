@@ -62,9 +62,14 @@ typedef struct {
     size_t actual_epochs;   // Actual number of epochs completed (after early stopping)
 } TrainingMetrics;
 
-/** Materialised float data of `t` plus its element count; `numel` is recomputed
+/**
+ * Materialised float data of `t` plus its element count; `numel` is recomputed
  * from the shape when the tensor has not cached it. NULL when `t` is not
- * float32 or has no data. */
+ * float32 or has no data.
+ * @param t (Tensor*)
+ * @param num_elements (size_t*)
+ * @return (float*)
+ */
 float* cml_tensor_float_buffer(Tensor* t, size_t* num_elements);
 
 TrainingMetrics* training_metrics_create(size_t num_epochs);
@@ -72,8 +77,19 @@ void training_metrics_start_epoch(TrainingMetrics* metrics);
 void training_metrics_record_epoch(TrainingMetrics* metrics, size_t epoch, float loss,
                                    float accuracy);
 
-/** Record train plus optional test/val loss and accuracy for `epoch`. A split is recorded only
- * when its loss and accuracy are both finite and non-negative: pass NAN for one that is absent. */
+/**
+ * Record train plus optional test/val loss and accuracy for `epoch`. A split is recorded only
+ * when its loss and accuracy are both finite and non-negative: pass NAN for one that is absent.
+ * @param metrics (TrainingMetrics*)
+ * @param epoch (size_t)
+ * @param train_loss (float)
+ * @param train_accuracy (float)
+ * @param test_loss (float)
+ * @param test_accuracy (float)
+ * @param val_loss (float)
+ * @param val_accuracy (float)
+ * @return (void)
+ */
 void training_metrics_record_epoch_full(TrainingMetrics* metrics, size_t epoch, float train_loss,
                                         float train_accuracy, float test_loss, float test_accuracy,
                                         float val_loss, float val_accuracy);
@@ -87,13 +103,26 @@ void training_metrics_set_gradient_norm(TrainingMetrics* metrics, float grad_nor
 float training_metrics_calculate_gradient_norm(TrainingMetrics* metrics, void** parameters,
                                                int num_parameters);
 
-/** Summarise the weight and gradient populations for `epoch`. Call once per
- * epoch, after backward; skipped cheaply when the arrays were never allocated. */
+/**
+ * Summarise the weight and gradient populations for `epoch`. Call once per
+ * epoch, after backward; skipped cheaply when the arrays were never allocated.
+ * @param metrics (TrainingMetrics*)
+ * @param epoch (size_t)
+ * @param parameters (void**)
+ * @param num_parameters (int)
+ * @return (void)
+ */
 void training_metrics_record_distributions(TrainingMetrics* metrics, size_t epoch,
                                            void** parameters, int num_parameters);
 
-/** Write the metrics as JSON to `path`; `incremental` marks the run as still training. Returns 0
- * on success (and under NO_EXPORT), negative on error. */
+/**
+ * Write the metrics as JSON to `path`; `incremental` marks the run as still training. Returns 0
+ * on success (and under NO_EXPORT), negative on error.
+ * @param metrics (const TrainingMetrics*)
+ * @param path (const char*)
+ * @param incremental (bool)
+ * @return (int)
+ */
 int training_metrics_export_json(const TrainingMetrics* metrics, const char* path,
                                  bool incremental);
 int training_metrics_export_epoch_update(const TrainingMetrics* metrics, size_t epoch,
@@ -105,6 +134,15 @@ void training_metrics_log(TrainingMetrics* metrics, size_t epoch);
 /**
  * Training step helper: forward pass, loss, backward, optimizer step,
  * and automatic metrics recording.
+ * @param model (Module*)
+ * @param X (Tensor*)
+ * @param y (Tensor*)
+ * @param loss_fn (Tensor* (*)(Tensor*, Tensor*))
+ * @param optimizer (Optimizer*)
+ * @param epoch (size_t)
+ * @param loss_out (float*)
+ * @param accuracy_out (float*)
+ * @return (int)
  */
 int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn)(Tensor*, Tensor*),
                           Optimizer* optimizer, size_t epoch, float* loss_out, float* accuracy_out);
@@ -117,10 +155,17 @@ void training_metrics_auto_capture_optimizer(Optimizer* optimizer);
  * Classification losses call this with (prediction, target) so the metrics layer
  * can auto-compute per-epoch accuracy during loss capture. The pointers are kept
  * until the next loss capture reads them, or until either tensor is freed.
+ * @param prediction (Tensor*)
+ * @param target (Tensor*)
+ * @return (void)
  */
 void training_metrics_note_prediction(Tensor* prediction, Tensor* target);
 void training_metrics_init_global(void);
-/** Drop any capture state pointing at @p obj (a Module or Tensor) before it is freed. */
+/**
+ * Drop any capture state pointing at @p obj (a Module or Tensor) before it is freed.
+ * @param obj (const void*)
+ * @return (void)
+ */
 void training_metrics_forget(const void* obj);
 void training_metrics_cleanup_global(void);
 void training_metrics_mark_zero_grad(void);
@@ -142,6 +187,7 @@ void training_metrics_mark_early_stop(size_t actual_epochs);
  * never moves and every epoch overwrites the first slot. Under automatic epoch
  * detection, call it once at the end of training, since tracking there
  * increments on the NEXT zero_grad call and the final epoch would be missed.
+ * @return (void)
  */
 void training_metrics_complete_epoch(void);
 

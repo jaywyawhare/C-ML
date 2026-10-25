@@ -11,8 +11,15 @@
 #include "tensor/tensor.h"
 #include "alloc/cml_allocator.h"
 
-/** Build a UOP_SGD_STEP node (optional momentum input) so the in-place parameter update
- *  is scheduled with the graph; result inherits `param`'s shape/dtype/device. */
+/**
+ * Build a UOP_SGD_STEP node (optional momentum input) so the in-place parameter update
+ * is scheduled with the graph; result inherits `param`'s shape/dtype/device.
+ * @param param (Tensor*)
+ * @param grad (Tensor*)
+ * @param momentum_buf (Tensor*)
+ * @param p (SgdStepParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_sgd_step(Tensor* param, Tensor* grad, Tensor* momentum_buf, SgdStepParams* p) {
     if (!param || !grad || !p)
         return NULL;
@@ -43,8 +50,17 @@ Tensor* uop_sgd_step(Tensor* param, Tensor* grad, Tensor* momentum_buf, SgdStepP
     return cml_uop_finish_source_node(ir, param->shape, param->ndim, param->dtype, param->device);
 }
 
-/** Build a UOP_ADAM_STEP node; the optional `max_exp_avg_sq` input enables AMSGrad.
- *  Result inherits `param`'s shape/dtype/device. */
+/**
+ * Build a UOP_ADAM_STEP node; the optional `max_exp_avg_sq` input enables AMSGrad.
+ * Result inherits `param`'s shape/dtype/device.
+ * @param param (Tensor*)
+ * @param grad (Tensor*)
+ * @param exp_avg (Tensor*)
+ * @param exp_avg_sq (Tensor*)
+ * @param max_exp_avg_sq (Tensor*)
+ * @param p (AdamStepParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_adam_step(Tensor* param, Tensor* grad, Tensor* exp_avg, Tensor* exp_avg_sq,
                       Tensor* max_exp_avg_sq, AdamStepParams* p) {
     if (!param || !grad || !exp_avg || !exp_avg_sq || !p)

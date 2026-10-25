@@ -26,42 +26,97 @@ extern "C" {
 
 /* --- Accessors (direct struct field access) --- */
 
-/** Fast Tensor.retain: bump ref_count with no null check (t must be non-NULL). */
+/**
+ * Fast Tensor.retain: bump ref_count with no null check (t must be non-NULL).
+ * @param t (Tensor*)
+ * @return (void)
+ */
 static inline void torch_tensor_retain_fast(Tensor* t) { t->ref_count++; }
 
-/** Fast Tensor.dim() via direct field access. */
+/**
+ * Fast Tensor.dim() via direct field access.
+ * @param t (const Tensor*)
+ * @return (int)
+ */
 static inline int torch_tensor_ndim_fast(const Tensor* t) { return t->ndim; }
 
-/** Fast Tensor.numel() via direct field access. */
+/**
+ * Fast Tensor.numel() via direct field access.
+ * @param t (const Tensor*)
+ * @return (size_t)
+ */
 static inline size_t torch_tensor_numel_fast(const Tensor* t) { return t->numel; }
 
-/** Fast Tensor.dtype via direct field access. */
+/**
+ * Fast Tensor.dtype via direct field access.
+ * @param t (const Tensor*)
+ * @return (DType)
+ */
 static inline DType torch_tensor_dtype_fast(const Tensor* t) { return t->dtype; }
 
-/** Fast Tensor.device via direct field access. */
+/**
+ * Fast Tensor.device via direct field access.
+ * @param t (const Tensor*)
+ * @return (DeviceType)
+ */
 static inline DeviceType torch_tensor_device_fast(const Tensor* t) { return t->device; }
 
-/** Fast Tensor.is_contiguous() via direct field access. */
+/**
+ * Fast Tensor.is_contiguous() via direct field access.
+ * @param t (const Tensor*)
+ * @return (bool)
+ */
 static inline bool torch_tensor_is_contiguous_fast(const Tensor* t) { return t->is_contiguous; }
 
-/** Fast Tensor.requires_grad via direct field access. */
+/**
+ * Fast Tensor.requires_grad via direct field access.
+ * @param t (const Tensor*)
+ * @return (bool)
+ */
 static inline bool torch_tensor_requires_grad_fast(const Tensor* t) { return t->requires_grad; }
 
-/** Fast Tensor.size(): direct pointer to the shape array. */
+/**
+ * Fast Tensor.size(): direct pointer to the shape array.
+ * @param t (const Tensor*)
+ * @return (const int*)
+ */
 static inline const int* torch_tensor_sizes_fast(const Tensor* t) { return t->shape; }
 
-/** Fast Tensor.data_ptr() with no realize/error handling. */
+/**
+ * Fast Tensor.data_ptr() with no realize/error handling.
+ * @param t (Tensor*)
+ * @return (void*)
+ */
 static inline void* torch_tensor_data_ptr_fast(Tensor* t) { return tensor_data_ptr(t); }
 
 /* --- Hot tensor ops (skip cml_* wrapper layer) --- */
 
-/** torch.add() hot path skipping the cml_* wrapper layer. */
+/**
+ * torch.add() hot path skipping the cml_* wrapper layer.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 static inline Tensor* torch_add_fast(Tensor* a, Tensor* b) { return tensor_add(a, b); }
-/** torch.mul() hot path skipping the cml_* wrapper layer. */
+/**
+ * torch.mul() hot path skipping the cml_* wrapper layer.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 static inline Tensor* torch_mul_fast(Tensor* a, Tensor* b) { return tensor_mul(a, b); }
-/** torch.matmul() hot path skipping the cml_* wrapper layer. */
+/**
+ * torch.matmul() hot path skipping the cml_* wrapper layer.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 static inline Tensor* torch_matmul_fast(Tensor* a, Tensor* b) { return tensor_matmul(a, b); }
-/** torch.relu() hot path skipping the cml_* wrapper layer. */
+/**
+ * torch.relu() hot path skipping the cml_* wrapper layer.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 static inline Tensor* torch_relu_fast(Tensor* a) { return tensor_relu(a); }
 
 #ifdef __cplusplus

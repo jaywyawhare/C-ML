@@ -25,8 +25,12 @@
 #define CUDA_SUCCESS 0
 #define CU_STREAM_CAPTURE_MODE_GLOBAL 0
 
-/** Resolve the cuGraph* capture/replay entry points from the already-loaded CUDA
- * driver library. Returns -1 if any are missing (needs CUDA 10+). */
+/**
+ * Resolve the cuGraph* capture/replay entry points from the already-loaded CUDA
+ * driver library. Returns -1 if any are missing (needs CUDA 10+).
+ * @param gb (CMLCUDAGraphBackend*)
+ * @return (int)
+ */
 static int load_graph_symbols(CMLCUDAGraphBackend* gb) {
     if (gb->symbols_loaded)
         return 0;
@@ -54,8 +58,12 @@ static int load_graph_symbols(CMLCUDAGraphBackend* gb) {
     return 0;
 }
 
-/** Create a graph-replay wrapper over an initialized CUDA backend. Symbol loading
- * failure is non-fatal; replay simply stays unavailable. */
+/**
+ * Create a graph-replay wrapper over an initialized CUDA backend. Symbol loading
+ * failure is non-fatal; replay simply stays unavailable.
+ * @param backend (CMLCUDABackend*)
+ * @return (CMLCUDAGraphBackend*)
+ */
 CMLCUDAGraphBackend* cml_cuda_graph_backend_create(CMLCUDABackend* backend) {
     if (!backend || !backend->initialized)
         return NULL;
@@ -73,15 +81,23 @@ CMLCUDAGraphBackend* cml_cuda_graph_backend_create(CMLCUDABackend* backend) {
     return gb;
 }
 
-/** Free the graph-replay wrapper. Does not own the underlying CUDA backend. */
+/**
+ * Free the graph-replay wrapper. Does not own the underlying CUDA backend.
+ * @param gb (CMLCUDAGraphBackend*)
+ * @return (void)
+ */
 void cml_cuda_graph_backend_free(CMLCUDAGraphBackend* gb) {
     if (!gb)
         return;
     cml_free(gb);
 }
 
-/** Begin stream capture so subsequent launches are recorded into a graph rather
- * than executed. Requires a non-default stream. */
+/**
+ * Begin stream capture so subsequent launches are recorded into a graph rather
+ * than executed. Requires a non-default stream.
+ * @param gb (CMLCUDAGraphBackend*)
+ * @return (int)
+ */
 int cml_cuda_graph_begin_capture(CMLCUDAGraphBackend* gb) {
     if (!gb || !gb->symbols_loaded)
         return -1;
@@ -104,8 +120,13 @@ int cml_cuda_graph_begin_capture(CMLCUDAGraphBackend* gb) {
     return 0;
 }
 
-/** End stream capture and instantiate the captured graph into an executable, ready
- * for replay. Fills `out` with the graph, instance, and destroy hooks. */
+/**
+ * End stream capture and instantiate the captured graph into an executable, ready
+ * for replay. Fills `out` with the graph, instance, and destroy hooks.
+ * @param gb (CMLCUDAGraphBackend*)
+ * @param out (CMLCapturedGraph*)
+ * @return (int)
+ */
 int cml_cuda_graph_end_capture(CMLCUDAGraphBackend* gb, CMLCapturedGraph* out) {
     if (!gb || !gb->symbols_loaded || !gb->capture_active || !out)
         return -1;
@@ -143,8 +164,13 @@ int cml_cuda_graph_end_capture(CMLCUDAGraphBackend* gb, CMLCapturedGraph* out) {
     return 0;
 }
 
-/** Launch a previously captured executable graph, re-running the whole recorded
- * sequence in one submission. Bumps the replay counter. */
+/**
+ * Launch a previously captured executable graph, re-running the whole recorded
+ * sequence in one submission. Bumps the replay counter.
+ * @param gb (CMLCUDAGraphBackend*)
+ * @param graph (CMLCapturedGraph*)
+ * @return (int)
+ */
 int cml_cuda_graph_replay(CMLCUDAGraphBackend* gb, CMLCapturedGraph* graph) {
     if (!gb || !gb->symbols_loaded || !graph)
         return -1;
@@ -162,8 +188,12 @@ int cml_cuda_graph_replay(CMLCUDAGraphBackend* gb, CMLCapturedGraph* graph) {
     return 0;
 }
 
-/** Release a captured graph's GPU resources via its stored destroy hooks (exec
- * before graph, since the exec depends on the graph). */
+/**
+ * Release a captured graph's GPU resources via its stored destroy hooks (exec
+ * before graph, since the exec depends on the graph).
+ * @param graph (CMLCapturedGraph*)
+ * @return (void)
+ */
 void cml_cuda_graph_free(CMLCapturedGraph* graph) {
     if (!graph)
         return;
@@ -188,7 +218,11 @@ typedef struct CUDAGraphCaptureCtx {
     CMLCapturedGraph* target;
 } CUDAGraphCaptureCtx;
 
-/** graph_capture.c dispatch hook: begin capture on the context's graph backend. */
+/**
+ * graph_capture.c dispatch hook: begin capture on the context's graph backend.
+ * @param ctx (void*)
+ * @return (int)
+ */
 int cml_cuda_graph_capture_begin(void* ctx) {
     CUDAGraphCaptureCtx* c = ctx;
     if (!c || !c->gb)
@@ -196,7 +230,11 @@ int cml_cuda_graph_capture_begin(void* ctx) {
     return cml_cuda_graph_begin_capture(c->gb);
 }
 
-/** graph_capture.c dispatch hook: end capture into the context's target graph. */
+/**
+ * graph_capture.c dispatch hook: end capture into the context's target graph.
+ * @param ctx (void*)
+ * @return (int)
+ */
 int cml_cuda_graph_capture_end(void* ctx) {
     CUDAGraphCaptureCtx* c = ctx;
     if (!c || !c->gb || !c->target)
@@ -204,7 +242,11 @@ int cml_cuda_graph_capture_end(void* ctx) {
     return cml_cuda_graph_end_capture(c->gb, c->target);
 }
 
-/** graph_capture.c dispatch hook: replay the context's target graph. */
+/**
+ * graph_capture.c dispatch hook: replay the context's target graph.
+ * @param ctx (void*)
+ * @return (int)
+ */
 int cml_cuda_graph_capture_replay(void* ctx) {
     CUDAGraphCaptureCtx* c = ctx;
     if (!c || !c->gb || !c->target)
@@ -212,7 +254,11 @@ int cml_cuda_graph_capture_replay(void* ctx) {
     return cml_cuda_graph_replay(c->gb, c->target);
 }
 
-/** graph_capture.c dispatch hook: free the captured graph and the context itself. */
+/**
+ * graph_capture.c dispatch hook: free the captured graph and the context itself.
+ * @param ctx (void*)
+ * @return (void)
+ */
 void cml_cuda_graph_capture_free(void* ctx) {
     CUDAGraphCaptureCtx* c = ctx;
     if (!c)

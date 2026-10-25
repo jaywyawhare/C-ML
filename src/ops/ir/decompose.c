@@ -30,7 +30,10 @@ static struct IRNode* insert_fill_node(CMLGraph_t ir, int* shape, int ndim, floa
 static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
                                     struct IRNode* chain_head, struct IRNode* chain_tail);
 
-/** Generate a unique "_dN" name for an intermediate tensor (caller frees). */
+/**
+ * Generate a unique "_dN" name for an intermediate tensor (caller frees).
+ * @return (char*)
+ */
 static char* decompose_unique_name(void) {
     int id     = atomic_fetch_add(&g_decompose_counter, 1);
     char* name = cml_malloc(32);
@@ -230,6 +233,11 @@ static struct IRNode* insert_fill_node(CMLGraph_t ir, int* shape, int ndim, floa
  *
  * The chain is inserted before `original` in the linked list, then `original`
  * is removed.
+ * @param ir (CMLGraph_t)
+ * @param original (struct IRNode*)
+ * @param chain_head (struct IRNode*)
+ * @param chain_tail (struct IRNode*)
+ * @return (void)
  */
 static void replace_node_with_chain(CMLGraph_t ir, struct IRNode* original,
                                     struct IRNode* chain_head, struct IRNode* chain_tail) {
@@ -346,7 +354,12 @@ static struct IRNode* chain_fill(CMLGraph_t ir, struct IRNode** head, struct IRN
 
 // Decomposition Rules
 
-/** SIGMOID: recip(1 + exp(-x)) */
+/**
+ * SIGMOID: recip(1 + exp(-x))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_sigmoid(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -390,7 +403,12 @@ static int decompose_sigmoid(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** TANH: 2 * sigmoid(2x) - 1 */
+/**
+ * TANH: 2 * sigmoid(2x) - 1
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_tanh(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -463,7 +481,12 @@ static int decompose_tanh(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** ABS: where(x < 0, -x, x) */
+/**
+ * ABS: where(x < 0, -x, x)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_abs(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -499,7 +522,12 @@ static int decompose_abs(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** RELU: max(x, 0) */
+/**
+ * RELU: max(x, 0)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_relu(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -521,7 +549,12 @@ static int decompose_relu(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** SILU / SWISH: x * sigmoid(x) = x * recip(1 + exp(-x)) */
+/**
+ * SILU / SWISH: x * sigmoid(x) = x * recip(1 + exp(-x))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_silu(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x           = node->inputs[0];
     int* shape          = x->shape;
@@ -590,7 +623,12 @@ static int decompose_gelu(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** RELU6: min(max(x, 0), 6) = where(max(x,0) < 6, max(x,0), 6) */
+/**
+ * RELU6: min(max(x, 0), 6) = where(max(x,0) < 6, max(x,0), 6)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_relu6(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x           = node->inputs[0];
     int* shape          = x->shape;
@@ -624,7 +662,12 @@ static int decompose_relu6(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** HARDSWISH: x * clamp(x+3, 0, 6) / 6 */
+/**
+ * HARDSWISH: x * clamp(x+3, 0, 6) / 6
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_hardswish(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x        = node->inputs[0];
     int* s           = x->shape;
@@ -682,7 +725,12 @@ static int decompose_hardswish(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** MISH: x * tanh(softplus(x)); softplus = log(1+exp(x)); tanh(y) = 2/(1+exp(-2y)) - 1 */
+/**
+ * MISH: x * tanh(softplus(x)); softplus = log(1+exp(x)); tanh(y) = 2/(1+exp(-2y)) - 1
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_mish(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x        = node->inputs[0];
     int* s           = x->shape;
@@ -752,7 +800,12 @@ static int decompose_mish(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** SQUARE: x * x */
+/**
+ * SQUARE: x * x
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_square(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -770,7 +823,12 @@ static int decompose_square(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** RSQRT: recip(sqrt(x)) */
+/**
+ * RSQRT: recip(sqrt(x))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_rsqrt(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -791,7 +849,12 @@ static int decompose_rsqrt(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** COS: sin(x + pi/2) */
+/**
+ * COS: sin(x + pi/2)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_cos(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -818,7 +881,12 @@ static int decompose_cos(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** TAN: sin(x) / sin(x + pi/2) */
+/**
+ * TAN: sin(x) / sin(x + pi/2)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_tan(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -858,7 +926,12 @@ static int decompose_tan(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** LOG2: log(x) / log(2) */
+/**
+ * LOG2: log(x) / log(2)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_log2(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -886,7 +959,12 @@ static int decompose_log2(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** EXP2: exp(x * log(2)) */
+/**
+ * EXP2: exp(x * log(2))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_exp2(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -913,7 +991,12 @@ static int decompose_exp2(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** SIGN: where(x > 0, 1, where(x < 0, -1, 0)) */
+/**
+ * SIGN: where(x > 0, 1, where(x < 0, -1, 0))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_sign(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -994,7 +1077,12 @@ static struct IRNode* chain_cmpeq(CMLGraph_t ir, struct IRNode** head, struct IR
     return chain_emit(ir, head, tail, UOP_WHERE, outer_inputs, 3, NULL, shape, ndim);
 }
 
-/** CMPEQ: build an equality test from primitive comparisons via chain_cmpeq. */
+/**
+ * CMPEQ: build an equality test from primitive comparisons via chain_cmpeq.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_cmpeq(CMLGraph_t ir, struct IRNode* node) {
     int* shape = node->output ? node->output->shape : node->output_shape;
     int ndim   = node->output ? node->output->ndim : node->output_ndim;
@@ -1007,7 +1095,12 @@ static int decompose_cmpeq(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** CMPNE: 1 - cmpeq(a, b)  => decompose to primitives directly */
+/**
+ * CMPNE: 1 - cmpeq(a, b)  => decompose to primitives directly
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_cmpne(CMLGraph_t ir, struct IRNode* node) {
     int* shape = node->output ? node->output->shape : node->output_shape;
     int ndim   = node->output ? node->output->ndim : node->output_ndim;
@@ -1027,7 +1120,12 @@ static int decompose_cmpne(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** CMPLE: 1 - cmplt(b, a) */
+/**
+ * CMPLE: 1 - cmplt(b, a)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_cmple(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a  = node->inputs[0];
     Tensor* b  = node->inputs[1];
@@ -1057,7 +1155,12 @@ static int decompose_cmple(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** CMPGT: cmplt(b, a) */
+/**
+ * CMPGT: cmplt(b, a)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_cmpgt(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a  = node->inputs[0];
     Tensor* b  = node->inputs[1];
@@ -1075,7 +1178,12 @@ static int decompose_cmpgt(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** CMPGE: 1 - cmplt(a, b) */
+/**
+ * CMPGE: 1 - cmplt(a, b)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_cmpge(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a  = node->inputs[0];
     Tensor* b  = node->inputs[1];
@@ -1103,7 +1211,12 @@ static int decompose_cmpge(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** MINIMUM: where(a < b, a, b) */
+/**
+ * MINIMUM: where(a < b, a, b)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_minimum(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a  = node->inputs[0];
     Tensor* b  = node->inputs[1];
@@ -1128,7 +1241,12 @@ static int decompose_minimum(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** LOG10: log(x) * (1/log(10)) */
+/**
+ * LOG10: log(x) * (1/log(10))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_log10(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -1154,7 +1272,12 @@ static int decompose_log10(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** LOGADDEXP: max(a,b) + log(1 + exp(-|a-b|)) */
+/**
+ * LOGADDEXP: max(a,b) + log(1 + exp(-|a-b|))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_logaddexp(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a  = node->inputs[0];
     Tensor* b  = node->inputs[1];
@@ -1239,7 +1362,12 @@ static int decompose_logaddexp(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** MOD: a - floor(a/b) * b */
+/**
+ * MOD: a - floor(a/b) * b
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_mod(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a  = node->inputs[0];
     Tensor* b  = node->inputs[1];
@@ -1279,7 +1407,12 @@ static int decompose_mod(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** IDIV: floor(a / b) */
+/**
+ * IDIV: floor(a / b)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_idiv(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a  = node->inputs[0];
     Tensor* b  = node->inputs[1];
@@ -1306,6 +1439,9 @@ static int decompose_idiv(CMLGraph_t ir, struct IRNode* node) {
 /**
  * COPYSIGN: abs(a) * sign(b) => where(a<0,-a,a) * where(b>0,1,where(b<0,-1,0))
  * Simplified: where(b >= 0, abs(a), -abs(a))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
  */
 static int decompose_copysign(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a  = node->inputs[0];
@@ -1362,7 +1498,12 @@ static int decompose_copysign(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** MEAN: sum(x) / n */
+/**
+ * MEAN: sum(x) / n
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_mean(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x      = node->inputs[0];
     int* out_shape = node->output ? node->output->shape : node->output_shape;
@@ -1440,7 +1581,12 @@ static int decompose_mean(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** MIN_REDUCE: neg(max_reduce(neg(x))) */
+/**
+ * MIN_REDUCE: neg(max_reduce(neg(x)))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_min_reduce(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x      = node->inputs[0];
     int* out_shape = node->output ? node->output->shape : node->output_shape;
@@ -1505,6 +1651,9 @@ static int decompose_min_reduce(CMLGraph_t ir, struct IRNode* node) {
  * Simplified: we treat nonzero as true. where(x < 0 OR 0 < x, 0, 1)
  * Even simpler: use CMPEQ with 0, which gives 1 where x==0 and 0 where x!=0
  * But CMPEQ itself gets decomposed. So: where(x < 0, 0, where(0 < x, 0, 1))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
  */
 static int decompose_logical_not(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
@@ -1567,6 +1716,9 @@ static int decompose_logical_not(CMLGraph_t ir, struct IRNode* node) {
  * Simplified: where(a != 0, where(b != 0, 1, 0), 0)
  * But cmpne gets decomposed. Use: treat a directly as condition for WHERE
  * (WHERE checks cond != 0), so: where(a, where(b, 1, 0), 0) works directly
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
  */
 static int decompose_logical_and(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a  = node->inputs[0];
@@ -1606,7 +1758,12 @@ static int decompose_logical_and(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** LOGICAL_OR: where(a, 1, where(b, 1, 0)) */
+/**
+ * LOGICAL_OR: where(a, 1, where(b, 1, 0))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_logical_or(CMLGraph_t ir, struct IRNode* node) {
     Tensor* a  = node->inputs[0];
     Tensor* b  = node->inputs[1];
@@ -1648,6 +1805,9 @@ static int decompose_logical_or(CMLGraph_t ir, struct IRNode* node) {
 /**
  * CLAMP: where(x < min, min, where(x > max, max, x))
  * = where(x < min, min, where(max < x, max, x))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
  */
 static int decompose_clamp(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
@@ -1700,7 +1860,12 @@ static int decompose_clamp(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** SINH: (exp(x) - exp(-x)) / 2 */
+/**
+ * SINH: (exp(x) - exp(-x)) / 2
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_sinh(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -1741,7 +1906,12 @@ static int decompose_sinh(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** COSH: (exp(x) + exp(-x)) / 2 */
+/**
+ * COSH: (exp(x) + exp(-x)) / 2
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_cosh(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -1782,7 +1952,12 @@ static int decompose_cosh(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** ATANH: 0.5 * log((1+x)/(1-x)) */
+/**
+ * ATANH: 0.5 * log((1+x)/(1-x))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_atanh(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -1840,7 +2015,12 @@ static int decompose_atanh(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** SOFTPLUS: log(1 + exp(x)) */
+/**
+ * SOFTPLUS: log(1 + exp(x))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_softplus(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -1871,7 +2051,12 @@ static int decompose_softplus(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** LOGSIGMOID: log(sigmoid(x)) = -softplus(-x) = -log(1 + exp(-x)) */
+/**
+ * LOGSIGMOID: log(sigmoid(x)) = -softplus(-x) = -log(1 + exp(-x))
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_logsigmoid(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -1912,7 +2097,12 @@ static int decompose_logsigmoid(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** ERFC: 1 - erf(x) */
+/**
+ * ERFC: 1 - erf(x)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_erfc(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x  = node->inputs[0];
     int* shape = x->shape;
@@ -1938,7 +2128,12 @@ static int decompose_erfc(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** malloc a ReduceParams copy from src with a chosen keepdim (node takes ownership) */
+/**
+ * malloc a ReduceParams copy from src with a chosen keepdim (node takes ownership)
+ * @param src (const ReduceParams*)
+ * @param keepdim (bool)
+ * @return (ReduceParams*)
+ */
 static ReduceParams* dup_reduce_params(const ReduceParams* src, bool keepdim) {
     ReduceParams* p = cml_malloc(sizeof(ReduceParams));
     if (!p)
@@ -2066,7 +2261,12 @@ static struct IRNode* build_variance(CMLGraph_t ir, struct IRNode* node, struct 
     return var;
 }
 
-/** VAR: mean((x - mean(x))^2)  [biased, matches the executor] */
+/**
+ * VAR: mean((x - mean(x))^2)  [biased, matches the executor]
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_var(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
     struct IRNode* var = build_variance(ir, node, &head, &tail);
@@ -2076,7 +2276,12 @@ static int decompose_var(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** STD: sqrt(var) */
+/**
+ * STD: sqrt(var)
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_std(CMLGraph_t ir, struct IRNode* node) {
     struct IRNode *head = NULL, *tail = NULL;
     struct IRNode* var = build_variance(ir, node, &head, &tail);
@@ -2091,7 +2296,14 @@ static int decompose_std(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** ELU: where(0<x, x, alpha*(exp(x)-1)), optionally scaled (SELU). */
+/**
+ * ELU: where(0<x, x, alpha*(exp(x)-1)), optionally scaled (SELU).
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @param alpha (float)
+ * @param scale (float)
+ * @return (int)
+ */
 static int decompose_elu_impl(CMLGraph_t ir, struct IRNode* node, float alpha, float scale) {
     Tensor* x        = node->inputs[0];
     int* s           = x->shape;
@@ -2152,19 +2364,34 @@ static int decompose_elu_impl(CMLGraph_t ir, struct IRNode* node, float alpha, f
     return 0;
 }
 
-/** ELU: unscaled elu via decompose_elu_impl (alpha from params, scale 1). */
+/**
+ * ELU: unscaled elu via decompose_elu_impl (alpha from params, scale 1).
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_elu(CMLGraph_t ir, struct IRNode* node) {
     ClampParams* cp = (ClampParams*)node->params;
     float alpha     = cp ? cp->min_val : 1.0f;
     return decompose_elu_impl(ir, node, alpha, 1.0f);
 }
 
-/** SELU: scale * elu(x, alpha) with the standard SELU constants. */
+/**
+ * SELU: scale * elu(x, alpha) with the standard SELU constants.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_selu(CMLGraph_t ir, struct IRNode* node) {
     return decompose_elu_impl(ir, node, 1.6732632423543772f, 1.0507009873554805f);
 }
 
-/** CELU: where(0<x, x, alpha*(exp(x/alpha)-1)). */
+/**
+ * CELU: where(0<x, x, alpha*(exp(x/alpha)-1)).
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_celu(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x       = node->inputs[0];
     int* s          = x->shape;
@@ -2225,7 +2452,12 @@ static int decompose_celu(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** SOFTSIGN: x / (1 + |x|);  |x| = max(x, -x). */
+/**
+ * SOFTSIGN: x / (1 + |x|);  |x| = max(x, -x).
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_softsign(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x        = node->inputs[0];
     int* s           = x->shape;
@@ -2260,7 +2492,12 @@ static int decompose_softsign(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** NEG: x * (-1). */
+/**
+ * NEG: x * (-1).
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_neg(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x        = node->inputs[0];
     int* s           = x->shape;
@@ -2279,7 +2516,12 @@ static int decompose_neg(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** SUB: a + (b * -1). Same broadcast semantics as the SUB kernel (ADD/MUL share it). */
+/**
+ * SUB: a + (b * -1). Same broadcast semantics as the SUB kernel (ADD/MUL share it).
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_sub(CMLGraph_t ir, struct IRNode* node) {
     if (node->num_inputs < 2)
         return 0;
@@ -2308,7 +2550,12 @@ static int decompose_sub(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** DIV: a * recip(b). */
+/**
+ * DIV: a * recip(b).
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_div(CMLGraph_t ir, struct IRNode* node) {
     if (node->num_inputs < 2)
         return 0;
@@ -2332,7 +2579,12 @@ static int decompose_div(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** FLATTEN: a reshape to the node's (already-computed) output shape. */
+/**
+ * FLATTEN: a reshape to the node's (already-computed) output shape.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_flatten(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x = node->inputs[0];
     int* os   = node->output ? node->output->shape : node->output_shape;
@@ -2470,6 +2722,10 @@ static struct IRNode* insert_reduce_last(CMLGraph_t ir, Tensor* in, int nd, UOpT
  * reduce(kw) → permute → (avg: * 1/(kh*kw)). Uses only movement + reduce
  * primitives, so backward is automatic. Returns -1 to leave the node for the
  * executor fallback (exotic dilation / ceil_mode / count_exclude_pad cases).
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @param is_max (bool)
+ * @return (int)
  */
 static int decompose_pool2d(CMLGraph_t ir, struct IRNode* node, bool is_max) {
     Tensor* x = node->inputs[0];
@@ -2580,11 +2836,21 @@ static int decompose_pool2d(CMLGraph_t ir, struct IRNode* node, bool is_max) {
     return 0;
 }
 
-/** MAXPOOL2D: delegate to the shared pool2d decomposition in max mode. */
+/**
+ * MAXPOOL2D: delegate to the shared pool2d decomposition in max mode.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_maxpool2d(CMLGraph_t ir, struct IRNode* node) {
     return decompose_pool2d(ir, node, true);
 }
-/** AVGPOOL2D: delegate to the shared pool2d decomposition in average mode. */
+/**
+ * AVGPOOL2D: delegate to the shared pool2d decomposition in average mode.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_avgpool2d(CMLGraph_t ir, struct IRNode* node) {
     return decompose_pool2d(ir, node, false);
 }
@@ -2640,6 +2906,9 @@ static struct IRNode* insert_expand(CMLGraph_t ir, Tensor* in, const int* new_sh
  * → matmul with reshaped/transposed weight → reshape → permute → (+bias).
  * MATMUL is kept as the one hardware-GEMM primitive. Clean case only
  * (dilation=1, groups=1); otherwise leaves the node for the executor.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
  */
 static int decompose_conv2d(CMLGraph_t ir, struct IRNode* node) {
     /* Conv2d is kept whole in every mode: the executor runs a direct / Winograd
@@ -2656,6 +2925,9 @@ static int decompose_conv2d(CMLGraph_t ir, struct IRNode* node) {
  * CONV3D → im2col via three unfolds (W,H,D) → matmul → reshape → permute →
  * (+bias). Same construction as conv2d with an extra depth axis. Clean case
  * only (dilation=1); otherwise leaves the node for the executor.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
  */
 static int decompose_conv3d(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x    = node->inputs[0];
@@ -2793,6 +3065,9 @@ static int decompose_conv3d(CMLGraph_t ir, struct IRNode* node) {
  * separable FOLD (col2im, scatter to output) → shrink off padding → (+bias).
  * The adjoint of the conv2d im2col. Clean case only (dilation=1,
  * output_padding=0); otherwise leaves the node for the executor.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
  */
 static int decompose_conv_transpose2d(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x    = node->inputs[0]; // [N,Cin,H,W]
@@ -2917,7 +3192,12 @@ static int decompose_conv_transpose2d(CMLGraph_t ir, struct IRNode* node) {
     return 0;
 }
 
-/** CONV_TRANSPOSE3D → matmul → three separable FOLDs (W,H,D) → shrink → (+bias). */
+/**
+ * CONV_TRANSPOSE3D → matmul → three separable FOLDs (W,H,D) → shrink → (+bias).
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int decompose_conv_transpose3d(CMLGraph_t ir, struct IRNode* node) {
     Tensor* x    = node->inputs[0]; // [N,Cin,D,H,W]
     Tensor* w    = node->inputs[1]; // [Cin,Cout,kd,kh,kw]
@@ -3052,6 +3332,9 @@ static int decompose_conv_transpose3d(CMLGraph_t ir, struct IRNode* node) {
 /**
  * Run the decomposition pass from `start` to a fixpoint, repeatedly lowering
  * composite ops to primitives (since some rules emit further composites).
+ * @param ir (CMLGraph_t)
+ * @param start (struct IRNode*)
+ * @return (int)
  */
 static int decompose_scan(CMLGraph_t ir, struct IRNode* start) {
     LOG_DEBUG("Running IR decomposition pass");
@@ -3335,7 +3618,11 @@ static int decompose_scan(CMLGraph_t ir, struct IRNode* start) {
     return 0;
 }
 
-/** Decompose the whole graph to primitives (no-op if already decomposed). */
+/**
+ * Decompose the whole graph to primitives (no-op if already decomposed).
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_decompose(CMLGraph_t ir) {
     if (!ir)
         return -1;
@@ -3344,7 +3631,12 @@ int cml_ir_decompose(CMLGraph_t ir) {
     return decompose_scan(ir, ir->head);
 }
 
-/** Decompose only the subgraph starting at `start` (used for incremental lowering). */
+/**
+ * Decompose only the subgraph starting at `start` (used for incremental lowering).
+ * @param ir (CMLGraph_t)
+ * @param start (struct IRNode*)
+ * @return (int)
+ */
 int cml_ir_decompose_from(CMLGraph_t ir, struct IRNode* start) {
     if (!ir)
         return -1;

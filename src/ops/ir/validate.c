@@ -7,7 +7,10 @@
 #include <stdarg.h>
 #include "alloc/cml_allocator.h"
 
-/** Default validation options: check shapes, dtypes, and cycles; skip dead-code. */
+/**
+ * Default validation options: check shapes, dtypes, and cycles; skip dead-code.
+ * @return (CMLValidateOpts)
+ */
 CMLValidateOpts cml_validate_default_opts(void) {
     CMLValidateOpts o;
     o.check_shapes = true;
@@ -21,6 +24,14 @@ CMLValidateOpts cml_validate_default_opts(void) {
 /**
  * Record a formatted diagnostic, always bumping the count but only writing into
  * `diags` while there is room (respecting max_diags).
+ * @param diags (CMLValidateDiag*)
+ * @param max_diags (int)
+ * @param count (int*)
+ * @param code (CMLValidateCode)
+ * @param node_idx (int)
+ * @param fmt (const char*)
+ * @param ... variadic arguments
+ * @return (void)
  */
 static void push_diag(CMLValidateDiag* diags, int max_diags, int* count, CMLValidateCode code,
                       int node_idx, const char* fmt, ...) {
@@ -56,7 +67,11 @@ static struct IRNode** collect_nodes(CMLGraph_t ir, int* out_count) {
     return arr;
 }
 
-/** Expected input count for an op, or -1 if the op has no fixed arity. */
+/**
+ * Expected input count for an op, or -1 if the op has no fixed arity.
+ * @param t (UOpType)
+ * @return (int)
+ */
 static int expected_inputs(UOpType t) {
     switch (t) {
     case UOP_ADD:
@@ -119,12 +134,24 @@ static int expected_inputs(UOpType t) {
     }
 }
 
-/** True if the op takes exactly two inputs. */
+/**
+ * True if the op takes exactly two inputs.
+ * @param t (UOpType)
+ * @return (bool)
+ */
 static bool is_binary(UOpType t) { return expected_inputs(t) == 2; }
 
 /**
  * Three-color DFS over the data dependency edges; records a diagnostic and
  * returns true if a back-edge (cycle) is found.
+ * @param arr (struct IRNode**)
+ * @param n (int)
+ * @param color (uint8_t*)
+ * @param idx (int)
+ * @param diags (CMLValidateDiag*)
+ * @param max_diags (int)
+ * @param ndiags (int*)
+ * @return (bool)
  */
 static bool dfs_has_cycle(struct IRNode** arr, int n, uint8_t* color, int idx,
                           CMLValidateDiag* diags, int max_diags, int* ndiags) {
@@ -156,6 +183,12 @@ static bool dfs_has_cycle(struct IRNode** arr, int n, uint8_t* color, int idx,
 /**
  * Validate an IR graph (null/empty, node arity, cycles, dtype and shape checks
  * per opts), filling `diags` and returning the first error code encountered.
+ * @param ir (CMLGraph_t)
+ * @param opts (const CMLValidateOpts*)
+ * @param diags (CMLValidateDiag*)
+ * @param max_diag_count (int)
+ * @param num_diags_out (int*)
+ * @return (CMLValidateCode)
  */
 CMLValidateCode cml_validate_graph(CMLGraph_t ir, const CMLValidateOpts* opts,
                                    CMLValidateDiag* diags, int max_diag_count, int* num_diags_out) {
@@ -261,7 +294,11 @@ done:
 #undef RECORD
 }
 
-/** Validate with default options, printing diagnostics and returning false on failure. */
+/**
+ * Validate with default options, printing diagnostics and returning false on failure.
+ * @param ir (CMLGraph_t)
+ * @return (bool)
+ */
 bool cml_validate_graph_or_die(CMLGraph_t ir) {
     CMLValidateDiag diags[32];
     int ndiags         = 0;
@@ -274,7 +311,12 @@ bool cml_validate_graph_or_die(CMLGraph_t ir) {
     return true;
 }
 
-/** Print each diagnostic to stderr with its node index, code, and message. */
+/**
+ * Print each diagnostic to stderr with its node index, code, and message.
+ * @param diags (const CMLValidateDiag*)
+ * @param num_diags (int)
+ * @return (void)
+ */
 void cml_validate_print_diags(const CMLValidateDiag* diags, int num_diags) {
     for (int i = 0; i < num_diags; ++i) {
         const CMLValidateDiag* d = &diags[i];
@@ -283,7 +325,11 @@ void cml_validate_print_diags(const CMLValidateDiag* diags, int num_diags) {
     }
 }
 
-/** Short string name for a validation result code. */
+/**
+ * Short string name for a validation result code.
+ * @param code (CMLValidateCode)
+ * @return (const char*)
+ */
 const char* cml_validate_code_str(CMLValidateCode code) {
     switch (code) {
     case CML_VALID_OK:

@@ -54,8 +54,13 @@ typedef struct {
 } DiskUring;
 #endif
 
-/** Create a disk backend rooted at base_path; for async mode, set up the
- *  io_uring ring when available, otherwise warn and fall back to sync reads. */
+/**
+ * Create a disk backend rooted at base_path; for async mode, set up the
+ * io_uring ring when available, otherwise warn and fall back to sync reads.
+ * @param base_path (const char*)
+ * @param mode (CMLDiskIOMode)
+ * @return (CMLDiskBackend*)
+ */
 CMLDiskBackend* cml_disk_backend_create(const char* base_path, CMLDiskIOMode mode) {
     if (!base_path)
         return NULL;
@@ -95,7 +100,11 @@ CMLDiskBackend* cml_disk_backend_create(const char* base_path, CMLDiskIOMode mod
     return b;
 }
 
-/** Close any pending io_uring fds, tear down the ring, and free the backend. */
+/**
+ * Close any pending io_uring fds, tear down the ring, and free the backend.
+ * @param backend (CMLDiskBackend*)
+ * @return (void)
+ */
 void cml_disk_backend_free(CMLDiskBackend* backend) {
     if (!backend)
         return;
@@ -113,7 +122,13 @@ void cml_disk_backend_free(CMLDiskBackend* backend) {
     cml_free(backend);
 }
 
-/** Serialize a tensor to "<name>.cml_tensor" with a header plus raw dtype bytes. */
+/**
+ * Serialize a tensor to "<name>.cml_tensor" with a header plus raw dtype bytes.
+ * @param backend (CMLDiskBackend*)
+ * @param name (const char*)
+ * @param tensor (Tensor*)
+ * @return (int)
+ */
 int cml_disk_save_tensor(CMLDiskBackend* backend, const char* name, Tensor* tensor) {
     if (!backend || !name || !tensor || backend->read_only)
         return -1;
@@ -159,8 +174,13 @@ int cml_disk_save_tensor(CMLDiskBackend* backend, const char* name, Tensor* tens
     return 0;
 }
 
-/** Load a tensor saved by cml_disk_save_tensor, validating the header and
- *  honoring the recorded dtype. */
+/**
+ * Load a tensor saved by cml_disk_save_tensor, validating the header and
+ * honoring the recorded dtype.
+ * @param backend (CMLDiskBackend*)
+ * @param name (const char*)
+ * @return (Tensor*)
+ */
 Tensor* cml_disk_load_tensor(CMLDiskBackend* backend, const char* name) {
     if (!backend || !name)
         return NULL;
@@ -232,8 +252,13 @@ Tensor* cml_disk_load_tensor(CMLDiskBackend* backend, const char* name) {
     return t;
 }
 
-/** Open a saved tensor as a lazily-mapped CMLDiskTensor, mmap'ing the file where
- *  supported and recording metadata for a stdio fallback otherwise. */
+/**
+ * Open a saved tensor as a lazily-mapped CMLDiskTensor, mmap'ing the file where
+ * supported and recording metadata for a stdio fallback otherwise.
+ * @param backend (CMLDiskBackend*)
+ * @param name (const char*)
+ * @return (CMLDiskTensor*)
+ */
 CMLDiskTensor* cml_disk_mmap_tensor(CMLDiskBackend* backend, const char* name) {
     if (!backend || !name)
         return NULL;
@@ -286,7 +311,14 @@ CMLDiskTensor* cml_disk_mmap_tensor(CMLDiskBackend* backend, const char* name) {
     return dt;
 }
 
-/** Read a byte range from a disk tensor, from the mapping or via stdio fallback. */
+/**
+ * Read a byte range from a disk tensor, from the mapping or via stdio fallback.
+ * @param dt (CMLDiskTensor*)
+ * @param buffer (void*)
+ * @param offset (size_t)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_disk_tensor_read(CMLDiskTensor* dt, void* buffer, size_t offset, size_t size) {
     if (!dt || !buffer)
         return -1;
@@ -309,7 +341,11 @@ int cml_disk_tensor_read(CMLDiskTensor* dt, void* buffer, size_t offset, size_t 
     return read_count == size ? 0 : -1;
 }
 
-/** Unmap a disk tensor's memory mapping if one is active. */
+/**
+ * Unmap a disk tensor's memory mapping if one is active.
+ * @param dt (CMLDiskTensor*)
+ * @return (void)
+ */
 void cml_disk_tensor_unmap(CMLDiskTensor* dt) {
     if (!dt)
         return;
@@ -322,7 +358,11 @@ void cml_disk_tensor_unmap(CMLDiskTensor* dt) {
 #endif
 }
 
-/** Unmap and free a disk tensor and its path string. */
+/**
+ * Unmap and free a disk tensor and its path string.
+ * @param dt (CMLDiskTensor*)
+ * @return (void)
+ */
 void cml_disk_tensor_free(CMLDiskTensor* dt) {
     if (!dt)
         return;
@@ -331,7 +371,11 @@ void cml_disk_tensor_free(CMLDiskTensor* dt) {
     cml_free(dt);
 }
 
-/** Materialize a disk tensor into an in-memory Tensor, copying its data. */
+/**
+ * Materialize a disk tensor into an in-memory Tensor, copying its data.
+ * @param dt (CMLDiskTensor*)
+ * @return (Tensor*)
+ */
 Tensor* cml_disk_tensor_to_tensor(CMLDiskTensor* dt) {
     if (!dt)
         return NULL;
@@ -347,8 +391,15 @@ Tensor* cml_disk_tensor_to_tensor(CMLDiskTensor* dt) {
     return t;
 }
 
-/** Queue an async read of a saved tensor's data via io_uring, or read it
- *  synchronously when io_uring is unavailable. */
+/**
+ * Queue an async read of a saved tensor's data via io_uring, or read it
+ * synchronously when io_uring is unavailable.
+ * @param backend (CMLDiskBackend*)
+ * @param name (const char*)
+ * @param buffer (void*)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_disk_async_read(CMLDiskBackend* backend, const char* name, void* buffer, size_t size) {
     if (!backend || !name || !buffer)
         return -1;
@@ -415,8 +466,12 @@ int cml_disk_async_read(CMLDiskBackend* backend, const char* name, void* buffer,
     return read_count == size ? 0 : -1;
 }
 
-/** Block until all outstanding io_uring reads complete, detecting short reads;
- *  a no-op on the synchronous path. */
+/**
+ * Block until all outstanding io_uring reads complete, detecting short reads;
+ * a no-op on the synchronous path.
+ * @param backend (CMLDiskBackend*)
+ * @return (int)
+ */
 int cml_disk_wait(CMLDiskBackend* backend) {
     if (!backend)
         return -1;
@@ -458,7 +513,15 @@ int cml_disk_wait(CMLDiskBackend* backend) {
     return 0;
 }
 
-/** Report cumulative read/write byte and operation counters via out-params. */
+/**
+ * Report cumulative read/write byte and operation counters via out-params.
+ * @param backend (const CMLDiskBackend*)
+ * @param bytes_read (uint64_t*)
+ * @param bytes_written (uint64_t*)
+ * @param num_reads (uint64_t*)
+ * @param num_writes (uint64_t*)
+ * @return (void)
+ */
 void cml_disk_backend_stats(const CMLDiskBackend* backend, uint64_t* bytes_read,
                             uint64_t* bytes_written, uint64_t* num_reads, uint64_t* num_writes) {
     if (!backend)
@@ -473,7 +536,11 @@ void cml_disk_backend_stats(const CMLDiskBackend* backend, uint64_t* bytes_read,
         *num_writes = backend->num_writes;
 }
 
-/** Print the disk backend's configuration and I/O statistics. */
+/**
+ * Print the disk backend's configuration and I/O statistics.
+ * @param backend (const CMLDiskBackend*)
+ * @return (void)
+ */
 void cml_disk_backend_print(const CMLDiskBackend* backend) {
     if (!backend) {
         printf("DiskBackend: NULL\n");

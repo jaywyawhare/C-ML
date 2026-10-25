@@ -2,10 +2,19 @@
 #include <stdio.h>
 #include <string.h>
 
-/** True for SIMD lane counts the backends can emit (powers of two, 1..16). */
+/**
+ * True for SIMD lane counts the backends can emit (powers of two, 1..16).
+ * @param n (int)
+ * @return (bool)
+ */
 static bool is_valid_width(int n) { return n == 1 || n == 2 || n == 4 || n == 8 || n == 16; }
 
-/** Build a vector dtype of `n` lanes; clamps an unsupported width to 0 (invalid). */
+/**
+ * Build a vector dtype of `n` lanes; clamps an unsupported width to 0 (invalid).
+ * @param d (DType)
+ * @param n (int)
+ * @return (VecDType)
+ */
 VecDType dtype_vec(DType d, int n) {
     VecDType vt;
     vt.scalar = d;
@@ -13,7 +22,11 @@ VecDType dtype_vec(DType d, int n) {
     return vt;
 }
 
-/** Whether the backends can represent this vector type; fp8 caps at 2 lanes, bool at 1. */
+/**
+ * Whether the backends can represent this vector type; fp8 caps at 2 lanes, bool at 1.
+ * @param vt (VecDType)
+ * @return (bool)
+ */
 bool dtype_vec_valid(VecDType vt) {
     if (!is_valid_width(vt.n))
         return false;
@@ -26,10 +39,18 @@ bool dtype_vec_valid(VecDType vt) {
     return true;
 }
 
-/** Total byte size of the packed vector (scalar size times lane count). */
+/**
+ * Total byte size of the packed vector (scalar size times lane count).
+ * @param vt (VecDType)
+ * @return (size_t)
+ */
 size_t dtype_vec_size(VecDType vt) { return cml_dtype_size(vt.scalar) * (size_t)vt.n; }
 
-/** Natural alignment for the vector: the size rounded up to a power of two, capped at 16. */
+/**
+ * Natural alignment for the vector: the size rounded up to a power of two, capped at 16.
+ * @param vt (VecDType)
+ * @return (size_t)
+ */
 size_t dtype_vec_alignment(VecDType vt) {
     size_t sz = dtype_vec_size(vt);
 
@@ -39,7 +60,11 @@ size_t dtype_vec_alignment(VecDType vt) {
     return align;
 }
 
-/** C/OpenCL scalar type name for a dtype; "unknown" for unhandled dtypes. */
+/**
+ * C/OpenCL scalar type name for a dtype; "unknown" for unhandled dtypes.
+ * @param d (DType)
+ * @return (const char*)
+ */
 static const char* dtype_c_base(DType d) {
     switch (d) {
     case DTYPE_FLOAT32:
@@ -81,7 +106,11 @@ static const char* dtype_c_base(DType d) {
     }
 }
 
-/** Kernel-source type name for the vector (e.g. "float4"); "" if unsupported. */
+/**
+ * Kernel-source type name for the vector (e.g. "float4"); "" if unsupported.
+ * @param vt (VecDType)
+ * @return (const char*)
+ */
 const char* dtype_vec_c_name(VecDType vt) {
     if (!dtype_vec_valid(vt))
         return "";
@@ -149,7 +178,11 @@ const char* dtype_vec_c_name(VecDType vt) {
     return "";
 }
 
-/** Double the lane count, or return `vt` unchanged if that would exceed the valid widths. */
+/**
+ * Double the lane count, or return `vt` unchanged if that would exceed the valid widths.
+ * @param vt (VecDType)
+ * @return (VecDType)
+ */
 VecDType dtype_vec_widen(VecDType vt) {
     int new_n = vt.n * 2;
     if (!is_valid_width(new_n))
@@ -157,7 +190,11 @@ VecDType dtype_vec_widen(VecDType vt) {
     return dtype_vec(vt.scalar, new_n);
 }
 
-/** Halve the lane count, flooring at a single scalar lane. */
+/**
+ * Halve the lane count, flooring at a single scalar lane.
+ * @param vt (VecDType)
+ * @return (VecDType)
+ */
 VecDType dtype_vec_narrow(VecDType vt) {
     int new_n = vt.n / 2;
     if (new_n < 1)
@@ -165,7 +202,11 @@ VecDType dtype_vec_narrow(VecDType vt) {
     return dtype_vec(vt.scalar, new_n);
 }
 
-/** Widest lane count the backends support for this scalar dtype. */
+/**
+ * Widest lane count the backends support for this scalar dtype.
+ * @param d (DType)
+ * @return (int)
+ */
 int dtype_vec_max_width(DType d) {
     switch (d) {
     case DTYPE_FLOAT32:
@@ -192,8 +233,15 @@ int dtype_vec_max_width(DType d) {
     }
 }
 
-/** Emit a kernel expression broadcasting `val` across all lanes into `buf`.
- *  Returns 0 on success, -1 on a bad buffer or unrepresentable vector type. */
+/**
+ * Emit a kernel expression broadcasting `val` across all lanes into `buf`.
+ * Returns 0 on success, -1 on a bad buffer or unrepresentable vector type.
+ * @param vt (VecDType)
+ * @param val (double)
+ * @param buf (char*)
+ * @param buf_size (size_t)
+ * @return (int)
+ */
 int dtype_vec_splat(VecDType vt, double val, char* buf, size_t buf_size) {
     if (!buf || buf_size == 0)
         return -1;
@@ -205,8 +253,16 @@ int dtype_vec_splat(VecDType vt, double val, char* buf, size_t buf_size) {
     return snprintf(buf, buf_size, "(%s)(%g)", tname, val) < 0 ? -1 : 0;
 }
 
-/** Emit a kernel expression selecting one lane of `vec_name` (.x/.y/.z/.w or .sN) into `buf`.
- *  Returns 0 on success, -1 on a bad buffer or out-of-range lane. */
+/**
+ * Emit a kernel expression selecting one lane of `vec_name` (.x/.y/.z/.w or .sN) into `buf`.
+ * Returns 0 on success, -1 on a bad buffer or out-of-range lane.
+ * @param vt (VecDType)
+ * @param lane (int)
+ * @param vec_name (const char*)
+ * @param buf (char*)
+ * @param buf_size (size_t)
+ * @return (int)
+ */
 int dtype_vec_lane(VecDType vt, int lane, const char* vec_name, char* buf, size_t buf_size) {
     if (!buf || buf_size == 0 || !vec_name)
         return -1;

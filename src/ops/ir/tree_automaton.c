@@ -36,15 +36,29 @@ struct CMLAutomaton {
     int wildcard_state;
 };
 
-/** Seed an FNV-1a hash. */
+/**
+ * Seed an FNV-1a hash.
+ * @return (uint64_t)
+ */
 static uint64_t fnv1a_init(void) { return CML_FNV_OFFSET_BASIS; }
 
-/** Fold one int into an FNV-1a running hash. */
+/**
+ * Fold one int into an FNV-1a running hash.
+ * @param hash (uint64_t)
+ * @param value (int)
+ * @return (uint64_t)
+ */
 static uint64_t fnv1a_int(uint64_t hash, int value) {
     return cml_fnv1a_bytes(hash, &value, sizeof(value));
 }
 
-/** Hash an (op, arity, child-states) tuple into a transition-table key. */
+/**
+ * Hash an (op, arity, child-states) tuple into a transition-table key.
+ * @param op_type (int)
+ * @param child_states (const int*)
+ * @param arity (int)
+ * @return (uint64_t)
+ */
 static uint64_t transition_key(int op_type, const int* child_states, int arity) {
     uint64_t h = fnv1a_init();
     h          = fnv1a_int(h, op_type);
@@ -54,7 +68,12 @@ static uint64_t transition_key(int op_type, const int* child_states, int arity) 
     return h;
 }
 
-/** Look up a transition's result state by key, returning the dead state on a miss. */
+/**
+ * Look up a transition's result state by key, returning the dead state on a miss.
+ * @param aut (const CMLAutomaton*)
+ * @param key (uint64_t)
+ * @return (int)
+ */
 static int transition_lookup(const CMLAutomaton* aut, uint64_t key) {
     if (aut->table_capacity == 0)
         return AUTOMATON_DEAD_STATE;
@@ -71,7 +90,13 @@ static int transition_lookup(const CMLAutomaton* aut, uint64_t key) {
 
 static void transition_grow(CMLAutomaton* aut);
 
-/** Insert or overwrite a transition, growing the open-addressed table when it fills. */
+/**
+ * Insert or overwrite a transition, growing the open-addressed table when it fills.
+ * @param aut (CMLAutomaton*)
+ * @param key (uint64_t)
+ * @param result_state (int)
+ * @return (void)
+ */
 static void transition_insert(CMLAutomaton* aut, uint64_t key, int result_state) {
     if (aut->num_transitions * 2 >= aut->table_capacity)
         transition_grow(aut);
@@ -93,7 +118,11 @@ static void transition_insert(CMLAutomaton* aut, uint64_t key, int result_state)
     }
 }
 
-/** Double the transition table capacity and rehash all existing entries. */
+/**
+ * Double the transition table capacity and rehash all existing entries.
+ * @param aut (CMLAutomaton*)
+ * @return (void)
+ */
 static void transition_grow(CMLAutomaton* aut) {
     int old_cap        = aut->table_capacity;
     CMLTransition* old = aut->transitions;
@@ -110,7 +139,11 @@ static void transition_grow(CMLAutomaton* aut) {
     cml_free(old);
 }
 
-/** Append a new empty automaton state and return its id (-1 on OOM). */
+/**
+ * Append a new empty automaton state and return its id (-1 on OOM).
+ * @param aut (CMLAutomaton*)
+ * @return (int)
+ */
 static int automaton_add_state(CMLAutomaton* aut) {
     if (aut->num_states >= aut->states_capacity) {
         int new_cap = aut->states_capacity * 2;
@@ -132,7 +165,13 @@ static int automaton_add_state(CMLAutomaton* aut) {
     return id;
 }
 
-/** Record that `rule_idx` accepts at `state_id` (deduplicated). */
+/**
+ * Record that `rule_idx` accepts at `state_id` (deduplicated).
+ * @param aut (CMLAutomaton*)
+ * @param state_id (int)
+ * @param rule_idx (int)
+ * @return (void)
+ */
 static void state_add_rule(CMLAutomaton* aut, int state_id, int rule_idx) {
     if (state_id < 0 || state_id >= aut->num_states)
         return;
@@ -214,7 +253,13 @@ typedef struct {
     bool is_root;
 } PendingWildcard;
 
-/** Iterate to a fixpoint, adding transitions that substitute each concrete state for a wildcard. */
+/**
+ * Iterate to a fixpoint, adding transitions that substitute each concrete state for a wildcard.
+ * @param aut (CMLAutomaton*)
+ * @param pending (PendingWildcard*)
+ * @param num_pending (int)
+ * @return (void)
+ */
 static void expand_wildcard_transitions(CMLAutomaton* aut, PendingWildcard* pending,
                                         int num_pending) {
     if (num_pending == 0)
@@ -319,7 +364,11 @@ CMLAutomaton* cml_automaton_compile(CMLRewriteRegistry* registry) {
     return aut;
 }
 
-/** Free an automaton, its states' rule lists, and the transition table. */
+/**
+ * Free an automaton, its states' rule lists, and the transition table.
+ * @param automaton (CMLAutomaton*)
+ * @return (void)
+ */
 void cml_automaton_free(CMLAutomaton* automaton) {
     if (!automaton)
         return;
@@ -484,12 +533,20 @@ int cml_automaton_rewrite(CMLAutomaton* automaton, struct CMLGraph* graph) {
     return total_rewrites;
 }
 
-/** Return the automaton's state count. */
+/**
+ * Return the automaton's state count.
+ * @param automaton (const CMLAutomaton*)
+ * @return (int)
+ */
 int cml_automaton_num_states(const CMLAutomaton* automaton) {
     return automaton ? automaton->num_states : 0;
 }
 
-/** Return the automaton's transition count. */
+/**
+ * Return the automaton's transition count.
+ * @param automaton (const CMLAutomaton*)
+ * @return (int)
+ */
 int cml_automaton_num_transitions(const CMLAutomaton* automaton) {
     return automaton ? automaton->num_transitions : 0;
 }

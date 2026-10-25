@@ -10,7 +10,13 @@ typedef struct {
     atomic_int status; /* first non-zero compile status seen */
 } CompileBatch;
 
-/** Thread-pool worker: compile the index range [start, end). */
+/**
+ * Thread-pool worker: compile the index range [start, end).
+ * @param data (void*)
+ * @param start (size_t)
+ * @param end (size_t)
+ * @return (void)
+ */
 static void compile_range(void* data, size_t start, size_t end) {
     CompileBatch* b = (CompileBatch*)data;
     for (size_t i = start; i < end; i++) {

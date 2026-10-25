@@ -15,25 +15,47 @@ static CMLKernelFreeFn g_kernel_free_fns[CML_KERNEL_BACKEND_COUNT] = {0};
 
 static CMLKernelCache* g_default_cache = NULL;
 
-/** Seed value for an FNV-1a hash. */
+/**
+ * Seed value for an FNV-1a hash.
+ * @return (uint64_t)
+ */
 static uint64_t fnv1a_hash_init(void) { return CML_FNV_OFFSET_BASIS; }
 
-/** Fold an int into an FNV-1a hash. */
+/**
+ * Fold an int into an FNV-1a hash.
+ * @param hash (uint64_t)
+ * @param value (int)
+ * @return (uint64_t)
+ */
 static uint64_t fnv1a_hash_int(uint64_t hash, int value) {
     return cml_fnv1a_bytes(hash, &value, sizeof(value));
 }
 
-/** Fold a size_t into an FNV-1a hash. */
+/**
+ * Fold a size_t into an FNV-1a hash.
+ * @param hash (uint64_t)
+ * @param value (size_t)
+ * @return (uint64_t)
+ */
 static uint64_t fnv1a_hash_size(uint64_t hash, size_t value) {
     return cml_fnv1a_bytes(hash, &value, sizeof(value));
 }
 
-/** Create a kernel cache with an entry cap and no memory cap. */
+/**
+ * Create a kernel cache with an entry cap and no memory cap.
+ * @param max_entries (size_t)
+ * @return (CMLKernelCache*)
+ */
 CMLKernelCache* cml_kernel_cache_create(size_t max_entries) {
     return cml_kernel_cache_create_with_limits(max_entries, 0);
 }
 
-/** Create a kernel cache bounded by max entries and/or max memory (0 = unbounded). */
+/**
+ * Create a kernel cache bounded by max entries and/or max memory (0 = unbounded).
+ * @param max_entries (size_t)
+ * @param max_memory (size_t)
+ * @return (CMLKernelCache*)
+ */
 CMLKernelCache* cml_kernel_cache_create_with_limits(size_t max_entries, size_t max_memory) {
     CMLKernelCache* cache = (CMLKernelCache*)cml_calloc(1, sizeof(CMLKernelCache));
     if (!cache) {
@@ -68,7 +90,11 @@ CMLKernelCache* cml_kernel_cache_create_with_limits(size_t max_entries, size_t m
     return cache;
 }
 
-/** Free a cache entry, invoking the backend-specific free fn on its compiled kernel. */
+/**
+ * Free a cache entry, invoking the backend-specific free fn on its compiled kernel.
+ * @param entry (CMLKernelEntry*)
+ * @return (void)
+ */
 static void free_entry(CMLKernelEntry* entry) {
     if (!entry)
         return;
@@ -81,7 +107,11 @@ static void free_entry(CMLKernelEntry* entry) {
     cml_free(entry);
 }
 
-/** Clear and destroy a kernel cache, including its mutex. */
+/**
+ * Clear and destroy a kernel cache, including its mutex.
+ * @param cache (CMLKernelCache*)
+ * @return (void)
+ */
 void cml_kernel_cache_free(CMLKernelCache* cache) {
     if (!cache)
         return;
@@ -96,7 +126,11 @@ void cml_kernel_cache_free(CMLKernelCache* cache) {
     cml_free(cache);
 }
 
-/** Evict and free every entry, leaving the cache empty. */
+/**
+ * Evict and free every entry, leaving the cache empty.
+ * @param cache (CMLKernelCache*)
+ * @return (void)
+ */
 void kernel_cache_clear(CMLKernelCache* cache) {
     if (!cache)
         return;
@@ -119,7 +153,14 @@ void kernel_cache_clear(CMLKernelCache* cache) {
     pthread_mutex_unlock(&cache->lock);
 }
 
-/** Hash a graph plus input shapes/dtypes and backend into a cache key. */
+/**
+ * Hash a graph plus input shapes/dtypes and backend into a cache key.
+ * @param ir (CMLGraph_t)
+ * @param inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param backend (CMLKernelBackend)
+ * @return (uint64_t)
+ */
 uint64_t cml_kernel_cache_compute_hash(CMLGraph_t ir, Tensor** inputs, int num_inputs,
                                        CMLKernelBackend backend) {
     uint64_t hash = fnv1a_hash_init();
@@ -164,7 +205,12 @@ uint64_t cml_kernel_cache_compute_hash(CMLGraph_t ir, Tensor** inputs, int num_i
     return hash;
 }
 
-/** Look up an entry by hash, bumping its LRU timestamp and hit/miss stats. */
+/**
+ * Look up an entry by hash, bumping its LRU timestamp and hit/miss stats.
+ * @param cache (CMLKernelCache*)
+ * @param hash (uint64_t)
+ * @return (CMLKernelEntry*)
+ */
 CMLKernelEntry* cml_kernel_cache_lookup(CMLKernelCache* cache, uint64_t hash) {
     if (!cache)
         return NULL;
@@ -189,14 +235,30 @@ CMLKernelEntry* cml_kernel_cache_lookup(CMLKernelCache* cache, uint64_t hash) {
     return NULL;
 }
 
-/** Look up a compiled kernel for an IR graph and its inputs. */
+/**
+ * Look up a compiled kernel for an IR graph and its inputs.
+ * @param cache (CMLKernelCache*)
+ * @param ir (CMLGraph_t)
+ * @param inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param backend (CMLKernelBackend)
+ * @return (CMLKernelEntry*)
+ */
 CMLKernelEntry* cml_kernel_cache_lookup_ir(CMLKernelCache* cache, CMLGraph_t ir, Tensor** inputs,
                                            int num_inputs, CMLKernelBackend backend) {
     uint64_t hash = cml_kernel_cache_compute_hash(ir, inputs, num_inputs, backend);
     return cml_kernel_cache_lookup(cache, hash);
 }
 
-/** Insert a compiled kernel under @p hash, evicting LRU entries to honor limits. */
+/**
+ * Insert a compiled kernel under @p hash, evicting LRU entries to honor limits.
+ * @param cache (CMLKernelCache*)
+ * @param hash (uint64_t)
+ * @param backend (CMLKernelBackend)
+ * @param compiled (void*)
+ * @param memory_size (size_t)
+ * @return (int)
+ */
 int cml_kernel_cache_insert(CMLKernelCache* cache, uint64_t hash, CMLKernelBackend backend,
                             void* compiled, size_t memory_size) {
     if (!cache || !compiled)
@@ -243,7 +305,17 @@ int cml_kernel_cache_insert(CMLKernelCache* cache, uint64_t hash, CMLKernelBacke
     return 0;
 }
 
-/** Insert a compiled kernel keyed on an IR graph, recording its op and io counts. */
+/**
+ * Insert a compiled kernel keyed on an IR graph, recording its op and io counts.
+ * @param cache (CMLKernelCache*)
+ * @param ir (CMLGraph_t)
+ * @param inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param backend (CMLKernelBackend)
+ * @param compiled (void*)
+ * @param memory_size (size_t)
+ * @return (int)
+ */
 int cml_kernel_cache_insert_ir(CMLKernelCache* cache, CMLGraph_t ir, Tensor** inputs,
                                int num_inputs, CMLKernelBackend backend, void* compiled,
                                size_t memory_size) {
@@ -275,7 +347,12 @@ int cml_kernel_cache_insert_ir(CMLKernelCache* cache, CMLGraph_t ir, Tensor** in
     return result;
 }
 
-/** Remove and free the entry matching @p hash; returns -1 if absent. */
+/**
+ * Remove and free the entry matching @p hash; returns -1 if absent.
+ * @param cache (CMLKernelCache*)
+ * @param hash (uint64_t)
+ * @return (int)
+ */
 int cml_kernel_cache_remove(CMLKernelCache* cache, uint64_t hash) {
     if (!cache)
         return -1;
@@ -305,7 +382,11 @@ int cml_kernel_cache_remove(CMLKernelCache* cache, uint64_t hash) {
     return -1;
 }
 
-/** Evict the single least-recently-used entry. */
+/**
+ * Evict the single least-recently-used entry.
+ * @param cache (CMLKernelCache*)
+ * @return (int)
+ */
 int cml_kernel_cache_evict_lru(CMLKernelCache* cache) {
     if (!cache || cache->count == 0)
         return -1;
@@ -350,7 +431,11 @@ int cml_kernel_cache_evict_lru(CMLKernelCache* cache) {
     return 0;
 }
 
-/** Evict LRU entries until entry and memory limits hold; returns the number evicted. */
+/**
+ * Evict LRU entries until entry and memory limits hold; returns the number evicted.
+ * @param cache (CMLKernelCache*)
+ * @return (int)
+ */
 int cml_kernel_cache_enforce_limits(CMLKernelCache* cache) {
     if (!cache)
         return 0;
@@ -372,7 +457,15 @@ int cml_kernel_cache_enforce_limits(CMLKernelCache* cache) {
     return evicted;
 }
 
-/** Read back hit/miss/entry/memory counters (any out-param may be NULL). */
+/**
+ * Read back hit/miss/entry/memory counters (any out-param may be NULL).
+ * @param cache (CMLKernelCache*)
+ * @param hits (size_t*)
+ * @param misses (size_t*)
+ * @param count (size_t*)
+ * @param memory (size_t*)
+ * @return (void)
+ */
 void kernel_cache_stats(CMLKernelCache* cache, size_t* hits, size_t* misses, size_t* count,
                         size_t* memory) {
     if (!cache) {
@@ -401,7 +494,11 @@ void kernel_cache_stats(CMLKernelCache* cache, size_t* hits, size_t* misses, siz
     pthread_mutex_unlock(&cache->lock);
 }
 
-/** Fraction of lookups that hit, or 0 when there have been none. */
+/**
+ * Fraction of lookups that hit, or 0 when there have been none.
+ * @param cache (CMLKernelCache*)
+ * @return (double)
+ */
 double kernel_cache_hit_rate(CMLKernelCache* cache) {
     if (!cache)
         return 0.0;
@@ -416,7 +513,11 @@ double kernel_cache_hit_rate(CMLKernelCache* cache) {
     return rate;
 }
 
-/** Print human-readable cache statistics to stdout. */
+/**
+ * Print human-readable cache statistics to stdout.
+ * @param cache (CMLKernelCache*)
+ * @return (void)
+ */
 void kernel_cache_print_stats(CMLKernelCache* cache) {
     if (!cache) {
         printf("Kernel Cache: (null)\n");
@@ -441,14 +542,22 @@ void kernel_cache_print_stats(CMLKernelCache* cache) {
     pthread_mutex_unlock(&cache->lock);
 }
 
-/** Register the free function used to release a backend's compiled kernels. */
+/**
+ * Register the free function used to release a backend's compiled kernels.
+ * @param backend (CMLKernelBackend)
+ * @param free_fn (CMLKernelFreeFn)
+ * @return (void)
+ */
 void cml_kernel_cache_set_free_fn(CMLKernelBackend backend, CMLKernelFreeFn free_fn) {
     if (backend >= 0 && backend < CML_KERNEL_BACKEND_COUNT) {
         g_kernel_free_fns[backend] = free_fn;
     }
 }
 
-/** Lazily-created process-wide default kernel cache. */
+/**
+ * Lazily-created process-wide default kernel cache.
+ * @return (CMLKernelCache*)
+ */
 CMLKernelCache* cml_kernel_cache_get_default(void) {
     if (!g_default_cache) {
         g_default_cache = cml_kernel_cache_create(256);
@@ -456,19 +565,39 @@ CMLKernelCache* cml_kernel_cache_get_default(void) {
     return g_default_cache;
 }
 
-/** Public wrapper around kernel_cache_clear. */
+/**
+ * Public wrapper around kernel_cache_clear.
+ * @param cache (CMLKernelCache*)
+ * @return (void)
+ */
 void cml_kernel_cache_clear_impl(CMLKernelCache* cache) { kernel_cache_clear(cache); }
 
-/** Public wrapper around kernel_cache_stats. */
+/**
+ * Public wrapper around kernel_cache_stats.
+ * @param cache (CMLKernelCache*)
+ * @param hits (size_t*)
+ * @param misses (size_t*)
+ * @param count (size_t*)
+ * @param memory (size_t*)
+ * @return (void)
+ */
 void cml_kernel_cache_stats_impl(CMLKernelCache* cache, size_t* hits, size_t* misses, size_t* count,
                                  size_t* memory) {
     kernel_cache_stats(cache, hits, misses, count, memory);
 }
 
-/** Public wrapper around kernel_cache_hit_rate. */
+/**
+ * Public wrapper around kernel_cache_hit_rate.
+ * @param cache (CMLKernelCache*)
+ * @return (double)
+ */
 double cml_kernel_cache_hit_rate_impl(CMLKernelCache* cache) {
     return kernel_cache_hit_rate(cache);
 }
 
-/** Public wrapper around kernel_cache_print_stats. */
+/**
+ * Public wrapper around kernel_cache_print_stats.
+ * @param cache (CMLKernelCache*)
+ * @return (void)
+ */
 void cml_kernel_cache_print_stats_impl(CMLKernelCache* cache) { kernel_cache_print_stats(cache); }

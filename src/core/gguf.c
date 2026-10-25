@@ -56,7 +56,12 @@ static const struct {
 };
 #define GGUF_NUM_PLAIN_TYPES (sizeof(GGUF_PLAIN_TYPES) / sizeof(GGUF_PLAIN_TYPES[0]))
 
-/** DType stored by a plain GGUF tensor type; false for quantized or unsupported types. */
+/**
+ * DType stored by a plain GGUF tensor type; false for quantized or unsupported types.
+ * @param type (GGUFTensorType)
+ * @param out (DType*)
+ * @return (bool)
+ */
 static bool gguf_type_to_dtype(GGUFTensorType type, DType* out) {
     for (size_t i = 0; i < GGUF_NUM_PLAIN_TYPES; i++) {
         if (GGUF_PLAIN_TYPES[i].gguf == type) {
@@ -67,7 +72,12 @@ static bool gguf_type_to_dtype(GGUFTensorType type, DType* out) {
     return false;
 }
 
-/** GGUF tensor type that stores `dtype`; false when GGUF has no plain encoding for it. */
+/**
+ * GGUF tensor type that stores `dtype`; false when GGUF has no plain encoding for it.
+ * @param dtype (DType)
+ * @param out (GGUFTensorType*)
+ * @return (bool)
+ */
 static bool dtype_to_gguf_type(DType dtype, GGUFTensorType* out) {
     for (size_t i = 0; i < GGUF_NUM_PLAIN_TYPES; i++) {
         if (GGUF_PLAIN_TYPES[i].dtype == dtype) {
@@ -78,7 +88,11 @@ static bool dtype_to_gguf_type(DType dtype, GGUFTensorType* out) {
     return false;
 }
 
-/** Read a GGUF length-prefixed string (u64 len + bytes) into a NUL-terminated buffer. */
+/**
+ * Read a GGUF length-prefixed string (u64 len + bytes) into a NUL-terminated buffer.
+ * @param f (FILE*)
+ * @return (char*)
+ */
 static char* read_gguf_string(FILE* f) {
     uint64_t len;
     if (fread(&len, 8, 1, f) != 1)
@@ -96,14 +110,23 @@ static char* read_gguf_string(FILE* f) {
     return str;
 }
 
-/** Write a GGUF length-prefixed string (u64 len + bytes). */
+/**
+ * Write a GGUF length-prefixed string (u64 len + bytes).
+ * @param f (FILE*)
+ * @param str (const char*)
+ * @return (void)
+ */
 static void write_gguf_string(FILE* f, const char* str) {
     uint64_t len = strlen(str);
     fwrite(&len, 8, 1, f);
     fwrite(str, 1, len, f);
 }
 
-/** Byte width of a fixed-size GGUF metadata type; 0 for strings, arrays and unknown types. */
+/**
+ * Byte width of a fixed-size GGUF metadata type; 0 for strings, arrays and unknown types.
+ * @param type (uint32_t)
+ * @return (size_t)
+ */
 static size_t gguf_scalar_size(uint32_t type) {
     switch (type) {
     case GGUF_TYPE_UINT8:
@@ -128,8 +151,15 @@ static size_t gguf_scalar_size(uint32_t type) {
 
 static bool skip_gguf_value(FILE* f, uint32_t type, int depth);
 
-/** Seek past the `arr_len` elements of a GGUF array whose header was already read. Fixed-size
- *  elements are skipped in one seek, so a hostile length cannot spin. False on failure. */
+/**
+ * Seek past the `arr_len` elements of a GGUF array whose header was already read. Fixed-size
+ * elements are skipped in one seek, so a hostile length cannot spin. False on failure.
+ * @param f (FILE*)
+ * @param arr_type (uint32_t)
+ * @param arr_len (uint64_t)
+ * @param depth (int)
+ * @return (bool)
+ */
 static bool skip_gguf_array(FILE* f, uint32_t arr_type, uint64_t arr_len, int depth) {
     size_t width = gguf_scalar_size(arr_type);
     if (width)
@@ -140,8 +170,14 @@ static bool skip_gguf_array(FILE* f, uint32_t arr_type, uint64_t arr_len, int de
     return true;
 }
 
-/** Seek past a GGUF metadata value of the given type, with array nesting capped at
- *  GGUF_MAX_ARRAY_DEPTH. Returns false on a truncated file or an invalid value. */
+/**
+ * Seek past a GGUF metadata value of the given type, with array nesting capped at
+ * GGUF_MAX_ARRAY_DEPTH. Returns false on a truncated file or an invalid value.
+ * @param f (FILE*)
+ * @param type (uint32_t)
+ * @param depth (int)
+ * @return (bool)
+ */
 static bool skip_gguf_value(FILE* f, uint32_t type, int depth) {
     size_t width = gguf_scalar_size(type);
     if (width)
@@ -158,7 +194,12 @@ static bool skip_gguf_value(FILE* f, uint32_t type, int depth) {
            skip_gguf_array(f, arr_type, arr_len, depth);
 }
 
-/** Free a string list of `n` entries (NULL-safe). */
+/**
+ * Free a string list of `n` entries (NULL-safe).
+ * @param items (char**)
+ * @param n (int)
+ * @return (void)
+ */
 static void free_string_list(char** items, int n) {
     if (!items)
         return;
@@ -171,6 +212,8 @@ static void free_string_list(char** items, int n) {
  * Open a GGUF file for reading: validates the magic/version, captures the tokenizer
  * vocab and BPE merges from the metadata (skipping everything else), and records each
  * tensor's shape/type/offset/size. The data section is 32-byte aligned.
+ * @param filepath (const char*)
+ * @return (GGUFContext*)
  */
 GGUFContext* gguf_open_read(const char* filepath) {
     FILE* f = fopen(filepath, "rb");
@@ -328,7 +371,11 @@ malformed:
     return NULL;
 }
 
-/** Create a write context that buffers tensor data in memory until close. */
+/**
+ * Create a write context that buffers tensor data in memory until close.
+ * @param filepath (const char*)
+ * @return (GGUFContext*)
+ */
 GGUFContext* gguf_open_write(const char* filepath) {
     GGUFContext* ctx = cml_calloc(1, sizeof(GGUFContext));
     if (!ctx)
@@ -345,8 +392,12 @@ GGUFContext* gguf_open_write(const char* filepath) {
     return ctx;
 }
 
-/** Close the context. For write contexts, emits the header, tensor infos, 32-byte
- *  alignment padding, and buffered data. Frees all owned resources. */
+/**
+ * Close the context. For write contexts, emits the header, tensor infos, 32-byte
+ * alignment padding, and buffered data. Frees all owned resources.
+ * @param ctx (GGUFContext*)
+ * @return (void)
+ */
 void gguf_close(GGUFContext* ctx) {
     if (!ctx)
         return;
@@ -404,8 +455,16 @@ void gguf_close(GGUFContext* ctx) {
     cml_free(ctx);
 }
 
-/** Hand back the context-owned tokenizer vocab and merge lists (borrowed, not copied);
- *  -1 if no tokenizer metadata was present. */
+/**
+ * Hand back the context-owned tokenizer vocab and merge lists (borrowed, not copied);
+ * -1 if no tokenizer metadata was present.
+ * @param ctx (GGUFContext*)
+ * @param tokens_out (char***)
+ * @param num_tokens_out (int*)
+ * @param merges_out (char***)
+ * @param num_merges_out (int*)
+ * @return (int)
+ */
 int gguf_get_tokenizer(GGUFContext* ctx, char*** tokens_out, int* num_tokens_out,
                        char*** merges_out, int* num_merges_out) {
     if (tokens_out)
@@ -429,18 +488,32 @@ int gguf_get_tokenizer(GGUFContext* ctx, char*** tokens_out, int* num_tokens_out
     return 0;
 }
 
-/** Number of tensors in an opened-for-read file. */
+/**
+ * Number of tensors in an opened-for-read file.
+ * @param ctx (GGUFContext*)
+ * @return (int)
+ */
 int gguf_get_num_tensors(GGUFContext* ctx) { return ctx ? ctx->num_tensors : 0; }
 
-/** Name of the tensor at the given index, or NULL if out of range. */
+/**
+ * Name of the tensor at the given index, or NULL if out of range.
+ * @param ctx (GGUFContext*)
+ * @param index (int)
+ * @return (const char*)
+ */
 const char* gguf_get_tensor_name(GGUFContext* ctx, int index) {
     if (!ctx || index < 0 || index >= ctx->num_tensors)
         return NULL;
     return ctx->tensors[index].name;
 }
 
-/** Read a named tensor. Quantized tensors are dequantized to float32 while the raw
- *  blocks are retained on the tensor (quant_data) for requantized compute; NULL if absent. */
+/**
+ * Read a named tensor. Quantized tensors are dequantized to float32 while the raw
+ * blocks are retained on the tensor (quant_data) for requantized compute; NULL if absent.
+ * @param ctx (GGUFContext*)
+ * @param name (const char*)
+ * @return (Tensor*)
+ */
 Tensor* gguf_read_tensor(GGUFContext* ctx, const char* name) {
     if (!ctx || !name || ctx->is_write)
         return NULL;
@@ -518,7 +591,13 @@ Tensor* gguf_read_tensor(GGUFContext* ctx, const char* name) {
     return t;
 }
 
-/** Append a tensor's raw bytes to the write buffer, recording its metadata; -1 on error. */
+/**
+ * Append a tensor's raw bytes to the write buffer, recording its metadata; -1 on error.
+ * @param ctx (GGUFContext*)
+ * @param name (const char*)
+ * @param tensor (Tensor*)
+ * @return (int)
+ */
 int gguf_write_tensor(GGUFContext* ctx, const char* name, Tensor* tensor) {
     if (!ctx || !name || !tensor || !ctx->is_write)
         return -1;
@@ -564,7 +643,12 @@ int gguf_write_tensor(GGUFContext* ctx, const char* name, Tensor* tensor) {
     return 0;
 }
 
-/** Save all of a module's named parameters to a GGUF file. */
+/**
+ * Save all of a module's named parameters to a GGUF file.
+ * @param module (Module*)
+ * @param filepath (const char*)
+ * @return (int)
+ */
 int module_save_gguf(Module* module, const char* filepath) {
     if (!module || !filepath)
         return -1;
@@ -591,7 +675,12 @@ int module_save_gguf(Module* module, const char* filepath) {
     return 0;
 }
 
-/** Load a module's parameters from a GGUF file, copying only where element counts match. */
+/**
+ * Load a module's parameters from a GGUF file, copying only where element counts match.
+ * @param module (Module*)
+ * @param filepath (const char*)
+ * @return (int)
+ */
 int module_load_gguf(Module* module, const char* filepath) {
     if (!module || !filepath)
         return -1;

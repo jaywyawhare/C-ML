@@ -6,12 +6,20 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** Floats of K (or V) stored per token: num_kv_heads * head_dim. */
+/**
+ * Floats of K (or V) stored per token: num_kv_heads * head_dim.
+ * @param cache (const CMLPagedKVCache*)
+ * @return (size_t)
+ */
 static inline size_t token_kv_size(const CMLPagedKVCache* cache) {
     return (size_t)cache->num_kv_heads * cache->head_dim;
 }
 
-/** Floats in one block's key (or value) buffer: block_size * token_kv_size. */
+/**
+ * Floats in one block's key (or value) buffer: block_size * token_kv_size.
+ * @param cache (const CMLPagedKVCache*)
+ * @return (size_t)
+ */
 static inline size_t block_buf_size(const CMLPagedKVCache* cache) {
     return (size_t)cache->block_size * token_kv_size(cache);
 }
@@ -19,6 +27,11 @@ static inline size_t block_buf_size(const CMLPagedKVCache* cache) {
 /**
  * Allocate a paged KV cache: `max_blocks` fixed-size blocks on a free list plus
  * `max_sequences` block tables, for vLLM-style non-contiguous KV storage.
+ * @param max_blocks (int)
+ * @param max_sequences (int)
+ * @param num_kv_heads (int)
+ * @param head_dim (int)
+ * @return (CMLPagedKVCache*)
  */
 CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences, int num_kv_heads,
                                            int head_dim) {
@@ -108,7 +121,11 @@ CMLPagedKVCache* cml_paged_kv_cache_create(int max_blocks, int max_sequences, in
     return cache;
 }
 
-/** Free all sequence tables, block buffers and the free list. */
+/**
+ * Free all sequence tables, block buffers and the free list.
+ * @param cache (CMLPagedKVCache*)
+ * @return (void)
+ */
 void cml_paged_kv_cache_free(CMLPagedKVCache* cache) {
     if (!cache)
         return;
@@ -134,7 +151,11 @@ void cml_paged_kv_cache_free(CMLPagedKVCache* cache) {
     cml_free(cache);
 }
 
-/** Pop a zeroed block off the free list; returns its block id or -1 if none free. */
+/**
+ * Pop a zeroed block off the free list; returns its block id or -1 if none free.
+ * @param cache (CMLPagedKVCache*)
+ * @return (int)
+ */
 int cml_paged_cache_alloc_block(CMLPagedKVCache* cache) {
     if (!cache) {
         LOG_ERROR("cml_paged_cache_alloc_block: NULL cache");
@@ -158,7 +179,12 @@ int cml_paged_cache_alloc_block(CMLPagedKVCache* cache) {
     return block_id;
 }
 
-/** Return a block to the free list, marking it unused. */
+/**
+ * Return a block to the free list, marking it unused.
+ * @param cache (CMLPagedKVCache*)
+ * @param block_id (int)
+ * @return (void)
+ */
 void cml_paged_cache_free_block(CMLPagedKVCache* cache, int block_id) {
     if (!cache) {
         LOG_ERROR("cml_paged_cache_free_block: NULL cache");
@@ -181,7 +207,11 @@ void cml_paged_cache_free_block(CMLPagedKVCache* cache, int block_id) {
     cache->total_freed++;
 }
 
-/** Claim a free sequence slot and give it an empty block table; returns its seq id. */
+/**
+ * Claim a free sequence slot and give it an empty block table; returns its seq id.
+ * @param cache (CMLPagedKVCache*)
+ * @return (int)
+ */
 int cml_paged_cache_init_sequence(CMLPagedKVCache* cache) {
     if (!cache) {
         LOG_ERROR("cml_paged_cache_init_sequence: NULL cache");
@@ -221,7 +251,12 @@ int cml_paged_cache_init_sequence(CMLPagedKVCache* cache) {
     return seq_id;
 }
 
-/** Release a sequence, returning all its blocks to the free pool. */
+/**
+ * Release a sequence, returning all its blocks to the free pool.
+ * @param cache (CMLPagedKVCache*)
+ * @param seq_id (int)
+ * @return (void)
+ */
 void cml_paged_cache_free_sequence(CMLPagedKVCache* cache, int seq_id) {
     if (!cache) {
         LOG_ERROR("cml_paged_cache_free_sequence: NULL cache");
@@ -251,7 +286,14 @@ void cml_paged_cache_free_sequence(CMLPagedKVCache* cache, int seq_id) {
     cache->num_sequences--;
 }
 
-/** Append one token's K/V to a sequence, allocating a new block when the tail fills. */
+/**
+ * Append one token's K/V to a sequence, allocating a new block when the tail fills.
+ * @param cache (CMLPagedKVCache*)
+ * @param seq_id (int)
+ * @param key (const float*)
+ * @param value (const float*)
+ * @return (int)
+ */
 int cml_paged_cache_append(CMLPagedKVCache* cache, int seq_id, const float* key,
                            const float* value) {
     if (!cache || !key || !value) {
@@ -412,6 +454,11 @@ static int paged_gqa_forward_seq(CMLPagedKVCache* cache, CMLBlockTable* bt, cons
 /**
  * Shared paged GQA implementation: validate Q and the per-batch-row sequence ids,
  * then run attention over each row's cached blocks into a [batch, seq_q, dim] tensor.
+ * @param cache (CMLPagedKVCache*)
+ * @param seq_ids (const int*)
+ * @param Q (Tensor*)
+ * @param config (const CMLGQAConfig*)
+ * @return (Tensor*)
  */
 static Tensor* paged_gqa_forward_impl(CMLPagedKVCache* cache, const int* seq_ids, Tensor* Q,
                                       const CMLGQAConfig* config) {
@@ -500,7 +547,14 @@ static Tensor* paged_gqa_forward_impl(CMLPagedKVCache* cache, const int* seq_ids
     return result;
 }
 
-/** Paged GQA where each batch row `b` attends to its own cached sequence seq_ids[b]. */
+/**
+ * Paged GQA where each batch row `b` attends to its own cached sequence seq_ids[b].
+ * @param cache (CMLPagedKVCache*)
+ * @param seq_ids (const int*)
+ * @param Q (Tensor*)
+ * @param config (const CMLGQAConfig*)
+ * @return (Tensor*)
+ */
 Tensor* cml_paged_gqa_forward_batch(CMLPagedKVCache* cache, const int* seq_ids, Tensor* Q,
                                     const CMLGQAConfig* config) {
     if (!seq_ids) {
@@ -510,7 +564,14 @@ Tensor* cml_paged_gqa_forward_batch(CMLPagedKVCache* cache, const int* seq_ids, 
     return paged_gqa_forward_impl(cache, seq_ids, Q, config);
 }
 
-/** Paged GQA where every batch row attends to the same cached sequence `seq_id`. */
+/**
+ * Paged GQA where every batch row attends to the same cached sequence `seq_id`.
+ * @param cache (CMLPagedKVCache*)
+ * @param seq_id (int)
+ * @param Q (Tensor*)
+ * @param config (const CMLGQAConfig*)
+ * @return (Tensor*)
+ */
 Tensor* cml_paged_gqa_forward(CMLPagedKVCache* cache, int seq_id, Tensor* Q,
                               const CMLGQAConfig* config) {
     if (!cache || !Q || !config) {

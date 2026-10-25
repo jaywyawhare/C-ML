@@ -22,8 +22,16 @@ typedef enum {
     BINARY_DTYPE_BOOL,     /* comparisons yield bool */
 } BinaryResultDType;
 
-/** Build a lazy binary UOP node: broadcasts `a`/`b`, sets grad flags when `has_grad`,
- *  and applies the chosen result-dtype policy (inferred, numpy promotion, or bool). */
+/**
+ * Build a lazy binary UOP node: broadcasts `a`/`b`, sets grad flags when `has_grad`,
+ * and applies the chosen result-dtype policy (inferred, numpy promotion, or bool).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param type (UOpType)
+ * @param has_grad (bool)
+ * @param result_dtype (BinaryResultDType)
+ * @return (Tensor*)
+ */
 static Tensor* uop_binary_ex(Tensor* a, Tensor* b, UOpType type, bool has_grad,
                              BinaryResultDType result_dtype) {
     if (!a || !b)
@@ -54,7 +62,13 @@ static Tensor* uop_binary_ex(Tensor* a, Tensor* b, UOpType type, bool has_grad,
     return t;
 }
 
-/** Default binary op: differentiable, with numpy-style dtype promotion. */
+/**
+ * Default binary op: differentiable, with numpy-style dtype promotion.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param type (UOpType)
+ * @return (Tensor*)
+ */
 static Tensor* uop_binary(Tensor* a, Tensor* b, UOpType type) {
     return uop_binary_ex(a, b, type, true, BINARY_DTYPE_PROMOTE);
 }
@@ -205,16 +219,41 @@ static void attach_movement_op(Tensor* a, Tensor* result, UOpType type, ShapePar
     node->output       = result;
 }
 
-/** Lazy element-wise add (broadcasting). */
+/**
+ * Lazy element-wise add (broadcasting).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_add(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_ADD); }
-/** Lazy element-wise subtract (broadcasting). */
+/**
+ * Lazy element-wise subtract (broadcasting).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_sub(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_SUB); }
-/** Lazy element-wise multiply (broadcasting). */
+/**
+ * Lazy element-wise multiply (broadcasting).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_mul(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_MUL); }
-/** Lazy element-wise divide (broadcasting). */
+/**
+ * Lazy element-wise divide (broadcasting).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_div(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_DIV); }
 
-/** Lazy element-wise maximum (broadcasting). */
+/**
+ * Lazy element-wise maximum (broadcasting).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_max(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_MAX); }
 
 /* Comparisons return DTYPE_BOOL (numpy-style) and carry no gradient. */
@@ -222,7 +261,12 @@ Tensor* uop_cmplt(Tensor* a, Tensor* b) {
     return uop_binary_ex(a, b, UOP_CMPLT, false, BINARY_DTYPE_BOOL);
 }
 
-/** Build a lazy unary UOP node whose output shape and grad flag mirror input `a`. */
+/**
+ * Build a lazy unary UOP node whose output shape and grad flag mirror input `a`.
+ * @param a (Tensor*)
+ * @param type (UOpType)
+ * @return (Tensor*)
+ */
 static Tensor* uop_unary(Tensor* a, UOpType type) {
     if (!a)
         CML_ERR_NULL("NULL tensor input to unary uop");
@@ -251,16 +295,36 @@ static Tensor* uop_unary(Tensor* a, UOpType type) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy element-wise negation. */
+/**
+ * Lazy element-wise negation.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_neg(Tensor* a) { return uop_unary(a, UOP_NEG); }
-/** Lazy element-wise exp. */
+/**
+ * Lazy element-wise exp.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_exp(Tensor* a) { return uop_unary(a, UOP_EXP); }
-/** Lazy element-wise natural log. */
+/**
+ * Lazy element-wise natural log.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_log(Tensor* a) { return uop_unary(a, UOP_LOG); }
-/** Lazy element-wise square root. */
+/**
+ * Lazy element-wise square root.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_sqrt(Tensor* a) { return uop_unary(a, UOP_SQRT); }
 
-/** Lazy reciprocal, built as 1 / a via a filled-ones constant. */
+/**
+ * Lazy reciprocal, built as 1 / a via a filled-ones constant.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_recip(Tensor* a) {
     if (!a) {
         CML_ERR_NULL("NULL tensor input to uop_recip");
@@ -272,16 +336,37 @@ Tensor* uop_recip(Tensor* a) {
     return uop_div(ones, a);
 }
 
-/** Lazy element-wise absolute value. */
+/**
+ * Lazy element-wise absolute value.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_abs(Tensor* a) { return uop_unary(a, UOP_ABS); }
-/** Lazy element-wise sine. */
+/**
+ * Lazy element-wise sine.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_sin(Tensor* a) { return uop_unary(a, UOP_SIN); }
-/** Lazy element-wise cosine. */
+/**
+ * Lazy element-wise cosine.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_cos(Tensor* a) { return uop_unary(a, UOP_COS); }
-/** Lazy element-wise tangent. */
+/**
+ * Lazy element-wise tangent.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_tan(Tensor* a) { return uop_unary(a, UOP_TAN); }
 
-/** Lazy element-wise power a**b (broadcasting). */
+/**
+ * Lazy element-wise power a**b (broadcasting).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_pow(Tensor* a, Tensor* b) { return uop_binary(a, b, UOP_POW); }
 
 /* Deep-copy `params` for the IR node, which takes ownership of the clone.
@@ -373,18 +458,39 @@ static Tensor* uop_reduce_ex(Tensor* a, ReduceParams* params, UOpType type, bool
     return tensor_from_ir_node(node, ir);
 }
 
-/** Default (differentiable) reduction over the axes in `params`. */
+/**
+ * Default (differentiable) reduction over the axes in `params`.
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @param type (UOpType)
+ * @return (Tensor*)
+ */
 static Tensor* uop_reduce(Tensor* a, ReduceParams* params, UOpType type) {
     return uop_reduce_ex(a, params, type, true);
 }
 
-/** Lazy sum reduction over `params` axes (or the whole tensor). */
+/**
+ * Lazy sum reduction over `params` axes (or the whole tensor).
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_sum(Tensor* a, ReduceParams* params) { return uop_reduce(a, params, UOP_SUM); }
-/** Lazy max-value reduction over `params` axes. */
+/**
+ * Lazy max-value reduction over `params` axes.
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_max_reduce(Tensor* a, ReduceParams* params) {
     return uop_reduce(a, params, UOP_MAX_REDUCE);
 }
-/** Lazy mean reduction over `params` axes. */
+/**
+ * Lazy mean reduction over `params` axes.
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_mean(Tensor* a, ReduceParams* params) { return uop_reduce(a, params, UOP_MEAN); }
 
 /* The params structs are read-only here -- uop_reshape/uop_expand copy the
@@ -395,7 +501,13 @@ Tensor* uop_reshape_to(Tensor* a, const int* new_shape, int new_ndim) {
     return uop_reshape(a, &params);
 }
 
-/** Convenience wrapper: broadcast `a` to `new_shape` (lazy, via uop_expand). */
+/**
+ * Convenience wrapper: broadcast `a` to `new_shape` (lazy, via uop_expand).
+ * @param a (Tensor*)
+ * @param new_shape (const int*)
+ * @param new_ndim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_expand_to(Tensor* a, const int* new_shape, int new_ndim) {
     ExpandParams params = {.new_shape = (int*)new_shape, .new_ndim = new_ndim};
     return uop_expand(a, &params);
@@ -409,24 +521,47 @@ static Tensor* uop_reduce_dim(Tensor* a, int dim, bool keepdim, UOpType type) {
     return uop_reduce(a, &params, type);
 }
 
-/** Lazy mean over a single `dim` (dim < 0 reduces all axes). */
+/**
+ * Lazy mean over a single `dim` (dim < 0 reduces all axes).
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param keepdim (bool)
+ * @return (Tensor*)
+ */
 Tensor* uop_mean_dim(Tensor* a, int dim, bool keepdim) {
     return uop_reduce_dim(a, dim, keepdim, UOP_MEAN);
 }
 
-/** Lazy sum over a single `dim` (dim < 0 reduces all axes). */
+/**
+ * Lazy sum over a single `dim` (dim < 0 reduces all axes).
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param keepdim (bool)
+ * @return (Tensor*)
+ */
 Tensor* uop_sum_dim(Tensor* a, int dim, bool keepdim) {
     return uop_reduce_dim(a, dim, keepdim, UOP_SUM);
 }
 
-/** Lazy max-value reduction over a single `dim` (dim < 0 reduces all axes). */
+/**
+ * Lazy max-value reduction over a single `dim` (dim < 0 reduces all axes).
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param keepdim (bool)
+ * @return (Tensor*)
+ */
 Tensor* uop_max_reduce_dim(Tensor* a, int dim, bool keepdim) {
     return uop_reduce_dim(a, dim, keepdim, UOP_MAX_REDUCE);
 }
 
-/** Reshape `a` to the target shape; a realized contiguous input keeps a cheap view, while a
- *  non-contiguous or still-lazy one emits a real UOP_RESHAPE node, so reshaping never
- *  executes the graph. */
+/**
+ * Reshape `a` to the target shape; a realized contiguous input keeps a cheap view, while a
+ * non-contiguous or still-lazy one emits a real UOP_RESHAPE node, so reshaping never
+ * executes the graph.
+ * @param a (Tensor*)
+ * @param params (ReshapeParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_reshape(Tensor* a, ReshapeParams* params) {
     if (!a || !params) {
         CML_ERR_NULL("NULL input to uop_reshape");
@@ -487,8 +622,13 @@ Tensor* uop_reshape(Tensor* a, ReshapeParams* params) {
     return result;
 }
 
-/** Reorder axes by `params->perm` (lazy); validates the permutation is a complete,
- *  duplicate-free bijection over the tensor's dimensions. */
+/**
+ * Reorder axes by `params->perm` (lazy); validates the permutation is a complete,
+ * duplicate-free bijection over the tensor's dimensions.
+ * @param a (Tensor*)
+ * @param params (PermuteParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_permute(Tensor* a, PermuteParams* params) {
     if (!a || !params || !params->perm) {
         CML_ERR_NULL("NULL input to uop_permute");
@@ -575,8 +715,13 @@ Tensor* uop_permute(Tensor* a, PermuteParams* params) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Broadcast `a` to `new_shape` as a zero-stride strided view: size-1 (and prepended)
- *  dims get stride 0 so their indices alias one source element; no data is copied. */
+/**
+ * Broadcast `a` to `new_shape` as a zero-stride strided view: size-1 (and prepended)
+ * dims get stride 0 so their indices alias one source element; no data is copied.
+ * @param a (Tensor*)
+ * @param params (ExpandParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_expand(Tensor* a, ExpandParams* params) {
     if (!a || !params || !params->new_shape) {
         CML_ERR_NULL("NULL input to uop_expand");
@@ -659,8 +804,13 @@ Tensor* uop_expand(Tensor* a, ExpandParams* params) {
     return result;
 }
 
-/** Reinterpret `a` with caller-supplied strides (same shape) as a strided view, and
- *  record a UOP_STRIDE node so the view participates in the graph. */
+/**
+ * Reinterpret `a` with caller-supplied strides (same shape) as a strided view, and
+ * record a UOP_STRIDE node so the view participates in the graph.
+ * @param a (Tensor*)
+ * @param params (StrideParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_stride(Tensor* a, StrideParams* params) {
     if (!a || !params || !params->new_strides) {
         CML_ERR_NULL("NULL input to uop_stride");
@@ -712,8 +862,13 @@ Tensor* uop_stride(Tensor* a, StrideParams* params) {
     return result;
 }
 
-/** Slice each axis by [start,end) with positive `step` as a strided view (no copy);
- *  negative indices wrap, bounds are clamped, and step < 1 is rejected. */
+/**
+ * Slice each axis by [start,end) with positive `step` as a strided view (no copy);
+ * negative indices wrap, bounds are clamped, and step < 1 is rejected.
+ * @param a (Tensor*)
+ * @param params (SliceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_slice(Tensor* a, SliceParams* params) {
     if (!a || !params || !params->start || !params->end) {
         CML_ERR_NULL("NULL input to uop_slice");
@@ -854,7 +1009,13 @@ Tensor* uop_slice(Tensor* a, SliceParams* params) {
     return result;
 }
 
-/** Lazy affine layer input @ weight^T (+ bias): [...,K] -> [...,N]; bias optional. */
+/**
+ * Lazy affine layer input @ weight^T (+ bias): [...,K] -> [...,N]; bias optional.
+ * @param input (Tensor*)
+ * @param weight (Tensor*)
+ * @param bias (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias) {
     if (!input || !weight) {
         CML_ERR_NULL("NULL tensor input to uop_linear");
@@ -901,7 +1062,13 @@ Tensor* uop_linear(Tensor* input, Tensor* weight, Tensor* bias) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Fused GRU cell gate math: inputs ih/hh [B,3H], hidden [B,H] -> h_new [B,H]. */
+/**
+ * Fused GRU cell gate math: inputs ih/hh [B,3H], hidden [B,H] -> h_new [B,H].
+ * @param ih (Tensor*)
+ * @param hh (Tensor*)
+ * @param hidden (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_gru_cell(Tensor* ih, Tensor* hh, Tensor* hidden) {
     if (!ih || !hh || !hidden) {
         CML_ERR_NULL("NULL tensor input to uop_gru_cell");
@@ -944,7 +1111,14 @@ Tensor* uop_gru_cell(Tensor* ih, Tensor* hh, Tensor* hidden) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Adjoint of uop_gru_cell: packs [dih(3H) | dhh(3H) | dhidden(H)] into [B,7H]. */
+/**
+ * Adjoint of uop_gru_cell: packs [dih(3H) | dhh(3H) | dhidden(H)] into [B,7H].
+ * @param grad_h (Tensor*)
+ * @param ih (Tensor*)
+ * @param hh (Tensor*)
+ * @param hidden (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_gru_cell_bwd(Tensor* grad_h, Tensor* ih, Tensor* hh, Tensor* hidden) {
     if (!grad_h || !ih || !hh || !hidden) {
         CML_ERR_NULL("NULL tensor input to uop_gru_cell_bwd");
@@ -970,7 +1144,12 @@ Tensor* uop_gru_cell_bwd(Tensor* grad_h, Tensor* ih, Tensor* hh, Tensor* hidden)
     return tensor_from_ir_node(node, ir);
 }
 
-/** Fused LSTM cell gate math: gates [B,4H], c_prev [B,H] -> packed [B,2H]. */
+/**
+ * Fused LSTM cell gate math: gates [B,4H], c_prev [B,H] -> packed [B,2H].
+ * @param gates (Tensor*)
+ * @param c_prev (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_lstm_cell(Tensor* gates, Tensor* c_prev) {
     if (!gates || !c_prev) {
         CML_ERR_NULL("NULL tensor input to uop_lstm_cell");
@@ -1011,7 +1190,13 @@ Tensor* uop_lstm_cell(Tensor* gates, Tensor* c_prev) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Adjoint of uop_lstm_cell: packs [dgates(4H) | dc_prev(H)] into [B,5H]. */
+/**
+ * Adjoint of uop_lstm_cell: packs [dgates(4H) | dc_prev(H)] into [B,5H].
+ * @param grad_packed (Tensor*)
+ * @param gates (Tensor*)
+ * @param c_prev (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_lstm_cell_bwd(Tensor* grad_packed, Tensor* gates, Tensor* c_prev) {
     if (!grad_packed || !gates || !c_prev) {
         CML_ERR_NULL("NULL tensor input to uop_lstm_cell_bwd");
@@ -1037,7 +1222,12 @@ Tensor* uop_lstm_cell_bwd(Tensor* grad_packed, Tensor* gates, Tensor* c_prev) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Fused RNN (tanh) cell: ih, hh [B,H] -> h_new = tanh(ih+hh) [B,H]. */
+/**
+ * Fused RNN (tanh) cell: ih, hh [B,H] -> h_new = tanh(ih+hh) [B,H].
+ * @param ih (Tensor*)
+ * @param hh (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_rnn_cell(Tensor* ih, Tensor* hh) {
     if (!ih || !hh) {
         CML_ERR_NULL("NULL tensor input to uop_rnn_cell");
@@ -1072,7 +1262,12 @@ Tensor* uop_rnn_cell(Tensor* ih, Tensor* hh) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Adjoint of uop_rnn_cell: da = grad_h * (1 - h_new^2) [B,H]. */
+/**
+ * Adjoint of uop_rnn_cell: da = grad_h * (1 - h_new^2) [B,H].
+ * @param grad_h (Tensor*)
+ * @param h_new (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_rnn_cell_bwd(Tensor* grad_h, Tensor* h_new) {
     if (!grad_h || !h_new) {
         CML_ERR_NULL("NULL tensor input to uop_rnn_cell_bwd");
@@ -1094,7 +1289,14 @@ Tensor* uop_rnn_cell_bwd(Tensor* grad_h, Tensor* h_new) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Fused LayerNorm over the last dim; gamma/beta both NULL = no affine. */
+/**
+ * Fused LayerNorm over the last dim; gamma/beta both NULL = no affine.
+ * @param x (Tensor*)
+ * @param gamma (Tensor*)
+ * @param beta (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_layernorm(Tensor* x, Tensor* gamma, Tensor* beta, float eps) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_layernorm");
@@ -1131,7 +1333,14 @@ Tensor* uop_layernorm(Tensor* x, Tensor* gamma, Tensor* beta, float eps) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Adjoint of uop_layernorm: flat [dx (rows*D) | dgamma (D) | dbeta (D)]. */
+/**
+ * Adjoint of uop_layernorm: flat [dx (rows*D) | dgamma (D) | dbeta (D)].
+ * @param grad_y (Tensor*)
+ * @param x (Tensor*)
+ * @param gamma (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_layernorm_bwd(Tensor* grad_y, Tensor* x, Tensor* gamma, float eps) {
     if (!grad_y || !x) {
         CML_ERR_NULL("NULL tensor input to uop_layernorm_bwd");
@@ -1160,7 +1369,13 @@ Tensor* uop_layernorm_bwd(Tensor* grad_y, Tensor* x, Tensor* gamma, float eps) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Fused RMSNorm over the last dim: y = x * rsqrt(mean(x^2) + eps) * weight. */
+/**
+ * Fused RMSNorm over the last dim: y = x * rsqrt(mean(x^2) + eps) * weight.
+ * @param x (Tensor*)
+ * @param weight (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_rmsnorm(Tensor* x, Tensor* weight, float eps) {
     if (!x || !weight) {
         CML_ERR_NULL("NULL tensor input to uop_rmsnorm");
@@ -1192,7 +1407,14 @@ Tensor* uop_rmsnorm(Tensor* x, Tensor* weight, float eps) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Adjoint of uop_rmsnorm: flat [dx (rows*D) | dweight (D)]. */
+/**
+ * Adjoint of uop_rmsnorm: flat [dx (rows*D) | dweight (D)].
+ * @param grad_y (Tensor*)
+ * @param x (Tensor*)
+ * @param weight (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_rmsnorm_bwd(Tensor* grad_y, Tensor* x, Tensor* weight, float eps) {
     if (!grad_y || !x || !weight) {
         CML_ERR_NULL("NULL tensor input to uop_rmsnorm_bwd");
@@ -1220,7 +1442,12 @@ Tensor* uop_rmsnorm_bwd(Tensor* grad_y, Tensor* x, Tensor* weight, float eps) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Matrix multiply a @ b (delegates to tensor_matmul, which handles batching/broadcast). */
+/**
+ * Matrix multiply a @ b (delegates to tensor_matmul, which handles batching/broadcast).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_matmul(Tensor* a, Tensor* b) {
     if (!a || !b) {
         CML_ERR_NULL("NULL tensor input to uop_matmul");
@@ -1230,12 +1457,26 @@ Tensor* uop_matmul(Tensor* a, Tensor* b) {
     return tensor_matmul(a, b);
 }
 
-/** Constant-filled float32 CPU tensor of the given shape (lazy source node). */
+/**
+ * Constant-filled float32 CPU tensor of the given shape (lazy source node).
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param value (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_fill(int* shape, int ndim, float value) {
     return uop_fill_ex(shape, ndim, value, DTYPE_FLOAT32, DEVICE_CPU);
 }
 
-/** Constant-filled tensor with explicit dtype/device (lazy UOP_FILL source node). */
+/**
+ * Constant-filled tensor with explicit dtype/device (lazy UOP_FILL source node).
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param value (float)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_fill_ex(int* shape, int ndim, float value, DType dtype, DeviceType device) {
     if (!shape || ndim <= 0) {
         CML_ERR_NULL("Invalid shape for uop_fill_ex");
@@ -1269,7 +1510,16 @@ Tensor* uop_fill_ex(int* shape, int ndim, float value, DType dtype, DeviceType d
     return cml_uop_finish_source_node(ir, shape, ndim, dtype, device);
 }
 
-/** Materialize a constant tensor by copying `data` into a lazy UOP_CONST source node. */
+/**
+ * Materialize a constant tensor by copying `data` into a lazy UOP_CONST source node.
+ * @param data (const void*)
+ * @param data_size (size_t)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_const(const void* data, size_t data_size, int* shape, int ndim, DType dtype,
                   DeviceType device) {
     if (!data || data_size == 0 || !shape || ndim <= 0) {
@@ -1312,7 +1562,14 @@ Tensor* uop_const(const void* data, size_t data_size, int* shape, int ndim, DTyp
     return cml_uop_finish_source_node(ir, shape, ndim, dtype, device);
 }
 
-/** Lazy U(0,1) random source tensor of the given shape/dtype/device. */
+/**
+ * Lazy U(0,1) random source tensor of the given shape/dtype/device.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_rand_uniform(int* shape, int ndim, DType dtype, DeviceType device) {
     if (!shape || ndim <= 0) {
         CML_ERR_NULL("Invalid shape for uop_rand_uniform");
@@ -1336,7 +1593,14 @@ Tensor* uop_rand_uniform(int* shape, int ndim, DType dtype, DeviceType device) {
     return cml_uop_finish_source_node(ir, shape, ndim, dtype, device);
 }
 
-/** Lazy standard-normal N(0,1) random source tensor of the given shape/dtype/device. */
+/**
+ * Lazy standard-normal N(0,1) random source tensor of the given shape/dtype/device.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_rand_normal(int* shape, int ndim, DType dtype, DeviceType device) {
     if (!shape || ndim <= 0) {
         CML_ERR_NULL("Invalid shape for uop_rand_normal");
@@ -1360,7 +1624,15 @@ Tensor* uop_rand_normal(int* shape, int ndim, DType dtype, DeviceType device) {
     return cml_uop_finish_source_node(ir, shape, ndim, dtype, device);
 }
 
-/** Lazy 1-D range [start, end) stepped by `step`; length is ceil((end-start)/step). */
+/**
+ * Lazy 1-D range [start, end) stepped by `step`; length is ceil((end-start)/step).
+ * @param start (float)
+ * @param end (float)
+ * @param step (float)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_arange_op(float start, float end, float step, DType dtype, DeviceType device) {
     if (step == 0.0f) {
         CML_ERR_NULL("uop_arange_op: step cannot be zero");
@@ -1407,7 +1679,13 @@ Tensor* uop_arange_op(float start, float end, float step, DType dtype, DeviceTyp
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy n x n identity matrix source node. */
+/**
+ * Lazy n x n identity matrix source node.
+ * @param n (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_eye_op(int n, DType dtype, DeviceType device) {
     if (n <= 0) {
         LOG_ERROR("uop_eye_op: n must be positive, got %d", n);
@@ -1448,7 +1726,16 @@ Tensor* uop_eye_op(int n, DType dtype, DeviceType device) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy random-integer source tensor with values drawn from [low, high). */
+/**
+ * Lazy random-integer source tensor with values drawn from [low, high).
+ * @param low (int)
+ * @param high (int)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_rand_int(int low, int high, int* shape, int ndim, DType dtype, DeviceType device) {
     if (!shape || ndim <= 0) {
         CML_ERR_NULL("Invalid shape for uop_rand_int");
@@ -1479,8 +1766,14 @@ Tensor* uop_rand_int(int low, int high, int* shape, int ndim, DType dtype, Devic
     return cml_uop_finish_source_node(ir, shape, ndim, dtype, device);
 }
 
-/** NumPy-style gather along `dim` with 1-D `indices`; output shape is
- *  indices.shape + input.shape[dim+1:]. Gradient flows only to `input`. */
+/**
+ * NumPy-style gather along `dim` with 1-D `indices`; output shape is
+ * indices.shape + input.shape[dim+1:]. Gradient flows only to `input`.
+ * @param input (Tensor*)
+ * @param indices (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_gather(Tensor* input, Tensor* indices, int dim) {
     if (!input || !indices) {
         CML_ERR_NULL("NULL tensor input to uop_gather");
@@ -1555,8 +1848,12 @@ Tensor* uop_gather(Tensor* input, Tensor* indices, int dim) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Element-wise select cond ? a : b, lowered to cond*a + (1-cond)*b so it stays
- *  differentiable through the arithmetic uops. */
+/**
+ * Element-wise select cond ? a : b, lowered to cond*a + (1-cond)*b so it stays
+ * differentiable through the arithmetic uops.
+ * @param params (WhereParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_where(WhereParams* params) {
     if (!params || !params->cond || !params->a || !params->b) {
         CML_ERR_NULL("NULL input to uop_where");
@@ -1581,14 +1878,30 @@ Tensor* uop_where(WhereParams* params) {
     return uop_add(term1, term2);
 }
 
-/** Lazy ReLU activation. */
+/**
+ * Lazy ReLU activation.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_relu(Tensor* x) { return uop_unary_noparam(x, UOP_RELU, true); }
-/** Lazy logistic sigmoid activation. */
+/**
+ * Lazy logistic sigmoid activation.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_sigmoid(Tensor* x) { return uop_unary_noparam(x, UOP_SIGMOID, true); }
-/** Lazy tanh activation. */
+/**
+ * Lazy tanh activation.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_tanh(Tensor* x) { return uop_unary_noparam(x, UOP_TANH, true); }
 
-/** Tanh-approximation GELU, composed from primitive uops so it is differentiable. */
+/**
+ * Tanh-approximation GELU, composed from primitive uops so it is differentiable.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_gelu(Tensor* x) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_gelu");
@@ -1645,7 +1958,11 @@ Tensor* uop_gelu(Tensor* x) {
 
 /** Numerically-stable softmax along `dim`, composed from max/exp/sum uops; the reduced
  *  max and sum are broadcast back via explicit EXPAND so the VJP is exact. */
-/** Fused softmax over the last dim: y = exp(x-max)/sum(exp(x-max)) per row. */
+/**
+ * Fused softmax over the last dim: y = exp(x-max)/sum(exp(x-max)) per row.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_softmax_lastdim(Tensor* x) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_softmax_lastdim");
@@ -1669,7 +1986,12 @@ Tensor* uop_softmax_lastdim(Tensor* x) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Adjoint of uop_softmax_lastdim: dx = y*(grad_y - rowsum(grad_y*y)). */
+/**
+ * Adjoint of uop_softmax_lastdim: dx = y*(grad_y - rowsum(grad_y*y)).
+ * @param grad_y (Tensor*)
+ * @param y (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_softmax_bwd(Tensor* grad_y, Tensor* y) {
     if (!grad_y || !y) {
         CML_ERR_NULL("NULL tensor input to uop_softmax_bwd");
@@ -1694,7 +2016,11 @@ Tensor* uop_softmax_bwd(Tensor* grad_y, Tensor* y) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Fused log-softmax over the last dim: y = x - max - log(sum exp(x-max)). */
+/**
+ * Fused log-softmax over the last dim: y = x - max - log(sum exp(x-max)).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_log_softmax_lastdim(Tensor* x) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_log_softmax_lastdim");
@@ -1718,7 +2044,12 @@ Tensor* uop_log_softmax_lastdim(Tensor* x) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Adjoint of uop_log_softmax_lastdim: dx = grad_y - exp(y)*rowsum(grad_y). */
+/**
+ * Adjoint of uop_log_softmax_lastdim: dx = grad_y - exp(y)*rowsum(grad_y).
+ * @param grad_y (Tensor*)
+ * @param y (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_log_softmax_bwd(Tensor* grad_y, Tensor* y) {
     if (!grad_y || !y) {
         CML_ERR_NULL("NULL tensor input to uop_log_softmax_bwd");
@@ -1800,7 +2131,12 @@ Tensor* uop_softmax(Tensor* x, int dim) {
     return uop_div(exp_x, sum_e);
 }
 
-/** Leaky ReLU as max(x, negative_slope * x) built from primitive uops. */
+/**
+ * Leaky ReLU as max(x, negative_slope * x) built from primitive uops.
+ * @param x (Tensor*)
+ * @param negative_slope (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_leaky_relu(Tensor* x, float negative_slope) {
     if (!x) {
         CML_ERR_NULL("NULL tensor input to uop_leaky_relu");
@@ -1836,7 +2172,13 @@ DEFINE_SIMPLE_UNARY_UOP(uop_square, UOP_SQUARE)
 DEFINE_SIMPLE_UNARY_UOP(uop_rsqrt, UOP_RSQRT)
 DEFINE_SIMPLE_UNARY_UOP(uop_erf, UOP_ERF)
 
-/** Lazy element-wise clamp to [min_val, max_val] (UOP_CLAMP). */
+/**
+ * Lazy element-wise clamp to [min_val, max_val] (UOP_CLAMP).
+ * @param a (Tensor*)
+ * @param min_val (float)
+ * @param max_val (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_clamp(Tensor* a, float min_val, float max_val) {
     if (!a)
         return NULL;
@@ -1858,20 +2200,40 @@ Tensor* uop_clamp(Tensor* a, float min_val, float max_val) {
     return finish_samesize_unary(ir, a);
 }
 
-/** Lazy product reduction over `params` axes. */
+/**
+ * Lazy product reduction over `params` axes.
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_prod(Tensor* a, ReduceParams* params) { return uop_reduce(a, params, UOP_PROD); }
 
-/** Lazy argmax reduction (returns indices; non-differentiable). */
+/**
+ * Lazy argmax reduction (returns indices; non-differentiable).
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_argmax(Tensor* a, ReduceParams* params) {
     return uop_reduce_ex(a, params, UOP_ARGMAX, false);
 }
 
-/** Lazy argmin reduction (returns indices; non-differentiable). */
+/**
+ * Lazy argmin reduction (returns indices; non-differentiable).
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_argmin(Tensor* a, ReduceParams* params) {
     return uop_reduce_ex(a, params, UOP_ARGMIN, false);
 }
 
-/** Lazy cumulative sum along `dim` (negative dim wraps); output keeps input shape. */
+/**
+ * Lazy cumulative sum along `dim` (negative dim wraps); output keeps input shape.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_cumsum(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -1893,7 +2255,12 @@ Tensor* uop_cumsum(Tensor* a, int dim) {
     return finish_samesize_unary(ir, a);
 }
 
-/** Lazy upper-triangular mask, keeping entries on/above the given `diagonal`. */
+/**
+ * Lazy upper-triangular mask, keeping entries on/above the given `diagonal`.
+ * @param a (Tensor*)
+ * @param diagonal (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_triu(Tensor* a, int diagonal) {
     if (!a || a->ndim < 2)
         return NULL;
@@ -1915,7 +2282,12 @@ Tensor* uop_triu(Tensor* a, int diagonal) {
     return finish_samesize_unary(ir, a);
 }
 
-/** Lazy lower-triangular mask, keeping entries on/below the given `diagonal`. */
+/**
+ * Lazy lower-triangular mask, keeping entries on/below the given `diagonal`.
+ * @param a (Tensor*)
+ * @param diagonal (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_tril(Tensor* a, int diagonal) {
     if (!a || a->ndim < 2)
         return NULL;
@@ -1963,8 +2335,16 @@ static int add_pad_node(CMLGraph_t ir, Tensor* a, int* pad_widths, int num_dims,
     return 0;
 }
 
-/** Shared pad builder: emits a UOP_PAD node with the given mode/value and grows each
- *  axis by its (before, after) pair from `pad_widths`. */
+/**
+ * Shared pad builder: emits a UOP_PAD node with the given mode/value and grows each
+ * axis by its (before, after) pair from `pad_widths`.
+ * @param a (Tensor*)
+ * @param pad_widths (int*)
+ * @param num_dims (int)
+ * @param mode (int)
+ * @param value (float)
+ * @return (Tensor*)
+ */
 static Tensor* uop_pad_impl(Tensor* a, int* pad_widths, int num_dims, int mode, float value) {
     if (!a || !pad_widths || num_dims != a->ndim)
         return NULL;
@@ -1983,12 +2363,25 @@ static Tensor* uop_pad_impl(Tensor* a, int* pad_widths, int num_dims, int mode, 
     return finish_reshaped_unary(ir, a, out_shape, a->ndim);
 }
 
-/** Lazy constant padding with `value` (per-axis before/after widths). */
+/**
+ * Lazy constant padding with `value` (per-axis before/after widths).
+ * @param a (Tensor*)
+ * @param pad_widths (int*)
+ * @param num_dims (int)
+ * @param value (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_pad(Tensor* a, int* pad_widths, int num_dims, float value) {
     return uop_pad_impl(a, pad_widths, num_dims, PAD_CONSTANT, value);
 }
 
-/** Lazy sort of values along `dim` (negative dim wraps); shape is preserved. */
+/**
+ * Lazy sort of values along `dim` (negative dim wraps); shape is preserved.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param descending (bool)
+ * @return (Tensor*)
+ */
 Tensor* uop_sort(Tensor* a, int dim, bool descending) {
     if (!a)
         return NULL;
@@ -2013,7 +2406,13 @@ Tensor* uop_sort(Tensor* a, int dim, bool descending) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy argsort: indices that sort `a` along `dim` (shape preserved). */
+/**
+ * Lazy argsort: indices that sort `a` along `dim` (shape preserved).
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param descending (bool)
+ * @return (Tensor*)
+ */
 Tensor* uop_argsort(Tensor* a, int dim, bool descending) {
     if (!a)
         return NULL;
@@ -2038,8 +2437,16 @@ Tensor* uop_argsort(Tensor* a, int dim, bool descending) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy top-k along `dim`: returns the k values and, if `indices_out` is set, their
- *  indices (derived by shrinking an argsort to the first k of the ordering). */
+/**
+ * Lazy top-k along `dim`: returns the k values and, if `indices_out` is set, their
+ * indices (derived by shrinking an argsort to the first k of the ordering).
+ * @param a (Tensor*)
+ * @param k (int)
+ * @param dim (int)
+ * @param largest (bool)
+ * @param indices_out (Tensor**)
+ * @return (Tensor*)
+ */
 Tensor* uop_topk(Tensor* a, int k, int dim, bool largest, Tensor** indices_out) {
     if (!a || k <= 0)
         return NULL;
@@ -2106,7 +2513,12 @@ Tensor* uop_topk(Tensor* a, int k, int dim, bool largest, Tensor** indices_out) 
     return values;
 }
 
-/** Lazy cumulative product along `dim` (negative dim wraps); shape is preserved. */
+/**
+ * Lazy cumulative product along `dim` (negative dim wraps); shape is preserved.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_cumprod(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -2130,7 +2542,12 @@ Tensor* uop_cumprod(Tensor* a, int dim) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy element-wise bitwise AND (broadcasting, no gradient). */
+/**
+ * Lazy element-wise bitwise AND (broadcasting, no gradient).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_bitwise_and(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
@@ -2151,7 +2568,12 @@ Tensor* uop_bitwise_and(Tensor* a, Tensor* b) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy element-wise bitwise OR (broadcasting, no gradient). */
+/**
+ * Lazy element-wise bitwise OR (broadcasting, no gradient).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_bitwise_or(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
@@ -2172,7 +2594,12 @@ Tensor* uop_bitwise_or(Tensor* a, Tensor* b) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy element-wise bitwise XOR (broadcasting, no gradient). */
+/**
+ * Lazy element-wise bitwise XOR (broadcasting, no gradient).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_bitwise_xor(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
@@ -2193,7 +2620,11 @@ Tensor* uop_bitwise_xor(Tensor* a, Tensor* b) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy element-wise bitwise NOT (shape preserved, no gradient). */
+/**
+ * Lazy element-wise bitwise NOT (shape preserved, no gradient).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_bitwise_not(Tensor* a) {
     if (!a)
         return NULL;
@@ -2210,8 +2641,12 @@ Tensor* uop_bitwise_not(Tensor* a) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Coordinates of non-zero elements; eagerly executes `a` to count hits, then emits a
- *  UOP_NONZERO node shaped [count] (1-D input) or [count, ndim]. */
+/**
+ * Coordinates of non-zero elements; eagerly executes `a` to count hits, then emits a
+ * UOP_NONZERO node shaped [count] (1-D input) or [count, ndim].
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_nonzero(Tensor* a) {
     if (!a)
         return NULL;
@@ -2245,7 +2680,13 @@ Tensor* uop_nonzero(Tensor* a) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy masked fill: replace elements of `a` where `mask` is true with `value`. */
+/**
+ * Lazy masked fill: replace elements of `a` where `mask` is true with `value`.
+ * @param a (Tensor*)
+ * @param mask (Tensor*)
+ * @param value (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_masked_fill(Tensor* a, Tensor* mask, float value) {
     if (!a || !mask)
         return NULL;
@@ -2314,33 +2755,68 @@ DEFINE_BOOL_CMP_UOP(uop_cmpge, UOP_CMPGE)
 #undef DEFINE_BINARY_UOP
 #undef DEFINE_BOOL_CMP_UOP
 
-/** Lazy min-value reduction over `params` axes. */
+/**
+ * Lazy min-value reduction over `params` axes.
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_min_reduce(Tensor* a, ReduceParams* params) {
     return uop_reduce(a, params, UOP_MIN_REDUCE);
 }
 
-/** Lazy variance reduction over `params` axes. */
+/**
+ * Lazy variance reduction over `params` axes.
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_var(Tensor* a, ReduceParams* params) { return uop_reduce(a, params, UOP_VAR); }
 
-/** Lazy standard-deviation reduction over `params` axes. */
+/**
+ * Lazy standard-deviation reduction over `params` axes.
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_std(Tensor* a, ReduceParams* params) { return uop_reduce(a, params, UOP_STD); }
 
-/** Lazy "any non-zero" reduction over `params` axes (non-differentiable). */
+/**
+ * Lazy "any non-zero" reduction over `params` axes (non-differentiable).
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_any(Tensor* a, ReduceParams* params) {
     return uop_reduce_ex(a, params, UOP_ANY, false);
 }
 
-/** Lazy "all non-zero" reduction over `params` axes (non-differentiable). */
+/**
+ * Lazy "all non-zero" reduction over `params` axes (non-differentiable).
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_all(Tensor* a, ReduceParams* params) {
     return uop_reduce_ex(a, params, UOP_ALL, false);
 }
 
-/** Lazy numerically-stable log-sum-exp reduction over `params` axes. */
+/**
+ * Lazy numerically-stable log-sum-exp reduction over `params` axes.
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @return (Tensor*)
+ */
 Tensor* uop_logsumexp(Tensor* a, ReduceParams* params) {
     return uop_reduce(a, params, UOP_LOGSUMEXP);
 }
 
-/** Lazy cumulative maximum along `dim` (negative dim wraps); shape is preserved. */
+/**
+ * Lazy cumulative maximum along `dim` (negative dim wraps); shape is preserved.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_cummax(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -2364,7 +2840,12 @@ Tensor* uop_cummax(Tensor* a, int dim) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy cumulative minimum along `dim` (negative dim wraps); shape is preserved. */
+/**
+ * Lazy cumulative minimum along `dim` (negative dim wraps); shape is preserved.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_cummin(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -2388,8 +2869,14 @@ Tensor* uop_cummin(Tensor* a, int dim) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Concatenate tensors along existing axis `dim`; all other dimensions must match.
- *  Output extent along `dim` is the sum of the inputs' extents. */
+/**
+ * Concatenate tensors along existing axis `dim`; all other dimensions must match.
+ * Output extent along `dim` is the sum of the inputs' extents.
+ * @param tensors (Tensor**)
+ * @param num_tensors (int)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_cat(Tensor** tensors, int num_tensors, int dim) {
     if (!tensors || num_tensors <= 0)
         return NULL;
@@ -2434,8 +2921,14 @@ Tensor* uop_cat(Tensor** tensors, int num_tensors, int dim) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Stack equally-shaped tensors along a new axis `dim`, adding one dimension of size
- *  num_tensors. */
+/**
+ * Stack equally-shaped tensors along a new axis `dim`, adding one dimension of size
+ * num_tensors.
+ * @param tensors (Tensor**)
+ * @param num_tensors (int)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_stack(Tensor** tensors, int num_tensors, int dim) {
     if (!tensors || num_tensors <= 0)
         return NULL;
@@ -2485,7 +2978,14 @@ Tensor* uop_stack(Tensor** tensors, int num_tensors, int dim) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy scatter: write `src` into a copy of `a` at positions given by `index` along `dim`. */
+/**
+ * Lazy scatter: write `src` into a copy of `a` at positions given by `index` along `dim`.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param index (Tensor*)
+ * @param src (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_scatter(Tensor* a, int dim, Tensor* index, Tensor* src) {
     if (!a || !index || !src)
         return NULL;
@@ -2512,7 +3012,13 @@ Tensor* uop_scatter(Tensor* a, int dim, Tensor* index, Tensor* src) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy circular shift of elements by `shift` along `dim` (negative dim wraps). */
+/**
+ * Lazy circular shift of elements by `shift` along `dim` (negative dim wraps).
+ * @param a (Tensor*)
+ * @param shift (int)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_roll(Tensor* a, int shift, int dim) {
     if (!a)
         return NULL;
@@ -2538,7 +3044,12 @@ Tensor* uop_roll(Tensor* a, int shift, int dim) {
     return finish_samesize_unary(ir, a);
 }
 
-/** Lazy reverse of elements along `dim` (negative dim wraps). */
+/**
+ * Lazy reverse of elements along `dim` (negative dim wraps).
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_flip(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -2563,7 +3074,13 @@ Tensor* uop_flip(Tensor* a, int dim) {
     return finish_samesize_unary(ir, a);
 }
 
-/** Lazy flatten of dims [start_dim, end_dim] into one (negative indices wrap). */
+/**
+ * Lazy flatten of dims [start_dim, end_dim] into one (negative indices wrap).
+ * @param a (Tensor*)
+ * @param start_dim (int)
+ * @param end_dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_flatten(Tensor* a, int start_dim, int end_dim) {
     if (!a)
         return NULL;
@@ -2609,7 +3126,14 @@ Tensor* uop_flatten(Tensor* a, int start_dim, int end_dim) {
     return finish_reshaped_unary(ir, a, out_shape, out_ndim);
 }
 
-/** Lazy unflatten: split `dim` into `sizes` (whose product must equal the current extent). */
+/**
+ * Lazy unflatten: split `dim` into `sizes` (whose product must equal the current extent).
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param sizes (int*)
+ * @param num_sizes (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_unflatten(Tensor* a, int dim, int* sizes, int num_sizes) {
     if (!a || !sizes || num_sizes <= 0)
         return NULL;
@@ -2663,8 +3187,13 @@ Tensor* uop_unflatten(Tensor* a, int dim, int* sizes, int num_sizes) {
     return finish_reshaped_unary(ir, a, out_shape, out_ndim);
 }
 
-/** Lazy diagonal op: a 1-D input becomes a diagonal matrix, a 2-D input yields its
- *  `offset` diagonal. */
+/**
+ * Lazy diagonal op: a 1-D input becomes a diagonal matrix, a 2-D input yields its
+ * `offset` diagonal.
+ * @param a (Tensor*)
+ * @param offset (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_diag(Tensor* a, int offset) {
     if (!a)
         return NULL;
@@ -2711,7 +3240,12 @@ Tensor* uop_diag(Tensor* a, int offset) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy one-hot encode: append a trailing `num_classes` dimension (non-differentiable). */
+/**
+ * Lazy one-hot encode: append a trailing `num_classes` dimension (non-differentiable).
+ * @param a (Tensor*)
+ * @param num_classes (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_one_hot(Tensor* a, int num_classes) {
     if (!a || num_classes <= 0)
         return NULL;
@@ -2744,7 +3278,11 @@ Tensor* uop_one_hot(Tensor* a, int num_classes) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy complementary error function erfc(a). */
+/**
+ * Lazy complementary error function erfc(a).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_erfc(Tensor* a) {
     if (!a)
         return NULL;
@@ -2757,7 +3295,13 @@ Tensor* uop_erfc(Tensor* a) {
     return finish_samesize_unary(ir, a);
 }
 
-/** Lazy linear interpolation a + t*(b - a), composed from primitive uops. */
+/**
+ * Lazy linear interpolation a + t*(b - a), composed from primitive uops.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param t (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_lerp(Tensor* a, Tensor* b, Tensor* t) {
     if (!a || !b || !t)
         return NULL;
@@ -2771,7 +3315,13 @@ Tensor* uop_lerp(Tensor* a, Tensor* b, Tensor* t) {
     return uop_add(a, scaled);
 }
 
-/** Lazy tile: repeat the tensor `repeats[i]` times along each axis i. */
+/**
+ * Lazy tile: repeat the tensor `repeats[i]` times along each axis i.
+ * @param a (Tensor*)
+ * @param repeats (int*)
+ * @param num_dims (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_tile(Tensor* a, int* repeats, int num_dims) {
     if (!a || !repeats || num_dims != a->ndim)
         return NULL;
@@ -2812,7 +3362,13 @@ Tensor* uop_tile(Tensor* a, int* repeats, int num_dims) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy repeat-interleave: duplicate each element `repeats` times along `dim`. */
+/**
+ * Lazy repeat-interleave: duplicate each element `repeats` times along `dim`.
+ * @param a (Tensor*)
+ * @param repeats (int)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_repeat_interleave(Tensor* a, int repeats, int dim) {
     if (!a || repeats <= 0)
         return NULL;
@@ -2844,7 +3400,11 @@ Tensor* uop_repeat_interleave(Tensor* a, int repeats, int dim) {
     return finish_reshaped_unary(ir, a, out_shape, a->ndim);
 }
 
-/** Lazy matrix trace (sum of the main diagonal) of a 2-D tensor; result shape [1]. */
+/**
+ * Lazy matrix trace (sum of the main diagonal) of a 2-D tensor; result shape [1].
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_trace(Tensor* a) {
     if (!a || a->ndim != 2)
         return NULL;
@@ -2867,7 +3427,14 @@ Tensor* uop_trace(Tensor* a) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy contiguous crop to the box [starts[i], ends[i]) on every axis (differentiable). */
+/**
+ * Lazy contiguous crop to the box [starts[i], ends[i]) on every axis (differentiable).
+ * @param a (Tensor*)
+ * @param starts (int*)
+ * @param ends (int*)
+ * @param num_dims (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_shrink(Tensor* a, int* starts, int* ends, int num_dims) {
     if (!a || !starts || !ends || num_dims != a->ndim)
         return NULL;
@@ -2915,7 +3482,12 @@ Tensor* uop_shrink(Tensor* a, int* starts, int* ends, int num_dims) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy numerically-stable cumulative log-sum-exp along `dim` (negative dim wraps). */
+/**
+ * Lazy numerically-stable cumulative log-sum-exp along `dim` (negative dim wraps).
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_logcumsumexp(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -2937,7 +3509,11 @@ Tensor* uop_logcumsumexp(Tensor* a, int dim) {
     return finish_samesize_unary(ir, a);
 }
 
-/** ReLU6 activation, i.e. clamp(x, 0, 6). */
+/**
+ * ReLU6 activation, i.e. clamp(x, 0, 6).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_relu6(Tensor* x) {
     if (!x)
         return NULL;
@@ -2945,7 +3521,11 @@ Tensor* uop_relu6(Tensor* x) {
     return uop_clamp(x, 0.0f, 6.0f);
 }
 
-/** Hard sigmoid clamp((x + 3) / 6, 0, 1), composed from primitive uops. */
+/**
+ * Hard sigmoid clamp((x + 3) / 6, 0, 1), composed from primitive uops.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_hard_sigmoid(Tensor* x) {
     if (!x)
         return NULL;
@@ -2965,14 +3545,23 @@ Tensor* uop_hard_sigmoid(Tensor* x) {
     return uop_clamp(scaled, 0.0f, 1.0f);
 }
 
-/** Hard tanh activation, i.e. clamp(x, -1, 1). */
+/**
+ * Hard tanh activation, i.e. clamp(x, -1, 1).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_hard_tanh(Tensor* x) {
     if (!x)
         return NULL;
     return uop_clamp(x, -1.0f, 1.0f);
 }
 
-/** Lazy CELU activation; `alpha` is passed through ClampParams to the UOP_CELU kernel. */
+/**
+ * Lazy CELU activation; `alpha` is passed through ClampParams to the UOP_CELU kernel.
+ * @param x (Tensor*)
+ * @param alpha (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_celu(Tensor* x, float alpha) {
     if (!x)
         return NULL;
@@ -2995,7 +3584,11 @@ Tensor* uop_celu(Tensor* x, float alpha) {
     return finish_samesize_unary(ir, x);
 }
 
-/** Quick GELU x * sigmoid(1.702 * x), composed from primitive uops. */
+/**
+ * Quick GELU x * sigmoid(1.702 * x), composed from primitive uops.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_quick_gelu(Tensor* x) {
     if (!x)
         return NULL;
@@ -3012,12 +3605,24 @@ Tensor* uop_quick_gelu(Tensor* x) {
     return uop_mul(x, sig);
 }
 
-/** Lazy softplus activation. */
+/**
+ * Lazy softplus activation.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_softplus(Tensor* x) { return uop_unary_noparam(x, UOP_SOFTPLUS, true); }
-/** Lazy softsign activation. */
+/**
+ * Lazy softsign activation.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_softsign(Tensor* x) { return uop_unary_noparam(x, UOP_SOFTSIGN, true); }
 
-/** Lazy log-sigmoid activation (stable UOP_LOGSIGMOID kernel). */
+/**
+ * Lazy log-sigmoid activation (stable UOP_LOGSIGMOID kernel).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_logsigmoid(Tensor* x) {
     if (!x)
         return NULL;
@@ -3032,8 +3637,14 @@ Tensor* uop_logsigmoid(Tensor* x) {
     return finish_samesize_unary(ir, x);
 }
 
-/** Lazy im2col over the last axis: slide a `kernel_size` window by `stride`, adding a
- *  trailing window dimension ([..., num_windows, kernel_size]). */
+/**
+ * Lazy im2col over the last axis: slide a `kernel_size` window by `stride`, adding a
+ * trailing window dimension ([..., num_windows, kernel_size]).
+ * @param a (Tensor*)
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_unfold(Tensor* a, int kernel_size, int stride) {
     if (!a)
         return NULL;
@@ -3241,7 +3852,14 @@ Tensor* uop_col2im(Tensor* g, Col2imParams* params) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Compute variance and mean over `params` axes together into the two out-params. */
+/**
+ * Compute variance and mean over `params` axes together into the two out-params.
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @param out_var (Tensor**)
+ * @param out_mean (Tensor**)
+ * @return (void)
+ */
 void uop_var_mean(Tensor* a, ReduceParams* params, Tensor** out_var, Tensor** out_mean) {
     if (!a || !out_var || !out_mean)
         return;
@@ -3249,7 +3867,14 @@ void uop_var_mean(Tensor* a, ReduceParams* params, Tensor** out_var, Tensor** ou
     *out_var  = uop_var(a, params);
 }
 
-/** Compute standard deviation and mean over `params` axes together into the out-params. */
+/**
+ * Compute standard deviation and mean over `params` axes together into the out-params.
+ * @param a (Tensor*)
+ * @param params (ReduceParams*)
+ * @param out_std (Tensor**)
+ * @param out_mean (Tensor**)
+ * @return (void)
+ */
 void uop_std_mean(Tensor* a, ReduceParams* params, Tensor** out_std, Tensor** out_mean) {
     if (!a || !out_std || !out_mean)
         return;
@@ -3257,7 +3882,12 @@ void uop_std_mean(Tensor* a, ReduceParams* params, Tensor** out_std, Tensor** ou
     *out_std  = uop_std(a, params);
 }
 
-/** Lazy ELU activation; `alpha` is passed through ClampParams to the UOP_ELU kernel. */
+/**
+ * Lazy ELU activation; `alpha` is passed through ClampParams to the UOP_ELU kernel.
+ * @param x (Tensor*)
+ * @param alpha (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_elu(Tensor* x, float alpha) {
     if (!x)
         return NULL;
@@ -3280,17 +3910,38 @@ Tensor* uop_elu(Tensor* x, float alpha) {
     return finish_samesize_unary(ir, x);
 }
 
-/** Lazy SELU activation. */
+/**
+ * Lazy SELU activation.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_selu(Tensor* x) { return uop_unary_noparam(x, UOP_SELU, true); }
-/** Lazy Mish activation. */
+/**
+ * Lazy Mish activation.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_mish(Tensor* x) { return uop_unary_noparam(x, UOP_MISH, true); }
-/** Lazy SiLU/swish activation. */
+/**
+ * Lazy SiLU/swish activation.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_silu(Tensor* x) { return uop_unary_noparam(x, UOP_SILU, true); }
-/** Lazy hard-swish activation. */
+/**
+ * Lazy hard-swish activation.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_hardswish(Tensor* x) { return uop_unary_noparam(x, UOP_HARDSWISH, true); }
 
-/** Lazy masked select into a 1-D result; node is shaped to the full numel, trimmed to the
- *  number of true mask entries at execution. */
+/**
+ * Lazy masked select into a 1-D result; node is shaped to the full numel, trimmed to the
+ * number of true mask entries at execution.
+ * @param a (Tensor*)
+ * @param mask (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_masked_select(Tensor* a, Tensor* mask) {
     if (!a || !mask)
         return NULL;
@@ -3312,8 +3963,15 @@ Tensor* uop_masked_select(Tensor* a, Tensor* mask) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Split `a` along `dim` into fixed-size `split_size` chunks (last may be smaller), each a
- *  lazy slice; returns the array and writes the count to `num_splits`. */
+/**
+ * Split `a` along `dim` into fixed-size `split_size` chunks (last may be smaller), each a
+ * lazy slice; returns the array and writes the count to `num_splits`.
+ * @param a (Tensor*)
+ * @param split_size (int)
+ * @param dim (int)
+ * @param num_splits (int*)
+ * @return (Tensor**)
+ */
 Tensor** uop_split(Tensor* a, int split_size, int dim, int* num_splits) {
     if (!a || split_size <= 0 || !num_splits)
         return NULL;
@@ -3371,7 +4029,14 @@ Tensor** uop_split(Tensor* a, int split_size, int dim, int* num_splits) {
     return results;
 }
 
-/** Split `a` into (up to) `chunks` roughly-equal parts along `dim` (wraps uop_split). */
+/**
+ * Split `a` into (up to) `chunks` roughly-equal parts along `dim` (wraps uop_split).
+ * @param a (Tensor*)
+ * @param chunks (int)
+ * @param dim (int)
+ * @param num_chunks (int*)
+ * @return (Tensor**)
+ */
 Tensor** uop_chunk(Tensor* a, int chunks, int dim, int* num_chunks) {
     if (!a || chunks <= 0 || !num_chunks)
         return NULL;
@@ -3385,8 +4050,14 @@ Tensor** uop_chunk(Tensor* a, int chunks, int dim, int* num_chunks) {
     return uop_split(a, chunk_size, dim, num_chunks);
 }
 
-/** Build N coordinate grids from N 1-D tensors by reshaping each to a distinct axis and
- *  broadcasting via EXPAND; returns the array and writes the count to `num_outputs`. */
+/**
+ * Build N coordinate grids from N 1-D tensors by reshaping each to a distinct axis and
+ * broadcasting via EXPAND; returns the array and writes the count to `num_outputs`.
+ * @param tensors (Tensor**)
+ * @param num_tensors (int)
+ * @param num_outputs (int*)
+ * @return (Tensor**)
+ */
 Tensor** uop_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {
     if (!tensors || num_tensors <= 0 || !num_outputs)
         return NULL;
@@ -3437,8 +4108,15 @@ Tensor** uop_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {
     return results;
 }
 
-/** Lazy diagonal taken from the (`dim1`, `dim2`) plane at `offset`; those two axes are
- *  replaced by a single trailing diagonal-length dimension. */
+/**
+ * Lazy diagonal taken from the (`dim1`, `dim2`) plane at `offset`; those two axes are
+ * replaced by a single trailing diagonal-length dimension.
+ * @param a (Tensor*)
+ * @param offset (int)
+ * @param dim1 (int)
+ * @param dim2 (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_diagonal(Tensor* a, int offset, int dim1, int dim2) {
     if (!a || a->ndim < 2)
         return NULL;
@@ -3497,7 +4175,13 @@ Tensor* uop_diagonal(Tensor* a, int offset, int dim1, int dim2) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Lazy reflection padding (mirror without repeating the edge), per-axis before/after widths. */
+/**
+ * Lazy reflection padding (mirror without repeating the edge), per-axis before/after widths.
+ * @param a (Tensor*)
+ * @param pad_widths (int*)
+ * @param num_dims (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_pad_reflect(Tensor* a, int* pad_widths, int num_dims) {
     if (!a || !pad_widths || num_dims != a->ndim)
         return NULL;
@@ -3517,14 +4201,29 @@ Tensor* uop_pad_reflect(Tensor* a, int* pad_widths, int num_dims) {
     return finish_reshaped_unary(ir, a, out_shape, a->ndim);
 }
 
-/** Lazy replication (edge) padding, per-axis before/after widths. */
+/**
+ * Lazy replication (edge) padding, per-axis before/after widths.
+ * @param a (Tensor*)
+ * @param pad_widths (int*)
+ * @param num_dims (int)
+ * @return (Tensor*)
+ */
 Tensor* uop_pad_replicate(Tensor* a, int* pad_widths, int num_dims) {
     return uop_pad_impl(a, pad_widths, num_dims, PAD_REPLICATE, 0.0f);
 }
 
 /** Scaled dot-product attention softmax(q k^T / sqrt(d_k) + mask + bias) v, composed from
  *  primitive uops; `mask` and `attn_bias` are optional additive terms. */
-/** Fused scaled-dot-product attention (UOP_SDPA). q,k,v are [B,H,S,D]. */
+/**
+ * Fused scaled-dot-product attention (UOP_SDPA). q,k,v are [B,H,S,D].
+ * @param q (Tensor*)
+ * @param k (Tensor*)
+ * @param v (Tensor*)
+ * @param mask (Tensor*)
+ * @param bias (Tensor*)
+ * @param scale (float)
+ * @return (Tensor*)
+ */
 Tensor* uop_sdpa(Tensor* q, Tensor* k, Tensor* v, Tensor* mask, Tensor* bias, float scale) {
     if (!q || !k || !v) {
         CML_ERR_NULL("NULL tensor input to uop_sdpa");
@@ -3647,13 +4346,24 @@ Tensor* uop_scaled_dot_product_attention_bias(Tensor* q, Tensor* k, Tensor* v, T
     return uop_matmul(attn, v);
 }
 
-/** Scaled dot-product attention without an additive bias (wraps the _bias variant). */
+/**
+ * Scaled dot-product attention without an additive bias (wraps the _bias variant).
+ * @param q (Tensor*)
+ * @param k (Tensor*)
+ * @param v (Tensor*)
+ * @param mask (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* uop_scaled_dot_product_attention(Tensor* q, Tensor* k, Tensor* v, Tensor* mask) {
     return uop_scaled_dot_product_attention_bias(q, k, v, mask, NULL);
 }
 
-/** Execute a standalone UOp by dispatching through uop_create_and_execute and storing the
- *  result on `uop->output`. Returns 0 on success, -1 on failure. */
+/**
+ * Execute a standalone UOp by dispatching through uop_create_and_execute and storing the
+ * result on `uop->output`. Returns 0 on success, -1 on failure.
+ * @param uop (UOp*)
+ * @return (int)
+ */
 int uop_execute(UOp* uop) {
     if (!uop || !uop->inputs) {
         LOG_ERROR("Invalid uop");
@@ -3669,8 +4379,15 @@ int uop_execute(UOp* uop) {
     return 0;
 }
 
-/** Dispatch a UOpType plus its inputs to the matching uop_* builder; the single entry point
- *  the interpreter/executor uses to re-materialize an op from its type tag. */
+/**
+ * Dispatch a UOpType plus its inputs to the matching uop_* builder; the single entry point
+ * the interpreter/executor uses to re-materialize an op from its type tag.
+ * @param type (UOpType)
+ * @param inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param params (void*)
+ * @return (Tensor*)
+ */
 Tensor* uop_create_and_execute(UOpType type, Tensor** inputs, int num_inputs, void* params) {
 
     (void)params;
@@ -3996,7 +4713,14 @@ Tensor* uop_create_and_execute(UOpType type, Tensor** inputs, int num_inputs, vo
 
 /* ── Lazy allocation ─────────────────────────────────────────────────────── */
 
-/** Lazy UOP_ALLOC source node: an uninitialized tensor of the given shape/dtype/device. */
+/**
+ * Lazy UOP_ALLOC source node: an uninitialized tensor of the given shape/dtype/device.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* uop_alloc(int* shape, int ndim, DType dtype, DeviceType device) {
     if (!shape || ndim <= 0)
         return NULL;

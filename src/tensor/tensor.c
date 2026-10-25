@@ -24,8 +24,14 @@
 #include "core/threefry.h"
 #include "autograd/autograd.h"
 
-/** Resolve a (possibly NULL) config into a concrete dtype/device, applying the
- *  defaults for a NULL config and expanding DEVICE_AUTO to the best device. */
+/**
+ * Resolve a (possibly NULL) config into a concrete dtype/device, applying the
+ * defaults for a NULL config and expanding DEVICE_AUTO to the best device.
+ * @param config (const TensorConfig*)
+ * @param dtype (DType*)
+ * @param device (DeviceType*)
+ * @return (void)
+ */
 static void resolve_config(const TensorConfig* config, DType* dtype, DeviceType* device) {
     if (!config) {
         *dtype  = DTYPE_FLOAT32;
@@ -41,8 +47,16 @@ static void resolve_config(const TensorConfig* config, DType* dtype, DeviceType*
     }
 }
 
-/** Allocate an eager, contiguous tensor that owns a fresh (uninitialized) data
- *  buffer. Returns NULL on bad args or overflow/OOM. */
+/**
+ * Allocate an eager, contiguous tensor that owns a fresh (uninitialized) data
+ * buffer. Returns NULL on bad args or overflow/OOM.
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @param ndim (int)
+ * @param shape (const int*)
+ * @param requires_grad (bool)
+ * @return (Tensor*)
+ */
 Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape,
                       bool requires_grad) {
     if (!shape || ndim < 0)
@@ -110,7 +124,13 @@ Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape
     return t;
 }
 
-/** Lazy zero-filled tensor of `shape` (via a fill uop). NULL on bad args. */
+/**
+ * Lazy zero-filled tensor of `shape` (via a fill uop). NULL on bad args.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_zeros(int* shape, int ndim, const TensorConfig* config) {
     DType dtype;
     DeviceType device;
@@ -121,7 +141,13 @@ Tensor* tensor_zeros(int* shape, int ndim, const TensorConfig* config) {
     return uop_fill_ex(shape, ndim, 0.0f, dtype, device);
 }
 
-/** Lazy one-filled tensor of `shape` (via a fill uop). NULL on bad args. */
+/**
+ * Lazy one-filled tensor of `shape` (via a fill uop). NULL on bad args.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_ones(int* shape, int ndim, const TensorConfig* config) {
     DType dtype;
     DeviceType device;
@@ -132,7 +158,14 @@ Tensor* tensor_ones(int* shape, int ndim, const TensorConfig* config) {
     return uop_fill_ex(shape, ndim, 1.0f, dtype, device);
 }
 
-/** Lazy tensor of `shape` filled with `value` (via a fill uop). NULL on bad args. */
+/**
+ * Lazy tensor of `shape` filled with `value` (via a fill uop). NULL on bad args.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param config (const TensorConfig*)
+ * @param value (float)
+ * @return (Tensor*)
+ */
 Tensor* tensor_full(int* shape, int ndim, const TensorConfig* config, float value) {
     DType dtype;
     DeviceType device;
@@ -143,8 +176,12 @@ Tensor* tensor_full(int* shape, int ndim, const TensorConfig* config, float valu
     return uop_fill_ex(shape, ndim, value, dtype, device);
 }
 
-/** Return `t`'s data pointer, forcing lazy execution (and refreshing shape from
- *  the IR node) if needed. Allocates zeroed data as a fallback if execution fails. */
+/**
+ * Return `t`'s data pointer, forcing lazy execution (and refreshing shape from
+ * the IR node) if needed. Allocates zeroed data as a fallback if execution fails.
+ * @param t (Tensor*)
+ * @return (void*)
+ */
 void* tensor_data_ptr(Tensor* t) {
     if (!t)
         return NULL;
@@ -193,7 +230,11 @@ void* tensor_data_ptr(Tensor* t) {
     return t->data;
 }
 
-/** Size in bytes of one element of `dtype` (defaults to float size if unknown). */
+/**
+ * Size in bytes of one element of `dtype` (defaults to float size if unknown).
+ * @param dtype (DType)
+ * @return (size_t)
+ */
 size_t cml_dtype_size(DType dtype) {
     switch (dtype) {
     case DTYPE_FLOAT32:
@@ -229,8 +270,12 @@ size_t cml_dtype_size(DType dtype) {
     }
 }
 
-/** Human-readable name for a dtype (e.g. "float32", "bfloat16"), for diagnostics
- *  and graph/kernel export. Returns "unknown" for an unrecognized value. */
+/**
+ * Human-readable name for a dtype (e.g. "float32", "bfloat16"), for diagnostics
+ * and graph/kernel export. Returns "unknown" for an unrecognized value.
+ * @param dtype (DType)
+ * @return (const char*)
+ */
 const char* cml_dtype_to_string(DType dtype) {
     switch (dtype) {
     case DTYPE_FLOAT32:
@@ -272,8 +317,13 @@ const char* cml_dtype_to_string(DType dtype) {
     }
 }
 
-/** Type-promotion result for a binary op: the higher-ranked of the two dtypes
- *  along the bool < uint < int < float hierarchy. */
+/**
+ * Type-promotion result for a binary op: the higher-ranked of the two dtypes
+ * along the bool < uint < int < float hierarchy.
+ * @param dtype1 (DType)
+ * @param dtype2 (DType)
+ * @return (DType)
+ */
 DType cml_promote_dtype(DType dtype1, DType dtype2) {
     if (dtype1 == dtype2) {
         return dtype1;
@@ -308,8 +358,14 @@ DType cml_promote_dtype(DType dtype1, DType dtype2) {
     return (rank1 > rank2) ? dtype1 : dtype2;
 }
 
-/** Compute the element count of `shape` with overflow and negative-dim checks;
- *  writes it to `*out`. Returns false on bad args or overflow. */
+/**
+ * Compute the element count of `shape` with overflow and negative-dim checks;
+ * writes it to `*out`. Returns false on bad args or overflow.
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param out (size_t*)
+ * @return (bool)
+ */
 bool tensor_numel_checked(const int* shape, int ndim, size_t* out) {
     if (!out || ndim < 0 || (!shape && ndim > 0))
         return false;
@@ -331,15 +387,26 @@ bool tensor_numel_checked(const int* shape, int ndim, size_t* out) {
     return true;
 }
 
-/** Element count of `shape`; unchecked convenience wrapper returning 1 on failure. */
+/**
+ * Element count of `shape`; unchecked convenience wrapper returning 1 on failure.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @return (size_t)
+ */
 size_t tensor_numel(int* shape, int ndim) {
     size_t numel = 1;
     tensor_numel_checked(shape, ndim, &numel);
     return numel;
 }
 
-/** Byte size of `numel` elements of `dtype` into `*out`, guarding overflow.
- *  Returns false on an unknown dtype or overflow. */
+/**
+ * Byte size of `numel` elements of `dtype` into `*out`, guarding overflow.
+ * Returns false on an unknown dtype or overflow.
+ * @param numel (size_t)
+ * @param dtype (DType)
+ * @param out (size_t*)
+ * @return (bool)
+ */
 bool tensor_nbytes_checked(size_t numel, DType dtype, size_t* out) {
     size_t elem_size = cml_dtype_size(dtype);
     if (elem_size == 0 || numel > SIZE_MAX / elem_size)
@@ -348,8 +415,13 @@ bool tensor_nbytes_checked(size_t numel, DType dtype, size_t* out) {
     return true;
 }
 
-/** Allocate row-major (contiguous) strides for `shape`; a scalar gets a 1-slot
- *  array. Returns a newly allocated array the caller frees, or NULL on bad args. */
+/**
+ * Allocate row-major (contiguous) strides for `shape`; a scalar gets a 1-slot
+ * array. Returns a newly allocated array the caller frees, or NULL on bad args.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @return (size_t*)
+ */
 size_t* compute_contiguous_strides(int* shape, int ndim) {
     if (!shape || ndim < 0)
         return NULL;
@@ -372,7 +444,13 @@ size_t* compute_contiguous_strides(int* shape, int ndim) {
     return strides;
 }
 
-/** True if `strides` describe a dense row-major layout for `shape`. */
+/**
+ * True if `strides` describe a dense row-major layout for `shape`.
+ * @param shape (int*)
+ * @param strides (size_t*)
+ * @param ndim (int)
+ * @return (bool)
+ */
 bool tensor_check_is_contiguous(int* shape, size_t* strides, int ndim) {
     if (!shape || !strides || ndim <= 0)
         return false;
@@ -387,8 +465,14 @@ bool tensor_check_is_contiguous(int* shape, size_t* strides, int ndim) {
     return true;
 }
 
-/** Minimum element count the backing storage must hold for the given shape/strides
- *  (largest reachable offset plus one). 0 on bad args. */
+/**
+ * Minimum element count the backing storage must hold for the given shape/strides
+ * (largest reachable offset plus one). 0 on bad args.
+ * @param shape (int*)
+ * @param strides (size_t*)
+ * @param ndim (int)
+ * @return (size_t)
+ */
 size_t tensor_compute_storage_size(int* shape, size_t* strides, int ndim) {
     if (!shape || !strides || ndim <= 0)
         return 0;
@@ -403,7 +487,12 @@ size_t tensor_compute_storage_size(int* shape, size_t* strides, int ndim) {
     return max_offset + 1;
 }
 
-/** Allocate a copy of a shape array (handles the 0-dim case). Caller frees it. */
+/**
+ * Allocate a copy of a shape array (handles the 0-dim case). Caller frees it.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @return (int*)
+ */
 int* tensor_shape_copy(int* shape, int ndim) {
     int* new_shape = (int*)cml_malloc((size_t)ndim * sizeof(int));
     if (!new_shape) {
@@ -430,8 +519,13 @@ static size_t tensor_flat_offset(const Tensor* t, size_t idx) {
     return offset;
 }
 
-/** Read flat element `idx` as float, honoring strides/offset for views and
- *  converting from any dtype. 0.0f on NULL/out-of-range or an unset buffer. */
+/**
+ * Read flat element `idx` as float, honoring strides/offset for views and
+ * converting from any dtype. 0.0f on NULL/out-of-range or an unset buffer.
+ * @param t (Tensor*)
+ * @param idx (size_t)
+ * @return (float)
+ */
 float tensor_get_float(Tensor* t, size_t idx) {
     if (t && !t->is_executed) {
         void* data = tensor_data_ptr(t);
@@ -485,8 +579,14 @@ float tensor_get_float(Tensor* t, size_t idx) {
     }
 }
 
-/** Write `value` to flat element `idx`, honoring strides/offset and converting to
- *  the tensor's dtype. No-op on NULL/out-of-range or an unset buffer. */
+/**
+ * Write `value` to flat element `idx`, honoring strides/offset and converting to
+ * the tensor's dtype. No-op on NULL/out-of-range or an unset buffer.
+ * @param t (Tensor*)
+ * @param idx (size_t)
+ * @param value (float)
+ * @return (void)
+ */
 void tensor_set_float(Tensor* t, size_t idx, float value) {
     if (t && cml_flag_enabled(CML_FLAG_CHECK_OOB) && idx >= t->numel)
         LOG_ERROR("CHECK_OOB: tensor_set_float index %zu out of bounds (numel=%zu)", idx, t->numel);
@@ -557,8 +657,13 @@ void tensor_set_float(Tensor* t, size_t idx, float value) {
     }
 }
 
-/** Reset `t`'s shape/ndim/numel/strides from `node`'s output shape (e.g. after a
- *  reshape op). Returns 0 on success, -1 on bad node or OOM. */
+/**
+ * Reset `t`'s shape/ndim/numel/strides from `node`'s output shape (e.g. after a
+ * reshape op). Returns 0 on success, -1 on bad node or OOM.
+ * @param t (Tensor*)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int tensor_refresh_shape_from_node(Tensor* t, struct IRNode* node) {
     if (!t || !node || !node->output_shape || node->output_ndim <= 0)
         return -1;
@@ -583,9 +688,14 @@ static int tensor_refresh_shape_from_node(Tensor* t, struct IRNode* node) {
     return 0;
 }
 
-/** Create (or reuse) the lazy output tensor for an IR node, inferring its
- *  shape/dtype/device from the node or its inputs. The tensor stays unexecuted
- *  until realized. Returns NULL on bad args or OOM. */
+/**
+ * Create (or reuse) the lazy output tensor for an IR node, inferring its
+ * shape/dtype/device from the node or its inputs. The tensor stays unexecuted
+ * until realized. Returns NULL on bad args or OOM.
+ * @param node (struct IRNode*)
+ * @param ir_context (CMLGraph_t)
+ * @return (Tensor*)
+ */
 Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     if (!node || !ir_context)
         return NULL;
@@ -698,7 +808,11 @@ Tensor* tensor_from_ir_node(struct IRNode* node, CMLGraph_t ir_context) {
     return t;
 }
 
-/** Force `t` to be materialized if lazy. Returns 0 if data is available, -1 otherwise. */
+/**
+ * Force `t` to be materialized if lazy. Returns 0 if data is available, -1 otherwise.
+ * @param t (Tensor*)
+ * @return (int)
+ */
 int tensor_ensure_executed(Tensor* t) {
     if (!t)
         return -1;
@@ -709,21 +823,39 @@ int tensor_ensure_executed(Tensor* t) {
     return data ? 0 : -1;
 }
 
-/** The IR graph this tensor belongs to, or NULL if it is detached/eager. */
+/**
+ * The IR graph this tensor belongs to, or NULL if it is detached/eager.
+ * @param t (Tensor*)
+ * @return (CMLGraph_t)
+ */
 CMLGraph_t tensor_get_ir_context(Tensor* t) { return t ? t->ir_context : NULL; }
 
-/** True for a rank-0 (scalar) tensor. */
+/**
+ * True for a rank-0 (scalar) tensor.
+ * @param t (Tensor*)
+ * @return (bool)
+ */
 bool tensor_is_scalar(Tensor* t) { return t && t->ndim == 0; }
 
-/** True if `t`'s current layout is dense row-major. */
+/**
+ * True if `t`'s current layout is dense row-major.
+ * @param t (Tensor*)
+ * @return (bool)
+ */
 bool tensor_is_contiguous(Tensor* t) {
     if (!t)
         return false;
     return t->is_contiguous;
 }
 
-/** Eagerly allocate an uninitialized tensor so callers can write ->data directly
- *  without triggering lazy execution. Returns NULL on bad args. */
+/**
+ * Eagerly allocate an uninitialized tensor so callers can write ->data directly
+ * without triggering lazy execution. Returns NULL on bad args.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_empty(int* shape, int ndim, const TensorConfig* config) {
     if (!shape || ndim < 0) {
         error_stack_push(CM_INVALID_ARGUMENT,
@@ -742,8 +874,15 @@ Tensor* tensor_empty(int* shape, int ndim, const TensorConfig* config) {
     return tensor_create(dtype, device, ndim, shape, false);
 }
 
-/** Eager tensor holding a private copy of `data`; survives IR graph resets without
- *  tensor_realize. Returns NULL on bad args or OOM. */
+/**
+ * Eager tensor holding a private copy of `data`; survives IR graph resets without
+ * tensor_realize. Returns NULL on bad args or OOM.
+ * @param data (const void*)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_from_data(const void* data, int* shape, int ndim, const TensorConfig* config) {
     if (!data) {
         error_stack_push(CM_INVALID_ARGUMENT, "Invalid argument to tensor_from_data: data is NULL",
@@ -807,14 +946,22 @@ void tensor_detach_keep(Tensor* t) {
     t->saved_ir_context = NULL;
 }
 
-/** Add an external reference so a graph teardown keeps `t` alive (detach instead
- *  of free). Balance with tensor_release. */
+/**
+ * Add an external reference so a graph teardown keeps `t` alive (detach instead
+ * of free). Balance with tensor_release.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_pin(Tensor* t) {
     if (t)
         t->external_refs++;
 }
 
-/** Drop one external reference and free `t` if nothing else holds it. */
+/**
+ * Drop one external reference and free `t` if nothing else holds it.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_release(Tensor* t) {
     if (!t)
         return;
@@ -825,8 +972,12 @@ void tensor_release(Tensor* t) {
 
 /* --- Shared storage lifetime for views ---------------------------------- */
 
-/** Attach a refcounted shared-storage block to `owner` (first view), capturing its
- *  owned CPU/device buffer. Returns the block, or NULL if none can be attached. */
+/**
+ * Attach a refcounted shared-storage block to `owner` (first view), capturing its
+ * owned CPU/device buffer. Returns the block, or NULL if none can be attached.
+ * @param owner (Tensor*)
+ * @return (CMLTensorStorage*)
+ */
 static CMLTensorStorage* tensor_storage_attach(Tensor* owner) {
     if (!owner || owner->storage || !owner->owns_data || !owner->data || owner->buffer_handle)
         return owner ? owner->storage : NULL;
@@ -843,8 +994,13 @@ static CMLTensorStorage* tensor_storage_attach(Tensor* owner) {
     return s;
 }
 
-/** Make `view` co-own `src`'s storage block (attaching one to `src` if needed), so
- *  the data outlives the base. No-op when `src` has no shareable owned block. */
+/**
+ * Make `view` co-own `src`'s storage block (attaching one to `src` if needed), so
+ * the data outlives the base. No-op when `src` has no shareable owned block.
+ * @param view (Tensor*)
+ * @param src (Tensor*)
+ * @return (void)
+ */
 void tensor_storage_share(Tensor* view, Tensor* src) {
     if (!view || !src)
         return;
@@ -859,8 +1015,12 @@ void tensor_storage_share(Tensor* view, Tensor* src) {
     view->storage = s;
 }
 
-/** Drop `t`'s reference to its shared-storage block, freeing the underlying buffer
- *  once the last referent releases it. */
+/**
+ * Drop `t`'s reference to its shared-storage block, freeing the underlying buffer
+ * once the last referent releases it.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_storage_release(Tensor* t) {
     if (!t || !t->storage)
         return;
@@ -897,11 +1057,15 @@ void tensor_storage_drop_if_detached(Tensor* t) {
     tensor_storage_release(t);
 }
 
-/** Release `t`'s buffer through the allocator that produced it. A shared block (owner or
- *  view) only drops this tensor's hold, so it is freed once the last reference goes. A cache
- *  block goes back to the cache even when a data-dependent op (masked_select, nonzero) shrank
- *  numel to 0 after allocation. The pointer is nulled so a second call never returns a block
- *  to the cache twice. */
+/**
+ * Release `t`'s buffer through the allocator that produced it. A shared block (owner or
+ * view) only drops this tensor's hold, so it is freed once the last reference goes. A cache
+ * block goes back to the cache even when a data-dependent op (masked_select, nonzero) shrank
+ * numel to 0 after allocation. The pointer is nulled so a second call never returns a block
+ * to the cache twice.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_release_data(Tensor* t) {
     if (!t)
         return;
@@ -922,9 +1086,13 @@ void tensor_release_data(Tensor* t) {
     t->from_buffer_cache = false;
 }
 
-/** Decrement `t`'s refcount and, at zero, release its data (respecting shared
- *  storage, buffer cache, and device memory), grad, hooks, and metadata. A tensor
- *  with external refs is detached and kept alive instead. */
+/**
+ * Decrement `t`'s refcount and, at zero, release its data (respecting shared
+ * storage, buffer cache, and device memory), grad, hooks, and metadata. A tensor
+ * with external refs is detached and kept alive instead.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_free(Tensor* t) {
     if (!t)
         return;
@@ -989,8 +1157,12 @@ void tensor_free(Tensor* t) {
     cml_free(t);
 }
 
-/** Deep-copy `t` into a fresh contiguous, owned tensor (materializing it first),
- *  carrying over requires_grad. NULL on error. */
+/**
+ * Deep-copy `t` into a fresh contiguous, owned tensor (materializing it first),
+ * carrying over requires_grad. NULL on error.
+ * @param t (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_clone(Tensor* t) {
     if (!t)
         return NULL;
@@ -1018,8 +1190,14 @@ Tensor* tensor_clone(Tensor* t) {
     return clone;
 }
 
-/** Build a [rows, cols] tensor from a flat row-major float array (via a const uop,
- *  copying the data) using the default dtype/device. NULL on bad args. */
+/**
+ * Build a [rows, cols] tensor from a flat row-major float array (via a const uop,
+ * copying the data) using the default dtype/device. NULL on bad args.
+ * @param data (const float*)
+ * @param rows (int)
+ * @param cols (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_from_flat(const float* data, int rows, int cols) {
     if (!data || rows <= 0 || cols <= 0)
         return NULL;
@@ -1030,12 +1208,23 @@ Tensor* tensor_from_flat(const float* data, int rows, int cols) {
     return uop_const(data, (size_t)(rows * cols) * sizeof(float), shape, 2, dtype, device);
 }
 
-/** Alias for tensor_from_flat: a [rows, cols] tensor from a flat float array. */
+/**
+ * Alias for tensor_from_flat: a [rows, cols] tensor from a flat float array.
+ * @param data (const float*)
+ * @param rows (int)
+ * @param cols (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_from_array_2d(const float* data, int rows, int cols) {
     return tensor_from_flat(data, rows, cols);
 }
 
-/** Convenience [rows, cols] zero tensor with default dtype/device. */
+/**
+ * Convenience [rows, cols] zero tensor with default dtype/device.
+ * @param rows (int)
+ * @param cols (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_zeros_2d(int rows, int cols) {
     int shape[2] = {rows, cols};
 
@@ -1045,7 +1234,12 @@ Tensor* tensor_zeros_2d(int rows, int cols) {
     return tensor_zeros(shape, 2, &config);
 }
 
-/** Convenience [rows, cols] one tensor with default dtype/device. */
+/**
+ * Convenience [rows, cols] one tensor with default dtype/device.
+ * @param rows (int)
+ * @param cols (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_ones_2d(int rows, int cols) {
     int shape[2] = {rows, cols};
 
@@ -1055,7 +1249,12 @@ Tensor* tensor_ones_2d(int rows, int cols) {
     return tensor_ones(shape, 2, &config);
 }
 
-/** Convenience uninitialized [rows, cols] tensor with default dtype/device. */
+/**
+ * Convenience uninitialized [rows, cols] tensor with default dtype/device.
+ * @param rows (int)
+ * @param cols (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_empty_2d(int rows, int cols) {
     int shape[2] = {rows, cols};
 
@@ -1065,8 +1264,13 @@ Tensor* tensor_empty_2d(int rows, int cols) {
     return tensor_empty(shape, 2, &config);
 }
 
-/** Allocate a shape array from `ndim` variadic int dimensions. Caller frees it;
- *  NULL on ndim <= 0 or OOM. */
+/**
+ * Allocate a shape array from `ndim` variadic int dimensions. Caller frees it;
+ * NULL on ndim <= 0 or OOM.
+ * @param ndim (int)
+ * @param ... variadic arguments
+ * @return (int*)
+ */
 int* tensor_shape(int ndim, ...) {
     if (ndim <= 0) {
         return NULL;
@@ -1088,7 +1292,12 @@ int* tensor_shape(int ndim, ...) {
     return shape;
 }
 
-/** Move `tensor` to `device` in place. Returns 0 on success, -1 on NULL input. */
+/**
+ * Move `tensor` to `device` in place. Returns 0 on success, -1 on NULL input.
+ * @param tensor (Tensor*)
+ * @param device (DeviceType)
+ * @return (int)
+ */
 int tensor_to_device(Tensor* tensor, DeviceType device) {
     if (!tensor) {
         return -1;
@@ -1096,7 +1305,14 @@ int tensor_to_device(Tensor* tensor, DeviceType device) {
     return device_move_tensor(tensor, device);
 }
 
-/** 1-D tensor of values from `start` to `end` (exclusive) by `step`. NULL if step is 0. */
+/**
+ * 1-D tensor of values from `start` to `end` (exclusive) by `step`. NULL if step is 0.
+ * @param start (float)
+ * @param end (float)
+ * @param step (float)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_arange(float start, float end, float step, const TensorConfig* config) {
     if (step == 0.0f)
         return NULL;
@@ -1106,8 +1322,15 @@ Tensor* tensor_arange(float start, float end, float step, const TensorConfig* co
     return uop_arange_op(start, end, step, dtype, device);
 }
 
-/** 1-D tensor of `steps` evenly spaced values from `start` to `end` (inclusive),
- *  built eagerly then wrapped in a const uop. NULL on steps <= 0 or OOM. */
+/**
+ * 1-D tensor of `steps` evenly spaced values from `start` to `end` (inclusive),
+ * built eagerly then wrapped in a const uop. NULL on steps <= 0 or OOM.
+ * @param start (float)
+ * @param end (float)
+ * @param steps (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_linspace(float start, float end, int steps, const TensorConfig* config) {
     if (steps <= 0)
         return NULL;
@@ -1132,7 +1355,12 @@ Tensor* tensor_linspace(float start, float end, int steps, const TensorConfig* c
     return out;
 }
 
-/** `n` x `n` identity matrix. NULL on n <= 0. */
+/**
+ * `n` x `n` identity matrix. NULL on n <= 0.
+ * @param n (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_eye(int n, const TensorConfig* config) {
     if (n <= 0)
         return NULL;
@@ -1142,10 +1370,20 @@ Tensor* tensor_eye(int n, const TensorConfig* config) {
     return uop_eye_op(n, dtype, device);
 }
 
-/** Seed the global RNG used by the random tensor constructors. */
+/**
+ * Seed the global RNG used by the random tensor constructors.
+ * @param seed (uint64_t)
+ * @return (void)
+ */
 void tensor_manual_seed(uint64_t seed) { cml_rng_set_global_seed(seed); }
 
-/** Tensor of `shape` with uniform [0, 1) random values. */
+/**
+ * Tensor of `shape` with uniform [0, 1) random values.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_rand(int* shape, int ndim, const TensorConfig* config) {
     DType dtype;
     DeviceType device;
@@ -1153,7 +1391,13 @@ Tensor* tensor_rand(int* shape, int ndim, const TensorConfig* config) {
     return uop_rand_uniform(shape, ndim, dtype, device);
 }
 
-/** Tensor of `shape` with standard-normal random values. */
+/**
+ * Tensor of `shape` with standard-normal random values.
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_randn(int* shape, int ndim, const TensorConfig* config) {
     DType dtype;
     DeviceType device;
@@ -1161,7 +1405,15 @@ Tensor* tensor_randn(int* shape, int ndim, const TensorConfig* config) {
     return uop_rand_normal(shape, ndim, dtype, device);
 }
 
-/** Tensor of `shape` with random integers in [low, high). */
+/**
+ * Tensor of `shape` with random integers in [low, high).
+ * @param low (int)
+ * @param high (int)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_randint(int low, int high, int* shape, int ndim, const TensorConfig* config) {
     DType dtype;
     DeviceType device;
@@ -1169,7 +1421,11 @@ Tensor* tensor_randint(int low, int high, int* shape, int ndim, const TensorConf
     return uop_rand_int(low, high, shape, ndim, dtype, device);
 }
 
-/** Zero tensor matching `a`'s shape, dtype, and device. NULL if `a` is NULL. */
+/**
+ * Zero tensor matching `a`'s shape, dtype, and device. NULL if `a` is NULL.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_zeros_like(Tensor* a) {
     if (!a)
         return NULL;
@@ -1178,7 +1434,11 @@ Tensor* tensor_zeros_like(Tensor* a) {
     return tensor_zeros(a->shape, a->ndim, &config);
 }
 
-/** One tensor matching `a`'s shape, dtype, and device. NULL if `a` is NULL. */
+/**
+ * One tensor matching `a`'s shape, dtype, and device. NULL if `a` is NULL.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_ones_like(Tensor* a) {
     if (!a)
         return NULL;
@@ -1187,7 +1447,11 @@ Tensor* tensor_ones_like(Tensor* a) {
     return tensor_ones(a->shape, a->ndim, &config);
 }
 
-/** Uniform-random tensor matching `a`'s shape, dtype, and device. NULL if `a` is NULL. */
+/**
+ * Uniform-random tensor matching `a`'s shape, dtype, and device. NULL if `a` is NULL.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_rand_like(Tensor* a) {
     if (!a)
         return NULL;
@@ -1196,7 +1460,11 @@ Tensor* tensor_rand_like(Tensor* a) {
     return tensor_rand(a->shape, a->ndim, &config);
 }
 
-/** Normal-random tensor matching `a`'s shape, dtype, and device. NULL if `a` is NULL. */
+/**
+ * Normal-random tensor matching `a`'s shape, dtype, and device. NULL if `a` is NULL.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_randn_like(Tensor* a) {
     if (!a)
         return NULL;
@@ -1205,7 +1473,12 @@ Tensor* tensor_randn_like(Tensor* a) {
     return tensor_randn(a->shape, a->ndim, &config);
 }
 
-/** Tensor filled with `value` matching `a`'s shape, dtype, and device. NULL if `a` is NULL. */
+/**
+ * Tensor filled with `value` matching `a`'s shape, dtype, and device. NULL if `a` is NULL.
+ * @param a (Tensor*)
+ * @param value (float)
+ * @return (Tensor*)
+ */
 Tensor* tensor_full_like(Tensor* a, float value) {
     if (!a)
         return NULL;
@@ -1214,8 +1487,13 @@ Tensor* tensor_full_like(Tensor* a, float value) {
     return tensor_full(a->shape, a->ndim, &config, value);
 }
 
-/** Remove size-1 dimensions (only `dim` if >= 0, else all), returning a reshape
- *  view. Never drops below rank 1. NULL if `a` is NULL or on OOM. */
+/**
+ * Remove size-1 dimensions (only `dim` if >= 0, else all), returning a reshape
+ * view. Never drops below rank 1. NULL if `a` is NULL or on OOM.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_squeeze(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -1259,8 +1537,13 @@ Tensor* tensor_squeeze(Tensor* a, int dim) {
     return result;
 }
 
-/** Insert a size-1 dimension at `dim` (negative indexes from the end), returning a
- *  reshape view. NULL if `a` is NULL or `dim` is out of range. */
+/**
+ * Insert a size-1 dimension at `dim` (negative indexes from the end), returning a
+ * reshape view. NULL if `a` is NULL or `dim` is out of range.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_unsqueeze(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -1288,8 +1571,13 @@ Tensor* tensor_unsqueeze(Tensor* a, int dim) {
     return result;
 }
 
-/** Reverse `a` along `dim` (negative indexes from the end) into a new CPU tensor
- *  (eager; 1-D/2-D handled, higher ranks copied as-is). NULL on error. */
+/**
+ * Reverse `a` along `dim` (negative indexes from the end) into a new CPU tensor
+ * (eager; 1-D/2-D handled, higher ranks copied as-is). NULL on error.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_flip(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -1332,8 +1620,14 @@ Tensor* tensor_flip(Tensor* a, int dim) {
     return result;
 }
 
-/** Tile `a`, repeating each axis by the matching `repeats` entry (requires one per
- *  dim; lazy, via uop_tile). NULL on bad args. */
+/**
+ * Tile `a`, repeating each axis by the matching `repeats` entry (requires one per
+ * dim; lazy, via uop_tile). NULL on bad args.
+ * @param a (Tensor*)
+ * @param repeats (int*)
+ * @param num_repeats (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_repeat(Tensor* a, int* repeats, int num_repeats) {
     if (!a || !repeats || num_repeats != a->ndim)
         return NULL;
@@ -1342,8 +1636,15 @@ Tensor* tensor_repeat(Tensor* a, int* repeats, int num_repeats) {
 
 // tensor_split is defined in tensor_manipulation.c
 
-/** Split `a` into `chunks` pieces along `dim`; writes the count to `out_count` if
- *  given. Returns the array from tensor_split (caller frees). */
+/**
+ * Split `a` into `chunks` pieces along `dim`; writes the count to `out_count` if
+ * given. Returns the array from tensor_split (caller frees).
+ * @param a (Tensor*)
+ * @param chunks (int)
+ * @param dim (int)
+ * @param out_count (int*)
+ * @return (Tensor**)
+ */
 Tensor** tensor_chunk(Tensor* a, int chunks, int dim, int* out_count) {
     Tensor** result = tensor_split(a, chunks, dim, NULL);
     if (result && out_count)
@@ -1351,7 +1652,14 @@ Tensor** tensor_chunk(Tensor* a, int chunks, int dim, int* out_count) {
     return result;
 }
 
-/** Kaiming/He uniform init: uniform over [-bound, bound) with bound = sqrt(6/fan_in). */
+/**
+ * Kaiming/He uniform init: uniform over [-bound, bound) with bound = sqrt(6/fan_in).
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param fan_in (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorConfig* config) {
     Tensor* t = tensor_rand(shape, ndim, config);
     if (!t)
@@ -1367,7 +1675,14 @@ Tensor* tensor_kaiming_uniform(int* shape, int ndim, int fan_in, const TensorCon
     return t;
 }
 
-/** Kaiming/He normal init: normal scaled by std = sqrt(2/fan_in). */
+/**
+ * Kaiming/He normal init: normal scaled by std = sqrt(2/fan_in).
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param fan_in (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConfig* config) {
     Tensor* t = tensor_randn(shape, ndim, config);
     if (!t)
@@ -1383,8 +1698,16 @@ Tensor* tensor_kaiming_normal(int* shape, int ndim, int fan_in, const TensorConf
     return t;
 }
 
-/** Glorot/Xavier uniform init: uniform over [-bound, bound) with
- *  bound = sqrt(6/(fan_in + fan_out)). */
+/**
+ * Glorot/Xavier uniform init: uniform over [-bound, bound) with
+ * bound = sqrt(6/(fan_in + fan_out)).
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param fan_in (int)
+ * @param fan_out (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out,
                               const TensorConfig* config) {
     Tensor* t = tensor_rand(shape, ndim, config);
@@ -1401,7 +1724,15 @@ Tensor* tensor_glorot_uniform(int* shape, int ndim, int fan_in, int fan_out,
     return t;
 }
 
-/** Xavier/Glorot normal init: normal scaled by std = sqrt(2/(fan_in + fan_out)). */
+/**
+ * Xavier/Glorot normal init: normal scaled by std = sqrt(2/(fan_in + fan_out)).
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param fan_in (int)
+ * @param fan_out (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_xavier_normal(int* shape, int ndim, int fan_in, int fan_out,
                              const TensorConfig* config) {
     Tensor* t = tensor_randn(shape, ndim, config);
@@ -1437,8 +1768,13 @@ int cml_cast_buffer(const void* src, DType from, void* dst, DType to, size_t n) 
     return 0;
 }
 
-/** Convert `a` to `dtype` into a new tensor (clone if already that dtype), using
- *  the precision-preserving path with a float fallback for f16/bf16/fp8. NULL on error. */
+/**
+ * Convert `a` to `dtype` into a new tensor (clone if already that dtype), using
+ * the precision-preserving path with a float fallback for f16/bf16/fp8. NULL on error.
+ * @param a (Tensor*)
+ * @param dtype (DType)
+ * @return (Tensor*)
+ */
 Tensor* tensor_cast(Tensor* a, DType dtype) {
     if (!a)
         return NULL;
@@ -1461,8 +1797,15 @@ Tensor* tensor_cast(Tensor* a, DType dtype) {
     return out;
 }
 
-/** Wrap caller-owned `data` as a tensor without copying (owns_data=false); the
- *  caller must keep the buffer alive. NULL on bad args or OOM. */
+/**
+ * Wrap caller-owned `data` as a tensor without copying (owns_data=false); the
+ * caller must keep the buffer alive. NULL on bad args or OOM.
+ * @param data (void*)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_from_blob(void* data, int* shape, int ndim, const TensorConfig* config) {
     if (!data || !shape || ndim <= 0)
         return NULL;
@@ -1497,7 +1840,12 @@ Tensor* tensor_from_blob(void* data, int* shape, int ndim, const TensorConfig* c
     return t;
 }
 
-/** 1-D tensor holding a random permutation of 0..n-1 (Fisher-Yates). NULL on n <= 0 or OOM. */
+/**
+ * 1-D tensor holding a random permutation of 0..n-1 (Fisher-Yates). NULL on n <= 0 or OOM.
+ * @param n (int)
+ * @param config (const TensorConfig*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_randperm(int n, const TensorConfig* config) {
     if (n <= 0)
         return NULL;
@@ -1525,29 +1873,76 @@ Tensor* tensor_randperm(int n, const TensorConfig* config) {
     return out;
 }
 
-/** Cast `a` to float16. */
+/**
+ * Cast `a` to float16.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_half(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT16); }
-/** Cast `a` to float32. */
+/**
+ * Cast `a` to float32.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_float(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT32); }
-/** Cast `a` to float64. */
+/**
+ * Cast `a` to float64.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_double(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT64); }
-/** Cast `a` to int32. */
+/**
+ * Cast `a` to int32.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_int(Tensor* a) { return tensor_cast(a, DTYPE_INT32); }
-/** Cast `a` to int64. */
+/**
+ * Cast `a` to int64.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_long(Tensor* a) { return tensor_cast(a, DTYPE_INT64); }
-/** Cast `a` to int16. */
+/**
+ * Cast `a` to int16.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_short(Tensor* a) { return tensor_cast(a, DTYPE_INT16); }
-/** Cast `a` to bool. */
+/**
+ * Cast `a` to bool.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_bool(Tensor* a) { return tensor_cast(a, DTYPE_BOOL); }
-/** Cast `a` to bfloat16. */
+/**
+ * Cast `a` to bfloat16.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_bfloat16(Tensor* a) { return tensor_cast(a, DTYPE_BFLOAT16); }
-/** Cast `a` to fp8 E4M3 (FNUZ). */
+/**
+ * Cast `a` to fp8 E4M3 (FNUZ).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_fp8e4m3fnuz(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT8_E4M3_FNUZ); }
-/** Cast `a` to fp8 E5M2 (FNUZ). */
+/**
+ * Cast `a` to fp8 E5M2 (FNUZ).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_fp8e5m2fnuz(Tensor* a) { return tensor_cast(a, DTYPE_FLOAT8_E5M2_FNUZ); }
 
-/** Resize a 4-D [N,C,H,W] tensor to `output_size` [out_h, out_w] using nearest or
- *  bilinear sampling (eager). Only 4-D input with 2-D output is supported. NULL on error. */
+/**
+ * Resize a 4-D [N,C,H,W] tensor to `output_size` [out_h, out_w] using nearest or
+ * bilinear sampling (eager). Only 4-D input with 2-D output is supported. NULL on error.
+ * @param a (Tensor*)
+ * @param output_size (int*)
+ * @param num_dims (int)
+ * @param mode (InterpMode)
+ * @return (Tensor*)
+ */
 Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode mode) {
     if (!a || !output_size || num_dims < 1)
         return NULL;
@@ -1622,8 +2017,13 @@ Tensor* tensor_interpolate(Tensor* a, int* output_size, int num_dims, InterpMode
     return out;
 }
 
-/** Dot product of two equal-length 1-D tensors as sum(a*b); lazy and differentiable.
- *  Returns a keepdim scalar tensor, or NULL on shape mismatch. */
+/**
+ * Dot product of two equal-length 1-D tensors as sum(a*b); lazy and differentiable.
+ * Returns a keepdim scalar tensor, or NULL on shape mismatch.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_dot(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
@@ -1644,7 +2044,12 @@ Tensor* tensor_dot(Tensor* a, Tensor* b) {
  * `dim`, combining collisions with `mode` (SUM/PROD/MEAN/AMAX/AMIN; MEAN counts
  * `self` as one contributor). `index` and `src` must match `self`'s rank.
  * Equivalent to torch.Tensor.scatter_reduce(..., include_self=True).
- * @return a newly allocated result tensor, or NULL on error.
+ * @param self (Tensor*)
+ * @param dim (int)
+ * @param index (Tensor*)
+ * @param src (Tensor*)
+ * @param mode (ScatterReduceMode)
+ * @return (Tensor*)
  */
 Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
                               ScatterReduceMode mode) {
@@ -1735,8 +2140,13 @@ Tensor* tensor_scatter_reduce(Tensor* self, int dim, Tensor* index, Tensor* src,
     return output;
 }
 
-/** Reinterpret `a`'s raw bytes as `target_dtype` (no value conversion), reshaping
- *  the last dim to match. Requires the total byte size to divide evenly. NULL on error. */
+/**
+ * Reinterpret `a`'s raw bytes as `target_dtype` (no value conversion), reshaping
+ * the last dim to match. Requires the total byte size to divide evenly. NULL on error.
+ * @param a (Tensor*)
+ * @param target_dtype (DType)
+ * @return (Tensor*)
+ */
 Tensor* tensor_bitcast(Tensor* a, DType target_dtype) {
     if (!a)
         return NULL;
@@ -1789,8 +2199,12 @@ Tensor* tensor_bitcast(Tensor* a, DType target_dtype) {
     return out;
 }
 
-/** Reduced QR decomposition of a 2-D matrix via Householder reflections, returning
- *  Q [m,k] and R [k,n]. Both results are NULL on error. */
+/**
+ * Reduced QR decomposition of a 2-D matrix via Householder reflections, returning
+ * Q [m,k] and R [k,n]. Both results are NULL on error.
+ * @param a (Tensor*)
+ * @return (QRResult)
+ */
 QRResult tensor_qr(Tensor* a) {
     QRResult result = {NULL, NULL};
     if (!a || a->ndim != 2) {
@@ -1908,8 +2322,12 @@ QRResult tensor_qr(Tensor* a) {
     return result;
 }
 
-/** Singular value decomposition of a 2-D matrix via one-sided Jacobi rotations,
- *  returning U [m,k], S [k] (descending), and Vt [k,n]. Fields are NULL on error. */
+/**
+ * Singular value decomposition of a 2-D matrix via one-sided Jacobi rotations,
+ * returning U [m,k], S [k] (descending), and Vt [k,n]. Fields are NULL on error.
+ * @param a (Tensor*)
+ * @return (SVDResult)
+ */
 SVDResult tensor_svd(Tensor* a) {
     SVDResult result = {NULL, NULL, NULL};
     if (!a || a->ndim != 2) {
@@ -2087,8 +2505,12 @@ SVDResult tensor_svd(Tensor* a) {
     return result;
 }
 
-/** Download `url` (via curl/wget) to a temp file and load it with tensor_read_file.
- *  NULL on download or parse failure. */
+/**
+ * Download `url` (via curl/wget) to a temp file and load it with tensor_read_file.
+ * NULL on download or parse failure.
+ * @param url (const char*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_from_url(const char* url) {
     if (!url)
         return NULL;
@@ -2117,9 +2539,14 @@ Tensor* tensor_from_url(const char* url) {
     return t;
 }
 
-/** Overwrite `t`'s data with `src`'s (shapes must match), detaching `t` from its
- *  IR node and freeing old storage; shares `src`'s buffer on the same device,
- *  else copies. Returns 0 on success, -1 on error. */
+/**
+ * Overwrite `t`'s data with `src`'s (shapes must match), detaching `t` from its
+ * IR node and freeing old storage; shares `src`'s buffer on the same device,
+ * else copies. Returns 0 on success, -1 on error.
+ * @param t (Tensor*)
+ * @param src (Tensor*)
+ * @return (int)
+ */
 int tensor_assign(Tensor* t, Tensor* src) {
     if (!t || !src)
         return -1;
@@ -2163,8 +2590,14 @@ int tensor_assign(Tensor* t, Tensor* src) {
     return 0;
 }
 
-/** Copy up to `nbytes` of raw `data` into `t`'s buffer (allocating it if needed),
- *  marking `t` executed. Returns 0 on success, -1 if `nbytes` exceeds capacity. */
+/**
+ * Copy up to `nbytes` of raw `data` into `t`'s buffer (allocating it if needed),
+ * marking `t` executed. Returns 0 on success, -1 if `nbytes` exceeds capacity.
+ * @param t (Tensor*)
+ * @param data (const void*)
+ * @param nbytes (size_t)
+ * @return (int)
+ */
 int tensor_assign_data(Tensor* t, const void* data, size_t nbytes) {
     if (!t || !data || nbytes == 0)
         return -1;

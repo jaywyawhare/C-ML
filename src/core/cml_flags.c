@@ -20,7 +20,11 @@ static FlagEntry g_flags[CML_FLAG_COUNT] = {
 
 static pthread_once_t g_flags_once = PTHREAD_ONCE_INIT;
 
-/** Integer value of a flag string: a number, else 0 for false/no/off and 1 for any other word. */
+/**
+ * Integer value of a flag string: a number, else 0 for false/no/off and 1 for any other word.
+ * @param v (const char*)
+ * @return (int)
+ */
 static int flag_value(const char* v) {
     char* end;
     long n = strtol(v, &end, 10);
@@ -29,7 +33,10 @@ static int flag_value(const char* v) {
     return !(strcasecmp(v, "false") == 0 || strcasecmp(v, "no") == 0 || strcasecmp(v, "off") == 0);
 }
 
-/** Seed each flag's value from its environment variable (run once via pthread_once). */
+/**
+ * Seed each flag's value from its environment variable (run once via pthread_once).
+ * @return (void)
+ */
 static void flags_init_once(void) {
     for (int i = 0; i < CML_FLAG_COUNT; i++) {
         const char* v = getenv(g_flags[i].name);
@@ -40,10 +47,17 @@ static void flags_init_once(void) {
     }
 }
 
-/** Lazily parse flag env vars exactly once, regardless of caller or thread. */
+/**
+ * Lazily parse flag env vars exactly once, regardless of caller or thread.
+ * @return (void)
+ */
 void cml_flags_init(void) { pthread_once(&g_flags_once, flags_init_once); }
 
-/** Current integer value of a flag, or 0 if the id is out of range. */
+/**
+ * Current integer value of a flag, or 0 if the id is out of range.
+ * @param id (CmlFlag)
+ * @return (int)
+ */
 int cml_flag(CmlFlag id) {
     if ((unsigned)id >= CML_FLAG_COUNT)
         return 0;
@@ -51,10 +65,18 @@ int cml_flag(CmlFlag id) {
     return g_flags[id].value;
 }
 
-/** True if the flag's value is non-zero. */
+/**
+ * True if the flag's value is non-zero.
+ * @param id (CmlFlag)
+ * @return (bool)
+ */
 bool cml_flag_enabled(CmlFlag id) { return cml_flag(id) != 0; }
 
-/** True if the flag was explicitly set via its environment variable. */
+/**
+ * True if the flag was explicitly set via its environment variable.
+ * @param id (CmlFlag)
+ * @return (bool)
+ */
 bool cml_flag_was_set(CmlFlag id) {
     if ((unsigned)id >= CML_FLAG_COUNT)
         return false;
@@ -62,22 +84,38 @@ bool cml_flag_was_set(CmlFlag id) {
     return g_flags[id].set;
 }
 
-/** True when VIZ is on and NO_EXPORT is off: the single gate for every VIZ-only path. */
+/**
+ * True when VIZ is on and NO_EXPORT is off: the single gate for every VIZ-only path.
+ * @return (bool)
+ */
 bool cml_viz_enabled(void) {
     return cml_flag_enabled(CML_FLAG_VIZ) && !cml_flag_enabled(CML_FLAG_NO_EXPORT);
 }
 
-/** Environment-variable name of a flag, or "" if the id is out of range. */
+/**
+ * Environment-variable name of a flag, or "" if the id is out of range.
+ * @param id (CmlFlag)
+ * @return (const char*)
+ */
 const char* cml_flag_name(CmlFlag id) {
     return (unsigned)id < CML_FLAG_COUNT ? g_flags[id].name : "";
 }
 
-/** Human-readable description of a flag, or "" if the id is out of range. */
+/**
+ * Human-readable description of a flag, or "" if the id is out of range.
+ * @param id (CmlFlag)
+ * @return (const char*)
+ */
 const char* cml_flag_desc(CmlFlag id) {
     return (unsigned)id < CML_FLAG_COUNT ? g_flags[id].desc : "";
 }
 
-/** Temporarily override a flag, returning the previous value for cml_flag_pop. */
+/**
+ * Temporarily override a flag, returning the previous value for cml_flag_pop.
+ * @param id (CmlFlag)
+ * @param value (int)
+ * @return (int)
+ */
 int cml_flag_push(CmlFlag id, int value) {
     if ((unsigned)id >= CML_FLAG_COUNT)
         return 0;
@@ -87,14 +125,23 @@ int cml_flag_push(CmlFlag id, int value) {
     return prev;
 }
 
-/** Restore a flag to the value returned by a matching cml_flag_push. */
+/**
+ * Restore a flag to the value returned by a matching cml_flag_push.
+ * @param id (CmlFlag)
+ * @param previous (int)
+ * @return (void)
+ */
 void cml_flag_pop(CmlFlag id, int previous) {
     if ((unsigned)id >= CML_FLAG_COUNT)
         return;
     g_flags[id].value = previous;
 }
 
-/** Print all flags that differ from their defaults to the given stream. */
+/**
+ * Print all flags that differ from their defaults to the given stream.
+ * @param out (FILE*)
+ * @return (void)
+ */
 void cml_flags_dump(FILE* out) {
     if (!out)
         return;

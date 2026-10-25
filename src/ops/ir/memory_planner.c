@@ -19,10 +19,20 @@ typedef struct {
  * loads on every backend and keeps unrelated slots off a shared cache line. */
 #define CML_MEM_SLOT_ALIGN 256
 
-/** Round `v` up to the next multiple of `a` (a must be non-zero). */
+/**
+ * Round `v` up to the next multiple of `a` (a must be non-zero).
+ * @param v (size_t)
+ * @param a (size_t)
+ * @return (size_t)
+ */
 static size_t mem_align_up(size_t v, size_t a) { return (v + a - 1) / a * a; }
 
-/** Order buffers by decreasing size (index tie-break) for greedy coloring. */
+/**
+ * Order buffers by decreasing size (index tie-break) for greedy coloring.
+ * @param a (const void*)
+ * @param b (const void*)
+ * @return (int)
+ */
 static int cmp_by_size_desc(const void* a, const void* b) {
     const BufferEntry* ea = (const BufferEntry*)a;
     const BufferEntry* eb = (const BufferEntry*)b;
@@ -33,7 +43,14 @@ static int cmp_by_size_desc(const void* a, const void* b) {
     return ea->index - eb->index;
 }
 
-/** True if two [first_use, last_use] lifetimes intersect (so the buffers cannot share a slot). */
+/**
+ * True if two [first_use, last_use] lifetimes intersect (so the buffers cannot share a slot).
+ * @param a_first (int)
+ * @param a_last (int)
+ * @param b_first (int)
+ * @param b_last (int)
+ * @return (int)
+ */
 static int lifetimes_overlap(int a_first, int a_last, int b_first, int b_last) {
     return !(a_last < b_first || b_last < a_first);
 }
@@ -255,7 +272,11 @@ CMLMemoryPlan* cml_memory_plan_create(int num_buffers, size_t* sizes, int* first
     return plan;
 }
 
-/** Free a memory plan and its per-buffer arrays. */
+/**
+ * Free a memory plan and its per-buffer arrays.
+ * @param plan (CMLMemoryPlan*)
+ * @return (void)
+ */
 void cml_memory_plan_free(CMLMemoryPlan* plan) {
     if (!plan)
         return;
@@ -267,7 +288,11 @@ void cml_memory_plan_free(CMLMemoryPlan* plan) {
     cml_free(plan);
 }
 
-/** Print the plan's totals and per-buffer sizes/offsets/lifetimes/reuse to stdout. */
+/**
+ * Print the plan's totals and per-buffer sizes/offsets/lifetimes/reuse to stdout.
+ * @param plan (const CMLMemoryPlan*)
+ * @return (void)
+ */
 void cml_memory_plan_print(const CMLMemoryPlan* plan) {
     if (!plan) {
         printf("MemoryPlan: (null)\n");

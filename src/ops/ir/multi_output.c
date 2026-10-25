@@ -13,7 +13,12 @@ typedef struct {
     CMLScheduleItemType type;
 } GroupSignature;
 
-/** Build a group's signature: its external (non-internal) input tensors and schedule type. */
+/**
+ * Build a group's signature: its external (non-internal) input tensors and schedule type.
+ * @param g (const CMLFusionGroup*)
+ * @param sig (GroupSignature*)
+ * @return (void)
+ */
 static void collect_group_inputs(const CMLFusionGroup* g, GroupSignature* sig) {
     sig->num_inputs = 0;
     sig->type       = g->type;
@@ -52,7 +57,12 @@ static void collect_group_inputs(const CMLFusionGroup* g, GroupSignature* sig) {
     }
 }
 
-/** True if two groups share the same type and the same set of external inputs. */
+/**
+ * True if two groups share the same type and the same set of external inputs.
+ * @param a (const GroupSignature*)
+ * @param b (const GroupSignature*)
+ * @return (int)
+ */
 static int signatures_match(const GroupSignature* a, const GroupSignature* b) {
     if (a->type != b->type)
         return 0;
@@ -73,7 +83,12 @@ static int signatures_match(const GroupSignature* a, const GroupSignature* b) {
     return 1;
 }
 
-/** True if two groups produce no common output tensor (safe to merge). */
+/**
+ * True if two groups produce no common output tensor (safe to merge).
+ * @param a (const CMLFusionGroup*)
+ * @param b (const CMLFusionGroup*)
+ * @return (int)
+ */
 static int groups_have_distinct_outputs(const CMLFusionGroup* a, const CMLFusionGroup* b) {
     for (int i = 0; i < a->num_nodes; i++) {
         if (!a->nodes[i] || !a->nodes[i]->output)

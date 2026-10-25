@@ -61,26 +61,64 @@
 #define CMP_LT 0x2
 #define CMP_NE 0x3
 
-/** Extract the 4-bit opcode class field. */
+/**
+ * Extract the 4-bit opcode class field.
+ * @param insn (uint32_t)
+ * @return (uint32_t)
+ */
 static inline uint32_t decode_opclass(uint32_t insn) { return (insn >> 28) & 0xF; }
-/** Extract the 4-bit sub-opcode field. */
+/**
+ * Extract the 4-bit sub-opcode field.
+ * @param insn (uint32_t)
+ * @return (uint32_t)
+ */
 static inline uint32_t decode_subop(uint32_t insn) { return (insn >> 24) & 0xF; }
-/** Extract the 5-bit destination register index. */
+/**
+ * Extract the 5-bit destination register index.
+ * @param insn (uint32_t)
+ * @return (uint32_t)
+ */
 static inline uint32_t decode_rd(uint32_t insn) { return (insn >> 19) & 0x1F; }
-/** Extract the 5-bit source register 1 index. */
+/**
+ * Extract the 5-bit source register 1 index.
+ * @param insn (uint32_t)
+ * @return (uint32_t)
+ */
 static inline uint32_t decode_rs(uint32_t insn) { return (insn >> 14) & 0x1F; }
-/** Extract the 5-bit source register 2 index. */
+/**
+ * Extract the 5-bit source register 2 index.
+ * @param insn (uint32_t)
+ * @return (uint32_t)
+ */
 static inline uint32_t decode_rt(uint32_t insn) { return (insn >> 9) & 0x1F; }
-/** Extract the 9-bit immediate/flags field. */
+/**
+ * Extract the 9-bit immediate/flags field.
+ * @param insn (uint32_t)
+ * @return (uint32_t)
+ */
 static inline uint32_t decode_imm9(uint32_t insn) { return insn & 0x1FF; }
-/** Extract the low 16-bit immediate (MOVI). */
+/**
+ * Extract the low 16-bit immediate (MOVI).
+ * @param insn (uint32_t)
+ * @return (uint16_t)
+ */
 static inline uint16_t decode_imm16(uint32_t insn) { return (uint16_t)(insn & 0xFFFF); }
-/** Sign-extend a 9-bit immediate to 32 bits. */
+/**
+ * Sign-extend a 9-bit immediate to 32 bits.
+ * @param v (uint32_t)
+ * @return (int32_t)
+ */
 static inline int32_t int9_sign_extend(uint32_t v) {
     return (v & 0x100) ? (int32_t)(v | 0xFFFFFE00) : (int32_t)v;
 }
 
-/** Verify [addr, addr+size) lies within simulated memory; logs and fails on OOB. */
+/**
+ * Verify [addr, addr+size) lies within simulated memory; logs and fails on OOB.
+ * @param sim (CMLHexagonSim*)
+ * @param addr (uint64_t)
+ * @param size (size_t)
+ * @return (int)
+ */
 static inline int bounds_check(CMLHexagonSim* sim, uint64_t addr, size_t size) {
     if (addr + size > sim->mem_size) {
         LOG_ERROR("Hexagon sim: OOB access at 0x%" PRIx64 " (size=%zu, mem=%zu)", addr, size,
@@ -90,7 +128,12 @@ static inline int bounds_check(CMLHexagonSim* sim, uint64_t addr, size_t size) {
     return 0;
 }
 
-/** Read a 32-bit word from simulated memory; halts the sim on OOB. */
+/**
+ * Read a 32-bit word from simulated memory; halts the sim on OOB.
+ * @param sim (CMLHexagonSim*)
+ * @param addr (uint64_t)
+ * @return (uint32_t)
+ */
 static inline uint32_t mem_read32(CMLHexagonSim* sim, uint64_t addr) {
     if (bounds_check(sim, addr, 4) != 0) {
         sim->running = false;
@@ -101,7 +144,13 @@ static inline uint32_t mem_read32(CMLHexagonSim* sim, uint64_t addr) {
     return v;
 }
 
-/** Write a 32-bit word to simulated memory; halts the sim on OOB. */
+/**
+ * Write a 32-bit word to simulated memory; halts the sim on OOB.
+ * @param sim (CMLHexagonSim*)
+ * @param addr (uint64_t)
+ * @param val (uint32_t)
+ * @return (void)
+ */
 static inline void mem_write32(CMLHexagonSim* sim, uint64_t addr, uint32_t val) {
     if (bounds_check(sim, addr, 4) != 0) {
         sim->running = false;
@@ -110,7 +159,11 @@ static inline void mem_write32(CMLHexagonSim* sim, uint64_t addr, uint32_t val) 
     memcpy(sim->memory + addr, &val, 4);
 }
 
-/** Allocate a simulator with `mem_size` bytes of memory (1 MiB default if 0). */
+/**
+ * Allocate a simulator with `mem_size` bytes of memory (1 MiB default if 0).
+ * @param mem_size (size_t)
+ * @return (CMLHexagonSim*)
+ */
 CMLHexagonSim* cml_hexagon_sim_create(size_t mem_size) {
     if (mem_size == 0)
         mem_size = 1024 * 1024;
@@ -131,7 +184,11 @@ CMLHexagonSim* cml_hexagon_sim_create(size_t mem_size) {
     return sim;
 }
 
-/** Free the simulator and its memory. */
+/**
+ * Free the simulator and its memory.
+ * @param sim (CMLHexagonSim*)
+ * @return (void)
+ */
 void cml_hexagon_sim_free(CMLHexagonSim* sim) {
     if (!sim)
         return;
@@ -139,7 +196,14 @@ void cml_hexagon_sim_free(CMLHexagonSim* sim) {
     cml_free(sim);
 }
 
-/** Copy a program into memory at `load_addr`, set PC there, and mark the sim running. */
+/**
+ * Copy a program into memory at `load_addr`, set PC there, and mark the sim running.
+ * @param sim (CMLHexagonSim*)
+ * @param program (const void*)
+ * @param size (size_t)
+ * @param load_addr (uint64_t)
+ * @return (int)
+ */
 int cml_hexagon_sim_load(CMLHexagonSim* sim, const void* program, size_t size, uint64_t load_addr) {
     if (!sim || !program || size == 0)
         return -1;
@@ -152,7 +216,11 @@ int cml_hexagon_sim_load(CMLHexagonSim* sim, const void* program, size_t size, u
     return 0;
 }
 
-/** Fetch, decode, and execute one instruction; returns 1 when halted, 0 running, -1 on error. */
+/**
+ * Fetch, decode, and execute one instruction; returns 1 when halted, 0 running, -1 on error.
+ * @param sim (CMLHexagonSim*)
+ * @return (int)
+ */
 int cml_hexagon_sim_step(CMLHexagonSim* sim) {
     if (!sim || !sim->running)
         return -1;
@@ -340,7 +408,12 @@ int cml_hexagon_sim_step(CMLHexagonSim* sim) {
     return sim->running ? 0 : 1;
 }
 
-/** Step until halt or `max_cycles` elapse; returns 0 on halt, 1 if the budget ran out. */
+/**
+ * Step until halt or `max_cycles` elapse; returns 0 on halt, 1 if the budget ran out.
+ * @param sim (CMLHexagonSim*)
+ * @param max_cycles (int)
+ * @return (int)
+ */
 int cml_hexagon_sim_run(CMLHexagonSim* sim, int max_cycles) {
     if (!sim || !sim->running)
         return -1;
@@ -358,7 +431,14 @@ int cml_hexagon_sim_run(CMLHexagonSim* sim, int max_cycles) {
     return sim->running ? 1 : 0;
 }
 
-/** Host-side write of a buffer into simulated memory (bounds-checked). */
+/**
+ * Host-side write of a buffer into simulated memory (bounds-checked).
+ * @param sim (CMLHexagonSim*)
+ * @param addr (uint64_t)
+ * @param data (const void*)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_hexagon_sim_write(CMLHexagonSim* sim, uint64_t addr, const void* data, size_t size) {
     if (!sim || !data)
         return -1;
@@ -368,7 +448,14 @@ int cml_hexagon_sim_write(CMLHexagonSim* sim, uint64_t addr, const void* data, s
     return 0;
 }
 
-/** Host-side read from simulated memory into a buffer (bounds-checked). */
+/**
+ * Host-side read from simulated memory into a buffer (bounds-checked).
+ * @param sim (CMLHexagonSim*)
+ * @param addr (uint64_t)
+ * @param data (void*)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_hexagon_sim_read(CMLHexagonSim* sim, uint64_t addr, void* data, size_t size) {
     if (!sim || !data)
         return -1;
@@ -378,7 +465,15 @@ int cml_hexagon_sim_read(CMLHexagonSim* sim, uint64_t addr, void* data, size_t s
     return 0;
 }
 
-/** HVX elementwise add of vector regs vs+vt into vd over `elem_size`-byte lanes. */
+/**
+ * HVX elementwise add of vector regs vs+vt into vd over `elem_size`-byte lanes.
+ * @param sim (CMLHexagonSim*)
+ * @param vd (int)
+ * @param vs (int)
+ * @param vt (int)
+ * @param elem_size (int)
+ * @return (int)
+ */
 int cml_hexagon_sim_hvx_vadd(CMLHexagonSim* sim, int vd, int vs, int vt, int elem_size) {
     if (!sim || vd < 0 || vd >= 32 || vs < 0 || vs >= 32 || vt < 0 || vt >= 32)
         return -1;
@@ -410,7 +505,15 @@ int cml_hexagon_sim_hvx_vadd(CMLHexagonSim* sim, int vd, int vs, int vt, int ele
     return 0;
 }
 
-/** HVX elementwise multiply of vector regs vs*vt into vd over `elem_size`-byte lanes. */
+/**
+ * HVX elementwise multiply of vector regs vs*vt into vd over `elem_size`-byte lanes.
+ * @param sim (CMLHexagonSim*)
+ * @param vd (int)
+ * @param vs (int)
+ * @param vt (int)
+ * @param elem_size (int)
+ * @return (int)
+ */
 int cml_hexagon_sim_hvx_vmpy(CMLHexagonSim* sim, int vd, int vs, int vt, int elem_size) {
     if (!sim || vd < 0 || vd >= 32 || vs < 0 || vs >= 32 || vt < 0 || vt >= 32)
         return -1;
@@ -442,7 +545,13 @@ int cml_hexagon_sim_hvx_vmpy(CMLHexagonSim* sim, int vd, int vs, int vt, int ele
     return 0;
 }
 
-/** Load a full HVX vector register from memory at `addr`. */
+/**
+ * Load a full HVX vector register from memory at `addr`.
+ * @param sim (CMLHexagonSim*)
+ * @param vd (int)
+ * @param addr (uint64_t)
+ * @return (int)
+ */
 int cml_hexagon_sim_hvx_vmem_load(CMLHexagonSim* sim, int vd, uint64_t addr) {
     if (!sim || vd < 0 || vd >= 32)
         return -1;
@@ -452,7 +561,13 @@ int cml_hexagon_sim_hvx_vmem_load(CMLHexagonSim* sim, int vd, uint64_t addr) {
     return 0;
 }
 
-/** Store a full HVX vector register to memory at `addr`. */
+/**
+ * Store a full HVX vector register to memory at `addr`.
+ * @param sim (CMLHexagonSim*)
+ * @param vs (int)
+ * @param addr (uint64_t)
+ * @return (int)
+ */
 int cml_hexagon_sim_hvx_vmem_store(CMLHexagonSim* sim, int vs, uint64_t addr) {
     if (!sim || vs < 0 || vs >= 32)
         return -1;

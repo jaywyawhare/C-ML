@@ -13,22 +13,43 @@
 extern "C" {
 #endif
 
-/** Whether match recording is active (VIZ or REWRITE_TRACE set, export allowed). */
+/**
+ * Whether match recording is active (VIZ or REWRITE_TRACE set, export allowed).
+ * @return (bool)
+ */
 bool cml_rewrite_trace_enabled(void);
 
-/** Start a named rewrite pass; subsequent records are grouped under it. */
+/**
+ * Start a named rewrite pass; subsequent records are grouped under it.
+ * @param pass_name (const char*)
+ * @return (void)
+ */
 void cml_rewrite_trace_begin_pass(const char* pass_name);
 
-/** Record one successful rule application: the rule's name, the matched node's
- *  op string, the output names before and after, and the emit duration (us). */
+/**
+ * Record one successful rule application: the rule's name, the matched node's
+ * op string, the output names before and after, and the emit duration (us).
+ * @param rule (const char*)
+ * @param op (const char*)
+ * @param from (const char*)
+ * @param to (const char*)
+ * @param dur_us (double)
+ * @return (void)
+ */
 void cml_rewrite_trace_record(const char* rule, const char* op, const char* from, const char* to,
                               double dur_us);
 
-/** Drop all recorded events and passes; cml_ir_optimize does this before its rewrite rules. */
+/**
+ * Drop all recorded events and passes; cml_ir_optimize does this before its rewrite rules.
+ * @return (void)
+ */
 void cml_rewrite_trace_reset(void);
 
-/** Serialize the recorded passes/events to a JSON string (caller frees), or
- *  NULL if nothing was recorded. Schema: {"passes":[{"name","matches":[...] }]}. */
+/**
+ * Serialize the recorded passes/events to a JSON string (caller frees), or
+ * NULL if nothing was recorded. Schema: {"passes":[{"name","matches":[...] }]}.
+ * @return (char*)
+ */
 char* cml_rewrite_trace_export_json(void);
 
 #ifdef __cplusplus

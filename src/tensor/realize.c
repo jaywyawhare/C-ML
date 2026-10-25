@@ -7,12 +7,20 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/** True once `t` holds materialized data (non-NULL ->data). */
+/**
+ * True once `t` holds materialized data (non-NULL ->data).
+ * @param t (const Tensor*)
+ * @return (bool)
+ */
 bool tensor_is_realized(const Tensor* t) { return t != NULL && t->data != NULL; }
 
-/** Execute the IR graph up to `t`, copy any borrowed plan buffer into owned
- *  storage, and detach `t` from the graph so it survives graph teardown (the
- *  linkage is saved for tensor_unrealize). Returns 0 on success, nonzero on error. */
+/**
+ * Execute the IR graph up to `t`, copy any borrowed plan buffer into owned
+ * storage, and detach `t` from the graph so it survives graph teardown (the
+ * linkage is saved for tensor_unrealize). Returns 0 on success, nonzero on error.
+ * @param t (Tensor*)
+ * @return (int)
+ */
 int tensor_realize(Tensor* t) {
     if (!t)
         return -1;
@@ -55,7 +63,12 @@ int tensor_realize(Tensor* t) {
     return 0;
 }
 
-/** Execute every unrealized tensor in the array; returns the last error code, or 0. */
+/**
+ * Execute every unrealized tensor in the array; returns the last error code, or 0.
+ * @param tensors (Tensor**)
+ * @param num_tensors (int)
+ * @return (int)
+ */
 int tensor_realize_all(Tensor** tensors, int num_tensors) {
     if (!tensors || num_tensors <= 0)
         return -1;
@@ -70,8 +83,12 @@ int tensor_realize_all(Tensor** tensors, int num_tensors) {
     return rc;
 }
 
-/** Free `t`'s materialized data and reconnect it to its saved IR node so it can
- *  be recomputed on demand (gradient checkpointing / re-materialization). */
+/**
+ * Free `t`'s materialized data and reconnect it to its saved IR node so it can
+ * be recomputed on demand (gradient checkpointing / re-materialization).
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_unrealize(Tensor* t) {
     if (!t || !t->data)
         return;
@@ -90,7 +107,11 @@ void tensor_unrealize(Tensor* t) {
     }
 }
 
-/** Realize `t` and, if present, its gradient tensor. Returns 0 on success. */
+/**
+ * Realize `t` and, if present, its gradient tensor. Returns 0 on success.
+ * @param t (Tensor*)
+ * @return (int)
+ */
 int tensor_realize_with_grads(Tensor* t) {
     if (!t)
         return -1;
@@ -102,10 +123,18 @@ int tensor_realize_with_grads(Tensor* t) {
     return rc;
 }
 
-/** Alias for tensor_realize; present for API symmetry with lazy frameworks. */
+/**
+ * Alias for tensor_realize; present for API symmetry with lazy frameworks.
+ * @param t (Tensor*)
+ * @return (int)
+ */
 int tensor_schedule(Tensor* t) { return tensor_realize(t); }
 
-/** Block until `t`'s device work completes. No-op on the CPU backend. */
+/**
+ * Block until `t`'s device work completes. No-op on the CPU backend.
+ * @param t (Tensor*)
+ * @return (int)
+ */
 int tensor_sync(Tensor* t) {
     (void)t;
     return 0;

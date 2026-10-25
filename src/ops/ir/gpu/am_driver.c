@@ -193,7 +193,13 @@ typedef struct __attribute__((packed)) {
 
 #ifdef __linux__
 
-/** Wrapper around ioctl to the KFD device that retries on EINTR and logs failures. */
+/**
+ * Wrapper around ioctl to the KFD device that retries on EINTR and logs failures.
+ * @param fd (int)
+ * @param request (unsigned long)
+ * @param arg (void*)
+ * @return (int)
+ */
 static int kfd_ioctl(int fd, unsigned long request, void* arg) {
     int ret;
     do {
@@ -206,8 +212,17 @@ static int kfd_ioctl(int fd, unsigned long request, void* arg) {
     return ret;
 }
 
-/** Allocate GPU memory via KFD, bump the driver VA cursor, map it to the GPU, and
- * (for GTT/public-VRAM) mmap a CPU view. Rolls back the alloc on map failure. */
+/**
+ * Allocate GPU memory via KFD, bump the driver VA cursor, map it to the GPU, and
+ * (for GTT/public-VRAM) mmap a CPU view. Rolls back the alloc on map failure.
+ * @param drv (CMLAMDriver*)
+ * @param size (size_t)
+ * @param flags (uint32_t)
+ * @param out_handle (uint64_t*)
+ * @param out_va (uint64_t*)
+ * @param out_cpu_addr (void**)
+ * @return (int)
+ */
 static int am_alloc_and_map(CMLAMDriver* drv, size_t size, uint32_t flags, uint64_t* out_handle,
                             uint64_t* out_va, void** out_cpu_addr) {
     uint64_t aligned_size = AM_PAGE_ALIGN(size);
@@ -276,7 +291,14 @@ static int am_alloc_and_map(CMLAMDriver* drv, size_t size, uint32_t flags, uint6
     return 0;
 }
 
-/** Reverse of am_alloc_and_map: munmap any CPU view, then unmap from and free on the GPU. */
+/**
+ * Reverse of am_alloc_and_map: munmap any CPU view, then unmap from and free on the GPU.
+ * @param drv (CMLAMDriver*)
+ * @param handle (uint64_t)
+ * @param cpu_addr (void*)
+ * @param size (size_t)
+ * @return (void)
+ */
 static void am_free_and_unmap(CMLAMDriver* drv, uint64_t handle, void* cpu_addr, size_t size) {
     if (cpu_addr) {
         munmap(cpu_addr, AM_PAGE_ALIGN(size));
@@ -343,8 +365,14 @@ typedef struct {
     bool has_cpu_cores;
 } gpu_parse_ctx;
 
-/** Topology property callback: fold one KFD key=value pair into the GPU info struct
- * (name, CU/SIMD counts, IDs, clocks, VRAM/LDS sizes, gfx version, SDMA count). */
+/**
+ * Topology property callback: fold one KFD key=value pair into the GPU info struct
+ * (name, CU/SIMD counts, IDs, clocks, VRAM/LDS sizes, gfx version, SDMA count).
+ * @param key (const char*)
+ * @param value (const char*)
+ * @param ctx (void*)
+ * @return (void)
+ */
 static void gpu_prop_cb(const char* key, const char* value, void* ctx) {
     gpu_parse_ctx* pc = (gpu_parse_ctx*)ctx;
     CMLAMGPUInfo* g   = pc->info;
@@ -393,8 +421,13 @@ static void gpu_prop_cb(const char* key, const char* value, void* ctx) {
 
 #endif /* __linux__ */
 
-/** Walk the KFD sysfs topology nodes and return an allocated array of GPU (non-CPU)
- * nodes with their properties and gpu_id. Caller frees *gpus. */
+/**
+ * Walk the KFD sysfs topology nodes and return an allocated array of GPU (non-CPU)
+ * nodes with their properties and gpu_id. Caller frees *gpus.
+ * @param gpus (CMLAMGPUInfo**)
+ * @param count (int*)
+ * @return (int)
+ */
 int cml_am_enumerate_gpus(CMLAMGPUInfo** gpus, int* count) {
 #ifdef __linux__
     if (!gpus || !count)
@@ -476,8 +509,12 @@ int cml_am_enumerate_gpus(CMLAMGPUInfo** gpus, int* count) {
 #endif
 }
 
-/** Return the known XCD/CU chiplet layout for a given gfx target (e.g. gfx942/950/12xx),
- * or a zeroed config for unrecognized targets. */
+/**
+ * Return the known XCD/CU chiplet layout for a given gfx target (e.g. gfx942/950/12xx),
+ * or a zeroed config for unrecognized targets.
+ * @param gfx_version (const char*)
+ * @return (CMLAMChipletConfig)
+ */
 CMLAMChipletConfig cml_am_get_chiplet_config(const char* gfx_version) {
     CMLAMChipletConfig cfg = {0};
 
@@ -504,8 +541,16 @@ CMLAMChipletConfig cml_am_get_chiplet_config(const char* gfx_version) {
     return cfg;
 }
 
-/** SDMA copy intended to prefer the SDMA engine nearest a given XCD on chiplet GPUs;
- * currently delegates to the generic cml_am_sdma_copy. */
+/**
+ * SDMA copy intended to prefer the SDMA engine nearest a given XCD on chiplet GPUs;
+ * currently delegates to the generic cml_am_sdma_copy.
+ * @param drv (CMLAMDriver*)
+ * @param xcd_idx (int)
+ * @param dst_va (uint64_t)
+ * @param src_va (uint64_t)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_am_sdma_copy_nearest_xcd(CMLAMDriver* drv, int xcd_idx, uint64_t dst_va, uint64_t src_va,
                                  size_t size) {
     if (!drv || !drv->initialized)
@@ -518,8 +563,11 @@ int cml_am_sdma_copy_nearest_xcd(CMLAMDriver* drv, int xcd_idx, uint64_t dst_va,
     return cml_am_sdma_copy(drv, dst_va, src_va, size);
 }
 
-/** Check for a usable AMD GPU by opening /dev/kfd and /dev/dri/renderD128 and
- * querying the KFD version. */
+/**
+ * Check for a usable AMD GPU by opening /dev/kfd and /dev/dri/renderD128 and
+ * querying the KFD version.
+ * @return (bool)
+ */
 bool cml_am_driver_available(void) {
 #ifdef __linux__
     if (access("/dev/kfd", R_OK) != 0)
@@ -546,7 +594,10 @@ bool cml_am_driver_available(void) {
 #endif
 }
 
-/** Allocate an AM driver context with default fds (-1) and the initial VA range. */
+/**
+ * Allocate an AM driver context with default fds (-1) and the initial VA range.
+ * @return (CMLAMDriver*)
+ */
 CMLAMDriver* cml_am_driver_create(void) {
     CMLAMDriver* drv = (CMLAMDriver*)cml_calloc(1, sizeof(CMLAMDriver));
     if (!drv) {
@@ -566,8 +617,13 @@ CMLAMDriver* cml_am_driver_create(void) {
 }
 
 #ifdef __linux__
-/** Set up a compute AQL queue: allocate ring, read/write pointer, and EOP buffers,
- * create the KFD queue, and mmap its doorbell. */
+/**
+ * Set up a compute AQL queue: allocate ring, read/write pointer, and EOP buffers,
+ * create the KFD queue, and mmap its doorbell.
+ * @param drv (CMLAMDriver*)
+ * @param q (CMLAMQueue*)
+ * @return (int)
+ */
 static int am_init_aql_queue(CMLAMDriver* drv, CMLAMQueue* q) {
     uint32_t gtt_flags = KFD_IOC_ALLOC_MEM_FLAGS_GTT | KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE |
                          KFD_IOC_ALLOC_MEM_FLAGS_COHERENT;
@@ -637,8 +693,12 @@ static int am_init_aql_queue(CMLAMDriver* drv, CMLAMQueue* q) {
 }
 #endif
 
-/** Bring up the AM driver: pick/enumerate a GPU, open KFD + DRM fds, acquire the VM,
- * allocate the signal page, and create the primary AQL (and optional SDMA) queues. */
+/**
+ * Bring up the AM driver: pick/enumerate a GPU, open KFD + DRM fds, acquire the VM,
+ * allocate the signal page, and create the primary AQL (and optional SDMA) queues.
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_am_driver_init(CMLAMDriver* drv) {
 #ifdef __linux__
     if (!drv)
@@ -762,8 +822,12 @@ fail:
 #endif
 }
 
-/** Synchronize, destroy all compute/SDMA queues and doorbells, free scratch, close
- * the fds, and free the driver context. */
+/**
+ * Synchronize, destroy all compute/SDMA queues and doorbells, free scratch, close
+ * the fds, and free the driver context.
+ * @param drv (CMLAMDriver*)
+ * @return (void)
+ */
 void cml_am_driver_free(CMLAMDriver* drv) {
     if (!drv)
         return;
@@ -821,7 +885,12 @@ void cml_am_driver_free(CMLAMDriver* drv) {
 
 /* Multi-queue */
 
-/** Create an additional compute AQL queue at the given slot (no-op if already active). */
+/**
+ * Create an additional compute AQL queue at the given slot (no-op if already active).
+ * @param drv (CMLAMDriver*)
+ * @param queue_index (int)
+ * @return (int)
+ */
 int cml_am_create_compute_queue(CMLAMDriver* drv, int queue_index) {
 #ifdef __linux__
     if (!drv || !drv->initialized)
@@ -857,8 +926,12 @@ int cml_am_create_compute_queue(CMLAMDriver* drv, int queue_index) {
 
 /* SDMA queue */
 
-/** Allocate ring and pointer buffers and create an SDMA queue with its doorbell for
- * DMA copies. Non-fatal on failure; the driver falls back to CPU copies. */
+/**
+ * Allocate ring and pointer buffers and create an SDMA queue with its doorbell for
+ * DMA copies. Non-fatal on failure; the driver falls back to CPU copies.
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_am_sdma_queue_create(CMLAMDriver* drv) {
 #ifdef __linux__
     if (!drv || drv->fd_kfd < 0)
@@ -923,8 +996,15 @@ int cml_am_sdma_queue_create(CMLAMDriver* drv) {
 #endif
 }
 
-/** Enqueue SDMA linear-copy packets (splitting oversized copies), advance the write
- * pointer, and ring the doorbell to submit. */
+/**
+ * Enqueue SDMA linear-copy packets (splitting oversized copies), advance the write
+ * pointer, and ring the doorbell to submit.
+ * @param drv (CMLAMDriver*)
+ * @param dst_va (uint64_t)
+ * @param src_va (uint64_t)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_am_sdma_copy(CMLAMDriver* drv, uint64_t dst_va, uint64_t src_va, size_t size) {
 #ifdef __linux__
     if (!drv || !drv->has_sdma || !drv->sdma_queue.active)
@@ -993,8 +1073,14 @@ int cml_am_sdma_copy(CMLAMDriver* drv, uint64_t dst_va, uint64_t src_va, size_t 
 #endif
 }
 
-/** Enqueue an SDMA fence packet that writes `value` to `signal_va` once prior SDMA
- * work completes, then ring the doorbell. */
+/**
+ * Enqueue an SDMA fence packet that writes `value` to `signal_va` once prior SDMA
+ * work completes, then ring the doorbell.
+ * @param drv (CMLAMDriver*)
+ * @param signal_va (uint64_t)
+ * @param value (uint64_t)
+ * @return (int)
+ */
 int cml_am_sdma_fence(CMLAMDriver* drv, uint64_t signal_va, uint64_t value) {
 #ifdef __linux__
     if (!drv || !drv->has_sdma || !drv->sdma_queue.active)
@@ -1036,8 +1122,12 @@ int cml_am_sdma_fence(CMLAMDriver* drv, uint64_t signal_va, uint64_t value) {
 #endif
 }
 
-/** Poll the SDMA read pointer until it catches up to the write pointer (with a
- * backing-off sleep), or time out. */
+/**
+ * Poll the SDMA read pointer until it catches up to the write pointer (with a
+ * backing-off sleep), or time out.
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_am_sdma_synchronize(CMLAMDriver* drv) {
 #ifdef __linux__
     if (!drv || !drv->has_sdma || !drv->sdma_queue.active)
@@ -1074,7 +1164,12 @@ int cml_am_sdma_synchronize(CMLAMDriver* drv) {
 
 /* Signal system */
 
-/** Allocate a coherent GTT-backed completion signal initialized to `initial_value`. */
+/**
+ * Allocate a coherent GTT-backed completion signal initialized to `initial_value`.
+ * @param drv (CMLAMDriver*)
+ * @param initial_value (uint64_t)
+ * @return (CMLAMSignal*)
+ */
 CMLAMSignal* cml_am_signal_create(CMLAMDriver* drv, uint64_t initial_value) {
 #ifdef __linux__
     if (!drv || !drv->initialized)
@@ -1110,7 +1205,12 @@ CMLAMSignal* cml_am_signal_create(CMLAMDriver* drv, uint64_t initial_value) {
 #endif
 }
 
-/** Unmap/free a signal's backing memory and the signal struct. */
+/**
+ * Unmap/free a signal's backing memory and the signal struct.
+ * @param drv (CMLAMDriver*)
+ * @param signal (CMLAMSignal*)
+ * @return (void)
+ */
 void cml_am_signal_free(CMLAMDriver* drv, CMLAMSignal* signal) {
     if (!drv || !signal)
         return;
@@ -1124,7 +1224,13 @@ void cml_am_signal_free(CMLAMDriver* drv, CMLAMSignal* signal) {
     cml_free(signal);
 }
 
-/** Spin-poll a signal until its value reaches `expected` or the timeout elapses. */
+/**
+ * Spin-poll a signal until its value reaches `expected` or the timeout elapses.
+ * @param signal (CMLAMSignal*)
+ * @param expected (uint64_t)
+ * @param timeout_ns (uint64_t)
+ * @return (int)
+ */
 int cml_am_signal_wait(CMLAMSignal* signal, uint64_t expected, uint64_t timeout_ns) {
 #ifdef __linux__
     if (!signal || !signal->value)
@@ -1162,16 +1268,29 @@ int cml_am_signal_wait(CMLAMSignal* signal, uint64_t expected, uint64_t timeout_
 /* Barrier packets */
 
 #ifdef __linux__
-/** Build the 16-bit AQL packet header for a barrier packet with system-scope
- * acquire/release fences. */
+/**
+ * Build the 16-bit AQL packet header for a barrier packet with system-scope
+ * acquire/release fences.
+ * @param pkt_type (int)
+ * @return (uint16_t)
+ */
 static uint16_t am_make_barrier_header(int pkt_type) {
     return (uint16_t)((pkt_type << AQL_HDR_TYPE_SHIFT) | (1 << AQL_HDR_BARRIER_SHIFT) |
                       (AQL_FENCE_SCOPE_SYSTEM << AQL_HDR_ACQUIRE_SHIFT) |
                       (AQL_FENCE_SCOPE_SYSTEM << AQL_HDR_RELEASE_SHIFT));
 }
 
-/** Write a barrier-AND/OR AQL packet (up to 5 dependency signals plus a completion
- * signal) into a compute queue's ring and ring the doorbell. */
+/**
+ * Write a barrier-AND/OR AQL packet (up to 5 dependency signals plus a completion
+ * signal) into a compute queue's ring and ring the doorbell.
+ * @param drv (CMLAMDriver*)
+ * @param queue_idx (int)
+ * @param pkt_type (int)
+ * @param deps (CMLAMSignal**)
+ * @param num_deps (int)
+ * @param completion (CMLAMSignal*)
+ * @return (int)
+ */
 static int am_submit_barrier(CMLAMDriver* drv, int queue_idx, int pkt_type, CMLAMSignal** deps,
                              int num_deps, CMLAMSignal* completion) {
     if (!drv || !drv->initialized)
@@ -1219,7 +1338,15 @@ static int am_submit_barrier(CMLAMDriver* drv, int queue_idx, int pkt_type, CMLA
 }
 #endif
 
-/** Submit a barrier-AND packet: completion fires once all dependency signals satisfy. */
+/**
+ * Submit a barrier-AND packet: completion fires once all dependency signals satisfy.
+ * @param drv (CMLAMDriver*)
+ * @param queue_idx (int)
+ * @param deps (CMLAMSignal**)
+ * @param num_deps (int)
+ * @param completion (CMLAMSignal*)
+ * @return (int)
+ */
 int cml_am_barrier_and(CMLAMDriver* drv, int queue_idx, CMLAMSignal** deps, int num_deps,
                        CMLAMSignal* completion) {
 #ifdef __linux__
@@ -1234,7 +1361,15 @@ int cml_am_barrier_and(CMLAMDriver* drv, int queue_idx, CMLAMSignal** deps, int 
 #endif
 }
 
-/** Submit a barrier-OR packet: completion fires once any dependency signal satisfies. */
+/**
+ * Submit a barrier-OR packet: completion fires once any dependency signal satisfies.
+ * @param drv (CMLAMDriver*)
+ * @param queue_idx (int)
+ * @param deps (CMLAMSignal**)
+ * @param num_deps (int)
+ * @param completion (CMLAMSignal*)
+ * @return (int)
+ */
 int cml_am_barrier_or(CMLAMDriver* drv, int queue_idx, CMLAMSignal** deps, int num_deps,
                       CMLAMSignal* completion) {
 #ifdef __linux__
@@ -1251,8 +1386,14 @@ int cml_am_barrier_or(CMLAMDriver* drv, int queue_idx, CMLAMSignal** deps, int n
 
 /* Scratch and LDS */
 
-/** Allocate (or reallocate) the VRAM scratch region sized for per-thread private
- * memory across the given wave count. */
+/**
+ * Allocate (or reallocate) the VRAM scratch region sized for per-thread private
+ * memory across the given wave count.
+ * @param drv (CMLAMDriver*)
+ * @param per_thread_size (size_t)
+ * @param max_waves (uint32_t)
+ * @return (int)
+ */
 int cml_am_alloc_scratch(CMLAMDriver* drv, size_t per_thread_size, uint32_t max_waves) {
 #ifdef __linux__
     if (!drv || !drv->initialized)
@@ -1293,7 +1434,12 @@ int cml_am_alloc_scratch(CMLAMDriver* drv, size_t per_thread_size, uint32_t max_
 #endif
 }
 
-/** Check a requested LDS (shared memory) size against the hardware per-CU limit. */
+/**
+ * Check a requested LDS (shared memory) size against the hardware per-CU limit.
+ * @param drv (CMLAMDriver*)
+ * @param requested_bytes (uint32_t)
+ * @return (bool)
+ */
 bool cml_am_validate_lds(CMLAMDriver* drv, uint32_t requested_bytes) {
 #ifdef __linux__
     if (!drv || !drv->initialized)
@@ -1320,8 +1466,12 @@ bool cml_am_validate_lds(CMLAMDriver* drv, uint32_t requested_bytes) {
 
 /* Error recovery */
 
-/** Heuristically detect a GPU hang: queue write pointer ahead of read while the GPU
- * reports 100% busy. Returns 1 if suspected, 0 if fine, -1 on error. */
+/**
+ * Heuristically detect a GPU hang: queue write pointer ahead of read while the GPU
+ * reports 100% busy. Returns 1 if suspected, 0 if fine, -1 on error.
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_am_check_gpu_hang(CMLAMDriver* drv) {
 #ifdef __linux__
     if (!drv || !drv->initialized)
@@ -1355,8 +1505,12 @@ int cml_am_check_gpu_hang(CMLAMDriver* drv) {
 #endif
 }
 
-/** Attempt a GPU recovery by writing the amdgpu debugfs recover file (requires root);
- * marks the driver uninitialized afterward. */
+/**
+ * Attempt a GPU recovery by writing the amdgpu debugfs recover file (requires root);
+ * marks the driver uninitialized afterward.
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_am_gpu_reset(CMLAMDriver* drv) {
 #ifdef __linux__
     if (!drv || !drv->initialized)
@@ -1391,7 +1545,11 @@ int cml_am_gpu_reset(CMLAMDriver* drv) {
 #endif
 }
 
-/** Dump GPU wave status from amdgpu debugfs to the log for hang diagnosis (needs root). */
+/**
+ * Dump GPU wave status from amdgpu debugfs to the log for hang diagnosis (needs root).
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_am_dump_wave_status(CMLAMDriver* drv) {
 #ifdef __linux__
     if (!drv)
@@ -1425,8 +1583,14 @@ int cml_am_dump_wave_status(CMLAMDriver* drv) {
 
 /* Buffer management */
 
-/** Allocate a device buffer in VRAM or coherent GTT and map it, returning a handle
- * with its GPU VA and (if host-visible) CPU address. */
+/**
+ * Allocate a device buffer in VRAM or coherent GTT and map it, returning a handle
+ * with its GPU VA and (if host-visible) CPU address.
+ * @param drv (CMLAMDriver*)
+ * @param size (size_t)
+ * @param vram (bool)
+ * @return (CMLAMBuffer*)
+ */
 CMLAMBuffer* cml_am_buffer_create(CMLAMDriver* drv, size_t size, bool vram) {
 #ifdef __linux__
     if (!drv || !drv->initialized || size == 0) {
@@ -1472,7 +1636,12 @@ CMLAMBuffer* cml_am_buffer_create(CMLAMDriver* drv, size_t size, bool vram) {
 #endif
 }
 
-/** Unmap/free a device buffer's GPU memory and the buffer struct. */
+/**
+ * Unmap/free a device buffer's GPU memory and the buffer struct.
+ * @param drv (CMLAMDriver*)
+ * @param buf (CMLAMBuffer*)
+ * @return (void)
+ */
 void cml_am_buffer_free(CMLAMDriver* drv, CMLAMBuffer* buf) {
     if (!drv || !buf)
         return;
@@ -1486,8 +1655,15 @@ void cml_am_buffer_free(CMLAMDriver* drv, CMLAMBuffer* buf) {
     cml_free(buf);
 }
 
-/** Copy host data into a device buffer: directly if host-mapped, else via a staging
- * buffer and SDMA (falling back to VA remap). */
+/**
+ * Copy host data into a device buffer: directly if host-mapped, else via a staging
+ * buffer and SDMA (falling back to VA remap).
+ * @param drv (CMLAMDriver*)
+ * @param dst (CMLAMBuffer*)
+ * @param src (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_am_buffer_upload(CMLAMDriver* drv, CMLAMBuffer* dst, const void* src, size_t n) {
 #ifdef __linux__
     if (!drv || !drv->initialized || !dst || !src || n == 0)
@@ -1529,8 +1705,15 @@ int cml_am_buffer_upload(CMLAMDriver* drv, CMLAMBuffer* dst, const void* src, si
 #endif
 }
 
-/** Copy a device buffer back to host: directly if host-mapped, else via a staging
- * buffer and SDMA. */
+/**
+ * Copy a device buffer back to host: directly if host-mapped, else via a staging
+ * buffer and SDMA.
+ * @param drv (CMLAMDriver*)
+ * @param src (CMLAMBuffer*)
+ * @param dst (void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_am_buffer_download(CMLAMDriver* drv, CMLAMBuffer* src, void* dst, size_t n) {
 #ifdef __linux__
     if (!drv || !drv->initialized || !src || !dst || n == 0)
@@ -1588,8 +1771,15 @@ int cml_am_buffer_download(CMLAMDriver* drv, CMLAMBuffer* src, void* dst, size_t
 #define ELF_U64(elf, off) ((uint64_t)ELF_U32(elf, off) | ((uint64_t)ELF_U32(elf, (off) + 4) << 32))
 #define ELF_I64(elf, off) ((int64_t)ELF_U64(elf, off))
 
-/** Parse an AMDGPU code-object ELF to locate the named kernel's descriptor in .text
- * (matching the symbol, honoring the ".kd" suffix) and copy it out. */
+/**
+ * Parse an AMDGPU code-object ELF to locate the named kernel's descriptor in .text
+ * (matching the symbol, honoring the ".kd" suffix) and copy it out.
+ * @param code_object (const void*)
+ * @param code_size (size_t)
+ * @param kernel_name (const char*)
+ * @param kd (AMDGPUKernelDescriptor*)
+ * @return (int)
+ */
 int am_parse_kernel_descriptor(const void* code_object, size_t code_size, const char* kernel_name,
                                AMDGPUKernelDescriptor* kd) {
 #ifdef __linux__
@@ -1717,8 +1907,15 @@ int am_parse_kernel_descriptor(const void* code_object, size_t code_size, const 
 #endif
 }
 
-/** Load an AMDGPU code object into executable VRAM and extract kernel metadata (seg
- * sizes, kernarg size, VGPR/SGPR counts) from the descriptor or the msgpack note. */
+/**
+ * Load an AMDGPU code object into executable VRAM and extract kernel metadata (seg
+ * sizes, kernarg size, VGPR/SGPR counts) from the descriptor or the msgpack note.
+ * @param drv (CMLAMDriver*)
+ * @param code_object (const void*)
+ * @param code_size (size_t)
+ * @param kernel_name (const char*)
+ * @return (CMLAMKernel*)
+ */
 CMLAMKernel* cml_am_kernel_load(CMLAMDriver* drv, const void* code_object, size_t code_size,
                                 const char* kernel_name) {
 #ifdef __linux__
@@ -1906,7 +2103,12 @@ CMLAMKernel* cml_am_kernel_load(CMLAMDriver* drv, const void* code_object, size_
 #endif
 }
 
-/** Free a loaded kernel's GPU code allocation and host copies. */
+/**
+ * Free a loaded kernel's GPU code allocation and host copies.
+ * @param drv (CMLAMDriver*)
+ * @param kernel (CMLAMKernel*)
+ * @return (void)
+ */
 void cml_am_kernel_free(CMLAMDriver* drv, CMLAMKernel* kernel) {
     if (!drv || !kernel)
         return;
@@ -1925,8 +2127,19 @@ void cml_am_kernel_free(CMLAMDriver* drv, CMLAMKernel* kernel) {
 /* Kernel launch */
 
 #ifdef __linux__
-/** Build and submit an AQL kernel-dispatch packet on a queue: stage kernargs, fill
- * grid/block and segment sizes, set the completion signal, and ring the doorbell. */
+/**
+ * Build and submit an AQL kernel-dispatch packet on a queue: stage kernargs, fill
+ * grid/block and segment sizes, set the completion signal, and ring the doorbell.
+ * @param drv (CMLAMDriver*)
+ * @param q (CMLAMQueue*)
+ * @param kernel (CMLAMKernel*)
+ * @param grid (uint32_t[3])
+ * @param block (uint32_t[3])
+ * @param kernarg (void*)
+ * @param kernarg_size (uint32_t)
+ * @param completion_signal_va (uint64_t)
+ * @return (int)
+ */
 static int am_launch_on_queue(CMLAMDriver* drv, CMLAMQueue* q, CMLAMKernel* kernel,
                               uint32_t grid[3], uint32_t block[3], void* kernarg,
                               uint32_t kernarg_size, uint64_t completion_signal_va) {
@@ -1994,7 +2207,16 @@ static int am_launch_on_queue(CMLAMDriver* drv, CMLAMQueue* q, CMLAMKernel* kern
 }
 #endif
 
-/** Launch a kernel on the primary AQL queue, bumping the driver's completion signal. */
+/**
+ * Launch a kernel on the primary AQL queue, bumping the driver's completion signal.
+ * @param drv (CMLAMDriver*)
+ * @param kernel (CMLAMKernel*)
+ * @param grid (uint32_t[3])
+ * @param block (uint32_t[3])
+ * @param kernarg (void*)
+ * @param kernarg_size (uint32_t)
+ * @return (int)
+ */
 int cml_am_kernel_launch(CMLAMDriver* drv, CMLAMKernel* kernel, uint32_t grid[3], uint32_t block[3],
                          void* kernarg, uint32_t kernarg_size) {
 #ifdef __linux__
@@ -2023,8 +2245,19 @@ int cml_am_kernel_launch(CMLAMDriver* drv, CMLAMKernel* kernel, uint32_t grid[3]
 #endif
 }
 
-/** Launch a kernel on a specific compute queue, signaling either the caller-provided
- * completion signal or the driver's default signal. */
+/**
+ * Launch a kernel on a specific compute queue, signaling either the caller-provided
+ * completion signal or the driver's default signal.
+ * @param drv (CMLAMDriver*)
+ * @param queue_idx (int)
+ * @param kernel (CMLAMKernel*)
+ * @param grid (uint32_t[3])
+ * @param block (uint32_t[3])
+ * @param kernarg (void*)
+ * @param kernarg_size (uint32_t)
+ * @param completion (CMLAMSignal*)
+ * @return (int)
+ */
 int cml_am_kernel_launch_on_queue(CMLAMDriver* drv, int queue_idx, CMLAMKernel* kernel,
                                   uint32_t grid[3], uint32_t block[3], void* kernarg,
                                   uint32_t kernarg_size, CMLAMSignal* completion) {
@@ -2063,8 +2296,12 @@ int cml_am_kernel_launch_on_queue(CMLAMDriver* drv, int queue_idx, CMLAMKernel* 
 
 /* Synchronization */
 
-/** Wait for all submitted kernels to complete by polling the driver's completion
- * signal up to its expected value, with a backing-off sleep and timeout. */
+/**
+ * Wait for all submitted kernels to complete by polling the driver's completion
+ * signal up to its expected value, with a backing-off sleep and timeout.
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_am_synchronize(CMLAMDriver* drv) {
 #ifdef __linux__
     if (!drv || !drv->initialized)
@@ -2127,13 +2364,22 @@ static bool am_emu_unary_supported(UOpType t) {
     }
 }
 
-/** Binary ops the CPU-side emulation path actually implements (add/sub/mul/div). */
+/**
+ * Binary ops the CPU-side emulation path actually implements (add/sub/mul/div).
+ * @param t (UOpType)
+ * @return (bool)
+ */
 static bool am_emu_binary_supported(UOpType t) {
     return t == UOP_ADD || t == UOP_SUB || t == UOP_MUL || t == UOP_DIV;
 }
 
-/** Execute an IR graph node by node: run supported elementwise ops through the GPU
- * buffer path (CPU-computed emulation), falling back to cpu_execute_node otherwise. */
+/**
+ * Execute an IR graph node by node: run supported elementwise ops through the GPU
+ * buffer path (CPU-computed emulation), falling back to cpu_execute_node otherwise.
+ * @param drv (CMLAMDriver*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_am_execute_graph(CMLAMDriver* drv, CMLGraph_t ir) {
     if (!drv || !ir)
         return -1;

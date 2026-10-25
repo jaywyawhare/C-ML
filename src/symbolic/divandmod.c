@@ -3,12 +3,22 @@
 #include <limits.h>
 #include <string.h>
 
-/** True if `e` is the constant `v`. */
+/**
+ * True if `e` is the constant `v`.
+ * @param e (const SymExpr*)
+ * @param v (int64_t)
+ * @return (bool)
+ */
 static bool is_const(const SymExpr* e, int64_t v) {
     return e && e->type == SYM_CONST && e->const_val == v;
 }
 
-/** True if `e` is any constant, writing its value to `out` when `out` is non-NULL. */
+/**
+ * True if `e` is any constant, writing its value to `out` when `out` is non-NULL.
+ * @param e (const SymExpr*)
+ * @param out (int64_t*)
+ * @return (bool)
+ */
 static bool is_const_any(const SymExpr* e, int64_t* out) {
     if (!e || e->type != SYM_CONST)
         return false;
@@ -17,7 +27,12 @@ static bool is_const_any(const SymExpr* e, int64_t* out) {
     return true;
 }
 
-/** Floor division rounding toward negative infinity; returns 0 on divide by zero. */
+/**
+ * Floor division rounding toward negative infinity; returns 0 on divide by zero.
+ * @param a (int64_t)
+ * @param b (int64_t)
+ * @return (int64_t)
+ */
 static int64_t floordiv_i64(int64_t a, int64_t b) {
     if (b == 0)
         return 0;
@@ -27,14 +42,24 @@ static int64_t floordiv_i64(int64_t a, int64_t b) {
     return q;
 }
 
-/** Ceiling division rounding toward positive infinity; returns 0 on divide by zero. */
+/**
+ * Ceiling division rounding toward positive infinity; returns 0 on divide by zero.
+ * @param a (int64_t)
+ * @param b (int64_t)
+ * @return (int64_t)
+ */
 static int64_t ceildiv_i64(int64_t a, int64_t b) {
     if (b == 0)
         return 0;
     return floordiv_i64(a + b - 1, b);
 }
 
-/** Remainder normalized to the non-negative range [0, |b|); returns 0 on divide by zero. */
+/**
+ * Remainder normalized to the non-negative range [0, |b|); returns 0 on divide by zero.
+ * @param a (int64_t)
+ * @param b (int64_t)
+ * @return (int64_t)
+ */
 static int64_t mod_pos_i64(int64_t a, int64_t b) {
     if (b == 0)
         return 0;
@@ -48,6 +73,9 @@ static int64_t mod_pos_i64(int64_t a, int64_t b) {
  * Floor-division node with algebraic simplification: folds constants, drops a /1 and
  * 0/x, cancels a matching constant factor, peels a divisible term off a sum when the
  * remainder is provably in [0, b), and flattens nested divisions. Falls back to sym_div.
+ * @param a (SymExpr*)
+ * @param b (SymExpr*)
+ * @return (SymExpr*)
  */
 SymExpr* sym_floordiv(SymExpr* a, SymExpr* b) {
     if (!a || !b)
@@ -125,7 +153,12 @@ SymExpr* sym_floordiv(SymExpr* a, SymExpr* b) {
     return sym_div(a, b);
 }
 
-/** sym_floordiv against a constant divisor `b`. */
+/**
+ * sym_floordiv against a constant divisor `b`.
+ * @param a (SymExpr*)
+ * @param b (int64_t)
+ * @return (SymExpr*)
+ */
 SymExpr* sym_floordiv_const(SymExpr* a, int64_t b) {
     SymExpr* bc = sym_const(b);
     SymExpr* r  = sym_floordiv(a, bc);
@@ -136,6 +169,9 @@ SymExpr* sym_floordiv_const(SymExpr* a, int64_t b) {
 /**
  * Ceiling-division node, built as floordiv(a + b - 1, b) so it inherits sym_floordiv's
  * simplifications; folds directly when both operands are constant.
+ * @param a (SymExpr*)
+ * @param b (SymExpr*)
+ * @return (SymExpr*)
  */
 SymExpr* sym_ceildiv(SymExpr* a, SymExpr* b) {
     if (!a || !b)
@@ -152,7 +188,12 @@ SymExpr* sym_ceildiv(SymExpr* a, SymExpr* b) {
     return result;
 }
 
-/** sym_ceildiv against a constant divisor `b`. */
+/**
+ * sym_ceildiv against a constant divisor `b`.
+ * @param a (SymExpr*)
+ * @param b (int64_t)
+ * @return (SymExpr*)
+ */
 SymExpr* sym_ceildiv_const(SymExpr* a, int64_t b) {
     SymExpr* bc = sym_const(b);
     SymExpr* r  = sym_ceildiv(a, bc);
@@ -164,6 +205,9 @@ SymExpr* sym_ceildiv_const(SymExpr* a, int64_t b) {
  * Non-negative modulo node with simplification: x%1 and 0%x fold to 0, multiples of `b`
  * vanish, a divisible term is dropped from a sum (recursing on the rest), and a value
  * already proven to lie in [0, b) is returned unchanged. Falls back to sym_mod.
+ * @param a (SymExpr*)
+ * @param b (SymExpr*)
+ * @return (SymExpr*)
  */
 SymExpr* sym_mod_pos(SymExpr* a, SymExpr* b) {
     if (!a || !b)
@@ -224,7 +268,12 @@ SymExpr* sym_mod_pos(SymExpr* a, SymExpr* b) {
     return sym_mod(a, b);
 }
 
-/** sym_mod_pos against a constant modulus `b`. */
+/**
+ * sym_mod_pos against a constant modulus `b`.
+ * @param a (SymExpr*)
+ * @param b (int64_t)
+ * @return (SymExpr*)
+ */
 SymExpr* sym_mod_pos_const(SymExpr* a, int64_t b) {
     SymExpr* bc = sym_const(b);
     SymExpr* r  = sym_mod_pos(a, bc);
@@ -235,6 +284,9 @@ SymExpr* sym_mod_pos_const(SymExpr* a, int64_t b) {
 /**
  * Conservatively decide whether `expr` is a guaranteed multiple of `divisor`:
  * a product needs one divisible factor, a sum needs every term divisible.
+ * @param expr (const SymExpr*)
+ * @param divisor (int64_t)
+ * @return (bool)
  */
 bool sym_divisible_by(const SymExpr* expr, int64_t divisor) {
     if (!expr || divisor == 0)
@@ -261,7 +313,12 @@ bool sym_divisible_by(const SymExpr* expr, int64_t divisor) {
     }
 }
 
-/** Whether `expr` divides exactly by `divisor`; thin alias for sym_divisible_by. */
+/**
+ * Whether `expr` divides exactly by `divisor`; thin alias for sym_divisible_by.
+ * @param expr (const SymExpr*)
+ * @param divisor (int64_t)
+ * @return (bool)
+ */
 bool sym_divmod_exact(const SymExpr* expr, int64_t divisor) {
 
     return sym_divisible_by(expr, divisor);
@@ -271,7 +328,12 @@ bool sym_divmod_exact(const SymExpr* expr, int64_t divisor) {
  * Rebuild the expression bottom-up, routing DIV/MOD nodes through sym_floordiv and
  * sym_mod_pos so divisibility rules apply; other ops are reconstructed unchanged.
  */
-/** True if two expressions render identically (cheap structural equality). */
+/**
+ * True if two expressions render identically (cheap structural equality).
+ * @param a (const SymExpr*)
+ * @param b (const SymExpr*)
+ * @return (bool)
+ */
 static bool exprs_equal(const SymExpr* a, const SymExpr* b) {
     char ba[256] = {0}, bb[256] = {0};
     sym_expr_to_string(a, ba, sizeof(ba));
@@ -279,7 +341,13 @@ static bool exprs_equal(const SymExpr* a, const SymExpr* b) {
     return strcmp(ba, bb) == 0;
 }
 
-/** If `mul` is `(X // c) * c` or `c * (X // c)` for a constant c, return (X, c). */
+/**
+ * If `mul` is `(X // c) * c` or `c * (X // c)` for a constant c, return (X, c).
+ * @param mul (const SymExpr*)
+ * @param x_out (const SymExpr**)
+ * @param c_out (int64_t*)
+ * @return (bool)
+ */
 static bool match_quotient_times_divisor(const SymExpr* mul, const SymExpr** x_out,
                                          int64_t* c_out) {
     if (!mul || mul->type != SYM_MUL)
@@ -302,6 +370,9 @@ static bool match_quotient_times_divisor(const SymExpr* mul, const SymExpr** x_o
 /**
  * Recover a flattened index: `(X % c) + (X // c) * c` is just `X` for c != 0.
  * Returns X retained on a match, NULL otherwise. Either addend order is handled.
+ * @param l (SymExpr*)
+ * @param r (SymExpr*)
+ * @return (SymExpr*)
  */
 static SymExpr* try_divmod_recombine(SymExpr* l, SymExpr* r) {
     SymExpr* sides[2] = {l, r};
@@ -377,6 +448,8 @@ SymExpr* sym_simplify_divmod(SymExpr* e) {
 /**
  * Alternate sym_simplify and sym_simplify_divmod to a fixed point (at most 8 passes),
  * comparing rendered string forms to detect convergence. Caller releases the result.
+ * @param e (SymExpr*)
+ * @return (SymExpr*)
  */
 SymExpr* sym_simplify_full(SymExpr* e) {
     if (!e)

@@ -9,7 +9,10 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
-/** Default Mask R-CNN config: 81 classes, 9 anchors, 256 FPN ch, 7x7 ROI, 14x14 mask. */
+/**
+ * Default Mask R-CNN config: 81 classes, 9 anchors, 256 FPN ch, 7x7 ROI, 14x14 mask.
+ * @return (MaskRCNNConfig)
+ */
 MaskRCNNConfig cml_zoo_mask_rcnn_default_config(void) {
     MaskRCNNConfig cfg = {.num_classes      = 81,
                           .num_anchors      = 9,
@@ -28,7 +31,18 @@ typedef struct {
     Sequential* layer4;
 } Backbone;
 
-/** Append @p num_blocks ResNet bottleneck blocks to @p stage; the first applies first_stride. */
+/**
+ * Append @p num_blocks ResNet bottleneck blocks to @p stage; the first applies first_stride.
+ * @param stage (Sequential*)
+ * @param num_blocks (int)
+ * @param in_ch (int)
+ * @param mid_ch (int)
+ * @param out_ch (int)
+ * @param first_stride (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (void)
+ */
 static void build_bottleneck_layer(Sequential* stage, int num_blocks, int in_ch, int mid_ch,
                                    int out_ch, int first_stride, DType dtype, DeviceType device) {
     for (int i = 0; i < num_blocks; i++) {
@@ -53,7 +67,12 @@ static void build_bottleneck_layer(Sequential* stage, int num_blocks, int in_ch,
     }
 }
 
-/** Run the ResNet-50 backbone stem then layers 1-4, returning the C5 feature map. */
+/**
+ * Run the ResNet-50 backbone stem then layers 1-4, returning the C5 feature map.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* backbone_forward(Module* module, Tensor* input) {
     Backbone* bb = (Backbone*)module;
     if (!bb || !input)
@@ -74,7 +93,11 @@ static Tensor* backbone_forward(Module* module, Tensor* input) {
     return module_forward((Module*)bb->layer4, x);
 }
 
-/** Free the ResNet-50 backbone stem and residual stage sequentials. */
+/**
+ * Free the ResNet-50 backbone stem and residual stage sequentials.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void backbone_free(Module* module) {
     Backbone* bb = (Backbone*)module;
     if (!bb)
@@ -92,7 +115,12 @@ static void backbone_free(Module* module) {
     cml_free(bb);
 }
 
-/** Build the ResNet-50 backbone: 7x7 stem and four bottleneck stages (3,4,6,3 blocks). */
+/**
+ * Build the ResNet-50 backbone: 7x7 stem and four bottleneck stages (3,4,6,3 blocks).
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_backbone(DType dtype, DeviceType device) {
     Backbone* bb = cml_malloc(sizeof(Backbone));
     if (!bb)
@@ -136,9 +164,14 @@ typedef struct {
     Module* smooth5;
 } FPN;
 
-/** Standalone module interface takes a single tensor, so it maps C5 -> P5.
+/**
+ * Standalone module interface takes a single tensor, so it maps C5 -> P5.
  * The full top-down pyramid runs in mask_rcnn_forward, which can see the
- * intermediate backbone stages. */
+ * intermediate backbone stages.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* fpn_forward(Module* module, Tensor* input) {
     FPN* fpn = (FPN*)module;
     if (!fpn || !input)
@@ -149,7 +182,11 @@ static Tensor* fpn_forward(Module* module, Tensor* input) {
     return module_forward(fpn->smooth5, p5);
 }
 
-/** Free all FPN lateral (P2-P5) and smoothing convolutions. */
+/**
+ * Free all FPN lateral (P2-P5) and smoothing convolutions.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void fpn_free(Module* module) {
     FPN* fpn = (FPN*)module;
     if (!fpn)
@@ -173,7 +210,13 @@ static void fpn_free(Module* module) {
     cml_free(fpn);
 }
 
-/** Build a feature pyramid network: 1x1 laterals and 3x3 smoothers for backbone levels C2-C5. */
+/**
+ * Build a feature pyramid network: 1x1 laterals and 3x3 smoothers for backbone levels C2-C5.
+ * @param fpn_ch (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_fpn(int fpn_ch, DType dtype, DeviceType device) {
     FPN* fpn = cml_malloc(sizeof(FPN));
     if (!fpn)
@@ -204,7 +247,12 @@ typedef struct {
     Module* rpn_bbox;
 } RPN;
 
-/** Region proposal network forward: shared 3x3 conv followed by ReLU over the pyramid feature. */
+/**
+ * Region proposal network forward: shared 3x3 conv followed by ReLU over the pyramid feature.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* rpn_forward(Module* module, Tensor* input) {
     RPN* rpn = (RPN*)module;
     if (!rpn || !input)
@@ -216,7 +264,11 @@ static Tensor* rpn_forward(Module* module, Tensor* input) {
     return f_relu(x);
 }
 
-/** Free the RPN shared conv and its objectness/bbox prediction heads. */
+/**
+ * Free the RPN shared conv and its objectness/bbox prediction heads.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void rpn_free(Module* module) {
     RPN* rpn = (RPN*)module;
     if (!rpn)
@@ -230,7 +282,14 @@ static void rpn_free(Module* module) {
     cml_free(rpn);
 }
 
-/** Build the RPN: shared 3x3 conv with 1x1 objectness (2*anchors) and bbox (4*anchors) heads. */
+/**
+ * Build the RPN: shared 3x3 conv with 1x1 objectness (2*anchors) and bbox (4*anchors) heads.
+ * @param fpn_ch (int)
+ * @param num_anchors (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_rpn(int fpn_ch, int num_anchors, DType dtype, DeviceType device) {
     RPN* rpn = cml_malloc(sizeof(RPN));
     if (!rpn)
@@ -257,7 +316,12 @@ typedef struct {
     int roi_output_size;
 } ROIHead;
 
-/** ROI box head forward: two FC+ReLU layers then the class-score head over pooled features. */
+/**
+ * ROI box head forward: two FC+ReLU layers then the class-score head over pooled features.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* roi_head_forward(Module* module, Tensor* input) {
     ROIHead* head = (ROIHead*)module;
     if (!head || !input)
@@ -276,7 +340,11 @@ static Tensor* roi_head_forward(Module* module, Tensor* input) {
     return module_forward(head->cls_score, x);
 }
 
-/** Free the ROI box head's FC layers and classification/bbox regressors. */
+/**
+ * Free the ROI box head's FC layers and classification/bbox regressors.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void roi_head_free(Module* module) {
     ROIHead* head = (ROIHead*)module;
     if (!head)
@@ -292,7 +360,15 @@ static void roi_head_free(Module* module) {
     cml_free(head);
 }
 
-/** Build the ROI box head: two 1024-wide FC layers with class-score and bbox-regression outputs. */
+/**
+ * Build the ROI box head: two 1024-wide FC layers with class-score and bbox-regression outputs.
+ * @param fpn_ch (int)
+ * @param roi_size (int)
+ * @param num_classes (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_roi_head(int fpn_ch, int roi_size, int num_classes, DType dtype,
                                DeviceType device) {
     ROIHead* head = cml_malloc(sizeof(ROIHead));
@@ -321,7 +397,12 @@ typedef struct {
     Module* mask_pred;
 } MaskHead;
 
-/** Mask head forward: conv stack, transposed-conv upsample + ReLU, then per-class mask conv. */
+/**
+ * Mask head forward: conv stack, transposed-conv upsample + ReLU, then per-class mask conv.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* mask_head_forward(Module* module, Tensor* input) {
     MaskHead* head = (MaskHead*)module;
     if (!head || !input)
@@ -339,7 +420,11 @@ static Tensor* mask_head_forward(Module* module, Tensor* input) {
     return module_forward(head->mask_pred, x);
 }
 
-/** Free the mask head's conv stack, deconv upsampler and mask predictor. */
+/**
+ * Free the mask head's conv stack, deconv upsampler and mask predictor.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void mask_head_free(Module* module) {
     MaskHead* head = (MaskHead*)module;
     if (!head)
@@ -353,7 +438,14 @@ static void mask_head_free(Module* module) {
     cml_free(head);
 }
 
-/** Build the mask head: four 3x3 convs, a 2x transposed conv, and a 1x1 per-class mask conv. */
+/**
+ * Build the mask head: four 3x3 convs, a 2x transposed conv, and a 1x1 per-class mask conv.
+ * @param fpn_ch (int)
+ * @param num_classes (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_mask_head(int fpn_ch, int num_classes, DType dtype, DeviceType device) {
     MaskHead* head = cml_malloc(sizeof(MaskHead));
     if (!head)
@@ -387,7 +479,12 @@ typedef struct {
     int num_classes;
 } MaskRCNN;
 
-/** Forward: backbone C2-C5, top-down FPN to P2, then RPN and ROI box head on the P2 level. */
+/**
+ * Forward: backbone C2-C5, top-down FPN to P2, then RPN and ROI box head on the P2 level.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* mask_rcnn_forward(Module* module, Tensor* input) {
     MaskRCNN* net = (MaskRCNN*)module;
     if (!net || !input)
@@ -440,7 +537,11 @@ static Tensor* mask_rcnn_forward(Module* module, Tensor* input) {
     return module_forward(net->roi_head, rpn_out);
 }
 
-/** Free the Mask R-CNN backbone, FPN, RPN, ROI box head and mask head. */
+/**
+ * Free the Mask R-CNN backbone, FPN, RPN, ROI box head and mask head.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void mask_rcnn_free(Module* module) {
     MaskRCNN* net = (MaskRCNN*)module;
     if (!net)
@@ -458,7 +559,13 @@ static void mask_rcnn_free(Module* module) {
     cml_free(net);
 }
 
-/** Build Mask R-CNN from @p cfg: ResNet-50+FPN backbone, RPN, and ROI box and mask heads. */
+/**
+ * Build Mask R-CNN from @p cfg: ResNet-50+FPN backbone, RPN, and ROI box and mask heads.
+ * @param cfg (const MaskRCNNConfig*)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 Module* cml_zoo_mask_rcnn_create(const MaskRCNNConfig* cfg, DType dtype, DeviceType device) {
     MaskRCNNConfig c = cfg ? *cfg : cml_zoo_mask_rcnn_default_config();
     if (c.num_classes <= 0)

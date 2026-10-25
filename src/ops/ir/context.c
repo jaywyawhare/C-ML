@@ -13,7 +13,11 @@ static _Atomic(CMLGraph_t) g_auto_capture_ir = NULL;
 
 static _Thread_local CMLGraph_t tls_ir_context = NULL;
 
-/** Route subsequent tensor ops into @p ir for auto-capture. */
+/**
+ * Route subsequent tensor ops into @p ir for auto-capture.
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_ir_enable_auto_capture(CMLGraph_t ir) {
     if (!ir) {
         LOG_ERROR("Cannot enable auto-capture with NULL IR");
@@ -24,13 +28,24 @@ int cml_ir_enable_auto_capture(CMLGraph_t ir) {
     return 0;
 }
 
-/** Stop auto-capturing tensor ops. */
+/**
+ * Stop auto-capturing tensor ops.
+ * @return (void)
+ */
 void cml_ir_disable_auto_capture(void) { atomic_store(&g_auto_capture_ir, NULL); }
 
-/** Currently active auto-capture graph, or NULL. */
+/**
+ * Currently active auto-capture graph, or NULL.
+ * @return (CMLGraph_t)
+ */
 CMLGraph_t cml_ir_get_auto_capture_context(void) { return atomic_load(&g_auto_capture_ir); }
 
-/** Map a tensor-level OpType to its uop equivalent, or UOP_COUNT when none exists. */
+/**
+ * Map a tensor-level OpType to its uop equivalent, or UOP_COUNT when none exists.
+ * @param op_type (OpType)
+ * @param num_inputs (int)
+ * @return (UOpType)
+ */
 UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs) {
     switch (op_type) {
     case OP_NONE:
@@ -112,7 +127,14 @@ UOpType cml_ir_optype_to_uoptype(OpType op_type, int num_inputs) {
     }
 }
 
-/** Record a tensor op into the active auto-capture graph, if any; no-op otherwise. */
+/**
+ * Record a tensor op into the active auto-capture graph, if any; no-op otherwise.
+ * @param op_type (OpType)
+ * @param inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param params (void*)
+ * @return (int)
+ */
 int cml_ir_auto_capture_tensor_op(OpType op_type, Tensor** inputs, int num_inputs, void* params) {
     CMLGraph_t ir = cml_ir_get_auto_capture_context();
     if (!ir)
@@ -130,7 +152,10 @@ int cml_ir_auto_capture_tensor_op(OpType op_type, Tensor** inputs, int num_input
     return result;
 }
 
-/** Active auto-capture graph, else the lazily-created thread-local IR context. */
+/**
+ * Active auto-capture graph, else the lazily-created thread-local IR context.
+ * @return (CMLGraph_t)
+ */
 CMLGraph_t cml_ir_get_or_create_context(void) {
     CMLGraph_t auto_capture_ir = cml_ir_get_auto_capture_context();
     if (auto_capture_ir)
@@ -146,10 +171,18 @@ CMLGraph_t cml_ir_get_or_create_context(void) {
     return tls_ir_context;
 }
 
-/** Set the thread-local IR context. */
+/**
+ * Set the thread-local IR context.
+ * @param ir (CMLGraph_t)
+ * @return (void)
+ */
 void cml_ir_set_global_context(CMLGraph_t ir) { tls_ir_context = ir; }
 
-/** Clear the thread-local context (and auto-capture) only if it is @p ir. */
+/**
+ * Clear the thread-local context (and auto-capture) only if it is @p ir.
+ * @param ir (CMLGraph_t)
+ * @return (void)
+ */
 void cml_ir_clear_global_if_current(CMLGraph_t ir) {
     if (!ir || tls_ir_context != ir)
         return;
@@ -158,9 +191,13 @@ void cml_ir_clear_global_if_current(CMLGraph_t ir) {
     tls_ir_context = NULL;
 }
 
-/** Drop @p t from per-context bookkeeping as it is freed: the grad-publish logs of the
- *  thread-local, auto-capture and grad-owning contexts (the double-backward sweep skips the
- *  NULLed slots), and the detached-output list of the context that adopted it. */
+/**
+ * Drop @p t from per-context bookkeeping as it is freed: the grad-publish logs of the
+ * thread-local, auto-capture and grad-owning contexts (the double-backward sweep skips the
+ * NULLed slots), and the detached-output list of the context that adopted it.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void cml_ir_forget_tensor(Tensor* t) {
     CMLGraph_t ctxs[3] = {tls_ir_context, atomic_load(&g_auto_capture_ir),
                           t->grad ? t->grad->ir_context : NULL};
@@ -180,8 +217,11 @@ void cml_ir_forget_tensor(Tensor* t) {
                 owner->detached_outputs[i] = NULL;
 }
 
-/** Reset the thread-local IR context, tearing down dependent caches in order
- *  (plans hold Tensor* for buffer detach, so they go before the IR tensors). */
+/**
+ * Reset the thread-local IR context, tearing down dependent caches in order
+ * (plans hold Tensor* for buffer detach, so they go before the IR tensors).
+ * @return (void)
+ */
 void cml_ir_reset_global_context(void) {
     /* Tear down execution cache before IR tensors: plans hold Tensor* for buffer detach. */
     cml_graph_cache_reset_global();
@@ -196,7 +236,10 @@ void cml_ir_reset_global_context(void) {
     cml_cleanup_buffer_cache();
 }
 
-/** Free the thread-local IR graph but keep execution/buffer caches warm. */
+/**
+ * Free the thread-local IR graph but keep execution/buffer caches warm.
+ * @return (void)
+ */
 void cml_ir_reset_graph_only(void) {
     if (tls_ir_context) {
         if (atomic_load(&g_auto_capture_ir) == tls_ir_context) {
@@ -210,7 +253,11 @@ void cml_ir_reset_graph_only(void) {
      * Those caches stay warm so the next forward pass hits them. */
 }
 
-/** Force execution of every tracked tensor's lazy gradient. */
+/**
+ * Force execution of every tracked tensor's lazy gradient.
+ * @param ir (CMLGraph_t)
+ * @return (void)
+ */
 void cml_ir_ensure_gradients_executed(CMLGraph_t ir) {
     if (!ir || !ir->tensor_refs)
         return;

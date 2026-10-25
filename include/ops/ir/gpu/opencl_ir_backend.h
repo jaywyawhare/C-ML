@@ -125,18 +125,37 @@ typedef struct CMLOpenCLIRBackend {
     bool initialized;
 } CMLOpenCLIRBackend;
 
-/** Stub for builds without OpenCL: the backend is never available. */
+/**
+ * Stub for builds without OpenCL: the backend is never available.
+ * @return (bool)
+ */
 static inline bool cml_opencl_ir_available(void) { return false; }
-/** Stub for builds without OpenCL: no backend can be created. */
+/**
+ * Stub for builds without OpenCL: no backend can be created.
+ * @return (CMLOpenCLIRBackend*)
+ */
 static inline CMLOpenCLIRBackend* cml_opencl_ir_backend_create(void) { return NULL; }
-/** Stub for builds without OpenCL: initialization always fails. */
+/**
+ * Stub for builds without OpenCL: initialization always fails.
+ * @param b (CMLOpenCLIRBackend*)
+ * @return (int)
+ */
 static inline int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
     (void)b;
     return -1;
 }
-/** Stub for builds without OpenCL: nothing to release. */
+/**
+ * Stub for builds without OpenCL: nothing to release.
+ * @param b (CMLOpenCLIRBackend*)
+ * @return (void)
+ */
 static inline void cml_opencl_ir_backend_free(CMLOpenCLIRBackend* b) { (void)b; }
-/** Stub for builds without OpenCL: graph execution always fails. */
+/**
+ * Stub for builds without OpenCL: graph execution always fails.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 static inline int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
     (void)b;
     (void)ir;

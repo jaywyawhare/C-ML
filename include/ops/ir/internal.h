@@ -95,10 +95,21 @@ void cml_ir_free_node_params(struct IRNode* node);
 /* Canonical teardown of a node's owned storage (params/scope/build_stack/
  * shapes/...) without freeing the node or touching ref_count. */
 void cml_ir_release_node_storage(struct IRNode* node);
-/** Free an unlinked node: leave the CSE table, move the graph's last-result and frontier pointers
- *  off it, detach its output tensor, release its storage. */
+/**
+ * Free an unlinked node: leave the CSE table, move the graph's last-result and frontier pointers
+ * off it, detach its output tensor, release its storage.
+ * @param ir (CMLGraph_t)
+ * @param node (struct IRNode*)
+ * @return (void)
+ */
 void cml_ir_destroy_node(CMLGraph_t ir, struct IRNode* node);
-/** Hand @p shape to @p node, freeing any shape it already owns. */
+/**
+ * Hand @p shape to @p node, freeing any shape it already owns.
+ * @param node (struct IRNode*)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @return (void)
+ */
 void cml_ir_set_output_shape(struct IRNode* node, int* shape, int ndim);
 /* Give a fused-away node's output to the graph, which frees it at teardown. */
 void cml_ir_adopt_detached(CMLGraph_t ir, Tensor* t);

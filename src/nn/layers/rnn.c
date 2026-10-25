@@ -11,8 +11,13 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
-/** Module-interface stub: the generic forward cannot carry a hidden state, so it always returns
- *  NULL; call rnn_cell_forward() directly instead. */
+/**
+ * Module-interface stub: the generic forward cannot carry a hidden state, so it always returns
+ * NULL; call rnn_cell_forward() directly instead.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* rnn_cell_module_forward(Module* module, Tensor* input) {
     /* The Module interface does not carry the hidden state, so users
        should call rnn_cell_forward() directly. */
@@ -21,8 +26,14 @@ static Tensor* rnn_cell_module_forward(Module* module, Tensor* input) {
     return NULL;
 }
 
-/** torch.nn.RNNCell step: h' = tanh(input @ W_ih^T + hidden @ W_hh^T + b_ih + b_hh). A NULL hidden
- *  is treated as zeros. Returns NULL on NULL cell/input. */
+/**
+ * torch.nn.RNNCell step: h' = tanh(input @ W_ih^T + hidden @ W_hh^T + b_ih + b_hh). A NULL hidden
+ * is treated as zeros. Returns NULL on NULL cell/input.
+ * @param cell (RNNCell*)
+ * @param input (Tensor*)
+ * @param hidden (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* rnn_cell_forward(RNNCell* cell, Tensor* input, Tensor* hidden) {
     if (!cell || !input)
         return NULL;
@@ -50,10 +61,24 @@ Tensor* rnn_cell_forward(RNNCell* cell, Tensor* input, Tensor* hidden) {
     return uop_rnn_cell(ih, hh);
 }
 
-/** Register a recurrent cell's parameter set: weight_ih [gates, input_size],
- *  weight_hh [gates, hidden_size] and, when `use_bias`, the two [gates] biases.
- *  The RNN, LSTM and GRU cells differ only in how many gates they stack. Weights are
- *  initialized uniform in [-scale, scale], biases to zero. */
+/**
+ * Register a recurrent cell's parameter set: weight_ih [gates, input_size],
+ * weight_hh [gates, hidden_size] and, when `use_bias`, the two [gates] biases.
+ * The RNN, LSTM and GRU cells differ only in how many gates they stack. Weights are
+ * initialized uniform in [-scale, scale], biases to zero.
+ * @param cell (Module*)
+ * @param gates (int)
+ * @param input_size (int)
+ * @param hidden_size (int)
+ * @param scale (float)
+ * @param use_bias (bool)
+ * @param cfg (TensorConfig*)
+ * @param weight_ih (Parameter**)
+ * @param weight_hh (Parameter**)
+ * @param bias_ih (Parameter**)
+ * @param bias_hh (Parameter**)
+ * @return (void)
+ */
 static void add_cell_params(Module* cell, int gates, int input_size, int hidden_size, float scale,
                             bool use_bias, TensorConfig* cfg, Parameter** weight_ih,
                             Parameter** weight_hh, Parameter** bias_ih, Parameter** bias_hh) {
@@ -82,7 +107,15 @@ static void add_cell_params(Module* cell, int gates, int input_size, int hidden_
     *bias_hh = module_get_parameter(cell, "bias_hh");
 }
 
-/** Construct a torch.nn.RNNCell (single tanh gate). Returns NULL on failure. */
+/**
+ * Construct a torch.nn.RNNCell (single tanh gate). Returns NULL on failure.
+ * @param input_size (int)
+ * @param hidden_size (int)
+ * @param use_bias (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (RNNCell*)
+ */
 RNNCell* nn_rnn_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
                      DeviceType device) {
     RNNCell* cell = cml_malloc(sizeof(RNNCell));
@@ -107,16 +140,30 @@ RNNCell* nn_rnn_cell(int input_size, int hidden_size, bool use_bias, DType dtype
     return cell;
 }
 
-/** Module-interface stub: returns NULL because the generic forward cannot carry (h, c) state;
- *  call lstm_cell_forward() directly. */
+/**
+ * Module-interface stub: returns NULL because the generic forward cannot carry (h, c) state;
+ * call lstm_cell_forward() directly.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* lstm_cell_module_forward(Module* module, Tensor* input) {
     (void)module;
     (void)input;
     return NULL;
 }
 
-/** torch.nn.LSTMCell step: compute the four gates, then c' = f*c_prev + i*g and h' = o*tanh(c'),
- *  writing h'/c' to h_out/c_out. NULL h_prev/c_prev are treated as zeros. No-op on NULL args. */
+/**
+ * torch.nn.LSTMCell step: compute the four gates, then c' = f*c_prev + i*g and h' = o*tanh(c'),
+ * writing h'/c' to h_out/c_out. NULL h_prev/c_prev are treated as zeros. No-op on NULL args.
+ * @param cell (LSTMCell*)
+ * @param input (Tensor*)
+ * @param h_prev (Tensor*)
+ * @param c_prev (Tensor*)
+ * @param h_out (Tensor**)
+ * @param c_out (Tensor**)
+ * @return (void)
+ */
 void lstm_cell_forward(LSTMCell* cell, Tensor* input, Tensor* h_prev, Tensor* c_prev,
                        Tensor** h_out, Tensor** c_out) {
     if (!cell || !input || !h_out || !c_out)
@@ -158,7 +205,15 @@ void lstm_cell_forward(LSTMCell* cell, Tensor* input, Tensor* h_prev, Tensor* c_
     *c_out = uop_shrink(packed, sh_c, eh_c, 2);
 }
 
-/** Construct a torch.nn.LSTMCell (4 stacked gates). Returns NULL on failure. */
+/**
+ * Construct a torch.nn.LSTMCell (4 stacked gates). Returns NULL on failure.
+ * @param input_size (int)
+ * @param hidden_size (int)
+ * @param use_bias (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (LSTMCell*)
+ */
 LSTMCell* nn_lstm_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
                        DeviceType device) {
     LSTMCell* cell = cml_malloc(sizeof(LSTMCell));
@@ -184,16 +239,27 @@ LSTMCell* nn_lstm_cell(int input_size, int hidden_size, bool use_bias, DType dty
     return cell;
 }
 
-/** Module-interface stub: returns NULL because the generic forward cannot carry hidden state;
- *  call gru_cell_forward() directly. */
+/**
+ * Module-interface stub: returns NULL because the generic forward cannot carry hidden state;
+ * call gru_cell_forward() directly.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* gru_cell_module_forward(Module* module, Tensor* input) {
     (void)module;
     (void)input;
     return NULL;
 }
 
-/** torch.nn.GRUCell step: reset/update/new gates giving h' = (1-z)*n + z*hidden. A NULL hidden is
- *  treated as zeros. Returns NULL on NULL cell/input. */
+/**
+ * torch.nn.GRUCell step: reset/update/new gates giving h' = (1-z)*n + z*hidden. A NULL hidden is
+ * treated as zeros. Returns NULL on NULL cell/input.
+ * @param cell (GRUCell*)
+ * @param input (Tensor*)
+ * @param hidden (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* gru_cell_forward(GRUCell* cell, Tensor* input, Tensor* hidden) {
     if (!cell || !input)
         return NULL;
@@ -223,7 +289,15 @@ Tensor* gru_cell_forward(GRUCell* cell, Tensor* input, Tensor* hidden) {
     return uop_gru_cell(ih, hh, hidden);
 }
 
-/** Construct a torch.nn.GRUCell (3 stacked gates). Returns NULL on failure. */
+/**
+ * Construct a torch.nn.GRUCell (3 stacked gates). Returns NULL on failure.
+ * @param input_size (int)
+ * @param hidden_size (int)
+ * @param use_bias (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (GRUCell*)
+ */
 GRUCell* nn_gru_cell(int input_size, int hidden_size, bool use_bias, DType dtype,
                      DeviceType device) {
     GRUCell* cell = cml_malloc(sizeof(GRUCell));
@@ -249,8 +323,15 @@ GRUCell* nn_gru_cell(int input_size, int hidden_size, bool use_bias, DType dtype
     return cell;
 }
 
-/** Re-export a cell's parameters on the parent RNN/LSTM/GRU under "layers.<layer>.<fwd|rev>.<name>"
- *  names, aliasing the tensors rather than copying. */
+/**
+ * Re-export a cell's parameters on the parent RNN/LSTM/GRU under "layers.<layer>.<fwd|rev>.<name>"
+ * names, aliasing the tensors rather than copying.
+ * @param parent (Module*)
+ * @param cell (Module*)
+ * @param layer (int)
+ * @param dir (int)
+ * @return (void)
+ */
 static void register_cell_params(Module* parent, Module* cell, int layer, int dir) {
     const char* dir_str = (dir == 0) ? "fwd" : "rev";
     Parameter** params  = NULL;
@@ -272,7 +353,12 @@ static void register_cell_params(Module* parent, Module* cell, int layer, int di
     }
 }
 
-/** Lazy slice: [seq, batch, feat] -> [batch, feat] at time step t. NULL on op failure. */
+/**
+ * Lazy slice: [seq, batch, feat] -> [batch, feat] at time step t. NULL on op failure.
+ * @param src (Tensor*)
+ * @param t (int)
+ * @return (Tensor*)
+ */
 static Tensor* slice_timestep(Tensor* src, int t) {
     int batch      = src->shape[1];
     int feat       = src->shape[2];
@@ -288,21 +374,35 @@ static Tensor* slice_timestep(Tensor* src, int t) {
     return uop_reshape(sliced, &rp); /* [batch, feat] */
 }
 
-/** Lazy transpose of dims 0 and 1 of a 3-D tensor (batch_first <-> seq_first). */
+/**
+ * Lazy transpose of dims 0 and 1 of a 3-D tensor (batch_first <-> seq_first).
+ * @param src (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* transpose_01(Tensor* src) {
     int perm[]       = {1, 0, 2};
     PermuteParams pp = {.perm = perm, .num_dims = 3};
     return uop_permute(src, &pp);
 }
 
-/** Lazy concatenation of forward and reverse outputs along the feature axis. */
+/**
+ * Lazy concatenation of forward and reverse outputs along the feature axis.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* concat_features(Tensor* a, Tensor* b) {
     Tensor* inputs[] = {a, b};
     return uop_cat(inputs, 2, 2); /* cat along dim 2 (feature) */
 }
 
-/** Module-interface forward: run rnn_forward with a zero initial state and return just the
- *  sequence output (h_n is discarded, like torch's second return value). */
+/**
+ * Module-interface forward: run rnn_forward with a zero initial state and return just the
+ * sequence output (h_n is discarded, like torch's second return value).
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* rnn_module_forward(Module* module, Tensor* input) {
     /* Module interface returns the sequence output; h_n is an extra graph output
      * (left for the graph teardown, like torch's second return value). */
@@ -312,7 +412,11 @@ static Tensor* rnn_module_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Free the RNN module and every per-layer/direction cell it owns. */
+/**
+ * Free the RNN module and every per-layer/direction cell it owns.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void rnn_free(Module* module) {
     RNN* rnn = (RNN*)module;
     if (rnn->cells) {
@@ -327,8 +431,20 @@ static void rnn_free(Module* module) {
     cml_free(rnn);
 }
 
-/** Construct a multi-layer (optionally bidirectional) torch.nn.RNN, building one RNNCell per
- *  layer/direction and registering their parameters. Returns NULL on failure. */
+/**
+ * Construct a multi-layer (optionally bidirectional) torch.nn.RNN, building one RNNCell per
+ * layer/direction and registering their parameters. Returns NULL on failure.
+ * @param input_size (int)
+ * @param hidden_size (int)
+ * @param num_layers (int)
+ * @param bidirectional (bool)
+ * @param batch_first (bool)
+ * @param dropout (float)
+ * @param use_bias (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (RNN*)
+ */
 RNN* nn_rnn(int input_size, int hidden_size, int num_layers, bool bidirectional, bool batch_first,
             float dropout, bool use_bias, DType dtype, DeviceType device) {
     RNN* rnn = cml_malloc(sizeof(RNN));
@@ -373,9 +489,17 @@ RNN* nn_rnn(int input_size, int hidden_size, int num_layers, bool bidirectional,
     return rnn;
 }
 
-/** Run the full RNN over a sequence: stack per-timestep hidden states into `output` and the final
- *  per-layer/direction states into `h_n`. Honors batch_first and bidirectional. No-op on NULL
- *  args; a NULL h_0 starts from zeros. */
+/**
+ * Run the full RNN over a sequence: stack per-timestep hidden states into `output` and the final
+ * per-layer/direction states into `h_n`. Honors batch_first and bidirectional. No-op on NULL
+ * args; a NULL h_0 starts from zeros.
+ * @param rnn (RNN*)
+ * @param input (Tensor*)
+ * @param h_0 (Tensor*)
+ * @param output (Tensor**)
+ * @param h_n (Tensor**)
+ * @return (void)
+ */
 void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0, Tensor** output, Tensor** h_n) {
     if (!rnn || !input || !output || !h_n)
         return;
@@ -451,8 +575,13 @@ void rnn_forward(RNN* rnn, Tensor* input, Tensor* h_0, Tensor** output, Tensor**
     *h_n    = hn;
 }
 
-/** Module-interface forward: run lstm_forward with zero initial states and return just the
- *  sequence output (h_n, c_n discarded). */
+/**
+ * Module-interface forward: run lstm_forward with zero initial states and return just the
+ * sequence output (h_n, c_n discarded).
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* lstm_module_forward(Module* module, Tensor* input) {
     Tensor* output = NULL;
     Tensor* h_n    = NULL;
@@ -461,7 +590,11 @@ static Tensor* lstm_module_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Free the LSTM module and every per-layer/direction cell it owns. */
+/**
+ * Free the LSTM module and every per-layer/direction cell it owns.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void lstm_free(Module* module) {
     LSTM* lstm = (LSTM*)module;
     if (lstm->cells) {
@@ -476,8 +609,20 @@ static void lstm_free(Module* module) {
     cml_free(lstm);
 }
 
-/** Construct a multi-layer (optionally bidirectional) torch.nn.LSTM, building one LSTMCell per
- *  layer/direction and registering their parameters. Returns NULL on failure. */
+/**
+ * Construct a multi-layer (optionally bidirectional) torch.nn.LSTM, building one LSTMCell per
+ * layer/direction and registering their parameters. Returns NULL on failure.
+ * @param input_size (int)
+ * @param hidden_size (int)
+ * @param num_layers (int)
+ * @param bidirectional (bool)
+ * @param batch_first (bool)
+ * @param dropout (float)
+ * @param use_bias (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (LSTM*)
+ */
 LSTM* nn_lstm(int input_size, int hidden_size, int num_layers, bool bidirectional, bool batch_first,
               float dropout, bool use_bias, DType dtype, DeviceType device) {
     LSTM* lstm = cml_malloc(sizeof(LSTM));
@@ -522,9 +667,19 @@ LSTM* nn_lstm(int input_size, int hidden_size, int num_layers, bool bidirectiona
     return lstm;
 }
 
-/** Run the full LSTM over a sequence: stack per-timestep hidden states into `output` and the final
- *  per-layer/direction (h, c) into `h_n`/`c_n`. Honors batch_first and bidirectional. No-op on NULL
- *  args; NULL h_0/c_0 start from zeros. */
+/**
+ * Run the full LSTM over a sequence: stack per-timestep hidden states into `output` and the final
+ * per-layer/direction (h, c) into `h_n`/`c_n`. Honors batch_first and bidirectional. No-op on NULL
+ * args; NULL h_0/c_0 start from zeros.
+ * @param lstm (LSTM*)
+ * @param input (Tensor*)
+ * @param h_0 (Tensor*)
+ * @param c_0 (Tensor*)
+ * @param output (Tensor**)
+ * @param h_n (Tensor**)
+ * @param c_n (Tensor**)
+ * @return (void)
+ */
 void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0, Tensor** output,
                   Tensor** h_n, Tensor** c_n) {
     if (!lstm || !input || !output || !h_n || !c_n)
@@ -613,8 +768,13 @@ void lstm_forward(LSTM* lstm, Tensor* input, Tensor* h_0, Tensor* c_0, Tensor** 
     *c_n    = cn;
 }
 
-/** Module-interface forward: run gru_forward with a zero initial state and return just the
- *  sequence output (h_n discarded). */
+/**
+ * Module-interface forward: run gru_forward with a zero initial state and return just the
+ * sequence output (h_n discarded).
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* gru_module_forward(Module* module, Tensor* input) {
     Tensor* output = NULL;
     Tensor* h_n    = NULL;
@@ -622,7 +782,11 @@ static Tensor* gru_module_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Free the GRU module and every per-layer/direction cell it owns. */
+/**
+ * Free the GRU module and every per-layer/direction cell it owns.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void gru_free(Module* module) {
     GRU* gru = (GRU*)module;
     if (gru->cells) {
@@ -637,8 +801,20 @@ static void gru_free(Module* module) {
     cml_free(gru);
 }
 
-/** Construct a multi-layer (optionally bidirectional) torch.nn.GRU, building one GRUCell per
- *  layer/direction and registering their parameters. Returns NULL on failure. */
+/**
+ * Construct a multi-layer (optionally bidirectional) torch.nn.GRU, building one GRUCell per
+ * layer/direction and registering their parameters. Returns NULL on failure.
+ * @param input_size (int)
+ * @param hidden_size (int)
+ * @param num_layers (int)
+ * @param bidirectional (bool)
+ * @param batch_first (bool)
+ * @param dropout (float)
+ * @param use_bias (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (GRU*)
+ */
 GRU* nn_gru(int input_size, int hidden_size, int num_layers, bool bidirectional, bool batch_first,
             float dropout, bool use_bias, DType dtype, DeviceType device) {
     GRU* gru = cml_malloc(sizeof(GRU));
@@ -683,9 +859,17 @@ GRU* nn_gru(int input_size, int hidden_size, int num_layers, bool bidirectional,
     return gru;
 }
 
-/** Run the full GRU over a sequence: stack per-timestep hidden states into `output` and the final
- *  per-layer/direction states into `h_n`. Honors batch_first and bidirectional. No-op on NULL
- *  args; a NULL h_0 starts from zeros. */
+/**
+ * Run the full GRU over a sequence: stack per-timestep hidden states into `output` and the final
+ * per-layer/direction states into `h_n`. Honors batch_first and bidirectional. No-op on NULL
+ * args; a NULL h_0 starts from zeros.
+ * @param gru (GRU*)
+ * @param input (Tensor*)
+ * @param h_0 (Tensor*)
+ * @param output (Tensor**)
+ * @param h_n (Tensor**)
+ * @return (void)
+ */
 void gru_forward(GRU* gru, Tensor* input, Tensor* h_0, Tensor** output, Tensor** h_n) {
     if (!gru || !input || !output || !h_n)
         return;

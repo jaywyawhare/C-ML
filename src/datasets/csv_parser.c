@@ -18,6 +18,8 @@
 /**
  * Return non-zero if the string parses as a number, tolerating leading spaces,
  * sign, decimal point, and exponent notation. Used to tell data rows from headers.
+ * @param s (const char*)
+ * @return (int)
  */
 static int is_numeric(const char* s) {
     if (!s || !*s)
@@ -44,14 +46,24 @@ static int is_numeric(const char* s) {
     return has_digit;
 }
 
-/** Skip spaces and tabs, returning the first non-blank character. */
+/**
+ * Skip spaces and tabs, returning the first non-blank character.
+ * @param s (const char*)
+ * @return (const char*)
+ */
 static const char* skip_blanks(const char* s) {
     while (*s == ' ' || *s == '\t')
         s++;
     return s;
 }
 
-/** Read an integer of 1..maxlen digits; store it and advance *s past the digits. */
+/**
+ * Read an integer of 1..maxlen digits; store it and advance *s past the digits.
+ * @param s (const char**)
+ * @param maxlen (int)
+ * @param out (int*)
+ * @return (int)
+ */
 static int read_int(const char** s, int maxlen, int* out) {
     const char* p = *s;
     int n = 0, digits = 0;
@@ -71,6 +83,12 @@ static int read_int(const char** s, int maxlen, int* out) {
  * Parse a calendar date at *s. ISO `YYYY-MM-DD` is always accepted; `/` or `.`
  * separated dates are read in @p order (day/month/year or month/day/year), with a
  * two-digit year taken as 20xx. On success advances *s past the date and returns 1.
+ * @param s (const char**)
+ * @param order (CSVDateOrder)
+ * @param y (int*)
+ * @param mo (int*)
+ * @param d (int*)
+ * @return (int)
  */
 static int parse_date(const char** s, CSVDateOrder order, int* y, int* mo, int* d) {
     const char* p = *s;
@@ -117,7 +135,14 @@ static int parse_date(const char** s, CSVDateOrder order, int* y, int* mo, int* 
     return 1;
 }
 
-/** Parse `HH:MM` with optional `:SS` and `.fff`; advance *s and return 1 on success. */
+/**
+ * Parse `HH:MM` with optional `:SS` and `.fff`; advance *s and return 1 on success.
+ * @param s (const char**)
+ * @param h (int*)
+ * @param mi (int*)
+ * @param se (int*)
+ * @return (int)
+ */
 static int parse_clock(const char** s, int* h, int* mi, int* se) {
     const char* p = *s;
     int hh, mm, ss = 0;
@@ -145,7 +170,13 @@ static int parse_clock(const char** s, int* h, int* mi, int* se) {
     return 1;
 }
 
-/** Day of week by Sakamoto's method: 0 = Sunday .. 6 = Saturday. */
+/**
+ * Day of week by Sakamoto's method: 0 = Sunday .. 6 = Saturday.
+ * @param y (int)
+ * @param m (int)
+ * @param d (int)
+ * @return (int)
+ */
 static int day_of_week(int y, int m, int d) {
     static const int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
     if (m < 3)
@@ -166,6 +197,9 @@ typedef enum {
  * Classify a trimmed cell: a date and clock separated by `T`/space is COL_DATETIME,
  * either alone is COL_DATE/COL_TIME, a plain number is COL_NUMERIC, anything else
  * (text, a label) is COL_CATEGORICAL.
+ * @param raw (const char*)
+ * @param order (CSVDateOrder)
+ * @return (ColKind)
  */
 static ColKind classify_cell(const char* raw, CSVDateOrder order) {
     const char* s = skip_blanks(raw);
@@ -188,7 +222,12 @@ static ColKind classify_cell(const char* raw, CSVDateOrder order) {
     return COL_CATEGORICAL;
 }
 
-/** Heap-allocate "base.suffix", or a copy of base when suffix is empty. */
+/**
+ * Heap-allocate "base.suffix", or a copy of base when suffix is empty.
+ * @param base (const char*)
+ * @param suffix (const char*)
+ * @return (char*)
+ */
 static char* make_feat_name(const char* base, const char* suffix) {
     if (!base)
         return NULL;
@@ -205,6 +244,14 @@ static char* make_feat_name(const char* base, const char* suffix) {
  * Emit a date's components (year, month, day, day-of-week, plus month/dow sin-cos
  * when cyclical). Writes values to @p x and names to @p nm when non-NULL; returns
  * the component count, so a NULL/NULL call yields the column width.
+ * @param y (int)
+ * @param mo (int)
+ * @param d (int)
+ * @param o (const CSVParseOptions*)
+ * @param base (const char*)
+ * @param x (float*)
+ * @param nm (char**)
+ * @return (int)
  */
 static int emit_date(int y, int mo, int d, const CSVParseOptions* o, const char* base, float* x,
                      char** nm) {
@@ -236,6 +283,14 @@ static int emit_date(int y, int mo, int d, const CSVParseOptions* o, const char*
 /**
  * Emit a clock's components (hour, minute, second, plus hour sin-cos when cyclical).
  * Writes values to @p x and names to @p nm when non-NULL; returns the component count.
+ * @param h (int)
+ * @param mi (int)
+ * @param se (int)
+ * @param o (const CSVParseOptions*)
+ * @param base (const char*)
+ * @param x (float*)
+ * @param nm (char**)
+ * @return (int)
  */
 static int emit_time(int h, int mi, int se, const CSVParseOptions* o, const char* base, float* x,
                      char** nm) {
@@ -260,7 +315,12 @@ static int emit_time(int h, int mi, int se, const CSVParseOptions* o, const char
     return i;
 }
 
-/** Number of feature columns a source column of @p kind expands into. */
+/**
+ * Number of feature columns a source column of @p kind expands into.
+ * @param kind (ColKind)
+ * @param o (const CSVParseOptions*)
+ * @return (int)
+ */
 static int col_width(ColKind kind, const CSVParseOptions* o) {
     switch (kind) {
     case COL_DATE:
@@ -274,7 +334,14 @@ static int col_width(ColKind kind, const CSVParseOptions* o) {
     }
 }
 
-/** Write col_width(kind) names for @p base into nm (each heap-allocated). */
+/**
+ * Write col_width(kind) names for @p base into nm (each heap-allocated).
+ * @param kind (ColKind)
+ * @param o (const CSVParseOptions*)
+ * @param base (const char*)
+ * @param nm (char**)
+ * @return (void)
+ */
 static void col_names(ColKind kind, const CSVParseOptions* o, const char* base, char** nm) {
     switch (kind) {
     case COL_DATE:
@@ -298,6 +365,11 @@ static void col_names(ColKind kind, const CSVParseOptions* o, const char* base, 
  * Parse a date/time cell into its numeric components, writing col_width(kind) floats
  * to @p x. A cell that fails to parse (e.g. a stray row under a column typed from the
  * first data row) is written as zeros so the feature matrix stays rectangular.
+ * @param raw (const char*)
+ * @param kind (ColKind)
+ * @param o (const CSVParseOptions*)
+ * @param x (float*)
+ * @return (void)
  */
 static void fill_datetime(const char* raw, ColKind kind, const CSVParseOptions* o, float* x) {
     const char* s = skip_blanks(raw);
@@ -329,6 +401,8 @@ static void fill_datetime(const char* raw, ColKind kind, const CSVParseOptions* 
 /**
  * Guess the field delimiter of a line by majority count: tab, then semicolon,
  * otherwise defaulting to comma.
+ * @param line (const char*)
+ * @return (char)
  */
 static char detect_delimiter(const char* line) {
     int commas = 0, semicolons = 0, tabs = 0;
@@ -347,7 +421,14 @@ static char detect_delimiter(const char* line) {
     return ',';
 }
 
-/** Split a line by delimiter, return field count. Fields written into fields[] */
+/**
+ * Split a line by delimiter, return field count. Fields written into fields[]
+ * @param line (char*)
+ * @param delim (char)
+ * @param fields (char**)
+ * @param max_fields (int)
+ * @return (int)
+ */
 static int split_line(char* line, char delim, char** fields, int max_fields) {
     int count = 0;
     char* p   = line;
@@ -380,6 +461,9 @@ typedef struct {
 /**
  * Return the index of a (whitespace-trimmed) label, inserting it if new. Returns
  * -1 on an empty label or when the fixed MAX_LABELS table is full.
+ * @param lm (LabelMap*)
+ * @param s (const char*)
+ * @return (int)
  */
 static int label_map_get_or_add(LabelMap* lm, const char* s) {
     while (*s == ' ')
@@ -405,8 +489,11 @@ static int label_map_get_or_add(LabelMap* lm, const char* s) {
     return lm->count++;
 }
 
-/** Default parse options: last column is the target, auto header/delimiter, ISO
- *  dates, date/time columns expanded into numeric components, no cyclical encoding. */
+/**
+ * Default parse options: last column is the target, auto header/delimiter, ISO
+ * dates, date/time columns expanded into numeric components, no cyclical encoding.
+ * @return (CSVParseOptions)
+ */
 CSVParseOptions cml_csv_default_options(void) {
     CSVParseOptions o = {
         .target_col      = -1,
@@ -614,6 +701,15 @@ int cml_csv_parse_ex(const char* filepath, const CSVParseOptions* opts, float** 
  * date/time columns are split into numeric components and non-numeric targets are
  * mapped to class indices. Allocates *X_out, *y_out, and optionally *class_names_out
  * (all cml_malloc, caller frees). Returns 0 on success.
+ * @param filepath (const char*)
+ * @param target_col (int)
+ * @param X_out (float**)
+ * @param y_out (float**)
+ * @param num_samples (int*)
+ * @param num_features (int*)
+ * @param num_classes (int*)
+ * @param class_names_out (char***)
+ * @return (int)
  */
 int cml_csv_parse(const char* filepath, int target_col, float** X_out, float** y_out,
                   int* num_samples, int* num_features, int* num_classes, char*** class_names_out) {
@@ -627,6 +723,9 @@ int cml_csv_parse(const char* filepath, int target_col, float** X_out, float** y
  * Load a CSV file into a Dataset, using target_col as the label column, and
  * populate feature names and statistics. Returns NULL on error; the caller owns
  * the Dataset.
+ * @param filepath (const char*)
+ * @param target_col (int)
+ * @return (Dataset*)
  */
 Dataset* cml_dataset_from_csv(const char* filepath, int target_col) {
     if (!filepath)

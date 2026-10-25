@@ -10,8 +10,13 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** torch.nn.Conv2d forward: grouped cross-correlation of a 4D input [N, C_in, H, W] with the
- *  weight via uop_conv2d. Validates rank/channels; returns NULL on mismatch or op failure. */
+/**
+ * torch.nn.Conv2d forward: grouped cross-correlation of a 4D input [N, C_in, H, W] with the
+ * weight via uop_conv2d. Validates rank/channels; returns NULL on mismatch or op failure.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* conv2d_forward(Module* module, Tensor* input) {
     Conv2d* conv2d = (Conv2d*)module;
 
@@ -77,7 +82,11 @@ static Tensor* conv2d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Free the Conv2d module; owned parameters are released by module_free. */
+/**
+ * Free the Conv2d module; owned parameters are released by module_free.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void conv2d_free(Module* module) {
     Conv2d* conv2d = (Conv2d*)module;
     if (!conv2d)
@@ -86,14 +95,33 @@ static void conv2d_free(Module* module) {
     cml_free(conv2d);
 }
 
-/** Default weight initializer: Kaiming/He with fan-in over in_channels * kernel area. */
+/**
+ * Default weight initializer: Kaiming/He with fan-in over in_channels * kernel area.
+ * @param tensor (Tensor*)
+ * @param in_channels (int)
+ * @param out_channels (int)
+ * @param kernel_size (int)
+ * @return (void)
+ */
 static void kaiming_init(Tensor* tensor, int in_channels, int out_channels, int kernel_size) {
     (void)out_channels;
     nn_init_kaiming(tensor, in_channels, kernel_size * kernel_size);
 }
 
-/** Construct a square-kernel Conv2d (groups=1); weight is Kaiming-init, bias (zeros) added when
- *  use_bias. Returns NULL on failure. */
+/**
+ * Construct a square-kernel Conv2d (groups=1); weight is Kaiming-init, bias (zeros) added when
+ * use_bias. Returns NULL on failure.
+ * @param in_channels (int)
+ * @param out_channels (int)
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @param padding (int)
+ * @param dilation (int)
+ * @param use_bias (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Conv2d*)
+ */
 Conv2d* nn_conv2d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
                   int dilation, bool use_bias, DType dtype, DeviceType device) {
     Conv2d* conv2d = cml_malloc(sizeof(Conv2d));

@@ -6,7 +6,13 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
-/** Return the index into `device_ids` of the tensor's device, or 0 if not found. */
+/**
+ * Return the index into `device_ids` of the tensor's device, or 0 if not found.
+ * @param t (const Tensor*)
+ * @param device_ids (const int*)
+ * @param n (int)
+ * @return (int)
+ */
 static int device_for_tensor(const Tensor* t, const int* device_ids, int n) {
     if (!t)
         return device_ids[0];
@@ -16,7 +22,12 @@ static int device_for_tensor(const Tensor* t, const int* device_ids, int n) {
     return 0;
 }
 
-/** Whether two devices can peer-to-peer copy (currently always false: no P2P path). */
+/**
+ * Whether two devices can peer-to-peer copy (currently always false: no P2P path).
+ * @param dev_a (int)
+ * @param dev_b (int)
+ * @return (bool)
+ */
 bool devices_p2p_capable(int dev_a, int dev_b) {
 
     (void)dev_a;
@@ -24,8 +35,14 @@ bool devices_p2p_capable(int dev_a, int dev_b) {
     return false;
 }
 
-/** Partition a schedule across `num_devices` by output residency, inserting D2D transfer
- *  and device-compute steps in dependency order. Returns NULL on bad args/alloc. */
+/**
+ * Partition a schedule across `num_devices` by output residency, inserting D2D transfer
+ * and device-compute steps in dependency order. Returns NULL on bad args/alloc.
+ * @param sched (CMLSchedule*)
+ * @param device_ids (const int*)
+ * @param num_devices (int)
+ * @return (MultiDeviceSchedule*)
+ */
 MultiDeviceSchedule* multi_schedule_build(CMLSchedule* sched, const int* device_ids,
                                           int num_devices) {
     if (!sched || !device_ids || num_devices <= 0)
@@ -114,7 +131,11 @@ fail:
     return NULL;
 }
 
-/** Free a multi-device schedule and all its per-device sub-schedules. */
+/**
+ * Free a multi-device schedule and all its per-device sub-schedules.
+ * @param ms (MultiDeviceSchedule*)
+ * @return (void)
+ */
 void multi_schedule_free(MultiDeviceSchedule* ms) {
     if (!ms)
         return;
@@ -133,8 +154,12 @@ void multi_schedule_free(MultiDeviceSchedule* ms) {
     cml_free(ms);
 }
 
-/** Walk the step list validating transfers/compute. Returns 0 if nothing to do, -2 when
- *  device-compute steps remain (no schedule executor exists), -1 on a bad step. */
+/**
+ * Walk the step list validating transfers/compute. Returns 0 if nothing to do, -2 when
+ * device-compute steps remain (no schedule executor exists), -1 on a bad step.
+ * @param ms (MultiDeviceSchedule*)
+ * @return (int)
+ */
 int multi_schedule_run(MultiDeviceSchedule* ms) {
     if (!ms)
         return -1;
@@ -181,7 +206,11 @@ int multi_schedule_run(MultiDeviceSchedule* ms) {
     return 0;
 }
 
-/** Total bytes moved across all planned cross-device transfers. */
+/**
+ * Total bytes moved across all planned cross-device transfers.
+ * @param ms (const MultiDeviceSchedule*)
+ * @return (size_t)
+ */
 size_t multi_schedule_xfer_bytes(const MultiDeviceSchedule* ms) {
     if (!ms)
         return 0;
@@ -191,7 +220,11 @@ size_t multi_schedule_xfer_bytes(const MultiDeviceSchedule* ms) {
     return total;
 }
 
-/** Sum of kernel (item) counts across every device sub-schedule. */
+/**
+ * Sum of kernel (item) counts across every device sub-schedule.
+ * @param ms (const MultiDeviceSchedule*)
+ * @return (int)
+ */
 int multi_schedule_total_kernels(const MultiDeviceSchedule* ms) {
     if (!ms)
         return 0;
@@ -202,7 +235,11 @@ int multi_schedule_total_kernels(const MultiDeviceSchedule* ms) {
     return total;
 }
 
-/** Debug-print the device partition and cross-device transfer summary to stderr. */
+/**
+ * Debug-print the device partition and cross-device transfer summary to stderr.
+ * @param ms (const MultiDeviceSchedule*)
+ * @return (void)
+ */
 void multi_schedule_print(const MultiDeviceSchedule* ms) {
     if (!ms) {
         fprintf(stderr, "MultiDeviceSchedule(NULL)\n");

@@ -7,7 +7,12 @@
 #include <time.h>
 #include <string.h>
 
-/** Emit a timestamped MLPerf :::MLLOG line with a string value (or null). */
+/**
+ * Emit a timestamped MLPerf :::MLLOG line with a string value (or null).
+ * @param key (const char*)
+ * @param value (const char*)
+ * @return (void)
+ */
 void mlperf_log_event(const char* key, const char* value) {
     if (!key)
         return;
@@ -19,7 +24,12 @@ void mlperf_log_event(const char* key, const char* value) {
     fflush(stdout);
 }
 
-/** Emit a timestamped MLPerf :::MLLOG line with a numeric value. */
+/**
+ * Emit a timestamped MLPerf :::MLLOG line with a numeric value.
+ * @param key (const char*)
+ * @param value (double)
+ * @return (void)
+ */
 void mlperf_log_metric(const char* key, double value) {
     if (!key)
         return;
@@ -28,7 +38,11 @@ void mlperf_log_metric(const char* key, double value) {
     fflush(stdout);
 }
 
-/** Emit the MLPerf run_start marker for a benchmark. */
+/**
+ * Emit the MLPerf run_start marker for a benchmark.
+ * @param benchmark (const char*)
+ * @return (void)
+ */
 void mlperf_log_start(const char* benchmark) {
     if (!benchmark)
         return;
@@ -38,7 +52,12 @@ void mlperf_log_start(const char* benchmark) {
     fflush(stdout);
 }
 
-/** Emit the MLPerf run_stop marker; status defaults to "success" when NULL. */
+/**
+ * Emit the MLPerf run_stop marker; status defaults to "success" when NULL.
+ * @param benchmark (const char*)
+ * @param status (const char*)
+ * @return (void)
+ */
 void mlperf_log_end(const char* benchmark, const char* status) {
     if (!benchmark)
         return;

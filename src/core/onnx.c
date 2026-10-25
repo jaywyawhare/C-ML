@@ -7,7 +7,13 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/** Copy a protobuf string field into a fixed buffer, truncating and NUL-terminating. */
+/**
+ * Copy a protobuf string field into a fixed buffer, truncating and NUL-terminating.
+ * @param dst (char*)
+ * @param dst_size (size_t)
+ * @param field (const PBField*)
+ * @return (void)
+ */
 static void copy_pb_string(char* dst, size_t dst_size, const PBField* field) {
     size_t len      = 0;
     const char* src = pb_field_string(field, &len);
@@ -21,7 +27,11 @@ static void copy_pb_string(char* dst, size_t dst_size, const PBField* field) {
     dst[len] = '\0';
 }
 
-/** Heap-duplicate a protobuf string field as a C string; NULL when empty/absent. */
+/**
+ * Heap-duplicate a protobuf string field as a C string; NULL when empty/absent.
+ * @param field (const PBField*)
+ * @return (char*)
+ */
 static char* dup_pb_string(const PBField* field) {
     size_t len      = 0;
     const char* src = pb_field_string(field, &len);
@@ -49,7 +59,11 @@ static const struct {
 
 #define ONNX_DTYPE_COUNT (sizeof(ONNX_DTYPES) / sizeof(ONNX_DTYPES[0]))
 
-/** Map an ONNX TensorProto.DataType enum to the CML DType; defaults to FLOAT32. */
+/**
+ * Map an ONNX TensorProto.DataType enum to the CML DType; defaults to FLOAT32.
+ * @param onnx_dtype (int)
+ * @return (DType)
+ */
 static DType onnx_dtype_to_cml(int onnx_dtype) {
     for (size_t i = 0; i < ONNX_DTYPE_COUNT; i++)
         if (ONNX_DTYPES[i].onnx == onnx_dtype)
@@ -57,7 +71,11 @@ static DType onnx_dtype_to_cml(int onnx_dtype) {
     return DTYPE_FLOAT32;
 }
 
-/** ONNX TensorProto.DataType for @p dtype, or 0 when ONNX has no equivalent. */
+/**
+ * ONNX TensorProto.DataType for @p dtype, or 0 when ONNX has no equivalent.
+ * @param dtype (DType)
+ * @return (int)
+ */
 int cml_onnx_elem_type(DType dtype) {
     for (size_t i = 0; i < ONNX_DTYPE_COUNT; i++)
         if (ONNX_DTYPES[i].dtype == dtype)
@@ -77,7 +95,11 @@ int cml_onnx_elem_type(DType dtype) {
  *  20: type           (int32, AttributeType enum)
  */
 
-/** Free what @p attr's value union owns and zero it, so another field can claim the union. */
+/**
+ * Free what @p attr's value union owns and zero it, so another field can claim the union.
+ * @param attr (CMLONNXAttribute*)
+ * @return (void)
+ */
 static void clear_attr_value(CMLONNXAttribute* attr) {
     if (attr->type == CML_ONNX_ATTR_INTS)
         cml_free(attr->value.ints.data);
@@ -238,7 +260,13 @@ static void parse_node(PBReader* rd, CMLONNXNode* node) {
  *   9: raw_data    (bytes)
  */
 
-/** Append one TensorProto dim; false once the rank passes 8 or a dim overflows int. */
+/**
+ * Append one TensorProto dim; false once the rank passes 8 or a dim overflows int.
+ * @param dims (int*)
+ * @param ndim (int*)
+ * @param dim (uint64_t)
+ * @return (bool)
+ */
 static bool append_dim(int* dims, int* ndim, uint64_t dim) {
     if (*ndim >= 8 || dim > INT_MAX)
         return false;
@@ -246,7 +274,12 @@ static bool append_dim(int* dims, int* ndim, uint64_t dim) {
     return true;
 }
 
-/** Parse a TensorProto into @p init; returns -1 when its dims or payload size are malformed. */
+/**
+ * Parse a TensorProto into @p init; returns -1 when its dims or payload size are malformed.
+ * @param rd (PBReader*)
+ * @param init (CMLONNXInitializer*)
+ * @return (int)
+ */
 static int parse_tensor_proto(PBReader* rd, CMLONNXInitializer* init) {
     memset(init, 0, sizeof(*init));
 
@@ -399,7 +432,12 @@ static void parse_tensor_shape_dim(PBReader* rd, int* dim_out) {
     }
 }
 
-/** Collect each TensorShapeProto dimension into @p info (capped at 8 dims). */
+/**
+ * Collect each TensorShapeProto dimension into @p info (capped at 8 dims).
+ * @param rd (PBReader*)
+ * @param info (CMLONNXTensorInfo*)
+ * @return (void)
+ */
 static void parse_tensor_shape(PBReader* rd, CMLONNXTensorInfo* info) {
     PBField f;
     while (pb_read_field(rd, &f)) {
@@ -413,7 +451,12 @@ static void parse_tensor_shape(PBReader* rd, CMLONNXTensorInfo* info) {
     }
 }
 
-/** Parse a TypeProto.Tensor: element dtype and nested shape into @p info. */
+/**
+ * Parse a TypeProto.Tensor: element dtype and nested shape into @p info.
+ * @param rd (PBReader*)
+ * @param info (CMLONNXTensorInfo*)
+ * @return (void)
+ */
 static void parse_tensor_type(PBReader* rd, CMLONNXTensorInfo* info) {
     PBField f;
     while (pb_read_field(rd, &f)) {
@@ -433,7 +476,12 @@ static void parse_tensor_type(PBReader* rd, CMLONNXTensorInfo* info) {
     }
 }
 
-/** Descend a TypeProto into its tensor_type branch (the only kind handled). */
+/**
+ * Descend a TypeProto into its tensor_type branch (the only kind handled).
+ * @param rd (PBReader*)
+ * @param info (CMLONNXTensorInfo*)
+ * @return (void)
+ */
 static void parse_type_proto(PBReader* rd, CMLONNXTensorInfo* info) {
     PBField f;
     while (pb_read_field(rd, &f)) {
@@ -444,7 +492,12 @@ static void parse_type_proto(PBReader* rd, CMLONNXTensorInfo* info) {
     }
 }
 
-/** Parse a ValueInfoProto (graph input/output): name plus its tensor type/shape. */
+/**
+ * Parse a ValueInfoProto (graph input/output): name plus its tensor type/shape.
+ * @param rd (PBReader*)
+ * @param info (CMLONNXTensorInfo*)
+ * @return (void)
+ */
 static void parse_value_info(PBReader* rd, CMLONNXTensorInfo* info) {
     memset(info, 0, sizeof(*info));
     info->dtype = DTYPE_FLOAT32;
@@ -639,7 +692,11 @@ CMLONNXModel* cml_onnx_load_buffer(const uint8_t* data, size_t length) {
     return model;
 }
 
-/** Read an .onnx file fully into memory and parse it; NULL on any I/O or parse error. */
+/**
+ * Read an .onnx file fully into memory and parse it; NULL on any I/O or parse error.
+ * @param filepath (const char*)
+ * @return (CMLONNXModel*)
+ */
 CMLONNXModel* cml_onnx_load(const char* filepath) {
     if (!filepath)
         return NULL;
@@ -680,7 +737,11 @@ CMLONNXModel* cml_onnx_load(const char* filepath) {
     return model;
 }
 
-/** Free a model and everything it owns: node strings, attribute/initializer tensors. */
+/**
+ * Free a model and everything it owns: node strings, attribute/initializer tensors.
+ * @param model (CMLONNXModel*)
+ * @return (void)
+ */
 void cml_onnx_free(CMLONNXModel* model) {
     if (!model)
         return;

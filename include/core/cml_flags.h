@@ -85,7 +85,10 @@ bool cml_flag_enabled(CmlFlag id);
  * Useful for tri-state overrides such as WINO. */
 bool cml_flag_was_set(CmlFlag id);
 
-/** True when VIZ is on and NO_EXPORT is off: the single gate for every VIZ-only path. */
+/**
+ * True when VIZ is on and NO_EXPORT is off: the single gate for every VIZ-only path.
+ * @return (bool)
+ */
 bool cml_viz_enabled(void);
 
 /* The environment-variable name / description for a flag. */

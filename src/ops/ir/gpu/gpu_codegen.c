@@ -22,7 +22,10 @@
 static bool g_nvptx_initialized  = false;
 static bool g_amdgpu_initialized = false;
 
-/** Register LLVM's NVPTX target/MC/asm-printer once (idempotent). */
+/**
+ * Register LLVM's NVPTX target/MC/asm-printer once (idempotent).
+ * @return (void)
+ */
 static void init_nvptx_target(void) {
     if (g_nvptx_initialized)
         return;
@@ -33,7 +36,10 @@ static void init_nvptx_target(void) {
     g_nvptx_initialized = true;
 }
 
-/** Register LLVM's AMDGPU target/MC/asm-printer once (idempotent). */
+/**
+ * Register LLVM's AMDGPU target/MC/asm-printer once (idempotent).
+ * @return (void)
+ */
 static void init_amdgpu_target(void) {
     if (g_amdgpu_initialized)
         return;
@@ -44,8 +50,13 @@ static void init_amdgpu_target(void) {
     g_amdgpu_initialized = true;
 }
 
-/** Create an LLVM GPU codegen for CUDA (NVPTX) or ROCm (AMDGPU), wiring the target triple,
- *  CPU, and backend handle. NULL if `backend` is NULL or allocation fails. */
+/**
+ * Create an LLVM GPU codegen for CUDA (NVPTX) or ROCm (AMDGPU), wiring the target triple,
+ * CPU, and backend handle. NULL if `backend` is NULL or allocation fails.
+ * @param target (GPUTarget)
+ * @param backend (void*)
+ * @return (CMLGPUCodegen*)
+ */
 CMLGPUCodegen* cml_gpu_codegen_create(GPUTarget target, void* backend) {
     if (!backend)
         return NULL;
@@ -77,7 +88,11 @@ CMLGPUCodegen* cml_gpu_codegen_create(GPUTarget target, void* backend) {
     return cg;
 }
 
-/** Free the GPU codegen context. */
+/**
+ * Free the GPU codegen context.
+ * @param cg (CMLGPUCodegen*)
+ * @return (void)
+ */
 void cml_gpu_codegen_destroy(CMLGPUCodegen* cg) { cml_free(cg); }
 
 // NVPTX calling convention for kernels
@@ -85,8 +100,15 @@ void cml_gpu_codegen_destroy(CMLGPUCodegen* cg) { cml_free(cg); }
 // AMDGPU calling convention for kernels
 #define CC_AMDGPU_KERNEL 91
 
-/** Emit the flat global thread id (blockIdx*blockDim + threadIdx) using the target's
- *  intrinsics; returns the resulting i32 value. */
+/**
+ * Emit the flat global thread id (blockIdx*blockDim + threadIdx) using the target's
+ * intrinsics; returns the resulting i32 value.
+ * @param bld (LLVMBuilderRef)
+ * @param mod (LLVMModuleRef)
+ * @param ctx (LLVMContextRef)
+ * @param target (GPUTarget)
+ * @return (LLVMValueRef)
+ */
 static LLVMValueRef emit_global_thread_id(LLVMBuilderRef bld, LLVMModuleRef mod, LLVMContextRef ctx,
                                           GPUTarget target) {
     LLVMTypeRef i32 = LLVMInt32TypeInContext(ctx);
@@ -135,8 +157,14 @@ static LLVMValueRef emit_global_thread_id(LLVMBuilderRef bld, LLVMModuleRef mod,
     }
 }
 
-/** Set the module's target triple, data layout, and kernel calling convention, and add the
- *  nvvm.annotations "kernel" metadata on CUDA. */
+/**
+ * Set the module's target triple, data layout, and kernel calling convention, and add the
+ * nvvm.annotations "kernel" metadata on CUDA.
+ * @param mod (LLVMModuleRef)
+ * @param fn (LLVMValueRef)
+ * @param cg (CMLGPUCodegen*)
+ * @return (void)
+ */
 static void configure_gpu_module(LLVMModuleRef mod, LLVMValueRef fn, CMLGPUCodegen* cg) {
     LLVMSetTarget(mod, cg->target_triple);
 
@@ -164,8 +192,16 @@ static void configure_gpu_module(LLVMModuleRef mod, LLVMValueRef fn, CMLGPUCodeg
     }
 }
 
-/** Emit `if (gid < n)` guarding the kernel body: return the body block (builder left
- *  positioned there) with the early-return exit block already wired up. */
+/**
+ * Emit `if (gid < n)` guarding the kernel body: return the body block (builder left
+ * positioned there) with the early-return exit block already wired up.
+ * @param bld (LLVMBuilderRef)
+ * @param ctx (LLVMContextRef)
+ * @param fn (LLVMValueRef)
+ * @param gid (LLVMValueRef)
+ * @param n (LLVMValueRef)
+ * @return (LLVMBasicBlockRef)
+ */
 static LLVMBasicBlockRef emit_bounds_check(LLVMBuilderRef bld, LLVMContextRef ctx, LLVMValueRef fn,
                                            LLVMValueRef gid, LLVMValueRef n) {
     LLVMBasicBlockRef body    = LLVMAppendBasicBlockInContext(ctx, fn, "body");
@@ -353,7 +389,11 @@ typedef struct {
     LLVMTypeRef f32, i32, i64, ptr1, void_t;
 } GPUTypes;
 
-/** Bundle the common LLVM scalar/pointer/void types used across kernel builders. */
+/**
+ * Bundle the common LLVM scalar/pointer/void types used across kernel builders.
+ * @param ctx (LLVMContextRef)
+ * @return (GPUTypes)
+ */
 static GPUTypes gpu_types(LLVMContextRef ctx) {
     return (GPUTypes){
         .f32    = LLVMFloatTypeInContext(ctx),
@@ -364,8 +404,15 @@ static GPUTypes gpu_types(LLVMContextRef ctx) {
     };
 }
 
-/** Build an LLVM module for an element-wise unary kernel: void kernel(ptr in, ptr out, i32 n).
- *  NULL if `type` is not a supported unary op. */
+/**
+ * Build an LLVM module for an element-wise unary kernel: void kernel(ptr in, ptr out, i32 n).
+ * NULL if `type` is not a supported unary op.
+ * @param ctx (LLVMContextRef)
+ * @param type (UOpType)
+ * @param fn_name (const char*)
+ * @param cg (CMLGPUCodegen*)
+ * @return (LLVMModuleRef)
+ */
 static LLVMModuleRef gpu_build_unary_op(LLVMContextRef ctx, UOpType type, const char* fn_name,
                                         CMLGPUCodegen* cg) {
     LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(fn_name, ctx);
@@ -1419,8 +1466,14 @@ static LLVMModuleRef gpu_build_reshape_op(LLVMContextRef ctx, const char* fn_nam
     return mod;
 }
 
-/** Verify `mod`, then emit it to a fresh buffer as PTX text (CUDA) or an HSACO object
- *  (ROCm); returns NULL on verification or emission failure. */
+/**
+ * Verify `mod`, then emit it to a fresh buffer as PTX text (CUDA) or an HSACO object
+ * (ROCm); returns NULL on verification or emission failure.
+ * @param cg (CMLGPUCodegen*)
+ * @param mod (LLVMModuleRef)
+ * @param out_size (size_t*)
+ * @return (char*)
+ */
 static char* emit_gpu_code(CMLGPUCodegen* cg, LLVMModuleRef mod, size_t* out_size) {
     // Verify
     char* err = NULL;
@@ -1485,7 +1538,11 @@ static char* emit_gpu_code(CMLGPUCodegen* cg, LLVMModuleRef mod, size_t* out_siz
     return result;
 }
 
-/** True for element-wise binary ops (arithmetic, comparisons) handled by the binary builder. */
+/**
+ * True for element-wise binary ops (arithmetic, comparisons) handled by the binary builder.
+ * @param type (UOpType)
+ * @return (bool)
+ */
 static bool is_binary_op(UOpType type) {
     return type == UOP_ADD || type == UOP_SUB || type == UOP_MUL || type == UOP_DIV ||
            type == UOP_MAX || type == UOP_CMPLT || type == UOP_POW || type == UOP_IDIV ||
@@ -1493,7 +1550,11 @@ static bool is_binary_op(UOpType type) {
            type == UOP_CMPLE || type == UOP_CMPNE || type == UOP_CMPEQ;
 }
 
-/** True for element-wise unary ops (activations, math) handled by the unary builder. */
+/**
+ * True for element-wise unary ops (activations, math) handled by the unary builder.
+ * @param type (UOpType)
+ * @return (bool)
+ */
 static bool is_unary_op(UOpType type) {
     return type == UOP_NEG || type == UOP_EXP || type == UOP_LOG || type == UOP_SQRT ||
            type == UOP_ABS || type == UOP_SIN || type == UOP_COS || type == UOP_TAN ||
@@ -1505,13 +1566,23 @@ static bool is_unary_op(UOpType type) {
            type == UOP_FLOOR || type == UOP_CEIL || type == UOP_SIGN;
 }
 
-/** True for whole-tensor reduction ops (sum, mean, max/min, prod). */
+/**
+ * True for whole-tensor reduction ops (sum, mean, max/min, prod).
+ * @param type (UOpType)
+ * @return (bool)
+ */
 static bool is_reduction(UOpType type) {
     return type == UOP_SUM || type == UOP_MEAN || type == UOP_MAX_REDUCE ||
            type == UOP_MIN_REDUCE || type == UOP_PROD;
 }
 
-/** Allocate device memory and copy `numel` host floats to it; returns the device ptr or NULL. */
+/**
+ * Allocate device memory and copy `numel` host floats to it; returns the device ptr or NULL.
+ * @param cg (CMLGPUCodegen*)
+ * @param host_data (float*)
+ * @param numel (size_t)
+ * @return (void*)
+ */
 static void* gpu_upload(CMLGPUCodegen* cg, float* host_data, size_t numel) {
     if (numel > SIZE_MAX / sizeof(float))
         return NULL;
@@ -1537,7 +1608,12 @@ static void* gpu_upload(CMLGPUCodegen* cg, float* host_data, size_t numel) {
     }
 }
 
-/** Allocate `numel` device floats initialized to zero; returns the device pointer or NULL. */
+/**
+ * Allocate `numel` device floats initialized to zero; returns the device pointer or NULL.
+ * @param cg (CMLGPUCodegen*)
+ * @param numel (size_t)
+ * @return (void*)
+ */
 static void* gpu_alloc_zero(CMLGPUCodegen* cg, size_t numel) {
     size_t size  = numel * sizeof(float);
     float* zeros = cml_calloc(numel, sizeof(float));
@@ -1562,7 +1638,13 @@ static void* gpu_alloc_zero(CMLGPUCodegen* cg, size_t numel) {
     return dptr;
 }
 
-/** Allocate `numel` device floats initialized to `fill_val`; returns the device pointer or NULL. */
+/**
+ * Allocate `numel` device floats initialized to `fill_val`; returns the device pointer or NULL.
+ * @param cg (CMLGPUCodegen*)
+ * @param numel (size_t)
+ * @param fill_val (float)
+ * @return (void*)
+ */
 static void* gpu_alloc_filled(CMLGPUCodegen* cg, size_t numel, float fill_val) {
     size_t size = numel * sizeof(float);
     float* buf  = cml_malloc(size);
@@ -1589,7 +1671,14 @@ static void* gpu_alloc_filled(CMLGPUCodegen* cg, size_t numel, float fill_val) {
     return dptr;
 }
 
-/** Copy `numel` floats from device memory back to host; returns the backend status. */
+/**
+ * Copy `numel` floats from device memory back to host; returns the backend status.
+ * @param cg (CMLGPUCodegen*)
+ * @param dptr (void*)
+ * @param host_data (float*)
+ * @param numel (size_t)
+ * @return (int)
+ */
 static int gpu_download(CMLGPUCodegen* cg, void* dptr, float* host_data, size_t numel) {
     size_t size = numel * sizeof(float);
     if (cg->target == GPU_TARGET_CUDA) {
@@ -1599,7 +1688,12 @@ static int gpu_download(CMLGPUCodegen* cg, void* dptr, float* host_data, size_t 
     }
 }
 
-/** Free a device allocation on the active backend. */
+/**
+ * Free a device allocation on the active backend.
+ * @param cg (CMLGPUCodegen*)
+ * @param dptr (void*)
+ * @return (void)
+ */
 static void gpu_free(CMLGPUCodegen* cg, void* dptr) {
     if (!dptr)
         return;
@@ -1610,7 +1704,11 @@ static void gpu_free(CMLGPUCodegen* cg, void* dptr) {
     }
 }
 
-/** Block until the active backend's queued work completes. */
+/**
+ * Block until the active backend's queued work completes.
+ * @param cg (CMLGPUCodegen*)
+ * @return (int)
+ */
 static int gpu_sync(CMLGPUCodegen* cg) {
     if (cg->target == GPU_TARGET_CUDA) {
         return cml_cuda_synchronize(cg->cuda);
@@ -1619,8 +1717,17 @@ static int gpu_sync(CMLGPUCodegen* cg) {
     }
 }
 
-/** Emit code from `mod`, JIT-compile it on the active backend, and launch one grid sized to
- *  `numel`; disposes the module and frees the code. Returns the launch status. */
+/**
+ * Emit code from `mod`, JIT-compile it on the active backend, and launch one grid sized to
+ * `numel`; disposes the module and frees the code. Returns the launch status.
+ * @param cg (CMLGPUCodegen*)
+ * @param mod (LLVMModuleRef)
+ * @param fn_name (const char*)
+ * @param numel (int)
+ * @param args (void**)
+ * @param num_args (int)
+ * @return (int)
+ */
 static int gpu_compile_and_launch(CMLGPUCodegen* cg, LLVMModuleRef mod, const char* fn_name,
                                   int numel, void** args, int num_args) {
     // Emit PTX/HSACO
@@ -1665,8 +1772,13 @@ static int gpu_compile_and_launch(CMLGPUCodegen* cg, LLVMModuleRef mod, const ch
     return result;
 }
 
-/** Execute one IR node on the GPU: build the matching kernel, upload inputs, launch, and
- *  download the result. Returns -1 for unsupported ops so the caller can fall back to CPU. */
+/**
+ * Execute one IR node on the GPU: build the matching kernel, upload inputs, launch, and
+ * download the result. Returns -1 for unsupported ops so the caller can fall back to CPU.
+ * @param cg (CMLGPUCodegen*)
+ * @param node (struct IRNode*)
+ * @return (int)
+ */
 static int gpu_execute_node(CMLGPUCodegen* cg, struct IRNode* node) {
     if (!node || !node->output)
         return -1;
@@ -2047,8 +2159,13 @@ fallback:
     return cpu_execute_node(node);
 }
 
-/** Execute every unexecuted node of an IR graph on the GPU, falling back to CPU per node
- *  on failure. */
+/**
+ * Execute every unexecuted node of an IR graph on the GPU, falling back to CPU per node
+ * on failure.
+ * @param cg (CMLGPUCodegen*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_gpu_execute(CMLGPUCodegen* cg, CMLGraph_t ir) {
     if (!cg || !ir || !cg->initialized)
         return -1;
@@ -2073,7 +2190,13 @@ int cml_gpu_execute(CMLGPUCodegen* cg, CMLGraph_t ir) {
     return 0;
 }
 
-/** Like cml_gpu_execute but stops after executing `target` (for partial materialization). */
+/**
+ * Like cml_gpu_execute but stops after executing `target` (for partial materialization).
+ * @param cg (CMLGPUCodegen*)
+ * @param ir (CMLGraph_t)
+ * @param target (struct IRNode*)
+ * @return (int)
+ */
 int cml_gpu_execute_up_to(CMLGPUCodegen* cg, CMLGraph_t ir, struct IRNode* target) {
     if (!cg || !ir || !target || !cg->initialized)
         return -1;

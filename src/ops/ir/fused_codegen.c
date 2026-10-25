@@ -169,7 +169,11 @@ oom:
     return NULL;
 }
 
-/** Free a linear program and its op array. */
+/**
+ * Free a linear program and its op array.
+ * @param prog (CMLLinearProgram*)
+ * @return (void)
+ */
 void cml_linear_program_free(CMLLinearProgram* prog) {
     if (!prog)
         return;
@@ -177,7 +181,11 @@ void cml_linear_program_free(CMLLinearProgram* prog) {
     cml_free(prog);
 }
 
-/** Return a short display string for a linear-op kind. */
+/**
+ * Return a short display string for a linear-op kind.
+ * @param k (CMLLinearOpKind)
+ * @return (const char*)
+ */
 static const char* linop_kind_str(CMLLinearOpKind k) {
     switch (k) {
     case LINOP_LOAD:
@@ -191,7 +199,11 @@ static const char* linop_kind_str(CMLLinearOpKind k) {
     }
 }
 
-/** Dump a linear program's ops and vregs to stdout for debugging. */
+/**
+ * Dump a linear program's ops and vregs to stdout for debugging.
+ * @param prog (const CMLLinearProgram*)
+ * @return (void)
+ */
 void cml_linear_program_print(const CMLLinearProgram* prog) {
     if (!prog) {
         printf("LinearProgram: (null)\n");
@@ -216,7 +228,11 @@ void cml_linear_program_print(const CMLLinearProgram* prog) {
     }
 }
 
-/** Map a binary UOp to its C infix operator token. */
+/**
+ * Map a binary UOp to its C infix operator token.
+ * @param uop (UOpType)
+ * @return (const char*)
+ */
 static const char* uop_to_c_binary(UOpType uop) {
     switch (uop) {
     case UOP_ADD:
@@ -232,20 +248,33 @@ static const char* uop_to_c_binary(UOpType uop) {
     }
 }
 
-/** True if the UOp takes two operands in the fused codegen backends. */
+/**
+ * True if the UOp takes two operands in the fused codegen backends.
+ * @param uop (UOpType)
+ * @return (bool)
+ */
 static bool uop_is_binary(UOpType uop) {
     return uop == UOP_ADD || uop == UOP_SUB || uop == UOP_MUL || uop == UOP_DIV || uop == UOP_MAX ||
            uop == UOP_POW;
 }
 
-/** True if the UOp takes one operand in the fused codegen backends. */
+/**
+ * True if the UOp takes one operand in the fused codegen backends.
+ * @param uop (UOpType)
+ * @return (bool)
+ */
 static bool uop_is_unary(UOpType uop) {
     return uop == UOP_NEG || uop == UOP_EXP || uop == UOP_LOG || uop == UOP_SQRT ||
            uop == UOP_ABS || uop == UOP_SIN || uop == UOP_COS || uop == UOP_TANH ||
            uop == UOP_SIGMOID || uop == UOP_RECIP || uop == UOP_SILU;
 }
 
-/** Emit a scalar C source string implementing the fused kernel as a per-element loop. */
+/**
+ * Emit a scalar C source string implementing the fused kernel as a per-element loop.
+ * @param prog (const CMLLinearProgram*)
+ * @param work_size (size_t)
+ * @return (char*)
+ */
 static char* fused_codegen_c(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = cml_malloc(FUSED_BUF_SIZE);
     if (!buf)
@@ -694,7 +723,12 @@ char* cml_ptx_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_size) {
 
 #define SpvOpExtInst 12
 
-/** Append one SPIR-V word to the output stream and advance the cursor. */
+/**
+ * Append one SPIR-V word to the output stream and advance the cursor.
+ * @param ptr (uint32_t**)
+ * @param word (uint32_t)
+ * @return (void)
+ */
 static void emit(uint32_t** ptr, uint32_t word) {
     **ptr = word;
     (*ptr)++;
@@ -1169,7 +1203,12 @@ uint32_t* cml_spirv_gen_fused_kernel(const CMLLinearProgram* prog, size_t work_s
     return words;
 }
 
-/** Emit a WGSL compute shader implementing the fused kernel over storage buffers. */
+/**
+ * Emit a WGSL compute shader implementing the fused kernel over storage buffers.
+ * @param prog (const CMLLinearProgram*)
+ * @param work_size (size_t)
+ * @return (char*)
+ */
 static char* fused_codegen_wgsl(const CMLLinearProgram* prog, size_t work_size) {
     char* buf = cml_malloc(FUSED_BUF_SIZE);
     if (!buf)
@@ -1377,7 +1416,12 @@ CMLFusedKernel* cml_fused_codegen(const CMLLinearProgram* prog, CMLFusedBackend 
     return kernel;
 }
 
-/** Linearize a fusion group and codegen it, deriving work size from the first node's output. */
+/**
+ * Linearize a fusion group and codegen it, deriving work size from the first node's output.
+ * @param group (const CMLFusionGroup*)
+ * @param backend (CMLFusedBackend)
+ * @return (CMLFusedKernel*)
+ */
 CMLFusedKernel* cml_fused_codegen_group(const CMLFusionGroup* group, CMLFusedBackend backend) {
     if (!group)
         return NULL;
@@ -1401,7 +1445,11 @@ CMLFusedKernel* cml_fused_codegen_group(const CMLFusionGroup* group, CMLFusedBac
     return kernel;
 }
 
-/** Free a fused kernel and its source/SPIR-V buffers. */
+/**
+ * Free a fused kernel and its source/SPIR-V buffers.
+ * @param kernel (CMLFusedKernel*)
+ * @return (void)
+ */
 void cml_fused_kernel_free(CMLFusedKernel* kernel) {
     if (!kernel)
         return;
@@ -1410,7 +1458,11 @@ void cml_fused_kernel_free(CMLFusedKernel* kernel) {
     cml_free(kernel);
 }
 
-/** Print a fused kernel's metadata and generated source to stdout. */
+/**
+ * Print a fused kernel's metadata and generated source to stdout.
+ * @param kernel (const CMLFusedKernel*)
+ * @return (void)
+ */
 void cml_fused_kernel_print(const CMLFusedKernel* kernel) {
     if (!kernel) {
         printf("FusedKernel: (null)\n");

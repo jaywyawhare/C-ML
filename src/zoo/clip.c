@@ -8,7 +8,10 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** CLIP ViT-B/32 config: 768-dim/12-layer vision, 512-dim/12-layer text, 512 embed. */
+/**
+ * CLIP ViT-B/32 config: 768-dim/12-layer vision, 512-dim/12-layer text, 512 embed.
+ * @return (CMLCLIPConfig)
+ */
 CMLCLIPConfig cml_zoo_clip_config_vit_b32(void) {
     return (CMLCLIPConfig){.image_size    = 224,
                            .patch_size    = 32,
@@ -23,7 +26,10 @@ CMLCLIPConfig cml_zoo_clip_config_vit_b32(void) {
                            .embed_dim     = 512};
 }
 
-/** CLIP ViT-B/16 config: 768-dim/12-layer vision (patch 16), 512-dim text, 512 embed. */
+/**
+ * CLIP ViT-B/16 config: 768-dim/12-layer vision (patch 16), 512-dim text, 512 embed.
+ * @return (CMLCLIPConfig)
+ */
 CMLCLIPConfig cml_zoo_clip_config_vit_b16(void) {
     return (CMLCLIPConfig){.image_size    = 224,
                            .patch_size    = 16,
@@ -38,7 +44,10 @@ CMLCLIPConfig cml_zoo_clip_config_vit_b16(void) {
                            .embed_dim     = 512};
 }
 
-/** CLIP ViT-L/14 config: 1024-dim/24-layer vision (patch 14), 768-dim text, 768 embed. */
+/**
+ * CLIP ViT-L/14 config: 1024-dim/24-layer vision (patch 14), 768-dim text, 768 embed.
+ * @return (CMLCLIPConfig)
+ */
 CMLCLIPConfig cml_zoo_clip_config_vit_l14(void) {
     return (CMLCLIPConfig){.image_size    = 224,
                            .patch_size    = 14,
@@ -53,13 +62,27 @@ CMLCLIPConfig cml_zoo_clip_config_vit_l14(void) {
                            .embed_dim     = 768};
 }
 
-/** Build one CLIP vision transformer block (pre-norm attention + MLP, non-causal). */
+/**
+ * Build one CLIP vision transformer block (pre-norm attention + MLP, non-causal).
+ * @param dim (int)
+ * @param n_head (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_vision_block(int dim, int n_head, DType dtype, DeviceType device) {
     return (Module*)zoo_prenorm_block("CLIPVisionBlock", dim, n_head, dim * 4, 1e-5f, dtype,
                                       device);
 }
 
-/** Build one CLIP text transformer block (pre-norm) with causal attention enabled. */
+/**
+ * Build one CLIP text transformer block (pre-norm) with causal attention enabled.
+ * @param dim (int)
+ * @param n_head (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_text_block(int dim, int n_head, DType dtype, DeviceType device) {
     ZooPreNormBlock* block =
         zoo_prenorm_block("CLIPTextBlock", dim, n_head, dim * 4, 1e-5f, dtype, device);
@@ -96,12 +119,21 @@ typedef struct {
     int text_layers;
 } CLIPModel;
 
-/** Module forward hook: encodes @p input as an image through the vision tower. */
+/**
+ * Module forward hook: encodes @p input as an image through the vision tower.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* clip_forward(Module* module, Tensor* input) {
     return clip_encode_image(module, input);
 }
 
-/** Free the CLIP vision and text towers (patch embed, blocks, norms, projections). */
+/**
+ * Free the CLIP vision and text towers (patch embed, blocks, norms, projections).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void clip_free(Module* module) {
     CLIPModel* clip = (CLIPModel*)module;
     if (!clip)
@@ -128,7 +160,12 @@ static void clip_free(Module* module) {
     cml_free(clip);
 }
 
-/** Encode an image into the shared embedding space: patch embed, CLS+pos, blocks, norm, proj. */
+/**
+ * Encode an image into the shared embedding space: patch embed, CLS+pos, blocks, norm, proj.
+ * @param module (Module*)
+ * @param image (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* clip_encode_image(Module* module, Tensor* image) {
     CLIPModel* clip = (CLIPModel*)module;
     if (!clip || !image)
@@ -173,7 +210,12 @@ Tensor* clip_encode_image(Module* module, Tensor* image) {
     return module_forward((Module*)clip->vision_proj, x);
 }
 
-/** Encode token ids into the shared embedding space: token+pos embed, blocks, norm, proj. */
+/**
+ * Encode token ids into the shared embedding space: token+pos embed, blocks, norm, proj.
+ * @param module (Module*)
+ * @param text (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* clip_encode_text(Module* module, Tensor* text) {
     CLIPModel* clip = (CLIPModel*)module;
     if (!clip || !text)
@@ -203,7 +245,13 @@ Tensor* clip_encode_text(Module* module, Tensor* text) {
     return module_forward((Module*)clip->text_proj, x);
 }
 
-/** Symmetric InfoNCE loss over image/text embedding similarities scaled by 1/@p temperature. */
+/**
+ * Symmetric InfoNCE loss over image/text embedding similarities scaled by 1/@p temperature.
+ * @param image_embeds (Tensor*)
+ * @param text_embeds (Tensor*)
+ * @param temperature (float)
+ * @return (Tensor*)
+ */
 Tensor* clip_contrastive_loss(Tensor* image_embeds, Tensor* text_embeds, float temperature) {
     if (!image_embeds || !text_embeds)
         return NULL;
@@ -254,7 +302,13 @@ Tensor* clip_contrastive_loss(Tensor* image_embeds, Tensor* text_embeds, float t
     return tensor_mul(mean_loss, half);
 }
 
-/** Build a dual-encoder CLIP model from @p config: ViT vision tower, text tower, learnable temp. */
+/**
+ * Build a dual-encoder CLIP model from @p config: ViT vision tower, text tower, learnable temp.
+ * @param config (CMLCLIPConfig*)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 Module* cml_zoo_clip_create(CMLCLIPConfig* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;

@@ -10,19 +10,19 @@
 
 /**
  * @brief Connect a TCP stream socket to @p addr, retrying while the peer is
- *        not yet listening.
+ * not yet listening.
  *
  * Every attempt uses a fresh socket: after a failed connect() the socket is in
  * an unspecified state, and on macOS/BSD every later connect() on it fails too
  * (Linux happens to tolerate the reuse), which turned a startup race into a
  * hard timeout.
  *
- * @param addr     Peer address.
- * @param len      Size of @p addr.
- * @param retries  Maximum number of attempts.
- * @param delay_us Sleep between attempts, in microseconds.
- * @return A connected socket fd, or -1 if every attempt failed (errno is
- *         preserved from the last failure).
+ * preserved from the last failure).
+ * @param addr (const struct sockaddr*)
+ * @param len (socklen_t)
+ * @param retries (int)
+ * @param delay_us (unsigned)
+ * @return (int)
  */
 static inline int cml_sock_connect_retry(const struct sockaddr* addr, socklen_t len, int retries,
                                          unsigned delay_us) {

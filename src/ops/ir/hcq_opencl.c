@@ -25,7 +25,10 @@ static struct {
     bool initialized;
 } g_ocl_ctx = {0};
 
-/** Lazily populate the shared OpenCL context, reusing the dispatch backend if ready. */
+/**
+ * Lazily populate the shared OpenCL context, reusing the dispatch backend if ready.
+ * @return (int)
+ */
 static int ensure_ocl_init(void) {
     if (g_ocl_ctx.initialized)
         return 0;
@@ -68,7 +71,10 @@ static int ensure_ocl_init(void) {
     return 0;
 }
 
-/** Create an OpenCL queue wrapping a cl_command_queue on the shared context. */
+/**
+ * Create an OpenCL queue wrapping a cl_command_queue on the shared context.
+ * @return (CMLHCQQueue*)
+ */
 CMLHCQQueue* cml_hcq_opencl_queue_create(void) {
     if (ensure_ocl_init() != 0) {
         return NULL;
@@ -100,7 +106,11 @@ CMLHCQQueue* cml_hcq_opencl_queue_create(void) {
     return queue;
 }
 
-/** Release the cl_command_queue and free the queue wrapper. */
+/**
+ * Release the cl_command_queue and free the queue wrapper.
+ * @param queue (CMLHCQQueue*)
+ * @return (void)
+ */
 void cml_hcq_opencl_queue_destroy(CMLHCQQueue* queue) {
     if (!queue)
         return;
@@ -115,7 +125,12 @@ void cml_hcq_opencl_queue_destroy(CMLHCQQueue* queue) {
     cml_free(queue);
 }
 
-/** Enqueue a 3D NDRange kernel using the descriptor's grid/block as global/local sizes. */
+/**
+ * Enqueue a 3D NDRange kernel using the descriptor's grid/block as global/local sizes.
+ * @param queue (CMLHCQQueue*)
+ * @param desc (const CMLHCQKernelDesc*)
+ * @return (int)
+ */
 int cml_hcq_opencl_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     if (!queue || !desc)
         return -1;
@@ -139,7 +154,14 @@ int cml_hcq_opencl_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* des
     return 0;
 }
 
-/** Non-blocking host-to-device write into a cl_mem buffer. */
+/**
+ * Non-blocking host-to-device write into a cl_mem buffer.
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_opencl_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src)
         return -1;
@@ -157,7 +179,14 @@ int cml_hcq_opencl_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, si
     return 0;
 }
 
-/** Non-blocking device-to-host read from a cl_mem buffer. */
+/**
+ * Non-blocking device-to-host read from a cl_mem buffer.
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_opencl_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src)
         return -1;
@@ -175,7 +204,10 @@ int cml_hcq_opencl_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, si
     return 0;
 }
 
-/** Allocate an OpenCL signal; its cl_event is created lazily on signal_record. */
+/**
+ * Allocate an OpenCL signal; its cl_event is created lazily on signal_record.
+ * @return (CMLHCQSignal*)
+ */
 CMLHCQSignal* cml_hcq_opencl_signal_create(void) {
     CMLHCQSignal* signal = (CMLHCQSignal*)cml_calloc(1, sizeof(CMLHCQSignal));
     if (!signal) {
@@ -189,7 +221,11 @@ CMLHCQSignal* cml_hcq_opencl_signal_create(void) {
     return signal;
 }
 
-/** Release the recorded cl_event (if any) and free the signal. */
+/**
+ * Release the recorded cl_event (if any) and free the signal.
+ * @param signal (CMLHCQSignal*)
+ * @return (void)
+ */
 void cml_hcq_opencl_signal_destroy(CMLHCQSignal* signal) {
     if (!signal)
         return;
@@ -204,7 +240,12 @@ void cml_hcq_opencl_signal_destroy(CMLHCQSignal* signal) {
     cml_free(signal);
 }
 
-/** Enqueue a marker event, replacing any previously recorded one. */
+/**
+ * Enqueue a marker event, replacing any previously recorded one.
+ * @param queue (CMLHCQQueue*)
+ * @param signal (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_opencl_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal)
         return -1;
@@ -227,7 +268,12 @@ int cml_hcq_opencl_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return 0;
 }
 
-/** Enqueue a barrier that makes the queue wait on the signal's marker event. */
+/**
+ * Enqueue a barrier that makes the queue wait on the signal's marker event.
+ * @param queue (CMLHCQQueue*)
+ * @param signal (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_opencl_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal)
         return -1;
@@ -248,7 +294,12 @@ int cml_hcq_opencl_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return 0;
 }
 
-/** Block the host on the signal's marker event (no timeout in clWaitForEvents). */
+/**
+ * Block the host on the signal's marker event (no timeout in clWaitForEvents).
+ * @param signal (CMLHCQSignal*)
+ * @param timeout_ms (uint64_t)
+ * @return (int)
+ */
 int cml_hcq_opencl_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     if (!signal)
         return -1;
@@ -269,7 +320,11 @@ int cml_hcq_opencl_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     return 0;
 }
 
-/** Block until the command queue finishes all enqueued work (clFinish). */
+/**
+ * Block until the command queue finishes all enqueued work (clFinish).
+ * @param queue (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_opencl_queue_synchronize(CMLHCQQueue* queue) {
     if (!queue)
         return -1;

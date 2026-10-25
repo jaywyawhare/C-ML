@@ -21,7 +21,10 @@ typedef struct {
     uint64_t sem_gpu_va;
 } NVSignalData;
 
-/** Create an NV queue backed by the shared NV driver (NULL if unavailable). */
+/**
+ * Create an NV queue backed by the shared NV driver (NULL if unavailable).
+ * @return (CMLHCQQueue*)
+ */
 CMLHCQQueue* cml_hcq_nv_queue_create(void) {
     CMLNVDriver* nv = cml_dispatch_get_nv_driver();
     if (!nv || !nv->initialized) {
@@ -45,7 +48,11 @@ CMLHCQQueue* cml_hcq_nv_queue_create(void) {
     return queue;
 }
 
-/** Free an NV queue and its native queue data. */
+/**
+ * Free an NV queue and its native queue data.
+ * @param queue (CMLHCQQueue*)
+ * @return (void)
+ */
 void cml_hcq_nv_queue_destroy(CMLHCQQueue* queue) {
     if (!queue)
         return;
@@ -55,7 +62,12 @@ void cml_hcq_nv_queue_destroy(CMLHCQQueue* queue) {
     cml_free(queue);
 }
 
-/** Launch a compiled NV kernel and advance the queue's semaphore bookkeeping. */
+/**
+ * Launch a compiled NV kernel and advance the queue's semaphore bookkeeping.
+ * @param queue (CMLHCQQueue*)
+ * @param desc (const CMLHCQKernelDesc*)
+ * @return (int)
+ */
 int cml_hcq_nv_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     if (!queue || !desc)
         return -1;
@@ -82,7 +94,14 @@ int cml_hcq_nv_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     return ret;
 }
 
-/** Upload host data into an NV device buffer (dst is a CMLNVBuffer). */
+/**
+ * Upload host data into an NV device buffer (dst is a CMLNVBuffer).
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_nv_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src || bytes == 0)
         return -1;
@@ -101,7 +120,14 @@ int cml_hcq_nv_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t
     return ret;
 }
 
-/** Download an NV device buffer into host memory (src is a CMLNVBuffer). */
+/**
+ * Download an NV device buffer into host memory (src is a CMLNVBuffer).
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_nv_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     if (!queue || !dst || !src || bytes == 0)
         return -1;
@@ -120,7 +146,10 @@ int cml_hcq_nv_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t
     return ret;
 }
 
-/** Create an NV signal snapshotting the driver's timeline semaphore GPU VA. */
+/**
+ * Create an NV signal snapshotting the driver's timeline semaphore GPU VA.
+ * @return (CMLHCQSignal*)
+ */
 CMLHCQSignal* cml_hcq_nv_signal_create(void) {
     CMLNVDriver* nv = cml_dispatch_get_nv_driver();
     if (!nv || !nv->initialized)
@@ -144,7 +173,11 @@ CMLHCQSignal* cml_hcq_nv_signal_create(void) {
     return signal;
 }
 
-/** Free an NV signal and its native signal data. */
+/**
+ * Free an NV signal and its native signal data.
+ * @param signal (CMLHCQSignal*)
+ * @return (void)
+ */
 void cml_hcq_nv_signal_destroy(CMLHCQSignal* signal) {
     if (!signal)
         return;
@@ -153,7 +186,12 @@ void cml_hcq_nv_signal_destroy(CMLHCQSignal* signal) {
     cml_free(signal);
 }
 
-/** Capture the current semaphore target value into the signal. */
+/**
+ * Capture the current semaphore target value into the signal.
+ * @param queue (CMLHCQQueue*)
+ * @param signal (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_nv_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal)
         return -1;
@@ -175,7 +213,12 @@ int cml_hcq_nv_signal_record(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return 0;
 }
 
-/** Enqueue a GPU-side wait until the semaphore reaches the signal's target. */
+/**
+ * Enqueue a GPU-side wait until the semaphore reaches the signal's target.
+ * @param queue (CMLHCQQueue*)
+ * @param signal (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_nv_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     if (!queue || !signal)
         return -1;
@@ -191,7 +234,12 @@ int cml_hcq_nv_queue_wait(CMLHCQQueue* queue, CMLHCQSignal* signal) {
     return cml_nv_gpu_wait_semaphore(nv, sd->sem_gpu_va, (uint32_t)sd->target_value);
 }
 
-/** Busy-poll the host-mapped semaphore until it reaches the target or times out. */
+/**
+ * Busy-poll the host-mapped semaphore until it reaches the target or times out.
+ * @param signal (CMLHCQSignal*)
+ * @param timeout_ms (uint64_t)
+ * @return (int)
+ */
 int cml_hcq_nv_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     if (!signal)
         return -1;
@@ -238,7 +286,11 @@ int cml_hcq_nv_signal_wait_cpu(CMLHCQSignal* signal, uint64_t timeout_ms) {
     return 0;
 }
 
-/** Block until all submitted NV work completes (full driver synchronize). */
+/**
+ * Block until all submitted NV work completes (full driver synchronize).
+ * @param queue (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_nv_queue_synchronize(CMLHCQQueue* queue) {
     if (!queue)
         return -1;
@@ -252,19 +304,38 @@ int cml_hcq_nv_queue_synchronize(CMLHCQQueue* queue) {
 
 #else /* !CML_HAS_NV_DRIVER */
 
-/** Stub: no NV driver compiled in, so no queue can be created. */
+/**
+ * Stub: no NV driver compiled in, so no queue can be created.
+ * @return (CMLHCQQueue*)
+ */
 CMLHCQQueue* cml_hcq_nv_queue_create(void) { return NULL; }
-/** Stub: nothing to tear down without the NV driver. */
+/**
+ * Stub: nothing to tear down without the NV driver.
+ * @param q (CMLHCQQueue*)
+ * @return (void)
+ */
 void cml_hcq_nv_queue_destroy(CMLHCQQueue* q) { (void)q; }
 
-/** Stub: kernel submission unavailable without the NV driver. */
+/**
+ * Stub: kernel submission unavailable without the NV driver.
+ * @param q (CMLHCQQueue*)
+ * @param d (const CMLHCQKernelDesc*)
+ * @return (int)
+ */
 int cml_hcq_nv_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* d) {
     (void)q;
     (void)d;
     return -1;
 }
 
-/** Stub: H2D copy unavailable without the NV driver. */
+/**
+ * Stub: H2D copy unavailable without the NV driver.
+ * @param q (CMLHCQQueue*)
+ * @param d (void*)
+ * @param s (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_hcq_nv_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -273,7 +344,14 @@ int cml_hcq_nv_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     return -1;
 }
 
-/** Stub: D2H copy unavailable without the NV driver. */
+/**
+ * Stub: D2H copy unavailable without the NV driver.
+ * @param q (CMLHCQQueue*)
+ * @param d (void*)
+ * @param s (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_hcq_nv_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -282,33 +360,59 @@ int cml_hcq_nv_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     return -1;
 }
 
-/** Stub: no NV driver, so no signal can be created. */
+/**
+ * Stub: no NV driver, so no signal can be created.
+ * @return (CMLHCQSignal*)
+ */
 CMLHCQSignal* cml_hcq_nv_signal_create(void) { return NULL; }
-/** Stub: nothing to free without the NV driver. */
+/**
+ * Stub: nothing to free without the NV driver.
+ * @param s (CMLHCQSignal*)
+ * @return (void)
+ */
 void cml_hcq_nv_signal_destroy(CMLHCQSignal* s) { (void)s; }
 
-/** Stub: signal recording unavailable without the NV driver. */
+/**
+ * Stub: signal recording unavailable without the NV driver.
+ * @param q (CMLHCQQueue*)
+ * @param s (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_nv_signal_record(CMLHCQQueue* q, CMLHCQSignal* s) {
     (void)q;
     (void)s;
     return -1;
 }
 
-/** Stub: queue wait unavailable without the NV driver. */
+/**
+ * Stub: queue wait unavailable without the NV driver.
+ * @param q (CMLHCQQueue*)
+ * @param s (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_nv_queue_wait(CMLHCQQueue* q, CMLHCQSignal* s) {
     (void)q;
     (void)s;
     return -1;
 }
 
-/** Stub: host wait unavailable without the NV driver. */
+/**
+ * Stub: host wait unavailable without the NV driver.
+ * @param s (CMLHCQSignal*)
+ * @param t (uint64_t)
+ * @return (int)
+ */
 int cml_hcq_nv_signal_wait_cpu(CMLHCQSignal* s, uint64_t t) {
     (void)s;
     (void)t;
     return -1;
 }
 
-/** Stub: nothing to synchronize without the NV driver. */
+/**
+ * Stub: nothing to synchronize without the NV driver.
+ * @param q (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_nv_queue_synchronize(CMLHCQQueue* q) {
     (void)q;
     return -1;

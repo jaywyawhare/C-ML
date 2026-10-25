@@ -30,7 +30,11 @@ static bool g_mock_active = false;
 static void mock_create_topology(void);
 static void mock_remove_topology(void);
 
-/** Activate the AM mock GPU (RDNA3 defaults if no config) and build its fake sysfs topology. */
+/**
+ * Activate the AM mock GPU (RDNA3 defaults if no config) and build its fake sysfs topology.
+ * @param config (CMLAMMockGPU*)
+ * @return (void)
+ */
 void cml_am_mock_init(CMLAMMockGPU* config) {
     if (g_mock_active)
         cml_am_mock_shutdown();
@@ -63,7 +67,10 @@ void cml_am_mock_init(CMLAMMockGPU* config) {
     g_mock_active = true;
 }
 
-/** Free mock allocations, remove the fake topology dir, and deactivate the mock. */
+/**
+ * Free mock allocations, remove the fake topology dir, and deactivate the mock.
+ * @return (void)
+ */
 void cml_am_mock_shutdown(void) {
     if (!g_mock_active)
         return;
@@ -81,10 +88,17 @@ void cml_am_mock_shutdown(void) {
     g_mock_active = false;
 }
 
-/** Return the active AM mock state, or NULL when inactive. */
+/**
+ * Return the active AM mock state, or NULL when inactive.
+ * @return (CMLAMMockGPU*)
+ */
 CMLAMMockGPU* cml_am_mock_get(void) { return g_mock_active ? &g_mock : NULL; }
 
-/** Record a mock mmap allocation, growing the tracking table as needed. */
+/**
+ * Record a mock mmap allocation, growing the tracking table as needed.
+ * @param ptr (void*)
+ * @return (void)
+ */
 static void mock_track_alloc(void* ptr) {
     if (!ptr)
         return;
@@ -101,7 +115,11 @@ static void mock_track_alloc(void* ptr) {
     g_mock.alloc_table[g_mock.num_allocs++] = ptr;
 }
 
-/** Drop a pointer from the allocation table; returns false if not tracked. */
+/**
+ * Drop a pointer from the allocation table; returns false if not tracked.
+ * @param ptr (void*)
+ * @return (bool)
+ */
 static bool mock_untrack_alloc(void* ptr) {
     for (int i = 0; i < g_mock.num_allocs; i++) {
         if (g_mock.alloc_table[i] == ptr) {
@@ -114,7 +132,12 @@ static bool mock_untrack_alloc(void* ptr) {
 
 /* Fake sysfs topology */
 
-/** Write a string to a file, best-effort. */
+/**
+ * Write a string to a file, best-effort.
+ * @param path (const char*)
+ * @param content (const char*)
+ * @return (void)
+ */
 static void write_file(const char* path, const char* content) {
     FILE* f = fopen(path, "w");
     if (f) {
@@ -123,7 +146,12 @@ static void write_file(const char* path, const char* content) {
     }
 }
 
-/** Create a directory and all missing parent components. */
+/**
+ * Create a directory and all missing parent components.
+ * @param path (const char*)
+ * @param mode (mode_t)
+ * @return (int)
+ */
 static int mkpath(const char* path, mode_t mode) {
     char tmp[512];
     snprintf(tmp, sizeof(tmp), "%s", path);
@@ -137,7 +165,10 @@ static int mkpath(const char* path, mode_t mode) {
     return mkdir(tmp, mode);
 }
 
-/** Build a temp KFD sysfs topology tree (CPU + GPU nodes) mirroring the mock config. */
+/**
+ * Build a temp KFD sysfs topology tree (CPU + GPU nodes) mirroring the mock config.
+ * @return (void)
+ */
 static void mock_create_topology(void) {
     char template[] = "/tmp/cml_am_mock_XXXXXX";
     char* dir       = mkdtemp(template);
@@ -206,7 +237,10 @@ static void mock_create_topology(void) {
     write_file(path, gpu_id_str);
 }
 
-/** Recursively delete the temp topology directory. */
+/**
+ * Recursively delete the temp topology directory.
+ * @return (void)
+ */
 static void mock_remove_topology(void) {
     if (g_mock.topology_dir[0] == '\0')
         return;
@@ -220,7 +254,13 @@ static void mock_remove_topology(void) {
 
 /* Mock syscalls */
 
-/** Intercept opens of /dev/kfd and the render node, returning fixed mock descriptors. */
+/**
+ * Intercept opens of /dev/kfd and the render node, returning fixed mock descriptors.
+ * @param path (const char*)
+ * @param flags (int)
+ * @param ... variadic arguments
+ * @return (int)
+ */
 int cml_am_mock_open(const char* path, int flags, ...) {
     if (!g_mock_active) {
         va_list ap;
@@ -242,7 +282,11 @@ int cml_am_mock_open(const char* path, int flags, ...) {
     return open(path, flags, mode);
 }
 
-/** Swallow closes of mock descriptors; forward real ones. */
+/**
+ * Swallow closes of mock descriptors; forward real ones.
+ * @param fd (int)
+ * @return (int)
+ */
 int cml_am_mock_close(int fd) {
     if (!g_mock_active)
         return close(fd);
@@ -327,7 +371,13 @@ struct mock_kfd_unmap_memory {
 #define MOCK_IOC_MAP_MEMORY KFD_IOWR(0x1A, struct mock_kfd_map_memory)
 #define MOCK_IOC_UNMAP_MEMORY KFD_IOWR(0x1B, struct mock_kfd_unmap_memory)
 
-/** Service KFD ioctls (version, queue, memory alloc/map) from mock state; forward unknown fds. */
+/**
+ * Service KFD ioctls (version, queue, memory alloc/map) from mock state; forward unknown fds.
+ * @param fd (int)
+ * @param request (unsigned long)
+ * @param arg (void*)
+ * @return (int)
+ */
 int cml_am_mock_ioctl(int fd, unsigned long request, void* arg) {
     if (!g_mock_active || (fd != MOCK_FD_KFD && fd != MOCK_FD_DRM))
         return ioctl(fd, request, arg);
@@ -379,7 +429,16 @@ int cml_am_mock_ioctl(int fd, unsigned long request, void* arg) {
     return -1;
 }
 
-/** Back mock mappings with page-aligned host memory tracked for cleanup. */
+/**
+ * Back mock mappings with page-aligned host memory tracked for cleanup.
+ * @param addr (void*)
+ * @param length (size_t)
+ * @param prot (int)
+ * @param flags (int)
+ * @param fd (int)
+ * @param offset (off_t)
+ * @return (void*)
+ */
 void* cml_am_mock_mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {
     (void)addr;
     (void)prot;
@@ -398,7 +457,12 @@ void* cml_am_mock_mmap(void* addr, size_t length, int prot, int flags, int fd, o
     return ptr;
 }
 
-/** Free a tracked mock mapping, or forward to the real munmap. */
+/**
+ * Free a tracked mock mapping, or forward to the real munmap.
+ * @param addr (void*)
+ * @param length (size_t)
+ * @return (int)
+ */
 int cml_am_mock_munmap(void* addr, size_t length) {
     (void)length;
     if (!g_mock_active)
@@ -412,7 +476,12 @@ int cml_am_mock_munmap(void* addr, size_t length) {
     return munmap(addr, length);
 }
 
-/** Redirect KFD sysfs topology reads to the mock's temp directory. */
+/**
+ * Redirect KFD sysfs topology reads to the mock's temp directory.
+ * @param path (const char*)
+ * @param mode (const char*)
+ * @return (FILE*)
+ */
 FILE* cml_am_mock_fopen(const char* path, const char* mode) {
     if (!g_mock_active)
         return fopen(path, mode);
@@ -432,7 +501,10 @@ FILE* cml_am_mock_fopen(const char* path, const char* mode) {
 
 /* AQL auto-completion */
 
-/** Count a completed AQL dispatch for test observation. */
+/**
+ * Count a completed AQL dispatch for test observation.
+ * @return (void)
+ */
 void cml_am_mock_complete_dispatch(void) {
     if (!g_mock_active)
         return;
@@ -442,7 +514,12 @@ void cml_am_mock_complete_dispatch(void) {
 /* Called from the mock when auto_complete is enabled.
  * Scans known signal addresses and writes completion values. */
 
-/** Report the mock KFD/render device nodes as accessible; forward other paths. */
+/**
+ * Report the mock KFD/render device nodes as accessible; forward other paths.
+ * @param path (const char*)
+ * @param mode (int)
+ * @return (int)
+ */
 int cml_am_mock_access(const char* path, int mode) {
     if (!g_mock_active)
         return access(path, mode);
@@ -455,7 +532,11 @@ int cml_am_mock_access(const char* path, int mode) {
     return access(path, mode);
 }
 
-/** Redirect KFD topology directory listings to the mock's temp directory. */
+/**
+ * Redirect KFD topology directory listings to the mock's temp directory.
+ * @param path (const char*)
+ * @return (DIR*)
+ */
 DIR* cml_am_mock_opendir(const char* path) {
     if (!g_mock_active)
         return opendir(path);

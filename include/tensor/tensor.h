@@ -154,6 +154,12 @@ Tensor* tensor_empty(int* shape, int ndim, const TensorConfig* config);
  * @brief Allocate a contiguous eager tensor with uninitialized storage (no IR graph).
  *
  * Used when callers need an immediate backing buffer (e.g. arena or external init).
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @param ndim (int)
+ * @param shape (const int*)
+ * @param requires_grad (bool)
+ * @return (Tensor*)
  */
 Tensor* tensor_create(DType dtype, DeviceType device, int ndim, const int* shape,
                       bool requires_grad);
@@ -186,12 +192,20 @@ void tensor_detach_keep(Tensor* t);
  * last reference goes - use it wherever owned data is freed or replaced. */
 void tensor_storage_share(Tensor* view, Tensor* src);
 void tensor_storage_release(Tensor* t);
-/** Drop `t`'s shared-storage hold once its data no longer lives in that block
- *  (a view materialized onto a private buffer). No-op while it is still a view. */
+/**
+ * Drop `t`'s shared-storage hold once its data no longer lives in that block
+ * (a view materialized onto a private buffer). No-op while it is still a view.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_storage_drop_if_detached(Tensor* t);
-/** Release the buffer `t` holds through whichever allocator produced it (backend handle,
- *  shared storage, execution buffer cache, host or device heap) and clear `t->data`.
- *  Use it wherever a tensor's data is freed or replaced. */
+/**
+ * Release the buffer `t` holds through whichever allocator produced it (backend handle,
+ * shared storage, execution buffer cache, host or device heap) and clear `t->data`.
+ * Use it wherever a tensor's data is freed or replaced.
+ * @param t (Tensor*)
+ * @return (void)
+ */
 void tensor_release_data(Tensor* t);
 Tensor* tensor_clone(Tensor* t);
 float tensor_get_float(Tensor* t, size_t idx);

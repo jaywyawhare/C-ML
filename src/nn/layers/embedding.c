@@ -9,8 +9,13 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/** torch.nn.Embedding forward: gather rows of the weight table by integer indices, appending an
- *  embedding_dim axis to the input shape. Rows at padding_idx are zeroed. NULL on empty input. */
+/**
+ * torch.nn.Embedding forward: gather rows of the weight table by integer indices, appending an
+ * embedding_dim axis to the input shape. Rows at padding_idx are zeroed. NULL on empty input.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* embedding_forward(Module* module, Tensor* input) {
     Embedding* emb = (Embedding*)module;
     if (!emb || !input)
@@ -78,11 +83,23 @@ static Tensor* embedding_forward(Module* module, Tensor* input) {
     return out;
 }
 
-/** Free the Embedding module; the weight table is released by module_free. */
+/**
+ * Free the Embedding module; the weight table is released by module_free.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void embedding_free(Module* module) { cml_free(module); }
 
-/** Construct an Embedding of num_embeddings x embedding_dim, weights ~U(-1,1); the padding_idx
- *  row (if in range) is zeroed. Returns NULL on failure. */
+/**
+ * Construct an Embedding of num_embeddings x embedding_dim, weights ~U(-1,1); the padding_idx
+ * row (if in range) is zeroed. Returns NULL on failure.
+ * @param num_embeddings (int)
+ * @param embedding_dim (int)
+ * @param padding_idx (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Embedding*)
+ */
 Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx, DType dtype,
                         DeviceType device) {
     Embedding* emb = cml_malloc(sizeof(Embedding));

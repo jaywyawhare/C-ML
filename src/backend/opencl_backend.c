@@ -20,12 +20,18 @@
 static pthread_mutex_t g_opencl_lock;
 static bool g_lock_initialized = false;
 
-/** Acquire the OpenCL state lock if it has been initialized. */
+/**
+ * Acquire the OpenCL state lock if it has been initialized.
+ * @return (void)
+ */
 static inline void opencl_lock(void) {
     if (g_lock_initialized)
         pthread_mutex_lock(&g_opencl_lock);
 }
-/** Release the OpenCL state lock if it has been initialized. */
+/**
+ * Release the OpenCL state lock if it has been initialized.
+ * @return (void)
+ */
 static inline void opencl_unlock(void) {
     if (g_lock_initialized)
         pthread_mutex_unlock(&g_opencl_lock);
@@ -46,8 +52,16 @@ typedef struct {
 
 static GPUBufferPool g_gpu_pool = {.count = 0};
 
-/** Get a device buffer from the reuse pool (best-fit) or allocate a new one;
- *  COPY_HOST_PTR requests always allocate fresh. */
+/**
+ * Get a device buffer from the reuse pool (best-fit) or allocate a new one;
+ * COPY_HOST_PTR requests always allocate fresh.
+ * @param ctx (cl_context)
+ * @param flags (cl_mem_flags)
+ * @param size (size_t)
+ * @param host_ptr (void*)
+ * @param errcode (cl_int*)
+ * @return (cl_mem)
+ */
 static cl_mem gpu_pool_alloc(cl_context ctx, cl_mem_flags flags, size_t size, void* host_ptr,
                              cl_int* errcode) {
     /* Best-fit reuse: find smallest free buffer >= size */
@@ -89,7 +103,11 @@ static cl_mem gpu_pool_alloc(cl_context ctx, cl_mem_flags flags, size_t size, vo
     return buf;
 }
 
-/** Return a buffer to the pool as free, or release it if it isn't pooled. */
+/**
+ * Return a buffer to the pool as free, or release it if it isn't pooled.
+ * @param buf (cl_mem)
+ * @return (void)
+ */
 static void gpu_pool_release(cl_mem buf) {
     for (int i = 0; i < g_gpu_pool.count; i++) {
         if (g_gpu_pool.entries[i].buffer == buf) {
@@ -101,7 +119,10 @@ static void gpu_pool_release(cl_mem buf) {
     clReleaseMemObject(buf);
 }
 
-/** Release every buffer in the pool and reset it. */
+/**
+ * Release every buffer in the pool and reset it.
+ * @return (void)
+ */
 static void gpu_pool_cleanup(void) {
     for (int i = 0; i < g_gpu_pool.count; i++) {
         if (g_gpu_pool.entries[i].buffer) {
@@ -162,8 +183,17 @@ static cl_kernel g_k_sigmoid = NULL;
 static cl_kernel g_k_matmul  = NULL;
 static cl_kernel g_k_sum     = NULL;
 
-/** Run a unary or binary element-wise kernel on the GPU: upload inputs, enqueue,
- *  and read back; b may be NULL for unary ops. float32 only. */
+/**
+ * Run a unary or binary element-wise kernel on the GPU: upload inputs, enqueue,
+ * and read back; b may be NULL for unary ops. float32 only.
+ * @param kernel (cl_kernel)
+ * @param a (const void*)
+ * @param b (const void*)
+ * @param out (void*)
+ * @param n (size_t)
+ * @param dtype (DType)
+ * @return (void)
+ */
 static void opencl_elementwise(cl_kernel kernel, const void* a, const void* b, void* out, size_t n,
                                DType dtype) {
     if (dtype != DTYPE_FLOAT32 || !g_initialized)
@@ -205,27 +235,67 @@ static void opencl_elementwise(cl_kernel kernel, const void* a, const void* b, v
     opencl_unlock();
 }
 
-/** Element-wise add on the GPU. */
+/**
+ * Element-wise add on the GPU.
+ * @param a (const void*)
+ * @param b (const void*)
+ * @param out (void*)
+ * @param n (size_t)
+ * @param dtype (DType)
+ * @return (void)
+ */
 static void opencl_add(const void* a, const void* b, void* out, size_t n, DType dtype) {
     opencl_elementwise(g_k_add, a, b, out, n, dtype);
 }
 
-/** Element-wise multiply on the GPU. */
+/**
+ * Element-wise multiply on the GPU.
+ * @param a (const void*)
+ * @param b (const void*)
+ * @param out (void*)
+ * @param n (size_t)
+ * @param dtype (DType)
+ * @return (void)
+ */
 static void opencl_mul(const void* a, const void* b, void* out, size_t n, DType dtype) {
     opencl_elementwise(g_k_mul, a, b, out, n, dtype);
 }
 
-/** ReLU on the GPU. */
+/**
+ * ReLU on the GPU.
+ * @param x (const void*)
+ * @param out (void*)
+ * @param n (size_t)
+ * @param dtype (DType)
+ * @return (void)
+ */
 static void opencl_relu(const void* x, void* out, size_t n, DType dtype) {
     opencl_elementwise(g_k_relu, x, NULL, out, n, dtype);
 }
 
-/** Sigmoid on the GPU. */
+/**
+ * Sigmoid on the GPU.
+ * @param x (const void*)
+ * @param out (void*)
+ * @param n (size_t)
+ * @param dtype (DType)
+ * @return (void)
+ */
 static void opencl_sigmoid(const void* x, void* out, size_t n, DType dtype) {
     opencl_elementwise(g_k_sigmoid, x, NULL, out, n, dtype);
 }
 
-/** Matmul out[m,n] = a[m,k] * b[k,n] on the GPU via a 2D NDRange. float32 only. */
+/**
+ * Matmul out[m,n] = a[m,k] * b[k,n] on the GPU via a 2D NDRange. float32 only.
+ * @param a (const void*)
+ * @param b (const void*)
+ * @param out (void*)
+ * @param m (int)
+ * @param n (int)
+ * @param k (int)
+ * @param dtype (DType)
+ * @return (void)
+ */
 static void opencl_matmul(const void* a, const void* b, void* out, int m, int n, int k,
                           DType dtype) {
     if (dtype != DTYPE_FLOAT32 || !g_initialized)
@@ -260,7 +330,14 @@ static void opencl_matmul(const void* a, const void* b, void* out, int m, int n,
     opencl_unlock();
 }
 
-/** Reduction summing all elements on the GPU (single work-item). float32 only. */
+/**
+ * Reduction summing all elements on the GPU (single work-item). float32 only.
+ * @param x (const void*)
+ * @param out (void*)
+ * @param n (size_t)
+ * @param dtype (DType)
+ * @return (void)
+ */
 static void opencl_sum(const void* x, void* out, size_t n, DType dtype) {
     if (dtype != DTYPE_FLOAT32 || !g_initialized)
         return;
@@ -287,7 +364,14 @@ static void opencl_sum(const void* x, void* out, size_t n, DType dtype) {
     opencl_unlock();
 }
 
-/** Mean of all elements: GPU sum divided by count on the host. */
+/**
+ * Mean of all elements: GPU sum divided by count on the host.
+ * @param x (const void*)
+ * @param out (void*)
+ * @param n (size_t)
+ * @param dtype (DType)
+ * @return (void)
+ */
 static void opencl_mean(const void* x, void* out, size_t n, DType dtype) {
     opencl_sum(x, out, n, dtype);
     if (dtype == DTYPE_FLOAT32 && n > 0) {
@@ -295,7 +379,18 @@ static void opencl_mean(const void* x, void* out, size_t n, DType dtype) {
     }
 }
 
-/** Matmul then per-column bias add: GPU matmul followed by a host bias loop. */
+/**
+ * Matmul then per-column bias add: GPU matmul followed by a host bias loop.
+ * @param a (const void*)
+ * @param b (const void*)
+ * @param bias (const void*)
+ * @param out (void*)
+ * @param m (int)
+ * @param n (int)
+ * @param k (int)
+ * @param dtype (DType)
+ * @return (void)
+ */
 static void opencl_matmul_add(const void* a, const void* b, const void* bias, void* out, int m,
                               int n, int k, DType dtype) {
     opencl_matmul(a, b, out, m, n, k, dtype);
@@ -308,8 +403,11 @@ static void opencl_matmul_add(const void* a, const void* b, const void* bias, vo
     }
 }
 
-/** Select a platform and device, build the kernel program, and create the
- *  compute kernels; idempotent. Returns 0 on success. */
+/**
+ * Select a platform and device, build the kernel program, and create the
+ * compute kernels; idempotent. Returns 0 on success.
+ * @return (int)
+ */
 int opencl_backend_init(void) {
     if (!g_lock_initialized) {
         pthread_mutex_init(&g_opencl_lock, NULL);
@@ -400,7 +498,10 @@ int opencl_backend_init(void) {
     return 0;
 }
 
-/** Release all kernels, the program, queue, context, pooled buffers, and lock. */
+/**
+ * Release all kernels, the program, queue, context, pooled buffers, and lock.
+ * @return (void)
+ */
 void opencl_backend_cleanup(void) {
     opencl_lock();
 
@@ -439,14 +540,20 @@ void opencl_backend_cleanup(void) {
     }
 }
 
-/** True if at least one OpenCL platform is present. */
+/**
+ * True if at least one OpenCL platform is present.
+ * @return (bool)
+ */
 bool opencl_backend_is_available(void) {
     cl_uint num_platforms = 0;
     cl_int err            = clGetPlatformIDs(0, NULL, &num_platforms);
     return (err == CL_SUCCESS && num_platforms > 0);
 }
 
-/** Build the BackendOps table bound to the OpenCL kernel implementations. */
+/**
+ * Build the BackendOps table bound to the OpenCL kernel implementations.
+ * @return (BackendOps)
+ */
 BackendOps opencl_backend_get_ops(void) {
     BackendOps ops = {0};
     ops.matmul     = opencl_matmul;
@@ -460,7 +567,12 @@ BackendOps opencl_backend_get_ops(void) {
     return ops;
 }
 
-/** Write a description of the active OpenCL device (name, vendor, memory) into buffer. */
+/**
+ * Write a description of the active OpenCL device (name, vendor, memory) into buffer.
+ * @param buffer (char*)
+ * @param buffer_size (size_t)
+ * @return (int)
+ */
 int opencl_backend_get_device_info(char* buffer, size_t buffer_size) {
     opencl_lock();
 
@@ -486,25 +598,42 @@ int opencl_backend_get_device_info(char* buffer, size_t buffer_size) {
 
 #else /* !CML_HAS_OPENCL */
 
-/** Stub when OpenCL is not compiled in: reports the build-flag error. */
+/**
+ * Stub when OpenCL is not compiled in: reports the build-flag error.
+ * @return (int)
+ */
 int opencl_backend_init(void) {
     LOG_ERROR("OpenCL backend not compiled. Rebuild with -DENABLE_OPENCL=ON");
     return -1;
 }
 
-/** No-op cleanup stub when OpenCL is not compiled in. */
+/**
+ * No-op cleanup stub when OpenCL is not compiled in.
+ * @return (void)
+ */
 void opencl_backend_cleanup(void) {}
 
-/** Reports OpenCL unavailable when not compiled in. */
+/**
+ * Reports OpenCL unavailable when not compiled in.
+ * @return (bool)
+ */
 bool opencl_backend_is_available(void) { return false; }
 
-/** Returns an empty ops table when OpenCL is not compiled in. */
+/**
+ * Returns an empty ops table when OpenCL is not compiled in.
+ * @return (BackendOps)
+ */
 BackendOps opencl_backend_get_ops(void) {
     BackendOps ops = {0};
     return ops;
 }
 
-/** Device-info stub when OpenCL is not compiled in: empties buffer and fails. */
+/**
+ * Device-info stub when OpenCL is not compiled in: empties buffer and fails.
+ * @param buffer (char*)
+ * @param buffer_size (size_t)
+ * @return (int)
+ */
 int opencl_backend_get_device_info(char* buffer, size_t buffer_size) {
     if (buffer && buffer_size > 0)
         buffer[0] = '\0';

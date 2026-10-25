@@ -55,7 +55,12 @@ static void train_losses(float* losses, int steps) {
     module_free((Module*)model);
 }
 
-/** Two-layer sigmoid MLP for the GAN parity check. */
+/**
+ * Two-layer sigmoid MLP for the GAN parity check.
+ * @param in (int)
+ * @param out (int)
+ * @return (Sequential*)
+ */
 static Sequential* gan_net(int in, int out) {
     Sequential* m = cml_nn_sequential();
     cml_nn_sequential_add(m, (Module*)cml_nn_linear(in, 16, DTYPE_FLOAT32, DEVICE_CPU, true));

@@ -44,9 +44,13 @@ static int galloc_alloc_slots(CMLGraphAllocator_t galloc, int n_bufs) {
     return -1;
 }
 
-/** Create a single-buffer graph allocator for `buft`. Returns NULL on bad args or OOM;
- *  the slot arrays and galloc are released on any failure. Free with
- *  cml_graph_allocator_free. */
+/**
+ * Create a single-buffer graph allocator for `buft`. Returns NULL on bad args or OOM;
+ * the slot arrays and galloc are released on any failure. Free with
+ * cml_graph_allocator_free.
+ * @param buft (CMLBackendBufferType_t)
+ * @return (CMLGraphAllocator_t)
+ */
 CMLGraphAllocator_t cml_graph_allocator_new(CMLBackendBufferType_t buft) {
     if (!buft) {
         LOG_ERROR("Invalid buffer type");
@@ -71,8 +75,13 @@ CMLGraphAllocator_t cml_graph_allocator_new(CMLBackendBufferType_t buft) {
     return galloc;
 }
 
-/** Create a graph allocator with `n_bufs` buffers, one per entry of `bufts`. Returns NULL on
- *  bad args or OOM. Free with cml_graph_allocator_free. */
+/**
+ * Create a graph allocator with `n_bufs` buffers, one per entry of `bufts`. Returns NULL on
+ * bad args or OOM. Free with cml_graph_allocator_free.
+ * @param bufts (CMLBackendBufferType_t*)
+ * @param n_bufs (int)
+ * @return (CMLGraphAllocator_t)
+ */
 CMLGraphAllocator_t cml_graph_allocator_new_n(CMLBackendBufferType_t* bufts, int n_bufs) {
     if (!bufts || n_bufs <= 0) {
         LOG_ERROR("Invalid buffer types");
@@ -100,8 +109,12 @@ CMLGraphAllocator_t cml_graph_allocator_new_n(CMLBackendBufferType_t* bufts, int
     return galloc;
 }
 
-/** Destroy a graph allocator, freeing every backend buffer, memory pool, and the parallel
- *  slot arrays it owns. NULL-safe. */
+/**
+ * Destroy a graph allocator, freeing every backend buffer, memory pool, and the parallel
+ * slot arrays it owns. NULL-safe.
+ * @param galloc (CMLGraphAllocator_t)
+ * @return (void)
+ */
 void cml_graph_allocator_free(CMLGraphAllocator_t galloc) {
     if (!galloc)
         return;
@@ -134,7 +147,11 @@ void cml_graph_allocator_free(CMLGraphAllocator_t galloc) {
     cml_free(galloc);
 }
 
-/** Byte footprint of a tensor (numel * dtype size), or 0 for a NULL tensor. */
+/**
+ * Byte footprint of a tensor (numel * dtype size), or 0 for a NULL tensor.
+ * @param tensor (Tensor*)
+ * @return (size_t)
+ */
 static size_t calculate_tensor_size(Tensor* tensor) {
     if (!tensor)
         return 0;
@@ -403,8 +420,13 @@ static size_t calculate_peak_memory_simple(CMLComputationGraph_t graph) {
     return peak_memory;
 }
 
-/** Size every not-yet-reserved buffer to the graph's estimated peak memory (growing only),
- *  or just mark them reserved when `graph` is NULL. Returns false if galloc has no buffers. */
+/**
+ * Size every not-yet-reserved buffer to the graph's estimated peak memory (growing only),
+ * or just mark them reserved when `graph` is NULL. Returns false if galloc has no buffers.
+ * @param galloc (CMLGraphAllocator_t)
+ * @param graph (void*)
+ * @return (bool)
+ */
 bool cml_graph_allocator_reserve(CMLGraphAllocator_t galloc, void* graph) {
     if (!galloc || galloc->num_buffers == 0)
         return false;
@@ -434,9 +456,16 @@ bool cml_graph_allocator_reserve(CMLGraphAllocator_t galloc, void* graph) {
     return true;
 }
 
-/** Reserve per buffer using an explicit node->buffer and leaf->buffer assignment, summing each
- *  buffer's tensor sizes. Falls back to cml_graph_allocator_reserve when any mapping is NULL or
- *  the scratch allocation fails. */
+/**
+ * Reserve per buffer using an explicit node->buffer and leaf->buffer assignment, summing each
+ * buffer's tensor sizes. Falls back to cml_graph_allocator_reserve when any mapping is NULL or
+ * the scratch allocation fails.
+ * @param galloc (CMLGraphAllocator_t)
+ * @param graph (void*)
+ * @param node_buffer_ids (const int*)
+ * @param leaf_buffer_ids (const int*)
+ * @return (bool)
+ */
 bool cml_graph_allocator_reserve_n(CMLGraphAllocator_t galloc, void* graph,
                                    const int* node_buffer_ids, const int* leaf_buffer_ids) {
     if (!galloc || galloc->num_buffers == 0)
@@ -506,9 +535,14 @@ bool cml_graph_allocator_reserve_n(CMLGraphAllocator_t galloc, void* graph,
     return true;
 }
 
-/** Materialize backend buffers for any slots not yet allocated, sizing each to at least its
- *  reserved size (and the graph's recomputed peak). On failure, buffers created in this call
- *  are rolled back and false is returned. */
+/**
+ * Materialize backend buffers for any slots not yet allocated, sizing each to at least its
+ * reserved size (and the graph's recomputed peak). On failure, buffers created in this call
+ * are rolled back and false is returned.
+ * @param galloc (CMLGraphAllocator_t)
+ * @param graph (void*)
+ * @return (bool)
+ */
 bool cml_graph_allocator_alloc_graph(CMLGraphAllocator_t galloc, void* graph) {
     if (!galloc || galloc->num_buffers == 0)
         return false;
@@ -551,22 +585,38 @@ bool cml_graph_allocator_alloc_graph(CMLGraphAllocator_t galloc, void* graph) {
     return true;
 }
 
-/** Reserved byte size of a buffer, or 0 if galloc is NULL or buffer_id is out of range. */
+/**
+ * Reserved byte size of a buffer, or 0 if galloc is NULL or buffer_id is out of range.
+ * @param galloc (CMLGraphAllocator_t)
+ * @param buffer_id (int)
+ * @return (size_t)
+ */
 size_t cml_graph_allocator_get_buffer_size(CMLGraphAllocator_t galloc, int buffer_id) {
     if (!galloc || buffer_id < 0 || buffer_id >= galloc->num_buffers)
         return 0;
     return galloc->buffer_sizes[buffer_id];
 }
 
-/** Toggle buffer-reuse memory pooling for the allocator; NULL-safe. */
+/**
+ * Toggle buffer-reuse memory pooling for the allocator; NULL-safe.
+ * @param galloc (CMLGraphAllocator_t)
+ * @param enable (bool)
+ * @return (void)
+ */
 void cml_graph_allocator_enable_pooling(CMLGraphAllocator_t galloc, bool enable) {
     if (!galloc)
         return;
     galloc->use_pooling = enable;
 }
 
-/** Grow a buffer to `new_size`, freeing and re-allocating its backend buffer; a shrink or
- *  equal size is a no-op success. Returns false on bad args or allocation failure. */
+/**
+ * Grow a buffer to `new_size`, freeing and re-allocating its backend buffer; a shrink or
+ * equal size is a no-op success. Returns false on bad args or allocation failure.
+ * @param galloc (CMLGraphAllocator_t)
+ * @param buffer_id (int)
+ * @param new_size (size_t)
+ * @return (bool)
+ */
 bool cml_graph_allocator_realloc_buffer(CMLGraphAllocator_t galloc, int buffer_id,
                                         size_t new_size) {
     if (!galloc || buffer_id < 0 || buffer_id >= galloc->num_buffers)
@@ -594,8 +644,16 @@ bool cml_graph_allocator_realloc_buffer(CMLGraphAllocator_t galloc, int buffer_i
     return true;
 }
 
-/** Attach a fresh memory pool to a buffer slot (replacing any existing one) and enable pooling.
- *  Returns false on bad args or if the pool cannot be created. */
+/**
+ * Attach a fresh memory pool to a buffer slot (replacing any existing one) and enable pooling.
+ * Returns false on bad args or if the pool cannot be created.
+ * @param galloc (CMLGraphAllocator_t)
+ * @param buffer_id (int)
+ * @param block_size (size_t)
+ * @param num_blocks (int)
+ * @param dtype (DType)
+ * @return (bool)
+ */
 bool cml_graph_allocator_init_pool(CMLGraphAllocator_t galloc, int buffer_id, size_t block_size,
                                    int num_blocks, DType dtype) {
     if (!galloc || buffer_id < 0 || buffer_id >= galloc->num_buffers)
@@ -616,8 +674,13 @@ bool cml_graph_allocator_init_pool(CMLGraphAllocator_t galloc, int buffer_id, si
     return true;
 }
 
-/** Initialize a bump allocator over `buffer`, caching its base and alignment and resetting the
- *  offset. A NULL buffer leaves the allocator zeroed; it does not take ownership of the buffer. */
+/**
+ * Initialize a bump allocator over `buffer`, caching its base and alignment and resetting the
+ * offset. A NULL buffer leaves the allocator zeroed; it does not take ownership of the buffer.
+ * @param talloc (CMLTensorAllocator*)
+ * @param buffer (CMLBackendBuffer_t)
+ * @return (void)
+ */
 void cml_tensor_allocator_new(CMLTensorAllocator* talloc, CMLBackendBuffer_t buffer) {
     if (!talloc)
         return;
@@ -631,8 +694,13 @@ void cml_tensor_allocator_new(CMLTensorAllocator* talloc, CMLBackendBuffer_t buf
     talloc->offset    = 0;
 }
 
-/** Sub-allocate a tensor from the buffer by bumping the aligned offset; points tensor->data into
- *  the buffer as non-owning. Returns -1 on bad args or when the buffer is out of room. */
+/**
+ * Sub-allocate a tensor from the buffer by bumping the aligned offset; points tensor->data into
+ * the buffer as non-owning. Returns -1 on bad args or when the buffer is out of room.
+ * @param talloc (CMLTensorAllocator*)
+ * @param tensor (Tensor*)
+ * @return (int)
+ */
 int cml_tensor_allocator_alloc(CMLTensorAllocator* talloc, Tensor* tensor) {
     if (!talloc || !tensor || !talloc->buffer)
         return -1;
@@ -666,9 +734,13 @@ struct CMLContext {
     DeviceType device;
 };
 
-/** Create a CPU context. Depending on params it copies an existing mem_buffer, pre-allocates a
- *  backing buffer with a bump allocator, or stays in dynamic (per-tensor) allocation mode.
- *  Returns NULL on OOM. Free with cml_context_free. */
+/**
+ * Create a CPU context. Depending on params it copies an existing mem_buffer, pre-allocates a
+ * backing buffer with a bump allocator, or stays in dynamic (per-tensor) allocation mode.
+ * Returns NULL on OOM. Free with cml_context_free.
+ * @param params (CMLContextParams)
+ * @return (CMLContext_t)
+ */
 CMLContext_t cml_context_new(CMLContextParams params) {
     CMLContext_t ctx = cml_malloc(sizeof(struct CMLContext));
     if (!ctx)
@@ -725,8 +797,12 @@ CMLContext_t cml_context_new(CMLContextParams params) {
     return ctx;
 }
 
-/** Destroy a context, releasing its backing buffer if it owns one. NULL-safe. Tensors carved
- *  from the context buffer become dangling and must not be used afterward. */
+/**
+ * Destroy a context, releasing its backing buffer if it owns one. NULL-safe. Tensors carved
+ * from the context buffer become dangling and must not be used afterward.
+ * @param ctx (CMLContext_t)
+ * @return (void)
+ */
 void cml_context_free(CMLContext_t ctx) {
     if (!ctx)
         return;
@@ -738,23 +814,39 @@ void cml_context_free(CMLContext_t ctx) {
     cml_free(ctx);
 }
 
-/** Bytes handed out from the context so far, or 0 if ctx is NULL. */
+/**
+ * Bytes handed out from the context so far, or 0 if ctx is NULL.
+ * @param ctx (CMLContext_t)
+ * @return (size_t)
+ */
 size_t cml_context_used_mem(CMLContext_t ctx) {
     if (!ctx)
         return 0;
     return ctx->used_mem;
 }
 
-/** Total backing-buffer capacity of the context, or 0 if ctx is NULL or in dynamic mode. */
+/**
+ * Total backing-buffer capacity of the context, or 0 if ctx is NULL or in dynamic mode.
+ * @param ctx (CMLContext_t)
+ * @return (size_t)
+ */
 size_t cml_context_total_mem(CMLContext_t ctx) {
     if (!ctx)
         return 0;
     return ctx->mem_size;
 }
 
-/** Allocate a tensor through the context. In no_alloc mode it only accrues used_mem and returns
- *  NULL; with a context buffer it carves from the bump allocator; otherwise it allocates a
- *  dedicated backend buffer. Returns NULL on bad args or out-of-memory. */
+/**
+ * Allocate a tensor through the context. In no_alloc mode it only accrues used_mem and returns
+ * NULL; with a context buffer it carves from the bump allocator; otherwise it allocates a
+ * dedicated backend buffer. Returns NULL on bad args or out-of-memory.
+ * @param ctx (CMLContext_t)
+ * @param shape (int*)
+ * @param ndim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Tensor*)
+ */
 Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType dtype,
                                  DeviceType device) {
     if (!ctx || !shape || ndim <= 0)
@@ -820,9 +912,14 @@ Tensor* cml_context_alloc_tensor(CMLContext_t ctx, int* shape, int ndim, DType d
     return tensor;
 }
 
-/** Register an existing tensor as a context parameter: when the context has a buffer the tensor
- *  is rehomed into its bump allocator (freeing any prior owned data), otherwise it is just marked
- *  non-owning. Returns 0 on success, -1 on bad args or context OOM. */
+/**
+ * Register an existing tensor as a context parameter: when the context has a buffer the tensor
+ * is rehomed into its bump allocator (freeing any prior owned data), otherwise it is just marked
+ * non-owning. Returns 0 on success, -1 on bad args or context OOM.
+ * @param ctx (CMLContext_t)
+ * @param tensor (Tensor*)
+ * @return (int)
+ */
 int cml_context_set_param(CMLContext_t ctx, Tensor* tensor) {
     if (!ctx || !tensor)
         return -1;

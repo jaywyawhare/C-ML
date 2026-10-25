@@ -22,7 +22,11 @@ static const int PAD_MULTIPLES[]  = {16, 32, 64};
 #define NUM_VEC_WIDTHS (int)(sizeof(VEC_WIDTHS) / sizeof(VEC_WIDTHS[0]))
 #define NUM_PAD_MULTIPLES (int)(sizeof(PAD_MULTIPLES) / sizeof(PAD_MULTIPLES[0]))
 
-/** Return a display name for an optimization transform type. */
+/**
+ * Return a display name for an optimization transform type.
+ * @param type (CMLOptType)
+ * @return (const char*)
+ */
 const char* cml_opt_type_name(CMLOptType type) {
     switch (type) {
     case OPT_LOCAL:
@@ -41,7 +45,10 @@ const char* cml_opt_type_name(CMLOptType type) {
     return "???";
 }
 
-/** Allocate an empty, growable optimization list. */
+/**
+ * Allocate an empty, growable optimization list.
+ * @return (CMLOptList*)
+ */
 CMLOptList* cml_opt_list_create(void) {
     CMLOptList* list = cml_calloc(1, sizeof(CMLOptList));
     if (!list)
@@ -55,7 +62,11 @@ CMLOptList* cml_opt_list_create(void) {
     return list;
 }
 
-/** Free an optimization list and its backing array. */
+/**
+ * Free an optimization list and its backing array.
+ * @param list (CMLOptList*)
+ * @return (void)
+ */
 void cml_opt_list_free(CMLOptList* list) {
     if (!list)
         return;
@@ -63,7 +74,14 @@ void cml_opt_list_free(CMLOptList* list) {
     cml_free(list);
 }
 
-/** Append a (type, axis, amount) transform to the list, growing it as needed. */
+/**
+ * Append a (type, axis, amount) transform to the list, growing it as needed.
+ * @param list (CMLOptList*)
+ * @param type (CMLOptType)
+ * @param axis (int)
+ * @param amount (int)
+ * @return (void)
+ */
 void cml_opt_list_add(CMLOptList* list, CMLOptType type, int axis, int amount) {
     if (!list)
         return;
@@ -79,7 +97,11 @@ void cml_opt_list_add(CMLOptList* list, CMLOptType type, int axis, int amount) {
     list->opts[list->num_opts++] = opt;
 }
 
-/** Deep-copy an optimization list. */
+/**
+ * Deep-copy an optimization list.
+ * @param src (const CMLOptList*)
+ * @return (CMLOptList*)
+ */
 static CMLOptList* opt_list_clone(const CMLOptList* src) {
     if (!src)
         return NULL;
@@ -93,7 +115,12 @@ static CMLOptList* opt_list_clone(const CMLOptList* src) {
 
 /* ── Axis helpers ── */
 
-/** Append a new loop axis of the given extent; returns its index or -1. */
+/**
+ * Append a new loop axis of the given extent; returns its index or -1.
+ * @param prog (LinearProgram*)
+ * @param extent (int)
+ * @return (int)
+ */
 static int prog_add_axis(LinearProgram* prog, int extent) {
     if (!prog)
         return -1;
@@ -110,7 +137,12 @@ static int prog_add_axis(LinearProgram* prog, int extent) {
     return idx;
 }
 
-/** Return the extent of a loop axis, or -1 if the axis is out of range. */
+/**
+ * Return the extent of a loop axis, or -1 if the axis is out of range.
+ * @param prog (const LinearProgram*)
+ * @param axis (int)
+ * @return (int)
+ */
 static int prog_get_axis_extent(const LinearProgram* prog, int axis) {
     if (!prog || axis < 0 || axis >= prog->num_axes)
         return -1;
@@ -306,7 +338,13 @@ static int apply_upcast(int axis, int amount, LinearProgram* prog) {
     return 0;
 }
 
-/** Round an axis extent up to a multiple of `amount` for alignment. */
+/**
+ * Round an axis extent up to a multiple of `amount` for alignment.
+ * @param axis (int)
+ * @param amount (int)
+ * @param prog (LinearProgram*)
+ * @return (int)
+ */
 static int apply_padto(int axis, int amount, LinearProgram* prog) {
     int extent = prog_get_axis_extent(prog, axis);
     if (extent <= 0) {
@@ -328,7 +366,11 @@ static int apply_padto(int axis, int amount, LinearProgram* prog) {
     return 0;
 }
 
-/** Strip all local-memory ops (alloc/load/store/barrier) from the program. */
+/**
+ * Strip all local-memory ops (alloc/load/store/barrier) from the program.
+ * @param prog (LinearProgram*)
+ * @return (int)
+ */
 static int apply_nolocals(LinearProgram* prog) {
     int dst = 0;
     for (int i = 0; i < prog->num_ops; i++) {
@@ -351,7 +393,12 @@ static int apply_nolocals(LinearProgram* prog) {
 
 /* ── Public apply ── */
 
-/** Apply each transform in `opts` to `prog` in order, aborting on the first failure. */
+/**
+ * Apply each transform in `opts` to `prog` in order, aborting on the first failure.
+ * @param opts (CMLOptList*)
+ * @param prog (struct LinearProgram*)
+ * @return (int)
+ */
 int cml_opt_apply(CMLOptList* opts, struct LinearProgram* prog) {
     if (!opts || !prog)
         return -1;

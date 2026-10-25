@@ -19,58 +19,122 @@ extern void cml_hcq_vulkan_signal_destroy(CMLHCQSignal* signal);
 extern int cml_hcq_vulkan_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms);
 extern int cml_hcq_vulkan_synchronize(CMLHCQQueue* queue);
 
-/** Init a NIR queue by forwarding to the Vulkan HCQ backend. */
+/**
+ * Init a NIR queue by forwarding to the Vulkan HCQ backend.
+ * @param queue (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_nir_queue_init(CMLHCQQueue* queue) { return cml_hcq_vulkan_queue_init(queue); }
 
-/** Destroy a NIR queue via the Vulkan HCQ backend. */
+/**
+ * Destroy a NIR queue via the Vulkan HCQ backend.
+ * @param queue (CMLHCQQueue*)
+ * @return (void)
+ */
 void cml_hcq_nir_queue_destroy(CMLHCQQueue* queue) { cml_hcq_vulkan_queue_destroy(queue); }
 
-/** Submit a kernel via the Vulkan HCQ backend (NIR compiles to SPIR-V). */
+/**
+ * Submit a kernel via the Vulkan HCQ backend (NIR compiles to SPIR-V).
+ * @param queue (CMLHCQQueue*)
+ * @param desc (const CMLHCQKernelDesc*)
+ * @return (int)
+ */
 int cml_hcq_nir_submit_kernel(CMLHCQQueue* queue, const CMLHCQKernelDesc* desc) {
     LOG_DEBUG("HCQ NIR: submit kernel (forwarding to Vulkan HCQ)");
     return cml_hcq_vulkan_submit_kernel(queue, desc);
 }
 
-/** H2D copy via the Vulkan HCQ backend. */
+/**
+ * H2D copy via the Vulkan HCQ backend.
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_nir_memcpy_h2d(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     return cml_hcq_vulkan_memcpy_h2d(queue, dst, src, bytes);
 }
 
-/** D2H copy via the Vulkan HCQ backend. */
+/**
+ * D2H copy via the Vulkan HCQ backend.
+ * @param queue (CMLHCQQueue*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_hcq_nir_memcpy_d2h(CMLHCQQueue* queue, void* dst, const void* src, size_t bytes) {
     return cml_hcq_vulkan_memcpy_d2h(queue, dst, src, bytes);
 }
 
-/** Create a NIR signal via the Vulkan HCQ backend. */
+/**
+ * Create a NIR signal via the Vulkan HCQ backend.
+ * @param signal (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_nir_signal_create(CMLHCQSignal* signal) { return cml_hcq_vulkan_signal_create(signal); }
 
-/** Destroy a NIR signal via the Vulkan HCQ backend. */
+/**
+ * Destroy a NIR signal via the Vulkan HCQ backend.
+ * @param signal (CMLHCQSignal*)
+ * @return (void)
+ */
 void cml_hcq_nir_signal_destroy(CMLHCQSignal* signal) { cml_hcq_vulkan_signal_destroy(signal); }
 
-/** Block the host on a NIR signal via the Vulkan HCQ backend. */
+/**
+ * Block the host on a NIR signal via the Vulkan HCQ backend.
+ * @param signal (CMLHCQSignal*)
+ * @param timeout_ms (uint64_t)
+ * @return (int)
+ */
 int cml_hcq_nir_signal_wait(CMLHCQSignal* signal, uint64_t timeout_ms) {
     return cml_hcq_vulkan_signal_wait(signal, timeout_ms);
 }
 
-/** Synchronize a NIR queue via the Vulkan HCQ backend. */
+/**
+ * Synchronize a NIR queue via the Vulkan HCQ backend.
+ * @param queue (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_nir_synchronize(CMLHCQQueue* queue) { return cml_hcq_vulkan_synchronize(queue); }
 
 #else /* !CML_HAS_NIR */
 
-/** Stub: NIR not compiled in, so the queue cannot init. */
+/**
+ * Stub: NIR not compiled in, so the queue cannot init.
+ * @param q (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_nir_queue_init(CMLHCQQueue* q) {
     (void)q;
     return -1;
 }
-/** Stub: nothing to tear down without NIR. */
+/**
+ * Stub: nothing to tear down without NIR.
+ * @param q (CMLHCQQueue*)
+ * @return (void)
+ */
 void cml_hcq_nir_queue_destroy(CMLHCQQueue* q) { (void)q; }
-/** Stub: kernel submission unavailable without NIR. */
+/**
+ * Stub: kernel submission unavailable without NIR.
+ * @param q (CMLHCQQueue*)
+ * @param d (const CMLHCQKernelDesc*)
+ * @return (int)
+ */
 int cml_hcq_nir_submit_kernel(CMLHCQQueue* q, const CMLHCQKernelDesc* d) {
     (void)q;
     (void)d;
     return -1;
 }
-/** Stub: H2D copy unavailable without NIR. */
+/**
+ * Stub: H2D copy unavailable without NIR.
+ * @param q (CMLHCQQueue*)
+ * @param d (void*)
+ * @param s (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_hcq_nir_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -78,7 +142,14 @@ int cml_hcq_nir_memcpy_h2d(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)n;
     return -1;
 }
-/** Stub: D2H copy unavailable without NIR. */
+/**
+ * Stub: D2H copy unavailable without NIR.
+ * @param q (CMLHCQQueue*)
+ * @param d (void*)
+ * @param s (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_hcq_nir_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)q;
     (void)d;
@@ -86,20 +157,37 @@ int cml_hcq_nir_memcpy_d2h(CMLHCQQueue* q, void* d, const void* s, size_t n) {
     (void)n;
     return -1;
 }
-/** Stub: no NIR, so no signal can be created. */
+/**
+ * Stub: no NIR, so no signal can be created.
+ * @param s (CMLHCQSignal*)
+ * @return (int)
+ */
 int cml_hcq_nir_signal_create(CMLHCQSignal* s) {
     (void)s;
     return -1;
 }
-/** Stub: nothing to free without NIR. */
+/**
+ * Stub: nothing to free without NIR.
+ * @param s (CMLHCQSignal*)
+ * @return (void)
+ */
 void cml_hcq_nir_signal_destroy(CMLHCQSignal* s) { (void)s; }
-/** Stub: host wait unavailable without NIR. */
+/**
+ * Stub: host wait unavailable without NIR.
+ * @param s (CMLHCQSignal*)
+ * @param t (uint64_t)
+ * @return (int)
+ */
 int cml_hcq_nir_signal_wait(CMLHCQSignal* s, uint64_t t) {
     (void)s;
     (void)t;
     return -1;
 }
-/** Stub: nothing to synchronize without NIR. */
+/**
+ * Stub: nothing to synchronize without NIR.
+ * @param q (CMLHCQQueue*)
+ * @return (int)
+ */
 int cml_hcq_nir_synchronize(CMLHCQQueue* q) {
     (void)q;
     return -1;

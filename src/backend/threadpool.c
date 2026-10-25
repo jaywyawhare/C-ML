@@ -71,12 +71,18 @@ static pthread_mutex_t g_pool_lock;
 static bool g_pool_lock_initialized = false;
 static ThreadPool* g_global_pool    = NULL;
 
-/** Acquire the global-pool lock if it has been initialized. */
+/**
+ * Acquire the global-pool lock if it has been initialized.
+ * @return (void)
+ */
 static inline void pool_lock(void) {
     if (g_pool_lock_initialized)
         pthread_mutex_lock(&g_pool_lock);
 }
-/** Release the global-pool lock if it has been initialized. */
+/**
+ * Release the global-pool lock if it has been initialized.
+ * @return (void)
+ */
 static inline void pool_unlock(void) {
     if (g_pool_lock_initialized)
         pthread_mutex_unlock(&g_pool_lock);
@@ -155,8 +161,12 @@ static void drain_chunks(ThreadPool* pool, const Batch* b) {
     }
 }
 
-/** Worker loop: wait for each new generation, snapshot the batch, and drain its
- *  chunks, advancing one generation at a time; exits on shutdown. */
+/**
+ * Worker loop: wait for each new generation, snapshot the batch, and drain its
+ * chunks, advancing one generation at a time; exits on shutdown.
+ * @param arg (void*)
+ * @return (void*)
+ */
 static void* worker_thread(void* arg) {
     ThreadPool* pool  = (ThreadPool*)arg;
     uint64_t last_gen = 0;
@@ -182,8 +192,12 @@ static void* worker_thread(void* arg) {
     return NULL;
 }
 
-/** Create a pool of num_threads workers (0 = autodetect cores), spawning one
- *  fewer OS thread since the submitter participates in every batch. */
+/**
+ * Create a pool of num_threads workers (0 = autodetect cores), spawning one
+ * fewer OS thread since the submitter participates in every batch.
+ * @param num_threads (size_t)
+ * @return (ThreadPool*)
+ */
 ThreadPool* threadpool_create(size_t num_threads) {
     if (num_threads == 0) {
 #ifdef _WIN32
@@ -229,7 +243,11 @@ ThreadPool* threadpool_create(size_t num_threads) {
     return pool;
 }
 
-/** Signal shutdown, join all worker threads, and free the pool. */
+/**
+ * Signal shutdown, join all worker threads, and free the pool.
+ * @param pool (ThreadPool*)
+ * @return (void)
+ */
 void threadpool_destroy(ThreadPool* pool) {
     if (!pool)
         return;
@@ -251,8 +269,15 @@ void threadpool_destroy(ThreadPool* pool) {
     cml_free(pool);
 }
 
-/** Split [0,n) into one contiguous chunk per worker, run func across them, and
- *  block until the whole batch (this generation) completes. */
+/**
+ * Split [0,n) into one contiguous chunk per worker, run func across them, and
+ * block until the whole batch (this generation) completes.
+ * @param pool (ThreadPool*)
+ * @param func (TaskFunc)
+ * @param data (void*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void threadpool_parallel_for(ThreadPool* pool, TaskFunc func, void* data, size_t n) {
     if (!pool)
         pool = threadpool_get_global();
@@ -297,13 +322,24 @@ int threadpool_submit(ThreadPool* pool, Task* task) {
     threadpool_parallel_for(pool, task->func, task->data, task->total_size);
     return 0;
 }
-/** No-op: submit already runs synchronously, so there is nothing to wait on. */
+/**
+ * No-op: submit already runs synchronously, so there is nothing to wait on.
+ * @param pool (ThreadPool*)
+ * @return (void)
+ */
 void threadpool_wait(ThreadPool* pool) { (void)pool; }
 
-/** Number of workers (including the submitter) in the pool. */
+/**
+ * Number of workers (including the submitter) in the pool.
+ * @param pool (ThreadPool*)
+ * @return (size_t)
+ */
 size_t threadpool_get_num_threads(ThreadPool* pool) { return pool ? pool->num_threads : 0; }
 
-/** Return the process-wide pool, creating it on first use. */
+/**
+ * Return the process-wide pool, creating it on first use.
+ * @return (ThreadPool*)
+ */
 ThreadPool* threadpool_get_global(void) {
     if (!g_pool_lock_initialized) {
         pthread_mutex_init(&g_pool_lock, NULL);
@@ -317,7 +353,11 @@ ThreadPool* threadpool_get_global(void) {
     return result;
 }
 
-/** Install a pool as the global one, destroying any previous global pool. */
+/**
+ * Install a pool as the global one, destroying any previous global pool.
+ * @param pool (ThreadPool*)
+ * @return (void)
+ */
 void threadpool_set_global(ThreadPool* pool) {
     if (!g_pool_lock_initialized) {
         pthread_mutex_init(&g_pool_lock, NULL);

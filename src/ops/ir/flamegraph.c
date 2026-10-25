@@ -92,8 +92,10 @@ static int g_nspans       = 0;
 static int g_scap         = 0;
 static double g_t_origin  = -1.0;
 
-/** Whether flamegraph capture is active: FLAMEGRAPH or PROFILE, or VIZ (whose dashboard has a
- *  flamegraph panel) unless FLAMEGRAPH=0 declines the per-node clock reads; never under NO_EXPORT.
+/**
+ * Whether flamegraph capture is active: FLAMEGRAPH or PROFILE, or VIZ (whose dashboard has a
+ * flamegraph panel) unless FLAMEGRAPH=0 declines the per-node clock reads; never under NO_EXPORT.
+ * @return (int)
  */
 int cml_flame_enabled(void) {
     if (cml_flag_enabled(CML_FLAG_NO_EXPORT))
@@ -285,7 +287,11 @@ static const char* flame_phase(const struct IRNode* n) {
     return n->forward_node ? "backward" : "forward";
 }
 
-/** Element count of a node's output, from the tensor or its output shape. */
+/**
+ * Element count of a node's output, from the tensor or its output shape.
+ * @param n (const struct IRNode*)
+ * @return (long long)
+ */
 static long long flame_numel(const struct IRNode* n) {
     if (n->output && n->output->numel > 0)
         return (long long)n->output->numel;
@@ -298,7 +304,10 @@ static long long flame_numel(const struct IRNode* n) {
     return 0;
 }
 
-/** Clear all accumulated flamegraph entries and spans, freeing their storage. */
+/**
+ * Clear all accumulated flamegraph entries and spans, freeing their storage.
+ * @return (void)
+ */
 void cml_flame_reset(void) {
     for (int i = 0; i < g_nentries; i++) {
         cml_free(g_entries[i].scope);
@@ -367,6 +376,9 @@ static FlameEntry* flame_find_or_add(const char* op, const char* kind, const cha
 /**
  * Record one node execution of duration `ms`: accumulate into its signature
  * entry and append a timeline span (registering the atexit flush on first use).
+ * @param node (const struct IRNode*)
+ * @param ms (double)
+ * @return (void)
  */
 void cml_flame_record(const struct IRNode* node, double ms) {
     if (!cml_flame_enabled() || !node)
@@ -420,10 +432,17 @@ void cml_flame_record(const struct IRNode* node, double ms) {
     g_total += ms;
 }
 
-/** Total number of recorded node executions. */
+/**
+ * Total number of recorded node executions.
+ * @return (long long)
+ */
 long long cml_flame_num_spans(void) { return g_count; }
 
-/** Write the captured spans and per-signature aggregates to `path` as JSON. */
+/**
+ * Write the captured spans and per-signature aggregates to `path` as JSON.
+ * @param path (const char*)
+ * @return (int)
+ */
 int cml_flame_export(const char* path) {
     if (!cml_flame_enabled() || g_count == 0 || !path)
         return -1;

@@ -4,14 +4,27 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/** Cosine-annealing schedule over `T_max` steps down to `eta_min`; thin alias for
- *  lr_scheduler_cosine. */
+/**
+ * Cosine-annealing schedule over `T_max` steps down to `eta_min`; thin alias for
+ * lr_scheduler_cosine.
+ * @param optimizer (Optimizer*)
+ * @param T_max (int)
+ * @param eta_min (float)
+ * @return (LRScheduler*)
+ */
 LRScheduler* lr_scheduler_cosine_annealing(Optimizer* optimizer, int T_max, float eta_min) {
     return lr_scheduler_cosine(optimizer, T_max, eta_min);
 }
 
-/** MultiStep schedule: multiply the lr by `gamma` each time an epoch reaches one
- *  of the given `milestones`. Returns NULL on bad args or allocation failure. */
+/**
+ * MultiStep schedule: multiply the lr by `gamma` each time an epoch reaches one
+ * of the given `milestones`. Returns NULL on bad args or allocation failure.
+ * @param optimizer (Optimizer*)
+ * @param milestones (int*)
+ * @param num_milestones (int)
+ * @param gamma (float)
+ * @return (LRScheduler*)
+ */
 LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int num_milestones,
                                      float gamma) {
     if (!optimizer || !milestones || num_milestones <= 0) {
@@ -46,24 +59,42 @@ LRScheduler* lr_scheduler_multi_step(Optimizer* optimizer, int* milestones, int 
     return scheduler;
 }
 
-/** Advance the scheduler by one epoch (for metric-free schedulers). */
+/**
+ * Advance the scheduler by one epoch (for metric-free schedulers).
+ * @param scheduler (LRScheduler*)
+ * @return (void)
+ */
 void lr_scheduler_step_epoch(LRScheduler* scheduler) {
     if (!scheduler)
         return;
     lr_scheduler_update(scheduler, 0.0f);
 }
 
-/** Advance a metric-driven scheduler (e.g. ReduceLROnPlateau) with the latest
- *  monitored `metric`. */
+/**
+ * Advance a metric-driven scheduler (e.g. ReduceLROnPlateau) with the latest
+ * monitored `metric`.
+ * @param scheduler (LRScheduler*)
+ * @param metric (float)
+ * @return (void)
+ */
 void lr_scheduler_step_metric(LRScheduler* scheduler, float metric) {
     if (!scheduler)
         return;
     lr_scheduler_update(scheduler, metric);
 }
 
-/** One-cycle schedule: warm up from max_lr/div_factor to `max_lr` over `pct_start`
- *  of `total_steps`, then anneal to max_lr/final_div_factor. Non-positive
- *  hyper-parameters fall back to the usual defaults. */
+/**
+ * One-cycle schedule: warm up from max_lr/div_factor to `max_lr` over `pct_start`
+ * of `total_steps`, then anneal to max_lr/final_div_factor. Non-positive
+ * hyper-parameters fall back to the usual defaults.
+ * @param optimizer (Optimizer*)
+ * @param max_lr (float)
+ * @param total_steps (int)
+ * @param pct_start (float)
+ * @param div_factor (float)
+ * @param final_div_factor (float)
+ * @return (LRScheduler*)
+ */
 LRScheduler* lr_scheduler_one_cycle(Optimizer* optimizer, float max_lr, int total_steps,
                                     float pct_start, float div_factor, float final_div_factor) {
     if (!optimizer || total_steps <= 0) {

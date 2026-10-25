@@ -5,8 +5,13 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
-/** torch.nn.PReLU forward: max(0,x) + alpha * min(0,x), with the learnable alpha broadcast
- *  over the input shape. Returns NULL on NULL args or a missing alpha parameter. */
+/**
+ * torch.nn.PReLU forward: max(0,x) + alpha * min(0,x), with the learnable alpha broadcast
+ * over the input shape. Returns NULL on NULL args or a missing alpha parameter.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* prelu_forward(Module* module, Tensor* input) {
     PReLU* prelu = (PReLU*)module;
     if (!prelu || !input || !prelu->alpha || !prelu->alpha->tensor)
@@ -32,11 +37,22 @@ static Tensor* prelu_forward(Module* module, Tensor* input) {
     return uop_sub(pos, scaled_neg);
 }
 
-/** Free the PReLU module; the alpha parameter is released by module_free. */
+/**
+ * Free the PReLU module; the alpha parameter is released by module_free.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void prelu_free(Module* module) { cml_free(module); }
 
-/** Construct a PReLU layer with num_parameters alpha slopes (clamped to >=1) initialized to
- *  init (defaults to 0.25 when 0). Returns NULL on failure. */
+/**
+ * Construct a PReLU layer with num_parameters alpha slopes (clamped to >=1) initialized to
+ * init (defaults to 0.25 when 0). Returns NULL on failure.
+ * @param num_parameters (int)
+ * @param init (float)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (PReLU*)
+ */
 PReLU* nn_prelu(int num_parameters, float init, DType dtype, DeviceType device) {
     if (num_parameters <= 0)
         num_parameters = 1;

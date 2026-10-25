@@ -9,7 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/** Burn a little CPU so a scope has non-trivial, measurable duration. */
+/**
+ * Burn a little CPU so a scope has non-trivial, measurable duration.
+ * @return (double)
+ */
 static double burn(void) {
     volatile double acc = 0.0;
     for (int i = 0; i < 200000; i++)

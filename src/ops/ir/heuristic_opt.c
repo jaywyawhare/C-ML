@@ -12,14 +12,21 @@ static CMLHeuristicConfig g_heuristic_config = {
     .use_local_memory    = true,
 };
 
-/** Install the global heuristic-optimizer configuration. */
+/**
+ * Install the global heuristic-optimizer configuration.
+ * @param config (CMLHeuristicConfig*)
+ * @return (void)
+ */
 void cml_heuristic_set_config(CMLHeuristicConfig* config) {
     if (!config)
         return;
     g_heuristic_config = *config;
 }
 
-/** Return the current global heuristic-optimizer configuration. */
+/**
+ * Return the current global heuristic-optimizer configuration.
+ * @return (CMLHeuristicConfig)
+ */
 CMLHeuristicConfig cml_heuristic_get_config(void) { return g_heuristic_config; }
 
 typedef enum {
@@ -30,7 +37,11 @@ typedef enum {
     KERNEL_UNKNOWN,
 } KernelKind;
 
-/** Classify a program as matmul/conv/reduce/elementwise from the UOps it contains. */
+/**
+ * Classify a program as matmul/conv/reduce/elementwise from the UOps it contains.
+ * @param prog (const struct LinearProgram*)
+ * @return (KernelKind)
+ */
 static KernelKind classify_program(const struct LinearProgram* prog) {
     bool has_reduce = false;
     bool has_matmul = false;
@@ -75,7 +86,11 @@ static KernelKind classify_program(const struct LinearProgram* prog) {
     return KERNEL_ELEMENTWISE;
 }
 
-/** Find the axis being reduced over (first non-trivial loop axis), defaulting to the last. */
+/**
+ * Find the axis being reduced over (first non-trivial loop axis), defaulting to the last.
+ * @param prog (const struct LinearProgram*)
+ * @return (int)
+ */
 static int find_reduce_axis(const struct LinearProgram* prog) {
     for (int i = 0; i < prog->num_ops; i++) {
         if (prog->ops[i].kind == LINOP_LOOP && prog->ops[i].loop_extent > 1)
@@ -84,12 +99,21 @@ static int find_reduce_axis(const struct LinearProgram* prog) {
     return prog->num_axes > 0 ? prog->num_axes - 1 : 0;
 }
 
-/** Return the index of the innermost (last) loop axis. */
+/**
+ * Return the index of the innermost (last) loop axis.
+ * @param prog (const struct LinearProgram*)
+ * @return (int)
+ */
 static int innermost_axis(const struct LinearProgram* prog) {
     return prog->num_axes > 0 ? prog->num_axes - 1 : 0;
 }
 
-/** Choose the largest divisor of `extent` not exceeding `preferred` (halving down). */
+/**
+ * Choose the largest divisor of `extent` not exceeding `preferred` (halving down).
+ * @param extent (int)
+ * @param preferred (int)
+ * @return (int)
+ */
 static int pick_tile(int extent, int preferred) {
     if (extent <= 0)
         return 1;
@@ -99,7 +123,12 @@ static int pick_tile(int extent, int preferred) {
     return tile;
 }
 
-/** Choose the largest power-of-two tile that divides `extent` and fits within `max_tile`. */
+/**
+ * Choose the largest power-of-two tile that divides `extent` and fits within `max_tile`.
+ * @param extent (int)
+ * @param max_tile (int)
+ * @return (int)
+ */
 static int pick_power2_tile(int extent, int max_tile) {
     int tile = 1;
     while (tile * 2 <= max_tile && tile * 2 <= extent && extent % (tile * 2) == 0)
@@ -107,7 +136,12 @@ static int pick_power2_tile(int extent, int max_tile) {
     return tile;
 }
 
-/** Build an opt list for an elementwise kernel: vectorize the inner axis and group the largest. */
+/**
+ * Build an opt list for an elementwise kernel: vectorize the inner axis and group the largest.
+ * @param prog (const struct LinearProgram*)
+ * @param cfg (const CMLHeuristicConfig*)
+ * @return (CMLOptList*)
+ */
 static CMLOptList* optimize_elementwise(const struct LinearProgram* prog,
                                         const CMLHeuristicConfig* cfg) {
     CMLOptList* opts = cml_opt_list_create();
@@ -147,7 +181,12 @@ static CMLOptList* optimize_elementwise(const struct LinearProgram* prog,
     return opts;
 }
 
-/** Build an opt list for a reduction: optionally local-tile the reduce axis and unroll. */
+/**
+ * Build an opt list for a reduction: optionally local-tile the reduce axis and unroll.
+ * @param prog (const struct LinearProgram*)
+ * @param cfg (const CMLHeuristicConfig*)
+ * @return (CMLOptList*)
+ */
 static CMLOptList* optimize_reduce(const struct LinearProgram* prog,
                                    const CMLHeuristicConfig* cfg) {
     CMLOptList* opts = cml_opt_list_create();
@@ -188,7 +227,12 @@ static CMLOptList* optimize_reduce(const struct LinearProgram* prog,
     return opts;
 }
 
-/** Build an opt list for a matmul: local-tile the M/N axes and unroll the K axis. */
+/**
+ * Build an opt list for a matmul: local-tile the M/N axes and unroll the K axis.
+ * @param prog (const struct LinearProgram*)
+ * @param cfg (const CMLHeuristicConfig*)
+ * @return (CMLOptList*)
+ */
 static CMLOptList* optimize_matmul(const struct LinearProgram* prog,
                                    const CMLHeuristicConfig* cfg) {
     CMLOptList* opts = cml_opt_list_create();
@@ -229,7 +273,12 @@ static CMLOptList* optimize_matmul(const struct LinearProgram* prog,
     return opts;
 }
 
-/** Build an opt list for a conv: local-tile the spatial axes and unroll the channel axis. */
+/**
+ * Build an opt list for a conv: local-tile the spatial axes and unroll the channel axis.
+ * @param prog (const struct LinearProgram*)
+ * @param cfg (const CMLHeuristicConfig*)
+ * @return (CMLOptList*)
+ */
 static CMLOptList* optimize_conv(const struct LinearProgram* prog, const CMLHeuristicConfig* cfg) {
     CMLOptList* opts = cml_opt_list_create();
     if (!opts)
@@ -259,7 +308,11 @@ static CMLOptList* optimize_conv(const struct LinearProgram* prog, const CMLHeur
     return opts;
 }
 
-/** Classify the program and return a heuristic opt list tailored to that kernel kind. */
+/**
+ * Classify the program and return a heuristic opt list tailored to that kernel kind.
+ * @param prog (struct LinearProgram*)
+ * @return (CMLOptList*)
+ */
 CMLOptList* cml_heuristic_optimize(struct LinearProgram* prog) {
     if (!prog || prog->num_axes == 0)
         return cml_opt_list_create();

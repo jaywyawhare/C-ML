@@ -37,7 +37,13 @@ typedef struct {
 
 /* Reliable send/recv helpers */
 
-/** Send exactly len bytes, retrying on partial sends and EINTR. */
+/**
+ * Send exactly len bytes, retrying on partial sends and EINTR.
+ * @param fd (int)
+ * @param buf (const void*)
+ * @param len (size_t)
+ * @return (int)
+ */
 static int send_all(int fd, const void* buf, size_t len) {
     const uint8_t* p = (const uint8_t*)buf;
     size_t sent      = 0;
@@ -53,7 +59,13 @@ static int send_all(int fd, const void* buf, size_t len) {
     return 0;
 }
 
-/** Receive exactly len bytes, retrying on partial reads and EINTR. */
+/**
+ * Receive exactly len bytes, retrying on partial reads and EINTR.
+ * @param fd (int)
+ * @param buf (void*)
+ * @param len (size_t)
+ * @return (int)
+ */
 static int recv_all(int fd, void* buf, size_t len) {
     uint8_t* p = (uint8_t*)buf;
     size_t got = 0;
@@ -69,7 +81,14 @@ static int recv_all(int fd, void* buf, size_t len) {
     return 0;
 }
 
-/** Send a request: opcode/size header (network byte order) then the payload. */
+/**
+ * Send a request: opcode/size header (network byte order) then the payload.
+ * @param fd (int)
+ * @param opcode (uint32_t)
+ * @param payload (const void*)
+ * @param payload_size (uint32_t)
+ * @return (int)
+ */
 static int send_msg(int fd, uint32_t opcode, const void* payload, uint32_t payload_size) {
     MsgHeader hdr = {.opcode = htonl(opcode), .payload_size = htonl(payload_size)};
     if (send_all(fd, &hdr, sizeof(hdr)) != 0)
@@ -81,8 +100,15 @@ static int send_msg(int fd, uint32_t opcode, const void* payload, uint32_t paylo
     return 0;
 }
 
-/** Receive a response header and payload, discarding any body the caller did
- *  not provide a buffer for. */
+/**
+ * Receive a response header and payload, discarding any body the caller did
+ * not provide a buffer for.
+ * @param fd (int)
+ * @param status (uint32_t*)
+ * @param payload (void*)
+ * @param payload_size (uint32_t*)
+ * @return (int)
+ */
 static int recv_resp(int fd, uint32_t* status, void* payload, uint32_t* payload_size) {
     RespHeader rhdr;
     if (recv_all(fd, &rhdr, sizeof(rhdr)) != 0)
@@ -107,7 +133,14 @@ static int recv_resp(int fd, uint32_t* status, void* payload, uint32_t* payload_
     return 0;
 }
 
-/** Send a response: status/size header (network byte order) then the payload. */
+/**
+ * Send a response: status/size header (network byte order) then the payload.
+ * @param fd (int)
+ * @param status (uint32_t)
+ * @param payload (const void*)
+ * @param payload_size (uint32_t)
+ * @return (int)
+ */
 static int send_resp(int fd, uint32_t status, const void* payload, uint32_t payload_size) {
     RespHeader rhdr = {.status = htonl(status), .payload_size = htonl(payload_size)};
     if (send_all(fd, &rhdr, sizeof(rhdr)) != 0)
@@ -121,8 +154,13 @@ static int send_resp(int fd, uint32_t status, const void* payload, uint32_t payl
 
 /* Client */
 
-/** Connect to a remote device server, handshake with a PING, and return the
- *  session, or NULL on any resolution/connection/handshake failure. */
+/**
+ * Connect to a remote device server, handshake with a PING, and return the
+ * session, or NULL on any resolution/connection/handshake failure.
+ * @param host (const char*)
+ * @param port (int)
+ * @return (CMLRemoteDevice*)
+ */
 CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
     if (!host || port <= 0)
         return NULL;
@@ -191,7 +229,11 @@ CMLRemoteDevice* cml_remote_connect(const char* host, int port) {
     return dev;
 }
 
-/** Close the connection socket and free the remote device. */
+/**
+ * Close the connection socket and free the remote device.
+ * @param dev (CMLRemoteDevice*)
+ * @return (void)
+ */
 void cml_remote_disconnect(CMLRemoteDevice* dev) {
     if (!dev)
         return;
@@ -203,12 +245,21 @@ void cml_remote_disconnect(CMLRemoteDevice* dev) {
     cml_free(dev);
 }
 
-/** True if the device has a live, connected socket. */
+/**
+ * True if the device has a live, connected socket.
+ * @param dev (CMLRemoteDevice*)
+ * @return (bool)
+ */
 bool cml_remote_is_connected(CMLRemoteDevice* dev) {
     return dev && dev->connected && dev->sock_fd >= 0;
 }
 
-/** Request a remote allocation and return its handle, or 0 on failure. */
+/**
+ * Request a remote allocation and return its handle, or 0 on failure.
+ * @param dev (CMLRemoteDevice*)
+ * @param size (size_t)
+ * @return (uint64_t)
+ */
 uint64_t cml_remote_alloc(CMLRemoteDevice* dev, size_t size) {
     if (!cml_remote_is_connected(dev))
         return 0;
@@ -228,7 +279,12 @@ uint64_t cml_remote_alloc(CMLRemoteDevice* dev, size_t size) {
     return handle;
 }
 
-/** Free a remote allocation identified by handle. */
+/**
+ * Free a remote allocation identified by handle.
+ * @param dev (CMLRemoteDevice*)
+ * @param handle (uint64_t)
+ * @return (void)
+ */
 void cml_remote_free(CMLRemoteDevice* dev, uint64_t handle) {
     if (!cml_remote_is_connected(dev))
         return;
@@ -240,7 +296,14 @@ void cml_remote_free(CMLRemoteDevice* dev, uint64_t handle) {
     recv_resp(dev->sock_fd, &status, NULL, &psize);
 }
 
-/** Upload n bytes into a remote allocation (handle + length + data payload). */
+/**
+ * Upload n bytes into a remote allocation (handle + length + data payload).
+ * @param dev (CMLRemoteDevice*)
+ * @param handle (uint64_t)
+ * @param data (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_remote_upload(CMLRemoteDevice* dev, uint64_t handle, const void* data, size_t n) {
     if (!cml_remote_is_connected(dev) || !data)
         return -1;
@@ -267,7 +330,14 @@ int cml_remote_upload(CMLRemoteDevice* dev, uint64_t handle, const void* data, s
     return (status == CML_REMOTE_STATUS_OK) ? 0 : -1;
 }
 
-/** Download up to n bytes from a remote allocation, discarding any excess. */
+/**
+ * Download up to n bytes from a remote allocation, discarding any excess.
+ * @param dev (CMLRemoteDevice*)
+ * @param handle (uint64_t)
+ * @param data (void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 int cml_remote_download(CMLRemoteDevice* dev, uint64_t handle, void* data, size_t n) {
     if (!cml_remote_is_connected(dev) || !data)
         return -1;
@@ -308,8 +378,17 @@ int cml_remote_download(CMLRemoteDevice* dev, uint64_t handle, void* data, size_
     return 0;
 }
 
-/** Send a kernel source plus buffer handles and launch dims to the server for
- *  remote compilation and execution. */
+/**
+ * Send a kernel source plus buffer handles and launch dims to the server for
+ * remote compilation and execution.
+ * @param dev (CMLRemoteDevice*)
+ * @param kernel_source (const char*)
+ * @param buffer_handles (uint64_t*)
+ * @param num_buffers (int)
+ * @param grid (uint32_t[3])
+ * @param block (uint32_t[3])
+ * @return (int)
+ */
 int cml_remote_execute(CMLRemoteDevice* dev, const char* kernel_source, uint64_t* buffer_handles,
                        int num_buffers, uint32_t grid[3], uint32_t block[3]) {
     if (!cml_remote_is_connected(dev) || !kernel_source)
@@ -364,7 +443,11 @@ static AllocEntry g_allocs[MAX_ALLOCS];
 static int g_num_allocs       = 0;
 static uint64_t g_next_handle = 1;
 
-/** Allocate on the best available device (host fallback) and register a handle. */
+/**
+ * Allocate on the best available device (host fallback) and register a handle.
+ * @param size (size_t)
+ * @return (uint64_t)
+ */
 static uint64_t server_alloc(size_t size) {
     if (g_num_allocs >= MAX_ALLOCS)
         return 0;
@@ -385,7 +468,11 @@ static uint64_t server_alloc(size_t size) {
     return h;
 }
 
-/** Look up a server allocation entry by handle, or NULL if absent. */
+/**
+ * Look up a server allocation entry by handle, or NULL if absent.
+ * @param handle (uint64_t)
+ * @return (AllocEntry*)
+ */
 static AllocEntry* server_find(uint64_t handle) {
     for (int i = 0; i < g_num_allocs; i++) {
         if (g_allocs[i].handle == handle)
@@ -394,7 +481,11 @@ static AllocEntry* server_find(uint64_t handle) {
     return NULL;
 }
 
-/** Free the allocation for a handle and compact the table (swap with last). */
+/**
+ * Free the allocation for a handle and compact the table (swap with last).
+ * @param handle (uint64_t)
+ * @return (void)
+ */
 static void server_free_handle(uint64_t handle) {
     for (int i = 0; i < g_num_allocs; i++) {
         if (g_allocs[i].handle == handle) {
@@ -406,7 +497,10 @@ static void server_free_handle(uint64_t handle) {
     }
 }
 
-/** Free every server allocation and clear the table. */
+/**
+ * Free every server allocation and clear the table.
+ * @return (void)
+ */
 static void server_free_all(void) {
     for (int i = 0; i < g_num_allocs; i++) {
         cml_free(g_allocs[i].ptr);
@@ -416,8 +510,12 @@ static void server_free_all(void) {
 
 /* Server: handle one client */
 
-/** Serve one client connection: read requests and dispatch ping/alloc/free/
- *  upload/download/execute until the client disconnects. */
+/**
+ * Serve one client connection: read requests and dispatch ping/alloc/free/
+ * upload/download/execute until the client disconnects.
+ * @param client_fd (int)
+ * @return (void)
+ */
 static void handle_client(int client_fd) {
     while (1) {
         MsgHeader hdr;
@@ -668,7 +766,11 @@ static void handle_client(int client_fd) {
 
 /* Server lifecycle */
 
-/** Create a listening server socket bound to the given port. */
+/**
+ * Create a listening server socket bound to the given port.
+ * @param port (int)
+ * @return (CMLRemoteServer*)
+ */
 CMLRemoteServer* cml_remote_server_create(int port) {
     if (port <= 0)
         return NULL;
@@ -711,7 +813,11 @@ CMLRemoteServer* cml_remote_server_create(int port) {
     return srv;
 }
 
-/** Accept loop: serve each incoming client in turn until the server is stopped. */
+/**
+ * Accept loop: serve each incoming client in turn until the server is stopped.
+ * @param srv (CMLRemoteServer*)
+ * @return (int)
+ */
 int cml_remote_server_run(CMLRemoteServer* srv) {
     if (!srv)
         return -1;
@@ -749,7 +855,11 @@ int cml_remote_server_run(CMLRemoteServer* srv) {
     return 0;
 }
 
-/** Stop the accept loop and shut down the listening socket. */
+/**
+ * Stop the accept loop and shut down the listening socket.
+ * @param srv (CMLRemoteServer*)
+ * @return (void)
+ */
 void cml_remote_server_stop(CMLRemoteServer* srv) {
     if (!srv)
         return;
@@ -759,7 +869,11 @@ void cml_remote_server_stop(CMLRemoteServer* srv) {
     }
 }
 
-/** Stop the server, close its socket, free all allocations, and free the server. */
+/**
+ * Stop the server, close its socket, free all allocations, and free the server.
+ * @param srv (CMLRemoteServer*)
+ * @return (void)
+ */
 void cml_remote_server_free(CMLRemoteServer* srv) {
     if (!srv)
         return;

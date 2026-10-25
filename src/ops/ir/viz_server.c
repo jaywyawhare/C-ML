@@ -114,7 +114,11 @@ static const char VIZ_HTML_POST[] =
     "</script></body></html>\n";
 
 /** Short human-readable name for a dtype, used in the JSON node payload. */
-/** Group an op into a coarse class (elemwise/reduce/movement/matmul) for coloring. */
+/**
+ * Group an op into a coarse class (elemwise/reduce/movement/matmul) for coloring.
+ * @param op (UOpType)
+ * @return (const char*)
+ */
 static const char* op_class(UOpType op) {
     switch (op) {
     case UOP_ADD:
@@ -152,6 +156,8 @@ static const char* op_class(UOpType op) {
 /**
  * Serialize the IR graph to a JSON object with node and edge arrays for the
  * browser visualizer (caller frees the returned buffer).
+ * @param ir (CMLGraph_t)
+ * @return (char*)
  */
 char* viz_graph_to_json(CMLGraph_t ir) {
     if (!ir)
@@ -230,7 +236,12 @@ char* viz_graph_to_json(CMLGraph_t ir) {
     return buf;
 }
 
-/** Write a self-contained HTML page embedding the graph JSON to `path`. */
+/**
+ * Write a self-contained HTML page embedding the graph JSON to `path`.
+ * @param ir (CMLGraph_t)
+ * @param path (const char*)
+ * @return (int)
+ */
 int viz_export_html(CMLGraph_t ir, const char* path) {
     if (!path)
         return -1;
@@ -258,7 +269,11 @@ struct VizServer {
     char* json_cache;
 };
 
-/** Put a socket into non-blocking mode (platform-specific). */
+/**
+ * Put a socket into non-blocking mode (platform-specific).
+ * @param fd (sock_t)
+ * @return (void)
+ */
 static void set_nonblocking(sock_t fd) {
 #ifdef _WIN32
     u_long m = 1;
@@ -272,6 +287,9 @@ static void set_nonblocking(sock_t fd) {
 /**
  * Start a non-blocking HTTP server serving the graph viz on the given port
  * (0 picks a free port), caching the graph's JSON.
+ * @param ir (CMLGraph_t)
+ * @param port (int)
+ * @return (VizServer*)
  */
 VizServer* viz_server_start(CMLGraph_t ir, int port) {
 #ifdef _WIN32
@@ -316,7 +334,12 @@ VizServer* viz_server_start(CMLGraph_t ir, int port) {
     return srv;
 }
 
-/** Point the server at a new graph and rebuild its cached JSON. */
+/**
+ * Point the server at a new graph and rebuild its cached JSON.
+ * @param srv (VizServer*)
+ * @param ir (CMLGraph_t)
+ * @return (void)
+ */
 void viz_server_update(VizServer* srv, CMLGraph_t ir) {
     if (!srv)
         return;
@@ -325,7 +348,12 @@ void viz_server_update(VizServer* srv, CMLGraph_t ir) {
     srv->json_cache = ir ? viz_graph_to_json(ir) : NULL;
 }
 
-/** Read and discard the request, then send the cached HTML page and close. */
+/**
+ * Read and discard the request, then send the cached HTML page and close.
+ * @param srv (VizServer*)
+ * @param cfd (sock_t)
+ * @return (void)
+ */
 static void handle_request(VizServer* srv, sock_t cfd) {
     char req[1024];
     recv(cfd, req, sizeof(req) - 1, 0);
@@ -346,7 +374,11 @@ static void handle_request(VizServer* srv, sock_t cfd) {
     sock_close(cfd);
 }
 
-/** Accept and serve all pending connections; returns how many were handled. */
+/**
+ * Accept and serve all pending connections; returns how many were handled.
+ * @param srv (VizServer*)
+ * @return (int)
+ */
 int viz_server_poll(VizServer* srv) {
     if (!srv)
         return 0;
@@ -361,7 +393,11 @@ int viz_server_poll(VizServer* srv) {
     return handled;
 }
 
-/** Close the listening socket, free cached JSON, and tear down the server. */
+/**
+ * Close the listening socket, free cached JSON, and tear down the server.
+ * @param srv (VizServer*)
+ * @return (void)
+ */
 void viz_server_stop(VizServer* srv) {
     if (!srv)
         return;
@@ -373,5 +409,9 @@ void viz_server_stop(VizServer* srv) {
 #endif
 }
 
-/** Return the port the server is listening on, or -1 if none. */
+/**
+ * Return the port the server is listening on, or -1 if none.
+ * @param srv (const VizServer*)
+ * @return (int)
+ */
 int viz_server_port(const VizServer* srv) { return srv ? srv->port : -1; }

@@ -8,26 +8,45 @@
 
 static _Thread_local CMLTrace* g_active_trace = NULL;
 
-/** Return the thread-local trace currently recording, or NULL. */
+/**
+ * Return the thread-local trace currently recording, or NULL.
+ * @return (CMLTrace*)
+ */
 CMLTrace* cml_trace_get_active(void) { return g_active_trace; }
 
-/** Set the thread-local active trace that kernel/memcpy ops record into. */
+/**
+ * Set the thread-local active trace that kernel/memcpy ops record into.
+ * @param trace (CMLTrace*)
+ * @return (void)
+ */
 void cml_trace_set_active(CMLTrace* trace) { g_active_trace = trace; }
 
-/** Allocate a zeroed, empty trace (NULL on allocation failure). */
+/**
+ * Allocate a zeroed, empty trace (NULL on allocation failure).
+ * @return (CMLTrace*)
+ */
 CMLTrace* cml_trace_create(void) {
     CMLTrace* trace = (CMLTrace*)cml_calloc(1, sizeof(CMLTrace));
     return trace; /* NULL on allocation failure */
 }
 
-/** Free a trace. */
+/**
+ * Free a trace.
+ * @param trace (CMLTrace*)
+ * @return (void)
+ */
 void cml_trace_free(CMLTrace* trace) {
     if (!trace)
         return;
     cml_free(trace);
 }
 
-/** Reset a trace and start recording entries for the given graph hash. */
+/**
+ * Reset a trace and start recording entries for the given graph hash.
+ * @param trace (CMLTrace*)
+ * @param graph_hash (uint64_t)
+ * @return (int)
+ */
 int cml_trace_begin(CMLTrace* trace, uint64_t graph_hash) {
     if (!trace)
         return -1;
@@ -44,7 +63,11 @@ int cml_trace_begin(CMLTrace* trace, uint64_t graph_hash) {
     return 0;
 }
 
-/** Stop recording; mark the trace complete only if it was not truncated. */
+/**
+ * Stop recording; mark the trace complete only if it was not truncated.
+ * @param trace (CMLTrace*)
+ * @return (int)
+ */
 int cml_trace_end(CMLTrace* trace) {
     if (!trace)
         return -1;
@@ -61,6 +84,14 @@ int cml_trace_end(CMLTrace* trace) {
 /**
  * Append a kernel launch (compiled kernel, grid/block dims, and tensor-slot
  * argument indices) to the trace; flags truncation if the entry cap is hit.
+ * @param trace (CMLTrace*)
+ * @param kernel_hash (uint64_t)
+ * @param compiled_kernel (void*)
+ * @param grid (const size_t[3])
+ * @param block (const size_t[3])
+ * @param arg_indices (int*)
+ * @param num_args (int)
+ * @return (int)
  */
 int cml_trace_record_kernel(CMLTrace* trace, uint64_t kernel_hash, void* compiled_kernel,
                             const size_t grid[3], const size_t block[3], int* arg_indices,
@@ -98,7 +129,15 @@ int cml_trace_record_kernel(CMLTrace* trace, uint64_t kernel_hash, void* compile
     return 0;
 }
 
-/** Append a host/device memcpy between two tensor slots to the trace. */
+/**
+ * Append a host/device memcpy between two tensor slots to the trace.
+ * @param trace (CMLTrace*)
+ * @param type (CMLTraceEntryType)
+ * @param src_slot (int)
+ * @param dst_slot (int)
+ * @param bytes (size_t)
+ * @return (int)
+ */
 int cml_trace_record_memcpy(CMLTrace* trace, CMLTraceEntryType type, int src_slot, int dst_slot,
                             size_t bytes) {
     if (!trace || !trace->is_recording)
@@ -136,6 +175,10 @@ typedef void (*cml_kernel_fn_t)(void** args, int num_args, const size_t grid[3],
 /**
  * Replay a completed trace against caller-supplied tensor pointers, invoking
  * each recorded kernel and memcpy in order. Only complete traces may replay.
+ * @param trace (CMLTrace*)
+ * @param tensor_ptrs (void**)
+ * @param num_tensors (int)
+ * @return (int)
  */
 int cml_trace_replay(CMLTrace* trace, void** tensor_ptrs, int num_tensors) {
     if (!trace || !trace->is_complete)
@@ -194,13 +237,20 @@ int cml_trace_replay(CMLTrace* trace, void** tensor_ptrs, int num_tensors) {
     return 0;
 }
 
-/** Allocate an empty trace cache (open-addressed by graph hash). */
+/**
+ * Allocate an empty trace cache (open-addressed by graph hash).
+ * @return (CMLTraceCache*)
+ */
 CMLTraceCache* cml_trace_cache_create(void) {
     CMLTraceCache* cache = (CMLTraceCache*)cml_calloc(1, sizeof(CMLTraceCache));
     return cache;
 }
 
-/** Free the cache and every trace it still holds. */
+/**
+ * Free the cache and every trace it still holds.
+ * @param cache (CMLTraceCache*)
+ * @return (void)
+ */
 void cml_trace_cache_free(CMLTraceCache* cache) {
     if (!cache)
         return;
@@ -213,7 +263,12 @@ void cml_trace_cache_free(CMLTraceCache* cache) {
     cml_free(cache);
 }
 
-/** Linear-probe the cache for a trace matching the graph hash, or NULL. */
+/**
+ * Linear-probe the cache for a trace matching the graph hash, or NULL.
+ * @param cache (CMLTraceCache*)
+ * @param graph_hash (uint64_t)
+ * @return (CMLTrace*)
+ */
 CMLTrace* cml_trace_cache_lookup(CMLTraceCache* cache, uint64_t graph_hash) {
     if (!cache)
         return NULL;
@@ -234,7 +289,13 @@ CMLTrace* cml_trace_cache_lookup(CMLTraceCache* cache, uint64_t graph_hash) {
     return NULL; /* table full, not found */
 }
 
-/** Insert (or replace) a trace in the cache by graph hash, freeing any evicted trace. */
+/**
+ * Insert (or replace) a trace in the cache by graph hash, freeing any evicted trace.
+ * @param cache (CMLTraceCache*)
+ * @param graph_hash (uint64_t)
+ * @param trace (CMLTrace*)
+ * @return (int)
+ */
 int cml_trace_cache_insert(CMLTraceCache* cache, uint64_t graph_hash, CMLTrace* trace) {
     if (!cache || !trace)
         return -1;
@@ -271,6 +332,8 @@ static CMLTraceCache* g_trace_cache = NULL;
 /**
  * Execute a graph with trace capture/replay: replay a cached complete trace on
  * a hit, otherwise record a fresh trace during normal execution and cache it.
+ * @param ir (CMLGraph_t)
+ * @return (int)
  */
 int cml_ir_execute_traced(CMLGraph_t ir) {
     if (!ir)

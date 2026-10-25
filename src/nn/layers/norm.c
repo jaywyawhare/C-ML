@@ -11,15 +11,31 @@
 /* Deepest input rank the normalisation layers accept (BatchNorm3d, [N,C,D,H,W]). */
 #define NORM_MAX_NDIM 5
 
-/** Fill `out` with `shape` collapsed to 1 everywhere but `channel_dim`, the view
- *  a 1-D per-channel statistic must take before it can broadcast over `shape`. */
+/**
+ * Fill `out` with `shape` collapsed to 1 everywhere but `channel_dim`, the view
+ * a 1-D per-channel statistic must take before it can broadcast over `shape`.
+ * @param out (int*)
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param channel_dim (int)
+ * @return (void)
+ */
 static void channel_broadcast_shape(int* out, const int* shape, int ndim, int channel_dim) {
     for (int i = 0; i < ndim; i++)
         out[i] = (i == channel_dim) ? shape[channel_dim] : 1;
 }
 
-/** Apply the per-channel affine gamma * x + beta, broadcasting weight/bias along channel_dim.
- *  Returns x unchanged if any arg is NULL or ndim exceeds the supported maximum. */
+/**
+ * Apply the per-channel affine gamma * x + beta, broadcasting weight/bias along channel_dim.
+ * Returns x unchanged if any arg is NULL or ndim exceeds the supported maximum.
+ * @param x (Tensor*)
+ * @param weight (const Parameter*)
+ * @param bias (const Parameter*)
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param channel_dim (int)
+ * @return (Tensor*)
+ */
 Tensor* nn_norm_affine(Tensor* x, const Parameter* weight, const Parameter* bias, const int* shape,
                        int ndim, int channel_dim) {
     if (!x || !weight || !bias || ndim > NORM_MAX_NDIM)
@@ -33,8 +49,15 @@ Tensor* nn_norm_affine(Tensor* x, const Parameter* weight, const Parameter* bias
     return uop_add(uop_mul(gamma, x), beta);
 }
 
-/** Normalize x viewed as [rows, cols] to zero mean / unit variance along each row (with eps).
- *  Shared helper for the per-sample/per-group norms. Returns NULL on NULL input or op failure. */
+/**
+ * Normalize x viewed as [rows, cols] to zero mean / unit variance along each row (with eps).
+ * Shared helper for the per-sample/per-group norms. Returns NULL on NULL input or op failure.
+ * @param x (Tensor*)
+ * @param rows (int)
+ * @param cols (int)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 Tensor* nn_norm_rowwise(Tensor* x, int rows, int cols, float eps) {
     if (!x)
         return NULL;
@@ -59,10 +82,18 @@ Tensor* nn_norm_rowwise(Tensor* x, int rows, int cols, float eps) {
     return uop_div(diff, uop_expand_to(std, flat, 2));
 }
 
-/** Recompute current_mean/current_var from this batch and fold them into the
- *  running statistics. `input` is viewed as [batch, channels, spatial]; the
- *  per-channel mean is taken over the spatial axis and then over the batch,
- *  because uop_mean reduces a single axis at a time. Returns -1 on failure. */
+/**
+ * Recompute current_mean/current_var from this batch and fold them into the
+ * running statistics. `input` is viewed as [batch, channels, spatial]; the
+ * per-channel mean is taken over the spatial axis and then over the batch,
+ * because uop_mean reduces a single axis at a time. Returns -1 on failure.
+ * @param bn (BatchNormState*)
+ * @param input (Tensor*)
+ * @param batch (int)
+ * @param channels (int)
+ * @param spatial (int)
+ * @return (int)
+ */
 static int batchnorm_update_stats(BatchNormState* bn, Tensor* input, int batch, int channels,
                                   int spatial) {
     TensorConfig config = {
@@ -125,9 +156,14 @@ static int batchnorm_update_stats(BatchNormState* bn, Tensor* input, int batch, 
     return 0;
 }
 
-/** Shared BatchNorm{1,2,3}d forward: in training, normalize with differentiable batch mean/var
- *  (updating running stats as a side effect); in eval, normalize with the running stats. Applies
- *  the affine. NULL on rank/channel mismatch or missing eval statistics. */
+/**
+ * Shared BatchNorm{1,2,3}d forward: in training, normalize with differentiable batch mean/var
+ * (updating running stats as a side effect); in eval, normalize with the running stats. Applies
+ * the affine. NULL on rank/channel mismatch or missing eval statistics.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* batchnorm_forward(Module* module, Tensor* input) {
     BatchNormState* bn = (BatchNormState*)module;
     if (!bn || !input)
@@ -217,7 +253,11 @@ static Tensor* batchnorm_forward(Module* module, Tensor* input) {
     return nn_norm_affine(normalized, bn->weight, bn->bias, input->shape, input->ndim, 1);
 }
 
-/** Free a BatchNorm module and its running/current statistic tensors. */
+/**
+ * Free a BatchNorm module and its running/current statistic tensors.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void batchnorm_free(Module* module) {
     BatchNormState* bn = (BatchNormState*)module;
     if (!bn)
@@ -233,8 +273,20 @@ static void batchnorm_free(Module* module) {
     cml_free(bn);
 }
 
-/** Shared constructor for the BatchNorm variants: allocates affine params when affine and running
- *  mean/var buffers when track_running_stats (registered for DDP broadcast). NULL on failure. */
+/**
+ * Shared constructor for the BatchNorm variants: allocates affine params when affine and running
+ * mean/var buffers when track_running_stats (registered for DDP broadcast). NULL on failure.
+ * @param name (const char*)
+ * @param input_ndim (int)
+ * @param num_features (int)
+ * @param eps (float)
+ * @param momentum (float)
+ * @param affine (bool)
+ * @param track_running_stats (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (BatchNormState*)
+ */
 BatchNormState* nn_batchnorm_new(const char* name, int input_ndim, int num_features, float eps,
                                  float momentum, bool affine, bool track_running_stats, DType dtype,
                                  DeviceType device) {
@@ -281,21 +333,51 @@ BatchNormState* nn_batchnorm_new(const char* name, int input_ndim, int num_featu
     return bn;
 }
 
-/** Construct a torch.nn.BatchNorm1d (2D input [N, C]). Returns NULL on failure. */
+/**
+ * Construct a torch.nn.BatchNorm1d (2D input [N, C]). Returns NULL on failure.
+ * @param num_features (int)
+ * @param eps (float)
+ * @param momentum (float)
+ * @param affine (bool)
+ * @param track_running_stats (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (BatchNorm1d*)
+ */
 BatchNorm1d* nn_batchnorm1d(int num_features, float eps, float momentum, bool affine,
                             bool track_running_stats, DType dtype, DeviceType device) {
     return nn_batchnorm_new("BatchNorm1d", 2, num_features, eps, momentum, affine,
                             track_running_stats, dtype, device);
 }
 
-/** Construct a torch.nn.BatchNorm2d (4D input [N, C, H, W]). Returns NULL on failure. */
+/**
+ * Construct a torch.nn.BatchNorm2d (4D input [N, C, H, W]). Returns NULL on failure.
+ * @param num_features (int)
+ * @param eps (float)
+ * @param momentum (float)
+ * @param affine (bool)
+ * @param track_running_stats (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (BatchNorm2d*)
+ */
 BatchNorm2d* nn_batchnorm2d(int num_features, float eps, float momentum, bool affine,
                             bool track_running_stats, DType dtype, DeviceType device) {
     return nn_batchnorm_new("BatchNorm2d", 4, num_features, eps, momentum, affine,
                             track_running_stats, dtype, device);
 }
 
-/** Construct a torch.nn.BatchNorm3d (5D input [N, C, D, H, W]). Returns NULL on failure. */
+/**
+ * Construct a torch.nn.BatchNorm3d (5D input [N, C, D, H, W]). Returns NULL on failure.
+ * @param num_features (int)
+ * @param eps (float)
+ * @param momentum (float)
+ * @param affine (bool)
+ * @param track_running_stats (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (BatchNorm3d*)
+ */
 BatchNorm3d* nn_batchnorm3d(int num_features, float eps, float momentum, bool affine,
                             bool track_running_stats, DType dtype, DeviceType device) {
     return nn_batchnorm_new("BatchNorm3d", 5, num_features, eps, momentum, affine,

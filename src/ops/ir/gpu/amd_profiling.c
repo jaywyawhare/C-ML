@@ -36,14 +36,21 @@ struct kfd_sqtt_request {
     uint32_t flags;
 };
 
-/** Return a monotonic timestamp in nanoseconds. */
+/**
+ * Return a monotonic timestamp in nanoseconds.
+ * @return (uint64_t)
+ */
 static uint64_t get_timestamp_ns(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }
 
-/** Grow all per-entry sample arrays if the next entry would overflow; -1 on OOM. */
+/**
+ * Grow all per-entry sample arrays if the next entry would overflow; -1 on OOM.
+ * @param prof (CMLAMDProfile*)
+ * @return (int)
+ */
 static int profile_ensure_capacity(CMLAMDProfile* prof) {
     if (prof->num_entries < prof->capacity)
         return 0;
@@ -76,7 +83,10 @@ static int profile_ensure_capacity(CMLAMDProfile* prof) {
     return 0;
 }
 
-/** Allocate a profile with pre-sized sample buffers; NULL on failure. */
+/**
+ * Allocate a profile with pre-sized sample buffers; NULL on failure.
+ * @return (CMLAMDProfile*)
+ */
 CMLAMDProfile* cml_amd_profile_create(void) {
     CMLAMDProfile* prof = cml_calloc(1, sizeof(CMLAMDProfile));
     if (!prof)
@@ -98,7 +108,12 @@ CMLAMDProfile* cml_amd_profile_create(void) {
     return prof;
 }
 
-/** Reset the profile and record a baseline timestamp and PMC sample. */
+/**
+ * Reset the profile and record a baseline timestamp and PMC sample.
+ * @param prof (CMLAMDProfile*)
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_amd_profile_start(CMLAMDProfile* prof, CMLAMDriver* drv) {
     if (!prof || !drv || !drv->initialized)
         return -1;
@@ -126,7 +141,12 @@ int cml_amd_profile_start(CMLAMDProfile* prof, CMLAMDriver* drv) {
     return 0;
 }
 
-/** Record a final timestamp and PMC sample to close the profiling window. */
+/**
+ * Record a final timestamp and PMC sample to close the profiling window.
+ * @param prof (CMLAMDProfile*)
+ * @param drv (CMLAMDriver*)
+ * @return (int)
+ */
 int cml_amd_profile_stop(CMLAMDProfile* prof, CMLAMDriver* drv) {
     if (!prof || !drv || !drv->initialized)
         return -1;
@@ -153,7 +173,11 @@ int cml_amd_profile_stop(CMLAMDProfile* prof, CMLAMDriver* drv) {
     return 0;
 }
 
-/** Free the profile and all of its sample buffers. */
+/**
+ * Free the profile and all of its sample buffers.
+ * @param prof (CMLAMDProfile*)
+ * @return (void)
+ */
 void cml_amd_profile_free(CMLAMDProfile* prof) {
     if (!prof)
         return;
@@ -165,7 +189,13 @@ void cml_amd_profile_free(CMLAMDProfile* prof) {
     cml_free(prof);
 }
 
-/** Read a performance counter via amdgpu debugfs, falling back to the KFD ioctl. */
+/**
+ * Read a performance counter via amdgpu debugfs, falling back to the KFD ioctl.
+ * @param drv (CMLAMDriver*)
+ * @param counter_id (uint32_t)
+ * @param value (uint64_t*)
+ * @return (int)
+ */
 int cml_amd_pmc_read(CMLAMDriver* drv, uint32_t counter_id, uint64_t* value) {
     if (!drv || !drv->initialized || !value)
         return -1;
@@ -211,7 +241,12 @@ int cml_amd_pmc_read(CMLAMDriver* drv, uint32_t counter_id, uint64_t* value) {
     return -1;
 }
 
-/** Capture a Shader Queue Thread Trace over `num_dispatches` via KFD start/stop/read ioctls. */
+/**
+ * Capture a Shader Queue Thread Trace over `num_dispatches` via KFD start/stop/read ioctls.
+ * @param drv (CMLAMDriver*)
+ * @param num_dispatches (int)
+ * @return (CMLAMDSQTTTrace*)
+ */
 CMLAMDSQTTTrace* cml_amd_sqtt_capture(CMLAMDriver* drv, int num_dispatches) {
     if (!drv || !drv->initialized || num_dispatches <= 0)
         return NULL;
@@ -267,7 +302,11 @@ CMLAMDSQTTTrace* cml_amd_sqtt_capture(CMLAMDriver* drv, int num_dispatches) {
     return trace;
 }
 
-/** Free an SQTT trace and its data buffer. */
+/**
+ * Free an SQTT trace and its data buffer.
+ * @param trace (CMLAMDSQTTTrace*)
+ * @return (void)
+ */
 void cml_amd_sqtt_free(CMLAMDSQTTTrace* trace) {
     if (!trace)
         return;
@@ -275,7 +314,11 @@ void cml_amd_sqtt_free(CMLAMDSQTTTrace* trace) {
     cml_free(trace);
 }
 
-/** Print aggregate timing, bandwidth, and per-interval breakdown from the samples. */
+/**
+ * Print aggregate timing, bandwidth, and per-interval breakdown from the samples.
+ * @param prof (const CMLAMDProfile*)
+ * @return (void)
+ */
 void cml_amd_profile_print(const CMLAMDProfile* prof) {
     if (!prof || prof->num_entries < 2) {
         printf("AMD Profile: no data\n");

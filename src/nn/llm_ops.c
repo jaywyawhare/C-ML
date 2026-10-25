@@ -9,7 +9,13 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** Numerically stable row-wise softmax over a [rows, cols] array, in place. */
+/**
+ * Numerically stable row-wise softmax over a [rows, cols] array, in place.
+ * @param data (float*)
+ * @param rows (int)
+ * @param cols (int)
+ * @return (void)
+ */
 void cml_softmax_rows_inplace(float* data, int rows, int cols) {
     for (int r = 0; r < rows; r++) {
         float* row    = data + (size_t)r * cols;
@@ -32,8 +38,15 @@ void cml_softmax_rows_inplace(float* data, int rows, int cols) {
     }
 }
 
-/** Temperature softmax of one length-`n` logits row into `out`, max-shifted for
- *  numerical stability; `t` must be > 0. */
+/**
+ * Temperature softmax of one length-`n` logits row into `out`, max-shifted for
+ * numerical stability; `t` must be > 0.
+ * @param in (const float*)
+ * @param n (int)
+ * @param t (float)
+ * @param out (float*)
+ * @return (void)
+ */
 void cml_softmax_row_temp(const float* in, int n, float t, float* out) {
     float maxl = in[0];
     for (int i = 1; i < n; i++)
@@ -51,7 +64,11 @@ void cml_softmax_row_temp(const float* in, int n, float t, float* out) {
 
 #define HASH_EMPTY (-1)
 
-/** FNV-1a hash of a NUL-terminated string, used for the tokenizer's vocab table. */
+/**
+ * FNV-1a hash of a NUL-terminated string, used for the tokenizer's vocab table.
+ * @param str (const char*)
+ * @return (unsigned int)
+ */
 static unsigned int fnv1a_hash(const char* str) {
     unsigned int hash = 2166136261u;
     while (*str) {
@@ -61,7 +78,15 @@ static unsigned int fnv1a_hash(const char* str) {
     return hash;
 }
 
-/** Insert key->value into the open-addressed vocab hash table; -1 if the table is full. */
+/**
+ * Insert key->value into the open-addressed vocab hash table; -1 if the table is full.
+ * @param table (int*)
+ * @param table_size (int)
+ * @param vocab (char**)
+ * @param key (const char*)
+ * @param value (int)
+ * @return (int)
+ */
 static int hash_insert(int* table, int table_size, char** vocab, const char* key, int value) {
     unsigned int h = fnv1a_hash(key) % (unsigned int)table_size;
     for (int probe = 0; probe < table_size; probe++) {
@@ -79,7 +104,14 @@ static int hash_insert(int* table, int table_size, char** vocab, const char* key
     return -1; /* table full */
 }
 
-/** Look up a token string in the vocab hash table; returns its id or -1 if absent. */
+/**
+ * Look up a token string in the vocab hash table; returns its id or -1 if absent.
+ * @param table (const int*)
+ * @param table_size (int)
+ * @param vocab (char**)
+ * @param key (const char*)
+ * @return (int)
+ */
 static int hash_lookup(const int* table, int table_size, char** vocab, const char* key) {
     unsigned int h = fnv1a_hash(key) % (unsigned int)table_size;
     for (int probe = 0; probe < table_size; probe++) {
@@ -94,7 +126,13 @@ static int hash_lookup(const int* table, int table_size, char** vocab, const cha
     return -1;
 }
 
-/** Allocate a contiguous KV cache sized [max_seq_len, num_kv_heads, head_dim]. */
+/**
+ * Allocate a contiguous KV cache sized [max_seq_len, num_kv_heads, head_dim].
+ * @param max_seq_len (int)
+ * @param num_kv_heads (int)
+ * @param head_dim (int)
+ * @return (CMLKVCache*)
+ */
 CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim) {
     if (max_seq_len <= 0 || num_kv_heads <= 0 || head_dim <= 0) {
         LOG_ERROR("cml_kv_cache_create: invalid parameters (max_seq=%d, kv_heads=%d, head_dim=%d)",
@@ -132,7 +170,11 @@ CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim)
     return cache;
 }
 
-/** Free the key and value cache tensors and the cache struct. */
+/**
+ * Free the key and value cache tensors and the cache struct.
+ * @param cache (CMLKVCache*)
+ * @return (void)
+ */
 void cml_kv_cache_free(CMLKVCache* cache) {
     if (!cache)
         return;
@@ -143,7 +185,13 @@ void cml_kv_cache_free(CMLKVCache* cache) {
     cml_free(cache);
 }
 
-/** Append new K/V rows at the current position; returns the new length or -1 on overflow. */
+/**
+ * Append new K/V rows at the current position; returns the new length or -1 on overflow.
+ * @param cache (CMLKVCache*)
+ * @param new_key (Tensor*)
+ * @param new_value (Tensor*)
+ * @return (int)
+ */
 int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value) {
     if (!cache || !new_key || !new_value) {
         LOG_ERROR("cml_kv_cache_append: NULL argument");
@@ -183,14 +231,22 @@ int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value) {
     return cache->current_len;
 }
 
-/** Reset the cache to empty by zeroing its length (buffers are not cleared). */
+/**
+ * Reset the cache to empty by zeroing its length (buffers are not cleared).
+ * @param cache (CMLKVCache*)
+ * @return (void)
+ */
 void cml_kv_cache_reset(CMLKVCache* cache) {
     if (!cache)
         return;
     cache->current_len = 0;
 }
 
-/** View the populated keys as a [current_len, num_kv_heads, head_dim] tensor. */
+/**
+ * View the populated keys as a [current_len, num_kv_heads, head_dim] tensor.
+ * @param cache (CMLKVCache*)
+ * @return (Tensor*)
+ */
 Tensor* cml_kv_cache_get_keys(CMLKVCache* cache) {
     if (!cache || cache->current_len == 0)
         return NULL;
@@ -209,7 +265,11 @@ Tensor* cml_kv_cache_get_keys(CMLKVCache* cache) {
     return result;
 }
 
-/** View the populated values as a [current_len, num_kv_heads, head_dim] tensor. */
+/**
+ * View the populated values as a [current_len, num_kv_heads, head_dim] tensor.
+ * @param cache (CMLKVCache*)
+ * @return (Tensor*)
+ */
 Tensor* cml_kv_cache_get_values(CMLKVCache* cache) {
     if (!cache || cache->current_len == 0)
         return NULL;
@@ -228,6 +288,12 @@ Tensor* cml_kv_cache_get_values(CMLKVCache* cache) {
 /**
  * Grouped-query attention over 3D [batch, seq, heads*dim] tensors, with optional
  * causal, sliding-window and external masks. Multiple Q heads share each KV head.
+ * @param Q (Tensor*)
+ * @param K (Tensor*)
+ * @param V (Tensor*)
+ * @param config (const CMLGQAConfig*)
+ * @param mask (Tensor*)
+ * @return (Tensor*)
  */
 Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config, Tensor* mask) {
     if (!Q || !K || !V || !config) {
@@ -436,7 +502,15 @@ static int kv_cache_append_step(CMLKVCache* kv_cache, float* k_data, float* v_da
     return new_len;
 }
 
-/** GQA for autoregressive decode: append new K/V to the cache, then attend over all cached KV. */
+/**
+ * GQA for autoregressive decode: append new K/V to the cache, then attend over all cached KV.
+ * @param Q (Tensor*)
+ * @param K (Tensor*)
+ * @param V (Tensor*)
+ * @param kv_cache (CMLKVCache*)
+ * @param config (const CMLGQAConfig*)
+ * @return (Tensor*)
+ */
 Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_cache,
                                const CMLGQAConfig* config) {
     if (!Q || !K || !V || !kv_cache || !config) {
@@ -507,7 +581,10 @@ Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_c
     return result;
 }
 
-/** Default FlashAttention tiling config (64x64 tiles, enabled). */
+/**
+ * Default FlashAttention tiling config (64x64 tiles, enabled).
+ * @return (CMLFlashAttentionConfig)
+ */
 CMLFlashAttentionConfig cml_flash_attention_default_config(void) {
     CMLFlashAttentionConfig cfg = {.tile_size_q = 64, .tile_size_kv = 64, .enabled = true};
     return cfg;
@@ -516,6 +593,12 @@ CMLFlashAttentionConfig cml_flash_attention_default_config(void) {
 /**
  * Tiled FlashAttention GQA using online softmax, so the full [seq_q, kv_len] score
  * matrix is never materialized. Same masking semantics as cml_gqa_forward.
+ * @param Q (Tensor*)
+ * @param K (Tensor*)
+ * @param V (Tensor*)
+ * @param config (const CMLGQAConfig*)
+ * @param flash_config (const CMLFlashAttentionConfig*)
+ * @return (Tensor*)
  */
 Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config,
                               const CMLFlashAttentionConfig* flash_config) {
@@ -714,8 +797,17 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfi
     return result;
 }
 
-/** FlashAttention decode variant: append new K/V to the cache, then flash-attend over all
- * cached KV. */
+/**
+ * FlashAttention decode variant: append new K/V to the cache, then flash-attend over all
+ * cached KV.
+ * @param Q (Tensor*)
+ * @param K (Tensor*)
+ * @param V (Tensor*)
+ * @param kv_cache (CMLKVCache*)
+ * @param config (const CMLGQAConfig*)
+ * @param flash_config (const CMLFlashAttentionConfig*)
+ * @return (Tensor*)
+ */
 Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_cache,
                                      const CMLGQAConfig* config,
                                      const CMLFlashAttentionConfig* flash_config) {
@@ -780,6 +872,10 @@ Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache
  * Apply rotary position embeddings in place, rotating pairs within the last dim by
  * position-dependent angles. `start_pos` offsets positions for cached decoding.
  * Handles 2D/3D/4D layouts; returns the same tensor for chaining.
+ * @param x (Tensor*)
+ * @param start_pos (int)
+ * @param config (const CMLRoPEConfig*)
+ * @return (Tensor*)
  */
 Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) {
     if (!x || !config) {
@@ -887,8 +983,12 @@ Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) 
     return x; /* modified in-place, return same tensor for chaining */
 }
 
-/** Build a mixture-of-experts layer: a gate plus `num_experts` two-matrix FFN experts,
- * Xavier-init. */
+/**
+ * Build a mixture-of-experts layer: a gate plus `num_experts` two-matrix FFN experts,
+ * Xavier-init.
+ * @param config (const CMLMoEConfig*)
+ * @return (CMLMoELayer*)
+ */
 CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
     if (!config) {
         LOG_ERROR("cml_moe_create: NULL config");
@@ -962,7 +1062,11 @@ CMLMoELayer* cml_moe_create(const CMLMoEConfig* config) {
     return moe;
 }
 
-/** Free the gate weight and every expert's weight matrices. */
+/**
+ * Free the gate weight and every expert's weight matrices.
+ * @param moe (CMLMoELayer*)
+ * @return (void)
+ */
 void cml_moe_free(CMLMoELayer* moe) {
     if (!moe)
         return;
@@ -991,6 +1095,9 @@ void cml_moe_free(CMLMoELayer* moe) {
 /**
  * MoE forward: softmax gate over experts, route each token to its top-k experts
  * (ReLU FFN), and combine outputs weighted by the (optionally renormalized) gate probs.
+ * @param moe (CMLMoELayer*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
  */
 Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
     if (!moe || !input) {
@@ -1174,7 +1281,12 @@ Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input) {
     return result;
 }
 
-/** Return the per-token gate probabilities [total_tokens, num_experts] without running experts. */
+/**
+ * Return the per-token gate probabilities [total_tokens, num_experts] without running experts.
+ * @param moe (CMLMoELayer*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input) {
     if (!moe || !input) {
         LOG_ERROR("cml_moe_get_routing: NULL argument");
@@ -1235,6 +1347,11 @@ Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input) {
 /**
  * Build a BPE tokenizer: copy the vocab, index it in a hash table, and resolve each
  * merge rule's string to its vocab id. Input arrays are copied, not retained.
+ * @param vocab (char**)
+ * @param vocab_size (int)
+ * @param merge_pairs (char**)
+ * @param num_merges (int)
+ * @return (CMLTokenizer*)
  */
 CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size, char** merge_pairs,
                                    int num_merges) {
@@ -1325,7 +1442,11 @@ CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size, char** merge_pa
     return tok;
 }
 
-/** Free the tokenizer's vocab strings, merge rules and hash table. */
+/**
+ * Free the tokenizer's vocab strings, merge rules and hash table.
+ * @param tok (CMLTokenizer*)
+ * @return (void)
+ */
 void cml_tokenizer_free(CMLTokenizer* tok) {
     if (!tok)
         return;
@@ -1351,6 +1472,10 @@ void cml_tokenizer_free(CMLTokenizer* tok) {
 /**
  * BPE-encode `text`: split into character tokens, greedily apply merge rules in
  * priority order, then map to ids. Returns a malloc'd id array; count in `num_tokens`.
+ * @param tok (CMLTokenizer*)
+ * @param text (const char*)
+ * @param num_tokens (int*)
+ * @return (int*)
  */
 int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) {
     if (!tok || !text || !num_tokens) {
@@ -1462,7 +1587,13 @@ int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens) 
     return ids;
 }
 
-/** Decode token ids back to a newly allocated string by concatenating their vocab strings. */
+/**
+ * Decode token ids back to a newly allocated string by concatenating their vocab strings.
+ * @param tok (CMLTokenizer*)
+ * @param tokens (const int*)
+ * @param num_tokens (int)
+ * @return (char*)
+ */
 char* cml_tokenizer_decode(CMLTokenizer* tok, const int* tokens, int num_tokens) {
     if (!tok || !tokens || num_tokens <= 0) {
         LOG_ERROR("cml_tokenizer_decode: invalid arguments");
@@ -1499,7 +1630,15 @@ char* cml_tokenizer_decode(CMLTokenizer* tok, const int* tokens, int num_tokens)
     return result;
 }
 
-/** Set the BOS/EOS/PAD/UNK special-token ids. */
+/**
+ * Set the BOS/EOS/PAD/UNK special-token ids.
+ * @param tok (CMLTokenizer*)
+ * @param bos (int)
+ * @param eos (int)
+ * @param pad (int)
+ * @param unk (int)
+ * @return (void)
+ */
 void cml_tokenizer_set_special(CMLTokenizer* tok, int bos, int eos, int pad, int unk) {
     if (!tok)
         return;
@@ -1509,7 +1648,11 @@ void cml_tokenizer_set_special(CMLTokenizer* tok, int bos, int eos, int pad, int
     tok->unk_token_id = unk;
 }
 
-/** Number of tokens in the tokenizer's vocabulary. */
+/**
+ * Number of tokens in the tokenizer's vocabulary.
+ * @param tok (const CMLTokenizer*)
+ * @return (int)
+ */
 int cml_tokenizer_vocab_size(const CMLTokenizer* tok) {
     if (!tok)
         return 0;

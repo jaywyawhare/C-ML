@@ -100,7 +100,12 @@ double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data) {
 
 #include "ops/ir/beam_search.h"
 
-/** Stub timing callback when CUDA is unavailable; always reports failure. */
+/**
+ * Stub timing callback when CUDA is unavailable; always reports failure.
+ * @param variant (const CMLBeamVariant*)
+ * @param user_data (void*)
+ * @return (double)
+ */
 double cml_beam_cuda_timing_fn(const CMLBeamVariant* variant, void* user_data) {
     (void)variant;
     (void)user_data;

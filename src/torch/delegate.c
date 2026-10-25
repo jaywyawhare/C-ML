@@ -13,7 +13,14 @@
 
 static TorchDelegateRegistry g_registry = {0};
 
-/** Built-in CPU delegate compile hook: CPU runs the IR directly, so emit no blob. */
+/**
+ * Built-in CPU delegate compile hook: CPU runs the IR directly, so emit no blob.
+ * @param self (TorchDelegate*)
+ * @param subgraph (CMLGraph_t)
+ * @param blob_out (void**)
+ * @param blob_size_out (size_t*)
+ * @return (int)
+ */
 static int builtin_cpu_compile(TorchDelegate* self, CMLGraph_t subgraph, void** blob_out,
                                size_t* blob_size_out) {
     (void)self;
@@ -25,7 +32,17 @@ static int builtin_cpu_compile(TorchDelegate* self, CMLGraph_t subgraph, void** 
     return 0;
 }
 
-/** Built-in CPU delegate execute hook: dispatch the global IR on the CPU fallback backend. */
+/**
+ * Built-in CPU delegate execute hook: dispatch the global IR on the CPU fallback backend.
+ * @param self (TorchDelegate*)
+ * @param blob (const void*)
+ * @param blob_size (size_t)
+ * @param inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param outputs (Tensor**)
+ * @param num_outputs (int)
+ * @return (int)
+ */
 static int builtin_cpu_execute(TorchDelegate* self, const void* blob, size_t blob_size,
                                Tensor** inputs, int num_inputs, Tensor** outputs, int num_outputs) {
     (void)self;
@@ -39,7 +56,17 @@ static int builtin_cpu_execute(TorchDelegate* self, const void* blob, size_t blo
                                    num_outputs);
 }
 
-/** Built-in GPU delegate execute hook: dispatch the global IR on the delegate's backend. */
+/**
+ * Built-in GPU delegate execute hook: dispatch the global IR on the delegate's backend.
+ * @param self (TorchDelegate*)
+ * @param blob (const void*)
+ * @param blob_size (size_t)
+ * @param inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param outputs (Tensor**)
+ * @param num_outputs (int)
+ * @return (int)
+ */
 static int builtin_gpu_execute(TorchDelegate* self, const void* blob, size_t blob_size,
                                Tensor** inputs, int num_inputs, Tensor** outputs, int num_outputs) {
     (void)blob;
@@ -73,7 +100,10 @@ static TorchDelegate g_vulkan_delegate = {
     .execute = builtin_gpu_execute,
 };
 
-/** Lazily populate the registry with the built-in CPU/CUDA/Vulkan delegates (once). */
+/**
+ * Lazily populate the registry with the built-in CPU/CUDA/Vulkan delegates (once).
+ * @return (void)
+ */
 static void delegate_registry_init(void) {
     if (g_registry.capacity > 0)
         return;
@@ -88,13 +118,19 @@ static void delegate_registry_init(void) {
     g_registry.entries[g_registry.count++] = g_vulkan_delegate;
 }
 
-/** Return the global delegate registry, initializing the built-ins on first use. */
+/**
+ * Return the global delegate registry, initializing the built-ins on first use.
+ * @return (TorchDelegateRegistry*)
+ */
 TorchDelegateRegistry* torch_delegate_registry(void) {
     delegate_registry_init();
     return &g_registry;
 }
 
-/** Release the registry's entry array and reset it to the empty state. */
+/**
+ * Release the registry's entry array and reset it to the empty state.
+ * @return (void)
+ */
 void torch_delegate_registry_free(void) {
     free(g_registry.entries);
     g_registry.entries  = NULL;
@@ -102,7 +138,11 @@ void torch_delegate_registry_free(void) {
     g_registry.capacity = 0;
 }
 
-/** Register a vendor delegate (copied into the registry); returns 0 on success, -1 on error. */
+/**
+ * Register a vendor delegate (copied into the registry); returns 0 on success, -1 on error.
+ * @param delegate (TorchDelegate*)
+ * @return (int)
+ */
 int torch_delegate_register(TorchDelegate* delegate) {
     if (!delegate || !delegate->execute)
         return -1;
@@ -123,7 +163,11 @@ int torch_delegate_register(TorchDelegate* delegate) {
     return 0;
 }
 
-/** Remove a delegate by name, invoking its destroy hook; returns 0 if found, -1 otherwise. */
+/**
+ * Remove a delegate by name, invoking its destroy hook; returns 0 if found, -1 otherwise.
+ * @param name (const char*)
+ * @return (int)
+ */
 int torch_delegate_unregister(const char* name) {
     if (!name)
         return -1;
@@ -140,7 +184,11 @@ int torch_delegate_unregister(const char* name) {
     return -1;
 }
 
-/** Look up a registered delegate by name; returns NULL if none matches. */
+/**
+ * Look up a registered delegate by name; returns NULL if none matches.
+ * @param name (const char*)
+ * @return (TorchDelegate*)
+ */
 TorchDelegate* torch_delegate_find(const char* name) {
     if (!name)
         return NULL;
@@ -152,7 +200,11 @@ TorchDelegate* torch_delegate_find(const char* name) {
     return NULL;
 }
 
-/** Find the first registered delegate targeting the given backend; NULL if none. */
+/**
+ * Find the first registered delegate targeting the given backend; NULL if none.
+ * @param backend (CMLBackendType)
+ * @return (TorchDelegate*)
+ */
 TorchDelegate* torch_delegate_find_by_backend(CMLBackendType backend) {
     delegate_registry_init();
     for (int i = 0; i < g_registry.count; i++) {
@@ -162,14 +214,28 @@ TorchDelegate* torch_delegate_find_by_backend(CMLBackendType backend) {
     return NULL;
 }
 
-/** Return the built-in CPU-fallback delegate. */
+/**
+ * Return the built-in CPU-fallback delegate.
+ * @return (TorchDelegate*)
+ */
 TorchDelegate* torch_delegate_cpu(void) { return &g_cpu_delegate; }
-/** Return the built-in CUDA delegate. */
+/**
+ * Return the built-in CUDA delegate.
+ * @return (TorchDelegate*)
+ */
 TorchDelegate* torch_delegate_cuda(void) { return &g_cuda_delegate; }
-/** Return the built-in Vulkan delegate. */
+/**
+ * Return the built-in Vulkan delegate.
+ * @return (TorchDelegate*)
+ */
 TorchDelegate* torch_delegate_vulkan(void) { return &g_vulkan_delegate; }
 
-/** Report whether a delegate can run the given op (empty supported_ops means all). */
+/**
+ * Report whether a delegate can run the given op (empty supported_ops means all).
+ * @param d (const TorchDelegate*)
+ * @param op (UOpType)
+ * @return (bool)
+ */
 bool torch_delegate_supports_op(const TorchDelegate* d, UOpType op) {
     if (!d)
         return false;
@@ -182,7 +248,12 @@ bool torch_delegate_supports_op(const TorchDelegate* d, UOpType op) {
     return false;
 }
 
-/** True only if every node in the IR graph is supported by the delegate. */
+/**
+ * True only if every node in the IR graph is supported by the delegate.
+ * @param ir (CMLGraph_t)
+ * @param d (const TorchDelegate*)
+ * @return (bool)
+ */
 static bool graph_all_ops_supported(CMLGraph_t ir, const TorchDelegate* d) {
     if (!ir || !d)
         return false;
@@ -193,7 +264,11 @@ static bool graph_all_ops_supported(CMLGraph_t ir, const TorchDelegate* d) {
     return true;
 }
 
-/** Pick the best available backend that can run the whole graph, else CPU fallback. */
+/**
+ * Pick the best available backend that can run the whole graph, else CPU fallback.
+ * @param ir (CMLGraph_t)
+ * @return (CMLBackendType)
+ */
 CMLBackendType torch_delegate_select_backend(CMLGraph_t ir) {
     CMLDispatchContext* ctx = cml_dispatch_get_global();
     if (!ctx)
@@ -212,8 +287,13 @@ CMLBackendType torch_delegate_select_backend(CMLGraph_t ir) {
     return CML_BACKEND_CPU_FALLBACK;
 }
 
-/** Partition the IR for the preferred backend: one delegated partition if fully
- *  supported, otherwise a CPU fallback plan. Caller frees with torch_delegate_plan_free. */
+/**
+ * Partition the IR for the preferred backend: one delegated partition if fully
+ * supported, otherwise a CPU fallback plan. Caller frees with torch_delegate_plan_free.
+ * @param ir (CMLGraph_t)
+ * @param preferred (CMLBackendType)
+ * @return (TorchDelegatePlan*)
+ */
 TorchDelegatePlan* torch_delegate_partition_graph(CMLGraph_t ir, CMLBackendType preferred) {
     if (!ir)
         return NULL;
@@ -247,7 +327,11 @@ TorchDelegatePlan* torch_delegate_partition_graph(CMLGraph_t ir, CMLBackendType 
     return plan;
 }
 
-/** Free a partition plan produced by torch_delegate_partition_graph. */
+/**
+ * Free a partition plan produced by torch_delegate_partition_graph.
+ * @param plan (TorchDelegatePlan*)
+ * @return (void)
+ */
 void torch_delegate_plan_free(TorchDelegatePlan* plan) {
     if (!plan)
         return;
@@ -255,7 +339,15 @@ void torch_delegate_plan_free(TorchDelegatePlan* plan) {
     free(plan);
 }
 
-/** Run a partition plan: dispatch the delegated partition or the CPU fallback graph. */
+/**
+ * Run a partition plan: dispatch the delegated partition or the CPU fallback graph.
+ * @param plan (TorchDelegatePlan*)
+ * @param inputs (Tensor**)
+ * @param num_inputs (int)
+ * @param outputs (Tensor**)
+ * @param num_outputs (int)
+ * @return (int)
+ */
 int torch_delegate_execute_plan(TorchDelegatePlan* plan, Tensor** inputs, int num_inputs,
                                 Tensor** outputs, int num_outputs) {
     if (!plan)

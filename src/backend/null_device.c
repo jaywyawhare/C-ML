@@ -8,18 +8,27 @@
 #ifdef _POSIX_C_SOURCE
 #include <time.h>
 #include "alloc/cml_allocator.h"
-/** Monotonic timestamp in microseconds for measuring dispatch overhead. */
+/**
+ * Monotonic timestamp in microseconds for measuring dispatch overhead.
+ * @return (double)
+ */
 static double get_time_us(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1e6 + ts.tv_nsec / 1e3;
 }
 #else
-/** Fallback timer returning 0 when no monotonic clock is available. */
+/**
+ * Fallback timer returning 0 when no monotonic clock is available.
+ * @return (double)
+ */
 static double get_time_us(void) { return 0.0; }
 #endif
 
-/** Create a null benchmark device with default A100-like specs. */
+/**
+ * Create a null benchmark device with default A100-like specs.
+ * @return (CMLNullDevice*)
+ */
 CMLNullDevice* cml_null_device_create(void) {
     return cml_null_device_create_with_spec((size_t)16 * 1024 * 1024 * 1024ULL, /* 16 GB */
                                             900.0, /* ~900 GB/s (A100) */
@@ -27,7 +36,13 @@ CMLNullDevice* cml_null_device_create(void) {
     );
 }
 
-/** Create a null benchmark device with explicit memory, bandwidth, and compute specs. */
+/**
+ * Create a null benchmark device with explicit memory, bandwidth, and compute specs.
+ * @param memory_bytes (size_t)
+ * @param bandwidth_gbps (double)
+ * @param tflops (double)
+ * @return (CMLNullDevice*)
+ */
 CMLNullDevice* cml_null_device_create_with_spec(size_t memory_bytes, double bandwidth_gbps,
                                                 double tflops) {
     CMLNullDevice* dev = (CMLNullDevice*)cml_calloc(1, sizeof(CMLNullDevice));
@@ -43,11 +58,20 @@ CMLNullDevice* cml_null_device_create_with_spec(size_t memory_bytes, double band
     return dev;
 }
 
-/** Free a null benchmark device. */
+/**
+ * Free a null benchmark device.
+ * @param dev (CMLNullDevice*)
+ * @return (void)
+ */
 void cml_null_device_free(CMLNullDevice* dev) { cml_free(dev); }
 
-/** Simulate an allocation: track stats and the memory budget, returning a
- *  sentinel pointer without allocating real memory. */
+/**
+ * Simulate an allocation: track stats and the memory budget, returning a
+ * sentinel pointer without allocating real memory.
+ * @param dev (CMLNullDevice*)
+ * @param size (size_t)
+ * @return (void*)
+ */
 void* cml_null_device_alloc(CMLNullDevice* dev, size_t size) {
     if (!dev || !dev->initialized)
         return NULL;
@@ -65,7 +89,13 @@ void* cml_null_device_alloc(CMLNullDevice* dev, size_t size) {
     return (void*)(uintptr_t)(0xDEAD0000ULL + dev->stats.num_allocs);
 }
 
-/** Simulate a free: update counters and reclaim the tracked memory budget. */
+/**
+ * Simulate a free: update counters and reclaim the tracked memory budget.
+ * @param dev (CMLNullDevice*)
+ * @param ptr (void*)
+ * @param size (size_t)
+ * @return (void)
+ */
 void cml_null_device_free_mem(CMLNullDevice* dev, void* ptr, size_t size) {
     if (!dev || !ptr)
         return;
@@ -74,7 +104,14 @@ void cml_null_device_free_mem(CMLNullDevice* dev, void* ptr, size_t size) {
         dev->current_allocated -= size;
 }
 
-/** Simulate a memory copy: count it and the bytes moved without touching memory. */
+/**
+ * Simulate a memory copy: count it and the bytes moved without touching memory.
+ * @param dev (CMLNullDevice*)
+ * @param dst (void*)
+ * @param src (const void*)
+ * @param size (size_t)
+ * @return (void)
+ */
 void cml_null_device_copy(CMLNullDevice* dev, void* dst, const void* src, size_t size) {
     (void)dst;
     (void)src;
@@ -84,7 +121,14 @@ void cml_null_device_copy(CMLNullDevice* dev, void* dst, const void* src, size_t
     dev->stats.total_bytes_copied += size;
 }
 
-/** Simulate a kernel launch, recording only the dispatch overhead and count. */
+/**
+ * Simulate a kernel launch, recording only the dispatch overhead and count.
+ * @param dev (CMLNullDevice*)
+ * @param kernel_name (const char*)
+ * @param grid (size_t[3])
+ * @param block (size_t[3])
+ * @return (int)
+ */
 int cml_null_device_launch_kernel(CMLNullDevice* dev, const char* kernel_name, size_t grid[3],
                                   size_t block[3]) {
     (void)kernel_name;
@@ -102,7 +146,12 @@ int cml_null_device_launch_kernel(CMLNullDevice* dev, const char* kernel_name, s
     return 0;
 }
 
-/** Simulate IR graph execution: count dispatched ops without running them. */
+/**
+ * Simulate IR graph execution: count dispatched ops without running them.
+ * @param dev (CMLNullDevice*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_null_device_execute(CMLNullDevice* dev, CMLGraph_t ir) {
     if (!dev || !dev->initialized || !ir)
         return -1;
@@ -119,13 +168,21 @@ int cml_null_device_execute(CMLNullDevice* dev, CMLGraph_t ir) {
     return 0;
 }
 
-/** Snapshot of the device's accumulated statistics (zeroed if dev is NULL). */
+/**
+ * Snapshot of the device's accumulated statistics (zeroed if dev is NULL).
+ * @param dev (const CMLNullDevice*)
+ * @return (CMLNullDeviceStats)
+ */
 CMLNullDeviceStats cml_null_device_get_stats(const CMLNullDevice* dev) {
     CMLNullDeviceStats zero = {0};
     return dev ? dev->stats : zero;
 }
 
-/** Reset all statistics and the tracked allocation total to zero. */
+/**
+ * Reset all statistics and the tracked allocation total to zero.
+ * @param dev (CMLNullDevice*)
+ * @return (void)
+ */
 void cml_null_device_reset_stats(CMLNullDevice* dev) {
     if (!dev)
         return;
@@ -133,8 +190,14 @@ void cml_null_device_reset_stats(CMLNullDevice* dev) {
     dev->current_allocated = 0;
 }
 
-/** Roofline estimate (ms) of an op's runtime: max of compute- and
- *  memory-bound time given the device's simulated TFLOPS and bandwidth. */
+/**
+ * Roofline estimate (ms) of an op's runtime: max of compute- and
+ * memory-bound time given the device's simulated TFLOPS and bandwidth.
+ * @param dev (const CMLNullDevice*)
+ * @param flops (size_t)
+ * @param memory_bytes (size_t)
+ * @return (double)
+ */
 double cml_null_device_estimate_time_ms(const CMLNullDevice* dev, size_t flops,
                                         size_t memory_bytes) {
     if (!dev || !dev->initialized)
@@ -153,7 +216,11 @@ double cml_null_device_estimate_time_ms(const CMLNullDevice* dev, size_t flops,
     return compute_time_ms > memory_time_ms ? compute_time_ms : memory_time_ms;
 }
 
-/** Print the device's simulated specs and accumulated statistics. */
+/**
+ * Print the device's simulated specs and accumulated statistics.
+ * @param dev (const CMLNullDevice*)
+ * @return (void)
+ */
 void cml_null_device_print(const CMLNullDevice* dev) {
     if (!dev) {
         printf("NullDevice: NULL\n");

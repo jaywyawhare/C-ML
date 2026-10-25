@@ -7,7 +7,10 @@
 #include <stdio.h>
 #include "alloc/cml_allocator.h"
 
-/** Allocate an empty, initially-valid spec result with room for a few errors. */
+/**
+ * Allocate an empty, initially-valid spec result with room for a few errors.
+ * @return (CMLSpecResult*)
+ */
 static CMLSpecResult* spec_result_create(void) {
     CMLSpecResult* r = cml_calloc(1, sizeof(CMLSpecResult));
     if (!r)
@@ -22,7 +25,14 @@ static CMLSpecResult* spec_result_create(void) {
     return r;
 }
 
-/** Append a validation error (growing the array) and mark the result invalid. */
+/**
+ * Append a validation error (growing the array) and mark the result invalid.
+ * @param r (CMLSpecResult*)
+ * @param node_id (int)
+ * @param msg (const char*)
+ * @param level (CMLSpecLevel)
+ * @return (void)
+ */
 static void spec_add_error(CMLSpecResult* r, int node_id, const char* msg, CMLSpecLevel level) {
     if (!r)
         return;
@@ -41,7 +51,11 @@ static void spec_add_error(CMLSpecResult* r, int node_id, const char* msg, CMLSp
     r->num_errors++;
 }
 
-/** True for ops that take exactly two tensor inputs. */
+/**
+ * True for ops that take exactly two tensor inputs.
+ * @param t (UOpType)
+ * @return (bool)
+ */
 static bool is_binary_op(UOpType t) {
     switch (t) {
     case UOP_ADD:
@@ -74,7 +88,11 @@ static bool is_binary_op(UOpType t) {
     }
 }
 
-/** True for ops that take exactly one tensor input. */
+/**
+ * True for ops that take exactly one tensor input.
+ * @param t (UOpType)
+ * @return (bool)
+ */
 static bool is_unary_op(UOpType t) {
     switch (t) {
     case UOP_NEG:
@@ -130,7 +148,11 @@ static bool is_unary_op(UOpType t) {
     }
 }
 
-/** True for ops that reduce one or more axes of their input. */
+/**
+ * True for ops that reduce one or more axes of their input.
+ * @param t (UOpType)
+ * @return (bool)
+ */
 static bool is_reduce_op(UOpType t) {
     switch (t) {
     case UOP_SUM:
@@ -151,14 +173,22 @@ static bool is_reduce_op(UOpType t) {
     }
 }
 
-/** True for any floating-point dtype, including the reduced-precision formats. */
+/**
+ * True for any floating-point dtype, including the reduced-precision formats.
+ * @param d (DType)
+ * @return (bool)
+ */
 static bool is_float_dtype(DType d) {
     return d == DTYPE_FLOAT32 || d == DTYPE_FLOAT64 || d == DTYPE_FLOAT16 || d == DTYPE_BFLOAT16 ||
            d == DTYPE_FLOAT8_E4M3 || d == DTYPE_FLOAT8_E5M2 || d == DTYPE_FLOAT8_E4M3_FNUZ ||
            d == DTYPE_FLOAT8_E5M2_FNUZ;
 }
 
-/** True for any signed or unsigned integer dtype. */
+/**
+ * True for any signed or unsigned integer dtype.
+ * @param d (DType)
+ * @return (bool)
+ */
 static bool is_int_dtype(DType d) {
     return d == DTYPE_INT32 || d == DTYPE_INT64 || d == DTYPE_INT8 || d == DTYPE_INT16 ||
            d == DTYPE_UINT8 || d == DTYPE_UINT16 || d == DTYPE_UINT32 || d == DTYPE_UINT64;
@@ -167,6 +197,9 @@ static bool is_int_dtype(DType d) {
 /**
  * Tensor-level checks: valid op types, correct input arity, no mixed int/float
  * binary ops, broadcast-compatible shapes, in-bounds reduce axes, and cycles.
+ * @param graph (CMLGraph_t)
+ * @param result (CMLSpecResult*)
+ * @return (void)
  */
 static void validate_tensor_level(CMLGraph_t graph, CMLSpecResult* result) {
     if (!graph || !graph->head)
@@ -259,6 +292,9 @@ static void validate_tensor_level(CMLGraph_t graph, CMLSpecResult* result) {
 /**
  * Kernel-level checks: every node lands in a fusion group, no group references a
  * freed node, and no output buffer has a negative dimension.
+ * @param graph (CMLGraph_t)
+ * @param result (CMLSpecResult*)
+ * @return (void)
  */
 static void validate_kernel_level(CMLGraph_t graph, CMLSpecResult* result) {
     if (!graph || !graph->head)
@@ -332,6 +368,9 @@ static void validate_kernel_level(CMLGraph_t graph, CMLSpecResult* result) {
 /**
  * Linear-level checks on each group's lowered program: LOADs have a matching
  * STORE and LOOP/ENDLOOP markers are balanced.
+ * @param graph (CMLGraph_t)
+ * @param result (CMLSpecResult*)
+ * @return (void)
  */
 static void validate_linear_level(CMLGraph_t graph, CMLSpecResult* result) {
     if (!graph || !graph->head)
@@ -412,6 +451,9 @@ static void validate_linear_level(CMLGraph_t graph, CMLSpecResult* result) {
 /**
  * Program-level checks: no zero/negative buffer sizes, positive kernel launch
  * dimensions, and register usage within the hardware limit.
+ * @param graph (CMLGraph_t)
+ * @param result (CMLSpecResult*)
+ * @return (void)
  */
 static void validate_program_level(CMLGraph_t graph, CMLSpecResult* result) {
     if (!graph || !graph->head)
@@ -471,6 +513,9 @@ static void validate_program_level(CMLGraph_t graph, CMLSpecResult* result) {
 /**
  * Validate a graph up to the requested level, running every lower level too
  * (levels cascade via fallthrough from PROGRAM down to TENSOR).
+ * @param graph (CMLGraph_t)
+ * @param level (CMLSpecLevel)
+ * @return (CMLSpecResult*)
  */
 CMLSpecResult* cml_spec_validate(CMLGraph_t graph, CMLSpecLevel level) {
     CMLSpecResult* result = spec_result_create();
@@ -495,7 +540,11 @@ CMLSpecResult* cml_spec_validate(CMLGraph_t graph, CMLSpecLevel level) {
     return result;
 }
 
-/** Free a spec result and its error array. */
+/**
+ * Free a spec result and its error array.
+ * @param result (CMLSpecResult*)
+ * @return (void)
+ */
 void cml_spec_result_free(CMLSpecResult* result) {
     if (!result)
         return;
@@ -503,7 +552,11 @@ void cml_spec_result_free(CMLSpecResult* result) {
     cml_free(result);
 }
 
-/** Print the pass/fail summary and each error with its level and node id. */
+/**
+ * Print the pass/fail summary and each error with its level and node id.
+ * @param result (const CMLSpecResult*)
+ * @return (void)
+ */
 void cml_spec_result_print(const CMLSpecResult* result) {
     if (!result) {
         printf("SpecResult: (null)\n");

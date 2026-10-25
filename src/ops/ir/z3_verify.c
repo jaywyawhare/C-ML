@@ -110,6 +110,7 @@ static void* z3_load_sym(const char* name) {
  * Lazily dlopen libz3 and resolve its entry points (idempotent, cached).
  * Returns false and leaves the backend disabled if the library or any
  * required symbol is missing.
+ * @return (bool)
  */
 static bool z3_try_load(void) {
     if (z3_loaded)
@@ -172,12 +173,17 @@ static bool z3_try_load(void) {
     return true;
 }
 
-/** Report whether the Z3 shared library can be loaded in this build. */
+/**
+ * Report whether the Z3 shared library can be loaded in this build.
+ * @return (bool)
+ */
 bool cml_z3_available(void) { return z3_try_load(); }
 
 /**
  * Allocate a verifier and spin up a Z3 context/solver with the given
  * solver timeout. Returns an uninitialized verifier if Z3 is unavailable.
+ * @param timeout_ms (int)
+ * @return (CMLZ3Verifier*)
  */
 CMLZ3Verifier* cml_z3_verifier_create(int timeout_ms) {
     CMLZ3Verifier* v = cml_calloc(1, sizeof(CMLZ3Verifier));
@@ -209,7 +215,11 @@ CMLZ3Verifier* cml_z3_verifier_create(int timeout_ms) {
     return v;
 }
 
-/** Release the Z3 solver/context references and free the verifier. */
+/**
+ * Release the Z3 solver/context references and free the verifier.
+ * @param v (CMLZ3Verifier*)
+ * @return (void)
+ */
 void cml_z3_verifier_free(CMLZ3Verifier* v) {
     if (!v)
         return;
@@ -227,6 +237,11 @@ void cml_z3_verifier_free(CMLZ3Verifier* v) {
 /**
  * Build the Z3 arithmetic expression for a single node from its input
  * expressions. Returns NULL for ops that are not modeled symbolically.
+ * @param ctx (Z3_context)
+ * @param node (struct IRNode*)
+ * @param input_exprs (Z3_ast*)
+ * @param num_inputs (int)
+ * @return (Z3_ast)
  */
 static Z3_ast z3_build_node_expr(Z3_context ctx, struct IRNode* node, Z3_ast* input_exprs,
                                  int num_inputs) {
@@ -300,6 +315,12 @@ static Z3_ast z3_build_node_expr(Z3_context ctx, struct IRNode* node, Z3_ast* in
  * Walk the graph in order, assigning a fresh real variable to each leaf and
  * composing node expressions bottom-up. Returns the final node's expression
  * (the graph output) and reports how many leaf variables were introduced.
+ * @param ctx (Z3_context)
+ * @param ir (CMLGraph_t)
+ * @param leaf_vars (Z3_ast*)
+ * @param max_vars (int)
+ * @param num_vars_used (int*)
+ * @return (Z3_ast)
  */
 static Z3_ast z3_build_graph_expr(Z3_context ctx, CMLGraph_t ir, Z3_ast* leaf_vars, int max_vars,
                                   int* num_vars_used) {
@@ -360,6 +381,10 @@ static Z3_ast z3_build_graph_expr(Z3_context ctx, CMLGraph_t ir, Z3_ast* leaf_va
 /**
  * Prove two graphs compute the same output by asserting equal inputs but
  * unequal outputs: UNSAT means equivalent, SAT yields a counterexample.
+ * @param v (CMLZ3Verifier*)
+ * @param original (CMLGraph_t)
+ * @param optimized (CMLGraph_t)
+ * @return (CMLVerifyResult)
  */
 CMLVerifyResult cml_z3_verify_equivalence(CMLZ3Verifier* v, CMLGraph_t original,
                                           CMLGraph_t optimized) {
@@ -415,6 +440,9 @@ CMLVerifyResult cml_z3_verify_equivalence(CMLZ3Verifier* v, CMLGraph_t original,
 /**
  * Check that every output dimension is positive and that a symbolic index
  * into each dimension can satisfy 0 <= idx < size (basic bounds safety).
+ * @param v (CMLZ3Verifier*)
+ * @param ir (CMLGraph_t)
+ * @return (CMLVerifyResult)
  */
 CMLVerifyResult cml_z3_verify_bounds(CMLZ3Verifier* v, CMLGraph_t ir) {
     if (!v || !v->initialized || !ir)
@@ -478,7 +506,13 @@ CMLVerifyResult cml_z3_verify_bounds(CMLZ3Verifier* v, CMLGraph_t ir) {
     return CML_VERIFY_TIMEOUT;
 }
 
-/** Sanity-check a schedule's dependency ordering; currently delegates to bounds. */
+/**
+ * Sanity-check a schedule's dependency ordering; currently delegates to bounds.
+ * @param v (CMLZ3Verifier*)
+ * @param ir (CMLGraph_t)
+ * @param schedule (void*)
+ * @return (CMLVerifyResult)
+ */
 CMLVerifyResult cml_z3_verify_schedule(CMLZ3Verifier* v, CMLGraph_t ir, void* schedule) {
     (void)schedule;
     if (!v || !v->initialized || !ir)
@@ -490,7 +524,14 @@ CMLVerifyResult cml_z3_verify_schedule(CMLZ3Verifier* v, CMLGraph_t ir, void* sc
     return cml_z3_verify_bounds(v, ir);
 }
 
-/** Report cumulative check/pass/fail counts for the verifier (any arg may be NULL). */
+/**
+ * Report cumulative check/pass/fail counts for the verifier (any arg may be NULL).
+ * @param v (const CMLZ3Verifier*)
+ * @param checks (int*)
+ * @param passed (int*)
+ * @param failed (int*)
+ * @return (void)
+ */
 void cml_z3_verifier_stats(const CMLZ3Verifier* v, int* checks, int* passed, int* failed) {
     if (!v)
         return;
@@ -504,10 +545,17 @@ void cml_z3_verifier_stats(const CMLZ3Verifier* v, int* checks, int* passed, int
 
 #else /* !CML_HAS_Z3 */
 
-/** No-Z3 build: verification is always unavailable. */
+/**
+ * No-Z3 build: verification is always unavailable.
+ * @return (bool)
+ */
 bool cml_z3_available(void) { return false; }
 
-/** No-Z3 build: allocate a bare verifier with no solver attached. */
+/**
+ * No-Z3 build: allocate a bare verifier with no solver attached.
+ * @param timeout_ms (int)
+ * @return (CMLZ3Verifier*)
+ */
 CMLZ3Verifier* cml_z3_verifier_create(int timeout_ms) {
     CMLZ3Verifier* v = cml_calloc(1, sizeof(CMLZ3Verifier));
     if (v)
@@ -515,10 +563,20 @@ CMLZ3Verifier* cml_z3_verifier_create(int timeout_ms) {
     return v;
 }
 
-/** No-Z3 build: free the bare verifier. */
+/**
+ * No-Z3 build: free the bare verifier.
+ * @param v (CMLZ3Verifier*)
+ * @return (void)
+ */
 void cml_z3_verifier_free(CMLZ3Verifier* v) { cml_free(v); }
 
-/** No-Z3 build: equivalence checking is unsupported. */
+/**
+ * No-Z3 build: equivalence checking is unsupported.
+ * @param v (CMLZ3Verifier*)
+ * @param original (CMLGraph_t)
+ * @param optimized (CMLGraph_t)
+ * @return (CMLVerifyResult)
+ */
 CMLVerifyResult cml_z3_verify_equivalence(CMLZ3Verifier* v, CMLGraph_t original,
                                           CMLGraph_t optimized) {
     (void)v;
@@ -527,14 +585,25 @@ CMLVerifyResult cml_z3_verify_equivalence(CMLZ3Verifier* v, CMLGraph_t original,
     return CML_VERIFY_UNSUPPORTED;
 }
 
-/** No-Z3 build: bounds checking is unsupported. */
+/**
+ * No-Z3 build: bounds checking is unsupported.
+ * @param v (CMLZ3Verifier*)
+ * @param ir (CMLGraph_t)
+ * @return (CMLVerifyResult)
+ */
 CMLVerifyResult cml_z3_verify_bounds(CMLZ3Verifier* v, CMLGraph_t ir) {
     (void)v;
     (void)ir;
     return CML_VERIFY_UNSUPPORTED;
 }
 
-/** No-Z3 build: schedule checking is unsupported. */
+/**
+ * No-Z3 build: schedule checking is unsupported.
+ * @param v (CMLZ3Verifier*)
+ * @param ir (CMLGraph_t)
+ * @param schedule (void*)
+ * @return (CMLVerifyResult)
+ */
 CMLVerifyResult cml_z3_verify_schedule(CMLZ3Verifier* v, CMLGraph_t ir, void* schedule) {
     (void)v;
     (void)ir;
@@ -542,7 +611,14 @@ CMLVerifyResult cml_z3_verify_schedule(CMLZ3Verifier* v, CMLGraph_t ir, void* sc
     return CML_VERIFY_UNSUPPORTED;
 }
 
-/** No-Z3 build: report whatever counters the verifier accumulated. */
+/**
+ * No-Z3 build: report whatever counters the verifier accumulated.
+ * @param v (const CMLZ3Verifier*)
+ * @param checks (int*)
+ * @param passed (int*)
+ * @param failed (int*)
+ * @return (void)
+ */
 void cml_z3_verifier_stats(const CMLZ3Verifier* v, int* checks, int* passed, int* failed) {
     if (!v)
         return;

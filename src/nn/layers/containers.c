@@ -7,13 +7,22 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/** torch.nn.ModuleList has no forward; this returns the input unchanged (the user iterates). */
+/**
+ * torch.nn.ModuleList has no forward; this returns the input unchanged (the user iterates).
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* module_list_forward(Module* module, Tensor* input) {
     (void)module;
     return input; /* ModuleList doesn't define forward - user iterates */
 }
 
-/** Free a ModuleList and every child module it owns. */
+/**
+ * Free a ModuleList and every child module it owns.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void module_list_free(Module* module) {
     ModuleList* list = (ModuleList*)module;
     if (!list)
@@ -31,7 +40,10 @@ static void module_list_free(Module* module) {
     cml_free(list);
 }
 
-/** Construct an empty ModuleList (tracked for global cleanup). NULL on failure. */
+/**
+ * Construct an empty ModuleList (tracked for global cleanup). NULL on failure.
+ * @return (ModuleList*)
+ */
 ModuleList* nn_module_list(void) {
     ModuleList* list = cml_malloc(sizeof(ModuleList));
     if (!list) {
@@ -56,8 +68,14 @@ ModuleList* nn_module_list(void) {
     return list;
 }
 
-/** Re-export `module`'s parameters on `list` under "<index>.<module>.<param>"
- *  names, aliasing rather than copying the tensors. */
+/**
+ * Re-export `module`'s parameters on `list` under "<index>.<module>.<param>"
+ * names, aliasing rather than copying the tensors.
+ * @param list (ModuleList*)
+ * @param module (Module*)
+ * @param index (int)
+ * @return (void)
+ */
 static void module_list_adopt_params(ModuleList* list, Module* module, int index) {
     Parameter** params = NULL;
     int num_params     = 0;
@@ -80,8 +98,13 @@ static void module_list_adopt_params(ModuleList* list, Module* module, int index
         cml_free(params);
 }
 
-/** Append a module, taking ownership and adopting its parameters. Returns -1 on NULL args or
- *  allocation failure. */
+/**
+ * Append a module, taking ownership and adopting its parameters. Returns -1 on NULL args or
+ * allocation failure.
+ * @param list (ModuleList*)
+ * @param module (Module*)
+ * @return (int)
+ */
 int module_list_append(ModuleList* list, Module* module) {
     if (!list || !module)
         return -1;
@@ -107,8 +130,14 @@ int module_list_append(ModuleList* list, Module* module) {
     return 0;
 }
 
-/** Insert a module at index, taking ownership and adopting its parameters. Returns -1 on NULL
- *  args, out-of-range index, or allocation failure. */
+/**
+ * Insert a module at index, taking ownership and adopting its parameters. Returns -1 on NULL
+ * args, out-of-range index, or allocation failure.
+ * @param list (ModuleList*)
+ * @param index (int)
+ * @param module (Module*)
+ * @return (int)
+ */
 int module_list_insert(ModuleList* list, int index, Module* module) {
     if (!list || !module || index < 0 || index > list->num_modules)
         return -1;
@@ -138,15 +167,25 @@ int module_list_insert(ModuleList* list, int index, Module* module) {
     return 0;
 }
 
-/** Module at index, or NULL if the list is NULL or the index is out of range. */
+/**
+ * Module at index, or NULL if the list is NULL or the index is out of range.
+ * @param list (ModuleList*)
+ * @param index (int)
+ * @return (Module*)
+ */
 Module* module_list_get(ModuleList* list, int index) {
     if (!list || index < 0 || index >= list->num_modules)
         return NULL;
     return list->modules[index];
 }
 
-/** Remove the module at index without freeing it (caller takes ownership). Returns -1 on NULL
- *  list or out-of-range index. */
+/**
+ * Remove the module at index without freeing it (caller takes ownership). Returns -1 on NULL
+ * list or out-of-range index.
+ * @param list (ModuleList*)
+ * @param index (int)
+ * @return (int)
+ */
 int module_list_remove(ModuleList* list, int index) {
     if (!list || index < 0 || index >= list->num_modules)
         return -1;
@@ -159,16 +198,29 @@ int module_list_remove(ModuleList* list, int index) {
     return 0;
 }
 
-/** Number of modules in the list, or 0 if NULL. */
+/**
+ * Number of modules in the list, or 0 if NULL.
+ * @param list (ModuleList*)
+ * @return (int)
+ */
 int module_list_length(ModuleList* list) { return list ? list->num_modules : 0; }
 
-/** torch.nn.ModuleDict has no forward; this returns the input unchanged (user looks up by key). */
+/**
+ * torch.nn.ModuleDict has no forward; this returns the input unchanged (user looks up by key).
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* module_dict_forward(Module* module, Tensor* input) {
     (void)module;
     return input; /* ModuleDict doesn't define forward - user looks up by key */
 }
 
-/** Free a ModuleDict, its key strings, and every child module it owns. */
+/**
+ * Free a ModuleDict, its key strings, and every child module it owns.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void module_dict_free(Module* module) {
     ModuleDict* dict = (ModuleDict*)module;
     if (!dict)
@@ -187,7 +239,10 @@ static void module_dict_free(Module* module) {
     cml_free(dict);
 }
 
-/** Construct an empty ModuleDict (tracked for global cleanup). NULL on failure. */
+/**
+ * Construct an empty ModuleDict (tracked for global cleanup). NULL on failure.
+ * @return (ModuleDict*)
+ */
 ModuleDict* nn_module_dict(void) {
     ModuleDict* dict = cml_malloc(sizeof(ModuleDict));
     if (!dict) {
@@ -212,8 +267,14 @@ ModuleDict* nn_module_dict(void) {
     return dict;
 }
 
-/** Add a module under key, taking ownership and adopting its parameters; an existing key is
- *  replaced (old module freed). Returns -1 on NULL args or allocation failure. */
+/**
+ * Add a module under key, taking ownership and adopting its parameters; an existing key is
+ * replaced (old module freed). Returns -1 on NULL args or allocation failure.
+ * @param dict (ModuleDict*)
+ * @param key (const char*)
+ * @param module (Module*)
+ * @return (int)
+ */
 int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
     if (!dict || !key || !module)
         return -1;
@@ -266,7 +327,12 @@ int module_dict_add(ModuleDict* dict, const char* key, Module* module) {
     return 0;
 }
 
-/** Module stored under key, or NULL if absent or on NULL args. */
+/**
+ * Module stored under key, or NULL if absent or on NULL args.
+ * @param dict (ModuleDict*)
+ * @param key (const char*)
+ * @return (Module*)
+ */
 Module* module_dict_get(ModuleDict* dict, const char* key) {
     if (!dict || !key)
         return NULL;
@@ -278,8 +344,13 @@ Module* module_dict_get(ModuleDict* dict, const char* key) {
     return NULL;
 }
 
-/** Remove the entry for key, freeing the key string but not the module (caller takes ownership).
- *  Returns -1 on NULL args or if the key is absent. */
+/**
+ * Remove the entry for key, freeing the key string but not the module (caller takes ownership).
+ * Returns -1 on NULL args or if the key is absent.
+ * @param dict (ModuleDict*)
+ * @param key (const char*)
+ * @return (int)
+ */
 int module_dict_remove(ModuleDict* dict, const char* key) {
     if (!dict || !key)
         return -1;
@@ -298,11 +369,20 @@ int module_dict_remove(ModuleDict* dict, const char* key) {
     return -1;
 }
 
-/** Number of entries in the dict, or 0 if NULL. */
+/**
+ * Number of entries in the dict, or 0 if NULL.
+ * @param dict (ModuleDict*)
+ * @return (int)
+ */
 int module_dict_size(ModuleDict* dict) { return dict ? dict->num_entries : 0; }
 
-/** Allocate and return an array of the dict's keys (borrowed pointers; caller frees the array),
- *  writing the count to num_keys. NULL on NULL args, empty dict, or allocation failure. */
+/**
+ * Allocate and return an array of the dict's keys (borrowed pointers; caller frees the array),
+ * writing the count to num_keys. NULL on NULL args, empty dict, or allocation failure.
+ * @param dict (ModuleDict*)
+ * @param num_keys (int*)
+ * @return (const char**)
+ */
 const char** module_dict_keys(ModuleDict* dict, int* num_keys) {
     if (!dict || !num_keys)
         return NULL;

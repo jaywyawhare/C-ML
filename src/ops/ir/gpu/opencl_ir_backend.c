@@ -296,7 +296,12 @@ static const char* g_ocl_kernel_src =
 
 /* ─── Buffer tracker helpers ───────────────────────────────────────────── */
 
-/** Look up the tracked device buffer bound to a tensor, or NULL. */
+/**
+ * Look up the tracked device buffer bound to a tensor, or NULL.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param t (Tensor*)
+ * @return (CMLOCLBufferEntry*)
+ */
 static CMLOCLBufferEntry* ocl_find_buffer(CMLOpenCLIRBackend* b, Tensor* t) {
     for (int i = 0; i < b->buffer_count; i++) {
         if (b->buffers[i].tensor == t)
@@ -305,7 +310,13 @@ static CMLOCLBufferEntry* ocl_find_buffer(CMLOpenCLIRBackend* b, Tensor* t) {
     return NULL;
 }
 
-/** Find cached input buffer by CPU data pointer (survives tensor recreation) */
+/**
+ * Find cached input buffer by CPU data pointer (survives tensor recreation)
+ * @param b (CMLOpenCLIRBackend*)
+ * @param data (void*)
+ * @param size (size_t)
+ * @return (CMLOCLBufferEntry*)
+ */
 static CMLOCLBufferEntry* ocl_find_cached_input(CMLOpenCLIRBackend* b, void* data, size_t size) {
     for (int i = 0; i < b->buffer_count; i++) {
         if (b->buffers[i].is_input && b->buffers[i].data_ptr == data &&
@@ -315,7 +326,12 @@ static CMLOCLBufferEntry* ocl_find_cached_input(CMLOpenCLIRBackend* b, void* dat
     return NULL;
 }
 
-/** Return a device buffer holding the tensor's data, uploading or reusing a cached copy. */
+/**
+ * Return a device buffer holding the tensor's data, uploading or reusing a cached copy.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param t (Tensor*)
+ * @return (cl_mem)
+ */
 static cl_mem ocl_ensure_gpu(CMLOpenCLIRBackend* b, Tensor* t) {
     if (!t || !t->data)
         return NULL;
@@ -402,7 +418,12 @@ static cl_mem ocl_ensure_gpu(CMLOpenCLIRBackend* b, Tensor* t) {
     return buf;
 }
 
-/** Allocate (or reuse from the pool) a device-only output buffer for a tensor. */
+/**
+ * Allocate (or reuse from the pool) a device-only output buffer for a tensor.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param t (Tensor*)
+ * @return (cl_mem)
+ */
 static cl_mem ocl_alloc_output(CMLOpenCLIRBackend* b, Tensor* t) {
     size_t bytes = t->numel * cml_dtype_size(t->dtype);
     if (bytes == 0)
@@ -448,7 +469,12 @@ static cl_mem ocl_alloc_output(CMLOpenCLIRBackend* b, Tensor* t) {
     return buf;
 }
 
-/** Copy a tensor's device buffer back to host memory, allocating t->data if needed. */
+/**
+ * Copy a tensor's device buffer back to host memory, allocating t->data if needed.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param t (Tensor*)
+ * @return (int)
+ */
 static int ocl_download(CMLOpenCLIRBackend* b, Tensor* t) {
     CMLOCLBufferEntry* e = ocl_find_buffer(b, t);
     if (!e || !e->valid)
@@ -467,7 +493,11 @@ static int ocl_download(CMLOpenCLIRBackend* b, Tensor* t) {
     return (err == CL_SUCCESS) ? 0 : -1;
 }
 
-/** Invalidate intermediate buffers for pool reuse while keeping their allocations alive. */
+/**
+ * Invalidate intermediate buffers for pool reuse while keeping their allocations alive.
+ * @param b (CMLOpenCLIRBackend*)
+ * @return (void)
+ */
 static void ocl_release_intermediate_buffers(CMLOpenCLIRBackend* b) {
     /* Keep all buffers for reuse (pooling). Just mark intermediates as invalid
      * and clear tensor pointers so they can be reused by ocl_alloc_output. */
@@ -483,7 +513,11 @@ static void ocl_release_intermediate_buffers(CMLOpenCLIRBackend* b) {
     }
 }
 
-/** Release every tracked device buffer and reset the tracker. */
+/**
+ * Release every tracked device buffer and reset the tracker.
+ * @param b (CMLOpenCLIRBackend*)
+ * @return (void)
+ */
 static void ocl_release_all_buffers(CMLOpenCLIRBackend* b) {
     for (int i = 0; i < b->buffer_count; i++) {
         if (b->buffers[i].gpu_buf)
@@ -494,8 +528,13 @@ static void ocl_release_all_buffers(CMLOpenCLIRBackend* b) {
 
 /* ─── BEAM autotuner for GEMM kernels ─────────────────────────────────── */
 
-/** Generate OpenCL source for a parameterized GEMM kernel.
- * Returns heap-allocated string. Caller must cml_free(). */
+/**
+ * Generate OpenCL source for a parameterized GEMM kernel.
+ * Returns heap-allocated string. Caller must cml_free().
+ * @param p (const CMLGemmVariantParams*)
+ * @param id (int)
+ * @return (char*)
+ */
 static char* ocl_beam_generate_gemm(const CMLGemmVariantParams* p, int id) {
     int wg_x     = p->tsn / p->reg_n;
     int wg_y     = p->tsm / p->reg_m;
@@ -598,7 +637,11 @@ static char* ocl_beam_generate_gemm(const CMLGemmVariantParams* p, int id) {
     return buf;
 }
 
-/** Reject GEMM tile/register configs that violate workgroup, register, or SLM limits. */
+/**
+ * Reject GEMM tile/register configs that violate workgroup, register, or SLM limits.
+ * @param p (const CMLGemmVariantParams*)
+ * @return (bool)
+ */
 static bool ocl_beam_params_valid(const CMLGemmVariantParams* p) {
     int wg_x     = p->tsn / p->reg_n;
     int wg_y     = p->tsm / p->reg_m;
@@ -620,9 +663,13 @@ static bool ocl_beam_params_valid(const CMLGemmVariantParams* p) {
     return true;
 }
 
-/** Compile all BEAM GEMM variants. Called during backend init.
+/**
+ * Compile all BEAM GEMM variants. Called during backend init.
  * Order matters: known-best configs first (128x128 8x8, 64x64 8x4/4x8)
- * so autotuning with early-exit finds the winner quickly. */
+ * so autotuning with early-exit finds the winner quickly.
+ * @param b (CMLOpenCLIRBackend*)
+ * @return (void)
+ */
 static void ocl_beam_compile_variants(CMLOpenCLIRBackend* b) {
     /* Priority order: large tiles first (for big GEMM), then small tiles */
     static const int tile_sizes[][2] = {{128, 128}, {128, 64}, {64, 128}, {64, 64}};
@@ -696,7 +743,14 @@ static void ocl_beam_compile_variants(CMLOpenCLIRBackend* b) {
     LOG_INFO("BEAM: compiled %d GEMM variants", b->gemm_variant_count);
 }
 
-/** Look up the cached best variant index for an (M,N,K) shape, or -1. */
+/**
+ * Look up the cached best variant index for an (M,N,K) shape, or -1.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @return (int)
+ */
 static int ocl_beam_cache_lookup(CMLOpenCLIRBackend* b, int M, int N, int K) {
     uint64_t key = ((uint64_t)M << 40) | ((uint64_t)N << 20) | (uint64_t)K;
     for (int i = 0; i < CML_OCL_GEMM_CACHE_SIZE; i++) {
@@ -706,7 +760,15 @@ static int ocl_beam_cache_lookup(CMLOpenCLIRBackend* b, int M, int N, int K) {
     return -1;
 }
 
-/** Record the best variant index for an (M,N,K) shape, evicting slot 0 if full. */
+/**
+ * Record the best variant index for an (M,N,K) shape, evicting slot 0 if full.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @param vidx (int)
+ * @return (void)
+ */
 static void ocl_beam_cache_store(CMLOpenCLIRBackend* b, int M, int N, int K, int vidx) {
     uint64_t key = ((uint64_t)M << 40) | ((uint64_t)N << 20) | (uint64_t)K;
     for (int i = 0; i < CML_OCL_GEMM_CACHE_SIZE; i++) {
@@ -728,7 +790,14 @@ static void ocl_beam_cache_store(CMLOpenCLIRBackend* b, int M, int N, int K, int
  * ~1-2s one-time cost. */
 #define CML_OCL_BEAM_CAL 1024
 
-/** One timed GEMM launch (ns) of `kernel` at the calibration size. */
+/**
+ * One timed GEMM launch (ns) of `kernel` at the calibration size.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param kernel (cl_kernel)
+ * @param global (const size_t[2])
+ * @param local (const size_t[2])
+ * @return (double)
+ */
 static double ocl_beam_time_once(CMLOpenCLIRBackend* b, cl_kernel kernel, const size_t global[2],
                                  const size_t local[2]) {
     cl_event ev;
@@ -743,10 +812,19 @@ static double ocl_beam_time_once(CMLOpenCLIRBackend* b, cl_kernel kernel, const 
     return (double)(t1 - t0);
 }
 
-/** Best-of-N GEMM runtime (ns) of one variant at the calibration size, on
+/**
+ * Best-of-N GEMM runtime (ns) of one variant at the calibration size, on
  * dedicated buffers. Bails after the first timed launch if it is already >4x
  * `skip_ns` (a bad config -- register spill / poor occupancy), so a few slow
- * variants cannot blow up calibration time. Returns 1e18 on failure. */
+ * variants cannot blow up calibration time. Returns 1e18 on failure.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param var (CMLGemmVariant*)
+ * @param A (cl_mem)
+ * @param B (cl_mem)
+ * @param C (cl_mem)
+ * @param skip_ns (double)
+ * @return (double)
+ */
 static double ocl_beam_probe_variant(CMLOpenCLIRBackend* b, CMLGemmVariant* var, cl_mem A, cl_mem B,
                                      cl_mem C, double skip_ns) {
     const int S             = CML_OCL_BEAM_CAL;
@@ -776,10 +854,14 @@ static double ocl_beam_probe_variant(CMLOpenCLIRBackend* b, CMLGemmVariant* var,
     return best;
 }
 
-/** Score every variant once at the calibration size. A tile config's *relative*
+/**
+ * Score every variant once at the calibration size. A tile config's *relative*
  * speed is essentially size-independent, so per-shape selection can reuse these
  * scores instead of re-probing at the real (possibly 4096+) size -- which made
- * autotuning unusably slow. Runs once per backend. */
+ * autotuning unusably slow. Runs once per backend.
+ * @param b (CMLOpenCLIRBackend*)
+ * @return (void)
+ */
 static void ocl_beam_calibrate(CMLOpenCLIRBackend* b) {
     b->beam_calibrated = true;
     const int S        = CML_OCL_BEAM_CAL;
@@ -823,8 +905,17 @@ static void ocl_beam_calibrate(CMLOpenCLIRBackend* b) {
     clReleaseMemObject(C);
 }
 
-/** Pick the fastest calibrated variant whose tiles divide (M,N,K). Selection is
- * O(variants) after the one-time calibration -- no per-shape kernel launches. */
+/**
+ * Pick the fastest calibrated variant whose tiles divide (M,N,K). Selection is
+ * O(variants) after the one-time calibration -- no per-shape kernel launches.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @param buf_a (cl_mem)
+ * @param buf_b (cl_mem)
+ * @return (int)
+ */
 static int ocl_beam_autotune(CMLOpenCLIRBackend* b, int M, int N, int K, cl_mem buf_a,
                              cl_mem buf_b) {
     (void)buf_a;
@@ -879,7 +970,10 @@ static int ocl_beam_autotune(CMLOpenCLIRBackend* b, int M, int N, int K, cl_mem 
 
 /* ─── Backend lifecycle ────────────────────────────────────────────────── */
 
-/** Probe for an OpenCL platform exposing at least one GPU device. */
+/**
+ * Probe for an OpenCL platform exposing at least one GPU device.
+ * @return (bool)
+ */
 bool cml_opencl_ir_available(void) {
     cl_uint n  = 0;
     cl_int err = clGetPlatformIDs(0, NULL, &n);
@@ -893,13 +987,20 @@ bool cml_opencl_ir_available(void) {
     return (err == CL_SUCCESS && nd > 0);
 }
 
-/** Allocate a zeroed OpenCL IR backend handle. */
+/**
+ * Allocate a zeroed OpenCL IR backend handle.
+ * @return (CMLOpenCLIRBackend*)
+ */
 CMLOpenCLIRBackend* cml_opencl_ir_backend_create(void) {
     CMLOpenCLIRBackend* b = (CMLOpenCLIRBackend*)cml_calloc(1, sizeof(CMLOpenCLIRBackend));
     return b;
 }
 
-/** Select a GPU, build the kernel program, extract kernels, and optionally BEAM-autotune GEMM. */
+/**
+ * Select a GPU, build the kernel program, extract kernels, and optionally BEAM-autotune GEMM.
+ * @param b (CMLOpenCLIRBackend*)
+ * @return (int)
+ */
 int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
     if (!b)
         return -1;
@@ -1055,7 +1156,11 @@ int cml_opencl_ir_backend_init(CMLOpenCLIRBackend* b) {
     return 0;
 }
 
-/** Release all buffers, kernels, GEMM variants, queues, program, and context, then free b. */
+/**
+ * Release all buffers, kernels, GEMM variants, queues, program, and context, then free b.
+ * @param b (CMLOpenCLIRBackend*)
+ * @return (void)
+ */
 void cml_opencl_ir_backend_free(CMLOpenCLIRBackend* b) {
     if (!b)
         return;
@@ -1107,9 +1212,19 @@ void cml_opencl_ir_backend_free(CMLOpenCLIRBackend* b) {
 
 /* ─── Node execution helpers ───────────────────────────────────────────── */
 
-/** 2D GEMM dispatch: BEAM autotuner -> V3 aligned kernel -> naive fallback.
+/**
+ * 2D GEMM dispatch: BEAM autotuner -> V3 aligned kernel -> naive fallback.
  * Buffers may be sub-buffer views into a batched tensor (see the batched path),
- * so this must not assume base-of-allocation offsets. */
+ * so this must not assume base-of-allocation offsets.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param M (int)
+ * @param N (int)
+ * @param K (int)
+ * @param buf_a (cl_mem)
+ * @param buf_b (cl_mem)
+ * @param buf_out (cl_mem)
+ * @return (int)
+ */
 static int ocl_matmul_2d(CMLOpenCLIRBackend* b, int M, int N, int K, cl_mem buf_a, cl_mem buf_b,
                          cl_mem buf_out) {
     cl_kernel kernel;
@@ -1169,10 +1284,19 @@ static int ocl_matmul_2d(CMLOpenCLIRBackend* b, int M, int N, int K, cl_mem buf_
     return (err == CL_SUCCESS) ? 0 : -1;
 }
 
-/** Batched matmul: loop over batch slices, running the 2D GEMM on sub-buffer
+/**
+ * Batched matmul: loop over batch slices, running the 2D GEMM on sub-buffer
  * views. A 2D operand (batch count 1) is broadcast across all batches. Returns
  * -1 if a slice offset isn't device-aligned so the caller falls back to CPU
- * (correct, just unaccelerated) rather than failing. */
+ * (correct, just unaccelerated) rather than failing.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param a (Tensor*)
+ * @param bb (Tensor*)
+ * @param buf_a (cl_mem)
+ * @param buf_b (cl_mem)
+ * @param buf_out (cl_mem)
+ * @return (int)
+ */
 static int ocl_matmul_batched(CMLOpenCLIRBackend* b, Tensor* a, Tensor* bb, cl_mem buf_a,
                               cl_mem buf_b, cl_mem buf_out) {
     int M  = a->shape[a->ndim - 2];
@@ -1240,7 +1364,15 @@ static int ocl_matmul_batched(CMLOpenCLIRBackend* b, Tensor* a, Tensor* bb, cl_m
     return 0;
 }
 
-/** Derive M/N/K from input ranks and route to the 2D or batched GEMM path. */
+/**
+ * Derive M/N/K from input ranks and route to the 2D or batched GEMM path.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param node (struct IRNode*)
+ * @param buf_a (cl_mem)
+ * @param buf_b (cl_mem)
+ * @param buf_out (cl_mem)
+ * @return (int)
+ */
 static int ocl_exec_matmul(CMLOpenCLIRBackend* b, struct IRNode* node, cl_mem buf_a, cl_mem buf_b,
                            cl_mem buf_out) {
     Tensor* a  = node->inputs[0];
@@ -1268,7 +1400,16 @@ static int ocl_exec_matmul(CMLOpenCLIRBackend* b, struct IRNode* node, cl_mem bu
     return ocl_matmul_2d(b, M, N, K, buf_a, buf_b, buf_out);
 }
 
-/** Launch an elementwise binary kernel, passing modulo strides for broadcast operands. */
+/**
+ * Launch an elementwise binary kernel, passing modulo strides for broadcast operands.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param kernel (cl_kernel)
+ * @param node (struct IRNode*)
+ * @param buf_a (cl_mem)
+ * @param buf_b (cl_mem)
+ * @param buf_out (cl_mem)
+ * @return (int)
+ */
 static int ocl_exec_binary(CMLOpenCLIRBackend* b, cl_kernel kernel, struct IRNode* node,
                            cl_mem buf_a, cl_mem buf_b, cl_mem buf_out) {
     Tensor* a   = node->inputs[0];
@@ -1292,7 +1433,15 @@ static int ocl_exec_binary(CMLOpenCLIRBackend* b, cl_kernel kernel, struct IRNod
     return (err == CL_SUCCESS) ? 0 : -1;
 }
 
-/** Launch an elementwise unary kernel over `n` elements. */
+/**
+ * Launch an elementwise unary kernel over `n` elements.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param kernel (cl_kernel)
+ * @param buf_in (cl_mem)
+ * @param buf_out (cl_mem)
+ * @param n (int)
+ * @return (int)
+ */
 static int ocl_exec_unary(CMLOpenCLIRBackend* b, cl_kernel kernel, cl_mem buf_in, cl_mem buf_out,
                           int n) {
     clSetKernelArg(kernel, 0, sizeof(cl_mem), &buf_in);
@@ -1304,7 +1453,16 @@ static int ocl_exec_unary(CMLOpenCLIRBackend* b, cl_kernel kernel, cl_mem buf_in
     return (err == CL_SUCCESS) ? 0 : -1;
 }
 
-/** Run a one- or two-pass tree reduction, dividing by n afterward for mean. */
+/**
+ * Run a one- or two-pass tree reduction, dividing by n afterward for mean.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param kernel (cl_kernel)
+ * @param buf_in (cl_mem)
+ * @param buf_out (cl_mem)
+ * @param n (int)
+ * @param is_mean (bool)
+ * @return (int)
+ */
 static int ocl_exec_reduce(CMLOpenCLIRBackend* b, cl_kernel kernel, cl_mem buf_in, cl_mem buf_out,
                            int n, bool is_mean) {
     /* Multi-pass reduction: reduce n elements via work-groups of 256 */
@@ -1384,7 +1542,11 @@ static int ocl_exec_reduce(CMLOpenCLIRBackend* b, cl_kernel kernel, cl_mem buf_i
 
 /* ─── Graph execution ──────────────────────────────────────────────────── */
 
-/** True if the IR op has a GPU implementation (elementwise, matmul, reduce, view). */
+/**
+ * True if the IR op has a GPU implementation (elementwise, matmul, reduce, view).
+ * @param type (UOpType)
+ * @return (bool)
+ */
 static bool is_gpu_supported(UOpType type) {
     switch (type) {
     case UOP_MATMUL:
@@ -1412,14 +1574,23 @@ static bool is_gpu_supported(UOpType type) {
     }
 }
 
-/** True for metadata-only view ops (reshape/expand/permute/stride/slice). */
+/**
+ * True for metadata-only view ops (reshape/expand/permute/stride/slice).
+ * @param type (UOpType)
+ * @return (bool)
+ */
 static bool is_view_op(UOpType type) {
     return type == UOP_RESHAPE || type == UOP_EXPAND || type == UOP_PERMUTE || type == UOP_STRIDE ||
            type == UOP_SLICE;
 }
 
-/** Execute an IR graph on the GPU (keeping intermediates device-resident), with CPU fallback
- * per node; skips small graphs where launch overhead dominates and downloads only leaf outputs. */
+/**
+ * Execute an IR graph on the GPU (keeping intermediates device-resident), with CPU fallback
+ * per node; skips small graphs where launch overhead dominates and downloads only leaf outputs.
+ * @param b (CMLOpenCLIRBackend*)
+ * @param ir (CMLGraph_t)
+ * @return (int)
+ */
 int cml_opencl_execute_graph(CMLOpenCLIRBackend* b, CMLGraph_t ir) {
     if (!b || !b->initialized || !ir)
         return -1;

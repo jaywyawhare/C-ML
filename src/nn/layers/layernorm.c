@@ -10,8 +10,13 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** torch.nn.LayerNorm forward: normalize over the last dim to zero mean/unit variance (with
- *  eps), then apply the optional affine weight/bias. NULL on rank or last-dim mismatch. */
+/**
+ * torch.nn.LayerNorm forward: normalize over the last dim to zero mean/unit variance (with
+ * eps), then apply the optional affine weight/bias. NULL on rank or last-dim mismatch.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* layernorm_forward(Module* module, Tensor* input) {
     LayerNorm* ln = (LayerNorm*)module;
 
@@ -46,7 +51,11 @@ static Tensor* layernorm_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Free the LayerNorm module; affine parameters are released by module_free. */
+/**
+ * Free the LayerNorm module; affine parameters are released by module_free.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void layernorm_free(Module* module) {
     LayerNorm* ln = (LayerNorm*)module;
     if (!ln)
@@ -55,8 +64,16 @@ static void layernorm_free(Module* module) {
     module_free(module);
 }
 
-/** Construct a LayerNorm over a last dim of size normalized_shape; allocates weight/bias when
- *  affine. eps falls back to 1e-5 if non-positive. NULL on bad shape or failure. */
+/**
+ * Construct a LayerNorm over a last dim of size normalized_shape; allocates weight/bias when
+ * affine. eps falls back to 1e-5 if non-positive. NULL on bad shape or failure.
+ * @param normalized_shape (int)
+ * @param eps (float)
+ * @param affine (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (LayerNorm*)
+ */
 LayerNorm* nn_layernorm(int normalized_shape, float eps, bool affine, DType dtype,
                         DeviceType device) {
     if (normalized_shape <= 0) {

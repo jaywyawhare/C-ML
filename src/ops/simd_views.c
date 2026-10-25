@@ -25,7 +25,12 @@ void simd_transpose_2d_f32(const float* src, float* dst, int rows, int cols) {
     }
 }
 
-/** Transpose a square `n`x`n` matrix in place by swapping off-diagonal pairs. */
+/**
+ * Transpose a square `n`x`n` matrix in place by swapping off-diagonal pairs.
+ * @param data (float*)
+ * @param n (int)
+ * @return (void)
+ */
 void simd_transpose_inplace_f32(float* data, int n) {
     for (int i = 0; i < n; i++)
         for (int j = i + 1; j < n; j++) {
@@ -35,7 +40,15 @@ void simd_transpose_inplace_f32(float* data, int n) {
         }
 }
 
-/** Transpose each of `batch` contiguous `rows`x`cols` matrices independently. */
+/**
+ * Transpose each of `batch` contiguous `rows`x`cols` matrices independently.
+ * @param src (const float*)
+ * @param dst (float*)
+ * @param batch (int)
+ * @param rows (int)
+ * @param cols (int)
+ * @return (void)
+ */
 void simd_transpose_batched_f32(const float* src, float* dst, int batch, int rows, int cols) {
     size_t src_stride = (size_t)rows * cols;
     size_t dst_stride = (size_t)cols * rows;
@@ -43,28 +56,63 @@ void simd_transpose_batched_f32(const float* src, float* dst, int batch, int row
         simd_transpose_2d_f32(src + b * src_stride, dst + b * dst_stride, rows, cols);
 }
 
-/** Gather `n` elements: out[i] = src[indices[i]]. */
+/**
+ * Gather `n` elements: out[i] = src[indices[i]].
+ * @param src (const float*)
+ * @param indices (const int32_t*)
+ * @param out (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_gather_f32(const float* src, const int32_t* indices, float* out, size_t n) {
     for (size_t i = 0; i < n; i++)
         out[i] = src[indices[i]];
 }
 
-/** Scatter `n` elements: dst[indices[i]] = src[i]. */
+/**
+ * Scatter `n` elements: dst[indices[i]] = src[i].
+ * @param src (const float*)
+ * @param indices (const int32_t*)
+ * @param dst (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_scatter_f32(const float* src, const int32_t* indices, float* dst, size_t n) {
     for (size_t i = 0; i < n; i++)
         dst[indices[i]] = src[i];
 }
 
-/** Scatter-accumulate `n` elements: dst[indices[i]] += src[i] (duplicate indices sum). */
+/**
+ * Scatter-accumulate `n` elements: dst[indices[i]] += src[i] (duplicate indices sum).
+ * @param src (const float*)
+ * @param indices (const int32_t*)
+ * @param dst (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_scatter_add_f32(const float* src, const int32_t* indices, float* dst, size_t n) {
     for (size_t i = 0; i < n; i++)
         dst[indices[i]] += src[i];
 }
 
-/** Copy `n` contiguous floats from `src` to `dst`. */
+/**
+ * Copy `n` contiguous floats from `src` to `dst`.
+ * @param src (const float*)
+ * @param dst (float*)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_copy_f32(const float* src, float* dst, size_t n) { memcpy(dst, src, n * sizeof(float)); }
 
-/** Copy `n` floats between strided buffers; falls back to a flat copy when both strides are 1. */
+/**
+ * Copy `n` floats between strided buffers; falls back to a flat copy when both strides are 1.
+ * @param src (const float*)
+ * @param dst (float*)
+ * @param n (size_t)
+ * @param src_stride (size_t)
+ * @param dst_stride (size_t)
+ * @return (void)
+ */
 void simd_strided_copy_f32(const float* src, float* dst, size_t n, size_t src_stride,
                            size_t dst_stride) {
     if (src_stride == 1 && dst_stride == 1) {
@@ -75,14 +123,27 @@ void simd_strided_copy_f32(const float* src, float* dst, size_t n, size_t src_st
         dst[i * dst_stride] = src[i * src_stride];
 }
 
-/** Fill `n` floats of `dst` with `value`. */
+/**
+ * Fill `n` floats of `dst` with `value`.
+ * @param dst (float*)
+ * @param value (float)
+ * @param n (size_t)
+ * @return (void)
+ */
 void simd_fill_f32(float* dst, float value, size_t n) {
     for (size_t i = 0; i < n; i++)
         dst[i] = value;
 }
 
-/** Tile `src_n` elements to fill `dst_n`; a single source element is broadcast via fill,
- *  otherwise the block is doubled repeatedly until `dst` is full. */
+/**
+ * Tile `src_n` elements to fill `dst_n`; a single source element is broadcast via fill,
+ * otherwise the block is doubled repeatedly until `dst` is full.
+ * @param src (const float*)
+ * @param src_n (size_t)
+ * @param dst (float*)
+ * @param dst_n (size_t)
+ * @return (void)
+ */
 void simd_broadcast_copy_f32(const float* src, size_t src_n, float* dst, size_t dst_n) {
     if (src_n == 0 || dst_n == 0)
         return;
@@ -101,8 +162,18 @@ void simd_broadcast_copy_f32(const float* src, size_t src_n, float* dst, size_t 
     }
 }
 
-/** Permute axes of an n-D tensor into a contiguous `dst` following `perm`, reading `src`
- *  through its `strides`. Falls back to a flat copy if scratch allocation fails. */
+/**
+ * Permute axes of an n-D tensor into a contiguous `dst` following `perm`, reading `src`
+ * through its `strides`. Falls back to a flat copy if scratch allocation fails.
+ * @param src (const float*)
+ * @param dst (float*)
+ * @param shape (const int*)
+ * @param strides (const size_t*)
+ * @param perm (const int*)
+ * @param ndim (int)
+ * @param numel (size_t)
+ * @return (void)
+ */
 void simd_permute_nd_f32(const float* src, float* dst, const int* shape, const size_t* strides,
                          const int* perm, int ndim, size_t numel) {
     int* dst_shape      = (int*)cml_malloc(ndim * sizeof(int));

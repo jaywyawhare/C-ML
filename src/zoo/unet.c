@@ -6,12 +6,22 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
-/** Default U-Net config: 1 input channel, 2 classes, depth 4, 64 base filters. */
+/**
+ * Default U-Net config: 1 input channel, 2 classes, depth 4, 64 base filters.
+ * @return (CMLUNetConfig)
+ */
 CMLUNetConfig cml_zoo_unet_config_default(void) {
     return (CMLUNetConfig){.in_channels = 1, .num_classes = 2, .depth = 4, .base_filters = 64};
 }
 
-/** Double conv block: Conv3x3 -> BN -> ReLU -> Conv3x3 -> BN -> ReLU (in_ch -> out_ch). */
+/**
+ * Double conv block: Conv3x3 -> BN -> ReLU -> Conv3x3 -> BN -> ReLU (in_ch -> out_ch).
+ * @param in_ch (int)
+ * @param out_ch (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Sequential*)
+ */
 static Sequential* create_conv_block(int in_ch, int out_ch, DType dtype, DeviceType device) {
     Sequential* block = nn_sequential();
     sequential_add(block, (Module*)nn_conv2d(in_ch, out_ch, 3, 1, 1, 1, false, dtype, device));
@@ -36,7 +46,12 @@ typedef struct {
     int depth;
 } UNetModel;
 
-/** Forward pass: encoder with skip saves, bottleneck, then decoder upsample+concat+conv. */
+/**
+ * Forward pass: encoder with skip saves, bottleneck, then decoder upsample+concat+conv.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* unet_forward(Module* module, Tensor* input) {
     UNetModel* unet = (UNetModel*)module;
     if (!unet || !input)
@@ -77,7 +92,11 @@ static Tensor* unet_forward(Module* module, Tensor* input) {
     return module_forward((Module*)unet->final_conv, x);
 }
 
-/** Free all encoder/decoder blocks, pools, upsamplers, bottleneck and final conv. */
+/**
+ * Free all encoder/decoder blocks, pools, upsamplers, bottleneck and final conv.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void unet_free(Module* module) {
     UNetModel* unet = (UNetModel*)module;
     if (!unet)
@@ -100,7 +119,13 @@ static void unet_free(Module* module) {
     cml_free(unet);
 }
 
-/** Build a 2D U-Net from @p config: symmetric encoder/decoder with skip connections. */
+/**
+ * Build a 2D U-Net from @p config: symmetric encoder/decoder with skip connections.
+ * @param config (CMLUNetConfig*)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 Module* cml_zoo_unet_create(CMLUNetConfig* config, DType dtype, DeviceType device) {
     if (!config)
         return NULL;

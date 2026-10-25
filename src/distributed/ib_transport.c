@@ -196,8 +196,12 @@ static struct {
     fn_ibv_query_qp_t query_qp;
 } ib_api = {0};
 
-/** Resolve every libibverbs symbol this transport uses from @p lib into ib_api,
- * failing if any is missing. */
+/**
+ * Resolve every libibverbs symbol this transport uses from @p lib into ib_api,
+ * failing if any is missing.
+ * @param lib (void*)
+ * @return (bool)
+ */
 static bool load_ib_symbols(void* lib) {
 #define LOAD_SYM(name)                                                                             \
     do {                                                                                           \
@@ -230,7 +234,10 @@ static bool load_ib_symbols(void* lib) {
     return true;
 }
 
-/** True if libibverbs can be loaded and reports at least one IB device present. */
+/**
+ * True if libibverbs can be loaded and reports at least one IB device present.
+ * @return (bool)
+ */
 bool cml_ib_available(void) {
     void* lib = dlopen("libibverbs.so.1", RTLD_LAZY);
     if (!lib)
@@ -279,7 +286,13 @@ static int mock_pending      = 0;
 static uint64_t mock_wc_wrid = 0;
 static int mock_wc_status    = 0;
 
-/** Send exactly @p n bytes on mock socket @p fd (short-write loop, EINTR retry). */
+/**
+ * Send exactly @p n bytes on mock socket @p fd (short-write loop, EINTR retry).
+ * @param fd (int)
+ * @param b (const void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 static int mock_send_all(int fd, const void* b, size_t n) {
     const char* p = b;
     while (n) {
@@ -294,8 +307,14 @@ static int mock_send_all(int fd, const void* b, size_t n) {
     }
     return 0;
 }
-/** Receive exactly @p n bytes from mock socket @p fd (short-read loop, EINTR
- * retry). */
+/**
+ * Receive exactly @p n bytes from mock socket @p fd (short-read loop, EINTR
+ * retry).
+ * @param fd (int)
+ * @param b (void*)
+ * @param n (size_t)
+ * @return (int)
+ */
 static int mock_recv_all(int fd, void* b, size_t n) {
     char* p = b;
     while (n) {
@@ -310,8 +329,12 @@ static int mock_recv_all(int fd, void* b, size_t n) {
     }
     return 0;
 }
-/** True if @p lkey was handed out by mock_reg_mr; the mock send/recv paths
- * assert this to catch a regression to lkey=0. */
+/**
+ * True if @p lkey was handed out by mock_reg_mr; the mock send/recv paths
+ * assert this to catch a regression to lkey=0.
+ * @param lkey (uint32_t)
+ * @return (int)
+ */
 static int mock_key_known(uint32_t lkey) {
     for (int i = 0; i < mock_num_keys; i++)
         if (mock_keys[i] == lkey)
@@ -319,7 +342,11 @@ static int mock_key_known(uint32_t lkey) {
     return 0;
 }
 
-/** Mock ibv_get_device_list: report a single sentinel device. */
+/**
+ * Mock ibv_get_device_list: report a single sentinel device.
+ * @param n (int*)
+ * @return (ibv_device**)
+ */
 static ibv_device** mock_get_device_list(int* n) {
     static ibv_device* d[1];
     d[0] = (ibv_device*)&MOCK_CTX;
@@ -327,14 +354,26 @@ static ibv_device** mock_get_device_list(int* n) {
         *n = 1;
     return d;
 }
-/** Mock ibv_free_device_list: the list is static, so nothing to free. */
+/**
+ * Mock ibv_free_device_list: the list is static, so nothing to free.
+ * @param l (ibv_device**)
+ * @return (void)
+ */
 static void mock_free_device_list(ibv_device** l) { (void)l; }
-/** Mock ibv_open_device: return the sentinel context. */
+/**
+ * Mock ibv_open_device: return the sentinel context.
+ * @param d (ibv_device*)
+ * @return (ibv_context*)
+ */
 static ibv_context* mock_open_device(ibv_device* d) {
     (void)d;
     return (ibv_context*)&MOCK_CTX;
 }
-/** Mock ibv_close_device: close the TCP mesh sockets and free their array. */
+/**
+ * Mock ibv_close_device: close the TCP mesh sockets and free their array.
+ * @param c (ibv_context*)
+ * @return (int)
+ */
 static int mock_close_device(ibv_context* c) {
     (void)c;
     if (mock_fds) {
@@ -346,17 +385,33 @@ static int mock_close_device(ibv_context* c) {
     }
     return 0;
 }
-/** Mock ibv_alloc_pd: return the sentinel protection domain. */
+/**
+ * Mock ibv_alloc_pd: return the sentinel protection domain.
+ * @param c (ibv_context*)
+ * @return (ibv_pd*)
+ */
 static ibv_pd* mock_alloc_pd(ibv_context* c) {
     (void)c;
     return (ibv_pd*)&MOCK_PD;
 }
-/** Mock ibv_dealloc_pd: no-op (the PD is a sentinel). */
+/**
+ * Mock ibv_dealloc_pd: no-op (the PD is a sentinel).
+ * @param p (ibv_pd*)
+ * @return (int)
+ */
 static int mock_dealloc_pd(ibv_pd* p) {
     (void)p;
     return 0;
 }
-/** Mock ibv_create_cq: return the sentinel completion queue. */
+/**
+ * Mock ibv_create_cq: return the sentinel completion queue.
+ * @param c (ibv_context*)
+ * @param cqe (int)
+ * @param x (void*)
+ * @param ch (void*)
+ * @param cv (int)
+ * @return (ibv_cq*)
+ */
 static ibv_cq* mock_create_cq(ibv_context* c, int cqe, void* x, void* ch, int cv) {
     (void)c;
     (void)cqe;
@@ -365,12 +420,21 @@ static ibv_cq* mock_create_cq(ibv_context* c, int cqe, void* x, void* ch, int cv
     (void)cv;
     return (ibv_cq*)&MOCK_CQ;
 }
-/** Mock ibv_destroy_cq: no-op (the CQ is a sentinel). */
+/**
+ * Mock ibv_destroy_cq: no-op (the CQ is a sentinel).
+ * @param q (ibv_cq*)
+ * @return (int)
+ */
 static int mock_destroy_cq(ibv_cq* q) {
     (void)q;
     return 0;
 }
-/** Mock ibv_create_qp: hand back a heap int holding a unique fake QP number. */
+/**
+ * Mock ibv_create_qp: hand back a heap int holding a unique fake QP number.
+ * @param p (ibv_pd*)
+ * @param a (ibv_qp_init_attr*)
+ * @return (ibv_qp*)
+ */
 static ibv_qp* mock_create_qp(ibv_pd* p, ibv_qp_init_attr* a) {
     (void)p;
     (void)a;
@@ -381,20 +445,37 @@ static ibv_qp* mock_create_qp(ibv_pd* p, ibv_qp_init_attr* a) {
     *h = qpc++;
     return (ibv_qp*)h;
 }
-/** Mock ibv_destroy_qp: free the heap-allocated fake QP. */
+/**
+ * Mock ibv_destroy_qp: free the heap-allocated fake QP.
+ * @param q (ibv_qp*)
+ * @return (int)
+ */
 static int mock_destroy_qp(ibv_qp* q) {
     cml_free(q);
     return 0;
 }
-/** Mock ibv_modify_qp: accept any state transition (no real QP state machine). */
+/**
+ * Mock ibv_modify_qp: accept any state transition (no real QP state machine).
+ * @param q (ibv_qp*)
+ * @param a (ibv_qp_attr*)
+ * @param m (int)
+ * @return (int)
+ */
 static int mock_modify_qp(ibv_qp* q, ibv_qp_attr* a, int m) {
     (void)q;
     (void)a;
     (void)m;
     return 0;
 }
-/** Mock ibv_reg_mr: allocate an MR with a unique nonzero lkey/rkey and record it
- * so mock_key_known can validate later work requests. */
+/**
+ * Mock ibv_reg_mr: allocate an MR with a unique nonzero lkey/rkey and record it
+ * so mock_key_known can validate later work requests.
+ * @param p (ibv_pd*)
+ * @param addr (void*)
+ * @param len (size_t)
+ * @param access (int)
+ * @return (ibv_mr*)
+ */
 static ibv_mr* mock_reg_mr(ibv_pd* p, void* addr, size_t len, int access) {
     (void)p;
     (void)access;
@@ -410,13 +491,23 @@ static ibv_mr* mock_reg_mr(ibv_pd* p, void* addr, size_t len, int access) {
         mock_keys[mock_num_keys++] = mr->lkey;
     return mr;
 }
-/** Mock ibv_dereg_mr: free the mock MR (the key stays recorded). */
+/**
+ * Mock ibv_dereg_mr: free the mock MR (the key stays recorded).
+ * @param mr (ibv_mr*)
+ * @return (int)
+ */
 static int mock_dereg_mr(ibv_mr* mr) {
     cml_free(mr);
     return 0;
 }
-/** Mock ibv_post_send: validate the SGE lkey and peer, write the payload over the
- * peer's TCP socket, and stage a completion. Fails loudly on an unregistered key. */
+/**
+ * Mock ibv_post_send: validate the SGE lkey and peer, write the payload over the
+ * peer's TCP socket, and stage a completion. Fails loudly on an unregistered key.
+ * @param q (ibv_qp*)
+ * @param wr (ibv_send_wr*)
+ * @param bad (ibv_send_wr**)
+ * @return (int)
+ */
 static int mock_post_send(ibv_qp* q, ibv_send_wr* wr, ibv_send_wr** bad) {
     (void)q;
     (void)bad;
@@ -435,8 +526,14 @@ static int mock_post_send(ibv_qp* q, ibv_send_wr* wr, ibv_send_wr** bad) {
     mock_wc_status = ok ? 0 : 1;
     return 0;
 }
-/** Mock ibv_post_recv: validate the SGE lkey and peer, read the payload from the
- * peer's TCP socket, and stage a completion. */
+/**
+ * Mock ibv_post_recv: validate the SGE lkey and peer, read the payload from the
+ * peer's TCP socket, and stage a completion.
+ * @param q (ibv_qp*)
+ * @param wr (ibv_recv_wr*)
+ * @param bad (ibv_recv_wr**)
+ * @return (int)
+ */
 static int mock_post_recv(ibv_qp* q, ibv_recv_wr* wr, ibv_recv_wr** bad) {
     (void)q;
     (void)bad;
@@ -453,7 +550,13 @@ static int mock_post_recv(ibv_qp* q, ibv_recv_wr* wr, ibv_recv_wr** bad) {
     mock_wc_status = ok ? 0 : 1;
     return 0;
 }
-/** Mock ibv_poll_cq: return the single staged completion (if any) and clear it. */
+/**
+ * Mock ibv_poll_cq: return the single staged completion (if any) and clear it.
+ * @param cq (ibv_cq*)
+ * @param ne (int)
+ * @param wc (ibv_wc*)
+ * @return (int)
+ */
 static int mock_poll_cq(ibv_cq* cq, int ne, ibv_wc* wc) {
     (void)cq;
     (void)ne;
@@ -470,7 +573,13 @@ static int mock_poll_cq(ibv_cq* cq, int ne, ibv_wc* wc) {
     }
     return 0;
 }
-/** Mock ibv_query_port: report a deterministic LID derived from this rank. */
+/**
+ * Mock ibv_query_port: report a deterministic LID derived from this rank.
+ * @param c (ibv_context*)
+ * @param port (uint8_t)
+ * @param pa (ibv_port_attr*)
+ * @return (int)
+ */
 static int mock_query_port(ibv_context* c, uint8_t port, ibv_port_attr* pa) {
     (void)c;
     (void)port;
@@ -480,7 +589,14 @@ static int mock_query_port(ibv_context* c, uint8_t port, ibv_port_attr* pa) {
     }
     return 0;
 }
-/** Mock ibv_query_qp: report the fake QP number stored in the QP handle. */
+/**
+ * Mock ibv_query_qp: report the fake QP number stored in the QP handle.
+ * @param q (ibv_qp*)
+ * @param a (ibv_qp_attr*)
+ * @param m (int)
+ * @param ia (ibv_qp_init_attr*)
+ * @return (int)
+ */
 static int mock_query_qp(ibv_qp* q, ibv_qp_attr* a, int m, ibv_qp_init_attr* ia) {
     (void)m;
     (void)ia;
@@ -557,9 +673,14 @@ static int mock_build_mesh(int rank, int ws) {
     return 0;
 }
 
-/** Reset mock state, build the TCP peer mesh, and point ib_api at the mock verbs
+/**
+ * Reset mock state, build the TCP peer mesh, and point ib_api at the mock verbs
  * so the rest of the transport runs against the emulation. Returns -1 on mesh
- * setup failure. */
+ * setup failure.
+ * @param rank (int)
+ * @param ws (int)
+ * @return (int)
+ */
 static int install_mock_ib_api(int rank, int ws) {
     mock_rank     = rank;
     mock_ws       = ws;
@@ -591,10 +712,15 @@ static int install_mock_ib_api(int rank, int ws) {
     return 0;
 }
 
-/** Create an IB transport: load real libibverbs (or install the mock verbs when
+/**
+ * Create an IB transport: load real libibverbs (or install the mock verbs when
  * IB_MOCK is set), open the first device, and allocate a PD, CQ, and one RC QP
  * per peer. The mock path is marked already-connected; real QPs still need
- * cml_ib_connect. Returns NULL on any failure. */
+ * cml_ib_connect. Returns NULL on any failure.
+ * @param rank (int)
+ * @param world_size (int)
+ * @return (CMLIBTransport*)
+ */
 CMLIBTransport* cml_ib_create(int rank, int world_size) {
     if (rank < 0 || world_size <= 0 || rank >= world_size) {
         LOG_ERROR("Invalid rank=%d world_size=%d", rank, world_size);
@@ -738,8 +864,13 @@ typedef struct {
     uint32_t psn;
 } qp_info_t;
 
-/** Move the QP for @p peer to the INIT state with local-write and remote
- * read/write access on port 1. First step of the RC QP handshake. */
+/**
+ * Move the QP for @p peer to the INIT state with local-write and remote
+ * read/write access on port 1. First step of the RC QP handshake.
+ * @param ib (CMLIBTransport*)
+ * @param peer (int)
+ * @return (int)
+ */
 static int transition_qp_init(CMLIBTransport* ib, int peer) {
     ibv_qp_attr attr;
     memset(&attr, 0, sizeof(attr));
@@ -753,8 +884,14 @@ static int transition_qp_init(CMLIBTransport* ib, int peer) {
     return ib_api.modify_qp(ib->qps[peer], &attr, mask);
 }
 
-/** Move the QP for @p peer to Ready-to-Receive, wiring in the @p remote QP
- * number, PSN, and LID exchanged over TCP. Second step of the handshake. */
+/**
+ * Move the QP for @p peer to Ready-to-Receive, wiring in the @p remote QP
+ * number, PSN, and LID exchanged over TCP. Second step of the handshake.
+ * @param ib (CMLIBTransport*)
+ * @param peer (int)
+ * @param remote (qp_info_t*)
+ * @return (int)
+ */
 static int transition_qp_rtr(CMLIBTransport* ib, int peer, qp_info_t* remote) {
     ibv_qp_attr attr;
     memset(&attr, 0, sizeof(attr));
@@ -774,8 +911,14 @@ static int transition_qp_rtr(CMLIBTransport* ib, int peer, qp_info_t* remote) {
     return ib_api.modify_qp(ib->qps[peer], &attr, mask);
 }
 
-/** Move the QP for @p peer to Ready-to-Send with @p local_psn and retry/timeout
- * params. Final step of the handshake, after which sends may be posted. */
+/**
+ * Move the QP for @p peer to Ready-to-Send with @p local_psn and retry/timeout
+ * params. Final step of the handshake, after which sends may be posted.
+ * @param ib (CMLIBTransport*)
+ * @param peer (int)
+ * @param local_psn (uint32_t)
+ * @return (int)
+ */
 static int transition_qp_rts(CMLIBTransport* ib, int peer, uint32_t local_psn) {
     ibv_qp_attr attr;
     memset(&attr, 0, sizeof(attr));
@@ -790,9 +933,17 @@ static int transition_qp_rts(CMLIBTransport* ib, int peer, uint32_t local_psn) {
     return ib_api.modify_qp(ib->qps[peer], &attr, mask);
 }
 
-/** Exchange @p size bytes with one peer over a short-lived TCP connection: the
+/**
+ * Exchange @p size bytes with one peer over a short-lived TCP connection: the
  * server binds and accepts, the client connects (with retry), both send then
- * fully receive. Used to swap QP connection info during the handshake. */
+ * fully receive. Used to swap QP connection info during the handshake.
+ * @param addr (const char*)
+ * @param is_server (int)
+ * @param send_data (void*)
+ * @param recv_data (void*)
+ * @param size (size_t)
+ * @return (int)
+ */
 static int tcp_exchange(const char* addr, int is_server, void* send_data, void* recv_data,
                         size_t size) {
     struct addrinfo hints, *res;
@@ -870,9 +1021,15 @@ static int tcp_exchange(const char* addr, int is_server, void* send_data, void* 
     return 0;
 }
 
-/** Connect every QP by running the INIT->RTR->RTS handshake against each peer,
+/**
+ * Connect every QP by running the INIT->RTR->RTS handshake against each peer,
  * exchanging QP info over TCP (@p peer_addrs, one per peer). A no-op for the
- * already-connected mock transport. Returns 0 on success, -1 on error. */
+ * already-connected mock transport. Returns 0 on success, -1 on error.
+ * @param ib (CMLIBTransport*)
+ * @param peer_addrs (const char**)
+ * @param num_peers (int)
+ * @return (int)
+ */
 int cml_ib_connect(CMLIBTransport* ib, const char** peer_addrs, int num_peers) {
     if (!ib)
         return -1;
@@ -928,8 +1085,12 @@ int cml_ib_connect(CMLIBTransport* ib, const char** peer_addrs, int num_peers) {
     return 0;
 }
 
-/** Destroy all QPs, the CQ, PD, and device context, close the libibverbs handle,
- * and free the transport. */
+/**
+ * Destroy all QPs, the CQ, PD, and device context, close the libibverbs handle,
+ * and free the transport.
+ * @param ib (CMLIBTransport*)
+ * @return (void)
+ */
 void cml_ib_free(CMLIBTransport* ib) {
     if (!ib)
         return;
@@ -956,8 +1117,13 @@ void cml_ib_free(CMLIBTransport* ib) {
     cml_free(ib);
 }
 
-/** Poll the CQ until one work completion arrives or @p timeout_ms elapses.
- * Returns 0 on a successful completion, -1 on error, timeout, or poll failure. */
+/**
+ * Poll the CQ until one work completion arrives or @p timeout_ms elapses.
+ * Returns 0 on a successful completion, -1 on error, timeout, or poll failure.
+ * @param ib (CMLIBTransport*)
+ * @param timeout_ms (int)
+ * @return (int)
+ */
 static int poll_completion(CMLIBTransport* ib, int timeout_ms) {
     int elapsed = 0;
     while (elapsed < timeout_ms) {
@@ -981,8 +1147,15 @@ static int poll_completion(CMLIBTransport* ib, int timeout_ms) {
     return -1;
 }
 
-/** Blocking RDMA send of @p buf to @p peer: register the buffer, post the send
- * work request, wait for its completion, then deregister. Returns 0 on success. */
+/**
+ * Blocking RDMA send of @p buf to @p peer: register the buffer, post the send
+ * work request, wait for its completion, then deregister. Returns 0 on success.
+ * @param ib (CMLIBTransport*)
+ * @param peer (int)
+ * @param buf (const void*)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_ib_send(CMLIBTransport* ib, int peer, const void* buf, size_t size) {
     if (!ib || !ib->connected || peer < 0 || peer >= ib->world_size || peer == ib->rank)
         return -1;
@@ -1020,9 +1193,16 @@ int cml_ib_send(CMLIBTransport* ib, int peer, const void* buf, size_t size) {
     return rc;
 }
 
-/** Blocking RDMA receive into @p buf from @p peer: register the buffer, post the
+/**
+ * Blocking RDMA receive into @p buf from @p peer: register the buffer, post the
  * recv work request, wait for its completion, then deregister. Returns 0 on
- * success. */
+ * success.
+ * @param ib (CMLIBTransport*)
+ * @param peer (int)
+ * @param buf (void*)
+ * @param size (size_t)
+ * @return (int)
+ */
 int cml_ib_recv(CMLIBTransport* ib, int peer, void* buf, size_t size) {
     if (!ib || !ib->connected || peer < 0 || peer >= ib->world_size || peer == ib->rank)
         return -1;
@@ -1081,9 +1261,16 @@ static int ib_ring_sendrecv(CMLIBTransport* ib, int right, const void* sbuf, siz
     return 0;
 }
 
-/** Ring all-reduce-sum over @p buf (@p size bytes of @p elem_size elements)
+/**
+ * Ring all-reduce-sum over @p buf (@p size bytes of @p elem_size elements)
  * across the transport's ranks: a reduce-scatter phase then an all-gather phase,
- * using parity-ordered paired send/recv. Returns 0 on success, -1 on error. */
+ * using parity-ordered paired send/recv. Returns 0 on success, -1 on error.
+ * @param ib (CMLIBTransport*)
+ * @param buf (void*)
+ * @param size (size_t)
+ * @param elem_size (int)
+ * @return (int)
+ */
 int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) {
     if (!ib || !ib->connected || !buf || size == 0 || elem_size <= 0)
         return -1;
@@ -1156,8 +1343,12 @@ int cml_ib_allreduce(CMLIBTransport* ib, void* buf, size_t size, int elem_size) 
     return 0;
 }
 
-/** Barrier via world_size-1 rounds of one-byte paired ring send/recv, so no rank
- * proceeds until all have reached it. Returns 0 on success, -1 on error. */
+/**
+ * Barrier via world_size-1 rounds of one-byte paired ring send/recv, so no rank
+ * proceeds until all have reached it. Returns 0 on success, -1 on error.
+ * @param ib (CMLIBTransport*)
+ * @return (int)
+ */
 int cml_ib_barrier(CMLIBTransport* ib) {
     if (!ib || !ib->connected)
         return -1;
@@ -1173,9 +1364,15 @@ int cml_ib_barrier(CMLIBTransport* ib) {
     return 0;
 }
 
-/** Register @p addr/@p size for local and remote RDMA access and return a reusable
+/**
+ * Register @p addr/@p size for local and remote RDMA access and return a reusable
  * handle exposing the driver-assigned lkey/rkey. NULL on failure. Avoids the
- * per-op registration cost of cml_ib_send/recv. */
+ * per-op registration cost of cml_ib_send/recv.
+ * @param ib (CMLIBTransport*)
+ * @param addr (void*)
+ * @param size (size_t)
+ * @return (CMLIBMemReg*)
+ */
 CMLIBMemReg* cml_ib_register_memory(CMLIBTransport* ib, void* addr, size_t size) {
     if (!ib || !addr || size == 0)
         return NULL;
@@ -1202,8 +1399,13 @@ CMLIBMemReg* cml_ib_register_memory(CMLIBTransport* ib, void* addr, size_t size)
     return reg;
 }
 
-/** Deregister a memory region obtained from cml_ib_register_memory and free its
- * handle. */
+/**
+ * Deregister a memory region obtained from cml_ib_register_memory and free its
+ * handle.
+ * @param ib (CMLIBTransport*)
+ * @param reg (CMLIBMemReg*)
+ * @return (void)
+ */
 void cml_ib_deregister_memory(CMLIBTransport* ib, CMLIBMemReg* reg) {
     (void)ib;
     if (!reg)

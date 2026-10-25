@@ -10,10 +10,16 @@
 static DistProcessGroup* g_default_group = NULL;
 static pthread_mutex_t g_dist_mutex      = PTHREAD_MUTEX_INITIALIZER;
 
-/** Create the default process group and bring up the requested backend, falling
+/**
+ * Create the default process group and bring up the requested backend, falling
  * back to Gloo if NCCL/MPI is unavailable. Negative @p world_size / @p rank are
  * auto-detected from WORLD_SIZE / RANK (or LOCAL_RANK). Idempotent; returns -1
- * on invalid rank/world or backend failure. Thread-safe. */
+ * on invalid rank/world or backend failure. Thread-safe.
+ * @param backend (DistBackendType)
+ * @param world_size (int)
+ * @param rank (int)
+ * @return (int)
+ */
 int cml_dist_init(DistBackendType backend, int world_size, int rank) {
     pthread_mutex_lock(&g_dist_mutex);
 
@@ -122,20 +128,35 @@ int cml_dist_init(DistBackendType backend, int world_size, int rank) {
     return 0;
 }
 
-/** The default process group, or NULL if cml_dist_init has not run. */
+/**
+ * The default process group, or NULL if cml_dist_init has not run.
+ * @return (DistProcessGroup*)
+ */
 DistProcessGroup* cml_dist_get_default_group(void) { return g_default_group; }
 
-/** This process's rank, or 0 when distributed is uninitialized. */
+/**
+ * This process's rank, or 0 when distributed is uninitialized.
+ * @return (int)
+ */
 int cml_dist_get_rank(void) { return g_default_group ? g_default_group->rank : 0; }
 
-/** The group's world size, or 1 when distributed is uninitialized. */
+/**
+ * The group's world size, or 1 when distributed is uninitialized.
+ * @return (int)
+ */
 int cml_dist_get_world_size(void) { return g_default_group ? g_default_group->world_size : 1; }
 
-/** True once a default group exists and its backend has been initialized. */
+/**
+ * True once a default group exists and its backend has been initialized.
+ * @return (bool)
+ */
 bool cml_dist_is_initialized(void) { return g_default_group && g_default_group->initialized; }
 
-/** Tear down the backend and release the default process group. Thread-safe and
- * a no-op if nothing was initialized. */
+/**
+ * Tear down the backend and release the default process group. Thread-safe and
+ * a no-op if nothing was initialized.
+ * @return (void)
+ */
 void cml_dist_destroy(void) {
     pthread_mutex_lock(&g_dist_mutex);
 
@@ -154,8 +175,13 @@ void cml_dist_destroy(void) {
     LOG_INFO("Distributed destroyed");
 }
 
-/** Reduce @p tensor in place across all ranks with @p op. Dispatches to the
- * active backend; returns -1 if uninitialized or the op is unsupported. */
+/**
+ * Reduce @p tensor in place across all ranks with @p op. Dispatches to the
+ * active backend; returns -1 if uninitialized or the op is unsupported.
+ * @param tensor (Tensor*)
+ * @param op (DistReduceOp)
+ * @return (int)
+ */
 int cml_dist_allreduce(Tensor* tensor, DistReduceOp op) {
     if (!g_default_group || !g_default_group->initialized) {
         LOG_ERROR("Distributed not initialized");
@@ -167,8 +193,13 @@ int cml_dist_allreduce(Tensor* tensor, DistReduceOp op) {
     return g_default_group->ops->allreduce(tensor, op, g_default_group->backend_ctx);
 }
 
-/** Broadcast @p tensor from @p src_rank to every rank in place. Returns -1 if
- * uninitialized or unsupported by the backend. */
+/**
+ * Broadcast @p tensor from @p src_rank to every rank in place. Returns -1 if
+ * uninitialized or unsupported by the backend.
+ * @param tensor (Tensor*)
+ * @param src_rank (int)
+ * @return (int)
+ */
 int cml_dist_broadcast(Tensor* tensor, int src_rank) {
     if (!g_default_group || !g_default_group->initialized)
         return -1;
@@ -178,8 +209,13 @@ int cml_dist_broadcast(Tensor* tensor, int src_rank) {
     return g_default_group->ops->broadcast(tensor, src_rank, g_default_group->backend_ctx);
 }
 
-/** Gather each rank's @p input into the per-rank @p output array on all ranks.
- * Returns -1 if uninitialized or unsupported by the backend. */
+/**
+ * Gather each rank's @p input into the per-rank @p output array on all ranks.
+ * Returns -1 if uninitialized or unsupported by the backend.
+ * @param output (Tensor**)
+ * @param input (Tensor*)
+ * @return (int)
+ */
 int cml_dist_allgather(Tensor** output, Tensor* input) {
     if (!g_default_group || !g_default_group->initialized)
         return -1;
@@ -189,8 +225,11 @@ int cml_dist_allgather(Tensor** output, Tensor* input) {
     return g_default_group->ops->allgather(output, input, g_default_group->backend_ctx);
 }
 
-/** Block until all ranks reach the barrier. Returns 0 (treated as a no-op) if
- * the backend has no barrier op, -1 if uninitialized. */
+/**
+ * Block until all ranks reach the barrier. Returns 0 (treated as a no-op) if
+ * the backend has no barrier op, -1 if uninitialized.
+ * @return (int)
+ */
 int cml_dist_barrier(void) {
     if (!g_default_group || !g_default_group->initialized)
         return -1;
@@ -200,8 +239,14 @@ int cml_dist_barrier(void) {
     return g_default_group->ops->barrier(g_default_group->backend_ctx);
 }
 
-/** Point-to-point send of @p tensor to @p dst_rank with message @p tag. Returns
- * -1 if uninitialized or the backend lacks send. */
+/**
+ * Point-to-point send of @p tensor to @p dst_rank with message @p tag. Returns
+ * -1 if uninitialized or the backend lacks send.
+ * @param tensor (Tensor*)
+ * @param dst_rank (int)
+ * @param tag (int)
+ * @return (int)
+ */
 int cml_dist_send(Tensor* tensor, int dst_rank, int tag) {
     if (!g_default_group || !g_default_group->initialized)
         return -1;
@@ -210,8 +255,14 @@ int cml_dist_send(Tensor* tensor, int dst_rank, int tag) {
     return g_default_group->ops->send(tensor, dst_rank, tag, g_default_group->backend_ctx);
 }
 
-/** Point-to-point receive into @p tensor from @p src_rank matching @p tag.
- * Returns -1 if uninitialized or the backend lacks recv. */
+/**
+ * Point-to-point receive into @p tensor from @p src_rank matching @p tag.
+ * Returns -1 if uninitialized or the backend lacks recv.
+ * @param tensor (Tensor*)
+ * @param src_rank (int)
+ * @param tag (int)
+ * @return (int)
+ */
 int cml_dist_recv(Tensor* tensor, int src_rank, int tag) {
     if (!g_default_group || !g_default_group->initialized)
         return -1;
@@ -220,9 +271,14 @@ int cml_dist_recv(Tensor* tensor, int src_rank, int tag) {
     return g_default_group->ops->recv(tensor, src_rank, tag, g_default_group->backend_ctx);
 }
 
-/** Start a non-blocking all-reduce, returning a DistWork handle to wait on. If
+/**
+ * Start a non-blocking all-reduce, returning a DistWork handle to wait on. If
  * the backend has no async path, runs synchronously and returns an
- * already-completed handle. NULL on uninitialized or allocation failure. */
+ * already-completed handle. NULL on uninitialized or allocation failure.
+ * @param tensor (Tensor*)
+ * @param op (DistReduceOp)
+ * @return (DistWork*)
+ */
 DistWork* cml_dist_allreduce_async(Tensor* tensor, DistReduceOp op) {
     if (!g_default_group || !g_default_group->initialized)
         return NULL;
@@ -240,8 +296,12 @@ DistWork* cml_dist_allreduce_async(Tensor* tensor, DistReduceOp op) {
     return g_default_group->ops->allreduce_async(tensor, op, g_default_group->backend_ctx);
 }
 
-/** Block until @p work finishes and return its error code; returns immediately
- * for an already-completed handle. */
+/**
+ * Block until @p work finishes and return its error code; returns immediately
+ * for an already-completed handle.
+ * @param work (DistWork*)
+ * @return (int)
+ */
 int cml_dist_wait(DistWork* work) {
     if (!work)
         return -1;
@@ -254,7 +314,11 @@ int cml_dist_wait(DistWork* work) {
     return -1;
 }
 
-/** Release a DistWork handle and its backend-internal state. */
+/**
+ * Release a DistWork handle and its backend-internal state.
+ * @param work (DistWork*)
+ * @return (void)
+ */
 void cml_dist_work_free(DistWork* work) {
     if (!work)
         return;

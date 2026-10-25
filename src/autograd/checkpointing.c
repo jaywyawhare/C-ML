@@ -25,18 +25,29 @@ static CheckpointedTensor** checkpointed_tensors = NULL;
 static int num_checkpointed                      = 0;
 static int checkpointed_capacity                 = 0;
 
-/** Toggle the global gradient-checkpointing flag consulted by checkpoint_forward. */
+/**
+ * Toggle the global gradient-checkpointing flag consulted by checkpoint_forward.
+ * @param enabled (bool)
+ * @return (void)
+ */
 void autograd_set_checkpointing(bool enabled) {
     checkpointing_enabled = enabled;
     LOG_DEBUG("Gradient checkpointing %s", enabled ? "enabled" : "disabled");
 }
 
-/** Whether gradient checkpointing is currently enabled. */
+/**
+ * Whether gradient checkpointing is currently enabled.
+ * @return (bool)
+ */
 bool autograd_is_checkpointing_enabled(void) { return checkpointing_enabled; }
 
-/** Record a tensor's IR linkage and pinned inputs, then free its activation buffer so the
+/**
+ * Record a tensor's IR linkage and pinned inputs, then free its activation buffer so the
  * value can be recomputed later. Trades compute for memory. Returns 0 on success, -1 on
- * error or when checkpointing is disabled. */
+ * error or when checkpointing is disabled.
+ * @param tensor (Tensor*)
+ * @return (int)
+ */
 int autograd_checkpoint(Tensor* tensor) {
     if (!tensor || !checkpointing_enabled)
         return -1;
@@ -105,9 +116,13 @@ int autograd_checkpoint(Tensor* tensor) {
     return 0;
 }
 
-/** Rematerialize a checkpointed tensor by replaying its saved uop on its (recursively
+/**
+ * Rematerialize a checkpointed tensor by replaying its saved uop on its (recursively
  * recomputed) inputs, copying the result back and restoring its IR linkage. Returns the
- * tensor; falls back to restoring only the IR node for unsupported ops. */
+ * tensor; falls back to restoring only the IR node for unsupported ops.
+ * @param tensor (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* autograd_recompute(Tensor* tensor) {
     if (!tensor || !checkpointing_enabled)
         return NULL;
@@ -344,8 +359,13 @@ Tensor* autograd_recompute(Tensor* tensor) {
     return tensor;
 }
 
-/** Run a module forward and, when checkpointing is enabled, checkpoint its output so the
- * activation is dropped until backward. Returns the output, or NULL on error. */
+/**
+ * Run a module forward and, when checkpointing is enabled, checkpoint its output so the
+ * activation is dropped until backward. Returns the output, or NULL on error.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* checkpoint_forward(Module* module, Tensor* input) {
     if (!module || !input)
         return NULL;
@@ -361,8 +381,13 @@ Tensor* checkpoint_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Enable (or disable, when every_n is 0) checkpointing for a Sequential model; every_n is
- * the intended checkpoint stride. */
+/**
+ * Enable (or disable, when every_n is 0) checkpointing for a Sequential model; every_n is
+ * the intended checkpoint stride.
+ * @param seq (Sequential*)
+ * @param every_n (int)
+ * @return (void)
+ */
 void sequential_apply_checkpointing(Sequential* seq, int every_n) {
     if (!seq || every_n < 0)
         return;
@@ -377,8 +402,11 @@ void sequential_apply_checkpointing(Sequential* seq, int every_n) {
     LOG_DEBUG("Applied checkpointing to Sequential model: every %d layers", every_n);
 }
 
-/** Release all checkpoint records, dropping the input references pinned in
- * autograd_checkpoint and resetting the global registry. */
+/**
+ * Release all checkpoint records, dropping the input references pinned in
+ * autograd_checkpoint and resetting the global registry.
+ * @return (void)
+ */
 void autograd_checkpointing_cleanup(void) {
     if (checkpointed_tensors) {
         for (int i = 0; i < num_checkpointed; i++) {

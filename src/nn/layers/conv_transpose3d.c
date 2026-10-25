@@ -9,8 +9,13 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** torch.nn.ConvTranspose3d forward: fractionally-strided conv of a 5D input [N, C_in, D, H, W]
- *  via uop_conv_transpose3d. NULL on rank/channel mismatch or a missing weight. */
+/**
+ * torch.nn.ConvTranspose3d forward: fractionally-strided conv of a 5D input [N, C_in, D, H, W]
+ * via uop_conv_transpose3d. NULL on rank/channel mismatch or a missing weight.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* conv_transpose3d_forward(Module* module, Tensor* input) {
     ConvTranspose3d* layer = (ConvTranspose3d*)module;
 
@@ -50,7 +55,11 @@ Tensor* conv_transpose3d_forward(Module* module, Tensor* input) {
     return uop_conv_transpose3d(input, layer->weight->tensor, bias, &params);
 }
 
-/** Free the ConvTranspose3d module; owned parameters are released by module_free. */
+/**
+ * Free the ConvTranspose3d module; owned parameters are released by module_free.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void conv_transpose3d_free(Module* module) {
     ConvTranspose3d* layer = (ConvTranspose3d*)module;
     if (!layer)
@@ -58,7 +67,15 @@ static void conv_transpose3d_free(Module* module) {
     cml_free(layer);
 }
 
-/** Default weight initializer: Kaiming/He with fan-in over in_channels * kernel volume. */
+/**
+ * Default weight initializer: Kaiming/He with fan-in over in_channels * kernel volume.
+ * @param tensor (Tensor*)
+ * @param in_channels (int)
+ * @param kd (int)
+ * @param kh (int)
+ * @param kw (int)
+ * @return (void)
+ */
 static void kaiming_init_transpose3d(Tensor* tensor, int in_channels, int kd, int kh, int kw) {
     (void)kd;
     (void)kh;
@@ -66,8 +83,20 @@ static void kaiming_init_transpose3d(Tensor* tensor, int in_channels, int kd, in
     nn_init_kaiming(tensor, in_channels, kd * kh * kw);
 }
 
-/** Construct a cubic-kernel ConvTranspose3d; weight [in_channels, out_channels, k, k, k] is
- *  Kaiming-init, bias (zeros) added when use_bias. Returns NULL on failure. */
+/**
+ * Construct a cubic-kernel ConvTranspose3d; weight [in_channels, out_channels, k, k, k] is
+ * Kaiming-init, bias (zeros) added when use_bias. Returns NULL on failure.
+ * @param in_channels (int)
+ * @param out_channels (int)
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @param padding (int)
+ * @param output_padding (int)
+ * @param use_bias (bool)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (ConvTranspose3d*)
+ */
 ConvTranspose3d* nn_conv_transpose3d(int in_channels, int out_channels, int kernel_size, int stride,
                                      int padding, int output_padding, bool use_bias, DType dtype,
                                      DeviceType device) {

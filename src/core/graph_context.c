@@ -6,7 +6,10 @@
 static CMLComputationGraph_t g_current_graph = NULL;
 static bool g_graph_context_initialized      = false;
 
-/** Free the thread's current computation graph, if any, and clear the slot. */
+/**
+ * Free the thread's current computation graph, if any, and clear the slot.
+ * @return (void)
+ */
 void cml_free_current_graph(void) {
     if (g_current_graph) {
         cml_graph_free(g_current_graph);
@@ -14,14 +17,20 @@ void cml_free_current_graph(void) {
     }
 }
 
-/** Initialize the graph context subsystem; idempotent. */
+/**
+ * Initialize the graph context subsystem; idempotent.
+ * @return (void)
+ */
 void cml_graph_context_init(void) {
     if (g_graph_context_initialized)
         return;
     g_graph_context_initialized = true;
 }
 
-/** Release the current graph and mark the context uninitialized. */
+/**
+ * Release the current graph and mark the context uninitialized.
+ * @return (void)
+ */
 void cml_graph_context_cleanup(void) {
     cml_free_current_graph();
     g_graph_context_initialized = false;

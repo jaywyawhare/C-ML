@@ -6,7 +6,17 @@
 #include <stdlib.h>
 #include "alloc/cml_allocator.h"
 
-/** Basic Inception unit: Conv2d -> BatchNorm2d -> ReLU with the given kernel/stride/padding. */
+/**
+ * Basic Inception unit: Conv2d -> BatchNorm2d -> ReLU with the given kernel/stride/padding.
+ * @param in_ch (int)
+ * @param out_ch (int)
+ * @param kernel (int)
+ * @param stride (int)
+ * @param padding (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* conv_bn_relu(int in_ch, int out_ch, int kernel, int stride, int padding, DType dtype,
                             DeviceType device) {
     Sequential* block = nn_sequential();
@@ -27,7 +37,12 @@ typedef struct {
     int num_branches;
 } ConcatBlock;
 
-/** Run every branch on the same input and concatenate their outputs along the channel axis. */
+/**
+ * Run every branch on the same input and concatenate their outputs along the channel axis.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* concat_forward(Module* module, Tensor* input) {
     ConcatBlock* blk = (ConcatBlock*)module;
     if (!blk || !input)
@@ -50,7 +65,11 @@ static Tensor* concat_forward(Module* module, Tensor* input) {
     return result;
 }
 
-/** Free all branch modules and the concat block itself. */
+/**
+ * Free all branch modules and the concat block itself.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void concat_free(Module* module) {
     ConcatBlock* blk = (ConcatBlock*)module;
     if (!blk)
@@ -61,7 +80,12 @@ static void concat_free(Module* module) {
     cml_free(blk);
 }
 
-/** Allocate a parallel-branch concat block named @p name with @p num_branches empty slots. */
+/**
+ * Allocate a parallel-branch concat block named @p name with @p num_branches empty slots.
+ * @param name (const char*)
+ * @param num_branches (int)
+ * @return (ConcatBlock*)
+ */
 static ConcatBlock* create_concat_block(const char* name, int num_branches) {
     ConcatBlock* blk = cml_malloc(sizeof(ConcatBlock));
     if (!blk)
@@ -82,7 +106,14 @@ static ConcatBlock* create_concat_block(const char* name, int num_branches) {
     return blk;
 }
 
-/** Build an Inception-A module (4 branches: 1x1, 1x1->5x5, 1x1->3x3->3x3, pool->1x1). */
+/**
+ * Build an Inception-A module (4 branches: 1x1, 1x1->5x5, 1x1->3x3->3x3, pool->1x1).
+ * @param in_ch (int)
+ * @param pool_proj (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_inception_a(int in_ch, int pool_proj, DType dtype, DeviceType device) {
     ConcatBlock* blk = create_concat_block("InceptionA", 4);
     if (!blk)
@@ -111,7 +142,13 @@ static Module* create_inception_a(int in_ch, int pool_proj, DType dtype, DeviceT
     return (Module*)blk;
 }
 
-/** Build an Inception-B grid-reduction module (3 branches with stride-2 convs and maxpool). */
+/**
+ * Build an Inception-B grid-reduction module (3 branches with stride-2 convs and maxpool).
+ * @param in_ch (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_inception_b(int in_ch, DType dtype, DeviceType device) {
     ConcatBlock* blk = create_concat_block("InceptionB", 3);
     if (!blk)
@@ -134,7 +171,14 @@ static Module* create_inception_b(int in_ch, DType dtype, DeviceType device) {
     return (Module*)blk;
 }
 
-/** Build an Inception-C module with factorized 7x7 (as two 1x7/7x1) convolution branches. */
+/**
+ * Build an Inception-C module with factorized 7x7 (as two 1x7/7x1) convolution branches.
+ * @param in_ch (int)
+ * @param c7 (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_inception_c(int in_ch, int c7, DType dtype, DeviceType device) {
     ConcatBlock* blk = create_concat_block("InceptionC", 4);
     if (!blk)
@@ -166,7 +210,13 @@ static Module* create_inception_c(int in_ch, int c7, DType dtype, DeviceType dev
     return (Module*)blk;
 }
 
-/** Build an Inception-D grid-reduction module (3 branches with stride-2 convs and maxpool). */
+/**
+ * Build an Inception-D grid-reduction module (3 branches with stride-2 convs and maxpool).
+ * @param in_ch (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_inception_d(int in_ch, DType dtype, DeviceType device) {
     ConcatBlock* blk = create_concat_block("InceptionD", 3);
     if (!blk)
@@ -191,7 +241,13 @@ static Module* create_inception_d(int in_ch, DType dtype, DeviceType device) {
     return (Module*)blk;
 }
 
-/** Build an Inception-E module (4 branches with wide 3x3-expanded convolution paths). */
+/**
+ * Build an Inception-E module (4 branches with wide 3x3-expanded convolution paths).
+ * @param in_ch (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 static Module* create_inception_e(int in_ch, DType dtype, DeviceType device) {
     ConcatBlock* blk = create_concat_block("InceptionE", 4);
     if (!blk)
@@ -222,7 +278,13 @@ static Module* create_inception_e(int in_ch, DType dtype, DeviceType device) {
     return (Module*)blk;
 }
 
-/** Assemble Inception-v3: conv stem, Inception A/B/C/D/E stages, pool, dropout and linear head. */
+/**
+ * Assemble Inception-v3: conv stem, Inception A/B/C/D/E stages, pool, dropout and linear head.
+ * @param num_classes (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (Module*)
+ */
 Module* cml_zoo_inception_v3_create(int num_classes, DType dtype, DeviceType device) {
     if (num_classes <= 0)
         num_classes = 1000;

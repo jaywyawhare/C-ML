@@ -9,7 +9,13 @@
 #include <time.h>
 #include "alloc/cml_allocator.h"
 
-/** Index of the max logit in row `row_index` of a [rows, vocab_size] logits tensor. */
+/**
+ * Index of the max logit in row `row_index` of a [rows, vocab_size] logits tensor.
+ * @param logits (Tensor*)
+ * @param row_index (int)
+ * @param vocab_size (int)
+ * @return (int)
+ */
 static int argmax_at_row(Tensor* logits, int row_index, int vocab_size) {
     if (!logits || !logits->data) {
         tensor_ensure_executed(logits);
@@ -30,7 +36,10 @@ static int argmax_at_row(Tensor* logits, int row_index, int vocab_size) {
     return best;
 }
 
-/** Default speculative-decoding config (5 draft tokens, greedy acceptance). */
+/**
+ * Default speculative-decoding config (5 draft tokens, greedy acceptance).
+ * @return (CMLSpeculativeConfig)
+ */
 CMLSpeculativeConfig cml_speculative_default_config(void) {
     CMLSpeculativeConfig cfg;
     cfg.num_draft_tokens  = 5;
@@ -48,7 +57,12 @@ static void softmax_row(const float* row, int vocab, float temperature, float* p
     cml_softmax_row_temp(row, vocab, t, probs);
 }
 
-/** Draw a token index from a normalized probability row by inverse-CDF sampling. */
+/**
+ * Draw a token index from a normalized probability row by inverse-CDF sampling.
+ * @param probs (const float*)
+ * @param vocab (int)
+ * @return (int)
+ */
 static int sample_from_probs(const float* probs, int vocab) {
     float u   = (float)rand() / ((float)RAND_MAX + 1.0f);
     float acc = 0.0f;
@@ -60,7 +74,12 @@ static int sample_from_probs(const float* probs, int vocab) {
     return vocab - 1;
 }
 
-/** Allocate a speculative decoder from `config`; model callbacks are set separately. */
+/**
+ * Allocate a speculative decoder from `config`; model callbacks are set separately.
+ * @param config (const CMLSpeculativeConfig*)
+ * @param vocab_size (int)
+ * @return (CMLSpeculativeDecoder*)
+ */
 CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config, int vocab_size) {
     if (!config) {
         LOG_ERROR("cml_speculative_create: config is NULL");
@@ -88,14 +107,25 @@ CMLSpeculativeDecoder* cml_speculative_create(const CMLSpeculativeConfig* config
     return dec;
 }
 
-/** Free the decoder (model contexts are owned by the caller). */
+/**
+ * Free the decoder (model contexts are owned by the caller).
+ * @param decoder (CMLSpeculativeDecoder*)
+ * @return (void)
+ */
 void cml_speculative_free(CMLSpeculativeDecoder* decoder) {
     if (!decoder)
         return;
     cml_free(decoder);
 }
 
-/** Register the small draft model's context and forward/sample callbacks. */
+/**
+ * Register the small draft model's context and forward/sample callbacks.
+ * @param dec (CMLSpeculativeDecoder*)
+ * @param ctx (void*)
+ * @param forward_fn (CMLModelForwardFn)
+ * @param sample_fn (CMLSampleTokenFn)
+ * @return (void)
+ */
 void cml_speculative_set_draft_model(CMLSpeculativeDecoder* dec, void* ctx,
                                      CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn) {
     if (!dec)
@@ -105,7 +135,14 @@ void cml_speculative_set_draft_model(CMLSpeculativeDecoder* dec, void* ctx,
     dec->draft_sample    = sample_fn;
 }
 
-/** Register the large target model's context and forward/sample callbacks. */
+/**
+ * Register the large target model's context and forward/sample callbacks.
+ * @param dec (CMLSpeculativeDecoder*)
+ * @param ctx (void*)
+ * @param forward_fn (CMLModelForwardFn)
+ * @param sample_fn (CMLSampleTokenFn)
+ * @return (void)
+ */
 void cml_speculative_set_target_model(CMLSpeculativeDecoder* dec, void* ctx,
                                       CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn) {
     if (!dec)
@@ -119,6 +156,10 @@ void cml_speculative_set_target_model(CMLSpeculativeDecoder* dec, void* ctx,
  * One speculative step: draft K tokens with the draft model, verify them in a
  * single target forward, then accept/reject (greedy or Leviathan stochastic rule)
  * and append a correction or bonus token. Returns the accepted tokens and stats.
+ * @param dec (CMLSpeculativeDecoder*)
+ * @param prefix_tokens (const int*)
+ * @param prefix_len (int)
+ * @return (CMLSpeculativeResult*)
  */
 CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
                                                   const int* prefix_tokens, int prefix_len) {
@@ -363,7 +404,11 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
     return result;
 }
 
-/** Free a result returned by cml_speculative_decode_step. */
+/**
+ * Free a result returned by cml_speculative_decode_step.
+ * @param result (CMLSpeculativeResult*)
+ * @return (void)
+ */
 void cml_speculative_result_free(CMLSpeculativeResult* result) {
     if (!result)
         return;
@@ -371,7 +416,11 @@ void cml_speculative_result_free(CMLSpeculativeResult* result) {
     cml_free(result);
 }
 
-/** Lifetime acceptance rate (total accepted / total drafted) across all steps. */
+/**
+ * Lifetime acceptance rate (total accepted / total drafted) across all steps.
+ * @param dec (const CMLSpeculativeDecoder*)
+ * @return (float)
+ */
 float cml_speculative_acceptance_rate(const CMLSpeculativeDecoder* dec) {
     if (!dec || dec->total_drafted == 0)
         return 0.0f;

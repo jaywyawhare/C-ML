@@ -9,7 +9,13 @@
 #include "alloc/cml_allocator.h"
 #include "test_harness.h"
 
-/** Fill a float buffer with a constant value. */
+/**
+ * Fill a float buffer with a constant value.
+ * @param buf (float*)
+ * @param n (size_t)
+ * @param val (float)
+ * @return (void)
+ */
 static void fill_float(float* buf, size_t n, float val) {
     for (size_t i = 0; i < n; i++)
         buf[i] = val;

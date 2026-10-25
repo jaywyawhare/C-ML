@@ -5,7 +5,11 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** Number of colour channels in a pixel of `format`; 0 for an unknown format. */
+/**
+ * Number of colour channels in a pixel of `format`; 0 for an unknown format.
+ * @param format (CMLImageFormat)
+ * @return (int)
+ */
 int cml_image_dtype_channels(CMLImageFormat format) {
     switch (format) {
     case CML_IMAGE_R32F:
@@ -23,7 +27,11 @@ int cml_image_dtype_channels(CMLImageFormat format) {
     }
 }
 
-/** Bytes per pixel for `format`; 0 for an unknown format. */
+/**
+ * Bytes per pixel for `format`; 0 for an unknown format.
+ * @param format (CMLImageFormat)
+ * @return (int)
+ */
 int cml_image_dtype_bpp(CMLImageFormat format) {
     switch (format) {
     case CML_IMAGE_RGBA8:
@@ -45,7 +53,11 @@ int cml_image_dtype_bpp(CMLImageFormat format) {
     }
 }
 
-/** Human-readable name of `format` (e.g. "rgba8"); "unknown" if unrecognized. */
+/**
+ * Human-readable name of `format` (e.g. "rgba8"); "unknown" if unrecognized.
+ * @param format (CMLImageFormat)
+ * @return (const char*)
+ */
 const char* cml_image_dtype_name(CMLImageFormat format) {
     switch (format) {
     case CML_IMAGE_NONE:
@@ -69,8 +81,14 @@ const char* cml_image_dtype_name(CMLImageFormat format) {
     }
 }
 
-/** Whether `shape` can back a texture of `format`: last dim divisible by the
- *  channel count and the pixel total within the conservative 16384^2 limit. */
+/**
+ * Whether `shape` can back a texture of `format`: last dim divisible by the
+ * channel count and the pixel total within the conservative 16384^2 limit.
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param format (CMLImageFormat)
+ * @return (bool)
+ */
 bool cml_image_dtype_compatible(const int* shape, int ndim, CMLImageFormat format) {
     if (!shape || ndim < 1 || format == CML_IMAGE_NONE)
         return false;
@@ -98,7 +116,12 @@ bool cml_image_dtype_compatible(const int* shape, int ndim, CMLImageFormat forma
     return true;
 }
 
-/** Pick the widest-channel float format whose channel count divides the last dim. */
+/**
+ * Pick the widest-channel float format whose channel count divides the last dim.
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @return (CMLImageFormat)
+ */
 CMLImageFormat cml_image_dtype_select(const int* shape, int ndim) {
     if (!shape || ndim < 1)
         return CML_IMAGE_NONE;
@@ -113,8 +136,16 @@ CMLImageFormat cml_image_dtype_select(const int* shape, int ndim) {
     return CML_IMAGE_R32F;
 }
 
-/** Factor the pixel count into near-square texture dimensions for `format`.
- *  Writes 0x0 on an unknown format; leaves outputs untouched on bad shape. */
+/**
+ * Factor the pixel count into near-square texture dimensions for `format`.
+ * Writes 0x0 on an unknown format; leaves outputs untouched on bad shape.
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param format (CMLImageFormat)
+ * @param out_width (int*)
+ * @param out_height (int*)
+ * @return (void)
+ */
 void cml_image_dtype_dims(const int* shape, int ndim, CMLImageFormat format, int* out_width,
                           int* out_height) {
     if (!shape || ndim < 1 || !out_width || !out_height)
@@ -142,8 +173,13 @@ void cml_image_dtype_dims(const int* shape, int ndim, CMLImageFormat format, int
     *out_height = h;
 }
 
-/** Wrap `tensor` as an image view in `format` without copying its data; the
- *  wrapper borrows the tensor. Returns NULL if the shape is incompatible. */
+/**
+ * Wrap `tensor` as an image view in `format` without copying its data; the
+ * wrapper borrows the tensor. Returns NULL if the shape is incompatible.
+ * @param tensor (Tensor*)
+ * @param format (CMLImageFormat)
+ * @return (CMLImageTensor*)
+ */
 CMLImageTensor* cml_image_tensor_create(Tensor* tensor, CMLImageFormat format) {
     if (!tensor)
         return NULL;
@@ -170,7 +206,11 @@ CMLImageTensor* cml_image_tensor_create(Tensor* tensor, CMLImageFormat format) {
     return img;
 }
 
-/** Return the borrowed underlying tensor (ownership stays with the caller). */
+/**
+ * Return the borrowed underlying tensor (ownership stays with the caller).
+ * @param img (CMLImageTensor*)
+ * @return (Tensor*)
+ */
 Tensor* cml_image_tensor_to_regular(CMLImageTensor* img) {
     if (!img || !img->tensor)
         return NULL;
@@ -178,7 +218,11 @@ Tensor* cml_image_tensor_to_regular(CMLImageTensor* img) {
     return img->tensor;
 }
 
-/** Free the image wrapper only; the wrapped tensor is left untouched. */
+/**
+ * Free the image wrapper only; the wrapped tensor is left untouched.
+ * @param img (CMLImageTensor*)
+ * @return (void)
+ */
 void cml_image_tensor_free(CMLImageTensor* img) {
     if (!img)
         return;
@@ -186,14 +230,22 @@ void cml_image_tensor_free(CMLImageTensor* img) {
     cml_free(img);
 }
 
-/** Texture memory footprint in bytes (width * height * bytes-per-pixel). */
+/**
+ * Texture memory footprint in bytes (width * height * bytes-per-pixel).
+ * @param img (const CMLImageTensor*)
+ * @return (size_t)
+ */
 size_t cml_image_tensor_memory(const CMLImageTensor* img) {
     if (!img)
         return 0;
     return (size_t)img->width * (size_t)img->height * (size_t)cml_image_dtype_bpp(img->format);
 }
 
-/** Print a one-line summary (format, dimensions, memory, base shape) to stdout. */
+/**
+ * Print a one-line summary (format, dimensions, memory, base shape) to stdout.
+ * @param img (const CMLImageTensor*)
+ * @return (void)
+ */
 void cml_image_tensor_print(const CMLImageTensor* img) {
     if (!img) {
         printf("ImageTensor: NULL\n");

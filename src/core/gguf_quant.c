@@ -50,9 +50,13 @@ static float fp16_to_fp32(uint16_t h) {
 
 /**
  * Q4_0: 32 elements per block.
- *   Block: fp16 delta `d`, then 16 bytes of nibble-packed quants.
- *   Byte j holds quant[j] (low nibble) and quant[j+16] (high nibble).
- *   value = (nibble - 8) * d
+ * Block: fp16 delta `d`, then 16 bytes of nibble-packed quants.
+ * Byte j holds quant[j] (low nibble) and quant[j+16] (high nibble).
+ * value = (nibble - 8) * d
+ * @param src (const void*)
+ * @param dst (float*)
+ * @param num_blocks (size_t)
+ * @return (void)
  */
 static void dequantize_q4_0(const void* src, float* dst, size_t num_blocks) {
     const BlockQ4_0* blocks = (const BlockQ4_0*)src;
@@ -74,9 +78,13 @@ static void dequantize_q4_0(const void* src, float* dst, size_t num_blocks) {
 
 /**
  * Q4_1: 32 elements per block.
- *   Block: fp16 delta `d`, fp16 min `m`, then 16 bytes of nibble-packed quants.
- *   Same nibble packing as Q4_0.
- *   value = nibble * d + m
+ * Block: fp16 delta `d`, fp16 min `m`, then 16 bytes of nibble-packed quants.
+ * Same nibble packing as Q4_0.
+ * value = nibble * d + m
+ * @param src (const void*)
+ * @param dst (float*)
+ * @param num_blocks (size_t)
+ * @return (void)
  */
 static void dequantize_q4_1(const void* src, float* dst, size_t num_blocks) {
     const BlockQ4_1* blocks = (const BlockQ4_1*)src;
@@ -99,8 +107,12 @@ static void dequantize_q4_1(const void* src, float* dst, size_t num_blocks) {
 
 /**
  * Q8_0: 32 elements per block.
- *   Block: fp16 delta `d`, then 32 signed int8 quants.
- *   value = qs[i] * d
+ * Block: fp16 delta `d`, then 32 signed int8 quants.
+ * value = qs[i] * d
+ * @param src (const void*)
+ * @param dst (float*)
+ * @param num_blocks (size_t)
+ * @return (void)
  */
 static void dequantize_q8_0(const void* src, float* dst, size_t num_blocks) {
     const BlockQ8_0* blocks = (const BlockQ8_0*)src;
@@ -154,7 +166,13 @@ static void unpack_k_scales(const uint8_t* sc_raw, uint8_t* sc, uint8_t* mn) {
     }
 }
 
-/** Dequantize Q4_K super-blocks to float32 (see the format note above unpack_k_scales). */
+/**
+ * Dequantize Q4_K super-blocks to float32 (see the format note above unpack_k_scales).
+ * @param src (const void*)
+ * @param dst (float*)
+ * @param num_blocks (size_t)
+ * @return (void)
+ */
 static void dequantize_q4_k(const void* src, float* dst, size_t num_blocks) {
     const BlockQ4_K* blocks = (const BlockQ4_K*)src;
 
@@ -190,21 +208,25 @@ static void dequantize_q4_k(const void* src, float* dst, size_t num_blocks) {
 /**
  * Q5_K: 256 elements per super-block (8 sub-blocks of 32 elements).
  *
- *   Like Q4_K but with 5-bit quants.  The extra high bit per element is
- *   stored in qh[32] (one bit per element, 256 bits = 32 bytes).
+ * Like Q4_K but with 5-bit quants.  The extra high bit per element is
+ * stored in qh[32] (one bit per element, 256 bits = 32 bytes).
  *
- *   Block layout:
- *     fp16    d          -- super-block scale
- *     fp16    dmin       -- super-block min
- *     uint8   scales[12] -- packed 6-bit sub-block scales and mins (same as Q4_K)
- *     uint8   qh[32]     -- high bit for each element
- *     uint8   qs[128]    -- 4-bit low quants (nibble-packed, same as Q4_K)
+ * Block layout:
+ * fp16    d          -- super-block scale
+ * fp16    dmin       -- super-block min
+ * uint8   scales[12] -- packed 6-bit sub-block scales and mins (same as Q4_K)
+ * uint8   qh[32]     -- high bit for each element
+ * uint8   qs[128]    -- 4-bit low quants (nibble-packed, same as Q4_K)
  *
- *   For element at flat index e within the super-block:
- *     lo4      = 4-bit nibble from qs  (same packing as Q4_K)
- *     high_bit = (qh[e / 8] >> (e % 8)) & 1
- *     q5       = lo4 | (high_bit << 4)        (range 0..31)
- *     value    = q5 * (d * sc) - dmin * mn
+ * For element at flat index e within the super-block:
+ * lo4      = 4-bit nibble from qs  (same packing as Q4_K)
+ * high_bit = (qh[e / 8] >> (e % 8)) & 1
+ * q5       = lo4 | (high_bit << 4)        (range 0..31)
+ * value    = q5 * (d * sc) - dmin * mn
+ * @param src (const void*)
+ * @param dst (float*)
+ * @param num_blocks (size_t)
+ * @return (void)
  */
 static void dequantize_q5_k(const void* src, float* dst, size_t num_blocks) {
     const BlockQ5_K* blocks = (const BlockQ5_K*)src;
@@ -253,21 +275,25 @@ static void dequantize_q5_k(const void* src, float* dst, size_t num_blocks) {
 /**
  * Q6_K: 256 elements per super-block (16 sub-blocks of 16 elements).
  *
- *   6-bit quants formed from 4-bit lower (ql) and 2-bit upper (qh) parts,
- *   with scales quantized to 8 bits.
+ * 6-bit quants formed from 4-bit lower (ql) and 2-bit upper (qh) parts,
+ * with scales quantized to 8 bits.
  *
- *   Block layout:
- *     uint8   ql[128]    -- lower 4 bits of each quant (nibble-packed, 2 per byte)
- *     uint8   qh[64]     -- upper 2 bits of each quant (packed 4 per byte)
- *     int8    scales[16] -- 8-bit signed scale for each of 16 sub-blocks
- *     fp16    d          -- super-block scale
+ * Block layout:
+ * uint8   ql[128]    -- lower 4 bits of each quant (nibble-packed, 2 per byte)
+ * uint8   qh[64]     -- upper 2 bits of each quant (packed 4 per byte)
+ * int8    scales[16] -- 8-bit signed scale for each of 16 sub-blocks
+ * fp16    d          -- super-block scale
  *
- *   For element at flat index e (0..255):
- *     low4     = (e even) ? ql[e/2] & 0x0F : ql[e/2] >> 4
- *     high2    = (qh[e/4] >> (2 * (e % 4))) & 0x03
- *     q6       = low4 | (high2 << 4)          (range 0..63)
- *     signed_q = q6 - 32                      (range -32..31)
- *     value    = d * scales[e / 16] * signed_q
+ * For element at flat index e (0..255):
+ * low4     = (e even) ? ql[e/2] & 0x0F : ql[e/2] >> 4
+ * high2    = (qh[e/4] >> (2 * (e % 4))) & 0x03
+ * q6       = low4 | (high2 << 4)          (range 0..63)
+ * signed_q = q6 - 32                      (range -32..31)
+ * value    = d * scales[e / 16] * signed_q
+ * @param src (const void*)
+ * @param dst (float*)
+ * @param num_blocks (size_t)
+ * @return (void)
  */
 static void dequantize_q6_k(const void* src, float* dst, size_t num_blocks) {
     const BlockQ6_K* blocks = (const BlockQ6_K*)src;
@@ -299,7 +325,11 @@ static void dequantize_q6_k(const void* src, float* dst, size_t num_blocks) {
     }
 }
 
-/** True if the tensor type is one of the supported quantized block formats. */
+/**
+ * True if the tensor type is one of the supported quantized block formats.
+ * @param type (GGUFTensorType)
+ * @return (bool)
+ */
 bool gguf_type_is_quantized(GGUFTensorType type) {
     switch ((int)type) {
     case GGUF_TENSOR_Q4_0:
@@ -314,7 +344,11 @@ bool gguf_type_is_quantized(GGUFTensorType type) {
     }
 }
 
-/** Number of elements per quantization block (32 for Q*_0/1, 256 for K-quants); 0 if unknown. */
+/**
+ * Number of elements per quantization block (32 for Q*_0/1, 256 for K-quants); 0 if unknown.
+ * @param type (GGUFTensorType)
+ * @return (int)
+ */
 int gguf_quant_block_size(GGUFTensorType type) {
     switch ((int)type) {
     case GGUF_TENSOR_Q4_0:
@@ -334,7 +368,11 @@ int gguf_quant_block_size(GGUFTensorType type) {
     }
 }
 
-/** On-disk byte size of one quantization block for the given type; 0 if unknown. */
+/**
+ * On-disk byte size of one quantization block for the given type; 0 if unknown.
+ * @param type (GGUFTensorType)
+ * @return (size_t)
+ */
 size_t gguf_quant_type_size(GGUFTensorType type) {
     switch ((int)type) {
     case GGUF_TENSOR_Q4_0:
@@ -354,8 +392,15 @@ size_t gguf_quant_type_size(GGUFTensorType type) {
     }
 }
 
-/** Dispatch to the per-type dequantizer; numel must be a multiple of the block size.
- *  Returns -1 for unsupported types or a mis-sized element count. */
+/**
+ * Dispatch to the per-type dequantizer; numel must be a multiple of the block size.
+ * Returns -1 for unsupported types or a mis-sized element count.
+ * @param type (GGUFTensorType)
+ * @param src (const void*)
+ * @param dst (float*)
+ * @param numel (size_t)
+ * @return (int)
+ */
 int gguf_dequantize(GGUFTensorType type, const void* src, float* dst, size_t numel) {
     if (!src || !dst || numel == 0) {
         return -1;
@@ -398,8 +443,17 @@ int gguf_dequantize(GGUFTensorType type, const void* src, float* dst, size_t num
     return 0;
 }
 
-/** y[m,n] = x[m,k] * W^T where W is Q8_0-quantized (dequantized on the fly per block),
- *  avoiding a full dense expansion of the weights; -1 on bad dims. */
+/**
+ * y[m,n] = x[m,k] * W^T where W is Q8_0-quantized (dequantized on the fly per block),
+ * avoiding a full dense expansion of the weights; -1 on bad dims.
+ * @param x (const float*)
+ * @param w_q8 (const void*)
+ * @param y (float*)
+ * @param m (int)
+ * @param k (int)
+ * @param n (int)
+ * @return (int)
+ */
 int gguf_q8_0_matmul(const float* x, const void* w_q8, float* y, int m, int k, int n) {
     if (!x || !w_q8 || !y || m <= 0 || k <= 0 || n <= 0 || (k % QK8_0) != 0)
         return -1;
@@ -425,8 +479,17 @@ int gguf_q8_0_matmul(const float* x, const void* w_q8, float* y, int m, int k, i
     return 0;
 }
 
-/** y[m,n] = x[m,k] * W^T where W is Q4_0-quantized (nibbles dequantized on the fly
- *  as (q-8)*d); -1 on bad dims. */
+/**
+ * y[m,n] = x[m,k] * W^T where W is Q4_0-quantized (nibbles dequantized on the fly
+ * as (q-8)*d); -1 on bad dims.
+ * @param x (const float*)
+ * @param w_q4 (const void*)
+ * @param y (float*)
+ * @param m (int)
+ * @param k (int)
+ * @param n (int)
+ * @return (int)
+ */
 int gguf_q4_0_matmul(const float* x, const void* w_q4, float* y, int m, int k, int n) {
     if (!x || !w_q4 || !y || m <= 0 || k <= 0 || n <= 0 || (k % QK4_0) != 0)
         return -1;

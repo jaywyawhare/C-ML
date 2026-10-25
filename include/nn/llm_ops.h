@@ -56,11 +56,18 @@ typedef struct CMLFlashAttentionConfig {
 
 CMLFlashAttentionConfig cml_flash_attention_default_config(void);
 
-/** Flash GQA forward pass (O(N) memory via online softmax)
+/**
+ * Flash GQA forward pass (O(N) memory via online softmax)
  * Q: [batch, seq_len, num_heads * head_dim]
  * K: [batch, kv_len, num_kv_heads * head_dim]
  * V: [batch, kv_len, num_kv_heads * head_dim]
  * Returns: [batch, seq_len, num_heads * head_dim]
+ * @param Q (Tensor*)
+ * @param K (Tensor*)
+ * @param V (Tensor*)
+ * @param config (const CMLGQAConfig*)
+ * @param flash_config (const CMLFlashAttentionConfig*)
+ * @return (Tensor*)
  */
 Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config,
                               const CMLFlashAttentionConfig* flash_config);
@@ -69,11 +76,18 @@ Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache
                                      const CMLGQAConfig* config,
                                      const CMLFlashAttentionConfig* flash_config);
 
-/** Grouped Query Attention forward pass
+/**
+ * Grouped Query Attention forward pass
  * Q: [batch, seq_len, num_heads * head_dim]
  * K: [batch, kv_len, num_kv_heads * head_dim]
  * V: [batch, kv_len, num_kv_heads * head_dim]
  * Returns: [batch, seq_len, num_heads * head_dim]
+ * @param Q (Tensor*)
+ * @param K (Tensor*)
+ * @param V (Tensor*)
+ * @param config (const CMLGQAConfig*)
+ * @param mask (Tensor*)
+ * @return (Tensor*)
  */
 Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config, Tensor* mask);
 
@@ -86,9 +100,14 @@ typedef struct CMLRoPEConfig {
     float base;      /* Base frequency (default: 10000.0) */
 } CMLRoPEConfig;
 
-/** Apply RoPE to Q and K tensors in-place
+/**
+ * Apply RoPE to Q and K tensors in-place
  * x: [batch, seq_len, num_heads, head_dim]
  * position_ids: [batch, seq_len] or NULL for 0..seq_len-1
+ * @param x (Tensor*)
+ * @param start_pos (int)
+ * @param config (const CMLRoPEConfig*)
+ * @return (Tensor*)
  */
 Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config);
 
@@ -113,14 +132,22 @@ CMLMoELayer* cml_moe_create(const CMLMoEConfig* config);
 
 void cml_moe_free(CMLMoELayer* moe);
 
-/** MoE forward pass
+/**
+ * MoE forward pass
  * input: [batch, seq_len, input_dim]
  * Returns: [batch, seq_len, input_dim]
+ * @param moe (CMLMoELayer*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
  */
 Tensor* cml_moe_forward(CMLMoELayer* moe, Tensor* input);
 
-/** Get expert routing (for debugging/analysis)
+/**
+ * Get expert routing (for debugging/analysis)
  * Returns gating weights: [batch * seq_len, num_experts]
+ * @param moe (CMLMoELayer*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
  */
 Tensor* cml_moe_get_routing(CMLMoELayer* moe, Tensor* input);
 

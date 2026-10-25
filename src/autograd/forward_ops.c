@@ -34,87 +34,162 @@ static Tensor* forward_unary(Tensor* a, UOpType type) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Elementwise a + b, broadcast and dtype-promoted (lazy). @see uop_add */
+/**
+ * Elementwise a + b, broadcast and dtype-promoted (lazy). @see uop_add
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_add(Tensor* a, Tensor* b) { return uop_add(a, b); }
 
-/** Elementwise a - b, broadcast and dtype-promoted (lazy). @see uop_sub */
+/**
+ * Elementwise a - b, broadcast and dtype-promoted (lazy). @see uop_sub
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_sub(Tensor* a, Tensor* b) { return uop_sub(a, b); }
 
-/** Elementwise a * b, broadcast and dtype-promoted (lazy). @see uop_mul */
+/**
+ * Elementwise a * b, broadcast and dtype-promoted (lazy). @see uop_mul
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_mul(Tensor* a, Tensor* b) { return uop_mul(a, b); }
 
-/** Elementwise a / b, broadcast and dtype-promoted (lazy). @see uop_div */
+/**
+ * Elementwise a / b, broadcast and dtype-promoted (lazy). @see uop_div
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_div(Tensor* a, Tensor* b) { return uop_div(a, b); }
 
-/** Elementwise a ^ b (lazy). @see uop_pow */
+/**
+ * Elementwise a ^ b (lazy). @see uop_pow
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_pow(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
     return uop_pow(a, b);
 }
 
-/** Elementwise negation (lazy). */
+/**
+ * Elementwise negation (lazy).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_neg(Tensor* a) { return forward_unary(a, UOP_NEG); }
 
-/** Elementwise natural exponential (lazy). */
+/**
+ * Elementwise natural exponential (lazy).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_exp(Tensor* a) { return forward_unary(a, UOP_EXP); }
 
-/** Elementwise natural logarithm (lazy). */
+/**
+ * Elementwise natural logarithm (lazy).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_log(Tensor* a) { return forward_unary(a, UOP_LOG); }
 
-/** Elementwise square root (lazy). */
+/**
+ * Elementwise square root (lazy).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_sqrt(Tensor* a) { return forward_unary(a, UOP_SQRT); }
 
-/** Elementwise sine (lazy). @see uop_sin */
+/**
+ * Elementwise sine (lazy). @see uop_sin
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_sin(Tensor* a) {
     if (!a)
         return NULL;
     return uop_sin(a);
 }
 
-/** Elementwise cosine (lazy). @see uop_cos */
+/**
+ * Elementwise cosine (lazy). @see uop_cos
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_cos(Tensor* a) {
     if (!a)
         return NULL;
     return uop_cos(a);
 }
 
-/** Elementwise tangent (lazy). @see uop_tan */
+/**
+ * Elementwise tangent (lazy). @see uop_tan
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_tan(Tensor* a) {
     if (!a)
         return NULL;
     return uop_tan(a);
 }
 
-/** Elementwise hyperbolic tangent activation (lazy). @see uop_tanh */
+/**
+ * Elementwise hyperbolic tangent activation (lazy). @see uop_tanh
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_tanh(Tensor* a) {
     if (!a)
         return NULL;
     return uop_tanh(a);
 }
 
-/** ReLU activation, max(0, a) (lazy). @see uop_relu */
+/**
+ * ReLU activation, max(0, a) (lazy). @see uop_relu
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_relu(Tensor* a) {
     if (!a)
         return NULL;
     return uop_relu(a);
 }
 
-/** Logistic sigmoid activation (lazy). @see uop_sigmoid */
+/**
+ * Logistic sigmoid activation (lazy). @see uop_sigmoid
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_sigmoid(Tensor* a) {
     if (!a)
         return NULL;
     return uop_sigmoid(a);
 }
 
-/** Leaky ReLU with the given negative-region slope (lazy). @see uop_leaky_relu */
+/**
+ * Leaky ReLU with the given negative-region slope (lazy). @see uop_leaky_relu
+ * @param a (Tensor*)
+ * @param negative_slope (float)
+ * @return (Tensor*)
+ */
 Tensor* tensor_leaky_relu(Tensor* a, float negative_slope) {
     if (!a)
         return NULL;
     return uop_leaky_relu(a, negative_slope);
 }
 
-/** Softmax over dim (negative indices count from the end); errors on out-of-range dim. */
+/**
+ * Softmax over dim (negative indices count from the end); errors on out-of-range dim.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_softmax(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -152,28 +227,52 @@ static int resolve_reduce_dim(const Tensor* a, int dim) {
     return (dim >= 0 && dim < a->ndim) ? dim : -1;
 }
 
-/** Sum over dim (dim=-1 reduces all axes); see resolve_reduce_dim for axis handling. */
+/**
+ * Sum over dim (dim=-1 reduces all axes); see resolve_reduce_dim for axis handling.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param keepdim (bool)
+ * @return (Tensor*)
+ */
 Tensor* tensor_sum(Tensor* a, int dim, bool keepdim) {
     if (!a)
         return NULL;
     return uop_sum_dim(a, resolve_reduce_dim(a, dim), keepdim);
 }
 
-/** Mean over dim (dim=-1 reduces all axes); see resolve_reduce_dim for axis handling. */
+/**
+ * Mean over dim (dim=-1 reduces all axes); see resolve_reduce_dim for axis handling.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param keepdim (bool)
+ * @return (Tensor*)
+ */
 Tensor* tensor_mean(Tensor* a, int dim, bool keepdim) {
     if (!a)
         return NULL;
     return uop_mean_dim(a, resolve_reduce_dim(a, dim), keepdim);
 }
 
-/** Max-reduce over dim (dim=-1 reduces all axes); see resolve_reduce_dim for axis handling. */
+/**
+ * Max-reduce over dim (dim=-1 reduces all axes); see resolve_reduce_dim for axis handling.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param keepdim (bool)
+ * @return (Tensor*)
+ */
 Tensor* tensor_max(Tensor* a, int dim, bool keepdim) {
     if (!a)
         return NULL;
     return uop_max_reduce_dim(a, resolve_reduce_dim(a, dim), keepdim);
 }
 
-/** Min over dim, computed as -max(-a) so it reuses the differentiable max-reduce path. */
+/**
+ * Min over dim, computed as -max(-a) so it reuses the differentiable max-reduce path.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param keepdim (bool)
+ * @return (Tensor*)
+ */
 Tensor* tensor_min(Tensor* a, int dim, bool keepdim) {
     if (!a)
         return NULL;
@@ -217,8 +316,14 @@ Tensor* tensor_min(Tensor* a, int dim, bool keepdim) {
     return result;
 }
 
-/** Swap axes dim0 and dim1 via a permutation (lazy); negative dims default to the last two
- * axes. Errors on out-of-range dims. */
+/**
+ * Swap axes dim0 and dim1 via a permutation (lazy); negative dims default to the last two
+ * axes. Errors on out-of-range dims.
+ * @param a (Tensor*)
+ * @param dim0 (int)
+ * @param dim1 (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_transpose(Tensor* a, int dim0, int dim1) {
     if (!a)
         return NULL;
@@ -255,8 +360,13 @@ Tensor* tensor_transpose(Tensor* a, int dim0, int dim1) {
     return result;
 }
 
-/** Batched matrix multiply recorded into the lazy graph; batch dims come from a, the matrix
- * dims from a's rows and b's columns. Requires both operands be at least 2D. */
+/**
+ * Batched matrix multiply recorded into the lazy graph; batch dims come from a, the matrix
+ * dims from a's rows and b's columns. Requires both operands be at least 2D.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
@@ -289,8 +399,15 @@ Tensor* tensor_matmul(Tensor* a, Tensor* b) {
     return tensor_from_ir_node(node, ir);
 }
 
-/** Variance over dim as mean of squared deviations; unbiased divides by N-1 (guarded against
- * N<=1), biased by N. Built from sub/mul/reduce so it is differentiable. */
+/**
+ * Variance over dim as mean of squared deviations; unbiased divides by N-1 (guarded against
+ * N<=1), biased by N. Built from sub/mul/reduce so it is differentiable.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param unbiased (bool)
+ * @param keepdim (bool)
+ * @return (Tensor*)
+ */
 Tensor* tensor_var(Tensor* a, int dim, bool unbiased, bool keepdim) {
     if (!a)
         return NULL;
@@ -358,7 +475,14 @@ Tensor* tensor_var(Tensor* a, int dim, bool unbiased, bool keepdim) {
     return result;
 }
 
-/** Standard deviation over dim, as sqrt of tensor_var. */
+/**
+ * Standard deviation over dim, as sqrt of tensor_var.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param unbiased (bool)
+ * @param keepdim (bool)
+ * @return (Tensor*)
+ */
 Tensor* tensor_std(Tensor* a, int dim, bool unbiased, bool keepdim) {
     if (!a)
         return NULL;
@@ -372,7 +496,12 @@ Tensor* tensor_std(Tensor* a, int dim, bool unbiased, bool keepdim) {
     return result;
 }
 
-/** Indices of the maxima over dim (dim<0 reduces all axes). Non-differentiable. */
+/**
+ * Indices of the maxima over dim (dim<0 reduces all axes). Non-differentiable.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_argmax(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -384,7 +513,12 @@ Tensor* tensor_argmax(Tensor* a, int dim) {
     return uop_argmax(a, dim >= 0 ? &params : NULL);
 }
 
-/** Indices of the minima over dim (dim<0 reduces all axes). Non-differentiable. */
+/**
+ * Indices of the minima over dim (dim<0 reduces all axes). Non-differentiable.
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_argmin(Tensor* a, int dim) {
     if (!a)
         return NULL;
@@ -396,52 +530,91 @@ Tensor* tensor_argmin(Tensor* a, int dim) {
     return uop_argmin(a, dim >= 0 ? &params : NULL);
 }
 
-/** Whether the tensor currently holds an accumulated gradient. */
+/**
+ * Whether the tensor currently holds an accumulated gradient.
+ * @param a (Tensor*)
+ * @return (bool)
+ */
 bool tensor_has_grad(Tensor* a) { return a && a->grad != NULL; }
 
-/** ELU activation with the given alpha (lazy). @see uop_elu */
+/**
+ * ELU activation with the given alpha (lazy). @see uop_elu
+ * @param a (Tensor*)
+ * @param alpha (float)
+ * @return (Tensor*)
+ */
 Tensor* tensor_elu(Tensor* a, float alpha) {
     if (!a)
         return NULL;
     return uop_elu(a, alpha);
 }
 
-/** SELU (scaled ELU) activation (lazy). @see uop_selu */
+/**
+ * SELU (scaled ELU) activation (lazy). @see uop_selu
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_selu(Tensor* a) {
     if (!a)
         return NULL;
     return uop_selu(a);
 }
 
-/** Mish activation (lazy). @see uop_mish */
+/**
+ * Mish activation (lazy). @see uop_mish
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_mish(Tensor* a) {
     if (!a)
         return NULL;
     return uop_mish(a);
 }
 
-/** SiLU / swish activation (lazy). @see uop_silu */
+/**
+ * SiLU / swish activation (lazy). @see uop_silu
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_silu(Tensor* a) {
     if (!a)
         return NULL;
     return uop_silu(a);
 }
 
-/** Hard-swish activation (lazy). @see uop_hardswish */
+/**
+ * Hard-swish activation (lazy). @see uop_hardswish
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_hardswish(Tensor* a) {
     if (!a)
         return NULL;
     return uop_hardswish(a);
 }
 
-/** Sort values along dim, ascending or descending (lazy). @see uop_sort */
+/**
+ * Sort values along dim, ascending or descending (lazy). @see uop_sort
+ * @param a (Tensor*)
+ * @param dim (int)
+ * @param descending (bool)
+ * @return (Tensor*)
+ */
 Tensor* tensor_sort(Tensor* a, int dim, bool descending) {
     if (!a)
         return NULL;
     return uop_sort(a, dim, descending);
 }
 
-/** Top-k values along dim; the sorted flag is ignored since results are always sorted. */
+/**
+ * Top-k values along dim; the sorted flag is ignored since results are always sorted.
+ * @param a (Tensor*)
+ * @param k (int)
+ * @param dim (int)
+ * @param largest (bool)
+ * @param sorted (bool)
+ * @return (Tensor*)
+ */
 Tensor* tensor_topk(Tensor* a, int k, int dim, bool largest, bool sorted) {
     (void)sorted; // topk always returns sorted
     if (!a)
@@ -449,29 +622,53 @@ Tensor* tensor_topk(Tensor* a, int k, int dim, bool largest, bool sorted) {
     return uop_topk(a, k, dim, largest, NULL);
 }
 
-/** Select the elements of a where mask is true, flattened (lazy). @see uop_masked_select */
+/**
+ * Select the elements of a where mask is true, flattened (lazy). @see uop_masked_select
+ * @param a (Tensor*)
+ * @param mask (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_masked_select(Tensor* a, Tensor* mask) {
     if (!a || !mask)
         return NULL;
     return uop_masked_select(a, mask);
 }
 
-/** Build coordinate grids from the input 1-D tensors; writes the output count to
- * num_outputs and returns a newly allocated array of tensors. @see uop_meshgrid */
+/**
+ * Build coordinate grids from the input 1-D tensors; writes the output count to
+ * num_outputs and returns a newly allocated array of tensors. @see uop_meshgrid
+ * @param tensors (Tensor**)
+ * @param num_tensors (int)
+ * @param num_outputs (int*)
+ * @return (Tensor**)
+ */
 Tensor** tensor_meshgrid(Tensor** tensors, int num_tensors, int* num_outputs) {
     if (!tensors || !num_outputs)
         return NULL;
     return uop_meshgrid(tensors, num_tensors, num_outputs);
 }
 
-/** Extract the diagonal spanning dim1 and dim2 at the given offset (lazy). @see uop_diagonal */
+/**
+ * Extract the diagonal spanning dim1 and dim2 at the given offset (lazy). @see uop_diagonal
+ * @param a (Tensor*)
+ * @param offset (int)
+ * @param dim1 (int)
+ * @param dim2 (int)
+ * @return (Tensor*)
+ */
 Tensor* tensor_diagonal(Tensor* a, int offset, int dim1, int dim2) {
     if (!a)
         return NULL;
     return uop_diagonal(a, offset, dim1, dim2);
 }
 
-/** Linear interpolation a + weight*(b - a), with weight broadcast as a filled tensor (lazy). */
+/**
+ * Linear interpolation a + weight*(b - a), with weight broadcast as a filled tensor (lazy).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param weight (float)
+ * @return (Tensor*)
+ */
 Tensor* tensor_lerp(Tensor* a, Tensor* b, float weight) {
     if (!a || !b)
         return NULL;
@@ -481,14 +678,24 @@ Tensor* tensor_lerp(Tensor* a, Tensor* b, float weight) {
     return uop_lerp(a, b, w);
 }
 
-/** Elementwise integer (floor) division (lazy). @see uop_idiv */
+/**
+ * Elementwise integer (floor) division (lazy). @see uop_idiv
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_idiv(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;
     return uop_idiv(a, b);
 }
 
-/** Elementwise modulo (lazy). @see uop_mod */
+/**
+ * Elementwise modulo (lazy). @see uop_mod
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* tensor_mod(Tensor* a, Tensor* b) {
     if (!a || !b)
         return NULL;

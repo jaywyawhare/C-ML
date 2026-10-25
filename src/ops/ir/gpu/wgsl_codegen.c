@@ -13,7 +13,15 @@
 
 #define TILE_SIZE 16
 
-/** printf-append into a growable heap buffer, doubling capacity as needed. */
+/**
+ * printf-append into a growable heap buffer, doubling capacity as needed.
+ * @param buf (char**)
+ * @param cap (size_t*)
+ * @param len (size_t*)
+ * @param fmt (const char*)
+ * @param ... variadic arguments
+ * @return (void)
+ */
 static void wgsl_appendf(char** buf, size_t* cap, size_t* len, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -40,7 +48,12 @@ static void wgsl_appendf(char** buf, size_t* cap, size_t* len, const char* fmt, 
     *len += (size_t)needed;
 }
 
-/** Allocate an empty WGSL source buffer, initializing its capacity/length counters. */
+/**
+ * Allocate an empty WGSL source buffer, initializing its capacity/length counters.
+ * @param cap (size_t*)
+ * @param len (size_t*)
+ * @return (char*)
+ */
 static char* wgsl_buf_new(size_t* cap, size_t* len) {
     *cap      = WGSL_BUF_INIT_SIZE;
     *len      = 0;
@@ -50,8 +63,12 @@ static char* wgsl_buf_new(size_t* cap, size_t* len) {
     return buf;
 }
 
-/** Emit an element-wise binary-op WGSL compute shader (result[idx] = a OP b); NULL if
- *  `type` is not a supported binary op. */
+/**
+ * Emit an element-wise binary-op WGSL compute shader (result[idx] = a OP b); NULL if
+ * `type` is not a supported binary op.
+ * @param type (UOpType)
+ * @return (char*)
+ */
 static char* wgsl_binary_kernel(UOpType type) {
     const char* expr = NULL;
     switch (type) {
@@ -114,8 +131,12 @@ static char* wgsl_binary_kernel(UOpType type) {
     return buf;
 }
 
-/** Emit an element-wise unary-op WGSL compute shader (result[idx] = OP a); NULL if
- *  `type` is not a supported unary op. */
+/**
+ * Emit an element-wise unary-op WGSL compute shader (result[idx] = OP a); NULL if
+ * `type` is not a supported unary op.
+ * @param type (UOpType)
+ * @return (char*)
+ */
 static char* wgsl_unary_kernel(UOpType type) {
     const char* expr = NULL;
     switch (type) {
@@ -183,7 +204,10 @@ static char* wgsl_unary_kernel(UOpType type) {
     return buf;
 }
 
-/** Emit the WGSL sigmoid activation compute shader. */
+/**
+ * Emit the WGSL sigmoid activation compute shader.
+ * @return (char*)
+ */
 static char* wgsl_sigmoid_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -211,7 +235,10 @@ static char* wgsl_sigmoid_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL tanh activation compute shader. */
+/**
+ * Emit the WGSL tanh activation compute shader.
+ * @return (char*)
+ */
 static char* wgsl_tanh_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -239,7 +266,10 @@ static char* wgsl_tanh_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL ELU activation compute shader. */
+/**
+ * Emit the WGSL ELU activation compute shader.
+ * @return (char*)
+ */
 static char* wgsl_elu_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -267,7 +297,10 @@ static char* wgsl_elu_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL SELU activation compute shader. */
+/**
+ * Emit the WGSL SELU activation compute shader.
+ * @return (char*)
+ */
 static char* wgsl_selu_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -298,7 +331,10 @@ static char* wgsl_selu_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL SiLU (swish) activation compute shader. */
+/**
+ * Emit the WGSL SiLU (swish) activation compute shader.
+ * @return (char*)
+ */
 static char* wgsl_silu_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -327,7 +363,10 @@ static char* wgsl_silu_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL Mish activation compute shader. */
+/**
+ * Emit the WGSL Mish activation compute shader.
+ * @return (char*)
+ */
 static char* wgsl_mish_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -356,7 +395,10 @@ static char* wgsl_mish_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL hard-swish activation compute shader. */
+/**
+ * Emit the WGSL hard-swish activation compute shader.
+ * @return (char*)
+ */
 static char* wgsl_hardswish_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -386,7 +428,10 @@ static char* wgsl_hardswish_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL fill shader that writes a constant value to every element. */
+/**
+ * Emit the WGSL fill shader that writes a constant value to every element.
+ * @return (char*)
+ */
 static char* wgsl_fill_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -414,7 +459,10 @@ static char* wgsl_fill_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL where shader (result = cond ? a : b, element-wise). */
+/**
+ * Emit the WGSL where shader (result = cond ? a : b, element-wise).
+ * @return (char*)
+ */
 static char* wgsl_where_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -444,7 +492,10 @@ static char* wgsl_where_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL gather shader (result[idx] = input[indices[idx]*C + idx%C]). */
+/**
+ * Emit the WGSL gather shader (result[idx] = input[indices[idx]*C + idx%C]).
+ * @return (char*)
+ */
 static char* wgsl_gather_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -474,7 +525,10 @@ static char* wgsl_gather_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL max-reduction shader; accumulates into result[0] via an atomic-CAS float max. */
+/**
+ * Emit the WGSL max-reduction shader; accumulates into result[0] via an atomic-CAS float max.
+ * @return (char*)
+ */
 static char* wgsl_max_reduce_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -519,7 +573,10 @@ static char* wgsl_max_reduce_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL min-reduction shader; accumulates into result[0] via an atomic-CAS float min. */
+/**
+ * Emit the WGSL min-reduction shader; accumulates into result[0] via an atomic-CAS float min.
+ * @return (char*)
+ */
 static char* wgsl_min_reduce_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -564,7 +621,10 @@ static char* wgsl_min_reduce_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL mean-reduction shader; atomic-CAS adds each a[idx]/n into result[0]. */
+/**
+ * Emit the WGSL mean-reduction shader; atomic-CAS adds each a[idx]/n into result[0].
+ * @return (char*)
+ */
 static char* wgsl_mean_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -605,7 +665,10 @@ static char* wgsl_mean_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL product-reduction shader; accumulates into result[0] via atomic-CAS float mul. */
+/**
+ * Emit the WGSL product-reduction shader; accumulates into result[0] via atomic-CAS float mul.
+ * @return (char*)
+ */
 static char* wgsl_prod_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -646,7 +709,10 @@ static char* wgsl_prod_kernel(void) {
     return buf;
 }
 
-/** Emit the WGSL sum-reduction shader; accumulates into result[0] via atomic-CAS float add. */
+/**
+ * Emit the WGSL sum-reduction shader; accumulates into result[0] via atomic-CAS float add.
+ * @return (char*)
+ */
 static char* wgsl_sum_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -690,7 +756,10 @@ static char* wgsl_sum_kernel(void) {
     return buf;
 }
 
-/** Emit a tiled (16x16 workgroup, shared-memory) WGSL matmul compute shader. */
+/**
+ * Emit a tiled (16x16 workgroup, shared-memory) WGSL matmul compute shader.
+ * @return (char*)
+ */
 static char* wgsl_matmul_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -756,7 +825,10 @@ static char* wgsl_matmul_kernel(void) {
     return buf;
 }
 
-/** Emit a direct (one-thread-per-output) WGSL 2D convolution compute shader with padding. */
+/**
+ * Emit a direct (one-thread-per-output) WGSL 2D convolution compute shader with padding.
+ * @return (char*)
+ */
 static char* wgsl_conv2d_kernel(void) {
     size_t cap, len;
     char* buf = wgsl_buf_new(&cap, &len);
@@ -823,8 +895,12 @@ static char* wgsl_conv2d_kernel(void) {
     return buf;
 }
 
-/** Generate WGSL compute-shader source for a UOP node by dispatching on its op type;
- *  NULL for unsupported ops. Caller owns the returned string. */
+/**
+ * Generate WGSL compute-shader source for a UOP node by dispatching on its op type;
+ * NULL for unsupported ops. Caller owns the returned string.
+ * @param node (struct IRNode*)
+ * @return (char*)
+ */
 char* cml_wgsl_generate(struct IRNode* node) {
     if (!node) {
         LOG_ERROR("wgsl_codegen: NULL node");
@@ -906,8 +982,13 @@ char* cml_wgsl_generate(struct IRNode* node) {
     return NULL;
 }
 
-/** Execute an IR graph on the WebGPU backend node by node: generate and compile WGSL,
- *  upload inputs, launch one workgroup dispatch per node, and download outputs. */
+/**
+ * Execute an IR graph on the WebGPU backend node by node: generate and compile WGSL,
+ * upload inputs, launch one workgroup dispatch per node, and download outputs.
+ * @param backend (CMLWebGPUBackend*)
+ * @param graph (CMLGraph_t)
+ * @return (int)
+ */
 int cml_webgpu_execute_graph(CMLWebGPUBackend* backend, CMLGraph_t graph) {
     if (!backend || !backend->initialized) {
         LOG_ERROR("webgpu_execute_graph: backend not initialised");

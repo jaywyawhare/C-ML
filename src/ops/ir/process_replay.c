@@ -24,12 +24,21 @@ static pthread_mutex_t g_replay_lock = PTHREAD_MUTEX_INITIALIZER;
 static bool g_replay_enabled         = false;
 static char g_output_dir[4096];
 
-/** 64-bit FNV-1a hash of a byte range, used to key kernels by source. */
+/**
+ * 64-bit FNV-1a hash of a byte range, used to key kernels by source.
+ * @param data (const void*)
+ * @param len (size_t)
+ * @return (uint64_t)
+ */
 static uint64_t fnv1a(const void* data, size_t len) {
     return cml_fnv1a_bytes(CML_FNV_OFFSET_BASIS, data, len);
 }
 
-/** Create the directory if it does not already exist. */
+/**
+ * Create the directory if it does not already exist.
+ * @param path (const char*)
+ * @return (void)
+ */
 static void ensure_dir(const char* path) {
     struct stat st;
     if (stat(path, &st) != 0) {
@@ -37,7 +46,11 @@ static void ensure_dir(const char* path) {
     }
 }
 
-/** Enable kernel-source recording into `output_dir` (created if needed). */
+/**
+ * Enable kernel-source recording into `output_dir` (created if needed).
+ * @param output_dir (const char*)
+ * @return (void)
+ */
 void cml_process_replay_enable(const char* output_dir) {
     pthread_mutex_lock(&g_replay_lock);
 
@@ -54,14 +67,20 @@ void cml_process_replay_enable(const char* output_dir) {
     pthread_mutex_unlock(&g_replay_lock);
 }
 
-/** Disable kernel-source recording. */
+/**
+ * Disable kernel-source recording.
+ * @return (void)
+ */
 void cml_process_replay_disable(void) {
     pthread_mutex_lock(&g_replay_lock);
     g_replay_enabled = false;
     pthread_mutex_unlock(&g_replay_lock);
 }
 
-/** One-time lazy init: enable replay from PROCESS_REPLAY[_DIR] env vars. */
+/**
+ * One-time lazy init: enable replay from PROCESS_REPLAY[_DIR] env vars.
+ * @return (void)
+ */
 static void check_env_init(void) {
     static bool checked = false;
     if (checked)
@@ -79,7 +98,13 @@ static void check_env_init(void) {
     cml_process_replay_enable(dir);
 }
 
-/** Write a kernel's source (with a metadata header) to a file keyed by its source hash. */
+/**
+ * Write a kernel's source (with a metadata header) to a file keyed by its source hash.
+ * @param kernel_name (const char*)
+ * @param source (const char*)
+ * @param source_len (size_t)
+ * @return (void)
+ */
 void cml_process_replay_record(const char* kernel_name, const char* source, size_t source_len) {
     check_env_init();
 
@@ -115,7 +140,13 @@ void cml_process_replay_record(const char* kernel_name, const char* source, size
     pthread_mutex_unlock(&g_replay_lock);
 }
 
-/** Read a recorded kernel file and return just the source body past the header (caller frees). */
+/**
+ * Read a recorded kernel file and return just the source body past the header (caller frees).
+ * @param path (const char*)
+ * @param out_source (char**)
+ * @param out_len (size_t*)
+ * @return (int)
+ */
 static int read_kernel_file(const char* path, char** out_source, size_t* out_len) {
     FILE* f = fopen(path, "rb");
     if (!f)
@@ -165,6 +196,9 @@ static int read_kernel_file(const char* path, char** out_source, size_t* out_len
 /**
  * Compare recorded kernels in two directories by source body; returns the
  * number of mismatches (or -1 on error), for detecting codegen regressions.
+ * @param output_dir (const char*)
+ * @param baseline_dir (const char*)
+ * @return (int)
  */
 int cml_process_replay_compare(const char* output_dir, const char* baseline_dir) {
     if (!output_dir || !baseline_dir)

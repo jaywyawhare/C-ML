@@ -8,7 +8,11 @@
 #include <math.h>
 #include "alloc/cml_allocator.h"
 
-/** Cubic convolution kernel weight (a = -0.5) for bicubic interpolation; zero for |x| >= 2. */
+/**
+ * Cubic convolution kernel weight (a = -0.5) for bicubic interpolation; zero for |x| >= 2.
+ * @param x (float)
+ * @return (float)
+ */
 static float bicubic_kernel(float x) {
     float ax = fabsf(x);
     float a  = -0.5f;
@@ -21,8 +25,14 @@ static float bicubic_kernel(float x) {
     return 0.0f;
 }
 
-/** Nearest-neighbor resize of a 4D [N,C,H,W] tensor to (out_h, out_w). Integer upscales lower to
- *  a lazy reshape/expand/reshape; other ratios use an eager reference loop. NULL on failure. */
+/**
+ * Nearest-neighbor resize of a 4D [N,C,H,W] tensor to (out_h, out_w). Integer upscales lower to
+ * a lazy reshape/expand/reshape; other ratios use an eager reference loop. NULL on failure.
+ * @param input (Tensor*)
+ * @param out_h (int)
+ * @param out_w (int)
+ * @return (Tensor*)
+ */
 static Tensor* interpolate_nearest_4d(Tensor* input, int out_h, int out_w) {
     int batch    = input->shape[0];
     int channels = input->shape[1];
@@ -85,19 +95,40 @@ static Tensor* interpolate_nearest_4d(Tensor* input, int out_h, int out_w) {
     return output;
 }
 
-/** Per-axis interpolation scale: align_corners maps corner pixels exactly. */
+/**
+ * Per-axis interpolation scale: align_corners maps corner pixels exactly.
+ * @param in (int)
+ * @param out (int)
+ * @param align_corners (bool)
+ * @return (float)
+ */
 static inline float interp_scale(int in, int out, bool align_corners) {
     return (align_corners && out > 1) ? (float)(in - 1) / (float)(out - 1) : (float)in / (float)out;
 }
 
-/** Source coordinate for output index `o`: align_corners maps corner pixels
- *  exactly, otherwise pixel centres are aligned. */
+/**
+ * Source coordinate for output index `o`: align_corners maps corner pixels
+ * exactly, otherwise pixel centres are aligned.
+ * @param o (int)
+ * @param scale (float)
+ * @param out (int)
+ * @param align_corners (bool)
+ * @return (float)
+ */
 static inline float interp_src_coord(int o, float scale, int out, bool align_corners) {
     return (align_corners && out > 1) ? (float)o * scale : ((float)o + 0.5f) * scale - 0.5f;
 }
 
-/** Allocate the [N, C, out_h, out_w] destination an interpolation writes into,
- *  handing back both data pointers. Returns NULL on allocation failure. */
+/**
+ * Allocate the [N, C, out_h, out_w] destination an interpolation writes into,
+ * handing back both data pointers. Returns NULL on allocation failure.
+ * @param input (Tensor*)
+ * @param out_h (int)
+ * @param out_w (int)
+ * @param in_data (float**)
+ * @param out_data (float**)
+ * @return (Tensor*)
+ */
 static Tensor* interp_alloc_output(Tensor* input, int out_h, int out_w, float** in_data,
                                    float** out_data) {
     int out_shape[]     = {input->shape[0], input->shape[1], out_h, out_w};
@@ -111,8 +142,15 @@ static Tensor* interp_alloc_output(Tensor* input, int out_h, int out_w, float** 
     return output;
 }
 
-/** Bilinear resize of a 4D [N,C,H,W] tensor to (out_h, out_w) via an eager reference loop.
- *  NULL on allocation failure. */
+/**
+ * Bilinear resize of a 4D [N,C,H,W] tensor to (out_h, out_w) via an eager reference loop.
+ * NULL on allocation failure.
+ * @param input (Tensor*)
+ * @param out_h (int)
+ * @param out_w (int)
+ * @param align_corners (bool)
+ * @return (Tensor*)
+ */
 static Tensor* interpolate_bilinear_4d(Tensor* input, int out_h, int out_w, bool align_corners) {
     int batch    = input->shape[0];
     int channels = input->shape[1];
@@ -171,7 +209,13 @@ static Tensor* interpolate_bilinear_4d(Tensor* input, int out_h, int out_w, bool
     return output;
 }
 
-/** Clamp an integer into the inclusive range [lo, hi]. */
+/**
+ * Clamp an integer into the inclusive range [lo, hi].
+ * @param v (int)
+ * @param lo (int)
+ * @param hi (int)
+ * @return (int)
+ */
 static inline int clamp_int(int v, int lo, int hi) {
     if (v < lo)
         return lo;
@@ -180,8 +224,15 @@ static inline int clamp_int(int v, int lo, int hi) {
     return v;
 }
 
-/** Bicubic resize of a 4D [N,C,H,W] tensor to (out_h, out_w) using a 4x4 cubic neighbourhood
- *  (edges clamped). NULL on allocation failure. */
+/**
+ * Bicubic resize of a 4D [N,C,H,W] tensor to (out_h, out_w) using a 4x4 cubic neighbourhood
+ * (edges clamped). NULL on allocation failure.
+ * @param input (Tensor*)
+ * @param out_h (int)
+ * @param out_w (int)
+ * @param align_corners (bool)
+ * @return (Tensor*)
+ */
 static Tensor* interpolate_bicubic_4d(Tensor* input, int out_h, int out_w, bool align_corners) {
     int batch    = input->shape[0];
     int channels = input->shape[1];
@@ -236,8 +287,16 @@ static Tensor* interpolate_bicubic_4d(Tensor* input, int out_h, int out_w, bool 
     return output;
 }
 
-/** torch.nn.functional.interpolate for 4D [N,C,H,W] input: resize to output_size[0:2] using the
- *  nearest/bilinear/bicubic mode. NULL on NULL/invalid args or unsupported mode. */
+/**
+ * torch.nn.functional.interpolate for 4D [N,C,H,W] input: resize to output_size[0:2] using the
+ * nearest/bilinear/bicubic mode. NULL on NULL/invalid args or unsupported mode.
+ * @param input (Tensor*)
+ * @param output_size (const int*)
+ * @param num_dims (int)
+ * @param mode (UpsampleMode)
+ * @param align_corners (bool)
+ * @return (Tensor*)
+ */
 Tensor* f_interpolate(Tensor* input, const int* output_size, int num_dims, UpsampleMode mode,
                       bool align_corners) {
     if (!input) {
@@ -278,7 +337,14 @@ Tensor* f_interpolate(Tensor* input, const int* output_size, int num_dims, Upsam
     }
 }
 
-/** Nearest-neighbor upsample for 5D tensors [N, C, D, H, W]. NULL on allocation failure. */
+/**
+ * Nearest-neighbor upsample for 5D tensors [N, C, D, H, W]. NULL on allocation failure.
+ * @param input (Tensor*)
+ * @param out_d (int)
+ * @param out_h (int)
+ * @param out_w (int)
+ * @return (Tensor*)
+ */
 static Tensor* upsample_nearest_5d(Tensor* input, int out_d, int out_h, int out_w) {
     int N = input->shape[0], C = input->shape[1];
     int in_d = input->shape[2], in_h = input->shape[3], in_w = input->shape[4];
@@ -319,8 +385,13 @@ static Tensor* upsample_nearest_5d(Tensor* input, int out_d, int out_h, int out_
     return output;
 }
 
-/** torch.nn.Upsample forward: resize 4D or 5D input by scale_factor or to a fixed output_size.
- *  4D supports nearest/bilinear/bicubic; 5D supports nearest only. NULL on bad rank/size/mode. */
+/**
+ * torch.nn.Upsample forward: resize 4D or 5D input by scale_factor or to a fixed output_size.
+ * 4D supports nearest/bilinear/bicubic; 5D supports nearest only. NULL on bad rank/size/mode.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* upsample_forward(Module* module, Tensor* input) {
     Upsample* layer = (Upsample*)module;
 
@@ -405,7 +476,11 @@ Tensor* upsample_forward(Module* module, Tensor* input) {
     return NULL;
 }
 
-/** Free the Upsample module (no owned parameters). */
+/**
+ * Free the Upsample module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void upsample_free(Module* module) {
     Upsample* layer = (Upsample*)module;
     if (!layer)
@@ -413,8 +488,16 @@ static void upsample_free(Module* module) {
     cml_free(layer);
 }
 
-/** Construct an Upsample layer driven by scale_factor, or by output_size when scale_factor <= 0.
- *  output_size is capped at UPSAMPLE_MAX_DIMS. Returns NULL on failure. */
+/**
+ * Construct an Upsample layer driven by scale_factor, or by output_size when scale_factor <= 0.
+ * output_size is capped at UPSAMPLE_MAX_DIMS. Returns NULL on failure.
+ * @param scale_factor (float)
+ * @param output_size (const int*)
+ * @param num_output_dims (int)
+ * @param mode (UpsampleMode)
+ * @param align_corners (bool)
+ * @return (Upsample*)
+ */
 Upsample* nn_upsample(float scale_factor, const int* output_size, int num_output_dims,
                       UpsampleMode mode, bool align_corners) {
     Upsample* layer = cml_calloc(1, sizeof(Upsample));

@@ -128,7 +128,10 @@
 #define GLSLstd450Cosh 20
 #define GLSLstd450FSign 6
 
-/** Allocate a SPIR-V word-stream builder with an initial word buffer and id counter. */
+/**
+ * Allocate a SPIR-V word-stream builder with an initial word buffer and id counter.
+ * @return (SPIRVBuilder*)
+ */
 SPIRVBuilder* spirv_builder_create(void) {
     SPIRVBuilder* b = (SPIRVBuilder*)cml_calloc(1, sizeof(SPIRVBuilder));
     if (!b)
@@ -144,7 +147,11 @@ SPIRVBuilder* spirv_builder_create(void) {
     return b;
 }
 
-/** Free the builder and its word buffer. */
+/**
+ * Free the builder and its word buffer.
+ * @param b (SPIRVBuilder*)
+ * @return (void)
+ */
 void spirv_builder_destroy(SPIRVBuilder* b) {
     if (!b)
         return;
@@ -152,7 +159,12 @@ void spirv_builder_destroy(SPIRVBuilder* b) {
     cml_free(b);
 }
 
-/** Append one 32-bit word, doubling the buffer; sets the overflow flag if realloc fails. */
+/**
+ * Append one 32-bit word, doubling the buffer; sets the overflow flag if realloc fails.
+ * @param b (SPIRVBuilder*)
+ * @param word (uint32_t)
+ * @return (void)
+ */
 void spirv_builder_emit(SPIRVBuilder* b, uint32_t word) {
     if (b->len >= b->cap) {
         size_t ncap  = b->cap * 2;
@@ -167,21 +179,39 @@ void spirv_builder_emit(SPIRVBuilder* b, uint32_t word) {
     b->words[b->len++] = word;
 }
 
-/** Return the next fresh SPIR-V result <id>. */
+/**
+ * Return the next fresh SPIR-V result <id>.
+ * @param b (SPIRVBuilder*)
+ * @return (uint32_t)
+ */
 uint32_t spirv_builder_alloc_id(SPIRVBuilder* b) { return b->next_id++; }
 
-/** Emit an instruction's leading word: opcode | (word_count << 16). */
+/**
+ * Emit an instruction's leading word: opcode | (word_count << 16).
+ * @param b (SPIRVBuilder*)
+ * @param opcode (uint32_t)
+ * @param word_count (uint32_t)
+ * @return (void)
+ */
 static void emit_op(SPIRVBuilder* b, uint32_t opcode, uint32_t word_count) {
     spirv_builder_emit(b, (word_count << 16) | opcode);
 }
 
-/** Emit OpCapability Shader. */
+/**
+ * Emit OpCapability Shader.
+ * @param b (SPIRVBuilder*)
+ * @return (void)
+ */
 static void emit_capability(SPIRVBuilder* b) {
     emit_op(b, SpvOpCapability, 2);
     spirv_builder_emit(b, SpvCapabilityShader);
 }
 
-/** Import the GLSL.std.450 extended instruction set; returns its <id>. */
+/**
+ * Import the GLSL.std.450 extended instruction set; returns its <id>.
+ * @param b (SPIRVBuilder*)
+ * @return (uint32_t)
+ */
 static uint32_t emit_ext_import(SPIRVBuilder* b) {
     uint32_t id = spirv_builder_alloc_id(b);
     /* "GLSL.std.450" = 4 words of string + null padding */
@@ -194,14 +224,24 @@ static uint32_t emit_ext_import(SPIRVBuilder* b) {
     return id;
 }
 
-/** Emit OpMemoryModel Logical GLSL450. */
+/**
+ * Emit OpMemoryModel Logical GLSL450.
+ * @param b (SPIRVBuilder*)
+ * @return (void)
+ */
 static void emit_memory_model(SPIRVBuilder* b) {
     emit_op(b, SpvOpMemoryModel, 3);
     spirv_builder_emit(b, SpvAddressingModelLogical);
     spirv_builder_emit(b, SpvMemoryModelGLSL450);
 }
 
-/** Emit OpEntryPoint for the GLCompute "main" function with one interface variable. */
+/**
+ * Emit OpEntryPoint for the GLCompute "main" function with one interface variable.
+ * @param b (SPIRVBuilder*)
+ * @param func_id (uint32_t)
+ * @param global_inv_id (uint32_t)
+ * @return (void)
+ */
 static void emit_entry_point(SPIRVBuilder* b, uint32_t func_id, uint32_t global_inv_id) {
     /* "main" = 1 word + null byte padding */
     emit_op(b, SpvOpEntryPoint, 6);
@@ -212,7 +252,15 @@ static void emit_entry_point(SPIRVBuilder* b, uint32_t func_id, uint32_t global_
     spirv_builder_emit(b, global_inv_id);
 }
 
-/** Emit OpExecutionMode LocalSize declaring the kernel's workgroup dimensions. */
+/**
+ * Emit OpExecutionMode LocalSize declaring the kernel's workgroup dimensions.
+ * @param b (SPIRVBuilder*)
+ * @param func_id (uint32_t)
+ * @param lx (int)
+ * @param ly (int)
+ * @param lz (int)
+ * @return (void)
+ */
 static void emit_execution_mode(SPIRVBuilder* b, uint32_t func_id, int lx, int ly, int lz) {
     /* OpExecutionMode (opcode 16) <func> LocalSize(17) lx ly lz.
      * The opcode must be SpvOpExecutionMode; SpvExecutionModeLocalSize is the
@@ -226,7 +274,14 @@ static void emit_execution_mode(SPIRVBuilder* b, uint32_t func_id, int lx, int l
     spirv_builder_emit(b, (uint32_t)lz);
 }
 
-/** Emit OpDecorate with a single literal operand. */
+/**
+ * Emit OpDecorate with a single literal operand.
+ * @param b (SPIRVBuilder*)
+ * @param target (uint32_t)
+ * @param decoration (uint32_t)
+ * @param value (uint32_t)
+ * @return (void)
+ */
 static void emit_decorate(SPIRVBuilder* b, uint32_t target, uint32_t decoration, uint32_t value) {
     emit_op(b, SpvOpDecorate, 4);
     spirv_builder_emit(b, target);
@@ -234,14 +289,28 @@ static void emit_decorate(SPIRVBuilder* b, uint32_t target, uint32_t decoration,
     spirv_builder_emit(b, value);
 }
 
-/** Emit OpDecorate for a decoration that takes no literal operand (e.g. Block). */
+/**
+ * Emit OpDecorate for a decoration that takes no literal operand (e.g. Block).
+ * @param b (SPIRVBuilder*)
+ * @param target (uint32_t)
+ * @param decoration (uint32_t)
+ * @return (void)
+ */
 static void emit_decorate_no_value(SPIRVBuilder* b, uint32_t target, uint32_t decoration) {
     emit_op(b, SpvOpDecorate, 3);
     spirv_builder_emit(b, target);
     spirv_builder_emit(b, decoration);
 }
 
-/** Emit OpMemberDecorate for one member of a struct type. */
+/**
+ * Emit OpMemberDecorate for one member of a struct type.
+ * @param b (SPIRVBuilder*)
+ * @param struct_id (uint32_t)
+ * @param member (uint32_t)
+ * @param decoration (uint32_t)
+ * @param value (uint32_t)
+ * @return (void)
+ */
 static void emit_member_decorate(SPIRVBuilder* b, uint32_t struct_id, uint32_t member,
                                  uint32_t decoration, uint32_t value) {
     emit_op(b, SpvOpMemberDecorate, 5);
@@ -261,7 +330,14 @@ static void emit_pointer_type(SPIRVBuilder* b, uint32_t result, uint32_t storage
     spirv_builder_emit(b, pointee);
 }
 
-/** Emit OpVariable of the given pointer type and storage class. */
+/**
+ * Emit OpVariable of the given pointer type and storage class.
+ * @param b (SPIRVBuilder*)
+ * @param ptr_type (uint32_t)
+ * @param result (uint32_t)
+ * @param storage_class (uint32_t)
+ * @return (void)
+ */
 static void emit_variable(SPIRVBuilder* b, uint32_t ptr_type, uint32_t result,
                           uint32_t storage_class) {
     emit_op(b, SpvOpVariable, 4);
@@ -270,14 +346,27 @@ static void emit_variable(SPIRVBuilder* b, uint32_t ptr_type, uint32_t result,
     spirv_builder_emit(b, storage_class);
 }
 
-/** Emit a single-member OpTypeStruct. */
+/**
+ * Emit a single-member OpTypeStruct.
+ * @param b (SPIRVBuilder*)
+ * @param result (uint32_t)
+ * @param member_type (uint32_t)
+ * @return (void)
+ */
 static void emit_struct(SPIRVBuilder* b, uint32_t result, uint32_t member_type) {
     emit_op(b, SpvOpTypeStruct, 3);
     spirv_builder_emit(b, result);
     spirv_builder_emit(b, member_type);
 }
 
-/** Emit OpLoad. */
+/**
+ * Emit OpLoad.
+ * @param b (SPIRVBuilder*)
+ * @param type (uint32_t)
+ * @param result (uint32_t)
+ * @param pointer (uint32_t)
+ * @return (void)
+ */
 static void emit_load(SPIRVBuilder* b, uint32_t type, uint32_t result, uint32_t pointer) {
     emit_op(b, SpvOpLoad, 4);
     spirv_builder_emit(b, type);
@@ -285,14 +374,28 @@ static void emit_load(SPIRVBuilder* b, uint32_t type, uint32_t result, uint32_t 
     spirv_builder_emit(b, pointer);
 }
 
-/** Emit OpStore. */
+/**
+ * Emit OpStore.
+ * @param b (SPIRVBuilder*)
+ * @param pointer (uint32_t)
+ * @param value (uint32_t)
+ * @return (void)
+ */
 static void emit_store(SPIRVBuilder* b, uint32_t pointer, uint32_t value) {
     emit_op(b, SpvOpStore, 3);
     spirv_builder_emit(b, pointer);
     spirv_builder_emit(b, value);
 }
 
-/** Emit OpCompositeExtract of one index (e.g. a vector component). */
+/**
+ * Emit OpCompositeExtract of one index (e.g. a vector component).
+ * @param b (SPIRVBuilder*)
+ * @param type (uint32_t)
+ * @param result (uint32_t)
+ * @param composite (uint32_t)
+ * @param index (uint32_t)
+ * @return (void)
+ */
 static void emit_composite_extract(SPIRVBuilder* b, uint32_t type, uint32_t result,
                                    uint32_t composite, uint32_t index) {
     emit_op(b, SpvOpCompositeExtract, 5);
@@ -302,7 +405,13 @@ static void emit_composite_extract(SPIRVBuilder* b, uint32_t type, uint32_t resu
     spirv_builder_emit(b, index);
 }
 
-/** Emit OpTypeRuntimeArray of the given element type. */
+/**
+ * Emit OpTypeRuntimeArray of the given element type.
+ * @param b (SPIRVBuilder*)
+ * @param result (uint32_t)
+ * @param element_type (uint32_t)
+ * @return (void)
+ */
 static void emit_runtime_array(SPIRVBuilder* b, uint32_t result, uint32_t element_type) {
     emit_op(b, SpvOpTypeRuntimeArray, 3);
     spirv_builder_emit(b, result);
@@ -332,7 +441,14 @@ static void emit_scalar_types(SPIRVBuilder* b, uint32_t id_void, uint32_t id_boo
     spirv_builder_emit(b, id_void);
 }
 
-/** Emit OpConstant for a uint value into a caller-supplied result <id>. */
+/**
+ * Emit OpConstant for a uint value into a caller-supplied result <id>.
+ * @param b (SPIRVBuilder*)
+ * @param uint_type (uint32_t)
+ * @param result (uint32_t)
+ * @param value (uint32_t)
+ * @return (void)
+ */
 static void emit_uint_constant_id(SPIRVBuilder* b, uint32_t uint_type, uint32_t result,
                                   uint32_t value) {
     emit_op(b, SpvOpConstant, 4);
@@ -359,7 +475,15 @@ static void emit_function_entry(SPIRVBuilder* b, uint32_t id_void, uint32_t id_f
     spirv_builder_emit(b, id_label);
 }
 
-/** Emit a one-index OpAccessChain. */
+/**
+ * Emit a one-index OpAccessChain.
+ * @param b (SPIRVBuilder*)
+ * @param ptr_type (uint32_t)
+ * @param result (uint32_t)
+ * @param base (uint32_t)
+ * @param index (uint32_t)
+ * @return (void)
+ */
 static void emit_access_chain1(SPIRVBuilder* b, uint32_t ptr_type, uint32_t result, uint32_t base,
                                uint32_t index) {
     emit_op(b, SpvOpAccessChain, 5);
@@ -369,7 +493,16 @@ static void emit_access_chain1(SPIRVBuilder* b, uint32_t ptr_type, uint32_t resu
     spirv_builder_emit(b, index);
 }
 
-/** Emit a two-index OpAccessChain (e.g. buffer member then array element). */
+/**
+ * Emit a two-index OpAccessChain (e.g. buffer member then array element).
+ * @param b (SPIRVBuilder*)
+ * @param ptr_type (uint32_t)
+ * @param result (uint32_t)
+ * @param base (uint32_t)
+ * @param index0 (uint32_t)
+ * @param index1 (uint32_t)
+ * @return (void)
+ */
 static void emit_access_chain2(SPIRVBuilder* b, uint32_t ptr_type, uint32_t result, uint32_t base,
                                uint32_t index0, uint32_t index1) {
     emit_op(b, SpvOpAccessChain, 6);
@@ -410,7 +543,12 @@ static uint32_t emit_load_scalar(SPIRVBuilder* b, uint32_t type, uint32_t ptr_ty
     return value;
 }
 
-/** Emit OpLabel starting a new basic block. */
+/**
+ * Emit OpLabel starting a new basic block.
+ * @param b (SPIRVBuilder*)
+ * @param id_label (uint32_t)
+ * @return (void)
+ */
 static void emit_label(SPIRVBuilder* b, uint32_t id_label) {
     emit_op(b, SpvOpLabel, 2);
     spirv_builder_emit(b, id_label);
@@ -436,7 +574,13 @@ static void emit_bounds_check(SPIRVBuilder* b, uint32_t id_bool, uint32_t id_ind
     spirv_builder_emit(b, id_label_end);
 }
 
-/** Emit OpConstant for a float literal; returns its freshly allocated <id>. */
+/**
+ * Emit OpConstant for a float literal; returns its freshly allocated <id>.
+ * @param b (SPIRVBuilder*)
+ * @param float_type (uint32_t)
+ * @param value (float)
+ * @return (uint32_t)
+ */
 static uint32_t emit_float_constant(SPIRVBuilder* b, uint32_t float_type, float value) {
     uint32_t id = spirv_builder_alloc_id(b);
     uint32_t bits;
@@ -459,8 +603,13 @@ static uint32_t __attribute__((unused)) emit_uint_constant(SPIRVBuilder* b, uint
     return id;
 }
 
-/** Copy the accumulated word stream into a fresh heap buffer for the caller; NULL if the
- *  builder overflowed or is empty (so truncated/invalid SPIR-V is never shipped). */
+/**
+ * Copy the accumulated word stream into a fresh heap buffer for the caller; NULL if the
+ * builder overflowed or is empty (so truncated/invalid SPIR-V is never shipped).
+ * @param b (SPIRVBuilder*)
+ * @param out_size (size_t*)
+ * @return (uint32_t*)
+ */
 uint32_t* spirv_builder_finalize(SPIRVBuilder* b, size_t* out_size) {
     if (b->overflow || b->len == 0)
         return NULL; /* truncated → don't ship invalid SPIR-V */
@@ -472,7 +621,10 @@ uint32_t* spirv_builder_finalize(SPIRVBuilder* b, size_t* out_size) {
     return result;
 }
 
-/** Allocate a SPIR-V codegen context with a default 256x1x1 workgroup size. */
+/**
+ * Allocate a SPIR-V codegen context with a default 256x1x1 workgroup size.
+ * @return (CMLSPIRVCodegen*)
+ */
 CMLSPIRVCodegen* cml_spirv_codegen_create(void) {
     CMLSPIRVCodegen* cg = (CMLSPIRVCodegen*)cml_calloc(1, sizeof(CMLSPIRVCodegen));
     if (!cg)
@@ -484,7 +636,11 @@ CMLSPIRVCodegen* cml_spirv_codegen_create(void) {
     return cg;
 }
 
-/** Free the SPIR-V codegen context. */
+/**
+ * Free the SPIR-V codegen context.
+ * @param cg (CMLSPIRVCodegen*)
+ * @return (void)
+ */
 void cml_spirv_codegen_destroy(CMLSPIRVCodegen* cg) { cml_free(cg); }
 
 /* Core IDs every generated kernel allocates before it emits any type. */
@@ -814,8 +970,15 @@ uint32_t* cml_spirv_gen_unary(CMLSPIRVCodegen* cg, UOpType op, const char* name,
     return result;
 }
 
-/** Generate a binary element-wise compute shader (buffers A, out, B); unsupported ops emit a
- *  structurally-valid copy but mark the module invalid so finalize returns NULL. */
+/**
+ * Generate a binary element-wise compute shader (buffers A, out, B); unsupported ops emit a
+ * structurally-valid copy but mark the module invalid so finalize returns NULL.
+ * @param cg (CMLSPIRVCodegen*)
+ * @param op (UOpType)
+ * @param name (const char*)
+ * @param out_size (size_t*)
+ * @return (uint32_t*)
+ */
 uint32_t* cml_spirv_gen_binary(CMLSPIRVCodegen* cg, UOpType op, const char* name,
                                size_t* out_size) {
     (void)name;

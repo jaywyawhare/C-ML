@@ -10,8 +10,15 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/** Compose LayerNorm over the last dim from primitives so it records into the IR (fully lazy):
- *  normalize with eps, then apply the optional affine weight/bias. NULL on op failure. */
+/**
+ * Compose LayerNorm over the last dim from primitives so it records into the IR (fully lazy):
+ * normalize with eps, then apply the optional affine weight/bias. NULL on op failure.
+ * @param x (Tensor*)
+ * @param weight (Tensor*)
+ * @param bias (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
 static Tensor* apply_layernorm(Tensor* x, Tensor* weight, Tensor* bias, float eps) {
     if (!x)
         return NULL;
@@ -58,13 +65,22 @@ static Tensor* apply_layernorm(Tensor* x, Tensor* weight, Tensor* bias, float ep
     return norm;
 }
 
-/** Module-interface forward: self-attention with query=key=value=input and no mask. */
+/**
+ * Module-interface forward: self-attention with query=key=value=input and no mask.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* mha_module_forward(Module* module, Tensor* input) {
     MultiHeadAttention* mha = (MultiHeadAttention*)module;
     return multihead_attention_forward(mha, input, input, input, NULL);
 }
 
-/** Free the MultiHeadAttention module; projection parameters are released by module_free. */
+/**
+ * Free the MultiHeadAttention module; projection parameters are released by module_free.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void mha_free(Module* module) {
     MultiHeadAttention* mha = (MultiHeadAttention*)module;
     if (!mha)
@@ -72,8 +88,16 @@ static void mha_free(Module* module) {
     cml_free(mha);
 }
 
-/** Construct a torch.nn.MultiheadAttention; embed_dim must be divisible by num_heads. Allocates the
- *  four Q/K/V/O projection weights (Xavier) and biases (zeros). Returns NULL on failure. */
+/**
+ * Construct a torch.nn.MultiheadAttention; embed_dim must be divisible by num_heads. Allocates the
+ * four Q/K/V/O projection weights (Xavier) and biases (zeros). Returns NULL on failure.
+ * @param embed_dim (int)
+ * @param num_heads (int)
+ * @param dropout (float)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (MultiHeadAttention*)
+ */
 MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float dropout, DType dtype,
                                            DeviceType device) {
     if (embed_dim % num_heads != 0) {
@@ -150,10 +174,19 @@ MultiHeadAttention* nn_multihead_attention(int embed_dim, int num_heads, float d
     return mha;
 }
 
-/** Core attention: project Q/K/V, split into heads, run scaled dot-product attention (optionally
- *  masked/biased), then recombine and apply the output projection. Takes the flash-attention path
- *  for long sequences when enabled and no bias is given. Expects 3D [batch, seq, embed_dim] inputs;
- *  NULL on NULL args or rank mismatch. */
+/**
+ * Core attention: project Q/K/V, split into heads, run scaled dot-product attention (optionally
+ * masked/biased), then recombine and apply the output projection. Takes the flash-attention path
+ * for long sequences when enabled and no bias is given. Expects 3D [batch, seq, embed_dim] inputs;
+ * NULL on NULL args or rank mismatch.
+ * @param mha (MultiHeadAttention*)
+ * @param query (Tensor*)
+ * @param key (Tensor*)
+ * @param value (Tensor*)
+ * @param mask (Tensor*)
+ * @param attn_bias (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* mha_forward_impl(MultiHeadAttention* mha, Tensor* query, Tensor* key, Tensor* value,
                                 Tensor* mask, Tensor* attn_bias) {
     if (!mha || !query || !key || !value) {
@@ -249,22 +282,44 @@ static Tensor* mha_forward_impl(MultiHeadAttention* mha, Tensor* query, Tensor* 
     return uop_linear(concat, mha->W_o->tensor, mha->b_o->tensor);
 }
 
-/** Multi-head attention over (query, key, value) with an optional mask. NULL on failure. */
+/**
+ * Multi-head attention over (query, key, value) with an optional mask. NULL on failure.
+ * @param mha (MultiHeadAttention*)
+ * @param query (Tensor*)
+ * @param key (Tensor*)
+ * @param value (Tensor*)
+ * @param mask (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* multihead_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key,
                                     Tensor* value, Tensor* mask) {
     return mha_forward_impl(mha, query, key, value, mask, NULL);
 }
 
-/** As multihead_attention_forward but adds attn_bias to the attention scores (e.g. ALiBi/relative
- *  position). This forces the standard SDPA path. NULL on failure. */
+/**
+ * As multihead_attention_forward but adds attn_bias to the attention scores (e.g. ALiBi/relative
+ * position). This forces the standard SDPA path. NULL on failure.
+ * @param mha (MultiHeadAttention*)
+ * @param query (Tensor*)
+ * @param key (Tensor*)
+ * @param value (Tensor*)
+ * @param mask (Tensor*)
+ * @param attn_bias (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* multihead_attention_forward_bias(MultiHeadAttention* mha, Tensor* query, Tensor* key,
                                          Tensor* value, Tensor* mask, Tensor* attn_bias) {
     return mha_forward_impl(mha, query, key, value, mask, attn_bias);
 }
 
-/** torch.nn.TransformerEncoderLayer forward (post-norm): self-attention + residual + LN1, then
- *  the FFN (Linear->ReLU->Linear) + residual + LN2. Expects 3D [batch, seq, d_model]; NULL on
- *  rank mismatch or op failure. */
+/**
+ * torch.nn.TransformerEncoderLayer forward (post-norm): self-attention + residual + LN1, then
+ * the FFN (Linear->ReLU->Linear) + residual + LN2. Expects 3D [batch, seq, d_model]; NULL on
+ * rank mismatch or op failure.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* encoder_layer_forward(Module* module, Tensor* input) {
     TransformerEncoderLayer* layer = (TransformerEncoderLayer*)module;
     if (!layer || !input)
@@ -305,7 +360,11 @@ static Tensor* encoder_layer_forward(Module* module, Tensor* input) {
                            layer->norm_eps);
 }
 
-/** Free the encoder layer and its owned self-attention submodule. */
+/**
+ * Free the encoder layer and its owned self-attention submodule.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void encoder_layer_free(Module* module) {
     TransformerEncoderLayer* layer = (TransformerEncoderLayer*)module;
     if (!layer)
@@ -315,8 +374,14 @@ static void encoder_layer_free(Module* module) {
     cml_free(layer);
 }
 
-/** Register `tensor` as a named parameter and return the stored Parameter. Frees `tensor` (if the
- *  add fails) and `module`, returning NULL on failure, so callers can `return NULL` directly. */
+/**
+ * Register `tensor` as a named parameter and return the stored Parameter. Frees `tensor` (if the
+ * add fails) and `module`, returning NULL on failure, so callers can `return NULL` directly.
+ * @param module (Module*)
+ * @param tensor (Tensor*)
+ * @param name (const char*)
+ * @return (Parameter*)
+ */
 static Parameter* add_named_param(Module* module, Tensor* tensor, const char* name) {
     if (!tensor) {
         module_free(module);
@@ -330,9 +395,20 @@ static Parameter* add_named_param(Module* module, Tensor* tensor, const char* na
     return module_get_parameter(module, name);
 }
 
-/** Register the position-wise feed-forward pair shared by the encoder and
- *  decoder layers: linear1 (d_model -> d_ff) and linear2 (d_ff -> d_model), Xavier weights and
- *  zero biases. Returns -1 on any allocation failure. */
+/**
+ * Register the position-wise feed-forward pair shared by the encoder and
+ * decoder layers: linear1 (d_model -> d_ff) and linear2 (d_ff -> d_model), Xavier weights and
+ * zero biases. Returns -1 on any allocation failure.
+ * @param module (Module*)
+ * @param d_model (int)
+ * @param dim_feedforward (int)
+ * @param config (TensorConfig*)
+ * @param l1w (Parameter**)
+ * @param l1b (Parameter**)
+ * @param l2w (Parameter**)
+ * @param l2b (Parameter**)
+ * @return (int)
+ */
 static int add_ffn_params(Module* module, int d_model, int dim_feedforward, TensorConfig* config,
                           Parameter** l1w, Parameter** l1b, Parameter** l2w, Parameter** l2b) {
     int l1_w_shape[] = {dim_feedforward, d_model};
@@ -362,8 +438,18 @@ static int add_ffn_params(Module* module, int d_model, int dim_feedforward, Tens
     return *l2b ? 0 : -1;
 }
 
-/** Register one layer-norm gamma/beta pair (ones/zeros) under `weight_name`/`bias_name`.
- *  Returns -1 on allocation failure. */
+/**
+ * Register one layer-norm gamma/beta pair (ones/zeros) under `weight_name`/`bias_name`.
+ * Returns -1 on allocation failure.
+ * @param module (Module*)
+ * @param d_model (int)
+ * @param config (TensorConfig*)
+ * @param weight_name (const char*)
+ * @param bias_name (const char*)
+ * @param weight (Parameter**)
+ * @param bias (Parameter**)
+ * @return (int)
+ */
 static int add_norm_pair(Module* module, int d_model, TensorConfig* config, const char* weight_name,
                          const char* bias_name, Parameter** weight, Parameter** bias) {
     int norm_shape[] = {d_model};
@@ -374,8 +460,17 @@ static int add_norm_pair(Module* module, int d_model, TensorConfig* config, cons
     return *bias ? 0 : -1;
 }
 
-/** Construct a TransformerEncoderLayer: self-attention, the FFN pair, and two LayerNorms (eps
- *  1e-5). Returns NULL on failure. */
+/**
+ * Construct a TransformerEncoderLayer: self-attention, the FFN pair, and two LayerNorms (eps
+ * 1e-5). Returns NULL on failure.
+ * @param d_model (int)
+ * @param nhead (int)
+ * @param dim_feedforward (int)
+ * @param dropout (float)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (TransformerEncoderLayer*)
+ */
 TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, int dim_feedforward,
                                                       float dropout, DType dtype,
                                                       DeviceType device) {
@@ -418,8 +513,13 @@ TransformerEncoderLayer* nn_transformer_encoder_layer(int d_model, int nhead, in
     return layer;
 }
 
-/** torch.nn.TransformerEncoder forward: run the stacked encoder layers in sequence, then a final
- *  LayerNorm. Frees intermediate tensors it owns. NULL on NULL args or layer failure. */
+/**
+ * torch.nn.TransformerEncoder forward: run the stacked encoder layers in sequence, then a final
+ * LayerNorm. Frees intermediate tensors it owns. NULL on NULL args or layer failure.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* transformer_encoder_forward(Module* module, Tensor* input) {
     TransformerEncoder* enc = (TransformerEncoder*)module;
     if (!enc || !input)
@@ -445,7 +545,11 @@ static Tensor* transformer_encoder_forward(Module* module, Tensor* input) {
     return out;
 }
 
-/** Free the TransformerEncoder and every encoder layer it owns. */
+/**
+ * Free the TransformerEncoder and every encoder layer it owns.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void transformer_encoder_free(Module* module) {
     TransformerEncoder* enc = (TransformerEncoder*)module;
     if (!enc)
@@ -460,8 +564,18 @@ static void transformer_encoder_free(Module* module) {
     cml_free(enc);
 }
 
-/** Construct a TransformerEncoder stacking num_layers encoder layers plus a final LayerNorm.
- *  Returns NULL on failure. */
+/**
+ * Construct a TransformerEncoder stacking num_layers encoder layers plus a final LayerNorm.
+ * Returns NULL on failure.
+ * @param d_model (int)
+ * @param nhead (int)
+ * @param dim_feedforward (int)
+ * @param dropout (float)
+ * @param num_layers (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (TransformerEncoder*)
+ */
 TransformerEncoder* nn_transformer_encoder(int d_model, int nhead, int dim_feedforward,
                                            float dropout, int num_layers, DType dtype,
                                            DeviceType device) {
@@ -525,15 +639,28 @@ TransformerEncoder* nn_transformer_encoder(int d_model, int nhead, int dim_feedf
     return enc;
 }
 
-/** Module-interface forward: decoder-only pass (no cross-attention memory and no masks). */
+/**
+ * Module-interface forward: decoder-only pass (no cross-attention memory and no masks).
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* decoder_layer_forward_wrapper(Module* module, Tensor* input) {
     TransformerDecoderLayer* layer = (TransformerDecoderLayer*)module;
     return transformer_decoder_layer_forward(layer, input, NULL, NULL, NULL);
 }
 
-/** torch.nn.TransformerDecoderLayer forward (post-norm): masked self-attention + residual + LN1;
- *  cross-attention over `memory` + residual + LN2 (skipped when memory is NULL); FFN + residual +
- *  LN3. Expects 3D tgt; NULL on NULL layer/tgt, rank mismatch, or op failure. */
+/**
+ * torch.nn.TransformerDecoderLayer forward (post-norm): masked self-attention + residual + LN1;
+ * cross-attention over `memory` + residual + LN2 (skipped when memory is NULL); FFN + residual +
+ * LN3. Expects 3D tgt; NULL on NULL layer/tgt, rank mismatch, or op failure.
+ * @param layer (TransformerDecoderLayer*)
+ * @param tgt (Tensor*)
+ * @param memory (Tensor*)
+ * @param tgt_mask (Tensor*)
+ * @param memory_mask (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* transformer_decoder_layer_forward(TransformerDecoderLayer* layer, Tensor* tgt,
                                           Tensor* memory, Tensor* tgt_mask, Tensor* memory_mask) {
     if (!layer || !tgt)
@@ -585,7 +712,11 @@ Tensor* transformer_decoder_layer_forward(TransformerDecoderLayer* layer, Tensor
                            layer->norm_eps);
 }
 
-/** Free the decoder layer and its owned self-attention and cross-attention submodules. */
+/**
+ * Free the decoder layer and its owned self-attention and cross-attention submodules.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void decoder_layer_free(Module* module) {
     TransformerDecoderLayer* layer = (TransformerDecoderLayer*)module;
     if (!layer)
@@ -597,8 +728,17 @@ static void decoder_layer_free(Module* module) {
     cml_free(layer);
 }
 
-/** Construct a TransformerDecoderLayer: self-attention, cross-attention, the FFN pair, and three
- *  LayerNorms (eps 1e-5). Returns NULL on failure. */
+/**
+ * Construct a TransformerDecoderLayer: self-attention, cross-attention, the FFN pair, and three
+ * LayerNorms (eps 1e-5). Returns NULL on failure.
+ * @param d_model (int)
+ * @param nhead (int)
+ * @param dim_feedforward (int)
+ * @param dropout (float)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (TransformerDecoderLayer*)
+ */
 TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, int dim_feedforward,
                                                       float dropout, DType dtype,
                                                       DeviceType device) {
@@ -647,8 +787,13 @@ TransformerDecoderLayer* nn_transformer_decoder_layer(int d_model, int nhead, in
     return layer;
 }
 
-/** torch.nn.TransformerDecoder forward (decoder-only, no memory): run the stacked decoder layers,
- *  then a final LayerNorm. Frees intermediate tensors it owns. NULL on NULL args or failure. */
+/**
+ * torch.nn.TransformerDecoder forward (decoder-only, no memory): run the stacked decoder layers,
+ * then a final LayerNorm. Frees intermediate tensors it owns. NULL on NULL args or failure.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* transformer_decoder_forward(Module* module, Tensor* input) {
     TransformerDecoder* dec = (TransformerDecoder*)module;
     if (!dec || !input)
@@ -674,7 +819,11 @@ static Tensor* transformer_decoder_forward(Module* module, Tensor* input) {
     return out;
 }
 
-/** Free the TransformerDecoder and every decoder layer it owns. */
+/**
+ * Free the TransformerDecoder and every decoder layer it owns.
+ * @param module (Module*)
+ * @return (void)
+ */
 static void transformer_decoder_free(Module* module) {
     TransformerDecoder* dec = (TransformerDecoder*)module;
     if (!dec)
@@ -689,8 +838,18 @@ static void transformer_decoder_free(Module* module) {
     cml_free(dec);
 }
 
-/** Construct a TransformerDecoder stacking num_layers decoder layers plus a final LayerNorm.
- *  Returns NULL on failure. */
+/**
+ * Construct a TransformerDecoder stacking num_layers decoder layers plus a final LayerNorm.
+ * Returns NULL on failure.
+ * @param d_model (int)
+ * @param nhead (int)
+ * @param dim_feedforward (int)
+ * @param dropout (float)
+ * @param num_layers (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (TransformerDecoder*)
+ */
 TransformerDecoder* nn_transformer_decoder(int d_model, int nhead, int dim_feedforward,
                                            float dropout, int num_layers, DType dtype,
                                            DeviceType device) {
@@ -754,8 +913,17 @@ TransformerDecoder* nn_transformer_decoder(int d_model, int nhead, int dim_feedf
     return dec;
 }
 
-/** Allocate a key/value cache with zeroed [batch, num_heads, max_seq_len, head_dim] buffers for
- *  incremental decoding. Returns NULL on non-positive dimensions or allocation failure. */
+/**
+ * Allocate a key/value cache with zeroed [batch, num_heads, max_seq_len, head_dim] buffers for
+ * incremental decoding. Returns NULL on non-positive dimensions or allocation failure.
+ * @param batch (int)
+ * @param num_heads (int)
+ * @param max_seq_len (int)
+ * @param head_dim (int)
+ * @param dtype (DType)
+ * @param device (DeviceType)
+ * @return (KVCache*)
+ */
 KVCache* kv_cache_create(int batch, int num_heads, int max_seq_len, int head_dim, DType dtype,
                          DeviceType device) {
     if (batch <= 0 || num_heads <= 0 || max_seq_len <= 0 || head_dim <= 0) {
@@ -789,7 +957,11 @@ KVCache* kv_cache_create(int batch, int num_heads, int max_seq_len, int head_dim
     return cache;
 }
 
-/** Free a KV cache and its key/value tensors. */
+/**
+ * Free a KV cache and its key/value tensors.
+ * @param cache (KVCache*)
+ * @return (void)
+ */
 void kv_cache_free(KVCache* cache) {
     if (!cache)
         return;
@@ -800,7 +972,11 @@ void kv_cache_free(KVCache* cache) {
     cml_free(cache);
 }
 
-/** Reset a KV cache to length 0 and zero its (materialized) key/value buffers for reuse. */
+/**
+ * Reset a KV cache to length 0 and zero its (materialized) key/value buffers for reuse.
+ * @param cache (KVCache*)
+ * @return (void)
+ */
 void kv_cache_reset(KVCache* cache) {
     if (!cache)
         return;
@@ -820,8 +996,17 @@ void kv_cache_reset(KVCache* cache) {
     }
 }
 
-/** Run attention with flash attention temporarily forced on (applying `config` if given), then
- *  restore the layer's previous flash settings. NULL on NULL args. */
+/**
+ * Run attention with flash attention temporarily forced on (applying `config` if given), then
+ * restore the layer's previous flash settings. NULL on NULL args.
+ * @param mha (MultiHeadAttention*)
+ * @param query (Tensor*)
+ * @param key (Tensor*)
+ * @param value (Tensor*)
+ * @param mask (Tensor*)
+ * @param config (FlashAttentionConfig*)
+ * @return (Tensor*)
+ */
 Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* key, Tensor* value,
                                 Tensor* mask, FlashAttentionConfig* config) {
     if (!mha || !query || !key || !value)
@@ -843,9 +1028,18 @@ Tensor* flash_attention_forward(MultiHeadAttention* mha, Tensor* query, Tensor* 
     return out;
 }
 
-/** Incremental attention: append the projected K/V for this step into `cache`, then attend over the
- *  full cached sequence. Falls back to plain attention when cache is NULL. NULL on NULL args or
- *  cache overflow. */
+/**
+ * Incremental attention: append the projected K/V for this step into `cache`, then attend over the
+ * full cached sequence. Falls back to plain attention when cache is NULL. NULL on NULL args or
+ * cache overflow.
+ * @param mha (MultiHeadAttention*)
+ * @param query (Tensor*)
+ * @param key (Tensor*)
+ * @param value (Tensor*)
+ * @param mask (Tensor*)
+ * @param cache (KVCache*)
+ * @return (Tensor*)
+ */
 Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* query, Tensor* key,
                                            Tensor* value, Tensor* mask, KVCache* cache) {
     if (!mha || !query || !key || !value)
@@ -985,7 +1179,13 @@ Tensor* multihead_attention_forward_cached(MultiHeadAttention* mha, Tensor* quer
     return uop_linear(concat, mha->W_o->tensor, mha->b_o->tensor);
 }
 
-/** Enable/disable the flash-attention path and its causal flag. No-op if mha is NULL. */
+/**
+ * Enable/disable the flash-attention path and its causal flag. No-op if mha is NULL.
+ * @param mha (MultiHeadAttention*)
+ * @param enabled (bool)
+ * @param causal (bool)
+ * @return (void)
+ */
 void multihead_attention_set_flash(MultiHeadAttention* mha, bool enabled, bool causal) {
     if (!mha)
         return;

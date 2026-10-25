@@ -1,7 +1,13 @@
 #include "core/protobuf_mini.h"
 #include <string.h>
 
-/** Bind a reader to a byte buffer, starting the cursor at offset 0. */
+/**
+ * Bind a reader to a byte buffer, starting the cursor at offset 0.
+ * @param reader (PBReader*)
+ * @param data (const uint8_t*)
+ * @param length (size_t)
+ * @return (void)
+ */
 void pb_reader_init(PBReader* reader, const uint8_t* data, size_t length) {
     if (!reader)
         return;
@@ -10,7 +16,11 @@ void pb_reader_init(PBReader* reader, const uint8_t* data, size_t length) {
     reader->pos    = 0;
 }
 
-/** Decode a base-128 varint, advancing the cursor; stops at 64 bits to bound bad input. */
+/**
+ * Decode a base-128 varint, advancing the cursor; stops at 64 bits to bound bad input.
+ * @param reader (PBReader*)
+ * @return (uint64_t)
+ */
 uint64_t pb_read_varint(PBReader* reader) {
     uint64_t result = 0;
     int shift       = 0;
@@ -30,14 +40,22 @@ uint64_t pb_read_varint(PBReader* reader) {
     return result;
 }
 
-/** Read a signed varint, undoing protobuf's zigzag encoding. */
+/**
+ * Read a signed varint, undoing protobuf's zigzag encoding.
+ * @param reader (PBReader*)
+ * @return (int64_t)
+ */
 int64_t pb_read_svarint(PBReader* reader) {
     uint64_t n = pb_read_varint(reader);
     /* Zigzag decode: (n >> 1) ^ -(n & 1) */
     return (int64_t)((n >> 1) ^ (-(n & 1)));
 }
 
-/** Read a little-endian fixed 32-bit field; returns 0 if fewer than 4 bytes remain. */
+/**
+ * Read a little-endian fixed 32-bit field; returns 0 if fewer than 4 bytes remain.
+ * @param reader (PBReader*)
+ * @return (uint32_t)
+ */
 uint32_t pb_read_fixed32(PBReader* reader) {
     if (reader->pos + 4 > reader->length)
         return 0;
@@ -51,7 +69,11 @@ uint32_t pb_read_fixed32(PBReader* reader) {
     return v;
 }
 
-/** Read a little-endian fixed 64-bit field; returns 0 if fewer than 8 bytes remain. */
+/**
+ * Read a little-endian fixed 64-bit field; returns 0 if fewer than 8 bytes remain.
+ * @param reader (PBReader*)
+ * @return (uint64_t)
+ */
 uint64_t pb_read_fixed64(PBReader* reader) {
     if (reader->pos + 8 > reader->length)
         return 0;
@@ -64,7 +86,11 @@ uint64_t pb_read_fixed64(PBReader* reader) {
     return v;
 }
 
-/** Reinterpret a fixed32 field's bits as an IEEE-754 float. */
+/**
+ * Reinterpret a fixed32 field's bits as an IEEE-754 float.
+ * @param reader (PBReader*)
+ * @return (float)
+ */
 float pb_read_float(PBReader* reader) {
     uint32_t bits = pb_read_fixed32(reader);
     float f;
@@ -72,7 +98,11 @@ float pb_read_float(PBReader* reader) {
     return f;
 }
 
-/** Reinterpret a fixed64 field's bits as an IEEE-754 double. */
+/**
+ * Reinterpret a fixed64 field's bits as an IEEE-754 double.
+ * @param reader (PBReader*)
+ * @return (double)
+ */
 double pb_read_double(PBReader* reader) {
     uint64_t bits = pb_read_fixed64(reader);
     double d;
@@ -80,8 +110,13 @@ double pb_read_double(PBReader* reader) {
     return d;
 }
 
-/** Read one tag plus its value into @p field. Returns false at end of buffer, on a
- *  zero field number, an unknown wire type, or a length that overruns the buffer. */
+/**
+ * Read one tag plus its value into @p field. Returns false at end of buffer, on a
+ * zero field number, an unknown wire type, or a length that overruns the buffer.
+ * @param reader (PBReader*)
+ * @param field (PBField*)
+ * @return (bool)
+ */
 bool pb_read_field(PBReader* reader, PBField* field) {
     if (!reader || !field)
         return false;
@@ -128,7 +163,11 @@ bool pb_read_field(PBReader* reader, PBField* field) {
     return true;
 }
 
-/** Make a sub-reader over a LEN field's payload (for nested messages); empty otherwise. */
+/**
+ * Make a sub-reader over a LEN field's payload (for nested messages); empty otherwise.
+ * @param field (const PBField*)
+ * @return (PBReader)
+ */
 PBReader pb_reader_sub(const PBField* field) {
     PBReader sub;
     if (field && field->wire_type == PB_WIRE_LEN) {
@@ -142,7 +181,12 @@ PBReader pb_reader_sub(const PBField* field) {
     return sub;
 }
 
-/** View a LEN field as a (non-terminated) string; sets @p out_len, NULL for non-LEN. */
+/**
+ * View a LEN field as a (non-terminated) string; sets @p out_len, NULL for non-LEN.
+ * @param field (const PBField*)
+ * @param out_len (size_t*)
+ * @return (const char*)
+ */
 const char* pb_field_string(const PBField* field, size_t* out_len) {
     if (!field || field->wire_type != PB_WIRE_LEN) {
         if (out_len)
@@ -154,7 +198,11 @@ const char* pb_field_string(const PBField* field, size_t* out_len) {
     return (const char*)field->value.bytes.data;
 }
 
-/** True while the cursor has not reached the end of the buffer. */
+/**
+ * True while the cursor has not reached the end of the buffer.
+ * @param reader (const PBReader*)
+ * @return (bool)
+ */
 bool pb_reader_has_data(const PBReader* reader) {
     if (!reader)
         return false;

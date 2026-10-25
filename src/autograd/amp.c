@@ -26,7 +26,10 @@ static int autocast_env_dtype(void) {
 
 static bool g_dtype_resolved = false;
 
-/** Latch the env-selected target dtype into the global context once, on first use. */
+/**
+ * Latch the env-selected target dtype into the global context once, on first use.
+ * @return (void)
+ */
 static void autocast_resolve_dtype(void) {
     if (!g_dtype_resolved) {
         g_autocast_ctx.target_dtype = (DType)autocast_env_dtype();
@@ -34,7 +37,11 @@ static void autocast_resolve_dtype(void) {
     }
 }
 
-/** Enable autocast and pin the target low-precision dtype for the enclosing region. */
+/**
+ * Enable autocast and pin the target low-precision dtype for the enclosing region.
+ * @param target_dtype (DType)
+ * @return (void)
+ */
 void autocast_enter(DType target_dtype) {
     autocast_resolve_dtype();
     g_autocast_ctx.enabled      = true;
@@ -42,35 +49,58 @@ void autocast_enter(DType target_dtype) {
     g_dtype_resolved            = true;
 }
 
-/** Leave the autocast region; the pinned target dtype is left untouched. */
+/**
+ * Leave the autocast region; the pinned target dtype is left untouched.
+ * @return (void)
+ */
 void autocast_exit(void) { g_autocast_ctx.enabled = false; }
 
-/** Whether ops should currently be cast to the autocast target dtype. */
+/**
+ * Whether ops should currently be cast to the autocast target dtype.
+ * @return (bool)
+ */
 bool autocast_is_enabled(void) { return g_autocast_ctx.enabled; }
 
-/** Return the shared autocast context, resolving the env dtype first. */
+/**
+ * Return the shared autocast context, resolving the env dtype first.
+ * @return (AutocastContext*)
+ */
 AutocastContext* autocast_get_context(void) {
     autocast_resolve_dtype();
     return &g_autocast_ctx;
 }
 
-/** Target dtype selected by CML_AMP_DTYPE, independent of whether autocast is on. */
+/**
+ * Target dtype selected by CML_AMP_DTYPE, independent of whether autocast is on.
+ * @return (DType)
+ */
 DType autocast_default_dtype(void) { return (DType)autocast_env_dtype(); }
 
-/** Override the autocast target dtype, marking it resolved so env lookup is skipped. */
+/**
+ * Override the autocast target dtype, marking it resolved so env lookup is skipped.
+ * @param dtype (DType)
+ * @return (void)
+ */
 void autocast_set_dtype(DType dtype) {
     g_autocast_ctx.target_dtype = dtype;
     g_dtype_resolved            = true;
 }
 
-/** Current autocast target dtype, resolving the env default on first access. */
+/**
+ * Current autocast target dtype, resolving the env default on first access.
+ * @return (DType)
+ */
 DType autocast_get_dtype(void) {
     autocast_resolve_dtype();
     return g_autocast_ctx.target_dtype;
 }
 
-/** True for numerically sensitive ops (softmax, losses, log/exp/pow) that must stay fp32
- * even under autocast to avoid overflow or loss of precision. */
+/**
+ * True for numerically sensitive ops (softmax, losses, log/exp/pow) that must stay fp32
+ * even under autocast to avoid overflow or loss of precision.
+ * @param op (OpType)
+ * @return (bool)
+ */
 bool autocast_should_keep_float32(OpType op) {
     switch (op) {
     /* Numerically sensitive operations that need full precision */
@@ -91,8 +121,15 @@ bool autocast_should_keep_float32(OpType op) {
     }
 }
 
-/** Allocate a loss-scale controller; non-positive arguments fall back to defaults
- * (scale 65536, growth 2x, backoff 0.5x, interval 2000). Returns NULL on OOM. */
+/**
+ * Allocate a loss-scale controller; non-positive arguments fall back to defaults
+ * (scale 65536, growth 2x, backoff 0.5x, interval 2000). Returns NULL on OOM.
+ * @param init_scale (float)
+ * @param growth_factor (float)
+ * @param backoff_factor (float)
+ * @param growth_interval (int)
+ * @return (GradScaler*)
+ */
 GradScaler* grad_scaler_create(float init_scale, float growth_factor, float backoff_factor,
                                int growth_interval) {
     GradScaler* scaler = cml_calloc(1, sizeof(GradScaler));
@@ -111,15 +148,24 @@ GradScaler* grad_scaler_create(float init_scale, float growth_factor, float back
     return scaler;
 }
 
-/** Free a GradScaler; NULL-safe. */
+/**
+ * Free a GradScaler; NULL-safe.
+ * @param scaler (GradScaler*)
+ * @return (void)
+ */
 void grad_scaler_free(GradScaler* scaler) {
     if (!scaler)
         return;
     cml_free(scaler);
 }
 
-/** Multiply the loss by the current scale so fp16 gradients do not underflow. Returns a
- * new tensor, or the loss unchanged under bf16 (where scaling is unnecessary); NULL on error. */
+/**
+ * Multiply the loss by the current scale so fp16 gradients do not underflow. Returns a
+ * new tensor, or the loss unchanged under bf16 (where scaling is unnecessary); NULL on error.
+ * @param scaler (GradScaler*)
+ * @param loss (Tensor*)
+ * @return (Tensor*)
+ */
 Tensor* grad_scaler_scale(GradScaler* scaler, Tensor* loss) {
     if (!scaler || !loss) {
         LOG_ERROR("grad_scaler_scale: NULL argument");
@@ -169,8 +215,14 @@ Tensor* grad_scaler_scale(GradScaler* scaler, Tensor* loss) {
     return scaled;
 }
 
-/** Divide each parameter gradient in place by the scale factor, setting found_inf if any
- * inf/nan is seen so the following step can be skipped. */
+/**
+ * Divide each parameter gradient in place by the scale factor, setting found_inf if any
+ * inf/nan is seen so the following step can be skipped.
+ * @param scaler (GradScaler*)
+ * @param params (Parameter**)
+ * @param num_params (int)
+ * @return (void)
+ */
 void grad_scaler_unscale(GradScaler* scaler, Parameter** params, int num_params) {
     if (!scaler || !params) {
         LOG_ERROR("grad_scaler_unscale: NULL argument");
@@ -209,7 +261,13 @@ void grad_scaler_unscale(GradScaler* scaler, Parameter** params, int num_params)
     }
 }
 
-/** Invoke the optimizer step callback, but skip it when inf/nan gradients were detected. */
+/**
+ * Invoke the optimizer step callback, but skip it when inf/nan gradients were detected.
+ * @param scaler (GradScaler*)
+ * @param step_fn (void (*)(void*))
+ * @param optimizer (void*)
+ * @return (void)
+ */
 void grad_scaler_step(GradScaler* scaler, void (*step_fn)(void*), void* optimizer) {
     if (!scaler || !step_fn) {
         LOG_ERROR("grad_scaler_step: NULL argument");
@@ -224,8 +282,12 @@ void grad_scaler_step(GradScaler* scaler, void (*step_fn)(void*), void* optimize
     step_fn(optimizer);
 }
 
-/** Adapt the scale after a step: back off (clamped to >= 1) on inf/nan, otherwise grow by
- * growth_factor once growth_interval clean steps elapse (clamped to 2^32). */
+/**
+ * Adapt the scale after a step: back off (clamped to >= 1) on inf/nan, otherwise grow by
+ * growth_factor once growth_interval clean steps elapse (clamped to 2^32).
+ * @param scaler (GradScaler*)
+ * @return (void)
+ */
 void grad_scaler_update(GradScaler* scaler) {
     if (!scaler)
         return;

@@ -9,8 +9,17 @@
 #include <float.h>
 #include "alloc/cml_allocator.h"
 
-/** Output size of one pooled spatial axis from the kernel/stride/padding/dilation; ceil_mode
- *  rounds up a partial final window instead of flooring. */
+/**
+ * Output size of one pooled spatial axis from the kernel/stride/padding/dilation; ceil_mode
+ * rounds up a partial final window instead of flooring.
+ * @param in_size (int)
+ * @param kernel (int)
+ * @param stride (int)
+ * @param padding (int)
+ * @param dilation (int)
+ * @param ceil_mode (bool)
+ * @return (int)
+ */
 static int pool2d_out_dim(int in_size, int kernel, int stride, int padding, int dilation,
                           bool ceil_mode) {
     int numer = in_size + 2 * padding - dilation * (kernel - 1) - 1;
@@ -20,8 +29,13 @@ static int pool2d_out_dim(int in_size, int kernel, int stride, int padding, int 
     return out;
 }
 
-/** torch.nn.MaxPool2d forward over 4D [N,C,H,W] via uop_maxpool2d. Requires dilation=1; returns
- *  NULL on bad rank, dilation != 1, or non-positive output size. */
+/**
+ * torch.nn.MaxPool2d forward over 4D [N,C,H,W] via uop_maxpool2d. Requires dilation=1; returns
+ * NULL on bad rank, dilation != 1, or non-positive output size.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* maxpool2d_forward(Module* module, Tensor* input) {
     MaxPool2d* pool = (MaxPool2d*)module;
 
@@ -67,10 +81,22 @@ static Tensor* maxpool2d_forward(Module* module, Tensor* input) {
     return uop_maxpool2d(input, &params);
 }
 
-/** Free the MaxPool2d module (no owned parameters). */
+/**
+ * Free the MaxPool2d module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void maxpool2d_free(Module* module) { cml_free(module); }
 
-/** Construct a square-window MaxPool2d; stride <= 0 defaults to kernel_size. NULL on failure. */
+/**
+ * Construct a square-window MaxPool2d; stride <= 0 defaults to kernel_size. NULL on failure.
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @param padding (int)
+ * @param dilation (int)
+ * @param ceil_mode (bool)
+ * @return (MaxPool2d*)
+ */
 MaxPool2d* nn_maxpool2d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode) {
     MaxPool2d* pool = cml_malloc(sizeof(MaxPool2d));
     if (!pool)
@@ -94,8 +120,13 @@ MaxPool2d* nn_maxpool2d(int kernel_size, int stride, int padding, int dilation, 
     return pool;
 }
 
-/** torch.nn.AvgPool2d forward over 4D [N,C,H,W] via uop_avgpool2d, honoring count_include_pad.
- *  NULL on bad rank or non-positive output size. */
+/**
+ * torch.nn.AvgPool2d forward over 4D [N,C,H,W] via uop_avgpool2d, honoring count_include_pad.
+ * NULL on bad rank or non-positive output size.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* avgpool2d_forward(Module* module, Tensor* input) {
     AvgPool2d* pool = (AvgPool2d*)module;
 
@@ -132,10 +163,22 @@ static Tensor* avgpool2d_forward(Module* module, Tensor* input) {
     return uop_avgpool2d(input, &params);
 }
 
-/** Free the AvgPool2d module (no owned parameters). */
+/**
+ * Free the AvgPool2d module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void avgpool2d_free(Module* module) { cml_free(module); }
 
-/** Construct a square-window AvgPool2d; stride <= 0 defaults to kernel_size. NULL on failure. */
+/**
+ * Construct a square-window AvgPool2d; stride <= 0 defaults to kernel_size. NULL on failure.
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @param padding (int)
+ * @param ceil_mode (bool)
+ * @param count_include_pad (bool)
+ * @return (AvgPool2d*)
+ */
 AvgPool2d* nn_avgpool2d(int kernel_size, int stride, int padding, bool ceil_mode,
                         bool count_include_pad) {
     AvgPool2d* pool = cml_malloc(sizeof(AvgPool2d));
@@ -159,8 +202,15 @@ AvgPool2d* nn_avgpool2d(int kernel_size, int stride, int padding, bool ceil_mode
     return pool;
 }
 
-/** Allocate a materialised output tensor of `shape`/`ndim` matching `input`'s
- *  dtype and device, handing back its data pointer. NULL on allocation failure. */
+/**
+ * Allocate a materialised output tensor of `shape`/`ndim` matching `input`'s
+ * dtype and device, handing back its data pointer. NULL on allocation failure.
+ * @param input (Tensor*)
+ * @param shape (const int*)
+ * @param ndim (int)
+ * @param out_data (float**)
+ * @return (Tensor*)
+ */
 static Tensor* pool_alloc_output(Tensor* input, const int* shape, int ndim, float** out_data) {
     TensorConfig config = {
         .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
@@ -172,8 +222,13 @@ static Tensor* pool_alloc_output(Tensor* input, const int* shape, int ndim, floa
     return output;
 }
 
-/** torch.nn.MaxPool3d forward over 5D [N,C,D,H,W]. With dilation=1 it lowers to two separable 2D
- *  max-pools (differentiable); dilated kernels use an eager reference loop. NULL on bad rank. */
+/**
+ * torch.nn.MaxPool3d forward over 5D [N,C,D,H,W]. With dilation=1 it lowers to two separable 2D
+ * max-pools (differentiable); dilated kernels use an eager reference loop. NULL on bad rank.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* maxpool3d_forward(Module* module, Tensor* input) {
     MaxPool3d* pool = (MaxPool3d*)module;
     if (!input || input->ndim != 5)
@@ -299,11 +354,23 @@ static Tensor* maxpool3d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Free the MaxPool3d module (no owned parameters). */
+/**
+ * Free the MaxPool3d module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void maxpool3d_free(Module* module) { cml_free(module); }
 
-/** Construct a cubic-window MaxPool3d; stride/dilation <= 0 default to kernel_size/1. NULL on
- *  failure. */
+/**
+ * Construct a cubic-window MaxPool3d; stride/dilation <= 0 default to kernel_size/1. NULL on
+ * failure.
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @param padding (int)
+ * @param dilation (int)
+ * @param ceil_mode (bool)
+ * @return (MaxPool3d*)
+ */
 MaxPool3d* nn_maxpool3d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode) {
     MaxPool3d* pool = cml_malloc(sizeof(MaxPool3d));
     if (!pool)
@@ -322,8 +389,13 @@ MaxPool3d* nn_maxpool3d(int kernel_size, int stride, int padding, int dilation, 
     return pool;
 }
 
-/** torch.nn.AvgPool3d forward over 5D [N,C,D,H,W] via an eager reference loop, honoring
- *  count_include_pad. NULL on bad rank or allocation failure. */
+/**
+ * torch.nn.AvgPool3d forward over 5D [N,C,D,H,W] via an eager reference loop, honoring
+ * count_include_pad. NULL on bad rank or allocation failure.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* avgpool3d_forward(Module* module, Tensor* input) {
     AvgPool3d* pool = (AvgPool3d*)module;
     if (!input || input->ndim != 5)
@@ -401,10 +473,22 @@ static Tensor* avgpool3d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Free the AvgPool3d module (no owned parameters). */
+/**
+ * Free the AvgPool3d module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void avgpool3d_free(Module* module) { cml_free(module); }
 
-/** Construct a cubic-window AvgPool3d; stride <= 0 defaults to kernel_size. NULL on failure. */
+/**
+ * Construct a cubic-window AvgPool3d; stride <= 0 defaults to kernel_size. NULL on failure.
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @param padding (int)
+ * @param ceil_mode (bool)
+ * @param count_include_pad (bool)
+ * @return (AvgPool3d*)
+ */
 AvgPool3d* nn_avgpool3d(int kernel_size, int stride, int padding, bool ceil_mode,
                         bool count_include_pad) {
     AvgPool3d* pool = cml_malloc(sizeof(AvgPool3d));
@@ -424,8 +508,13 @@ AvgPool3d* nn_avgpool3d(int kernel_size, int stride, int padding, bool ceil_mode
     return pool;
 }
 
-/** torch.nn.MaxPool1d forward over 3D [N,C,L]. With dilation=1 it lowers to a height-1 2D
- *  max-pool (differentiable); dilated kernels use an eager reference loop. NULL on bad rank. */
+/**
+ * torch.nn.MaxPool1d forward over 3D [N,C,L]. With dilation=1 it lowers to a height-1 2D
+ * max-pool (differentiable); dilated kernels use an eager reference loop. NULL on bad rank.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* maxpool1d_forward(Module* module, Tensor* input) {
     MaxPool1d* pool = (MaxPool1d*)module;
     if (!input || input->ndim != 3)
@@ -497,10 +586,22 @@ static Tensor* maxpool1d_forward(Module* module, Tensor* input) {
     return output;
 }
 
-/** Free the MaxPool1d module (no owned parameters). */
+/**
+ * Free the MaxPool1d module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void maxpool1d_free(Module* module) { cml_free(module); }
 
-/** Construct a MaxPool1d; stride/dilation <= 0 default to kernel_size/1. NULL on failure. */
+/**
+ * Construct a MaxPool1d; stride/dilation <= 0 default to kernel_size/1. NULL on failure.
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @param padding (int)
+ * @param dilation (int)
+ * @param ceil_mode (bool)
+ * @return (MaxPool1d*)
+ */
 MaxPool1d* nn_maxpool1d(int kernel_size, int stride, int padding, int dilation, bool ceil_mode) {
     MaxPool1d* pool = cml_malloc(sizeof(MaxPool1d));
     if (!pool)
@@ -517,8 +618,13 @@ MaxPool1d* nn_maxpool1d(int kernel_size, int stride, int padding, int dilation, 
     return pool;
 }
 
-/** torch.nn.AvgPool1d forward over 3D [N,C,L], lowered to a height-1 2D avg-pool (differentiable,
- *  honors count_include_pad). NULL on bad rank or op failure. */
+/**
+ * torch.nn.AvgPool1d forward over 3D [N,C,L], lowered to a height-1 2D avg-pool (differentiable,
+ * honors count_include_pad). NULL on bad rank or op failure.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* avgpool1d_forward(Module* module, Tensor* input) {
     AvgPool1d* pool = (AvgPool1d*)module;
     if (!input || input->ndim != 3)
@@ -548,10 +654,22 @@ static Tensor* avgpool1d_forward(Module* module, Tensor* input) {
     return uop_reshape(y4, &rp2);
 }
 
-/** Free the AvgPool1d module (no owned parameters). */
+/**
+ * Free the AvgPool1d module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void avgpool1d_free(Module* module) { cml_free(module); }
 
-/** Construct an AvgPool1d; stride <= 0 defaults to kernel_size. NULL on failure. */
+/**
+ * Construct an AvgPool1d; stride <= 0 defaults to kernel_size. NULL on failure.
+ * @param kernel_size (int)
+ * @param stride (int)
+ * @param padding (int)
+ * @param ceil_mode (bool)
+ * @param count_include_pad (bool)
+ * @return (AvgPool1d*)
+ */
 AvgPool1d* nn_avgpool1d(int kernel_size, int stride, int padding, bool ceil_mode,
                         bool count_include_pad) {
     AvgPool1d* pool = cml_malloc(sizeof(AvgPool1d));
@@ -569,9 +687,15 @@ AvgPool1d* nn_avgpool1d(int kernel_size, int stride, int padding, bool ceil_mode
     return pool;
 }
 
-/** Adaptive 2-D pooling over [N, C, H, W]: output cell `o` reduces the input
- *  window [floor(o*in/out), ceil((o+1)*in/out)). `take_max` selects max-pooling
- *  over average-pooling -- the only difference between the two layers. NULL on bad rank. */
+/**
+ * Adaptive 2-D pooling over [N, C, H, W]: output cell `o` reduces the input
+ * window [floor(o*in/out), ceil((o+1)*in/out)). `take_max` selects max-pooling
+ * over average-pooling -- the only difference between the two layers. NULL on bad rank.
+ * @param input (Tensor*)
+ * @param output_size (const int*)
+ * @param take_max (bool)
+ * @return (Tensor*)
+ */
 static Tensor* adaptive_pool2d(Tensor* input, const int* output_size, bool take_max) {
     if (!input || input->ndim != 4)
         return NULL;
@@ -628,15 +752,29 @@ static Tensor* adaptive_pool2d(Tensor* input, const int* output_size, bool take_
     return output;
 }
 
-/** torch.nn.AdaptiveAvgPool2d forward: average-pool to the layer's fixed output_size. */
+/**
+ * torch.nn.AdaptiveAvgPool2d forward: average-pool to the layer's fixed output_size.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* adaptive_avgpool2d_forward(Module* module, Tensor* input) {
     return adaptive_pool2d(input, ((AdaptiveAvgPool2d*)module)->output_size, false);
 }
 
-/** Free the AdaptiveAvgPool2d module (no owned parameters). */
+/**
+ * Free the AdaptiveAvgPool2d module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void adaptive_avgpool2d_free(Module* module) { cml_free(module); }
 
-/** Construct an AdaptiveAvgPool2d producing a fixed (output_h, output_w). NULL on failure. */
+/**
+ * Construct an AdaptiveAvgPool2d producing a fixed (output_h, output_w). NULL on failure.
+ * @param output_h (int)
+ * @param output_w (int)
+ * @return (AdaptiveAvgPool2d*)
+ */
 AdaptiveAvgPool2d* nn_adaptive_avgpool2d(int output_h, int output_w) {
     AdaptiveAvgPool2d* pool = cml_malloc(sizeof(AdaptiveAvgPool2d));
     if (!pool)
@@ -651,8 +789,14 @@ AdaptiveAvgPool2d* nn_adaptive_avgpool2d(int output_h, int output_w) {
     return pool;
 }
 
-/** Adaptive 1-D pooling over [N, C, L]: output cell `o` reduces the input window
- *  [floor(o*L/out), ceil((o+1)*L/out)). `take_max` selects max over average. NULL on bad rank. */
+/**
+ * Adaptive 1-D pooling over [N, C, L]: output cell `o` reduces the input window
+ * [floor(o*L/out), ceil((o+1)*L/out)). `take_max` selects max over average. NULL on bad rank.
+ * @param input (Tensor*)
+ * @param out_l (int)
+ * @param take_max (bool)
+ * @return (Tensor*)
+ */
 static Tensor* adaptive_pool1d(Tensor* input, int out_l, bool take_max) {
     if (!input || input->ndim != 3)
         return NULL;
@@ -692,15 +836,28 @@ static Tensor* adaptive_pool1d(Tensor* input, int out_l, bool take_max) {
     return output;
 }
 
-/** torch.nn.AdaptiveAvgPool1d forward: average-pool to the layer's fixed output_size. */
+/**
+ * torch.nn.AdaptiveAvgPool1d forward: average-pool to the layer's fixed output_size.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* adaptive_avgpool1d_forward(Module* module, Tensor* input) {
     return adaptive_pool1d(input, ((AdaptiveAvgPool1d*)module)->output_size, false);
 }
 
-/** Free the AdaptiveAvgPool1d module (no owned parameters). */
+/**
+ * Free the AdaptiveAvgPool1d module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void adaptive_avgpool1d_free(Module* module) { cml_free(module); }
 
-/** Construct an AdaptiveAvgPool1d producing a fixed output_size. NULL on failure. */
+/**
+ * Construct an AdaptiveAvgPool1d producing a fixed output_size. NULL on failure.
+ * @param output_size (int)
+ * @return (AdaptiveAvgPool1d*)
+ */
 AdaptiveAvgPool1d* nn_adaptive_avgpool1d(int output_size) {
     AdaptiveAvgPool1d* pool = cml_malloc(sizeof(AdaptiveAvgPool1d));
     if (!pool)
@@ -714,15 +871,29 @@ AdaptiveAvgPool1d* nn_adaptive_avgpool1d(int output_size) {
     return pool;
 }
 
-/** torch.nn.AdaptiveMaxPool2d forward: max-pool to the layer's fixed output_size. */
+/**
+ * torch.nn.AdaptiveMaxPool2d forward: max-pool to the layer's fixed output_size.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* adaptive_maxpool2d_forward(Module* module, Tensor* input) {
     return adaptive_pool2d(input, ((AdaptiveMaxPool2d*)module)->output_size, true);
 }
 
-/** Free the AdaptiveMaxPool2d module (no owned parameters). */
+/**
+ * Free the AdaptiveMaxPool2d module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void adaptive_maxpool2d_free(Module* module) { cml_free(module); }
 
-/** Construct an AdaptiveMaxPool2d producing a fixed (output_h, output_w). NULL on failure. */
+/**
+ * Construct an AdaptiveMaxPool2d producing a fixed (output_h, output_w). NULL on failure.
+ * @param output_h (int)
+ * @param output_w (int)
+ * @return (AdaptiveMaxPool2d*)
+ */
 AdaptiveMaxPool2d* nn_adaptive_maxpool2d(int output_h, int output_w) {
     AdaptiveMaxPool2d* pool = cml_malloc(sizeof(AdaptiveMaxPool2d));
     if (!pool)
@@ -737,15 +908,28 @@ AdaptiveMaxPool2d* nn_adaptive_maxpool2d(int output_h, int output_w) {
     return pool;
 }
 
-/** torch.nn.AdaptiveMaxPool1d forward: max-pool to the layer's fixed output_size. */
+/**
+ * torch.nn.AdaptiveMaxPool1d forward: max-pool to the layer's fixed output_size.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* adaptive_maxpool1d_forward(Module* module, Tensor* input) {
     return adaptive_pool1d(input, ((AdaptiveMaxPool1d*)module)->output_size, true);
 }
 
-/** Free the AdaptiveMaxPool1d module (no owned parameters). */
+/**
+ * Free the AdaptiveMaxPool1d module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void adaptive_maxpool1d_free(Module* module) { cml_free(module); }
 
-/** Construct an AdaptiveMaxPool1d producing a fixed output_size. NULL on failure. */
+/**
+ * Construct an AdaptiveMaxPool1d producing a fixed output_size. NULL on failure.
+ * @param output_size (int)
+ * @return (AdaptiveMaxPool1d*)
+ */
 AdaptiveMaxPool1d* nn_adaptive_maxpool1d(int output_size) {
     AdaptiveMaxPool1d* pool = cml_malloc(sizeof(AdaptiveMaxPool1d));
     if (!pool)

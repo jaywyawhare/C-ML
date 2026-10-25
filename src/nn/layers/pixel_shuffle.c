@@ -7,9 +7,14 @@
 #include <string.h>
 #include "alloc/cml_allocator.h"
 
-/** Functional pixel shuffle: rearrange [N, C*r^2, H, W] into [N, C, H*r, W*r] via
- *  reshape/permute/reshape (lazy, differentiable). NULL on non-4D input, non-positive r, or
- *  channels not divisible by r^2. */
+/**
+ * Functional pixel shuffle: rearrange [N, C*r^2, H, W] into [N, C, H*r, W*r] via
+ * reshape/permute/reshape (lazy, differentiable). NULL on non-4D input, non-positive r, or
+ * channels not divisible by r^2.
+ * @param input (Tensor*)
+ * @param upscale_factor (int)
+ * @return (Tensor*)
+ */
 Tensor* f_pixel_shuffle(Tensor* input, int upscale_factor) {
     if (!input) {
         LOG_ERROR("f_pixel_shuffle: NULL input");
@@ -59,8 +64,13 @@ Tensor* f_pixel_shuffle(Tensor* input, int upscale_factor) {
     return uop_reshape(t2, &rs2);
 }
 
-/** Functional inverse of pixel shuffle: rearrange [N, C, H*r, W*r] into [N, C*r^2, H, W].
- *  NULL on non-4D input, non-positive r, or spatial dims not divisible by r. */
+/**
+ * Functional inverse of pixel shuffle: rearrange [N, C, H*r, W*r] into [N, C*r^2, H, W].
+ * NULL on non-4D input, non-positive r, or spatial dims not divisible by r.
+ * @param input (Tensor*)
+ * @param downscale_factor (int)
+ * @return (Tensor*)
+ */
 Tensor* f_pixel_unshuffle(Tensor* input, int downscale_factor) {
     if (!input) {
         LOG_ERROR("f_pixel_unshuffle: NULL input");
@@ -112,7 +122,12 @@ Tensor* f_pixel_unshuffle(Tensor* input, int downscale_factor) {
     return uop_reshape(t2, &rs2);
 }
 
-/** torch.nn.PixelShuffle forward: apply f_pixel_shuffle with the layer's upscale_factor. */
+/**
+ * torch.nn.PixelShuffle forward: apply f_pixel_shuffle with the layer's upscale_factor.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* pixel_shuffle_forward(Module* module, Tensor* input) {
     PixelShuffle* layer = (PixelShuffle*)module;
     if (!layer || !input)
@@ -120,7 +135,12 @@ static Tensor* pixel_shuffle_forward(Module* module, Tensor* input) {
     return f_pixel_shuffle(input, layer->upscale_factor);
 }
 
-/** torch.nn.PixelUnshuffle forward: apply f_pixel_unshuffle with the layer's downscale_factor. */
+/**
+ * torch.nn.PixelUnshuffle forward: apply f_pixel_unshuffle with the layer's downscale_factor.
+ * @param module (Module*)
+ * @param input (Tensor*)
+ * @return (Tensor*)
+ */
 static Tensor* pixel_unshuffle_forward(Module* module, Tensor* input) {
     PixelUnshuffle* layer = (PixelUnshuffle*)module;
     if (!layer || !input)
@@ -128,7 +148,11 @@ static Tensor* pixel_unshuffle_forward(Module* module, Tensor* input) {
     return f_pixel_unshuffle(input, layer->downscale_factor);
 }
 
-/** Free the PixelShuffle module (no owned parameters). */
+/**
+ * Free the PixelShuffle module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void pixel_shuffle_free(Module* module) {
     PixelShuffle* layer = (PixelShuffle*)module;
     if (!layer)
@@ -136,7 +160,11 @@ static void pixel_shuffle_free(Module* module) {
     cml_free(layer);
 }
 
-/** Free the PixelUnshuffle module (no owned parameters). */
+/**
+ * Free the PixelUnshuffle module (no owned parameters).
+ * @param module (Module*)
+ * @return (void)
+ */
 static void pixel_unshuffle_free(Module* module) {
     PixelUnshuffle* layer = (PixelUnshuffle*)module;
     if (!layer)
@@ -144,7 +172,11 @@ static void pixel_unshuffle_free(Module* module) {
     cml_free(layer);
 }
 
-/** Construct a PixelShuffle layer. NULL on non-positive upscale_factor or allocation failure. */
+/**
+ * Construct a PixelShuffle layer. NULL on non-positive upscale_factor or allocation failure.
+ * @param upscale_factor (int)
+ * @return (PixelShuffle*)
+ */
 PixelShuffle* nn_pixel_shuffle(int upscale_factor) {
     if (upscale_factor <= 0) {
         LOG_ERROR("PixelShuffle: upscale_factor must be positive, got %d", upscale_factor);
@@ -168,7 +200,11 @@ PixelShuffle* nn_pixel_shuffle(int upscale_factor) {
     return layer;
 }
 
-/** Construct a PixelUnshuffle layer. NULL on non-positive downscale_factor or alloc failure. */
+/**
+ * Construct a PixelUnshuffle layer. NULL on non-positive downscale_factor or alloc failure.
+ * @param downscale_factor (int)
+ * @return (PixelUnshuffle*)
+ */
 PixelUnshuffle* nn_pixel_unshuffle(int downscale_factor) {
     if (downscale_factor <= 0) {
         LOG_ERROR("PixelUnshuffle: downscale_factor must be positive, got %d", downscale_factor);

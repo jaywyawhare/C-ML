@@ -18,7 +18,10 @@ int cml_ir_execute_cpu(CMLGraph_t ir);
    are not available or fail. */
 int cpu_execute_ir(CMLGraph_t ir);
 
-/** Clear cpu_execute_ir fast-path state; call when the IR graph is reset. */
+/**
+ * Clear cpu_execute_ir fast-path state; call when the IR graph is reset.
+ * @return (void)
+ */
 void cml_cpu_execute_cache_reset(void);
 
 /* Executes up to and including the target node (for lazy evaluation). */

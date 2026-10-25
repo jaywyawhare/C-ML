@@ -13,7 +13,10 @@
 #include <time.h>
 #include "alloc/cml_allocator.h"
 
-/** Monotonic microsecond clock for per-match rewrite timing. */
+/**
+ * Monotonic microsecond clock for per-match rewrite timing.
+ * @return (double)
+ */
 static double rw_now_us(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -23,7 +26,10 @@ static double rw_now_us(void) {
 /** Counter for generating unique output names for replacement nodes. */
 static atomic_int g_rewrite_counter = 0;
 
-/** Generate a unique name prefixed with "_rw" for rewrite-emitted nodes. */
+/**
+ * Generate a unique name prefixed with "_rw" for rewrite-emitted nodes.
+ * @return (char*)
+ */
 static char* rewrite_unique_name(void) {
     int id     = atomic_fetch_add(&g_rewrite_counter, 1);
     char* name = cml_malloc(32);
@@ -36,6 +42,10 @@ static char* rewrite_unique_name(void) {
 /**
  * Record a capture in a CMLMatchResult.
  * Returns 0 on success, -1 if the capture table is full.
+ * @param result (CMLMatchResult*)
+ * @param name (const char*)
+ * @param node (struct IRNode*)
+ * @return (int)
  */
 static int record_capture(CMLMatchResult* result, const char* name, struct IRNode* node) {
     if (!result || !name || !node)
@@ -57,7 +67,14 @@ static int record_capture(CMLMatchResult* result, const char* name, struct IRNod
     return 0;
 }
 
-/** Recursively test whether @p pattern matches @p node, recording captures into @p result. */
+/**
+ * Recursively test whether @p pattern matches @p node, recording captures into @p result.
+ * @param ir (CMLGraph_t)
+ * @param pattern (const CMLPatternNode*)
+ * @param node (struct IRNode*)
+ * @param result (CMLMatchResult*)
+ * @return (bool)
+ */
 bool cml_pattern_match(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNode* node,
                        CMLMatchResult* result) {
     if (!pattern || !node)
@@ -107,7 +124,13 @@ bool cml_pattern_match(CMLGraph_t ir, const CMLPatternNode* pattern, struct IRNo
     }
 }
 
-/** Build an OP pattern node matching @p type with @p num_inputs sub-patterns. */
+/**
+ * Build an OP pattern node matching @p type with @p num_inputs sub-patterns.
+ * @param type (UOpType)
+ * @param inputs (CMLPatternNode**)
+ * @param num_inputs (int)
+ * @return (CMLPatternNode*)
+ */
 CMLPatternNode* cml_pattern_op(UOpType type, CMLPatternNode** inputs, int num_inputs) {
     if (num_inputs < 0 || num_inputs > CML_PATTERN_MAX_INPUTS)
         return NULL;
@@ -126,7 +149,11 @@ CMLPatternNode* cml_pattern_op(UOpType type, CMLPatternNode** inputs, int num_in
     return p;
 }
 
-/** Build a capture pattern that matches any node and binds it to @p name. */
+/**
+ * Build a capture pattern that matches any node and binds it to @p name.
+ * @param name (const char*)
+ * @return (CMLPatternNode*)
+ */
 CMLPatternNode* cml_pattern_capture(const char* name) {
     if (!name)
         return NULL;
@@ -142,7 +169,10 @@ CMLPatternNode* cml_pattern_capture(const char* name) {
     return p;
 }
 
-/** Build a wildcard pattern that matches any node. */
+/**
+ * Build a wildcard pattern that matches any node.
+ * @return (CMLPatternNode*)
+ */
 CMLPatternNode* cml_pattern_any(void) {
     CMLPatternNode* p = cml_calloc(1, sizeof(CMLPatternNode));
     if (!p)
@@ -153,7 +183,11 @@ CMLPatternNode* cml_pattern_any(void) {
     return p;
 }
 
-/** Build a pattern that matches a UOP_FILL node of a specific constant value. */
+/**
+ * Build a pattern that matches a UOP_FILL node of a specific constant value.
+ * @param value (float)
+ * @return (CMLPatternNode*)
+ */
 CMLPatternNode* cml_pattern_const(float value) {
     CMLPatternNode* p = cml_calloc(1, sizeof(CMLPatternNode));
     if (!p)
@@ -163,7 +197,12 @@ CMLPatternNode* cml_pattern_const(float value) {
     return p;
 }
 
-/** True if @p node is a UOP_FILL whose value equals @p value (within epsilon). */
+/**
+ * True if @p node is a UOP_FILL whose value equals @p value (within epsilon).
+ * @param node (const struct IRNode*)
+ * @param value (float)
+ * @return (bool)
+ */
 bool cml_pattern_match_const(const struct IRNode* node, float value) {
     if (!node || node->type != UOP_FILL || !node->params)
         return false;
@@ -174,7 +213,11 @@ bool cml_pattern_match_const(const struct IRNode* node, float value) {
     return diff < 1e-7f;
 }
 
-/** Recursively free a pattern tree. */
+/**
+ * Recursively free a pattern tree.
+ * @param node (CMLPatternNode*)
+ * @return (void)
+ */
 void cml_pattern_free(CMLPatternNode* node) {
     if (!node)
         return;
@@ -185,13 +228,20 @@ void cml_pattern_free(CMLPatternNode* node) {
     cml_free(node);
 }
 
-/** Allocate an empty rewrite-rule registry. */
+/**
+ * Allocate an empty rewrite-rule registry.
+ * @return (CMLRewriteRegistry*)
+ */
 CMLRewriteRegistry* cml_rewrite_registry_create(void) {
     CMLRewriteRegistry* reg = cml_calloc(1, sizeof(CMLRewriteRegistry));
     return reg; /* num_rules is 0 thanks to calloc */
 }
 
-/** Free a registry and the patterns it owns (emit fns and names are borrowed). */
+/**
+ * Free a registry and the patterns it owns (emit fns and names are borrowed).
+ * @param reg (CMLRewriteRegistry*)
+ * @return (void)
+ */
 void cml_rewrite_registry_free(CMLRewriteRegistry* reg) {
     if (!reg)
         return;
@@ -203,7 +253,15 @@ void cml_rewrite_registry_free(CMLRewriteRegistry* reg) {
     cml_free(reg);
 }
 
-/** Register a rewrite rule, keeping rules sorted by descending priority. */
+/**
+ * Register a rewrite rule, keeping rules sorted by descending priority.
+ * @param reg (CMLRewriteRegistry*)
+ * @param pattern (CMLPatternNode*)
+ * @param emit (CMLEmitFn)
+ * @param priority (int)
+ * @param name (const char*)
+ * @return (int)
+ */
 int cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pattern, CMLEmitFn emit,
                          int priority, const char* name) {
     if (!reg || !pattern)
@@ -236,8 +294,14 @@ int cml_rewrite_register(CMLRewriteRegistry* reg, CMLPatternNode* pattern, CMLEm
     return 0;
 }
 
-/** Run @p rule's emitter on @p match and splice the replacement in for the matched root, which
- *  is freed along with its output tensor binding. Returns true if the graph changed. */
+/**
+ * Run @p rule's emitter on @p match and splice the replacement in for the matched root, which
+ * is freed along with its output tensor binding. Returns true if the graph changed.
+ * @param ir (CMLGraph_t)
+ * @param rule (const CMLRewriteRule*)
+ * @param match (const CMLMatchResult*)
+ * @return (bool)
+ */
 bool cml_rewrite_fire(CMLGraph_t ir, const CMLRewriteRule* rule, const CMLMatchResult* match) {
     struct IRNode* node        = match->matched_root;
     bool trace                 = cml_rewrite_trace_enabled();
@@ -268,8 +332,14 @@ bool cml_rewrite_fire(CMLGraph_t ir, const CMLRewriteRule* rule, const CMLMatchR
     return true;
 }
 
-/** Apply registered rules to @p ir (automaton-accelerated when possible, else
- *  iterative linear matching); returns the total number of rewrites performed. */
+/**
+ * Apply registered rules to @p ir (automaton-accelerated when possible, else
+ * iterative linear matching); returns the total number of rewrites performed.
+ * @param reg (CMLRewriteRegistry*)
+ * @param ir (CMLGraph_t)
+ * @param max_iterations (int)
+ * @return (int)
+ */
 int cml_rewrite_apply(CMLRewriteRegistry* reg, CMLGraph_t ir, int max_iterations) {
     if (!reg || !ir)
         return -1;
@@ -471,7 +541,12 @@ static struct IRNode* emit_relu6_relu6(CMLGraph_t ir, const CMLMatchResult* m) {
     return inner;
 }
 
-/** Extract the fill value from a FILL node, return false if not FILL */
+/**
+ * Extract the fill value from a FILL node, return false if not FILL
+ * @param node (struct IRNode*)
+ * @param out (float*)
+ * @return (bool)
+ */
 static bool get_fill_value(struct IRNode* node, float* out) {
     if (!node || node->type != UOP_FILL || !node->params)
         return false;
@@ -669,6 +744,8 @@ static struct IRNode* emit_sqrt_sq(CMLGraph_t ir, const CMLMatchResult* m) {
 /**
  * Build pattern: OP(capture("a"), capture("b"))
  * Used for MUL, ADD, SUB patterns with 2 inputs.
+ * @param type (UOpType)
+ * @return (CMLPatternNode*)
  */
 static CMLPatternNode* make_binop_pattern(UOpType type) {
     CMLPatternNode* a = cml_pattern_capture("a");
@@ -685,6 +762,9 @@ static CMLPatternNode* make_binop_pattern(UOpType type) {
 /**
  * Build pattern: OUTER(INNER(capture("x")))
  * Used for exp(log(x)), neg(neg(x)), relu6(relu6(x)).
+ * @param outer (UOpType)
+ * @param inner (UOpType)
+ * @return (CMLPatternNode*)
  */
 static CMLPatternNode* make_unary_chain_pattern(UOpType outer, UOpType inner) {
     CMLPatternNode* x = cml_pattern_capture("x");
@@ -700,8 +780,11 @@ static CMLPatternNode* make_unary_chain_pattern(UOpType outer, UOpType inner) {
     return cml_pattern_op(outer, outer_inputs, 1);
 }
 
-/** Build a registry preloaded with the built-in algebraic simplification and
- *  constant-folding rewrite rules. */
+/**
+ * Build a registry preloaded with the built-in algebraic simplification and
+ * constant-folding rewrite rules.
+ * @return (CMLRewriteRegistry*)
+ */
 CMLRewriteRegistry* cml_rewrite_builtin_rules(void) {
     CMLRewriteRegistry* reg = cml_rewrite_registry_create();
     if (!reg)
@@ -829,6 +912,8 @@ CMLRewriteRegistry* cml_rewrite_builtin_rules(void) {
  * Mark-and-sweep DCE: starting from output nodes (the tail of the graph
  * and any nodes with live tensor references), mark all reachable nodes
  * via input_names, then remove unmarked nodes.
+ * @param ir (CMLGraph_t)
+ * @return (int)
  */
 int cml_rewrite_dce(CMLGraph_t ir) {
     if (!ir || !ir->head)
