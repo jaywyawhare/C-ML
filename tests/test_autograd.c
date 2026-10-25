@@ -237,7 +237,8 @@ static int test_backward_explicit_gradient(void) {
 }
 
 /* A second, unrelated backward on a graph that was never reset: the first pass's last node
- * was fused away during its execute, and the second pass resumed lowering from it. */
+ * was fused away during its execute, and the second pass resumed lowering from it. The first
+ * pass's plain grads must also survive it, as they do in eager mode. */
 static int test_backward_twice_without_reset(void) {
     cml_reset_ir_context();
     float one = 1.0f, two = 2.0f, half = 0.5f, tenth = 0.1f;
@@ -262,7 +263,8 @@ static int test_backward_twice_without_reset(void) {
     cml_backward(out, NULL, false, false);
 
     float s = 1.0f / (1.0f + expf(-1.1f));
-    int ok  = w->grad && APPROX_EQ(tensor_get_float(w->grad, 0), s * (1.0f - s) * 2.0f);
+    int ok = w->grad && APPROX_EQ(tensor_get_float(w->grad, 0), s * (1.0f - s) * 2.0f) && y->grad &&
+             APPROX_EQ(tensor_get_float(y->grad, 0), 2.0f);
     tensor_free(out);
     tensor_free(b);
     tensor_free(w);

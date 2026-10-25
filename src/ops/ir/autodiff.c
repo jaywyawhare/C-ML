@@ -1720,7 +1720,7 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, Tensor* seed, bool diff
     if (had_backward_nodes) {
         for (int i = 0; i < ir->grad_publish_count; i++) {
             Tensor* t = ir->grad_publish_log[i];
-            if (!t || !t->requires_grad || !t->grad)
+            if (!t || !t->requires_grad || !t->grad || !t->grad->requires_grad)
                 continue;
             if (t->grad->ir_context != ir)
                 continue;
