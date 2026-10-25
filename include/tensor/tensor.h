@@ -551,6 +551,134 @@ Tensor* tensor_cov(Tensor* a, bool rowvar);
  */
 Tensor* tensor_corrcoef(Tensor* a, bool rowvar);
 
+/**
+ * n-th discrete difference of a 1-D tensor (out[i]=a[i+1]-a[i], applied n times).
+ * @param a (Tensor*)
+ * @param n (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_diff(Tensor* a, int n);
+
+/**
+ * Outer product of two 1-D vectors: [len(a), len(b)] with out[i,j]=a[i]*b[j].
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_outer(Tensor* a, Tensor* b);
+
+/**
+ * Tile a 1-D tensor `reps` times end to end, returning [len(a)*reps].
+ * @param a (Tensor*)
+ * @param reps (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_tile(Tensor* a, int reps);
+
+/**
+ * Sorted unique values of all elements, returned as a 1-D tensor.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_unique(Tensor* a);
+
+/**
+ * Trapezoidal integral of a 1-D tensor with uniform spacing `dx`.
+ * @param y (Tensor*)
+ * @param dx (float)
+ * @return (float)
+ */
+float tensor_trapz(Tensor* y, float dx);
+
+/**
+ * Vandermonde matrix [len(x), N] of a 1-D x; column j is x^(N-1-j), or x^j when increasing.
+ * @param x (Tensor*)
+ * @param N (int)
+ * @param increasing (bool)
+ * @return (Tensor*)
+ */
+Tensor* tensor_vander(Tensor* x, int N, bool increasing);
+
+/**
+ * Least-squares polynomial fit of degree `deg`; coefficients [deg+1], highest power first.
+ * @param x (Tensor*)
+ * @param y (Tensor*)
+ * @param deg (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_polyfit(Tensor* x, Tensor* y, int deg);
+
+/**
+ * Evaluate a polynomial (coefficients highest power first) at each element of x (Horner).
+ * @param coeffs (Tensor*)
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_polyval(Tensor* coeffs, Tensor* x);
+
+/**
+ * Fisher-Pearson sample skewness m3 / m2^1.5 over all elements (biased, SciPy default).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_skewness(Tensor* a);
+
+/**
+ * Excess kurtosis m4 / m2^2 - 3 over all elements (biased, SciPy default).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_kurtosis(Tensor* a);
+
+/**
+ * Element-wise z-score (x-mean)/std over all elements (population std, ddof=0).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_zscore(Tensor* a);
+
+/**
+ * Mean of all elements ignoring NaN (0 if all NaN).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_nanmean(Tensor* a);
+
+/**
+ * Sum of all elements ignoring NaN.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_nansum(Tensor* a);
+
+/**
+ * Per-column standardization (x-mean)/std of a 2D [samples,features] matrix (population std).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_standard_scale(Tensor* x);
+
+/**
+ * Per-column min-max scaling to [0,1] of a 2D [samples,features] matrix.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_minmax_scale(Tensor* x);
+
+/**
+ * Per-column robust scaling (x-median)/IQR of a 2D [samples,features] matrix.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_robust_scale(Tensor* x);
+
+/**
+ * Per-row L2 normalization of a 2D [samples,features] matrix (zero rows stay zero).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_normalize_l2(Tensor* x);
+
 Tensor* tensor_from_url(const char* url);
 
 Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y);

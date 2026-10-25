@@ -3295,6 +3295,504 @@ Tensor* tensor_corrcoef(Tensor* a, bool rowvar) {
     return cov;
 }
 
+/** Make a 1-D float tensor from a buffer, matching @p ref's dtype/device. */
+static Tensor* tensor_vec_like(const float* data, int n, Tensor* ref) {
+    TensorConfig config = {
+        .dtype = ref->dtype, .device = ref->device, .has_dtype = true, .has_device = true};
+    int shape[] = {n};
+    return tensor_from_data(data, shape, 1, &config);
+}
+
+/**
+ * n-th discrete difference of a 1-D tensor (out[i]=a[i+1]-a[i], applied n times).
+ * @param a (Tensor*)
+ * @param n (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_diff(Tensor* a, int n) {
+    if (!a || a->ndim != 1 || n < 0) {
+        LOG_ERROR("tensor_diff: input must be a 1-D tensor and n>=0");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return NULL;
+    int len    = a->shape[0];
+    float* cur = cml_malloc((size_t)len * sizeof(float));
+    if (!cur)
+        return NULL;
+    for (int i = 0; i < len; i++)
+        cur[i] = tensor_get_float(a, i);
+    for (int k = 0; k < n && len > 0; k++) {
+        for (int i = 0; i < len - 1; i++)
+            cur[i] = cur[i + 1] - cur[i];
+        len--;
+    }
+    Tensor* out = tensor_vec_like(cur, len < 0 ? 0 : len, a);
+    cml_free(cur);
+    return out;
+}
+
+/**
+ * Outer product of two 1-D vectors: [len(a), len(b)] with out[i,j]=a[i]*b[j].
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_outer(Tensor* a, Tensor* b) {
+    if (!a || !b || a->ndim != 1 || b->ndim != 1) {
+        LOG_ERROR("tensor_outer: both inputs must be 1-D vectors");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    tensor_ensure_executed(b);
+    if (!a->data || !b->data)
+        return NULL;
+    int m = a->shape[0], n = b->shape[0];
+    float* out = cml_malloc((size_t)m * n * sizeof(float));
+    if (!out)
+        return NULL;
+    for (int i = 0; i < m; i++) {
+        float ai = tensor_get_float(a, i);
+        for (int j = 0; j < n; j++)
+            out[(size_t)i * n + j] = ai * tensor_get_float(b, j);
+    }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[]    = {m, n};
+    Tensor* result = tensor_from_data(out, shape, 2, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Tile a 1-D tensor `reps` times end to end, returning [len(a)*reps].
+ * @param a (Tensor*)
+ * @param reps (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_tile(Tensor* a, int reps) {
+    if (!a || a->ndim != 1 || reps < 0) {
+        LOG_ERROR("tensor_tile: input must be a 1-D tensor and reps>=0");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return NULL;
+    int len    = a->shape[0];
+    float* out = cml_malloc((size_t)len * reps * sizeof(float) + 1);
+    if (!out)
+        return NULL;
+    for (int r = 0; r < reps; r++)
+        for (int i = 0; i < len; i++)
+            out[(size_t)r * len + i] = tensor_get_float(a, i);
+    Tensor* result = tensor_vec_like(out, len * reps, a);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Sorted unique values of all elements, returned as a 1-D tensor.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_unique(Tensor* a) {
+    int n      = 0;
+    float* buf = tensor_sorted_values(a, &n);
+    if (!buf)
+        return NULL;
+    int u = 0;
+    for (int i = 0; i < n; i++)
+        if (i == 0 || buf[i] != buf[u - 1])
+            buf[u++] = buf[i];
+    Tensor* out = tensor_vec_like(buf, u, a);
+    cml_free(buf);
+    return out;
+}
+
+/**
+ * Trapezoidal integral of a 1-D tensor with uniform spacing `dx`.
+ * @param y (Tensor*)
+ * @param dx (float)
+ * @return (float)
+ */
+float tensor_trapz(Tensor* y, float dx) {
+    if (!y || y->ndim != 1)
+        return 0.0f;
+    tensor_ensure_executed(y);
+    if (!y->data || y->shape[0] < 2)
+        return 0.0f;
+    int n    = y->shape[0];
+    double s = 0.0;
+    for (int i = 0; i < n - 1; i++)
+        s += (double)tensor_get_float(y, i) + tensor_get_float(y, i + 1);
+    return (float)(s * 0.5 * dx);
+}
+
+/**
+ * Vandermonde matrix [len(x), N] of a 1-D x; column j is x^(N-1-j), or x^j when increasing.
+ * @param x (Tensor*)
+ * @param N (int)
+ * @param increasing (bool)
+ * @return (Tensor*)
+ */
+Tensor* tensor_vander(Tensor* x, int N, bool increasing) {
+    if (!x || x->ndim != 1 || N < 1) {
+        LOG_ERROR("tensor_vander: x must be 1-D and N>=1");
+        return NULL;
+    }
+    tensor_ensure_executed(x);
+    if (!x->data)
+        return NULL;
+    int m      = x->shape[0];
+    float* out = cml_malloc((size_t)m * N * sizeof(float));
+    if (!out)
+        return NULL;
+    for (int i = 0; i < m; i++) {
+        float xi = tensor_get_float(x, i);
+        for (int j = 0; j < N; j++) {
+            int power              = increasing ? j : (N - 1 - j);
+            out[(size_t)i * N + j] = powf(xi, (float)power);
+        }
+    }
+    TensorConfig config = {
+        .dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    int shape[]    = {m, N};
+    Tensor* result = tensor_from_data(out, shape, 2, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Least-squares polynomial fit of degree `deg`; coefficients [deg+1], highest power first.
+ * @param x (Tensor*)
+ * @param y (Tensor*)
+ * @param deg (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_polyfit(Tensor* x, Tensor* y, int deg) {
+    if (!x || !y || x->ndim != 1 || y->ndim != 1 || x->shape[0] != y->shape[0] || deg < 0) {
+        LOG_ERROR("tensor_polyfit: x,y must be 1-D of equal length and deg>=0");
+        return NULL;
+    }
+    Tensor* vander = tensor_vander(x, deg + 1, false);
+    if (!vander)
+        return NULL;
+    Tensor* coeffs = tensor_lstsq(vander, y);
+    tensor_free(vander);
+    return coeffs;
+}
+
+/**
+ * Evaluate a polynomial (coefficients highest power first) at each element of x (Horner).
+ * @param coeffs (Tensor*)
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_polyval(Tensor* coeffs, Tensor* x) {
+    if (!coeffs || !x || coeffs->ndim != 1) {
+        LOG_ERROR("tensor_polyval: coeffs must be 1-D");
+        return NULL;
+    }
+    tensor_ensure_executed(coeffs);
+    tensor_ensure_executed(x);
+    if (!coeffs->data || !x->data)
+        return NULL;
+    int nc     = coeffs->shape[0];
+    float* out = cml_malloc(x->numel * sizeof(float));
+    if (!out)
+        return NULL;
+    for (size_t i = 0; i < x->numel; i++) {
+        float xi  = tensor_get_float(x, i);
+        float acc = 0.0f;
+        for (int c = 0; c < nc; c++)
+            acc = acc * xi + tensor_get_float(coeffs, c);
+        out[i] = acc;
+    }
+    TensorConfig config = {
+        .dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, x->shape, x->ndim, &config);
+    cml_free(out);
+    return result;
+}
+
+/** Central moments m2, m3, m4 and the mean of all elements, accumulated in double. */
+static void central_moments(Tensor* a, double* mean, double* m2, double* m3, double* m4) {
+    size_t n  = a->numel;
+    double mu = 0.0;
+    for (size_t i = 0; i < n; i++)
+        mu += tensor_get_float(a, i);
+    mu /= (double)n;
+    double s2 = 0.0, s3 = 0.0, s4 = 0.0;
+    for (size_t i = 0; i < n; i++) {
+        double d  = (double)tensor_get_float(a, i) - mu;
+        double d2 = d * d;
+        s2 += d2;
+        s3 += d2 * d;
+        s4 += d2 * d2;
+    }
+    *mean = mu;
+    *m2   = s2 / n;
+    *m3   = s3 / n;
+    *m4   = s4 / n;
+}
+
+/**
+ * Fisher-Pearson sample skewness m3 / m2^1.5 over all elements (biased, SciPy default).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_skewness(Tensor* a) {
+    if (!a)
+        return 0.0f;
+    tensor_ensure_executed(a);
+    if (!a->data || a->numel == 0)
+        return 0.0f;
+    double mean, m2, m3, m4;
+    central_moments(a, &mean, &m2, &m3, &m4);
+    return m2 > 0.0 ? (float)(m3 / pow(m2, 1.5)) : 0.0f;
+}
+
+/**
+ * Excess kurtosis m4 / m2^2 - 3 over all elements (biased, SciPy default).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_kurtosis(Tensor* a) {
+    if (!a)
+        return 0.0f;
+    tensor_ensure_executed(a);
+    if (!a->data || a->numel == 0)
+        return 0.0f;
+    double mean, m2, m3, m4;
+    central_moments(a, &mean, &m2, &m3, &m4);
+    return m2 > 0.0 ? (float)(m4 / (m2 * m2) - 3.0) : 0.0f;
+}
+
+/**
+ * Element-wise z-score (x-mean)/std over all elements (population std, ddof=0).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_zscore(Tensor* a) {
+    if (!a)
+        return NULL;
+    tensor_ensure_executed(a);
+    if (!a->data || a->numel == 0)
+        return NULL;
+    double mean, m2, m3, m4;
+    central_moments(a, &mean, &m2, &m3, &m4);
+    float sd   = (float)sqrt(m2);
+    float* out = cml_malloc(a->numel * sizeof(float));
+    if (!out)
+        return NULL;
+    for (size_t i = 0; i < a->numel; i++)
+        out[i] = sd > 0.0f ? (float)((tensor_get_float(a, i) - mean) / sd) : 0.0f;
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, a->shape, a->ndim, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Mean of all elements ignoring NaN (0 if all NaN).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_nanmean(Tensor* a) {
+    if (!a)
+        return 0.0f;
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return 0.0f;
+    double s   = 0.0;
+    size_t cnt = 0;
+    for (size_t i = 0; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        if (v == v) {
+            s += v;
+            cnt++;
+        }
+    }
+    return cnt ? (float)(s / cnt) : 0.0f;
+}
+
+/**
+ * Sum of all elements ignoring NaN.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_nansum(Tensor* a) {
+    if (!a)
+        return 0.0f;
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return 0.0f;
+    double s = 0.0;
+    for (size_t i = 0; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        if (v == v)
+            s += v;
+    }
+    return (float)s;
+}
+
+/**
+ * Per-column standardization (x-mean)/std of a 2D [samples,features] matrix (population std).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_standard_scale(Tensor* x) {
+    if (!x || x->ndim != 2) {
+        LOG_ERROR("tensor_standard_scale: input must be a 2D matrix");
+        return NULL;
+    }
+    tensor_ensure_executed(x);
+    if (!x->data)
+        return NULL;
+    int n = x->shape[0], f = x->shape[1];
+    float* out = cml_malloc((size_t)n * f * sizeof(float));
+    if (!out)
+        return NULL;
+    for (int c = 0; c < f; c++) {
+        double mu = 0.0;
+        for (int r = 0; r < n; r++)
+            mu += tensor_get_float(x, (size_t)r * f + c);
+        mu /= n;
+        double var = 0.0;
+        for (int r = 0; r < n; r++) {
+            double d = tensor_get_float(x, (size_t)r * f + c) - mu;
+            var += d * d;
+        }
+        float sd = (float)sqrt(var / n);
+        for (int r = 0; r < n; r++) {
+            float v                = tensor_get_float(x, (size_t)r * f + c);
+            out[(size_t)r * f + c] = sd > 0.0f ? (float)((v - mu) / sd) : 0.0f;
+        }
+    }
+    TensorConfig config = {
+        .dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, x->shape, 2, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Per-column min-max scaling to [0,1] of a 2D [samples,features] matrix.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_minmax_scale(Tensor* x) {
+    if (!x || x->ndim != 2) {
+        LOG_ERROR("tensor_minmax_scale: input must be a 2D matrix");
+        return NULL;
+    }
+    tensor_ensure_executed(x);
+    if (!x->data)
+        return NULL;
+    int n = x->shape[0], f = x->shape[1];
+    float* out = cml_malloc((size_t)n * f * sizeof(float));
+    if (!out)
+        return NULL;
+    for (int c = 0; c < f; c++) {
+        float lo = tensor_get_float(x, c), hi = lo;
+        for (int r = 1; r < n; r++) {
+            float v = tensor_get_float(x, (size_t)r * f + c);
+            if (v < lo)
+                lo = v;
+            if (v > hi)
+                hi = v;
+        }
+        float range = hi - lo;
+        for (int r = 0; r < n; r++) {
+            float v                = tensor_get_float(x, (size_t)r * f + c);
+            out[(size_t)r * f + c] = range > 0.0f ? (v - lo) / range : 0.0f;
+        }
+    }
+    TensorConfig config = {
+        .dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, x->shape, 2, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Per-column robust scaling (x-median)/IQR of a 2D [samples,features] matrix.
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_robust_scale(Tensor* x) {
+    if (!x || x->ndim != 2) {
+        LOG_ERROR("tensor_robust_scale: input must be a 2D matrix");
+        return NULL;
+    }
+    tensor_ensure_executed(x);
+    if (!x->data)
+        return NULL;
+    int n = x->shape[0], f = x->shape[1];
+    float* out = cml_malloc((size_t)n * f * sizeof(float));
+    float* col = cml_malloc((size_t)n * sizeof(float));
+    if (!out || !col) {
+        cml_free(out);
+        cml_free(col);
+        return NULL;
+    }
+    for (int c = 0; c < f; c++) {
+        for (int r = 0; r < n; r++)
+            col[r] = tensor_get_float(x, (size_t)r * f + c);
+        qsort(col, n, sizeof(float), float_asc_cmp);
+        float med = sorted_quantile(col, n, 0.5f);
+        float iqr = sorted_quantile(col, n, 0.75f) - sorted_quantile(col, n, 0.25f);
+        for (int r = 0; r < n; r++) {
+            float v                = tensor_get_float(x, (size_t)r * f + c);
+            out[(size_t)r * f + c] = iqr > 0.0f ? (v - med) / iqr : 0.0f;
+        }
+    }
+    TensorConfig config = {
+        .dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, x->shape, 2, &config);
+    cml_free(out);
+    cml_free(col);
+    return result;
+}
+
+/**
+ * Per-row L2 normalization of a 2D [samples,features] matrix (zero rows stay zero).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_normalize_l2(Tensor* x) {
+    if (!x || x->ndim != 2) {
+        LOG_ERROR("tensor_normalize_l2: input must be a 2D matrix");
+        return NULL;
+    }
+    tensor_ensure_executed(x);
+    if (!x->data)
+        return NULL;
+    int n = x->shape[0], f = x->shape[1];
+    float* out = cml_malloc((size_t)n * f * sizeof(float));
+    if (!out)
+        return NULL;
+    for (int r = 0; r < n; r++) {
+        double sq = 0.0;
+        for (int c = 0; c < f; c++) {
+            float v = tensor_get_float(x, (size_t)r * f + c);
+            sq += (double)v * v;
+        }
+        float norm = (float)sqrt(sq);
+        for (int c = 0; c < f; c++) {
+            float v                = tensor_get_float(x, (size_t)r * f + c);
+            out[(size_t)r * f + c] = norm > 0.0f ? v / norm : 0.0f;
+        }
+    }
+    TensorConfig config = {
+        .dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, x->shape, 2, &config);
+    cml_free(out);
+    return result;
+}
+
 /**
  * Download `url` (via curl/wget) to a temp file and load it with tensor_read_file.
  * NULL on download or parse failure.
