@@ -289,6 +289,8 @@ set(CORE_SOURCES
     src/core/lr_finder.c
     src/core/interpret.c
     src/core/image_io.c
+    src/core/npy_io.c
+    src/core/audio_io.c
     src/core/model_architecture.c
     src/core/training_loop.c
     src/core/training_metrics.c
