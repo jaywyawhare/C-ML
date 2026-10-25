@@ -1,6 +1,7 @@
 #include "nn/state.h"
 #include "core/safetensors.h"
 #include "core/logging.h"
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -517,4 +518,103 @@ void cml_weight_avg_free(CMLWeightAvg* wa) {
         return;
     nn_state_dict_free_full(wa->avg);
     cml_free(wa);
+}
+
+/* Ascending comparator over float magnitudes. */
+static int prune_mag_cmp(const void* a, const void* b) {
+    float x = *(const float*)a, y = *(const float*)b;
+    return (x > y) - (x < y);
+}
+
+/** Fraction of float32 parameter weights that are exactly zero.
+ * @param model (const Module*)
+ * @return (float)
+ */
+float cml_model_sparsity(const Module* model) {
+    if (!model)
+        return 0.0f;
+    Parameter** p = NULL;
+    int np        = 0;
+    module_collect_parameters((Module*)model, &p, &np, true);
+    size_t total = 0, zeros = 0;
+    for (int i = 0; i < np; i++) {
+        Tensor* t = p[i]->tensor;
+        if (!t || t->dtype != DTYPE_FLOAT32)
+            continue;
+        float* d = (float*)tensor_data_ptr(t);
+        if (!d)
+            continue;
+        for (size_t j = 0; j < t->numel; j++) {
+            total++;
+            if (d[j] == 0.0f)
+                zeros++;
+        }
+    }
+    cml_free(p);
+    return total ? (float)zeros / (float)total : 0.0f;
+}
+
+/** Global magnitude pruning: zero the smallest-|w| float32 weights across all parameters
+ * until the target fraction are zero. Returns the achieved sparsity.
+ * @param model (Module*)
+ * @param sparsity (float)
+ * @return (float)
+ */
+float cml_prune_magnitude(Module* model, float sparsity) {
+    if (!model || sparsity <= 0.0f)
+        return cml_model_sparsity(model);
+    if (sparsity > 1.0f)
+        sparsity = 1.0f;
+    Parameter** p = NULL;
+    int np        = 0;
+    module_collect_parameters(model, &p, &np, true);
+    size_t total = 0;
+    for (int i = 0; i < np; i++) {
+        Tensor* t = p[i]->tensor;
+        if (t && t->dtype == DTYPE_FLOAT32)
+            total += t->numel;
+    }
+    if (total == 0) {
+        cml_free(p);
+        return 0.0f;
+    }
+    float* mags = cml_malloc(total * sizeof(float));
+    if (!mags) {
+        cml_free(p);
+        return cml_model_sparsity(model);
+    }
+    size_t idx = 0;
+    for (int i = 0; i < np; i++) {
+        Tensor* t = p[i]->tensor;
+        if (!t || t->dtype != DTYPE_FLOAT32)
+            continue;
+        float* d = (float*)tensor_data_ptr(t);
+        if (!d)
+            continue;
+        for (size_t j = 0; j < t->numel; j++)
+            mags[idx++] = fabsf(d[j]);
+    }
+    qsort(mags, idx, sizeof(float), prune_mag_cmp);
+    size_t k = (size_t)(sparsity * (float)idx);
+    float threshold;
+    if (k == 0)
+        threshold = 0.0f;
+    else if (k >= idx)
+        threshold = mags[idx - 1] + 1.0f;
+    else
+        threshold = mags[k];
+    cml_free(mags);
+    for (int i = 0; i < np; i++) {
+        Tensor* t = p[i]->tensor;
+        if (!t || t->dtype != DTYPE_FLOAT32)
+            continue;
+        float* d = (float*)tensor_data_ptr(t);
+        if (!d)
+            continue;
+        for (size_t j = 0; j < t->numel; j++)
+            if (fabsf(d[j]) < threshold)
+                d[j] = 0.0f;
+    }
+    cml_free(p);
+    return cml_model_sparsity(model);
 }

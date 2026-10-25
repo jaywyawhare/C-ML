@@ -149,6 +149,21 @@ int cml_weight_avg_copy_to(CMLWeightAvg* wa, Module* model);
  */
 void cml_weight_avg_free(CMLWeightAvg* wa);
 
+/**
+ * Fraction of float32 parameter weights that are exactly zero.
+ * @param model (const Module*)
+ * @return (float)
+ */
+float cml_model_sparsity(const Module* model);
+
+/**
+ * Global magnitude pruning to a target sparsity; returns the achieved sparsity.
+ * @param model (Module*)
+ * @param sparsity (float)
+ * @return (float)
+ */
+float cml_prune_magnitude(Module* model, float sparsity);
+
 #ifdef __cplusplus
 }
 #endif
