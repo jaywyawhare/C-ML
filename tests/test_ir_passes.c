@@ -21,6 +21,7 @@
 #include "ops/ir/pattern_matcher.h"
 #include "ops/ir/execution.h"
 #include "ops/ir/export.h"
+#include "ops/ir/internal.h"
 #include "alloc/cml_allocator.h"
 #include "tensor/realize.h"
 #include "test_harness.h"
@@ -266,6 +267,49 @@ static int test_optimize_view_leaves_graph(void) {
     return ok;
 }
 
+/* Fusion shrinks node_count, which output names used to be drawn from, so nodes built after
+ * a fused execution reused names still in the graph and name-based passes mislinked them. */
+static int test_names_stay_unique_after_fusion(void) {
+    cml_reset_ir_context();
+    float a[6] = {0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f};
+    Tensor* x  = mk23(a);
+    Tensor* y  = uop_exp(uop_neg(uop_add(x, x)));
+    Tensor* w  = uop_sqrt(x);
+    tensor_ensure_executed(w); /* runs the whole graph, fusing the add/neg/exp chain */
+    Tensor* z = uop_add(uop_mul(y, y), w);
+
+    int ok = 1;
+    for (struct IRNode* p = cml_ir_get_or_create_context()->head; p; p = p->next)
+        for (struct IRNode* q = p->next; q; q = q->next)
+            ok &=
+                !(p->output_name && q->output_name && strcmp(p->output_name, q->output_name) == 0);
+
+    tensor_free(x);
+    tensor_free(y);
+    tensor_free(w);
+    tensor_free(z);
+    cml_reset_ir_context();
+    return ok;
+}
+
+/* The graph JSON export visits each node once; it used to walk every root-to-leaf path, which
+ * doubles with each residual block. */
+static int test_export_json_residual_chain(void) {
+    cml_reset_ir_context();
+    float a[6] = {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f};
+    Tensor* x  = mk23(a);
+    Tensor* y  = x;
+    for (int i = 0; i < 40; i++)
+        y = uop_add(y, uop_mul(y, y));
+
+    const char* path = "/tmp/cml_export_residual.json";
+    int ok           = autograd_export_json(y, path) == 0;
+    remove(path);
+    tensor_free(x);
+    cml_reset_ir_context();
+    return ok;
+}
+
 int main(void) {
     cml_init();
 
@@ -276,6 +320,8 @@ int main(void) {
     TEST(pattern_matcher_contract);
     TEST(optimize_idempotent);
     TEST(optimize_view_leaves_graph);
+    TEST(names_stay_unique_after_fusion);
+    TEST(export_json_residual_chain);
 
     cml_cleanup();
     return TEST_SUMMARY();
