@@ -41,6 +41,66 @@ unsigned char* cml_zlib_inflate(const unsigned char* data, size_t len, size_t* o
  */
 float* cml_image_load_png(const char* path, int* width, int* height, int* channels);
 
+/**
+ * Load an uncompressed 24/32-bit BMP into a freshly allocated HWC float buffer normalized to
+ * [0,1] (3 or 4 channels). Sets width/height/channels. Caller frees; NULL on error.
+ * @param path (const char*)
+ * @param width (int*)
+ * @param height (int*)
+ * @param channels (int*)
+ * @return (float*)
+ */
+float* cml_image_load_bmp(const char* path, int* width, int* height, int* channels);
+
+/**
+ * Save an HWC float image (in [0,1], >=3 channels) as a 24-bit BMP. Returns 0 on success.
+ * @param path (const char*)
+ * @param px (const float*)
+ * @param width (int)
+ * @param height (int)
+ * @param channels (int)
+ * @return (int)
+ */
+int cml_image_save_bmp(const char* path, const float* px, int width, int height, int channels);
+
+/**
+ * Horizontally mirror an HWC image into a freshly allocated buffer (caller frees).
+ * @param px (const float*)
+ * @param width (int)
+ * @param height (int)
+ * @param channels (int)
+ * @return (float*)
+ */
+float* cml_image_flip_horizontal(const float* px, int width, int height, int channels);
+
+/**
+ * Center-crop an HWC image to crop_w x crop_h (must fit). Sets out_w/out_h. Caller frees.
+ * @param px (const float*)
+ * @param width (int)
+ * @param height (int)
+ * @param channels (int)
+ * @param crop_w (int)
+ * @param crop_h (int)
+ * @param out_w (int*)
+ * @param out_h (int*)
+ * @return (float*)
+ */
+float* cml_image_center_crop(const float* px, int width, int height, int channels, int crop_w,
+                             int crop_h, int* out_w, int* out_h);
+
+/**
+ * Bilinearly resize an HWC image to new_w x new_h into a freshly allocated buffer (caller frees).
+ * @param px (const float*)
+ * @param width (int)
+ * @param height (int)
+ * @param channels (int)
+ * @param new_w (int)
+ * @param new_h (int)
+ * @return (float*)
+ */
+float* cml_image_resize_bilinear(const float* px, int width, int height, int channels, int new_w,
+                                 int new_h);
+
 #ifdef __cplusplus
 }
 #endif
