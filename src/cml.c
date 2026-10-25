@@ -1119,16 +1119,6 @@ void cml_graph_cache_reset_global(void);
 void cml_autograd_step_end(Tensor* keep) {
     if (keep)
         tensor_realize(keep); /* materialize + detach so the reset won't free it */
-    /* FUSE_OPTIM is honored by sgd_step (optim.c); other optimizers still
-     * realize per parameter. Note the latter once. */
-    if (cml_flag_enabled(CML_FLAG_FUSE_OPTIM)) {
-        static bool warned = false;
-        if (!warned) {
-            LOG_INFO("FUSE_OPTIM set: SGD updates are co-scheduled; other "
-                     "optimizers still use the per-step path");
-            warned = true;
-        }
-    }
     cml_autograd_reset_after_step();
 }
 

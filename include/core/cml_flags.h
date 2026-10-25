@@ -50,7 +50,9 @@ extern "C" {
     X(NOLOCALS, "NOLOCALS", 0, "Disable use of local/shared memory in kernels")                    \
     X(SPLIT_REDUCEOP, "SPLIT_REDUCEOP", 1, "Split large reduce ops for parallelism")               \
     X(IGNORE_BEAM_CACHE, "IGNORE_BEAM_CACHE", 0, "Ignore the on-disk BEAM search cache")           \
-    X(FUSE_OPTIM, "FUSE_OPTIM", 0, "Fuse the optimizer update into the backward graph")            \
+    X(FUSE_OPTIM, "FUSE_OPTIM", 0,                                                                 \
+      "Realize gradients in one backward-graph pass before the "                                   \
+      "optimizer update (all optimizers)")                                                         \
     X(MAX_BUFFER_SIZE, "MAX_BUFFER_SIZE", 0,                                                       \
       "Cap single buffer allocation size in bytes (0 = "                                           \
       "unlimited)")                                                                                \

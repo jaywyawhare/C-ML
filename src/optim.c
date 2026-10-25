@@ -1,6 +1,7 @@
 #include "optim.h"
 #include "tensor/realize.h"
 #include "ops/uops.h"
+#include "ops/ir/execution.h"
 #include "core/cml_flags.h"
 #include "core/logging.h"
 #include "core/training_metrics.h"
@@ -544,12 +545,37 @@ static void optimizer_apply_lr_schedule(Optimizer* optimizer) {
     }
 }
 
+/** Under FUSE_OPTIM, execute the backward graph once so every gradient is realized
+ *  in a single pass before the update reads it. A host-side optimizer otherwise
+ *  realizes each parameter's gradient on first access, walking the graph again per
+ *  parameter; the IR-node optimizers (SGD, Adam) already co-schedule their own
+ *  update. No-op when FUSE_OPTIM is off or the gradients are already materialized,
+ *  so results are unchanged either way. */
+static void optim_fuse_realize_grads(Optimizer* optimizer) {
+    if (!cml_flag_enabled(CML_FLAG_FUSE_OPTIM))
+        return;
+    for (int g = 0; g < optimizer->num_param_groups; g++) {
+        ParameterGroup* group = &optimizer->param_groups[g];
+        for (int i = 0; i < group->num_parameters; i++) {
+            Parameter* param = group->parameters[i];
+            if (!param || !param->tensor || !param->requires_grad)
+                continue;
+            Tensor* grad = tensor_get_grad(param->tensor);
+            if (grad && grad->ir_context && !grad->is_executed) {
+                cml_ir_execute(grad->ir_context); /* one pass realizes the whole graph */
+                return;
+            }
+        }
+    }
+}
+
 /** Run the optimizer's parameter update, then apply the built-in StepLR decay
  *  and auto-capture training metrics. */
 void optimizer_step(Optimizer* optimizer) {
     if (!optimizer || !optimizer->step)
         return;
 
+    optim_fuse_realize_grads(optimizer);
     optimizer->step(optimizer);
     optimizer_apply_lr_schedule(optimizer);
     training_metrics_auto_capture_optimizer(optimizer);
