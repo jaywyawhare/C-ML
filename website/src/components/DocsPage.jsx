@@ -75,6 +75,7 @@ const sections = [
       { slug: 'kernel_studio', label: 'Kernel Studio', file: 'kernel_studio.md' },
       { slug: 'kernel_studio_quickref', label: 'Kernel Studio Quick Ref', file: 'kernel_studio_quickref.md' },
       { slug: 'benchmarks', label: 'Benchmarks', file: 'benchmarks.md' },
+      { slug: 'env_vars', label: 'Environment Variables', file: 'env_vars.md' },
       { slug: 'EXTERNAL_DEPENDENCIES', label: 'External Dependencies', file: 'EXTERNAL_DEPENDENCIES.md' },
       { slug: 'examples', label: 'Examples', file: 'examples.md' },
       { slug: 'python_installation', label: 'Python Bindings', file: 'python_installation.md' },

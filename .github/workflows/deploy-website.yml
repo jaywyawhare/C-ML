@@ -39,6 +39,7 @@ jobs:
           rm -f public/docs
           mkdir -p public/docs
           cp ../docs/*.md public/docs/
+          cp ../LICENSE.md public/docs/license.md
         working-directory: website
 
       - name: Build
