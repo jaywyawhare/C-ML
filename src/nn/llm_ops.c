@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdint.h>
 #include "alloc/cml_allocator.h"
 
 /**
@@ -1666,4 +1667,170 @@ int cml_tokenizer_vocab_size(const CMLTokenizer* tok) {
     if (!tok)
         return 0;
     return tok->vocab_size;
+}
+
+/* Open-addressing slot for counting adjacent (a,b) token-id pairs during BPE training. */
+typedef struct {
+    uint64_t key;
+    int a, b, count, used;
+} BPEPairSlot;
+
+/** Find or insert the slot for pair (a,b); returns its index, or -1 if the table is full.
+ * @param slots (BPEPairSlot*)
+ * @param cap (int)
+ * @param a (int)
+ * @param b (int)
+ * @return (int) */
+static int bpe_pair_slot(BPEPairSlot* slots, int cap, int a, int b) {
+    uint64_t key = ((uint64_t)(uint32_t)a << 32) | (uint32_t)b;
+    int h        = (int)((key * 1099511628211ULL) % (uint64_t)cap);
+    for (int probe = 0; probe < cap; probe++) {
+        int i = (h + probe) % cap;
+        if (!slots[i].used) {
+            slots[i].used  = 1;
+            slots[i].key   = key;
+            slots[i].a     = a;
+            slots[i].b     = b;
+            slots[i].count = 0;
+            return i;
+        }
+        if (slots[i].key == key)
+            return i;
+    }
+    return -1;
+}
+
+/**
+ * Train a byte-level BPE tokenizer on a corpus: start from the distinct characters, then
+ * repeatedly merge the most frequent adjacent token pair until the vocabulary reaches
+ * target_vocab_size (or no pair repeats). The merges are recorded in learned order, which
+ * is the priority order cml_tokenizer_encode applies them in. Returns a ready-to-use
+ * tokenizer (NULL on a bad argument or allocation failure); the caller frees it with
+ * cml_tokenizer_free.
+ * @param corpus (const char**)
+ * @param num_docs (int)
+ * @param target_vocab_size (int)
+ * @return (CMLTokenizer*)
+ */
+CMLTokenizer* cml_tokenizer_train(const char** corpus, int num_docs, int target_vocab_size) {
+    if (!corpus || num_docs <= 0 || target_vocab_size < 1) {
+        LOG_ERROR("cml_tokenizer_train: invalid arguments");
+        return NULL;
+    }
+
+    char** vocab       = cml_calloc((size_t)target_vocab_size, sizeof(char*));
+    char** merge_pairs = cml_calloc((size_t)target_vocab_size, sizeof(char*));
+    int** seqs         = cml_calloc((size_t)num_docs, sizeof(int*));
+    int* slen          = cml_calloc((size_t)num_docs, sizeof(int));
+    if (!vocab || !merge_pairs || !seqs || !slen) {
+        cml_free(vocab);
+        cml_free(merge_pairs);
+        cml_free(seqs);
+        cml_free(slen);
+        return NULL;
+    }
+    int vocab_size = 0, num_merges = 0;
+
+    /* Initial vocabulary: one token per distinct byte in the corpus. */
+    int byte_id[256];
+    for (int i = 0; i < 256; i++)
+        byte_id[i] = -1;
+    for (int d = 0; d < num_docs; d++) {
+        const char* s = corpus[d];
+        if (!s)
+            continue;
+        for (int i = 0; s[i]; i++) {
+            unsigned char c = (unsigned char)s[i];
+            if (byte_id[c] < 0 && vocab_size < target_vocab_size) {
+                char buf[2]       = {(char)c, '\0'};
+                vocab[vocab_size] = cml_strdup(buf);
+                byte_id[c]        = vocab_size++;
+            }
+        }
+    }
+
+    /* Each document becomes a sequence of current token ids (initially byte ids). */
+    for (int d = 0; d < num_docs; d++) {
+        const char* s = corpus[d];
+        int len       = s ? (int)strlen(s) : 0;
+        slen[d]       = len;
+        if (len == 0)
+            continue;
+        seqs[d] = cml_malloc((size_t)len * sizeof(int));
+        for (int i = 0; i < len; i++)
+            seqs[d][i] = byte_id[(unsigned char)s[i]];
+    }
+
+    while (vocab_size < target_vocab_size) {
+        long total = 0;
+        for (int d = 0; d < num_docs; d++)
+            if (slen[d] > 1)
+                total += slen[d] - 1;
+        if (total <= 0)
+            break;
+        int cap = 16;
+        while ((long)cap < total * 2 + 16)
+            cap <<= 1;
+        BPEPairSlot* slots = cml_calloc((size_t)cap, sizeof(BPEPairSlot));
+        if (!slots)
+            break;
+
+        int best = -1, best_count = 0;
+        for (int d = 0; d < num_docs; d++)
+            for (int i = 0; i + 1 < slen[d]; i++) {
+                int idx = bpe_pair_slot(slots, cap, seqs[d][i], seqs[d][i + 1]);
+                if (idx < 0)
+                    continue;
+                slots[idx].count++;
+                if (slots[idx].count > best_count) {
+                    best_count = slots[idx].count;
+                    best       = idx;
+                }
+            }
+        if (best < 0 || best_count < 2) {
+            cml_free(slots);
+            break; /* nothing repeats -> further merges would not compress */
+        }
+        int a = slots[best].a, b = slots[best].b;
+        cml_free(slots);
+
+        size_t na = strlen(vocab[a]), nb = strlen(vocab[b]);
+        char* ns = cml_malloc(na + nb + 1);
+        if (!ns)
+            break;
+        memcpy(ns, vocab[a], na);
+        memcpy(ns + na, vocab[b], nb + 1);
+        int new_id                = vocab_size;
+        vocab[vocab_size++]       = ns;
+        merge_pairs[num_merges++] = cml_strdup(ns);
+
+        /* Replace every adjacent (a,b) with the new id, left to right. */
+        for (int d = 0; d < num_docs; d++) {
+            int w = 0;
+            for (int i = 0; i < slen[d];) {
+                if (i + 1 < slen[d] && seqs[d][i] == a && seqs[d][i + 1] == b) {
+                    seqs[d][w++] = new_id;
+                    i += 2;
+                } else {
+                    seqs[d][w++] = seqs[d][i];
+                    i += 1;
+                }
+            }
+            slen[d] = w;
+        }
+    }
+
+    CMLTokenizer* tok = cml_tokenizer_create(vocab, vocab_size, merge_pairs, num_merges);
+
+    for (int i = 0; i < vocab_size; i++)
+        cml_free(vocab[i]);
+    for (int i = 0; i < num_merges; i++)
+        cml_free(merge_pairs[i]);
+    for (int d = 0; d < num_docs; d++)
+        cml_free(seqs[d]);
+    cml_free(vocab);
+    cml_free(merge_pairs);
+    cml_free(seqs);
+    cml_free(slen);
+    return tok;
 }

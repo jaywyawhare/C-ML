@@ -186,6 +186,17 @@ typedef struct CMLTokenizer {
 CMLTokenizer* cml_tokenizer_create(char** vocab, int vocab_size, char** merge_pairs,
                                    int num_merges);
 
+/**
+ * Train a byte-level BPE tokenizer on a corpus: start from the distinct characters, then
+ * merge the most frequent adjacent pair until the vocabulary reaches target_vocab_size
+ * (or no pair repeats). Returns a ready-to-use tokenizer; free with cml_tokenizer_free.
+ * @param corpus (const char**)
+ * @param num_docs (int)
+ * @param target_vocab_size (int)
+ * @return (CMLTokenizer*)
+ */
+CMLTokenizer* cml_tokenizer_train(const char** corpus, int num_docs, int target_vocab_size);
+
 void cml_tokenizer_free(CMLTokenizer* tok);
 
 int* cml_tokenizer_encode(CMLTokenizer* tok, const char* text, int* num_tokens);
