@@ -110,9 +110,9 @@ Embedding* nn_embedding(int num_embeddings, int embedding_dim, int padding_idx, 
     nn_init_uniform(weight, -1.0f, 1.0f);
     if (padding_idx >= 0 && padding_idx < num_embeddings) {
         char* data = tensor_data_ptr(weight);
+        size_t row = (size_t)embedding_dim * cml_dtype_size(weight->dtype);
         if (data)
-            memset(data + (size_t)padding_idx * embedding_dim * cml_dtype_size(weight->dtype), 0,
-                   (size_t)embedding_dim * cml_dtype_size(weight->dtype));
+            memset(data + (size_t)padding_idx * row, 0, row);
     }
 
     if (module_add_parameter((Module*)emb, weight, "weight", true) != 0) {
