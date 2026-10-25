@@ -549,3 +549,152 @@ int cml_hevc_forward_transform(const int32_t* block, int32_t* coeffs, int size, 
 int cml_hevc_inverse_transform(const int32_t* coeffs, int32_t* block, int size, int dst) {
     return hevc_transform(coeffs, block, size, dst, 1);
 }
+
+/* ---- Intra prediction (H.265 §8.4.4.2) ------------------------------------
+ * Spec-defined integer prediction of an n x n block from decoded neighbours. All
+ * tables and formulas are the standard's; the result is verifiable against the DC
+ * average, the planar bilinear and the pure horizontal/vertical/diagonal cases. */
+
+/* intraPredAngle (spec Table 8-4), indexed by mode; modes 0/1 are planar/DC. */
+static const int HEVC_INTRA_ANGLE[35] = {
+    0,   0,   32,  26,  21,  17, 13, 9,  5, 2, 0, -2, -5, -9, -13, -17, -21, -26,
+    -32, -26, -21, -17, -13, -9, -5, -2, 0, 2, 5, 9,  13, 17, 21,  26,  32,
+};
+
+/** Spec Table 8-5 inverse angle for a negative intraPredAngle; 0 otherwise.
+ * @param angle (int)
+ * @return (int) */
+static int hevc_inv_angle(int angle) {
+    switch (angle) {
+    case -2:
+        return -4096;
+    case -5:
+        return -1638;
+    case -9:
+        return -910;
+    case -13:
+        return -630;
+    case -17:
+        return -482;
+    case -21:
+        return -390;
+    case -26:
+        return -315;
+    case -32:
+        return -256;
+    default:
+        return 0;
+    }
+}
+
+/** Clamp an integer sample to the 8-bit range.
+ * @param v (int)
+ * @return (uint8_t) */
+static uint8_t hevc_clip8(int v) { return (uint8_t)(v < 0 ? 0 : (v > 255 ? 255 : v)); }
+
+/** Base-2 log of a power-of-two transform size (4->2 .. 32->5).
+ * @param n (int)
+ * @return (int) */
+static int hevc_log2(int n) {
+    int l = 0;
+    while ((1 << l) < n)
+        l++;
+    return l;
+}
+
+/** Angular intra prediction along `angle` using `main` as the projected reference
+ * row and `side` for the negative-angle extension; writes column-major when
+ * `transpose` is set (the horizontal mode class). `main`/`side` hold 2n samples and
+ * `corner` is p[-1][-1].
+ * @param n (int)
+ * @param angle (int)
+ * @param main (const uint8_t*)
+ * @param side (const uint8_t*)
+ * @param corner (uint8_t)
+ * @param transpose (int)
+ * @param out (uint8_t*)
+ * @return (void) */
+static void hevc_angular(int n, int angle, const uint8_t* main, const uint8_t* side, uint8_t corner,
+                         int transpose, uint8_t* out) {
+    int ref_buf[4 * 32 + 1]; /* indices [-2n, 2n], offset by 2n */
+    const int off = 2 * n;
+    int* ref      = ref_buf + off;
+    for (int i = 0; i <= 2 * n; i++)
+        ref[i] = (i == 0) ? corner : main[i - 1];
+    if (angle < 0) {
+        int inv    = hevc_inv_angle(angle);
+        int minIdx = (n * angle) >> 5;
+        for (int x = -1; x >= minIdx; x--) {
+            int k  = -1 + ((x * inv + 128) >> 8);
+            ref[x] = (k < 0) ? corner : side[k];
+        }
+    }
+    for (int y = 0; y < n; y++) {
+        int pos   = (y + 1) * angle;
+        int iIdx  = pos >> 5;
+        int iFact = pos & 31;
+        for (int x = 0; x < n; x++) {
+            int v = iFact ? ((32 - iFact) * ref[x + iIdx + 1] + iFact * ref[x + iIdx + 2] + 16) >> 5
+                          : ref[x + iIdx + 1];
+            int idx  = transpose ? (x * n + y) : (y * n + x);
+            out[idx] = hevc_clip8(v);
+        }
+    }
+}
+
+/**
+ * Intra-predict an n x n block from its neighbours (see the header for the sample
+ * layout). mode 0 = planar, 1 = DC, 2..34 = angular.
+ * @param mode (int)
+ * @param n (int)
+ * @param top (const uint8_t*)
+ * @param left (const uint8_t*)
+ * @param corner (uint8_t)
+ * @param out (uint8_t*)
+ * @return (int)
+ */
+int cml_hevc_intra_predict(int mode, int n, const uint8_t* top, const uint8_t* left, uint8_t corner,
+                           uint8_t* out) {
+    if (!top || !left || !out || mode < 0 || mode > 34)
+        return -1;
+    if (n != 4 && n != 8 && n != 16 && n != 32)
+        return -1;
+
+    int shift = hevc_log2(n) + 1;
+
+    if (mode == 0) { /* planar */
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++) {
+                int v = (n - 1 - x) * left[y] + (x + 1) * top[n] + (n - 1 - y) * top[x] +
+                        (y + 1) * left[n] + n;
+                out[y * n + x] = hevc_clip8(v >> shift);
+            }
+        return 0;
+    }
+
+    if (mode == 1) { /* DC */
+        int sum = n;
+        for (int i = 0; i < n; i++)
+            sum += top[i] + left[i];
+        int dc = sum >> shift;
+        for (int y = 0; y < n; y++)
+            for (int x = 0; x < n; x++)
+                out[y * n + x] = (uint8_t)dc;
+        if (n < 32) { /* luma boundary smoothing */
+            out[0] = hevc_clip8((left[0] + 2 * dc + top[0] + 2) >> 2);
+            for (int x = 1; x < n; x++)
+                out[x] = hevc_clip8((top[x] + 3 * dc + 2) >> 2);
+            for (int y = 1; y < n; y++)
+                out[y * n] = hevc_clip8((left[y] + 3 * dc + 2) >> 2);
+        }
+        return 0;
+    }
+
+    /* angular: modes >= 18 project the row above, modes < 18 the column to the left */
+    int angle = HEVC_INTRA_ANGLE[mode];
+    if (mode >= 18)
+        hevc_angular(n, angle, top, left, corner, 0, out);
+    else
+        hevc_angular(n, angle, left, top, corner, 1, out);
+    return 0;
+}

@@ -80,3 +80,14 @@ const int16_t* cml_hevc_transform_matrix(int size, int dst);
  * int32). `dst` selects DST-VII (size 4) vs DCT-II. Returns 0 on success. */
 int cml_hevc_forward_transform(const int32_t* block, int32_t* coeffs, int size, int dst);
 int cml_hevc_inverse_transform(const int32_t* coeffs, int32_t* block, int size, int dst);
+
+/* ---- Intra prediction (H.265 §8.4.4.2) ------------------------------------
+ * Predict an n x n block from its decoded neighbours. `top` holds the 2n samples
+ * directly above (p[0..2n-1][-1]), `left` the 2n samples to the left
+ * (p[-1][0..2n-1]) and `corner` the above-left sample (p[-1][-1]). `mode` is
+ * 0 = planar, 1 = DC, 2..34 = angular (spec Table 8-4). The n x n prediction is
+ * written row-major to `out`. DC applies the luma boundary smoothing for n < 32;
+ * the optional vertical/horizontal edge filter (modes 10/26) is not applied.
+ * Returns 0 on success, -1 on a bad mode, size or NULL pointer. */
+int cml_hevc_intra_predict(int mode, int n, const uint8_t* top, const uint8_t* left, uint8_t corner,
+                           uint8_t* out);
