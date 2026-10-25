@@ -1,10 +1,10 @@
 /**
- * Regression guard: the eager in-place optimizer fast path must produce the
- * same parameter updates as the node-emitting IR path it replaces. Both are run
- * on an identically-initialised model with identical gradients; FUSE_OPTIM
- * forces the IR path (the in-place path is skipped under it), and the final
- * parameters must match. This locks the two paths together so a future change
- * to one cannot silently diverge from the other.
+ * Regression guard: running an optimizer with and without FUSE_OPTIM must produce
+ * the same parameter updates. For SGD and Adam, FUSE_OPTIM forces the node-emitting
+ * IR path in place of the eager in-place fast path; for the host-side optimizers it
+ * realizes the gradients in one backward-graph pass. Both runs use an identically-
+ * initialised model and identical gradients, and the final parameters must match,
+ * so neither path can silently diverge from the plain update.
  */
 #include <math.h>
 #include <stdbool.h>
@@ -45,6 +45,35 @@ static Optimizer* make_adam_ams(Parameter** p, int n) {
     optimizer_set_amsgrad(o, true);
     return o;
 }
+/* Host-side optimizers (no IR step node): FUSE_OPTIM realizes their gradients in
+ * one backward-graph pass, which must not change the result. */
+static Optimizer* make_rmsprop(Parameter** p, int n) {
+    return cml_optim_rmsprop(p, n, 0.01f, 0.0f, 0.99f, 1e-8f);
+}
+static Optimizer* make_adagrad(Parameter** p, int n) {
+    return cml_optim_adagrad(p, n, 0.05f, 0.0f, 1e-10f);
+}
+static Optimizer* make_adamw(Parameter** p, int n) {
+    return cml_optim_adamw(p, n, 0.01f, 0.01f, 0.9f, 0.999f, 1e-8f);
+}
+static Optimizer* make_adadelta(Parameter** p, int n) {
+    return cml_optim_adadelta(p, n, 0.9f, 0.0f, 1e-6f);
+}
+static Optimizer* make_lamb(Parameter** p, int n) {
+    return cml_optim_lamb(p, n, 0.01f, 0.01f, 0.9f, 0.999f, 1e-6f);
+}
+static Optimizer* make_lars(Parameter** p, int n) {
+    return cml_optim_lars(p, n, 0.01f, 0.9f, 0.0f, 0.001f);
+}
+static Optimizer* make_muon(Parameter** p, int n) {
+    return cml_optim_muon(p, n, 0.02f, 0.9f, 0.0f, false);
+}
+static Optimizer* make_nadam(Parameter** p, int n) {
+    return cml_optim_nadam(p, n, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
+}
+static Optimizer* make_adamax(Parameter** p, int n) {
+    return cml_optim_adamax(p, n, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
+}
 
 /* Train a fresh fixed-init model for `steps` real steps (forward/loss/backward/
  * step/reset -- the ordinary loop), optionally forcing the node-emitting IR
@@ -83,6 +112,8 @@ static void run(OptFactory make, int steps, bool force_ir, float* out, int* out_
         cml_backward(loss, NULL, false, false);
         optimizer_step(opt);
         cml_reset_ir_context();
+        tensor_free(X);
+        tensor_free(Y);
     }
     if (force_ir)
         cml_flag_pop(CML_FLAG_FUSE_OPTIM, prev);
@@ -130,6 +161,15 @@ int main(void) {
     ok &= equiv(make_adam, "adam");
     ok &= equiv(make_adam_wd, "adam_wd");
     ok &= equiv(make_adam_ams, "adam_ams");
+    ok &= equiv(make_rmsprop, "rmsprop");
+    ok &= equiv(make_adagrad, "adagrad");
+    ok &= equiv(make_adamw, "adamw");
+    ok &= equiv(make_adadelta, "adadelta");
+    ok &= equiv(make_lamb, "lamb");
+    ok &= equiv(make_lars, "lars");
+    ok &= equiv(make_muon, "muon");
+    ok &= equiv(make_nadam, "nadam");
+    ok &= equiv(make_adamax, "adamax");
 
     printf(ok ? "All equivalence tests passed.\n" : "Equivalence FAILURES.\n");
     return ok ? 0 : 1;
