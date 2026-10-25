@@ -7,6 +7,7 @@
 #include "ops/ir/ir.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/rewrite_trace.h"
+#include "ops/ir/flamegraph.h"
 #include "ops/uops.h"
 #include <stdlib.h>
 #include <string.h>
@@ -506,24 +507,27 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
             /* The graph is structurally identical on every step of a training
              * loop, and the dashboard only ever shows the latest. Exporting per
              * step rewrote the same files hundreds of times; do it once per
-             * distinct graph shape instead. */
+             * distinct graph shape instead, and at most once a second, since a
+             * loop that never resets its graph has a new, larger shape each step. */
             static uint64_t last_exported_hash = 0;
+            static double last_export_ms       = -1e9;
             uint64_t graph_hash                = cml_ir_graph_hash(viz_ir);
+            double now_ms                      = cml_flame_now_ms();
 
             /* The optimizer rewrites in place, and its rewrites and DCE leave tensors
              * nothing to compute them, so the dashboard's optimized graph comes from a
              * copy: VIZ executes exactly the graph a run without it would. */
-            CMLGraph_t view = graph_hash != last_exported_hash ? cml_ir_view(viz_ir) : NULL;
+            CMLGraph_t view = graph_hash != last_exported_hash && now_ms - last_export_ms >= 1000.0
+                                  ? cml_ir_view(viz_ir)
+                                  : NULL;
             if (view) {
                 last_exported_hash = graph_hash;
+                last_export_ms     = now_ms;
 
                 /* Unoptimized analysis first -- it must be captured before the
                  * optimizer removes dead code and folds fusion groups. */
                 char* kernel_json_raw = cml_ir_export_kernel_analysis(view, false);
 
-                /* Capture every rule firing during optimize for the rewrite
-                 * stepper, fresh per exported graph. */
-                cml_rewrite_trace_reset();
                 cml_ir_optimize(view);
 
                 /* Post-optimization: dead/fused flags are now populated, which

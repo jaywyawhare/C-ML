@@ -725,6 +725,7 @@ int cml_ir_optimize(CMLGraph_t ir) {
     {
         CMLRewriteRegistry* builtin = cml_rewrite_builtin_rules();
         if (builtin) {
+            cml_rewrite_trace_reset();
             cml_rewrite_trace_begin_pass("builtin rewrite rules");
             int rewrites = cml_rewrite_apply(builtin, ir, 0);
             if (rewrites > 0) {
