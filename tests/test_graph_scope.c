@@ -54,11 +54,10 @@ static void train_losses(float* losses, int steps) {
 }
 
 int main(void) {
-    /* Enable scoping *after* cml_init: setting VIZ beforehand makes cml_init
-     * spawn the dashboard server and a browser, which a test must not do.
-     * cml_ir_scope_enabled() probes the env lazily, so this still takes. */
+    /* Enable VIZ *after* cml_init: setting it beforehand makes cml_init spawn
+     * the dashboard server and a browser, which a test must not do. */
     cml_init();
-    setenv("VIZ", "1", 1);
+    int viz_was = cml_flag_push(CML_FLAG_VIZ, 1);
     printf("=== graph scope ===\n");
 
     CHECK("scope tracking enabled under VIZ", cml_ir_scope_enabled());
@@ -104,10 +103,11 @@ int main(void) {
     }
 
     float plain[4], viz[4];
-    unsetenv("VIZ");
+    cml_flag_push(CML_FLAG_VIZ, 0);
     train_losses(plain, 4);
-    setenv("VIZ", "1", 1);
+    cml_flag_push(CML_FLAG_VIZ, 1);
     train_losses(viz, 4);
+    cml_flag_pop(CML_FLAG_VIZ, viz_was);
     CHECK("VIZ leaves training numerics unchanged", memcmp(plain, viz, sizeof(plain)) == 0);
 
     return TEST_SUMMARY();

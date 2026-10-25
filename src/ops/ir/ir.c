@@ -1857,18 +1857,9 @@ void cml_ir_insert_before(CMLGraph_t ir, struct IRNode* new_node, struct IRNode*
 static _Thread_local char g_scope_path[IR_SCOPE_MAX_LEN];
 static _Thread_local int g_scope_ends[IR_SCOPE_MAX_DEPTH]; /* path length after each push */
 static _Thread_local int g_scope_depth = 0;
-static int g_scope_enabled             = -1; /* -1 = not yet probed */
 
-/** Whether module-scope path tracking is on (VIZ env set, export not disabled). */
-bool cml_ir_scope_enabled(void) {
-    if (cml_flag_enabled(CML_FLAG_NO_EXPORT))
-        return false;
-    if (g_scope_enabled < 0) {
-        const char* viz = getenv("VIZ");
-        g_scope_enabled = (viz && viz[0] != '0') ? 1 : 0;
-    }
-    return g_scope_enabled == 1;
-}
+/** Whether module-scope path tracking is on (it feeds the VIZ graph view only). */
+bool cml_ir_scope_enabled(void) { return cml_viz_enabled(); }
 
 /* Folded call stack of whoever is building this node.
  *

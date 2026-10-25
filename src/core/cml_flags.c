@@ -2,6 +2,7 @@
 
 #include <pthread.h>
 #include <stdlib.h>
+#include <strings.h>
 
 typedef struct {
     const char* name;
@@ -19,12 +20,21 @@ static FlagEntry g_flags[CML_FLAG_COUNT] = {
 
 static pthread_once_t g_flags_once = PTHREAD_ONCE_INIT;
 
+/** Integer value of a flag string: a number, else 0 for false/no/off and 1 for any other word. */
+static int flag_value(const char* v) {
+    char* end;
+    long n = strtol(v, &end, 10);
+    if (end != v)
+        return (int)n;
+    return !(strcasecmp(v, "false") == 0 || strcasecmp(v, "no") == 0 || strcasecmp(v, "off") == 0);
+}
+
 /** Seed each flag's value from its environment variable (run once via pthread_once). */
 static void flags_init_once(void) {
     for (int i = 0; i < CML_FLAG_COUNT; i++) {
         const char* v = getenv(g_flags[i].name);
         if (v && *v) {
-            g_flags[i].value = (int)strtol(v, NULL, 10);
+            g_flags[i].value = flag_value(v);
             g_flags[i].set   = true;
         }
     }
@@ -50,6 +60,11 @@ bool cml_flag_was_set(CmlFlag id) {
         return false;
     cml_flags_init();
     return g_flags[id].set;
+}
+
+/** True when VIZ is on and NO_EXPORT is off: the single gate for every VIZ-only path. */
+bool cml_viz_enabled(void) {
+    return cml_flag_enabled(CML_FLAG_VIZ) && !cml_flag_enabled(CML_FLAG_NO_EXPORT);
 }
 
 /** Environment-variable name of a flag, or "" if the id is out of range. */

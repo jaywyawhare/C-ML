@@ -12,7 +12,8 @@ extern "C" {
  * Central runtime-flag registry (inspired by tinygrad's ContextVar).
  *
  * Every flag is read once from the environment on first access (or explicitly
- * via cml_flags_init()) and is thereafter queryable with cml_flag(). This
+ * via cml_flags_init()) and is thereafter queryable with cml_flag(). A value is
+ * an integer, or a word: false/no/off read as 0 and any other word as 1. This
  * replaces the scattered getenv() calls across the codebase with a single
  * documented table that DEBUG>=1 can dump.
  *
@@ -57,7 +58,9 @@ extern "C" {
     X(BEAM, "BEAM", 0, "Number of beams in kernel beam search (0 = disabled)")                     \
     X(DISABLE_FUSION, "DISABLE_FUSION", 0, "Disable operator fusion in the scheduler")             \
     X(DISABLE_JIT, "DISABLE_JIT", 0, "Disable JIT compilation (force interpreter/BLAS path)")      \
-    X(VIZ, "VIZ", 0, "Launch the graph/kernel visualizer")
+    X(VIZ, "VIZ", 0, "Launch the graph/kernel visualizer")                                         \
+    X(FLAMEGRAPH, "FLAMEGRAPH", 0, "Capture per-node timings into flamegraph.json (VIZ implies)")  \
+    X(REWRITE_TRACE, "REWRITE_TRACE", 0, "Record rewrite-rule firings (VIZ implies)")
 
 typedef enum {
 #define CML_FLAG_ENUM(id, name, dflt, desc) CML_FLAG_##id,
@@ -79,6 +82,9 @@ bool cml_flag_enabled(CmlFlag id);
 /* True if the flag was explicitly set via the environment (vs. left at default).
  * Useful for tri-state overrides such as WINO. */
 bool cml_flag_was_set(CmlFlag id);
+
+/** True when VIZ is on and NO_EXPORT is off: the single gate for every VIZ-only path. */
+bool cml_viz_enabled(void);
 
 /* The environment-variable name / description for a flag. */
 const char* cml_flag_name(CmlFlag id);

@@ -1,4 +1,5 @@
 #include "ops/ir/rewrite_trace.h"
+#include "core/cml_flags.h"
 #include "alloc/cml_allocator.h"
 
 #include <stdio.h>
@@ -20,9 +21,6 @@ typedef struct {
     char* name;
 } TracePass;
 
-static bool g_enabled_checked = false;
-static bool g_enabled         = false;
-
 static TraceEvent* g_events = NULL;
 static int g_nevents        = 0;
 static int g_ecap           = 0;
@@ -42,18 +40,11 @@ static char* dup_cstr(const char* s) {
     return out;
 }
 
+/** Whether rule firings are recorded: VIZ (the rewrite stepper) or REWRITE_TRACE, never under
+ *  NO_EXPORT. */
 bool cml_rewrite_trace_enabled(void) {
-    if (!g_enabled_checked) {
-        g_enabled_checked = true;
-        /* VIZ already pays graph/kernel export; piggyback on it. REWRITE_TRACE
-         * lets the trace be captured on its own. NO_EXPORT disables file output
-         * everywhere, so it suppresses this too. */
-        if (getenv("NO_EXPORT"))
-            g_enabled = false;
-        else
-            g_enabled = (getenv("VIZ") != NULL) || (getenv("REWRITE_TRACE") != NULL);
-    }
-    return g_enabled;
+    return cml_viz_enabled() ||
+           (cml_flag_enabled(CML_FLAG_REWRITE_TRACE) && !cml_flag_enabled(CML_FLAG_NO_EXPORT));
 }
 
 void cml_rewrite_trace_begin_pass(const char* pass_name) {

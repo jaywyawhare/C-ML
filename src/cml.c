@@ -266,14 +266,8 @@ void cml_register_cleanup_context(CleanupContext* ctx) {
 
 /* Constructor disabled: call check_and_launch_viz() from cml_init() instead */
 static void check_and_launch_viz(void) {
-    /* Quick exit: only activate when VIZ env var is explicitly set */
-    const char* viz = getenv("VIZ");
-    if (!viz || viz[0] == '\0') {
+    if (!cml_flag_enabled(CML_FLAG_VIZ))
         return;
-    }
-    if (viz[0] != '1' && strcmp(viz, "true") != 0) {
-        return;
-    }
 
     const char* viz_launched = getenv("VIZ_LAUNCHED");
     if (viz_launched && viz_launched[0] != '\0') {
@@ -443,17 +437,13 @@ int cml_init(void) {
      * the other guarantees none are written. Honouring a precedence rule would
      * mean a run started with VIZ=1 silently producing nothing, with no hint
      * why -- so reject the combination instead of quietly picking a winner. */
-    {
-        const char* viz = getenv("VIZ");
-        bool viz_on = viz && viz[0] != '\0' && strcmp(viz, "0") != 0 && strcmp(viz, "false") != 0;
-        if (viz_on && cml_flag_enabled(CML_FLAG_NO_EXPORT)) {
-            LOG_ERROR("VIZ=1 and NO_EXPORT=1 are mutually exclusive: VIZ asks for the "
-                      "dashboard exports, NO_EXPORT guarantees no files are written. "
-                      "Set exactly one.");
-            error_stack_push(CM_INVALID_ARGUMENT, "VIZ and NO_EXPORT are mutually exclusive",
-                             __FILE__, __LINE__, __func__);
-            return -1;
-        }
+    if (cml_flag_enabled(CML_FLAG_VIZ) && cml_flag_enabled(CML_FLAG_NO_EXPORT)) {
+        LOG_ERROR("VIZ=1 and NO_EXPORT=1 are mutually exclusive: VIZ asks for the "
+                  "dashboard exports, NO_EXPORT guarantees no files are written. "
+                  "Set exactly one.");
+        error_stack_push(CM_INVALID_ARGUMENT, "VIZ and NO_EXPORT are mutually exclusive", __FILE__,
+                         __LINE__, __func__);
+        return -1;
     }
 
     /* DEBUG=n raises the log verbosity (default is ERROR-only):

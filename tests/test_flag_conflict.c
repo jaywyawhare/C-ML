@@ -36,6 +36,10 @@ int main(int argc, char** argv) {
         return cml_init() == 0 ? 0 : 3;
     }
 
+    /* Each probe must see exactly the flags it passes, not ones this test inherited. */
+    unsetenv("VIZ");
+    unsetenv("NO_EXPORT");
+
     printf("=== VIZ / NO_EXPORT mutual exclusion ===\n");
 
     CHECK("neither flag: init succeeds", init_rc_with(NULL, NULL) == 0);

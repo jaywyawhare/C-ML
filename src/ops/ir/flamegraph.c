@@ -99,36 +99,15 @@ double cml_flame_now_ms(void) {
     return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1e6;
 }
 
-/** Whether flamegraph capture is active, honoring FLAMEGRAPH/PROFILE/VIZ and NO_EXPORT. */
+/** Whether flamegraph capture is active: FLAMEGRAPH or PROFILE, or VIZ (whose dashboard has a
+ *  flamegraph panel) unless FLAMEGRAPH=0 declines the per-node clock reads; never under NO_EXPORT.
+ */
 int cml_flame_enabled(void) {
-    static int checked = 0, on = 0;
-    /* Not cached: NO_EXPORT is checked every call so it still holds if capture
-     * was enabled before the flag was read. VIZ+NO_EXPORT is rejected at init. */
     if (cml_flag_enabled(CML_FLAG_NO_EXPORT))
         return 0;
-    if (!checked) {
-        const char* v     = getenv("FLAMEGRAPH");
-        bool explicit_off = v && (strcmp(v, "0") == 0 || strcmp(v, "false") == 0);
-        on                = v && v[0] != '\0' && !explicit_off;
-        /* PROFILE is the general profiling switch; it implies flamegraph capture. */
-        if (cml_flag_enabled(CML_FLAG_PROFILE))
-            on = 1;
-        /* VIZ implies it too: the dashboard has a flamegraph panel, and needing a
-         * second undiscoverable env var to fill it meant most dashboard runs
-         * showed an empty Kernel Studio. A VIZ run already pays graph export and
-         * per-epoch metrics, so one clock_gettime per node is proportionate --
-         * the zero-overhead guarantee that matters is for runs with neither set. */
-        /* ...unless FLAMEGRAPH=0 says otherwise: capture costs a clock read per
-         * executed node and writes a span buffer at exit, so a VIZ run that only
-         * wants the graph/metrics panels must be able to decline it. */
-        if (!on && !explicit_off) {
-            const char* viz = getenv("VIZ");
-            if (viz && viz[0] != '\0' && strcmp(viz, "0") != 0)
-                on = 1;
-        }
-        checked = 1;
-    }
-    return on;
+    if (cml_flag_enabled(CML_FLAG_FLAMEGRAPH) || cml_flag_enabled(CML_FLAG_PROFILE))
+        return 1;
+    return cml_viz_enabled() && !cml_flag_was_set(CML_FLAG_FLAMEGRAPH);
 }
 
 /* Coarse kernel class. Fusion wins first: a fused node is what we most want to

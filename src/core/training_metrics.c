@@ -1195,14 +1195,6 @@ int training_metrics_step(Module* model, Tensor* X, Tensor* y, Tensor* (*loss_fn
 
     return 0;
 }
-/** Whether live metric export is on: the VIZ env var is truthy and export is not
- * globally disabled. */
-bool cml_viz_enabled(void) {
-    if (cml_flag_enabled(CML_FLAG_NO_EXPORT))
-        return false;
-    const char* v = getenv("VIZ");
-    return v && v[0] != '\0' && strcmp(v, "0") != 0 && strcmp(v, "false") != 0;
-}
 /** Note that zero_grad ran, the signal the epoch auto-detector keys off. */
 void training_metrics_mark_zero_grad(void) { g_zero_grad_called = true; }
 /** Infer epoch boundaries from the zero_grad/step rhythm when the caller does not

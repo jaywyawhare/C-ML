@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <time.h>
+#include "core/cml_flags.h"
 
 typedef struct Module Module;
 typedef struct Optimizer Optimizer;
