@@ -320,7 +320,7 @@ Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input) {
     for (int s = 0; s < num_stages; s++) {
         for (int mb = 0; mb < num_mb; mb++) {
             if (pipeline->micro_batch_outputs[s][mb])
-                tensor_free(pipeline->micro_batch_outputs[s][mb]);
+                tensor_release(pipeline->micro_batch_outputs[s][mb]);
             pipeline->micro_batch_outputs[s][mb] = NULL;
         }
     }
@@ -381,6 +381,8 @@ Tensor* cml_pipeline_forward(CMLPipelineParallel* pipeline, Tensor* input) {
             goto fwd_fail;
         }
 
+        /* Pinned: cached activations outlive the graph resets between steps. */
+        tensor_pin(mb_output);
         pipeline->micro_batch_outputs[stage][mb] = mb_output;
     }
     cml_free(sched);
@@ -493,7 +495,7 @@ int cml_pipeline_backward(CMLPipelineParallel* pipeline, Tensor* grad_output) {
         if (interleaved && stage == 0) {
             for (int s = 0; s < num_stages; s++) {
                 if (pipeline->micro_batch_outputs[s][mb])
-                    tensor_free(pipeline->micro_batch_outputs[s][mb]);
+                    tensor_release(pipeline->micro_batch_outputs[s][mb]);
                 pipeline->micro_batch_outputs[s][mb] = NULL;
             }
         }
@@ -612,7 +614,7 @@ static void dist_free_cache(CMLPipelineParallel* p) {
     if (p->dist_stage_outputs) {
         for (int mb = 0; mb < p->num_micro_batches; mb++)
             if (p->dist_stage_outputs[mb])
-                tensor_free(p->dist_stage_outputs[mb]);
+                tensor_release(p->dist_stage_outputs[mb]);
         cml_free(p->dist_stage_outputs);
         p->dist_stage_outputs = NULL;
     }
@@ -682,6 +684,7 @@ Tensor* cml_pipeline_dist_forward(CMLPipelineParallel* pipeline, Tensor* input) 
         }
         tensor_ensure_executed(y);
 
+        tensor_pin(y);
         pipeline->dist_stage_inputs[mb]  = x;
         pipeline->dist_stage_outputs[mb] = y;
 
@@ -795,7 +798,7 @@ void cml_pipeline_free(CMLPipelineParallel* pipeline) {
             if (pipeline->micro_batch_outputs[s]) {
                 for (int mb = 0; mb < pipeline->num_micro_batches; mb++) {
                     if (pipeline->micro_batch_outputs[s][mb]) {
-                        tensor_free(pipeline->micro_batch_outputs[s][mb]);
+                        tensor_release(pipeline->micro_batch_outputs[s][mb]);
                     }
                 }
                 cml_free(pipeline->micro_batch_outputs[s]);

@@ -394,6 +394,8 @@ static bool test_pipeline_forward(void) {
     if (output)
         tensor_free(output);
     tensor_free(input);
+    /* A step boundary: the cached activations must survive it for the pipeline to free them. */
+    cml_ir_reset_global_context();
     cml_pipeline_free(pipeline);
     module_free(m1);
     module_free(m2);
