@@ -69,6 +69,10 @@ int main(void) {
     cfg.verbose          = false;
     cfg.use_progress_bar = false;
 
+    /* An attached sink must get the train and validation splits, and no test split. */
+    TrainingMetrics* sink = training_metrics_create(cfg.epochs);
+    optimizer_set_metrics(optimizer, sink);
+
     if (cml_train_with_validation((Module*)model, train_loader, val_loader, optimizer,
                                   tensor_mse_loss, &cfg) != 0) {
         printf("Error: training failed\n");
@@ -78,13 +82,16 @@ int main(void) {
         dataset_free(val_dataset);
         dataset_free(test_dataset);
         cml_cleanup();
+        training_metrics_free(sink);
         return 1;
     }
 
     TrainingMetrics* m = training_metrics_get_global();
-    int metrics_ok     = m && m->actual_epochs == 3 && m->epoch_validation_losses;
+    int metrics_ok     = m && m->actual_epochs == 3 && m->epoch_validation_losses && sink &&
+                     sink->epoch_validation_losses && !sink->epoch_testing_losses;
     for (int e = 0; metrics_ok && e < 3; e++)
         metrics_ok = m->epoch_training_losses[e] > 0.0f && m->epoch_validation_losses[e] > 0.0f &&
+                     sink->epoch_validation_losses[e] > 0.0f &&
                      !isinf(m->epoch_validation_losses[e]);
     const char* err = NULL;
     if (!metrics_ok)
@@ -102,5 +109,6 @@ int main(void) {
     dataset_free(test_dataset);
 
     cml_cleanup();
+    training_metrics_free(sink);
     return err ? 1 : 0;
 }

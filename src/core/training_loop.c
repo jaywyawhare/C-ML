@@ -718,10 +718,6 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
             batch_free(batch);
         }
         float avg_train_loss = num_train_batches > 0 ? train_loss / (float)num_train_batches : 0.0f;
-        if (metrics) {
-            training_metrics_record_epoch_full(metrics, (size_t)epoch, avg_train_loss, 0.0f, 0.0f,
-                                               0.0f, 0.0f, 0.0f);
-        }
 
         dataloader_reset(val_loader);
 
@@ -766,8 +762,8 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
         training_metrics_complete_epoch();
         training_metrics_auto_capture_validation(avg_val_loss, 0.0f);
         if (metrics) {
-            training_metrics_record_epoch_full(metrics, (size_t)epoch, avg_train_loss, 0.0f, 0.0f,
-                                               0.0f, avg_val_loss, 0.0f);
+            training_metrics_record_epoch_full(metrics, (size_t)epoch, avg_train_loss, 0.0f, NAN,
+                                               NAN, avg_val_loss, 0.0f);
         }
         if (scheduler) {
             lr_scheduler_update(scheduler, avg_val_loss);
