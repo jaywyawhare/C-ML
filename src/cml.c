@@ -2954,6 +2954,117 @@ Tensor* cml_cov(Tensor* a, bool rowvar) { return tensor_cov(a, rowvar); }
  * @return (Tensor*)
  */
 Tensor* cml_corrcoef(Tensor* a, bool rowvar) { return tensor_corrcoef(a, rowvar); }
+/**
+ * Public API: n-th discrete difference (-> tensor_diff).
+ * @param a (Tensor*)
+ * @param n (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_diff(Tensor* a, int n) { return tensor_diff(a, n); }
+/**
+ * Public API: vector outer product (-> tensor_outer).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_outer(Tensor* a, Tensor* b) { return tensor_outer(a, b); }
+/**
+ * Public API: tile a 1-D tensor (-> tensor_tile).
+ * @param a (Tensor*)
+ * @param reps (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_tile(Tensor* a, int reps) { return tensor_tile(a, reps); }
+/**
+ * Public API: sorted unique values (-> tensor_unique).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_unique(Tensor* a) { return tensor_unique(a); }
+/**
+ * Public API: trapezoidal integral (-> tensor_trapz).
+ * @param y (Tensor*)
+ * @param dx (float)
+ * @return (float)
+ */
+float cml_trapz(Tensor* y, float dx) { return tensor_trapz(y, dx); }
+/**
+ * Public API: Vandermonde matrix (-> tensor_vander).
+ * @param x (Tensor*)
+ * @param N (int)
+ * @param increasing (bool)
+ * @return (Tensor*)
+ */
+Tensor* cml_vander(Tensor* x, int N, bool increasing) { return tensor_vander(x, N, increasing); }
+/**
+ * Public API: least-squares polynomial fit (-> tensor_polyfit).
+ * @param x (Tensor*)
+ * @param y (Tensor*)
+ * @param deg (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_polyfit(Tensor* x, Tensor* y, int deg) { return tensor_polyfit(x, y, deg); }
+/**
+ * Public API: polynomial evaluation (-> tensor_polyval).
+ * @param coeffs (Tensor*)
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_polyval(Tensor* coeffs, Tensor* x) { return tensor_polyval(coeffs, x); }
+/**
+ * Public API: skewness (-> tensor_skewness).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_skewness(Tensor* a) { return tensor_skewness(a); }
+/**
+ * Public API: excess kurtosis (-> tensor_kurtosis).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_kurtosis(Tensor* a) { return tensor_kurtosis(a); }
+/**
+ * Public API: element-wise z-score (-> tensor_zscore).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_zscore(Tensor* a) { return tensor_zscore(a); }
+/**
+ * Public API: NaN-ignoring mean (-> tensor_nanmean).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_nanmean(Tensor* a) { return tensor_nanmean(a); }
+/**
+ * Public API: NaN-ignoring sum (-> tensor_nansum).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_nansum(Tensor* a) { return tensor_nansum(a); }
+/**
+ * Public API: per-column standardization (-> tensor_standard_scale).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_standard_scaler(Tensor* x) { return tensor_standard_scale(x); }
+/**
+ * Public API: per-column min-max scaling (-> tensor_minmax_scale).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_minmax_scaler(Tensor* x) { return tensor_minmax_scale(x); }
+/**
+ * Public API: per-column robust scaling (-> tensor_robust_scale).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_robust_scaler(Tensor* x) { return tensor_robust_scale(x); }
+/**
+ * Public API: per-row L2 normalization (-> tensor_normalize_l2).
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_normalize_l2(Tensor* x) { return tensor_normalize_l2(x); }
 
 /**
  * Public API: load a tensor from a URL (-> tensor_from_url).
