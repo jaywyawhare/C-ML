@@ -278,11 +278,10 @@ static int test_names_stay_unique_after_fusion(void) {
     tensor_ensure_executed(w); /* runs the whole graph, fusing the add/neg/exp chain */
     Tensor* z = uop_add(uop_mul(y, y), w);
 
-    int ok = 1;
-    for (struct IRNode* p = cml_ir_get_or_create_context()->head; p; p = p->next)
-        for (struct IRNode* q = p->next; q; q = q->next)
-            ok &=
-                !(p->output_name && q->output_name && strcmp(p->output_name, q->output_name) == 0);
+    int ok        = 1;
+    CMLGraph_t ir = cml_ir_get_or_create_context();
+    for (struct IRNode* p = ir->head; p; p = p->next)
+        ok &= !p->output_name || cml_ir_find_by_output(ir, p->output_name) == p;
 
     tensor_free(x);
     tensor_free(y);
