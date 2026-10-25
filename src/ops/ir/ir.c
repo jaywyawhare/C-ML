@@ -1238,6 +1238,15 @@ void cml_ir_free(CMLGraph_t ir) {
     cml_intern_table_free(ir->intern_table);
     ir->intern_table = NULL;
 
+    /* A fused kernel is owned by its first op but points back into every member, and list order
+     * need not put the owner first (cache-locality reordering runs after fusion), so release the
+     * kernels while all members are still alive. */
+    struct IRNode* lists[] = {ir->head, ir->backward_head};
+    for (int l = 0; l < 2; l++)
+        for (node = lists[l]; node; node = node->next)
+            if (node->fused_kernel && node->fused_kernel->ops && node->fused_kernel->ops[0] == node)
+                free_fused_kernel(node->fused_kernel);
+
     /* Phase 2: free all nodes (safe now that tensor pointers are cleared) */
     node     = ir->head;
     node_idx = 0;
