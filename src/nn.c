@@ -2,6 +2,7 @@
 #include "nn.h"
 #include "cml.h"
 #include "core/logging.h"
+#include "core/training_metrics.h"
 #include "core/error_stack.h"
 #include "backend/device.h"
 #include "tensor/tensor.h"
@@ -14,13 +15,6 @@
 #include <string.h>
 #include <math.h>
 #include "alloc/cml_allocator.h"
-
-static Module* g_viz_root_module = NULL;
-
-/** Record the top-level module so the viz/metrics layer can summarize the model. */
-void nn_viz_set_root_module(Module* module) { g_viz_root_module = module; }
-/** Return the module last set as the viz root (may be NULL). */
-Module* nn_viz_root_module(void) { return g_viz_root_module; }
 
 /** Bump a tensor's refcount to mark it aliased as a module parameter. */
 void nn_tensor_param_alias(Tensor* t) {
@@ -123,6 +117,7 @@ void module_free(Module* module) {
         return;
 
     cml_untrack_module(module);
+    training_metrics_forget(module);
 
     void (*specialized_free)(Module*) = module->free;
 
@@ -381,12 +376,6 @@ Tensor* module_forward(Module* module, Tensor* input) {
      * view can collapse thousands of primitives back into the layers they came
      * from. Nested containers nest naturally (Sequential/Linear). No-op unless
      * VIZ is set. */
-    /* The outermost forward in a pass is the model itself. Remembering it lets
-     * the metrics layer summarise weights/gradients for any training loop,
-     * including hand-written ones that never call cml_train. */
-    if (cml_ir_scope_enabled() && cml_ir_scope_current() == NULL)
-        nn_viz_set_root_module(module);
-
     cml_ir_scope_push(module->name);
     Tensor* out = module->forward(module, input);
     cml_ir_scope_pop();

@@ -129,12 +129,6 @@ Tensor* nn_norm_rowwise(Tensor* x, int rows, int cols, float eps);
 
 void nn_tensor_param_alias(Tensor* t);
 
-/* Outermost module of the most recent forward pass, i.e. the model. Recorded
- * only under VIZ; NULL otherwise. Lets the dashboard summarise parameters
- * without every training loop having to register its model. */
-void nn_viz_set_root_module(Module* module);
-Module* nn_viz_root_module(void);
-
 int module_get_parameters(Module* module, Parameter** params, int* num_parameters);
 
 Parameter* module_get_parameter(Module* module, const char* name);

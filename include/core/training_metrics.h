@@ -117,14 +117,11 @@ void training_metrics_auto_capture_optimizer(Optimizer* optimizer);
  */
 void training_metrics_note_prediction(Tensor* prediction, Tensor* target);
 void training_metrics_init_global(void);
+/** Drop any capture state pointing at @p obj (a Module or Tensor) before it is freed. */
+void training_metrics_forget(const void* obj);
 void training_metrics_cleanup_global(void);
 void training_metrics_mark_zero_grad(void);
 
-/*
- * True if visualization export is requested via the VIZ env var.
- * Truthy = set to any value other than "" / "0" / "false".
- */
-bool cml_viz_enabled(void);
 void training_metrics_set_expected_epochs(size_t num_epochs);
 void training_metrics_register_model(Module* model);
 void training_metrics_auto_export_architecture(Module* model);

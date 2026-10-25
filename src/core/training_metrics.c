@@ -241,27 +241,30 @@ void training_metrics_start_epoch(TrainingMetrics* metrics) {
     metrics->epoch_start_time = clock();
 }
 
-/* Summarise the model's parameters for `epoch` using whatever model most
- * recently ran a forward pass. Hand-written training loops never call
- * cml_train, so hooking the loop would have covered only the built-in one;
- * every loop does forward the model, which is what this keys off. */
+/* Epoch of the last distribution snapshot; capture runs off the optimizer step, which fires
+ * per batch, and keeps one snapshot per epoch. */
 static __thread size_t g_last_dist_epoch = (size_t)-1;
 
-static void capture_distributions_for_epoch(TrainingMetrics* metrics, size_t epoch) {
-    if (!metrics || !cml_ir_scope_enabled())
-        return;
-    /* Once per epoch: this runs off the optimizer step, which fires per batch. */
-    if (g_last_dist_epoch == epoch)
-        return;
-
-    Module* model = g_current_model ? g_current_model : nn_viz_root_module();
-    if (!model)
+/** Summarise the parameters @p optimizer is training for @p epoch. They come from the optimizer
+ *  rather than a remembered model: it is the one object every training loop steps, and it cannot
+ *  have been freed underneath its own step. */
+static void capture_distributions_for_epoch(TrainingMetrics* metrics, size_t epoch,
+                                            Optimizer* optimizer) {
+    if (!metrics || !cml_viz_enabled() || g_last_dist_epoch == epoch)
         return;
 
-    Parameter** params = NULL;
-    int num_params     = 0;
-    if (module_collect_parameters(model, &params, &num_params, true) != 0 || !params)
+    int num_params = 0;
+    for (int g = 0; g < optimizer->num_param_groups; g++)
+        num_params += optimizer->param_groups[g].num_parameters;
+    Parameter** params =
+        num_params > 0 ? cml_malloc((size_t)num_params * sizeof(Parameter*)) : NULL;
+    if (!params)
         return;
+    for (int g = 0, k = 0; g < optimizer->num_param_groups; g++) {
+        const ParameterGroup* grp = &optimizer->param_groups[g];
+        memcpy(params + k, grp->parameters, (size_t)grp->num_parameters * sizeof(Parameter*));
+        k += grp->num_parameters;
+    }
     training_metrics_record_distributions(metrics, epoch, (void**)params, num_params);
     g_last_dist_epoch = epoch;
     cml_free(params);
@@ -1203,6 +1206,7 @@ void training_metrics_set_expected_epochs(size_t num_epochs) {
         return;
     g_manual_epoch_control = true;
     g_current_epoch        = 0;
+    g_last_dist_epoch      = (size_t)-1;
     if (num_epochs > g_global_metrics->num_epochs) {
         training_metrics_ensure_capacity(g_global_metrics, num_epochs);
     }
@@ -1359,7 +1363,7 @@ void training_metrics_auto_capture_optimizer(Optimizer* optimizer) {
     /* Gradients are still attached here (zero_grad is a separate call), which is
      * why the distribution snapshot is taken from this hook rather than at the
      * epoch boundary where they have already been cleared. */
-    capture_distributions_for_epoch(g_global_metrics, g_current_epoch);
+    capture_distributions_for_epoch(g_global_metrics, g_current_epoch, optimizer);
     if (g_current_model && !g_architecture_exported) {
         training_metrics_auto_export_architecture(g_current_model);
     }
@@ -1374,32 +1378,45 @@ void training_metrics_auto_capture_optimizer(Optimizer* optimizer) {
             }
         }
     }
-    if (optimizer->param_groups && optimizer->num_param_groups > 0) {
-        ParameterGroup* group = &optimizer->param_groups[0];
-        if (group->parameters && group->num_parameters > 0) {
-            float grad_norm = training_metrics_calculate_gradient_norm(
-                g_global_metrics, (void**)group->parameters, group->num_parameters);
-            if (grad_norm > 0.0f) {
-                g_global_metrics->gradient_norm = grad_norm;
-            }
-        }
-    }
+    float grad_norm =
+        optimizer_clip_grad_norm(optimizer->param_groups, optimizer->num_param_groups, 0.0f);
+    if (grad_norm > 0.0f)
+        g_global_metrics->gradient_norm = grad_norm;
     const char* metrics_path = "training.json";
     training_metrics_export_json(g_global_metrics, metrics_path, true);
 }
+/** Reset the per-session auto-capture state, so a re-initialised session starts at epoch 0. */
+static void reset_capture_state(void) {
+    g_current_epoch         = 0;
+    g_epoch_start_time      = 0;
+    g_epoch_in_progress     = false;
+    g_current_model         = NULL;
+    g_architecture_exported = false;
+    g_last_dist_epoch       = (size_t)-1;
+    g_acc_pred              = NULL;
+    g_acc_target            = NULL;
+}
+
+/** Drop any capture state pointing at @p obj (a Module or Tensor) before it is freed. */
+void training_metrics_forget(const void* obj) {
+    if (!obj)
+        return;
+    if ((const void*)g_current_model == obj)
+        g_current_model = NULL;
+    if ((const void*)g_acc_pred == obj || (const void*)g_acc_target == obj) {
+        g_acc_pred   = NULL;
+        g_acc_target = NULL;
+    }
+}
+
 /** Create the thread-local global metrics object (default 100 epochs) and reset
  * all auto-capture state; no-op if already initialized. */
 void training_metrics_init_global(void) {
     if (g_global_metrics)
         return; // Already initialized
     g_global_metrics = training_metrics_create(100);
-    if (g_global_metrics) {
-        g_current_epoch         = 0;
-        g_epoch_start_time      = 0;
-        g_epoch_in_progress     = false;
-        g_current_model         = NULL;
-        g_architecture_exported = false;
-    }
+    if (g_global_metrics)
+        reset_capture_state();
 }
 /** Hook: record training accuracy for the current epoch and export. */
 void training_metrics_auto_capture_train_accuracy(float train_accuracy) {
@@ -1551,12 +1568,8 @@ void training_metrics_cleanup_global(void) {
         training_metrics_export_json(g_global_metrics, metrics_path, false);
 
         training_metrics_free(g_global_metrics);
-        g_global_metrics        = NULL;
-        g_current_epoch         = 0;
-        g_epoch_start_time      = 0;
-        g_epoch_in_progress     = false;
-        g_current_model         = NULL;
-        g_architecture_exported = false;
-        g_manual_epoch_control  = false;
+        g_global_metrics       = NULL;
+        g_manual_epoch_control = false;
+        reset_capture_state();
     }
 }

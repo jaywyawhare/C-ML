@@ -16,6 +16,7 @@
 #include "ops/uops.h"
 #include "backend/backend_buffer.h"
 #include "core/logging.h"
+#include "core/training_metrics.h"
 #include "core/cml_flags.h"
 #include "backend/device.h"
 #include "core/error_stack.h"
@@ -943,6 +944,7 @@ void tensor_free(Tensor* t) {
 
     cml_graph_cache_forget_tensor(t);
     cml_ir_forget_tensor(t);
+    training_metrics_forget(t);
 
     // CRITICAL: Clear IR node's output pointer BEFORE freeing the tensor
     // This prevents dangling pointers when cml_ir_free is called later
