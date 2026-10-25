@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "cml.h"
-#include "ops/ir/internal.h"
 #include "ops/ir/flamegraph.h"
 #include "ops/ir/rewrite_trace.h"
 #include "test_harness.h"
@@ -40,10 +39,7 @@ int main(int argc, char** argv) {
         if (cml_init() != 0)
             return 3;
         if (strcmp(argv[1], "--probe-gates") == 0)
-            return cml_viz_enabled() || cml_ir_scope_enabled() || cml_flame_enabled() ||
-                           cml_rewrite_trace_enabled()
-                       ? 4
-                       : 0;
+            return cml_viz_enabled() || cml_flame_enabled() || cml_rewrite_trace_enabled() ? 4 : 0;
         return 0;
     }
 

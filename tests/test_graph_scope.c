@@ -118,7 +118,7 @@ int main(void) {
     int viz_was = cml_flag_push(CML_FLAG_VIZ, 1);
     printf("=== graph scope ===\n");
 
-    CHECK("scope tracking enabled under VIZ", cml_ir_scope_enabled());
+    CHECK("scope tracking enabled under VIZ", cml_viz_enabled());
 
     /* Stack behaviour, independent of any model. */
     CHECK("scope starts empty", cml_ir_scope_current() == NULL);

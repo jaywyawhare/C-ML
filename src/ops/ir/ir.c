@@ -1867,9 +1867,6 @@ static _Thread_local char g_scope_path[IR_SCOPE_MAX_LEN];
 static _Thread_local int g_scope_ends[IR_SCOPE_MAX_DEPTH]; /* path length after each push */
 static _Thread_local int g_scope_depth = 0;
 
-/** Whether module-scope path tracking is on (it feeds the VIZ graph view only). */
-bool cml_ir_scope_enabled(void) { return cml_viz_enabled(); }
-
 /* Folded call stack of whoever is building this node.
  *
  * The flame graph's depth has to come from somewhere, and a lazy graph offers
@@ -2015,7 +2012,7 @@ static char* cml_capture_build_stack(void) {
 /** Push @p name onto the thread-local module scope path (for graph grouping). Every push counts
  *  toward the depth, even one too deep or too long to name, so each pop undoes exactly one. */
 void cml_ir_scope_push(const char* name) {
-    if (!cml_ir_scope_enabled())
+    if (!cml_viz_enabled())
         return;
     if (g_scope_depth < IR_SCOPE_MAX_DEPTH) {
         int len = (int)strlen(g_scope_path);
@@ -2032,7 +2029,7 @@ void cml_ir_scope_push(const char* name) {
 
 /** Pop the innermost module scope, truncating the path back to its parent. */
 void cml_ir_scope_pop(void) {
-    if (!cml_ir_scope_enabled() || g_scope_depth <= 0)
+    if (!cml_viz_enabled() || g_scope_depth <= 0)
         return;
     if (--g_scope_depth < IR_SCOPE_MAX_DEPTH)
         g_scope_path[g_scope_depth > 0 ? g_scope_ends[g_scope_depth - 1] : 0] = '\0';
@@ -2040,5 +2037,5 @@ void cml_ir_scope_pop(void) {
 
 /** Current module scope path, or NULL when scoping is disabled or empty. */
 const char* cml_ir_scope_current(void) {
-    return (cml_ir_scope_enabled() && g_scope_path[0]) ? g_scope_path : NULL;
+    return (cml_viz_enabled() && g_scope_path[0]) ? g_scope_path : NULL;
 }

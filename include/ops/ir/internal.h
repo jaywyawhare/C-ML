@@ -186,7 +186,6 @@ void cml_ir_insert_before(CMLGraph_t ir, struct IRNode* new_node, struct IRNode*
 void cml_ir_scope_push(const char* name);
 void cml_ir_scope_pop(void);
 const char* cml_ir_scope_current(void);
-bool cml_ir_scope_enabled(void);
 
 /* Axis-wise lane decomposition: element (o,j,i) of `t` around `dim` lives at
  * (o*count + j)*inner + i. */
