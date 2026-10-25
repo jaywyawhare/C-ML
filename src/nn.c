@@ -403,7 +403,7 @@ void module_zero_grad(Module* module) {
             Tensor* tensor = module->parameters[i]->tensor;
 
             if (tensor->grad) {
-                tensor_free(tensor->grad);
+                tensor_release(tensor->grad);
                 tensor->grad = NULL;
             }
 

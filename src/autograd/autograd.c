@@ -315,7 +315,7 @@ void tensor_zero_grad(Tensor* tensor) {
         /* Zero in-place instead of freeing - avoids reallocation in backward */
         memset(tensor->grad->data, 0, tensor->grad->numel * cml_dtype_size(tensor->grad->dtype));
     } else if (tensor->grad) {
-        tensor_free(tensor->grad);
+        tensor_release(tensor->grad);
         tensor->grad = NULL;
     }
 }
@@ -495,7 +495,7 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
             Tensor* t = tensor->ir_context->tensor_refs[i];
             if (!t || !t->grad || t->retains_grad || tensor_is_leaf(t))
                 continue;
-            tensor_free(t->grad);
+            tensor_release(t->grad);
             t->grad = NULL;
         }
     }

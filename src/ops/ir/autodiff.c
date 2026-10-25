@@ -1676,8 +1676,11 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
      * it while the surviving parent still holds it via ->grad and frees it again
      * on destruction - a double free that corrupts the exec buffer cache across
      * models. Pinning makes the teardown detach-and-keep it instead; the parent
-     * then owns it and releases the pin in tensor_free. Release any prior grad
-     * (e.g. a parameter's grad from the previous step) first. */
+     * then owns it and releases the pin in tensor_free. Each parent takes a
+     * reference along with the pin, since tensor_release drops both: a grad
+     * shared by several parents (identity VJPs) must not lose the graph's own
+     * references when they let go. Release any prior grad (e.g. a parameter's
+     * grad from the previous step) first. */
     for (int i = 0; i < map.count; i++) {
         Tensor* v = map.items[i].val;
         if (v && v->requires_grad) {
@@ -1700,8 +1703,10 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
                 if (v->grad)
                     tensor_release(v->grad);
                 v->grad = newg;
-                if (newg)
+                if (newg) {
+                    newg->ref_count++;
                     tensor_pin(newg);
+                }
             }
         }
     }
@@ -1732,6 +1737,7 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
                 continue;
             tensor_release(t->grad);
             t->grad = z;
+            z->ref_count++;
             tensor_pin(z);
         }
     }
