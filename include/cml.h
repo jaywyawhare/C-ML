@@ -163,6 +163,10 @@ Tensor* cml_solve(Tensor* a, Tensor* b);
 Tensor* cml_inverse(Tensor* a);
 float cml_det(Tensor* a);
 Tensor* cml_lstsq(Tensor* a, Tensor* b);
+float cml_matrix_norm(Tensor* a);
+int cml_matrix_rank(Tensor* a, float tol);
+Tensor* cml_pinv(Tensor* a);
+EigResult cml_eigh(Tensor* a);
 
 Tensor* cml_transpose(Tensor* a, int dim1, int dim2);
 Tensor* cml_reshape(Tensor* a, int* new_shape, int new_ndim);

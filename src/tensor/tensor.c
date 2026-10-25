@@ -2820,6 +2820,204 @@ Tensor* tensor_lstsq(Tensor* a, Tensor* b) {
 }
 
 /**
+ * Frobenius norm (square root of the sum of squared entries) of a tensor.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_matrix_norm(Tensor* a) {
+    if (!a)
+        return 0.0f;
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return 0.0f;
+    double s = 0.0;
+    for (size_t i = 0; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        s += (double)v * (double)v;
+    }
+    return (float)sqrt(s);
+}
+
+/* Default singular-value tolerance (NumPy convention) for rank/pseudo-inverse. */
+static float sv_default_tol(int m, int n, const float* s, int k) {
+    int big = m > n ? m : n;
+    return (k > 0 ? s[0] : 0.0f) * (float)big * 1.1920929e-7f; /* FLT_EPSILON */
+}
+
+/**
+ * Numerical rank: count of singular values above @p tol (tol<0 uses the default tolerance).
+ * @param a (Tensor*)
+ * @param tol (float)
+ * @return (int)
+ */
+int tensor_matrix_rank(Tensor* a, float tol) {
+    if (!a || a->ndim != 2)
+        return 0;
+    SVDResult svd = tensor_svd(a);
+    if (!svd.S)
+        return 0;
+    int k         = svd.S->shape[0];
+    float* s      = (float*)tensor_data_ptr(svd.S);
+    float use_tol = tol >= 0.0f ? tol : sv_default_tol(a->shape[0], a->shape[1], s, k);
+    int rank      = 0;
+    for (int i = 0; i < k; i++)
+        if (s[i] > use_tol)
+            rank++;
+    tensor_free(svd.U);
+    tensor_free(svd.S);
+    tensor_free(svd.Vt);
+    return rank;
+}
+
+/**
+ * Moore-Penrose pseudo-inverse [n,m] of an [m,n] matrix via its SVD.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_pinv(Tensor* a) {
+    if (!a || a->ndim != 2) {
+        LOG_ERROR("tensor_pinv: input must be a 2D matrix");
+        return NULL;
+    }
+    int m = a->shape[0], n = a->shape[1];
+    SVDResult svd = tensor_svd(a);
+    if (!svd.U || !svd.S || !svd.Vt)
+        return NULL;
+    int k      = svd.S->shape[0];
+    float* U   = (float*)tensor_data_ptr(svd.U);  /* [m,k] */
+    float* s   = (float*)tensor_data_ptr(svd.S);  /* [k]   */
+    float* Vt  = (float*)tensor_data_ptr(svd.Vt); /* [k,n] */
+    float tol  = sv_default_tol(m, n, s, k);
+    float* out = cml_calloc((size_t)n * m, sizeof(float));
+    if (out) {
+        /* pinv = sum_r (s_r>tol) (1/s_r) * v_r * u_r^T, v_r = Vt[r,:], u_r = U[:,r] */
+        for (int r = 0; r < k; r++) {
+            if (s[r] <= tol)
+                continue;
+            float inv = 1.0f / s[r];
+            for (int i = 0; i < n; i++)
+                for (int j = 0; j < m; j++)
+                    out[i * m + j] += inv * Vt[r * n + i] * U[j * k + r];
+        }
+    }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[]    = {n, m};
+    Tensor* result = out ? tensor_from_data(out, shape, 2, &config) : NULL;
+    cml_free(out);
+    tensor_free(svd.U);
+    tensor_free(svd.S);
+    tensor_free(svd.Vt);
+    return result;
+}
+
+/**
+ * Symmetric eigendecomposition via cyclic Jacobi rotations; eigenvalues ascending, with the
+ * matching eigenvectors as columns. Fields are NULL on error.
+ * @param a (Tensor*)
+ * @return (EigResult)
+ */
+EigResult tensor_eigh(Tensor* a) {
+    EigResult result = {NULL, NULL};
+    if (!a || a->ndim != 2 || a->shape[0] != a->shape[1]) {
+        LOG_ERROR("tensor_eigh: input must be a square matrix");
+        return result;
+    }
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return result;
+    int n    = a->shape[0];
+    float* A = cml_malloc((size_t)n * n * sizeof(float));
+    float* V = cml_calloc((size_t)n * n, sizeof(float));
+    if (!A || !V) {
+        cml_free(A);
+        cml_free(V);
+        return result;
+    }
+    for (int i = 0; i < n * n; i++)
+        A[i] = tensor_get_float(a, i);
+    for (int i = 0; i < n; i++)
+        V[i * n + i] = 1.0f;
+
+    for (int sweep = 0; sweep < 100; sweep++) {
+        float off = 0.0f;
+        for (int p = 0; p < n; p++)
+            for (int q = p + 1; q < n; q++)
+                off += A[p * n + q] * A[p * n + q];
+        if (off < 1e-20f)
+            break;
+        for (int p = 0; p < n; p++) {
+            for (int q = p + 1; q < n; q++) {
+                float apq = A[p * n + q];
+                if (fabsf(apq) < 1e-20f)
+                    continue;
+                float app = A[p * n + p], aqq = A[q * n + q];
+                float phi = 0.5f * atan2f(2.0f * apq, aqq - app);
+                float c = cosf(phi), s = sinf(phi);
+                for (int i = 0; i < n; i++) {
+                    float aip = A[i * n + p], aiq = A[i * n + q];
+                    A[i * n + p] = c * aip - s * aiq;
+                    A[i * n + q] = s * aip + c * aiq;
+                }
+                for (int i = 0; i < n; i++) {
+                    float api = A[p * n + i], aqi = A[q * n + i];
+                    A[p * n + i] = c * api - s * aqi;
+                    A[q * n + i] = s * api + c * aqi;
+                }
+                for (int i = 0; i < n; i++) {
+                    float vip = V[i * n + p], viq = V[i * n + q];
+                    V[i * n + p] = c * vip - s * viq;
+                    V[i * n + q] = s * vip + c * viq;
+                }
+            }
+        }
+    }
+
+    int* order = cml_malloc((size_t)n * sizeof(int));
+    if (!order) {
+        cml_free(A);
+        cml_free(V);
+        return result;
+    }
+    for (int i = 0; i < n; i++)
+        order[i] = i;
+    for (int i = 0; i < n; i++)
+        for (int j = i + 1; j < n; j++)
+            if (A[order[j] * n + order[j]] < A[order[i] * n + order[i]]) {
+                int t    = order[i];
+                order[i] = order[j];
+                order[j] = t;
+            }
+
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    int vshape[]   = {n};
+    result.values  = tensor_empty(vshape, 1, &config);
+    int mshape[]   = {n, n};
+    result.vectors = tensor_empty(mshape, 2, &config);
+    if (!result.values || !result.vectors) {
+        tensor_free(result.values);
+        tensor_free(result.vectors);
+        result.values  = NULL;
+        result.vectors = NULL;
+    } else {
+        tensor_ensure_executed(result.values);
+        tensor_ensure_executed(result.vectors);
+        float* ev   = (float*)result.values->data;
+        float* evec = (float*)result.vectors->data;
+        for (int i = 0; i < n; i++) {
+            ev[i] = A[order[i] * n + order[i]];
+            for (int r = 0; r < n; r++)
+                evec[r * n + i] = V[r * n + order[i]];
+        }
+    }
+    cml_free(order);
+    cml_free(A);
+    cml_free(V);
+    return result;
+}
+
+/**
  * Download `url` (via curl/wget) to a temp file and load it with tensor_read_file.
  * NULL on download or parse failure.
  * @param url (const char*)

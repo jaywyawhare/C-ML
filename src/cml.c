@@ -2848,6 +2848,31 @@ float cml_det(Tensor* a) { return tensor_det(a); }
  * @return (Tensor*)
  */
 Tensor* cml_lstsq(Tensor* a, Tensor* b) { return tensor_lstsq(a, b); }
+/**
+ * Public API: Frobenius norm (-> tensor_matrix_norm).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_matrix_norm(Tensor* a) { return tensor_matrix_norm(a); }
+/**
+ * Public API: numerical matrix rank (-> tensor_matrix_rank).
+ * @param a (Tensor*)
+ * @param tol (float)
+ * @return (int)
+ */
+int cml_matrix_rank(Tensor* a, float tol) { return tensor_matrix_rank(a, tol); }
+/**
+ * Public API: Moore-Penrose pseudo-inverse (-> tensor_pinv).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_pinv(Tensor* a) { return tensor_pinv(a); }
+/**
+ * Public API: symmetric eigendecomposition (-> tensor_eigh).
+ * @param a (Tensor*)
+ * @return (EigResult)
+ */
+EigResult cml_eigh(Tensor* a) { return tensor_eigh(a); }
 
 /**
  * Public API: load a tensor from a URL (-> tensor_from_url).

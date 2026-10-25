@@ -443,6 +443,40 @@ float tensor_det(Tensor* a);
  */
 Tensor* tensor_lstsq(Tensor* a, Tensor* b);
 
+typedef struct {
+    Tensor* values;  // Eigenvalues [n], ascending
+    Tensor* vectors; // Eigenvectors as columns [n, n]
+} EigResult;
+
+/**
+ * Frobenius norm of a tensor.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_matrix_norm(Tensor* a);
+
+/**
+ * Numerical matrix rank from the SVD (tol<0 selects the default tolerance).
+ * @param a (Tensor*)
+ * @param tol (float)
+ * @return (int)
+ */
+int tensor_matrix_rank(Tensor* a, float tol);
+
+/**
+ * Moore-Penrose pseudo-inverse via the SVD.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_pinv(Tensor* a);
+
+/**
+ * Symmetric eigendecomposition (cyclic Jacobi), eigenvalues ascending.
+ * @param a (Tensor*)
+ * @return (EigResult)
+ */
+EigResult tensor_eigh(Tensor* a);
+
 Tensor* tensor_from_url(const char* url);
 
 Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y);
