@@ -52,6 +52,36 @@ Tensor* augment_color_jitter(Tensor* input, float brightness, float contrast, fl
 Tensor* augment_normalize(Tensor* input, float* mean, float* std, int num_channels);
 Tensor* augment_apply(Tensor* input, AugmentationConfig* config);
 
+/**
+ * Zero a random size x size square per image (cutout / random erasing).
+ * @param input (Tensor*)
+ * @param size (int)
+ * @return (Tensor*)
+ */
+Tensor* augment_cutout(Tensor* input, int size);
+
+/**
+ * Mixup convex blend out = lambda*a + (1-lambda)*b of two identically-shaped batches.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param lambda (float)
+ * @return (Tensor*)
+ */
+Tensor* augment_mixup(Tensor* a, Tensor* b, float lambda);
+
+/**
+ * CutMix: paste b's box [top, top+box_h) x [left, left+box_w) over a copy of a
+ * (label-mix weight lambda = 1 - box_area/(H*W)).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param top (int)
+ * @param left (int)
+ * @param box_h (int)
+ * @param box_w (int)
+ * @return (Tensor*)
+ */
+Tensor* augment_cutmix(Tensor* a, Tensor* b, int top, int left, int box_h, int box_w);
+
 #ifdef __cplusplus
 }
 #endif

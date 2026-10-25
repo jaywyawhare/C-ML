@@ -586,3 +586,147 @@ Tensor* augment_apply(Tensor* input, AugmentationConfig* config) {
 
     return output;
 }
+
+/** Shapes-match check for two tensors.
+ * @param a (const Tensor*)
+ * @param b (const Tensor*)
+ * @return (bool) */
+static bool same_shape(const Tensor* a, const Tensor* b) {
+    if (a->ndim != b->ndim)
+        return false;
+    for (int i = 0; i < a->ndim; i++)
+        if (a->shape[i] != b->shape[i])
+            return false;
+    return true;
+}
+
+/**
+ * Zero a random size x size square (shared across channels) in each image of a 4D
+ * NCHW batch -- the "cutout"/random-erasing regulariser. A box is clamped to the
+ * image, so edge positions erase a smaller region. Returns a new tensor.
+ * @param input (Tensor*)
+ * @param size (int)
+ * @return (Tensor*)
+ */
+Tensor* augment_cutout(Tensor* input, int size) {
+    if (!input || input->ndim != 4 || size <= 0) {
+        LOG_ERROR("Cutout requires a 4D tensor [batch, channels, height, width] and size > 0");
+        return NULL;
+    }
+    int batch = input->shape[0], channels = input->shape[1];
+    int height = input->shape[2], width = input->shape[3];
+
+    TensorConfig config = {
+        .dtype = input->dtype, .device = input->device, .has_dtype = true, .has_device = true};
+    Tensor* output = tensor_empty(input->shape, 4, &config);
+    if (!output)
+        return NULL;
+    float* in_data  = (float*)tensor_data_ptr(input);
+    float* out_data = (float*)tensor_data_ptr(output);
+    if (!in_data || !out_data) {
+        tensor_free(output);
+        return NULL;
+    }
+    memcpy(out_data, in_data, input->numel * sizeof(float));
+
+    for (int b = 0; b < batch; b++) {
+        int cy = (int)(rand_float() * (float)height);
+        int cx = (int)(rand_float() * (float)width);
+        int y0 = cy - size / 2, x0 = cx - size / 2;
+        int y1 = y0 + size, x1 = x0 + size;
+        if (y0 < 0)
+            y0 = 0;
+        if (x0 < 0)
+            x0 = 0;
+        if (y1 > height)
+            y1 = height;
+        if (x1 > width)
+            x1 = width;
+        for (int c = 0; c < channels; c++)
+            for (int y = y0; y < y1; y++)
+                for (int x = x0; x < x1; x++)
+                    out_data[((b * channels + c) * height + y) * width + x] = 0.0f;
+    }
+    return output;
+}
+
+/**
+ * Mixup: element-wise convex blend out = lambda*a + (1-lambda)*b of two equally-shaped
+ * batches. The caller mixes the labels with the same lambda. Returns a new tensor.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param lambda (float)
+ * @return (Tensor*)
+ */
+Tensor* augment_mixup(Tensor* a, Tensor* b, float lambda) {
+    if (!a || !b || !same_shape(a, b)) {
+        LOG_ERROR("Mixup requires two tensors of identical shape");
+        return NULL;
+    }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* output = tensor_empty(a->shape, a->ndim, &config);
+    if (!output)
+        return NULL;
+    float* ad = (float*)tensor_data_ptr(a);
+    float* bd = (float*)tensor_data_ptr(b);
+    float* od = (float*)tensor_data_ptr(output);
+    if (!ad || !bd || !od) {
+        tensor_free(output);
+        return NULL;
+    }
+    for (size_t i = 0; i < a->numel; i++)
+        od[i] = lambda * ad[i] + (1.0f - lambda) * bd[i];
+    return output;
+}
+
+/**
+ * CutMix: copy batch `a`, then paste the box [top, top+box_h) x [left, left+box_w)
+ * from `b` over it (all channels). The label-mix weight is lambda = 1 - box_area /
+ * (height*width). Both tensors must be 4D NCHW and identically shaped; the box is
+ * clamped to the image. Returns a new tensor.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param top (int)
+ * @param left (int)
+ * @param box_h (int)
+ * @param box_w (int)
+ * @return (Tensor*)
+ */
+Tensor* augment_cutmix(Tensor* a, Tensor* b, int top, int left, int box_h, int box_w) {
+    if (!a || !b || a->ndim != 4 || !same_shape(a, b)) {
+        LOG_ERROR("CutMix requires two identically-shaped 4D tensors");
+        return NULL;
+    }
+    int batch = a->shape[0], channels = a->shape[1];
+    int height = a->shape[2], width = a->shape[3];
+
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* output = tensor_empty(a->shape, 4, &config);
+    if (!output)
+        return NULL;
+    float* ad = (float*)tensor_data_ptr(a);
+    float* bd = (float*)tensor_data_ptr(b);
+    float* od = (float*)tensor_data_ptr(output);
+    if (!ad || !bd || !od) {
+        tensor_free(output);
+        return NULL;
+    }
+    memcpy(od, ad, a->numel * sizeof(float));
+
+    int y0 = top < 0 ? 0 : top, x0 = left < 0 ? 0 : left;
+    int y1 = top + box_h, x1 = left + box_w;
+    if (y1 > height)
+        y1 = height;
+    if (x1 > width)
+        x1 = width;
+    for (int bi = 0; bi < batch; bi++)
+        for (int c = 0; c < channels; c++)
+            for (int y = y0; y < y1; y++)
+                for (int x = x0; x < x1; x++) {
+                    size_t idx = ((size_t)(bi * channels + c) * height + y) * width + x;
+                    od[idx]    = bd[idx];
+                }
+    return output;
+}
