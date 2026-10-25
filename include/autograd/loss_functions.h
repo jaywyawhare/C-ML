@@ -39,6 +39,9 @@ struct Tensor* tensor_hinge_loss(struct Tensor* input, struct Tensor* target);
 struct Tensor* tensor_focal_loss(struct Tensor* input, struct Tensor* target, float alpha,
                                  float gamma);
 
+/* Soft Dice loss: 1 - (2*sum(p*y) + eps) / (sum(p) + sum(y) + eps) */
+struct Tensor* tensor_dice_loss(struct Tensor* input, struct Tensor* target, float eps);
+
 /*
  * Smooth L1 loss:
  *   |x| < beta: 0.5 * x^2 / beta

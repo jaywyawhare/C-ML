@@ -449,6 +449,67 @@ Tensor* tensor_focal_loss(Tensor* input, Tensor* target, float alpha, float gamm
 }
 
 /**
+ * Soft Dice loss 1 - (2*sum(p*y) + eps) / (sum(p) + sum(y) + eps) over probabilities p and
+ * target masks y; eps (non-positive falls back to 1) smooths the empty-mask case. Shape mismatch
+ * errors.
+ * @param input (Tensor*)
+ * @param target (Tensor*)
+ * @param eps (float)
+ * @return (Tensor*)
+ */
+Tensor* tensor_dice_loss(Tensor* input, Tensor* target, float eps) {
+    if (!input || !target) {
+        CML_ERR_NULL("Dice Loss: input or target is NULL");
+    }
+    if (input->numel != target->numel) {
+        CML_ERR_NULL("Dice Loss: shape mismatch");
+    }
+    if (eps <= 0.0f)
+        eps = 1.0f;
+
+    ReduceParams reduce_params = {0};
+    Tensor* pm                 = uop_mul(input, target);
+    if (!pm)
+        return NULL;
+    Tensor* inter = uop_sum(pm, &reduce_params);
+    if (!inter)
+        return NULL;
+    Tensor* sum_p = uop_sum(input, &reduce_params);
+    if (!sum_p)
+        return NULL;
+    Tensor* sum_y = uop_sum(target, &reduce_params);
+    if (!sum_y)
+        return NULL;
+    Tensor* union_sum = uop_add(sum_p, sum_y);
+    if (!union_sum)
+        return NULL;
+
+    float two_arr[1] = {2.0f};
+    Tensor* two      = tensor_from_array_2d(two_arr, 1, 1);
+    float eps_arr[1] = {eps};
+    Tensor* eps_num  = tensor_from_array_2d(eps_arr, 1, 1);
+    Tensor* eps_den  = tensor_from_array_2d(eps_arr, 1, 1);
+    float one_arr[1] = {1.0f};
+    Tensor* one      = tensor_from_array_2d(one_arr, 1, 1);
+    if (!two || !eps_num || !eps_den || !one)
+        return NULL;
+
+    Tensor* two_inter = uop_mul(two, inter);
+    if (!two_inter)
+        return NULL;
+    Tensor* numerator = uop_add(two_inter, eps_num);
+    if (!numerator)
+        return NULL;
+    Tensor* denominator = uop_add(union_sum, eps_den);
+    if (!denominator)
+        return NULL;
+    Tensor* dice = uop_div(numerator, denominator);
+    if (!dice)
+        return NULL;
+    return uop_sub(one, dice);
+}
+
+/**
  * Smooth L1 loss: quadratic 0.5*d^2/beta where |d| < beta, else linear |d| - 0.5*beta,
  * selected with where. Non-positive beta defaults to 1. Returns the mean over elements.
  * @param input (Tensor*)
