@@ -161,7 +161,7 @@ After building with `-DBUILD_EXAMPLES=ON`, all example binaries are in `build/bi
 ./build/bin/hello_cml            # Smoke test
 ```
 
-See [examples/README.md](../examples/README.md) for the full list of 15+ examples covering linear regression, autoencoders, CNNs, RNNs, LSTMs, transformers, GANs, and more.
+See the [Examples](examples.md) page for the full list of 15+ examples covering linear regression, autoencoders, CNNs, RNNs, LSTMs, transformers, GANs, and more.
 
 ## Python Bindings
 
@@ -174,7 +174,7 @@ python cml/build_cffi.py
 python -c "import cml; cml.init(); print('OK'); cml.cleanup()"
 ```
 
-See [python/INSTALLATION.md](../python/INSTALLATION.md) for full setup instructions and usage examples.
+See [Python Bindings](python_installation.md) for full setup instructions and usage examples.
 
 ## Next Steps
 

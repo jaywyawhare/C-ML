@@ -204,7 +204,7 @@ Tensor* t = CML_CHECK(tensor_empty(shape, ndim, NULL), "Failed to create tensor"
 
 ## Contributing
 
-We welcome contributions! Please see the main [README](../README.md) for contributing guidelines.
+We welcome contributions! Please see the main [README](https://github.com/jaywyawhare/C-ML#readme) for contributing guidelines.
 
 ## License
 
