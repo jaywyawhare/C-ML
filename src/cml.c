@@ -3165,6 +3165,119 @@ float cml_gmean(Tensor* a) { return tensor_gmean(a); }
  * @return (float)
  */
 float cml_hmean(Tensor* a) { return tensor_hmean(a); }
+/**
+ * Public API: rolling window sum (-> tensor_rolling_sum).
+ * @param a (Tensor*)
+ * @param window (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_rolling_sum(Tensor* a, int window) { return tensor_rolling_sum(a, window); }
+/**
+ * Public API: rolling window mean (-> tensor_rolling_mean).
+ * @param a (Tensor*)
+ * @param window (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_rolling_mean(Tensor* a, int window) { return tensor_rolling_mean(a, window); }
+/**
+ * Public API: exponentially weighted moving average (-> tensor_ewma).
+ * @param a (Tensor*)
+ * @param alpha (float)
+ * @return (Tensor*)
+ */
+Tensor* cml_ewma(Tensor* a, float alpha) { return tensor_ewma(a, alpha); }
+/**
+ * Public API: cumulative maximum (-> tensor_cummax).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_cummax(Tensor* a) { return tensor_cummax(a); }
+/**
+ * Public API: cumulative minimum (-> tensor_cummin).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_cummin(Tensor* a) { return tensor_cummin(a); }
+/**
+ * Public API: integer matrix power (-> tensor_matrix_power).
+ * @param a (Tensor*)
+ * @param p (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_matrix_power(Tensor* a, int p) { return tensor_matrix_power(a, p); }
+/**
+ * Public API: 2-norm condition number (-> tensor_cond).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_cond(Tensor* a) { return tensor_cond(a); }
+/**
+ * Public API: triangular solve (-> tensor_solve_triangular).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param lower (bool)
+ * @return (Tensor*)
+ */
+Tensor* cml_solve_triangular(Tensor* a, Tensor* b, bool lower) {
+    return tensor_solve_triangular(a, b, lower);
+}
+/**
+ * Public API: matrix exponential (-> tensor_expm).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_expm(Tensor* a) { return tensor_expm(a); }
+/**
+ * Public API: complementary error function (-> tensor_erfc).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_erfc(Tensor* a) { return tensor_erfc(a); }
+/**
+ * Public API: log-gamma (-> tensor_lgamma).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_lgamma(Tensor* a) { return tensor_lgamma(a); }
+/**
+ * Public API: digamma (-> tensor_digamma).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_digamma(Tensor* a) { return tensor_digamma(a); }
+/**
+ * Public API: logit (-> tensor_logit).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_logit(Tensor* a) { return tensor_logit(a); }
+/**
+ * Public API: Toeplitz matrix (-> tensor_toeplitz).
+ * @param c (Tensor*)
+ * @param r (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_toeplitz(Tensor* c, Tensor* r) { return tensor_toeplitz(c, r); }
+/**
+ * Public API: circulant matrix (-> tensor_circulant).
+ * @param c (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_circulant(Tensor* c) { return tensor_circulant(c); }
+/**
+ * Public API: Hankel matrix (-> tensor_hankel).
+ * @param c (Tensor*)
+ * @param r (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_hankel(Tensor* c, Tensor* r) { return tensor_hankel(c, r); }
+/**
+ * Public API: detrend a 1-D signal (-> tensor_detrend).
+ * @param y (Tensor*)
+ * @param type (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_detrend(Tensor* y, int type) { return tensor_detrend(y, type); }
 
 /**
  * Public API: load a tensor from a URL (-> tensor_from_url).
