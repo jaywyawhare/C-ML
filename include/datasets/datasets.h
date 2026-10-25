@@ -2,12 +2,30 @@
 #define CML_DATASETS_H
 
 #include "core/dataset.h"
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 Dataset* cml_dataset_load(const char* name);
+
+/**
+ * Read CIFAR binary records from `f` into X/y starting at *offset: each record is
+ * label_bytes label bytes then 3072 pixel bytes (normalized to [0,1]); the kept class
+ * is label[label_index]. Stops at EOF or when *offset reaches max. (CIFAR-10 uses
+ * label_bytes=1, index 0; CIFAR-100 uses label_bytes=2, index 1 for the fine label.)
+ * @param f (FILE*)
+ * @param label_bytes (int)
+ * @param label_index (int)
+ * @param X (float*)
+ * @param y (float*)
+ * @param max (int)
+ * @param offset (int*)
+ * @return (void)
+ */
+void cml_cifar_read_batch(FILE* f, int label_bytes, int label_index, float* X, float* y, int max,
+                          int* offset);
 
 /* How to read `/`- or `.`-separated dates. ISO `YYYY-MM-DD` is always accepted. */
 typedef enum {

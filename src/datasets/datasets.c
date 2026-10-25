@@ -495,6 +495,35 @@ static Dataset* load_fashion_mnist(void) {
 }
 
 /**
+ * Read CIFAR binary records from `f` into X/y starting at *offset: each record is
+ * label_bytes label bytes then 3072 pixel bytes (normalized to [0,1]); the kept class
+ * is label[label_index]. Stops at EOF or when *offset reaches max.
+ * @param f (FILE*)
+ * @param label_bytes (int)
+ * @param label_index (int)
+ * @param X (float*)
+ * @param y (float*)
+ * @param max (int)
+ * @param offset (int*)
+ * @return (void)
+ */
+void cml_cifar_read_batch(FILE* f, int label_bytes, int label_index, float* X, float* y, int max,
+                          int* offset) {
+    uint8_t labels[2];
+    uint8_t pixels[3072];
+    while (*offset < max) {
+        if (fread(labels, 1, (size_t)label_bytes, f) != (size_t)label_bytes)
+            break;
+        if (fread(pixels, 1, 3072, f) != 3072)
+            break;
+        y[*offset] = (float)labels[label_index];
+        for (int j = 0; j < 3072; j++)
+            X[*offset * 3072 + j] = pixels[j] / 255.0f;
+        (*offset)++;
+    }
+}
+
+/**
  * Download, extract, and load CIFAR-10 from the binary distribution, concatenating
  * the five training batches and the test batch (3072 features per image,
  * normalized to [0,1]). Missing batches are skipped. Returns NULL on failure.
@@ -542,20 +571,7 @@ static Dataset* load_cifar10(void) {
             continue;
         }
 
-        /* Each record: 1 byte label + 3072 bytes pixel data */
-        for (int i = 0; i < 10000 && offset < total; i++) {
-            uint8_t label;
-            if (fread(&label, 1, 1, f) != 1)
-                break;
-            y[offset] = (float)label;
-
-            uint8_t pixels[3072];
-            if (fread(pixels, 1, 3072, f) != 3072)
-                break;
-            for (int j = 0; j < 3072; j++)
-                X[offset * feat + j] = pixels[j] / 255.0f;
-            offset++;
-        }
+        cml_cifar_read_batch(f, 1, 0, X, y, total, &offset); /* 1 label byte, kept as-is */
         fclose(f);
     }
 
@@ -563,6 +579,58 @@ static Dataset* load_cifar10(void) {
     if (ds) {
         ds->name        = "cifar10";
         ds->num_classes = 10;
+    }
+    cml_free(X);
+    cml_free(y);
+    return ds;
+}
+
+/**
+ * Download, extract, and load CIFAR-100 (train + test) from the binary distribution.
+ * Each record has two label bytes (coarse, fine); the fine label (0..99) is kept.
+ * 3072 features per image, normalized to [0,1]. Returns NULL on failure.
+ * @return (Dataset*)
+ */
+static Dataset* load_cifar100(void) {
+    const char* path = cml_dataset_download(
+        "https://www.cs.toronto.edu/~kriz/cifar-100-binary.tar.gz", "cifar-100-binary.tar.gz");
+    if (!path)
+        return NULL;
+
+    const char* dir = cml_dataset_cache_dir();
+    char cmd[2048];
+    snprintf(cmd, sizeof(cmd), "tar -xzf '%s' -C '%s' 2>/dev/null", path, dir);
+    if (system(cmd) != 0) { /* best-effort; downstream handles missing files */
+    }
+
+    int total = 60000;
+    int feat  = 3072;
+    float* X  = cml_malloc(sizeof(float) * total * feat);
+    float* y  = cml_malloc(sizeof(float) * total);
+    if (!X || !y) {
+        cml_free(X);
+        cml_free(y);
+        return NULL;
+    }
+
+    int offset                = 0;
+    const char* batch_files[] = {"cifar-100-binary/train.bin", "cifar-100-binary/test.bin", NULL};
+    for (int b = 0; batch_files[b]; b++) {
+        char fpath[1024];
+        snprintf(fpath, sizeof(fpath), "%s/%s", dir, batch_files[b]);
+        FILE* f = fopen(fpath, "rb");
+        if (!f) {
+            LOG_WARNING("[datasets] Cannot open CIFAR-100 batch: %s", fpath);
+            continue;
+        }
+        cml_cifar_read_batch(f, 2, 1, X, y, total, &offset); /* coarse+fine labels; keep fine */
+        fclose(f);
+    }
+
+    Dataset* ds = dataset_from_arrays(X, y, offset, feat, 1);
+    if (ds) {
+        ds->name        = "cifar100";
+        ds->num_classes = 100;
     }
     cml_free(X);
     cml_free(y);
@@ -648,6 +716,7 @@ static const DatasetEntry g_registry[] = {{"iris", load_iris},
                                           {"mnist", load_mnist},
                                           {"fashion_mnist", load_fashion_mnist},
                                           {"cifar10", load_cifar10},
+                                          {"cifar100", load_cifar100},
                                           {"airline", load_airline},
                                           {"digits", load_digits},
                                           {NULL, NULL}};
