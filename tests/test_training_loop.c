@@ -1,4 +1,5 @@
 #include "cml.h"
+#include <math.h>
 #include <stdio.h>
 
 int main(void) {
@@ -71,6 +72,22 @@ int main(void) {
     if (cml_train_with_validation((Module*)model, train_loader, val_loader, optimizer,
                                   tensor_mse_loss, &cfg) != 0) {
         printf("Error: training failed\n");
+        dataloader_free(train_loader);
+        dataloader_free(val_loader);
+        dataset_free(train_dataset);
+        dataset_free(val_dataset);
+        dataset_free(test_dataset);
+        cml_cleanup();
+        return 1;
+    }
+
+    TrainingMetrics* m = training_metrics_get_global();
+    int metrics_ok     = m && m->actual_epochs == 3 && m->epoch_validation_losses;
+    for (int e = 0; metrics_ok && e < 3; e++)
+        metrics_ok = m->epoch_training_losses[e] > 0.0f && m->epoch_validation_losses[e] > 0.0f &&
+                     !isinf(m->epoch_validation_losses[e]);
+    if (!metrics_ok) {
+        printf("Error: training metrics did not advance once per epoch\n");
         dataloader_free(train_loader);
         dataloader_free(val_loader);
         dataset_free(train_dataset);

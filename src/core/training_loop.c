@@ -442,6 +442,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
     if (!config) {
         config = &default_config;
     }
+    training_metrics_set_expected_epochs((size_t)config->epochs);
 
     int epochs                  = config->epochs;
     bool verbose                = config->verbose;
@@ -549,7 +550,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
             float loss_value = tensor_get_float(loss, 0);
             epoch_loss += loss_value;
             num_batches++;
-            optimizer->zero_grad(optimizer);
+            optimizer_zero_grad(optimizer);
             tensor_backward(loss, NULL, false, false);
             clip_gradients_by_norm(model, grad_clip_norm);
             /* static mode: in-place SGD (no IR nodes), then CAPTURE the graph so
@@ -562,7 +563,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
                 sg_loss     = loss; /* kept: part of the static graph */
                 sg_captured = true;
             } else {
-                optimizer->step(optimizer);
+                optimizer_step(optimizer);
             }
             if (use_progress_bar && num_batches % 10 == 0) {
                 float progress = 100.0f *
@@ -588,6 +589,7 @@ int cml_train(Module* model, DataLoader* train_loader, Optimizer* optimizer,
         if (metrics) {
             training_metrics_record_epoch(metrics, (size_t)epoch, avg_loss, 0.0f);
         }
+        training_metrics_complete_epoch();
         if (scheduler) {
             lr_scheduler_update(scheduler, avg_loss);
         }
@@ -648,6 +650,7 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
     if (!config) {
         config = &default_config;
     }
+    training_metrics_set_expected_epochs((size_t)config->epochs);
 
     int epochs                     = config->epochs;
     bool verbose                   = config->verbose;
@@ -703,10 +706,10 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
             float loss_value = tensor_get_float(loss, 0);
             train_loss += loss_value;
             num_train_batches++;
-            optimizer->zero_grad(optimizer);
+            optimizer_zero_grad(optimizer);
             tensor_backward(loss, NULL, false, false);
             clip_gradients_by_norm(model, grad_clip_norm);
-            optimizer->step(optimizer);
+            optimizer_step(optimizer);
             if (callbacks.on_batch_end) {
                 callbacks.on_batch_end(epoch, batch->batch_index, loss_value, callbacks.user_data);
             }
@@ -760,6 +763,8 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
         cml_ir_reset_global_context();
         module_set_training(model, true);
         float avg_val_loss = num_val_batches > 0 ? val_loss / (float)num_val_batches : 0.0f;
+        training_metrics_complete_epoch();
+        training_metrics_auto_capture_validation(avg_val_loss, 0.0f);
         if (metrics) {
             training_metrics_record_epoch_full(metrics, (size_t)epoch, avg_train_loss, 0.0f, 0.0f,
                                                0.0f, avg_val_loss, 0.0f);
@@ -777,6 +782,7 @@ int cml_train_with_validation(Module* model, DataLoader* train_loader, DataLoade
                     if (verbose) {
                         printf("Early stopping triggered at epoch %d\n", epoch + 1);
                     }
+                    training_metrics_mark_early_stop((size_t)epoch);
                     break;
                 }
             }
