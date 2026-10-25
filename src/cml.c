@@ -3065,6 +3065,106 @@ Tensor* cml_robust_scaler(Tensor* x) { return tensor_robust_scale(x); }
  * @return (Tensor*)
  */
 Tensor* cml_normalize_l2(Tensor* x) { return tensor_normalize_l2(x); }
+/**
+ * Public API: cosine similarity (-> tensor_cosine_similarity).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float cml_cosine_similarity(Tensor* a, Tensor* b) { return tensor_cosine_similarity(a, b); }
+/**
+ * Public API: Euclidean distance (-> tensor_euclidean_distance).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float cml_euclidean_distance(Tensor* a, Tensor* b) { return tensor_euclidean_distance(a, b); }
+/**
+ * Public API: Manhattan distance (-> tensor_manhattan_distance).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float cml_manhattan_distance(Tensor* a, Tensor* b) { return tensor_manhattan_distance(a, b); }
+/**
+ * Public API: pairwise Euclidean distance matrix (-> tensor_cdist).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_cdist(Tensor* a, Tensor* b) { return tensor_cdist(a, b); }
+/**
+ * Public API: principal component analysis (-> tensor_pca).
+ * @param x (Tensor*)
+ * @param n_components (int)
+ * @return (PCAResult)
+ */
+PCAResult cml_pca(Tensor* x, int n_components) { return tensor_pca(x, n_components); }
+/**
+ * Public API: sorted intersection of two 1-D tensors (-> tensor_intersect1d).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_intersect1d(Tensor* a, Tensor* b) { return tensor_intersect1d(a, b); }
+/**
+ * Public API: sorted union of two 1-D tensors (-> tensor_union1d).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_union1d(Tensor* a, Tensor* b) { return tensor_union1d(a, b); }
+/**
+ * Public API: sorted set difference (-> tensor_setdiff1d).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_setdiff1d(Tensor* a, Tensor* b) { return tensor_setdiff1d(a, b); }
+/**
+ * Public API: membership mask (-> tensor_isin).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_isin(Tensor* a, Tensor* b) { return tensor_isin(a, b); }
+/**
+ * Public API: peak-to-peak range (-> tensor_ptp).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_ptp(Tensor* a) { return tensor_ptp(a); }
+/**
+ * Public API: interquartile range (-> tensor_iqr).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_iqr(Tensor* a) { return tensor_iqr(a); }
+/**
+ * Public API: statistical mode (-> tensor_mode).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_mode(Tensor* a) { return tensor_mode(a); }
+/**
+ * Public API: Shannon entropy (-> tensor_entropy).
+ * @param a (Tensor*)
+ * @param base (float)
+ * @return (float)
+ */
+float cml_entropy(Tensor* a, float base) { return tensor_entropy(a, base); }
+/**
+ * Public API: geometric mean (-> tensor_gmean).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_gmean(Tensor* a) { return tensor_gmean(a); }
+/**
+ * Public API: harmonic mean (-> tensor_hmean).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_hmean(Tensor* a) { return tensor_hmean(a); }
 
 /**
  * Public API: load a tensor from a URL (-> tensor_from_url).

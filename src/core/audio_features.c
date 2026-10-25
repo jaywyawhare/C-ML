@@ -3,6 +3,7 @@
 #include "core/audio_features.h"
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 #include "alloc/cml_allocator.h"
 #include "cml.h"
 #include "core/logging.h"
@@ -44,8 +45,17 @@ float* cml_spectrogram(const float* signal, int n, int n_fft, int hop, int power
         cml_free(out);
         return NULL;
     }
-    for (int i = 0; i < n_fft; i++)
-        w[i] = 0.5f - 0.5f * cosf(2.0f * (float)M_PI * i / (n_fft - 1));
+    Tensor* hann = cml_hann_window(n_fft, NULL);
+    if (!hann || !hann->data) {
+        tensor_free(hann);
+        cml_free(w);
+        cml_free(re);
+        cml_free(im);
+        cml_free(out);
+        return NULL;
+    }
+    memcpy(w, hann->data, (size_t)n_fft * sizeof(float));
+    tensor_free(hann);
     for (int f = 0; f < nf; f++) {
         const float* seg = signal + (size_t)f * hop;
         for (int i = 0; i < n_fft; i++) {
