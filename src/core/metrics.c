@@ -689,3 +689,133 @@ float cml_expected_calibration_error(const float* confidences, const int* correc
     cml_free(count);
     return (float)ece;
 }
+
+/** Descending comparator over floats for qsort (used to build the ideal NDCG ordering). */
+static int float_desc_cmp(const void* a, const void* b) {
+    float x = *(const float*)a, y = *(const float*)b;
+    return (x < y) - (x > y);
+}
+
+/** Multi-class cross-entropy (log loss): mean -log of the clipped probability of the true class.
+ * @param y_true (const int*)
+ * @param y_prob (const float*)
+ * @param n (int)
+ * @param num_classes (int)
+ * @return (float)
+ */
+float cml_log_loss(const int* y_true, const float* y_prob, int n, int num_classes) {
+    if (!y_true || !y_prob || n <= 0 || num_classes <= 0)
+        return 0.0f;
+    const double eps = 1e-15;
+    double sum       = 0.0;
+    for (int i = 0; i < n; i++) {
+        int c = y_true[i];
+        if (c < 0 || c >= num_classes)
+            continue;
+        double p = y_prob[(size_t)i * num_classes + c];
+        if (p < eps)
+            p = eps;
+        if (p > 1.0 - eps)
+            p = 1.0 - eps;
+        sum -= log(p);
+    }
+    return (float)(sum / n);
+}
+
+/** Balanced accuracy: the macro average of per-class recall over classes with support.
+ * @param y_true (const int*)
+ * @param y_pred (const int*)
+ * @param n (int)
+ * @param num_classes (int)
+ * @return (float)
+ */
+float cml_balanced_accuracy(const int* y_true, const int* y_pred, int n, int num_classes) {
+    CMLConfusionMatrix* cm = cml_confusion_matrix(y_true, y_pred, n, num_classes);
+    if (!cm)
+        return 0.0f;
+    double sum  = 0.0;
+    int present = 0;
+    for (int c = 0; c < num_classes; c++) {
+        long tp, fp, fn, support;
+        class_counts(cm, c, &tp, &fp, &fn, &support);
+        if (support > 0) {
+            sum += (double)tp / support;
+            present++;
+        }
+    }
+    cml_confusion_matrix_free(cm);
+    return present ? (float)(sum / present) : 0.0f;
+}
+
+/** Macro-averaged Jaccard score (intersection over union) over classes with non-empty union.
+ * @param y_true (const int*)
+ * @param y_pred (const int*)
+ * @param n (int)
+ * @param num_classes (int)
+ * @return (float)
+ */
+float cml_jaccard_score(const int* y_true, const int* y_pred, int n, int num_classes) {
+    CMLConfusionMatrix* cm = cml_confusion_matrix(y_true, y_pred, n, num_classes);
+    if (!cm)
+        return 0.0f;
+    double sum  = 0.0;
+    int present = 0;
+    for (int c = 0; c < num_classes; c++) {
+        long tp, fp, fn, support;
+        class_counts(cm, c, &tp, &fp, &fn, &support);
+        long uni = tp + fp + fn;
+        if (uni > 0) {
+            sum += (double)tp / uni;
+            present++;
+        }
+    }
+    cml_confusion_matrix_free(cm);
+    return present ? (float)(sum / present) : 0.0f;
+}
+
+/** Hamming loss: the fraction of labels that are misclassified (1 - accuracy).
+ * @param y_true (const int*)
+ * @param y_pred (const int*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_hamming_loss(const int* y_true, const int* y_pred, int n) {
+    return 1.0f - cml_accuracy(y_true, y_pred, n);
+}
+
+/** Normalized discounted cumulative gain at rank k for a single ranked list.
+ * @param y_score (const float*)
+ * @param y_true_rel (const float*)
+ * @param n (int)
+ * @param k (int)
+ * @return (float)
+ */
+float cml_ndcg(const float* y_score, const float* y_true_rel, int n, int k) {
+    if (!y_score || !y_true_rel || n <= 0)
+        return 0.0f;
+    if (k <= 0 || k > n)
+        k = n;
+    ScoreLabel* ranked = cml_malloc((size_t)n * sizeof(ScoreLabel));
+    float* ideal       = cml_malloc((size_t)n * sizeof(float));
+    if (!ranked || !ideal) {
+        cml_free(ranked);
+        cml_free(ideal);
+        return 0.0f;
+    }
+    for (int i = 0; i < n; i++) {
+        ranked[i].score = y_score[i];
+        ranked[i].label = i;
+        ideal[i]        = y_true_rel[i];
+    }
+    qsort(ranked, (size_t)n, sizeof(ScoreLabel), scorelabel_cmp); /* ascending; read from the top */
+    qsort(ideal, (size_t)n, sizeof(float), float_desc_cmp);
+    double dcg = 0.0, idcg = 0.0;
+    for (int r = 0; r < k; r++) {
+        float rel = y_true_rel[ranked[n - 1 - r].label];
+        dcg += rel / log2(r + 2.0);
+        idcg += ideal[r] / log2(r + 2.0);
+    }
+    cml_free(ranked);
+    cml_free(ideal);
+    return idcg > 0.0 ? (float)(dcg / idcg) : 0.0f;
+}

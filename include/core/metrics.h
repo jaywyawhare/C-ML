@@ -248,6 +248,55 @@ float cml_spearman(const float* x, const float* y, int n);
 float cml_expected_calibration_error(const float* confidences, const int* correct, int n,
                                      int n_bins);
 
+/**
+ * Multi-class cross-entropy (log loss): mean -log of the clipped probability of the true class.
+ * @param y_true (const int*)
+ * @param y_prob (const float*)
+ * @param n (int)
+ * @param num_classes (int)
+ * @return (float)
+ */
+float cml_log_loss(const int* y_true, const float* y_prob, int n, int num_classes);
+
+/**
+ * Balanced accuracy: the macro average of per-class recall over classes with support.
+ * @param y_true (const int*)
+ * @param y_pred (const int*)
+ * @param n (int)
+ * @param num_classes (int)
+ * @return (float)
+ */
+float cml_balanced_accuracy(const int* y_true, const int* y_pred, int n, int num_classes);
+
+/**
+ * Macro-averaged Jaccard score (intersection over union) over classes with non-empty union.
+ * @param y_true (const int*)
+ * @param y_pred (const int*)
+ * @param n (int)
+ * @param num_classes (int)
+ * @return (float)
+ */
+float cml_jaccard_score(const int* y_true, const int* y_pred, int n, int num_classes);
+
+/**
+ * Hamming loss: the fraction of labels that are misclassified (1 - accuracy).
+ * @param y_true (const int*)
+ * @param y_pred (const int*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_hamming_loss(const int* y_true, const int* y_pred, int n);
+
+/**
+ * Normalized discounted cumulative gain at rank k for a single ranked list.
+ * @param y_score (const float*)
+ * @param y_true_rel (const float*)
+ * @param n (int)
+ * @param k (int)
+ * @return (float)
+ */
+float cml_ndcg(const float* y_score, const float* y_true_rel, int n, int k);
+
 #ifdef __cplusplus
 }
 #endif
