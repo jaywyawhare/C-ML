@@ -225,7 +225,7 @@ static Tensor* unbroadcast(Tensor* g, const int* tshape, int tndim) {
 }
 
 /* ── the reverse pass ─────────────────────────────────────────────────── */
-int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_grads) {
+int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, Tensor* seed, bool differentiable_grads) {
     if (!ir || !loss_node || !loss_node->output)
         return -1;
 
@@ -266,10 +266,10 @@ int cml_ir_grad(CMLGraph_t ir, struct IRNode* loss_node, bool differentiable_gra
 
     GradMap map = {0};
 
-    /* seed: d loss / d loss = ones (loss dtype: an fp32 seed zeroes out
+    /* seed: the caller's d loss / d loss, else ones (loss dtype: an fp32 seed zeroes out
      * half/bf16 graphs - the executor drops mismatched-dtype grads) */
     Tensor* lo = loss_node->output;
-    gm_put(&map, lo, uop_fill_ex(lo->shape, lo->ndim, 1.0f, lo->dtype, lo->device));
+    gm_put(&map, lo, seed ? seed : uop_fill_ex(lo->shape, lo->ndim, 1.0f, lo->dtype, lo->device));
 
     for (int i = n - 1; i >= 0; i--) {
         struct IRNode* nd = nodes[i];

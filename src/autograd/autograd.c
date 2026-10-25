@@ -450,11 +450,11 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
          * fuse + realize the whole fwd+bwd graph together. allow_grad lets the
          * fuser fuse forward chains (use_count keeps backward-needed intermediates
          * materialized); it is cleared right after so no lone forward realization
-         * ever fuses differentiable nodes. Assumes a ones/scalar seed. */
+         * ever fuses differentiable nodes. */
         /* Strict-gradient policy: a -1 here means CML_STRICT_GRAD=1 caught an
          * op with no VJP - do not execute a backward graph missing gradient
          * terms (it would silently train on partial gradients). */
-        if (cml_ir_grad(tensor->ir_context, tensor->ir_node, create_graph) != 0) {
+        if (cml_ir_grad(tensor->ir_context, tensor->ir_node, gradient, create_graph) != 0) {
             LOG_ERROR("tensor_backward: gradient construction failed "
                       "(missing VJP under CML_STRICT_GRAD=1?)");
             return;

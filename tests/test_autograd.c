@@ -213,6 +213,29 @@ static int test_loss_backward(void) {
     return ok;
 }
 
+/* backward(y, g) on a non-scalar y propagates g, not ones: the graph engine used to seed
+ * every backward with ones and ignore the gradient argument. */
+static int test_backward_explicit_gradient(void) {
+    float x_data[] = {1.0f, 2.0f, 3.0f};
+    float g_data[] = {1.0f, 10.0f, 100.0f};
+    Tensor* x      = cml_tensor_1d(x_data, 3);
+    Tensor* g      = cml_tensor_1d(g_data, 3);
+    if (!x || !g)
+        return 0;
+    cml_set_requires_grad(x, true);
+
+    Tensor* y = cml_mul(x, x);
+    cml_backward(y, g, false, false);
+    int ok = x->grad && APPROX_EQ(tensor_get_float(x->grad, 0), 2.0f) &&
+             APPROX_EQ(tensor_get_float(x->grad, 1), 40.0f) &&
+             APPROX_EQ(tensor_get_float(x->grad, 2), 600.0f);
+
+    tensor_free(y);
+    tensor_free(g);
+    tensor_free(x);
+    return ok;
+}
+
 int main(void) {
     cml_init();
 
@@ -225,6 +248,7 @@ int main(void) {
     printf("\nBackward:\n");
     TEST(backward_simple);
     TEST(loss_backward);
+    TEST(backward_explicit_gradient);
 
     printf("\nGrad Control:\n");
     TEST(requires_grad);
