@@ -81,6 +81,13 @@ static float r_gelu(float x) {
     const float k = 0.7978845608028654f; /* sqrt(2/pi) */
     return 0.5f * x * (1.0f + tanhf(k * (x + 0.044715f * x * x * x)));
 }
+static float r_round(float x) { return rintf(x); } /* ties-to-even, like cvt.rni */
+static float r_log10(float x) { return log10f(x); }
+static float r_sinh(float x) { return sinhf(x); }
+static float r_cosh(float x) { return coshf(x); }
+static float r_asinh(float x) { return asinhf(x); }
+static float r_acosh(float x) { return acoshf(x); }
+static float r_atanh(float x) { return atanhf(x); }
 
 static const UnaryCase UNARY[] = {
     {UOP_NEG, "neg", r_neg, -3.0f, 3.0f},
@@ -111,6 +118,13 @@ static const UnaryCase UNARY[] = {
     {UOP_MISH, "mish", r_mish, -2.0f, 2.0f},
     {UOP_HARDSWISH, "hardswish", r_hardswish, -4.0f, 4.0f},
     {UOP_GELU, "gelu", r_gelu, -2.0f, 2.0f},
+    {UOP_ROUND, "round", r_round, -3.0f, 3.0f},
+    {UOP_LOG10, "log10", r_log10, 0.25f, 5.0f},
+    {UOP_SINH, "sinh", r_sinh, -2.0f, 2.0f},
+    {UOP_COSH, "cosh", r_cosh, -2.0f, 2.0f},
+    {UOP_ASINH, "asinh", r_asinh, -2.0f, 2.0f},
+    {UOP_ACOSH, "acosh", r_acosh, 1.1f, 5.0f},
+    {UOP_ATANH, "atanh", r_atanh, -0.9f, 0.9f},
 };
 
 /* ---- binary ops ---------------------------------------------------------- */
