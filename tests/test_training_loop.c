@@ -86,28 +86,14 @@ int main(void) {
     for (int e = 0; metrics_ok && e < 3; e++)
         metrics_ok = m->epoch_training_losses[e] > 0.0f && m->epoch_validation_losses[e] > 0.0f &&
                      !isinf(m->epoch_validation_losses[e]);
-    if (!metrics_ok) {
-        printf("Error: training metrics did not advance once per epoch\n");
-        dataloader_free(train_loader);
-        dataloader_free(val_loader);
-        dataset_free(train_dataset);
-        dataset_free(val_dataset);
-        dataset_free(test_dataset);
-        cml_cleanup();
-        return 1;
-    }
-
-    if (training_metrics_evaluate_dataset((Module*)model, test_dataset, tensor_mse_loss, false) !=
-        0) {
-        printf("Error: test evaluation failed\n");
-        dataloader_free(train_loader);
-        dataloader_free(val_loader);
-        dataset_free(train_dataset);
-        dataset_free(val_dataset);
-        dataset_free(test_dataset);
-        cml_cleanup();
-        return 1;
-    }
+    const char* err = NULL;
+    if (!metrics_ok)
+        err = "training metrics did not advance once per epoch";
+    else if (training_metrics_evaluate_dataset((Module*)model, test_dataset, tensor_mse_loss,
+                                               false) != 0)
+        err = "test evaluation failed";
+    if (err)
+        printf("Error: %s\n", err);
 
     dataloader_free(train_loader);
     dataloader_free(val_loader);
@@ -116,5 +102,5 @@ int main(void) {
     dataset_free(test_dataset);
 
     cml_cleanup();
-    return 0;
+    return err ? 1 : 0;
 }
