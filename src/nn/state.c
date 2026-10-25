@@ -345,3 +345,100 @@ int nn_state_dict_lerp(StateDict* dst, const StateDict* src, float alpha) {
     }
     return 0;
 }
+
+/** Create a weight-average tracker seeded with a clone of @p model's current weights.
+ * @param model (const Module*)
+ * @param decay (float)
+ * @return (CMLWeightAvg*)
+ */
+CMLWeightAvg* cml_weight_avg_create(const Module* model, float decay) {
+    if (!model)
+        return NULL;
+    StateDict* live = nn_get_state_dict(model, NULL);
+    if (!live)
+        return NULL;
+    CMLWeightAvg* wa = cml_calloc(1, sizeof(CMLWeightAvg));
+    StateDict* avg   = nn_state_dict_create();
+    if (!wa || !avg) {
+        nn_state_dict_free(live);
+        nn_state_dict_free(avg);
+        cml_free(wa);
+        return NULL;
+    }
+    for (int i = 0; i < live->count; i++) {
+        Tensor* c = tensor_clone(live->entries[i].value);
+        if (!c || nn_state_dict_set(avg, live->entries[i].key, c) != 0) {
+            tensor_free(c);
+            for (int j = 0; j < avg->count; j++)
+                tensor_free(avg->entries[j].value);
+            nn_state_dict_free(avg);
+            nn_state_dict_free(live);
+            cml_free(wa);
+            return NULL;
+        }
+    }
+    nn_state_dict_free(live);
+    wa->avg   = avg;
+    wa->decay = decay;
+    wa->count = 0;
+    return wa;
+}
+
+/** EMA update: avg = decay*avg + (1-decay)*model.
+ * @param wa (CMLWeightAvg*)
+ * @param model (const Module*)
+ * @return (void)
+ */
+void cml_weight_avg_update_ema(CMLWeightAvg* wa, const Module* model) {
+    if (!wa || !model)
+        return;
+    StateDict* cur = nn_get_state_dict(model, NULL);
+    if (!cur)
+        return;
+    nn_state_dict_lerp(wa->avg, cur, 1.0f - wa->decay); /* dst = alpha*src + (1-alpha)*dst */
+    nn_state_dict_free(cur);                            /* refs live params; values untouched */
+    wa->count++;
+}
+
+/** SWA update: fold @p model into the equal running average of snapshots.
+ * @param wa (CMLWeightAvg*)
+ * @param model (const Module*)
+ * @return (void)
+ */
+void cml_weight_avg_update_swa(CMLWeightAvg* wa, const Module* model) {
+    if (!wa || !model)
+        return;
+    StateDict* cur = nn_get_state_dict(model, NULL);
+    if (!cur)
+        return;
+    float alpha = 1.0f / (float)(wa->count + 1); /* equal weight to each snapshot */
+    nn_state_dict_lerp(wa->avg, cur, alpha);
+    nn_state_dict_free(cur);
+    wa->count++;
+}
+
+/** Copy the averaged weights into @p model. Returns 0 on success.
+ * @param wa (CMLWeightAvg*)
+ * @param model (Module*)
+ * @return (int)
+ */
+int cml_weight_avg_copy_to(CMLWeightAvg* wa, Module* model) {
+    if (!wa || !model)
+        return -1;
+    return nn_load_state_dict(model, wa->avg, false);
+}
+
+/** Free a weight-average tracker and its cloned tensors.
+ * @param wa (CMLWeightAvg*)
+ * @return (void)
+ */
+void cml_weight_avg_free(CMLWeightAvg* wa) {
+    if (!wa)
+        return;
+    if (wa->avg) {
+        for (int i = 0; i < wa->avg->count; i++)
+            tensor_free(wa->avg->entries[i].value);
+        nn_state_dict_free(wa->avg);
+    }
+    cml_free(wa);
+}

@@ -46,6 +46,53 @@ void nn_state_dict_print(const StateDict* sd);
 
 int nn_state_dict_lerp(StateDict* dst, const StateDict* src, float alpha);
 
+/* Running average of a model's weights (EMA or SWA): owns cloned shadow tensors kept
+ * separate from the live parameters, so training is unaffected until they are copied back. */
+typedef struct CMLWeightAvg {
+    StateDict* avg; /* owned clones of each parameter */
+    float decay;    /* EMA decay in (0,1) */
+    long count;     /* number of SWA snapshots averaged in */
+} CMLWeightAvg;
+
+/**
+ * Create a weight-average tracker seeded with a clone of @p model's current weights.
+ * @param model (const Module*)
+ * @param decay (float)
+ * @return (CMLWeightAvg*)
+ */
+CMLWeightAvg* cml_weight_avg_create(const Module* model, float decay);
+
+/**
+ * EMA update: avg = decay*avg + (1-decay)*model.
+ * @param wa (CMLWeightAvg*)
+ * @param model (const Module*)
+ * @return (void)
+ */
+void cml_weight_avg_update_ema(CMLWeightAvg* wa, const Module* model);
+
+/**
+ * SWA update: fold @p model into the equal running average of snapshots.
+ * @param wa (CMLWeightAvg*)
+ * @param model (const Module*)
+ * @return (void)
+ */
+void cml_weight_avg_update_swa(CMLWeightAvg* wa, const Module* model);
+
+/**
+ * Copy the averaged weights into @p model (e.g. before evaluation). Returns 0 on success.
+ * @param wa (CMLWeightAvg*)
+ * @param model (Module*)
+ * @return (int)
+ */
+int cml_weight_avg_copy_to(CMLWeightAvg* wa, Module* model);
+
+/**
+ * Free a weight-average tracker and its cloned tensors.
+ * @param wa (CMLWeightAvg*)
+ * @return (void)
+ */
+void cml_weight_avg_free(CMLWeightAvg* wa);
+
 #ifdef __cplusplus
 }
 #endif
