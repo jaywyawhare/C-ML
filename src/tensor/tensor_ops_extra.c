@@ -748,3 +748,433 @@ Tensor* cml_fft2(Tensor* x, int inverse) {
     out->is_executed = true;
     return out;
 }
+
+/**
+ * Real-input FFT of a 1-D float signal [n]; returns the n/2+1 non-redundant bins as [n/2+1, 2].
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_rfft(Tensor* x) {
+    if (!x)
+        return NULL;
+    extern int tensor_realize(Tensor*);
+    if (tensor_realize(x) != 0 || !x->data)
+        return NULL;
+    if (x->ndim != 1 || x->dtype != DTYPE_FLOAT32) {
+        LOG_ERROR("cml_rfft: input must be a float32 1-D signal");
+        return NULL;
+    }
+    int n     = x->shape[0];
+    float* re = (float*)cml_calloc((size_t)n, sizeof(float));
+    float* im = (float*)cml_calloc((size_t)n, sizeof(float));
+    if (!re || !im) {
+        cml_free(re);
+        cml_free(im);
+        return NULL;
+    }
+    memcpy(re, x->data, (size_t)n * sizeof(float));
+    if (cml_fft_1d(re, im, n, 0) != 0) {
+        cml_free(re);
+        cml_free(im);
+        return NULL;
+    }
+    int bins         = n / 2 + 1;
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = x->device, .has_dtype = true, .has_device = true};
+    int shape[] = {bins, 2};
+    Tensor* out = tensor_empty(shape, 2, &cfg);
+    if (out && out->data) {
+        float* od = (float*)out->data;
+        for (int k = 0; k < bins; k++) {
+            od[2 * k]     = re[k];
+            od[2 * k + 1] = im[k];
+        }
+        out->is_executed = true;
+    }
+    cml_free(re);
+    cml_free(im);
+    return out;
+}
+
+/**
+ * Inverse real FFT: reconstructs the length-`n` real signal from its n/2+1 complex bins
+ * [n/2+1, 2] using Hermitian symmetry. NULL if the bin count does not match n.
+ * @param x (Tensor*)
+ * @param n (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_irfft(Tensor* x, int n) {
+    if (!x)
+        return NULL;
+    extern int tensor_realize(Tensor*);
+    if (tensor_realize(x) != 0 || !x->data)
+        return NULL;
+    if (x->ndim != 2 || x->shape[1] != 2 || x->dtype != DTYPE_FLOAT32 || x->shape[0] != n / 2 + 1) {
+        LOG_ERROR("cml_irfft: input must be float32 [n/2+1, 2] matching n");
+        return NULL;
+    }
+    float* re = (float*)cml_calloc((size_t)n, sizeof(float));
+    float* im = (float*)cml_calloc((size_t)n, sizeof(float));
+    if (!re || !im) {
+        cml_free(re);
+        cml_free(im);
+        return NULL;
+    }
+    const float* xd = (const float*)x->data;
+    int bins        = n / 2 + 1;
+    for (int k = 0; k < bins; k++) {
+        re[k] = xd[2 * k];
+        im[k] = xd[2 * k + 1];
+    }
+    for (int k = bins; k < n; k++) { /* Hermitian: X[n-k] = conj(X[k]) */
+        re[k] = re[n - k];
+        im[k] = -im[n - k];
+    }
+    if (cml_fft_1d(re, im, n, 1) != 0) {
+        cml_free(re);
+        cml_free(im);
+        return NULL;
+    }
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = x->device, .has_dtype = true, .has_device = true};
+    int shape[] = {n};
+    Tensor* out = tensor_empty(shape, 1, &cfg);
+    if (out && out->data) {
+        float* od = (float*)out->data;
+        for (int i = 0; i < n; i++)
+            od[i] = re[i];
+        out->is_executed = true;
+    }
+    cml_free(re);
+    cml_free(im);
+    return out;
+}
+
+/** Full linear convolution (length na+nb-1) of two real signals via FFT; NULL on error. */
+static float* fft_convolve_full(const float* a, int na, const float* b, int nb, int* out_len) {
+    int L      = na + nb - 1;
+    *out_len   = L;
+    float* ar  = (float*)cml_calloc((size_t)L, sizeof(float));
+    float* ai  = (float*)cml_calloc((size_t)L, sizeof(float));
+    float* br  = (float*)cml_calloc((size_t)L, sizeof(float));
+    float* bi  = (float*)cml_calloc((size_t)L, sizeof(float));
+    float* out = (float*)cml_malloc((size_t)L * sizeof(float));
+    if (!ar || !ai || !br || !bi || !out) {
+        cml_free(ar);
+        cml_free(ai);
+        cml_free(br);
+        cml_free(bi);
+        cml_free(out);
+        return NULL;
+    }
+    memcpy(ar, a, (size_t)na * sizeof(float));
+    memcpy(br, b, (size_t)nb * sizeof(float));
+    if (cml_fft_1d(ar, ai, L, 0) == 0 && cml_fft_1d(br, bi, L, 0) == 0) {
+        for (int i = 0; i < L; i++) {
+            float cr = ar[i] * br[i] - ai[i] * bi[i];
+            float ci = ar[i] * bi[i] + ai[i] * br[i];
+            ar[i]    = cr;
+            ai[i]    = ci;
+        }
+        cml_fft_1d(ar, ai, L, 1);
+        for (int i = 0; i < L; i++)
+            out[i] = ar[i];
+    } else {
+        cml_free(out);
+        out = NULL;
+    }
+    cml_free(ar);
+    cml_free(ai);
+    cml_free(br);
+    cml_free(bi);
+    return out;
+}
+
+/** Build the output tensor for a given convolution `mode` (0 full, 1 same, 2 valid). */
+static Tensor* conv_trim(const float* full, int na, int nb, int mode, int device) {
+    int L = na + nb - 1;
+    int out_len, start;
+    if (mode == 0) {
+        out_len = L;
+        start   = 0;
+    } else if (mode == 1) {
+        out_len = na > nb ? na : nb;
+        start   = (L - out_len) / 2;
+    } else {
+        int big = na > nb ? na : nb, small = na > nb ? nb : na;
+        out_len = big - small + 1;
+        start   = small - 1;
+    }
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = device, .has_dtype = true, .has_device = true};
+    int shape[] = {out_len};
+    Tensor* out = tensor_empty(shape, 1, &cfg);
+    if (out && out->data) {
+        float* od = (float*)out->data;
+        for (int i = 0; i < out_len; i++)
+            od[i] = full[start + i];
+        out->is_executed = true;
+    }
+    return out;
+}
+
+/** Validate a pair of 1-D float signals and return their flat data, else 0. */
+static int conv_inputs(Tensor* a, Tensor* b, const float** ad, int* na, const float** bd, int* nb) {
+    extern int tensor_realize(Tensor*);
+    if (!a || !b || tensor_realize(a) != 0 || tensor_realize(b) != 0 || !a->data || !b->data)
+        return 0;
+    if (a->ndim != 1 || b->ndim != 1 || a->dtype != DTYPE_FLOAT32 || b->dtype != DTYPE_FLOAT32)
+        return 0;
+    *ad = (const float*)a->data;
+    *bd = (const float*)b->data;
+    *na = a->shape[0];
+    *nb = b->shape[0];
+    return 1;
+}
+
+/**
+ * 1-D convolution of two real signals (NumPy convention, kernel flipped). mode: 0 full,
+ * 1 same (length max of inputs), 2 valid. NULL on error.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param mode (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_convolve1d(Tensor* a, Tensor* b, int mode) {
+    const float *ad, *bd;
+    int na, nb;
+    if (!conv_inputs(a, b, &ad, &na, &bd, &nb)) {
+        LOG_ERROR("cml_convolve1d: inputs must be float32 1-D signals");
+        return NULL;
+    }
+    int L;
+    float* full = fft_convolve_full(ad, na, bd, nb, &L);
+    if (!full)
+        return NULL;
+    Tensor* out = conv_trim(full, na, nb, mode, a->device);
+    cml_free(full);
+    return out;
+}
+
+/**
+ * 1-D cross-correlation of two real signals (NumPy convention, kernel not flipped). mode:
+ * 0 full, 1 same, 2 valid. NULL on error.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param mode (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_correlate1d(Tensor* a, Tensor* b, int mode) {
+    const float *ad, *bd;
+    int na, nb;
+    if (!conv_inputs(a, b, &ad, &na, &bd, &nb)) {
+        LOG_ERROR("cml_correlate1d: inputs must be float32 1-D signals");
+        return NULL;
+    }
+    float* rev =
+        (float*)cml_malloc((size_t)nb * sizeof(float)); /* correlate = convolve with b reversed */
+    if (!rev)
+        return NULL;
+    for (int i = 0; i < nb; i++)
+        rev[i] = bd[nb - 1 - i];
+    int L;
+    float* full = fft_convolve_full(ad, na, rev, nb, &L);
+    cml_free(rev);
+    if (!full)
+        return NULL;
+    Tensor* out = conv_trim(full, na, nb, mode, a->device);
+    cml_free(full);
+    return out;
+}
+
+/**
+ * Histogram of all elements into `bins` equal-width bins over [lo,hi] (values outside are
+ * dropped; hi falls in the last bin). If lo>=hi the range is taken from the data. Counts [bins].
+ * @param a (Tensor*)
+ * @param bins (int)
+ * @param lo (float)
+ * @param hi (float)
+ * @return (Tensor*)
+ */
+Tensor* cml_histogram(Tensor* a, int bins, float lo, float hi) {
+    if (!a || bins <= 0) {
+        LOG_ERROR("cml_histogram: need a tensor and bins>0");
+        return NULL;
+    }
+    extern int tensor_realize(Tensor*);
+    if (tensor_realize(a) != 0 || !a->data)
+        return NULL;
+    if (lo >= hi) {
+        lo = INFINITY;
+        hi = -INFINITY;
+        for (size_t i = 0; i < a->numel; i++) {
+            float v = tensor_get_float(a, i);
+            if (v < lo)
+                lo = v;
+            if (v > hi)
+                hi = v;
+        }
+        if (lo >= hi)
+            hi = lo + 1.0f;
+    }
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[] = {bins};
+    Tensor* out = tensor_empty(shape, 1, &cfg);
+    if (!out || !out->data)
+        return out;
+    float* counts = (float*)out->data;
+    memset(counts, 0, (size_t)bins * sizeof(float));
+    float width = (hi - lo) / bins;
+    for (size_t i = 0; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        if (v < lo || v > hi)
+            continue;
+        int idx = (int)((v - lo) / width);
+        if (idx >= bins)
+            idx = bins - 1;
+        counts[idx] += 1.0f;
+    }
+    out->is_executed = true;
+    return out;
+}
+
+/**
+ * Count occurrences of each non-negative integer value; output length is max(max_value+1,
+ * minlength). Counts [length].
+ * @param a (Tensor*)
+ * @param minlength (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_bincount(Tensor* a, int minlength) {
+    if (!a) {
+        LOG_ERROR("cml_bincount: need a tensor");
+        return NULL;
+    }
+    extern int tensor_realize(Tensor*);
+    if (tensor_realize(a) != 0 || !a->data)
+        return NULL;
+    int maxv = -1;
+    for (size_t i = 0; i < a->numel; i++) {
+        int v = (int)(tensor_get_float(a, i) + 0.5f);
+        if (v < 0) {
+            LOG_ERROR("cml_bincount: values must be non-negative");
+            return NULL;
+        }
+        if (v > maxv)
+            maxv = v;
+    }
+    int length = maxv + 1;
+    if (length < minlength)
+        length = minlength;
+    if (length <= 0)
+        length = minlength > 0 ? minlength : 0;
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = a->device, .has_dtype = true, .has_device = true};
+    int shape[] = {length};
+    Tensor* out = tensor_empty(shape, 1, &cfg);
+    if (!out || !out->data || length == 0)
+        return out;
+    float* counts = (float*)out->data;
+    memset(counts, 0, (size_t)length * sizeof(float));
+    for (size_t i = 0; i < a->numel; i++)
+        counts[(int)(tensor_get_float(a, i) + 0.5f)] += 1.0f;
+    out->is_executed = true;
+    return out;
+}
+
+/** Insertion index of `value` into ascending `sorted[0..n)`; right!=0 inserts after equals. */
+static int searchsorted_buf(const float* sorted, int n, float value, int right) {
+    int lo = 0, hi = n;
+    while (lo < hi) {
+        int mid      = lo + (hi - lo) / 2;
+        int go_right = right ? (sorted[mid] <= value) : (sorted[mid] < value);
+        if (go_right)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+    return lo;
+}
+
+/**
+ * Index at which `value` would keep ascending `sorted` ordered; right!=0 inserts after equals.
+ * @param sorted (Tensor*)
+ * @param value (float)
+ * @param right (int)
+ * @return (int)
+ */
+int cml_searchsorted(Tensor* sorted, float value, int right) {
+    if (!sorted || sorted->ndim != 1) {
+        LOG_ERROR("cml_searchsorted: input must be a 1-D sorted tensor");
+        return 0;
+    }
+    extern int tensor_realize(Tensor*);
+    if (tensor_realize(sorted) != 0 || !sorted->data)
+        return 0;
+    int n      = sorted->shape[0];
+    float* buf = (float*)cml_malloc((size_t)n * sizeof(float));
+    if (!buf)
+        return 0;
+    for (int i = 0; i < n; i++)
+        buf[i] = tensor_get_float(sorted, i);
+    int idx = searchsorted_buf(buf, n, value, right);
+    cml_free(buf);
+    return idx;
+}
+
+/**
+ * Piecewise-linear interpolation of query points `x` against sample points `xp` (ascending)
+ * with values `fp`; queries outside xp are clamped to the endpoints. Returns values [len(x)].
+ * @param x (Tensor*)
+ * @param xp (Tensor*)
+ * @param fp (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_interp1d(Tensor* x, Tensor* xp, Tensor* fp) {
+    if (!x || !xp || !fp || x->ndim != 1 || xp->ndim != 1 || fp->ndim != 1 ||
+        xp->shape[0] != fp->shape[0] || xp->shape[0] < 1) {
+        LOG_ERROR("cml_interp1d: need 1-D x, and xp,fp of equal length");
+        return NULL;
+    }
+    extern int tensor_realize(Tensor*);
+    if (tensor_realize(x) != 0 || tensor_realize(xp) != 0 || tensor_realize(fp) != 0)
+        return NULL;
+    int nq = x->shape[0], np = xp->shape[0];
+    float* xpb = (float*)cml_malloc((size_t)np * sizeof(float));
+    float* fpb = (float*)cml_malloc((size_t)np * sizeof(float));
+    if (!xpb || !fpb) {
+        cml_free(xpb);
+        cml_free(fpb);
+        return NULL;
+    }
+    for (int i = 0; i < np; i++) {
+        xpb[i] = tensor_get_float(xp, i);
+        fpb[i] = tensor_get_float(fp, i);
+    }
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = x->device, .has_dtype = true, .has_device = true};
+    int shape[] = {nq};
+    Tensor* out = tensor_empty(shape, 1, &cfg);
+    if (out && out->data) {
+        float* od = (float*)out->data;
+        for (int i = 0; i < nq; i++) {
+            float q = tensor_get_float(x, i);
+            if (q <= xpb[0]) {
+                od[i] = fpb[0];
+            } else if (q >= xpb[np - 1]) {
+                od[i] = fpb[np - 1];
+            } else {
+                int j = searchsorted_buf(xpb, np, q, 1); /* first sample strictly greater */
+                if (j < 1)
+                    j = 1;
+                float t = (q - xpb[j - 1]) / (xpb[j] - xpb[j - 1]);
+                od[i]   = fpb[j - 1] + t * (fpb[j] - fpb[j - 1]);
+            }
+        }
+        out->is_executed = true;
+    }
+    cml_free(xpb);
+    cml_free(fpb);
+    return out;
+}
