@@ -837,8 +837,11 @@ static void map_free(PtrIdMap* m) {
     if (m->ids)
         cml_free(m->ids);
 }
-/** Look up key, inserting it with next_id if absent; returns the stored id, or -1 on OOM. */
-static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
+/** Look up key, inserting it with next_id if absent; returns the stored id, or -1 on OOM.
+ *  @p inserted (optional) reports whether the key was absent. */
+static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id, bool* inserted) {
+    if (inserted)
+        *inserted = false;
     for (int i = 0; i < m->size; i++)
         if (m->keys[i] == key)
             return m->ids[i];
@@ -857,6 +860,8 @@ static int map_get_or_insert(PtrIdMap* m, const void* key, int next_id) {
     m->keys[m->size] = key;
     m->ids[m->size]  = next_id;
     m->size++;
+    if (inserted)
+        *inserted = true;
     return next_id;
 }
 
@@ -895,7 +900,7 @@ int autograd_export_json(Tensor* root, const char* path) {
     int next_id         = 1;
     struct IRNode* node = root->ir_context->head;
     while (node) {
-        map_get_or_insert(&idmap, (const void*)node, next_id++);
+        map_get_or_insert(&idmap, (const void*)node, next_id++, NULL);
         node = node->next;
     }
 
@@ -904,7 +909,7 @@ int autograd_export_json(Tensor* root, const char* path) {
     int stack_size        = 0;
     if (stack) {
         stack[stack_size++] = export_root;
-        map_get_or_insert(&reachable, (const void*)export_root, 1);
+        map_get_or_insert(&reachable, (const void*)export_root, 1, NULL);
 
         bool stack_ok = true;
         while (stack_size > 0 && stack_ok) {
@@ -913,8 +918,9 @@ int autograd_export_json(Tensor* root, const char* path) {
                 if (!n->inputs[j] || !n->inputs[j]->ir_node)
                     continue;
                 struct IRNode* input = n->inputs[j]->ir_node;
-                int already          = map_get_or_insert(&reachable, (const void*)input, 1);
-                if (already == 1) {
+                bool first_visit     = false;
+                if (map_get_or_insert(&reachable, (const void*)input, 1, &first_visit) >= 0 &&
+                    first_visit) {
                     if (stack_size >= stack_cap) {
                         stack_cap *= 2;
                         struct IRNode** new_stack =
@@ -938,7 +944,7 @@ int autograd_export_json(Tensor* root, const char* path) {
 
     node = root->ir_context->head;
     while (node) {
-        int my_id = map_get_or_insert(&idmap, (const void*)node, 0);
+        int my_id = map_get_or_insert(&idmap, (const void*)node, 0, NULL);
         if (my_id < 0) {
             LOG_ERROR("map_get_or_insert failed in autograd_export_json");
             fclose(f);
@@ -961,7 +967,7 @@ int autograd_export_json(Tensor* root, const char* path) {
         if (is_optimized) {
             is_dead = !node->is_used && node->use_count == 0;
         } else {
-            int reach_check = map_get_or_insert(&reachable, (const void*)node, 0);
+            int reach_check = map_get_or_insert(&reachable, (const void*)node, 0, NULL);
             is_dead         = (reach_check == 0);
         }
 
@@ -977,7 +983,7 @@ int autograd_export_json(Tensor* root, const char* path) {
                 continue;
 
             struct IRNode* input_node = node->inputs[j]->ir_node;
-            int src_id                = map_get_or_insert(&idmap, (const void*)input_node, 0);
+            int src_id                = map_get_or_insert(&idmap, (const void*)input_node, 0, NULL);
 
             if (src_id >= 0 && src_id > 0) {
                 if (!first_edge) {
