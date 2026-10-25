@@ -47,7 +47,7 @@ int cml_flame_export(const char* path);
 int cml_flame_export_chrome_trace(const char* path);
 
 /* Number of spans currently buffered. */
-int cml_flame_num_spans(void);
+long long cml_flame_num_spans(void);
 
 #ifdef __cplusplus
 }

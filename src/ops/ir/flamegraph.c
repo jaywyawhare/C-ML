@@ -2,6 +2,7 @@
 #include "ops/ir/internal.h"
 #include "alloc/cml_allocator.h"
 #include "core/cml_flags.h"
+#include "core/logging.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,7 +90,6 @@ typedef struct {
 static FlameSpan* g_spans = NULL;
 static int g_nspans       = 0;
 static int g_scap         = 0;
-static int g_dropped      = 0;
 static double g_t_origin  = -1.0;
 
 /** Current monotonic clock reading in milliseconds. */
@@ -318,8 +318,8 @@ void cml_flame_reset(void) {
     g_total    = 0.0;
     cml_free(g_spans);
     g_spans  = NULL;
-    g_nspans = g_scap = g_dropped = 0;
-    g_t_origin                    = -1.0;
+    g_nspans = g_scap = 0;
+    g_t_origin        = -1.0;
 }
 
 /* Flush accumulated spans to flamegraph.json when the process exits, so any
@@ -413,11 +413,7 @@ void cml_flame_record(const struct IRNode* node, double ms) {
             sp->t0        = (float)((now - ms) - g_t_origin);
             sp->dur       = (float)ms;
             sp->entry     = (int)(e - g_entries);
-        } else {
-            g_dropped++;
         }
-    } else {
-        g_dropped++;
     }
 
     if (e->first_ms < 0.0)
@@ -432,7 +428,7 @@ void cml_flame_record(const struct IRNode* node, double ms) {
 }
 
 /** Total number of recorded node executions. */
-int cml_flame_num_spans(void) { return g_count; }
+long long cml_flame_num_spans(void) { return g_count; }
 
 /** Write the captured spans and per-signature aggregates to `path` as JSON. */
 int cml_flame_export(const char* path) {
@@ -450,13 +446,13 @@ int cml_flame_export(const char* path) {
             g_count);
     for (int i = 0; i < g_nentries; i++) {
         FlameEntry* e = &g_entries[i];
-        fprintf(f,
-                "%s{\"i\":%d,\"op\":\"%s\",\"kind\":\"%s\",\"phase\":\"%s\","
-                "\"scope\":\"%s\",\"stack\":\"%s\","
-                "\"numel\":%lld,\"ms\":%.4f,\"count\":%lld,\"max_ms\":%.4f,"
-                "\"first_ms\":%.4f}",
+        fprintf(f, "%s{\"i\":%d,\"op\":\"%s\",\"kind\":\"%s\",\"phase\":\"%s\",\"scope\":",
                 i ? "," : "", i, e->op ? e->op : "?", e->kind ? e->kind : "other",
-                e->phase ? e->phase : "forward", e->scope ? e->scope : "", e->stack ? e->stack : "",
+                e->phase ? e->phase : "forward");
+        cml_json_write_escaped(f, e->scope ? e->scope : "");
+        fputs(",\"stack\":", f);
+        cml_json_write_escaped(f, e->stack ? e->stack : "");
+        fprintf(f, ",\"numel\":%lld,\"ms\":%.4f,\"count\":%lld,\"max_ms\":%.4f,\"first_ms\":%.4f}",
                 e->numel, e->total_ms, e->count, e->max_ms, e->first_ms < 0.0 ? 0.0 : e->first_ms);
     }
     fprintf(f, "]");
@@ -464,7 +460,7 @@ int cml_flame_export(const char* path) {
     /* The time axis: one triple per execution, [entry, start_ms, duration_ms],
      * in the order they ran. Indices rather than repeated op/kind/stack strings
      * -- at 14k executions that difference is megabytes. */
-    fprintf(f, ",\"timeline\":{\"dropped\":%d,\"spans\":[", g_dropped);
+    fprintf(f, ",\"timeline\":{\"dropped\":%lld,\"spans\":[", g_count - g_nspans);
     for (int i = 0; i < g_nspans; i++) {
         FlameSpan* sp = &g_spans[i];
         fprintf(f, "%s[%d,%.4f,%.4f]", i ? "," : "", sp->entry, (double)sp->t0, (double)sp->dur);
@@ -496,10 +492,12 @@ int cml_flame_export_chrome_trace(const char* path) {
         fprintf(f,
                 "%s{\"name\":\"%s\",\"cat\":\"%s\",\"ph\":\"X\","
                 "\"ts\":%.3f,\"dur\":%.3f,\"pid\":%d,\"tid\":0,"
-                "\"args\":{\"phase\":\"%s\",\"scope\":\"%s\",\"numel\":%lld}}",
+                "\"args\":{\"phase\":\"%s\",\"scope\":",
                 i ? "," : "", e->op ? e->op : "?", e->kind ? e->kind : "other",
                 (double)sp->t0 * 1000.0, (double)sp->dur * 1000.0, (int)getpid(),
-                e->phase ? e->phase : "forward", e->scope ? e->scope : "", e->numel);
+                e->phase ? e->phase : "forward");
+        cml_json_write_escaped(f, e->scope ? e->scope : "");
+        fprintf(f, ",\"numel\":%lld}}", e->numel);
     }
     fprintf(f, "],\"displayTimeUnit\":\"ns\"}\n");
     fclose(f);
