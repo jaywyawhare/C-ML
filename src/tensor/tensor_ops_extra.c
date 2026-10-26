@@ -1366,3 +1366,119 @@ Tensor* cml_hilbert(Tensor* x) {
     tensor_free(F);
     return out;
 }
+
+/**
+ * One-sided power spectral density (periodogram) of a real 1-D signal: mean-detrended, density
+ * scaled by 1/(fs*n) with the standard one-sided doubling. Returns [n/2+1]. NULL on error.
+ * @param x (Tensor*)
+ * @param fs (float)
+ * @return (Tensor*)
+ */
+Tensor* cml_periodogram(Tensor* x, float fs) {
+    if (!x)
+        return NULL;
+    extern int tensor_realize(Tensor*);
+    if (tensor_realize(x) != 0 || !x->data || x->ndim != 1 || x->dtype != DTYPE_FLOAT32 ||
+        fs <= 0.0f) {
+        LOG_ERROR("cml_periodogram: need a float32 1-D signal and fs>0");
+        return NULL;
+    }
+    int n     = x->shape[0];
+    double mu = 0.0;
+    for (int i = 0; i < n; i++)
+        mu += tensor_get_float(x, i);
+    mu /= n;
+    int dshape[]     = {n};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = x->device, .has_dtype = true, .has_device = true};
+    Tensor* xm = tensor_empty(dshape, 1, &cfg);
+    if (!xm || !xm->data)
+        return NULL;
+    float* xmd = (float*)xm->data;
+    for (int i = 0; i < n; i++)
+        xmd[i] = (float)(tensor_get_float(x, i) - mu); /* detrend: constant */
+    xm->is_executed = true;
+    Tensor* R       = cml_rfft(xm);
+    tensor_free(xm);
+    if (!R)
+        return NULL;
+    int bins     = n / 2 + 1;
+    float* rd    = (float*)tensor_data_ptr(R);
+    int pshape[] = {bins};
+    Tensor* pxx  = tensor_empty(pshape, 1, &cfg);
+    if (pxx && pxx->data) {
+        float* p    = (float*)pxx->data;
+        float scale = 1.0f / (fs * n);
+        for (int k = 0; k < bins; k++) {
+            float mag2 = rd[2 * k] * rd[2 * k] + rd[2 * k + 1] * rd[2 * k + 1];
+            float v    = scale * mag2;
+            if (k != 0 && !(n % 2 == 0 && k == n / 2))
+                v *= 2.0f; /* one-sided: double all but DC and Nyquist */
+            p[k] = v;
+        }
+        pxx->is_executed = true;
+    }
+    tensor_free(R);
+    return pxx;
+}
+
+/**
+ * Resample a real 1-D signal to `num` samples by Fourier-domain truncation/zero-padding. NULL on
+ * error.
+ * @param x (Tensor*)
+ * @param num (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_resample(Tensor* x, int num) {
+    if (!x)
+        return NULL;
+    extern int tensor_realize(Tensor*);
+    if (tensor_realize(x) != 0 || !x->data || x->ndim != 1 || x->dtype != DTYPE_FLOAT32 ||
+        num < 1) {
+        LOG_ERROR("cml_resample: need a float32 1-D signal and num>=1");
+        return NULL;
+    }
+    int n     = x->shape[0];
+    Tensor* R = cml_rfft(x);
+    if (!R)
+        return NULL;
+    int in_bins      = n / 2 + 1;
+    int out_bins     = num / 2 + 1;
+    float* rd        = (float*)tensor_data_ptr(R);
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = x->device, .has_dtype = true, .has_device = true};
+    int yshape[] = {out_bins, 2};
+    Tensor* Y    = tensor_empty(yshape, 2, &cfg);
+    if (!Y || !Y->data) {
+        tensor_free(R);
+        tensor_free(Y);
+        return NULL;
+    }
+    float* yd = (float*)Y->data;
+    for (int i = 0; i < out_bins * 2; i++)
+        yd[i] = 0.0f;
+    int N   = num < n ? num : n;
+    int nyq = N / 2 + 1;
+    for (int k = 0; k < nyq && k < in_bins && k < out_bins; k++) {
+        yd[2 * k]     = rd[2 * k];
+        yd[2 * k + 1] = rd[2 * k + 1];
+    }
+    if (N % 2 == 0) { /* split the shared Nyquist bin so energy is not doubled */
+        int kn = N / 2;
+        if (kn < out_bins) {
+            yd[2 * kn] *= 0.5f;
+            yd[2 * kn + 1] *= 0.5f;
+        }
+    }
+    Y->is_executed = true;
+    tensor_free(R);
+    Tensor* z = cml_irfft(Y, num);
+    tensor_free(Y);
+    if (!z)
+        return NULL;
+    float* zd   = (float*)tensor_data_ptr(z);
+    float scale = (float)num / n;
+    for (int i = 0; i < num; i++)
+        zd[i] *= scale;
+    return z;
+}
