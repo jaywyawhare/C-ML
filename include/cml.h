@@ -240,6 +240,17 @@ Tensor* cml_detrend(Tensor* y, int type);
 Tensor* cml_fftfreq(int n, float d, const TensorConfig* config);
 Tensor* cml_rfftfreq(int n, float d, const TensorConfig* config);
 Tensor* cml_hilbert(Tensor* x);
+float cml_median_abs_deviation(Tensor* a);
+float cml_trim_mean(Tensor* a, float proportion);
+float cml_sem(Tensor* a);
+Tensor* cml_winsorize(Tensor* a, float lower, float upper);
+float cml_minkowski_distance(Tensor* a, Tensor* b, float p);
+float cml_chebyshev_distance(Tensor* a, Tensor* b);
+float cml_hamming_distance(Tensor* a, Tensor* b);
+float cml_mahalanobis_distance(Tensor* a, Tensor* b, Tensor* vi);
+KMeansResult cml_kmeans(Tensor* x, int k, int max_iter);
+Tensor* cml_periodogram(Tensor* x, float fs);
+Tensor* cml_resample(Tensor* x, int num);
 
 Tensor* cml_transpose(Tensor* a, int dim1, int dim2);
 Tensor* cml_reshape(Tensor* a, int* new_shape, int new_ndim);

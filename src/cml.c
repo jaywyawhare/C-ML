@@ -3278,6 +3278,77 @@ Tensor* cml_hankel(Tensor* c, Tensor* r) { return tensor_hankel(c, r); }
  * @return (Tensor*)
  */
 Tensor* cml_detrend(Tensor* y, int type) { return tensor_detrend(y, type); }
+/**
+ * Public API: median absolute deviation (-> tensor_mad).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_median_abs_deviation(Tensor* a) { return tensor_mad(a); }
+/**
+ * Public API: trimmed mean (-> tensor_trim_mean).
+ * @param a (Tensor*)
+ * @param proportion (float)
+ * @return (float)
+ */
+float cml_trim_mean(Tensor* a, float proportion) { return tensor_trim_mean(a, proportion); }
+/**
+ * Public API: standard error of the mean (-> tensor_sem).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float cml_sem(Tensor* a) { return tensor_sem(a); }
+/**
+ * Public API: winsorize (-> tensor_winsorize).
+ * @param a (Tensor*)
+ * @param lower (float)
+ * @param upper (float)
+ * @return (Tensor*)
+ */
+Tensor* cml_winsorize(Tensor* a, float lower, float upper) {
+    return tensor_winsorize(a, lower, upper);
+}
+/**
+ * Public API: Minkowski distance (-> tensor_minkowski_distance).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param p (float)
+ * @return (float)
+ */
+float cml_minkowski_distance(Tensor* a, Tensor* b, float p) {
+    return tensor_minkowski_distance(a, b, p);
+}
+/**
+ * Public API: Chebyshev distance (-> tensor_chebyshev_distance).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float cml_chebyshev_distance(Tensor* a, Tensor* b) { return tensor_chebyshev_distance(a, b); }
+/**
+ * Public API: Hamming distance (-> tensor_hamming_distance).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float cml_hamming_distance(Tensor* a, Tensor* b) { return tensor_hamming_distance(a, b); }
+/**
+ * Public API: Mahalanobis distance (-> tensor_mahalanobis_distance).
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param vi (Tensor*)
+ * @return (float)
+ */
+float cml_mahalanobis_distance(Tensor* a, Tensor* b, Tensor* vi) {
+    return tensor_mahalanobis_distance(a, b, vi);
+}
+/**
+ * Public API: k-means clustering (-> tensor_kmeans).
+ * @param x (Tensor*)
+ * @param k (int)
+ * @param max_iter (int)
+ * @return (KMeansResult)
+ */
+KMeansResult cml_kmeans(Tensor* x, int k, int max_iter) { return tensor_kmeans(x, k, max_iter); }
 
 /**
  * Public API: load a tensor from a URL (-> tensor_from_url).
