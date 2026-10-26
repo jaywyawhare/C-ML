@@ -1008,6 +1008,39 @@ typedef struct {
  */
 KMeansResult tensor_kmeans(Tensor* x, int k, int max_iter);
 
+/**
+ * Mean silhouette score of a clustering: x is [samples,features], labels is [samples].
+ * @param x (Tensor*)
+ * @param labels (Tensor*)
+ * @return (float)
+ */
+float tensor_silhouette_score(Tensor* x, Tensor* labels);
+
+/**
+ * k-nearest-neighbor majority-vote prediction of query rows against labeled training rows.
+ * @param x_train (Tensor*)
+ * @param y_train (Tensor*)
+ * @param x_query (Tensor*)
+ * @param k (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_knn_predict(Tensor* x_train, Tensor* y_train, Tensor* x_query, int k);
+
+/**
+ * Replace NaN with 0 and +/-infinity with +/- the largest finite float, element-wise.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_nan_to_num(Tensor* a);
+
+/**
+ * Scale a tensor so its global L2 norm does not exceed max_norm (unchanged if already within).
+ * @param a (Tensor*)
+ * @param max_norm (float)
+ * @return (Tensor*)
+ */
+Tensor* tensor_clip_by_norm(Tensor* a, float max_norm);
+
 Tensor* tensor_from_url(const char* url);
 
 Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y);

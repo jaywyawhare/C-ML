@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <float.h>
 #include <stdarg.h>
 #include <unistd.h>
 #include "tensor/tensor.h"
@@ -5098,6 +5099,197 @@ KMeansResult tensor_kmeans(Tensor* x, int k, int max_iter) {
     cml_free(labels);
     cml_free(sum);
     cml_free(counts);
+    return result;
+}
+
+/**
+ * Mean silhouette score of a clustering: x is [samples,features], labels is [samples].
+ * @param x (Tensor*)
+ * @param labels (Tensor*)
+ * @return (float)
+ */
+float tensor_silhouette_score(Tensor* x, Tensor* labels) {
+    if (!x || !labels || x->ndim != 2 || labels->ndim != 1 || labels->shape[0] != x->shape[0]) {
+        LOG_ERROR("tensor_silhouette_score: need x [n,d] and labels [n]");
+        return 0.0f;
+    }
+    tensor_ensure_executed(labels);
+    int n        = x->shape[0];
+    Tensor* dist = tensor_cdist(x, x);
+    if (!dist)
+        return 0.0f;
+    int* lab = cml_malloc((size_t)n * sizeof(int));
+    if (!lab) {
+        tensor_free(dist);
+        return 0.0f;
+    }
+    for (int i = 0; i < n; i++)
+        lab[i] = (int)(tensor_get_float(labels, i) + 0.5f);
+    double total = 0.0;
+    int counted  = 0;
+    for (int i = 0; i < n; i++) {
+        int own = 0;
+        for (int j = 0; j < n; j++)
+            if (j != i && lab[j] == lab[i])
+                own++;
+        if (own == 0)
+            continue; /* singleton clusters contribute silhouette 0 */
+        double a = 0.0, b = INFINITY;
+        /* intra-cluster mean distance a(i) */
+        for (int j = 0; j < n; j++)
+            if (j != i && lab[j] == lab[i])
+                a += tensor_get_float(dist, (size_t)i * n + j);
+        a /= own;
+        /* smallest mean distance to any other cluster b(i) */
+        for (int c = 0; c < n; c++) {
+            int cl = lab[c];
+            if (cl == lab[i])
+                continue;
+            int seen = 0;
+            for (int t = 0; t < c; t++)
+                if (lab[t] == cl) {
+                    seen = 1;
+                    break;
+                }
+            if (seen)
+                continue; /* process each other-cluster id once */
+            double sum = 0.0;
+            int cnt    = 0;
+            for (int j = 0; j < n; j++)
+                if (lab[j] == cl) {
+                    sum += tensor_get_float(dist, (size_t)i * n + j);
+                    cnt++;
+                }
+            if (cnt > 0) {
+                double mean = sum / cnt;
+                if (mean < b)
+                    b = mean;
+            }
+        }
+        double denom = a > b ? a : b;
+        if (denom > 0.0) {
+            total += (b - a) / denom;
+            counted++;
+        }
+    }
+    cml_free(lab);
+    tensor_free(dist);
+    return counted ? (float)(total / counted) : 0.0f;
+}
+
+/**
+ * k-nearest-neighbor majority-vote prediction of query rows against labeled training rows.
+ * @param x_train (Tensor*)
+ * @param y_train (Tensor*)
+ * @param x_query (Tensor*)
+ * @param k (int)
+ * @return (Tensor*)
+ */
+Tensor* tensor_knn_predict(Tensor* x_train, Tensor* y_train, Tensor* x_query, int k) {
+    if (!x_train || !y_train || !x_query || x_train->ndim != 2 || x_query->ndim != 2 ||
+        y_train->ndim != 1 || x_train->shape[1] != x_query->shape[1] ||
+        y_train->shape[0] != x_train->shape[0] || k < 1 || k > x_train->shape[0]) {
+        LOG_ERROR("tensor_knn_predict: shape mismatch or invalid k");
+        return NULL;
+    }
+    tensor_ensure_executed(y_train);
+    int ntr = x_train->shape[0], nq = x_query->shape[0];
+    Tensor* dist = tensor_cdist(x_query, x_train); /* [nq, ntr] */
+    if (!dist)
+        return NULL;
+    int* idx   = cml_malloc((size_t)ntr * sizeof(int));
+    float* out = cml_malloc((size_t)nq * sizeof(float));
+    if (!idx || !out) {
+        cml_free(idx);
+        cml_free(out);
+        tensor_free(dist);
+        return NULL;
+    }
+    for (int q = 0; q < nq; q++) {
+        for (int i = 0; i < ntr; i++)
+            idx[i] = i;
+        /* partial selection of the k nearest by distance (small k) */
+        for (int a = 0; a < k; a++) {
+            int best = a;
+            for (int b = a + 1; b < ntr; b++)
+                if (tensor_get_float(dist, (size_t)q * ntr + idx[b]) <
+                    tensor_get_float(dist, (size_t)q * ntr + idx[best]))
+                    best = b;
+            int t     = idx[a];
+            idx[a]    = idx[best];
+            idx[best] = t;
+        }
+        /* majority vote among the k nearest labels (ties: smallest label) */
+        float best_lab = 0.0f;
+        int best_count = -1;
+        for (int a = 0; a < k; a++) {
+            float cand = tensor_get_float(y_train, idx[a]);
+            int cnt    = 0;
+            for (int b = 0; b < k; b++)
+                if (tensor_get_float(y_train, idx[b]) == cand)
+                    cnt++;
+            if (cnt > best_count || (cnt == best_count && cand < best_lab)) {
+                best_count = cnt;
+                best_lab   = cand;
+            }
+        }
+        out[q] = best_lab;
+    }
+    cml_free(idx);
+    tensor_free(dist);
+    Tensor* result = tensor_vec_like(out, nq, y_train);
+    cml_free(out);
+    return result;
+}
+
+/** Replace NaN with 0 and +/-inf with +/- the largest finite float. */
+static float nan_to_num_scalar(float v) {
+    if (v != v)
+        return 0.0f;
+    if (v == INFINITY)
+        return FLT_MAX;
+    if (v == -INFINITY)
+        return -FLT_MAX;
+    return v;
+}
+
+/**
+ * Replace NaN with 0 and +/-infinity with +/- the largest finite float, element-wise.
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* tensor_nan_to_num(Tensor* a) { return elementwise_map(a, nan_to_num_scalar); }
+
+/**
+ * Scale a tensor so its global L2 norm does not exceed max_norm (unchanged if already within).
+ * @param a (Tensor*)
+ * @param max_norm (float)
+ * @return (Tensor*)
+ */
+Tensor* tensor_clip_by_norm(Tensor* a, float max_norm) {
+    if (!a || max_norm <= 0.0f) {
+        LOG_ERROR("tensor_clip_by_norm: need a tensor and max_norm>0");
+        return NULL;
+    }
+    tensor_ensure_executed(a);
+    if (!a->data)
+        return NULL;
+    double sq = 0.0;
+    for (size_t i = 0; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        sq += (double)v * v;
+    }
+    float norm  = (float)sqrt(sq);
+    float scale = (norm > max_norm) ? max_norm / norm : 1.0f;
+    float* out  = cml_malloc(a->numel * sizeof(float));
+    if (!out)
+        return NULL;
+    for (size_t i = 0; i < a->numel; i++)
+        out[i] = tensor_get_float(a, i) * scale;
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, a->shape, a->ndim, &config);
+    cml_free(out);
     return result;
 }
 
