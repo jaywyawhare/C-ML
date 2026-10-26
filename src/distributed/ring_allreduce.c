@@ -3,17 +3,33 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <pthread.h>
 #include "alloc/cml_allocator.h"
 
+typedef struct {
+    DistCommOps* ops;
+    Tensor* tensor;
+    int peer;
+    int tag;
+    void* ctx;
+    int rc;
+} RingSendArg;
+
+/** Thread body: send one chunk to the right neighbour, concurrently with the main-thread recv.
+ * @param arg (void*)
+ * @return (void*)
+ */
+static void* ring_send_thread(void* arg) {
+    RingSendArg* a = (RingSendArg*)arg;
+    a->rc          = a->ops->send(a->tensor, a->peer, a->tag, a->ctx);
+    return NULL;
+}
+
 /**
- * Deadlock-free paired send/recv for a ring step.
- *
- * The naive "send to right, then recv from left" order deadlocks once a chunk
- * exceeds the kernel socket send buffer: every rank blocks in send() and nobody
- * is receiving. Ordering by rank parity breaks the cycle - even ranks send then
- * receive, odd ranks receive then send - so a blocking sender is always paired
- * with a peer that has already posted (or is about to post) the matching
- * receive. The send and recv buffers are disjoint here, so this is safe.
+ * Full-duplex ring step: send to the right neighbour and receive from the left at the same time,
+ * so a step costs max(send, recv) instead of send + recv. The two directions use different
+ * sockets and disjoint buffers, so overlapping them is safe and deadlock-free (every rank is
+ * simultaneously sending and receiving). Falls back to serial send-then-recv if no thread.
  * @param ops (DistCommOps*)
  * @param send_t (Tensor*)
  * @param right (int)
@@ -21,21 +37,21 @@
  * @param left (int)
  * @param tag (int)
  * @param ctx (void*)
- * @param rank (int)
  * @return (int)
  */
 static int ring_sendrecv(DistCommOps* ops, Tensor* send_t, int right, Tensor* recv_t, int left,
-                         int tag, void* ctx, int rank) {
-    if ((rank & 1) == 0) {
+                         int tag, void* ctx) {
+    RingSendArg sa = {ops, send_t, right, tag, ctx, 0};
+    pthread_t th;
+    if (pthread_create(&th, NULL, ring_send_thread, &sa) != 0) {
         int r = ops->send(send_t, right, tag, ctx);
         if (r != 0)
             return r;
         return ops->recv(recv_t, left, tag, ctx);
     }
-    int r = ops->recv(recv_t, left, tag, ctx);
-    if (r != 0)
-        return r;
-    return ops->send(send_t, right, tag, ctx);
+    int rc = ops->recv(recv_t, left, tag, ctx);
+    pthread_join(th, NULL);
+    return (rc != 0 || sa.rc != 0) ? -1 : 0;
 }
 
 /**
@@ -146,7 +162,7 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank, Dist
         recv_tensor.dtype  = DTYPE_FLOAT32;
 
         /* Send to right neighbor, recv from left neighbor (parity-ordered) */
-        int ret = ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left, step, ctx, rank);
+        int ret = ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left, step, ctx);
         if (ret != 0) {
             cml_free(recv_buf);
             return -1;
@@ -190,8 +206,8 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank, Dist
         recv_tensor.shape  = recv_shape;
         recv_tensor.dtype  = DTYPE_FLOAT32;
 
-        int ret = ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left, world_size + step,
-                                ctx, rank);
+        int ret =
+            ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left, world_size + step, ctx);
         if (ret != 0) {
             cml_free(recv_buf);
             return -1;
