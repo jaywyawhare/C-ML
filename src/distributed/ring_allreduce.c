@@ -39,8 +39,8 @@ static void* ring_send_thread(void* arg) {
  * @param ctx (void*)
  * @return (int)
  */
-static int ring_sendrecv(DistCommOps* ops, Tensor* send_t, int right, Tensor* recv_t, int left,
-                         int tag, void* ctx) {
+int cml_ring_sendrecv(DistCommOps* ops, Tensor* send_t, int right, Tensor* recv_t, int left,
+                      int tag, void* ctx) {
     RingSendArg sa = {ops, send_t, right, tag, ctx, 0};
     pthread_t th;
     if (pthread_create(&th, NULL, ring_send_thread, &sa) != 0) {
@@ -163,7 +163,7 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank, Dist
         recv_tensor.dtype  = DTYPE_FLOAT32;
 
         /* Send to right neighbor, recv from left neighbor (parity-ordered) */
-        int ret = ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left, step, ctx);
+        int ret = cml_ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left, step, ctx);
         if (ret != 0) {
             cml_free(recv_buf);
             return -1;
@@ -208,7 +208,7 @@ int cml_ring_allreduce(float* data, size_t count, int world_size, int rank, Dist
         recv_tensor.dtype  = DTYPE_FLOAT32;
 
         int ret =
-            ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left, world_size + step, ctx);
+            cml_ring_sendrecv(ops, &send_tensor, right, &recv_tensor, left, world_size + step, ctx);
         if (ret != 0) {
             cml_free(recv_buf);
             return -1;

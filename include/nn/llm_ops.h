@@ -70,6 +70,37 @@ typedef struct CMLFlashAttentionConfig {
 CMLFlashAttentionConfig cml_flash_attention_default_config(void);
 
 /**
+ * Fold one KV tile into a Q tile's FlashAttention online-softmax state (shared by the local
+ * and ring attention kernels). Masking uses global positions q_pos0+qi / kv_pos0+ki. Query
+ * rows are q_head[qi*q_stride + d]; KV rows k_head/v_head[ki*kv_stride + d]. State buffers
+ * row_max (init -1e30f), row_sum (init 0), acc (init 0) and scratch scores[tq_len*tkv_len]
+ * are caller-owned; normalize acc by row_sum after the last tile.
+ * @param row_max (float*)
+ * @param row_sum (float*)
+ * @param acc (float*)
+ * @param scores (float*)
+ * @param q_head (const float*)
+ * @param q_stride (int)
+ * @param tq_len (int)
+ * @param q_pos0 (int)
+ * @param k_head (const float*)
+ * @param v_head (const float*)
+ * @param kv_stride (int)
+ * @param tkv_len (int)
+ * @param kv_pos0 (int)
+ * @param head_dim (int)
+ * @param scale (float)
+ * @param causal (bool)
+ * @param window_size (int)
+ * @return (void)
+ */
+void cml_flash_attention_fold_tile(float* row_max, float* row_sum, float* acc, float* scores,
+                                   const float* q_head, int q_stride, int tq_len, int q_pos0,
+                                   const float* k_head, const float* v_head, int kv_stride,
+                                   int tkv_len, int kv_pos0, int head_dim, float scale, bool causal,
+                                   int window_size);
+
+/**
  * Flash GQA forward pass (O(N) memory via online softmax)
  * Q: [batch, seq_len, num_heads * head_dim]
  * K: [batch, kv_len, num_kv_heads * head_dim]

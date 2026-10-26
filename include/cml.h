@@ -50,6 +50,7 @@
 #include "distributed/distributed.h"
 #include "distributed/data_parallel.h"
 #include "distributed/pipeline_parallel.h"
+#include "distributed/ring_attention.h"
 #endif
 
 #include "symbolic/symbolic.h"

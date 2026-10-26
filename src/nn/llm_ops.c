@@ -601,6 +601,89 @@ CMLFlashAttentionConfig cml_flash_attention_default_config(void) {
 }
 
 /**
+ * Fold one KV tile into the FlashAttention online-softmax state of a Q tile: compute the
+ * tile scores, update the running max, rescale the previous sum/accumulator, then add the
+ * tile's weighted V. Masking uses the global positions q_pos0+qi and kv_pos0+ki, so the same
+ * kernel serves local attention and ring attention over KV sharded across ranks. Query rows
+ * read q_head[qi*q_stride + d]; KV rows read k_head/v_head[ki*kv_stride + d]. State buffers
+ * (row_max[-1e30], row_sum[0], acc[0]) and scratch `scores`[tq_len*tkv_len] are caller-owned.
+ * @param row_max (float*)
+ * @param row_sum (float*)
+ * @param acc (float*)
+ * @param scores (float*)
+ * @param q_head (const float*)
+ * @param q_stride (int)
+ * @param tq_len (int)
+ * @param q_pos0 (int)
+ * @param k_head (const float*)
+ * @param v_head (const float*)
+ * @param kv_stride (int)
+ * @param tkv_len (int)
+ * @param kv_pos0 (int)
+ * @param head_dim (int)
+ * @param scale (float)
+ * @param causal (bool)
+ * @param window_size (int)
+ * @return (void)
+ */
+void cml_flash_attention_fold_tile(float* row_max, float* row_sum, float* acc, float* scores,
+                                   const float* q_head, int q_stride, int tq_len, int q_pos0,
+                                   const float* k_head, const float* v_head, int kv_stride,
+                                   int tkv_len, int kv_pos0, int head_dim, float scale, bool causal,
+                                   int window_size) {
+    for (int qi = 0; qi < tq_len; qi++) {
+        int sq            = q_pos0 + qi;
+        const float* qrow = q_head + (size_t)qi * q_stride;
+        for (int ki = 0; ki < tkv_len; ki++) {
+            int sk            = kv_pos0 + ki;
+            const float* krow = k_head + (size_t)ki * kv_stride;
+            float dot         = 0.0f;
+            for (int d = 0; d < head_dim; d++)
+                dot += qrow[d] * krow[d];
+            float s = dot * scale;
+            if (causal && sk > sq)
+                s = -1e30f;
+            if (window_size > 0) {
+                int dist = sq - sk;
+                if (dist < 0)
+                    dist = -dist;
+                if (dist > window_size)
+                    s = -1e30f;
+            }
+            scores[qi * tkv_len + ki] = s;
+        }
+    }
+
+    for (int qi = 0; qi < tq_len; qi++) {
+        float tile_max = -1e30f;
+        for (int ki = 0; ki < tkv_len; ki++) {
+            float s = scores[qi * tkv_len + ki];
+            if (s > tile_max)
+                tile_max = s;
+        }
+
+        float old_max = row_max[qi];
+        float new_max = (tile_max > old_max) ? tile_max : old_max;
+        float rescale = expf(old_max - new_max);
+        row_sum[qi] *= rescale;
+        float* arow = acc + (size_t)qi * head_dim;
+        for (int d = 0; d < head_dim; d++)
+            arow[d] *= rescale;
+
+        float tile_sum = 0.0f;
+        for (int ki = 0; ki < tkv_len; ki++) {
+            float p = expf(scores[qi * tkv_len + ki] - new_max);
+            tile_sum += p;
+            const float* vrow = v_head + (size_t)ki * kv_stride;
+            for (int d = 0; d < head_dim; d++)
+                arow[d] += p * vrow[d];
+        }
+        row_sum[qi] += tile_sum;
+        row_max[qi] = new_max;
+    }
+}
+
+/**
  * Tiled FlashAttention GQA using online softmax, so the full [seq_q, kv_len] score
  * matrix is never materialized. Same masking semantics as cml_gqa_forward.
  * @param Q (Tensor*)
@@ -699,86 +782,26 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfi
                 }
                 memset(acc, 0, (size_t)tq_len * head_dim * sizeof(float));
 
-                /* Process KV in tiles */
+                /* Process KV in tiles, folding each into the online-softmax state */
                 for (int tkv_start = 0; tkv_start < kv_len; tkv_start += tile_kv) {
                     int tkv_end = tkv_start + tile_kv;
                     if (tkv_end > kv_len)
                         tkv_end = kv_len;
                     int tkv_len = tkv_end - tkv_start;
 
-                    /* Compute S = Q_tile @ K_tile^T * scale */
-                    for (int qi = 0; qi < tq_len; qi++) {
-                        int sq = tq_start + qi;
-                        for (int ki = 0; ki < tkv_len; ki++) {
-                            int sk    = tkv_start + ki;
-                            float dot = 0.0f;
-                            for (int d = 0; d < head_dim; d++) {
-                                float qv = q_data[((size_t)b * seq_q + sq) * num_heads * head_dim +
-                                                  h * head_dim + d];
-                                float kv =
-                                    k_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim +
-                                           kv_h * head_dim + d];
-                                dot += qv * kv;
-                            }
-                            float s = dot * scale;
+                    const float* q_head =
+                        q_data + (((size_t)b * seq_q + tq_start) * num_heads + h) * head_dim;
+                    const float* k_head =
+                        k_data +
+                        (((size_t)b * kv_len + tkv_start) * num_kv_heads + kv_h) * head_dim;
+                    const float* v_head =
+                        v_data +
+                        (((size_t)b * kv_len + tkv_start) * num_kv_heads + kv_h) * head_dim;
 
-                            /* Causal mask */
-                            if (config->causal && sk > sq)
-                                s = -1e30f;
-
-                            /* Sliding window mask (symmetric) */
-                            if (window_size > 0) {
-                                int dist = sq - sk;
-                                if (dist < 0)
-                                    dist = -dist;
-                                if (dist > window_size)
-                                    s = -1e30f;
-                            }
-
-                            tile_scores[qi * tkv_len + ki] = s;
-                        }
-                    }
-
-                    /* Online softmax update: for each query position, update
-                     * running max, rescale previous sum and acc, then accumulate */
-                    for (int qi = 0; qi < tq_len; qi++) {
-                        /* Find tile max for this query row */
-                        float tile_max = -1e30f;
-                        for (int ki = 0; ki < tkv_len; ki++) {
-                            float s = tile_scores[qi * tkv_len + ki];
-                            if (s > tile_max)
-                                tile_max = s;
-                        }
-
-                        /* Compute new global max */
-                        float old_max = row_max[qi];
-                        float new_max = (tile_max > old_max) ? tile_max : old_max;
-
-                        /* Rescale previous accumulator */
-                        float rescale = expf(old_max - new_max);
-                        row_sum[qi] *= rescale;
-                        for (int d = 0; d < head_dim; d++) {
-                            acc[qi * head_dim + d] *= rescale;
-                        }
-
-                        /* Accumulate new tile's contribution */
-                        float tile_sum = 0.0f;
-                        for (int ki = 0; ki < tkv_len; ki++) {
-                            float p = expf(tile_scores[qi * tkv_len + ki] - new_max);
-                            tile_sum += p;
-
-                            int sk = tkv_start + ki;
-                            for (int d = 0; d < head_dim; d++) {
-                                float vv =
-                                    v_data[((size_t)b * kv_len + sk) * num_kv_heads * head_dim +
-                                           kv_h * head_dim + d];
-                                acc[qi * head_dim + d] += p * vv;
-                            }
-                        }
-
-                        row_sum[qi] += tile_sum;
-                        row_max[qi] = new_max;
-                    }
+                    cml_flash_attention_fold_tile(
+                        row_max, row_sum, acc, tile_scores, q_head, num_heads * head_dim, tq_len,
+                        tq_start, k_head, v_head, num_kv_heads * head_dim, tkv_len, tkv_start,
+                        head_dim, scale, config->causal, window_size);
                 }
 
                 /* Normalize by sum and write output */

@@ -580,6 +580,7 @@ set(DISTRIBUTED_SOURCES
     src/distributed/nccl_backend.c
     src/distributed/mpi_backend.c
     src/distributed/ring_allreduce.c
+    src/distributed/ring_attention.c
     src/distributed/data_parallel.c
     src/distributed/pipeline_parallel.c
     src/distributed/tensor_parallel.c
