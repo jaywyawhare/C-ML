@@ -4,6 +4,7 @@
 #include "core/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -501,8 +502,7 @@ static void gloo_peer_addr(const GlooContext* gctx, int peer, char* out, size_t 
             return;
         }
     }
-    strncpy(out, gctx->master_addr, outsz - 1);
-    out[outsz - 1] = '\0';
+    snprintf(out, outsz, "%s", gctx->master_addr);
 }
 
 /**
