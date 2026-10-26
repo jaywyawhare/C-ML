@@ -51,13 +51,17 @@ static GlooContext* get_gloo_ctx(void* ctx) { return ctx ? (GlooContext*)ctx : g
  * @param len (size_t)
  * @return (int)
  */
-/** Disable Nagle's algorithm on a peer socket so small ring-all-reduce messages aren't delayed.
+/** Tune a peer socket for all-reduce: disable Nagle (low latency for the ring's small messages)
+ * and enlarge the send/recv buffers (high throughput for large tensors over high-latency links).
  * @param fd (int)
  * @return (void)
  */
-static void set_tcp_nodelay(int fd) {
+static void set_peer_sockopts(int fd) {
     int one = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+    int bufsz = 4 << 20; /* 4 MiB: lift the TCP window so WAN bandwidth-delay doesn't throttle */
+    setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bufsz, sizeof(bufsz));
+    setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &bufsz, sizeof(bufsz));
 }
 
 static int send_all(int fd, const void* buf, size_t len) {
@@ -630,7 +634,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
         }
 
         gctx->peer_fds[peer] = sock;
-        set_tcp_nodelay(sock);
+        set_peer_sockopts(sock);
         LOG_DEBUG("Gloo rank %d connected to rank %d", rank, peer);
     }
 
@@ -659,7 +663,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
         }
 
         gctx->peer_fds[peer_rank] = client_fd;
-        set_tcp_nodelay(client_fd);
+        set_peer_sockopts(client_fd);
         LOG_DEBUG("Gloo rank %d accepted connection from rank %d", rank, peer_rank);
     }
 
