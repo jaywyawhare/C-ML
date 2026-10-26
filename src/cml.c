@@ -3349,6 +3349,37 @@ float cml_mahalanobis_distance(Tensor* a, Tensor* b, Tensor* vi) {
  * @return (KMeansResult)
  */
 KMeansResult cml_kmeans(Tensor* x, int k, int max_iter) { return tensor_kmeans(x, k, max_iter); }
+/**
+ * Public API: silhouette score (-> tensor_silhouette_score).
+ * @param x (Tensor*)
+ * @param labels (Tensor*)
+ * @return (float)
+ */
+float cml_silhouette_score(Tensor* x, Tensor* labels) { return tensor_silhouette_score(x, labels); }
+/**
+ * Public API: k-nearest-neighbor prediction (-> tensor_knn_predict).
+ * @param x_train (Tensor*)
+ * @param y_train (Tensor*)
+ * @param x_query (Tensor*)
+ * @param k (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_knn_predict(Tensor* x_train, Tensor* y_train, Tensor* x_query, int k) {
+    return tensor_knn_predict(x_train, y_train, x_query, k);
+}
+/**
+ * Public API: NaN/inf sanitization (-> tensor_nan_to_num).
+ * @param a (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_nan_to_num(Tensor* a) { return tensor_nan_to_num(a); }
+/**
+ * Public API: global-norm clipping (-> tensor_clip_by_norm).
+ * @param a (Tensor*)
+ * @param max_norm (float)
+ * @return (Tensor*)
+ */
+Tensor* cml_clip_by_norm(Tensor* a, float max_norm) { return tensor_clip_by_norm(a, max_norm); }
 
 /**
  * Public API: load a tensor from a URL (-> tensor_from_url).

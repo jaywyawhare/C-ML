@@ -251,6 +251,16 @@ float cml_mahalanobis_distance(Tensor* a, Tensor* b, Tensor* vi);
 KMeansResult cml_kmeans(Tensor* x, int k, int max_iter);
 Tensor* cml_periodogram(Tensor* x, float fs);
 Tensor* cml_resample(Tensor* x, int num);
+Tensor* cml_lfilter(Tensor* b, Tensor* a, Tensor* x);
+Tensor* cml_medfilt(Tensor* x, int kernel);
+Tensor* cml_savgol_filter(Tensor* x, int window_length, int polyorder);
+float cml_zero_crossing_rate(Tensor* x);
+float cml_rms_energy(Tensor* x);
+float cml_spectral_centroid(Tensor* x, float fs);
+float cml_silhouette_score(Tensor* x, Tensor* labels);
+Tensor* cml_knn_predict(Tensor* x_train, Tensor* y_train, Tensor* x_query, int k);
+Tensor* cml_nan_to_num(Tensor* a);
+Tensor* cml_clip_by_norm(Tensor* a, float max_norm);
 
 Tensor* cml_transpose(Tensor* a, int dim1, int dim2);
 Tensor* cml_reshape(Tensor* a, int* new_shape, int new_ndim);
