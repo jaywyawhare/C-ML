@@ -297,6 +297,50 @@ float cml_hamming_loss(const int* y_true, const int* y_pred, int n);
  */
 float cml_ndcg(const float* y_score, const float* y_true_rel, int n, int k);
 
+/**
+ * Tie-averaged 1-based ranks of v[0..n) written into out (ordered by original index).
+ * @param v (const float*)
+ * @param n (int)
+ * @param out (float*)
+ * @return (void)
+ */
+void cml_rankdata(const float* v, int n, float* out);
+
+/**
+ * ROC curve into malloc'd fpr/tpr/thresholds; returns the point count or -1.
+ * @param y_true (const int*)
+ * @param y_score (const float*)
+ * @param n (int)
+ * @param fpr (float**)
+ * @param tpr (float**)
+ * @param thresholds (float**)
+ * @return (int)
+ */
+int cml_roc_curve(const int* y_true, const float* y_score, int n, float** fpr, float** tpr,
+                  float** thresholds);
+
+/**
+ * Precision-recall curve into malloc'd precision/recall/thresholds; returns threshold count or -1.
+ * @param y_true (const int*)
+ * @param y_score (const float*)
+ * @param n (int)
+ * @param precision (float**)
+ * @param recall (float**)
+ * @param thresholds (float**)
+ * @return (int)
+ */
+int cml_precision_recall_curve(const int* y_true, const float* y_score, int n, float** precision,
+                               float** recall, float** thresholds);
+
+/**
+ * Area under a curve by the trapezoidal rule over points (x,y).
+ * @param x (const float*)
+ * @param y (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_auc(const float* x, const float* y, int n);
+
 #ifdef __cplusplus
 }
 #endif

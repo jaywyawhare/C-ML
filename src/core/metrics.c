@@ -604,8 +604,13 @@ float cml_pearson(const float* x, const float* y, int n) {
     return (float)(sxy / sqrt(sxx * syy));
 }
 
-/* Write tie-averaged 1-based ranks of v[0..n) into out, ordered by original index. */
-static void average_ranks(const float* v, int n, float* out) {
+/** Write tie-averaged 1-based ranks of v[0..n) into out, ordered by original index.
+ * @param v (const float*)
+ * @param n (int)
+ * @param out (float*)
+ * @return (void)
+ */
+void cml_rankdata(const float* v, int n, float* out) {
     ScoreLabel* sl = cml_malloc((size_t)n * sizeof(ScoreLabel));
     if (!sl)
         return;
@@ -640,8 +645,8 @@ float cml_spearman(const float* x, const float* y, int n) {
     float* ry = cml_malloc((size_t)n * sizeof(float));
     float res = 0.0f;
     if (rx && ry) {
-        average_ranks(x, n, rx);
-        average_ranks(y, n, ry);
+        cml_rankdata(x, n, rx);
+        cml_rankdata(y, n, ry);
         res = cml_pearson(rx, ry, n);
     }
     cml_free(rx);
@@ -818,4 +823,164 @@ float cml_ndcg(const float* y_score, const float* y_true_rel, int n, int k) {
     cml_free(ranked);
     cml_free(ideal);
     return idcg > 0.0 ? (float)(dcg / idcg) : 0.0f;
+}
+
+/** ROC curve: fills malloc'd fpr/tpr/thresholds (point 0 is (0,0) at +inf), returns the point
+ * count or -1 on error; matches sklearn roc_curve with drop_intermediate=False.
+ * @param y_true (const int*)
+ * @param y_score (const float*)
+ * @param n (int)
+ * @param fpr (float**)
+ * @param tpr (float**)
+ * @param thresholds (float**)
+ * @return (int)
+ */
+int cml_roc_curve(const int* y_true, const float* y_score, int n, float** fpr, float** tpr,
+                  float** thresholds) {
+    if (!y_true || !y_score || n <= 0 || !fpr || !tpr || !thresholds)
+        return -1;
+    ScoreLabel* sl = cml_malloc((size_t)n * sizeof(ScoreLabel));
+    if (!sl)
+        return -1;
+    long P = 0, N = 0;
+    for (int i = 0; i < n; i++) {
+        sl[i].score = y_score[i];
+        sl[i].label = y_true[i] ? 1 : 0;
+        P += sl[i].label;
+        N += !sl[i].label;
+    }
+    if (P == 0 || N == 0) {
+        cml_free(sl);
+        return -1;
+    }
+    qsort(sl, (size_t)n, sizeof(ScoreLabel), scorelabel_cmp); /* ascending; read from the top */
+    int distinct = 1;
+    for (int i = 1; i < n; i++)
+        if (sl[i].score != sl[i - 1].score)
+            distinct++;
+    int np   = distinct + 1;
+    float* f = cml_malloc((size_t)np * sizeof(float));
+    float* t = cml_malloc((size_t)np * sizeof(float));
+    float* h = cml_malloc((size_t)np * sizeof(float));
+    if (!f || !t || !h) {
+        cml_free(sl);
+        cml_free(f);
+        cml_free(t);
+        cml_free(h);
+        return -1;
+    }
+    f[0]    = 0.0f;
+    t[0]    = 0.0f;
+    h[0]    = INFINITY;
+    long tp = 0, fp = 0;
+    int pt = 1;
+    for (int i = n - 1; i >= 0;) {
+        float s = sl[i].score;
+        while (i >= 0 && sl[i].score == s) {
+            if (sl[i].label)
+                tp++;
+            else
+                fp++;
+            i--;
+        }
+        f[pt] = (float)fp / N;
+        t[pt] = (float)tp / P;
+        h[pt] = s;
+        pt++;
+    }
+    cml_free(sl);
+    *fpr        = f;
+    *tpr        = t;
+    *thresholds = h;
+    return np;
+}
+
+/** Precision-recall curve: fills malloc'd precision/recall (length thr+1, last point (1,0)) and
+ * thresholds (ascending distinct scores), returns the threshold count or -1 on error.
+ * @param y_true (const int*)
+ * @param y_score (const float*)
+ * @param n (int)
+ * @param precision (float**)
+ * @param recall (float**)
+ * @param thresholds (float**)
+ * @return (int)
+ */
+int cml_precision_recall_curve(const int* y_true, const float* y_score, int n, float** precision,
+                               float** recall, float** thresholds) {
+    if (!y_true || !y_score || n <= 0 || !precision || !recall || !thresholds)
+        return -1;
+    ScoreLabel* sl = cml_malloc((size_t)n * sizeof(ScoreLabel));
+    int* suf_pos   = cml_malloc((size_t)(n + 1) * sizeof(int));
+    if (!sl || !suf_pos) {
+        cml_free(sl);
+        cml_free(suf_pos);
+        return -1;
+    }
+    long P = 0;
+    for (int i = 0; i < n; i++) {
+        sl[i].score = y_score[i];
+        sl[i].label = y_true[i] ? 1 : 0;
+        P += sl[i].label;
+    }
+    if (P == 0) {
+        cml_free(sl);
+        cml_free(suf_pos);
+        return -1;
+    }
+    qsort(sl, (size_t)n, sizeof(ScoreLabel), scorelabel_cmp); /* ascending */
+    suf_pos[n] = 0;
+    for (int i = n - 1; i >= 0; i--)
+        suf_pos[i] = suf_pos[i + 1] + sl[i].label;
+    int distinct = 1;
+    for (int i = 1; i < n; i++)
+        if (sl[i].score != sl[i - 1].score)
+            distinct++;
+    float* pr = cml_malloc((size_t)(distinct + 1) * sizeof(float));
+    float* rc = cml_malloc((size_t)(distinct + 1) * sizeof(float));
+    float* th = cml_malloc((size_t)distinct * sizeof(float));
+    if (!pr || !rc || !th) {
+        cml_free(sl);
+        cml_free(suf_pos);
+        cml_free(pr);
+        cml_free(rc);
+        cml_free(th);
+        return -1;
+    }
+    int k = 0;
+    for (int i = 0; i < n;) {
+        float s  = sl[i].score; /* first index of this distinct value = threshold */
+        long tp  = suf_pos[i];
+        long tot = n - i;
+        pr[k]    = (float)tp / tot;
+        rc[k]    = (float)tp / P;
+        th[k]    = s;
+        k++;
+        int j = i;
+        while (j < n && sl[j].score == s)
+            j++;
+        i = j;
+    }
+    pr[distinct] = 1.0f;
+    rc[distinct] = 0.0f;
+    cml_free(sl);
+    cml_free(suf_pos);
+    *precision  = pr;
+    *recall     = rc;
+    *thresholds = th;
+    return distinct;
+}
+
+/** Area under a curve by the trapezoidal rule over points (x[i], y[i]).
+ * @param x (const float*)
+ * @param y (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_auc(const float* x, const float* y, int n) {
+    if (!x || !y || n < 2)
+        return 0.0f;
+    double area = 0.0;
+    for (int i = 1; i < n; i++)
+        area += (double)(x[i] - x[i - 1]) * (y[i] + y[i - 1]) * 0.5;
+    return (float)fabs(area);
 }
