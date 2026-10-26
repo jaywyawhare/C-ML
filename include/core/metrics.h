@@ -341,6 +341,42 @@ int cml_precision_recall_curve(const int* y_true, const float* y_score, int n, f
  */
 float cml_auc(const float* x, const float* y, int n);
 
+/**
+ * Maximum absolute error between true and predicted values.
+ * @param y_true (const float*)
+ * @param y_pred (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_max_error(const float* y_true, const float* y_pred, int n);
+
+/**
+ * Median of the absolute errors between true and predicted values.
+ * @param y_true (const float*)
+ * @param y_pred (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_median_absolute_error(const float* y_true, const float* y_pred, int n);
+
+/**
+ * Mean squared logarithmic error over true and predicted values.
+ * @param y_true (const float*)
+ * @param y_pred (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_mean_squared_log_error(const float* y_true, const float* y_pred, int n);
+
+/**
+ * Explained-variance regression score.
+ * @param y_true (const float*)
+ * @param y_pred (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_explained_variance_score(const float* y_true, const float* y_pred, int n);
+
 #ifdef __cplusplus
 }
 #endif

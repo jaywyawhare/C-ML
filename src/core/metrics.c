@@ -984,3 +984,84 @@ float cml_auc(const float* x, const float* y, int n) {
         area += (double)(x[i] - x[i - 1]) * (y[i] + y[i - 1]) * 0.5;
     return (float)fabs(area);
 }
+
+/** Maximum absolute error between n true and predicted values.
+ * @param y_true (const float*)
+ * @param y_pred (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_max_error(const float* y_true, const float* y_pred, int n) {
+    if (!y_true || !y_pred || n <= 0)
+        return 0.0f;
+    float m = 0.0f;
+    for (int i = 0; i < n; i++) {
+        float e = fabsf(y_true[i] - y_pred[i]);
+        if (e > m)
+            m = e;
+    }
+    return m;
+}
+
+/** Median of the absolute errors between n true and predicted values.
+ * @param y_true (const float*)
+ * @param y_pred (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_median_absolute_error(const float* y_true, const float* y_pred, int n) {
+    if (!y_true || !y_pred || n <= 0)
+        return 0.0f;
+    float* e = cml_malloc((size_t)n * sizeof(float));
+    if (!e)
+        return 0.0f;
+    for (int i = 0; i < n; i++)
+        e[i] = fabsf(y_true[i] - y_pred[i]);
+    qsort(e, (size_t)n, sizeof(float), float_desc_cmp);
+    float med = (n % 2) ? e[n / 2] : 0.5f * (e[n / 2 - 1] + e[n / 2]);
+    cml_free(e);
+    return med;
+}
+
+/** Mean squared logarithmic error mean((log1p(y_true)-log1p(y_pred))^2); needs values > -1.
+ * @param y_true (const float*)
+ * @param y_pred (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_mean_squared_log_error(const float* y_true, const float* y_pred, int n) {
+    if (!y_true || !y_pred || n <= 0)
+        return 0.0f;
+    double s = 0.0;
+    for (int i = 0; i < n; i++) {
+        double d = log1p((double)y_true[i]) - log1p((double)y_pred[i]);
+        s += d * d;
+    }
+    return (float)(s / n);
+}
+
+/** Explained-variance score 1 - Var(y_true - y_pred) / Var(y_true) (population variance).
+ * @param y_true (const float*)
+ * @param y_pred (const float*)
+ * @param n (int)
+ * @return (float)
+ */
+float cml_explained_variance_score(const float* y_true, const float* y_pred, int n) {
+    if (!y_true || !y_pred || n <= 0)
+        return 0.0f;
+    double mt = 0.0, md = 0.0;
+    for (int i = 0; i < n; i++) {
+        mt += y_true[i];
+        md += (double)y_true[i] - y_pred[i];
+    }
+    mt /= n;
+    md /= n;
+    double var_err = 0.0, var_true = 0.0;
+    for (int i = 0; i < n; i++) {
+        double de = ((double)y_true[i] - y_pred[i]) - md;
+        double dt = (double)y_true[i] - mt;
+        var_err += de * de;
+        var_true += dt * dt;
+    }
+    return var_true > 0.0 ? (float)(1.0 - var_err / var_true) : 0.0f;
+}
