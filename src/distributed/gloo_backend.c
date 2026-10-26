@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
@@ -50,6 +51,15 @@ static GlooContext* get_gloo_ctx(void* ctx) { return ctx ? (GlooContext*)ctx : g
  * @param len (size_t)
  * @return (int)
  */
+/** Disable Nagle's algorithm on a peer socket so small ring-all-reduce messages aren't delayed.
+ * @param fd (int)
+ * @return (void)
+ */
+static void set_tcp_nodelay(int fd) {
+    int one = 1;
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
+}
+
 static int send_all(int fd, const void* buf, size_t len) {
     const char* p    = (const char*)buf;
     size_t remaining = len;
@@ -620,6 +630,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
         }
 
         gctx->peer_fds[peer] = sock;
+        set_tcp_nodelay(sock);
         LOG_DEBUG("Gloo rank %d connected to rank %d", rank, peer);
     }
 
@@ -648,6 +659,7 @@ static int gloo_init(void* ctx, int world_size, int rank) {
         }
 
         gctx->peer_fds[peer_rank] = client_fd;
+        set_tcp_nodelay(client_fd);
         LOG_DEBUG("Gloo rank %d accepted connection from rank %d", rank, peer_rank);
     }
 
