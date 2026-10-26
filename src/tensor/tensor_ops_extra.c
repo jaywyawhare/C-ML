@@ -1482,3 +1482,223 @@ Tensor* cml_resample(Tensor* x, int num) {
         zd[i] *= scale;
     return z;
 }
+
+/** Ascending float comparator for qsort (median-filter window sort). */
+static int float_asc_cmp_sig(const void* x, const void* y) {
+    float a = *(const float*)x, b = *(const float*)y;
+    return (a > b) - (a < b);
+}
+
+/** Build a 1-D float tensor from a buffer with float32/CPU-or-device config. */
+static Tensor* sig_vec(const float* data, int n, int device) {
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = device, .has_dtype = true, .has_device = true};
+    int shape[] = {n};
+    return tensor_from_data(data, shape, 1, &cfg);
+}
+
+/**
+ * Apply an IIR/FIR difference-equation filter with numerator b and denominator a to signal x.
+ * @param b (Tensor*)
+ * @param a (Tensor*)
+ * @param x (Tensor*)
+ * @return (Tensor*)
+ */
+Tensor* cml_lfilter(Tensor* b, Tensor* a, Tensor* x) {
+    if (!b || !a || !x || b->ndim != 1 || a->ndim != 1 || x->ndim != 1 || a->shape[0] < 1) {
+        LOG_ERROR("cml_lfilter: b, a, x must be 1-D and a non-empty");
+        return NULL;
+    }
+    tensor_ensure_executed(b);
+    tensor_ensure_executed(a);
+    tensor_ensure_executed(x);
+    if (!b->data || !a->data || !x->data)
+        return NULL;
+    int nb = b->shape[0], na = a->shape[0], n = x->shape[0];
+    float a0 = tensor_get_float(a, 0);
+    if (a0 == 0.0f) {
+        LOG_ERROR("cml_lfilter: a[0] must be non-zero");
+        return NULL;
+    }
+    float* y = cml_malloc((size_t)n * sizeof(float));
+    if (!y)
+        return NULL;
+    for (int i = 0; i < n; i++) {
+        double acc = 0.0;
+        for (int j = 0; j < nb; j++)
+            if (i - j >= 0)
+                acc += (double)tensor_get_float(b, j) * tensor_get_float(x, i - j);
+        for (int j = 1; j < na; j++)
+            if (i - j >= 0)
+                acc -= (double)tensor_get_float(a, j) * y[i - j];
+        y[i] = (float)(acc / a0);
+    }
+    Tensor* out = sig_vec(y, n, x->device);
+    cml_free(y);
+    return out;
+}
+
+/**
+ * Median filter of a 1-D signal with an odd kernel size (zero-padded edges, SciPy convention).
+ * @param x (Tensor*)
+ * @param kernel (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_medfilt(Tensor* x, int kernel) {
+    if (!x || x->ndim != 1 || kernel < 1 || kernel % 2 == 0) {
+        LOG_ERROR("cml_medfilt: need a 1-D signal and an odd kernel size");
+        return NULL;
+    }
+    tensor_ensure_executed(x);
+    if (!x->data)
+        return NULL;
+    int n    = x->shape[0];
+    int half = kernel / 2;
+    float* y = cml_malloc((size_t)n * sizeof(float));
+    float* w = cml_malloc((size_t)kernel * sizeof(float));
+    if (!y || !w) {
+        cml_free(y);
+        cml_free(w);
+        return NULL;
+    }
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < kernel; j++) {
+            int idx = i - half + j;
+            w[j]    = (idx >= 0 && idx < n) ? tensor_get_float(x, idx) : 0.0f; /* zero pad */
+        }
+        qsort(w, (size_t)kernel, sizeof(float), float_asc_cmp_sig);
+        y[i] = w[half];
+    }
+    Tensor* out = sig_vec(y, n, x->device);
+    cml_free(y);
+    cml_free(w);
+    return out;
+}
+
+/**
+ * Savitzky-Golay smoothing filter via a local polynomial fit per point (SciPy mode='interp').
+ * @param x (Tensor*)
+ * @param window_length (int)
+ * @param polyorder (int)
+ * @return (Tensor*)
+ */
+Tensor* cml_savgol_filter(Tensor* x, int window_length, int polyorder) {
+    if (!x || x->ndim != 1 || window_length < 1 || window_length % 2 == 0 ||
+        polyorder >= window_length || polyorder < 0 || window_length > x->shape[0]) {
+        LOG_ERROR("cml_savgol_filter: need odd window_length, polyorder<window_length<=n");
+        return NULL;
+    }
+    tensor_ensure_executed(x);
+    if (!x->data)
+        return NULL;
+    int n     = x->shape[0];
+    int half  = window_length / 2;
+    float* xs = cml_malloc((size_t)window_length * sizeof(float));
+    float* ys = cml_malloc((size_t)window_length * sizeof(float));
+    float* y  = cml_malloc((size_t)n * sizeof(float));
+    if (!xs || !ys || !y) {
+        cml_free(xs);
+        cml_free(ys);
+        cml_free(y);
+        return NULL;
+    }
+    for (int i = 0; i < window_length; i++)
+        xs[i] = (float)i;
+    Tensor* xt = sig_vec(xs, window_length, x->device);
+    for (int i = 0; i < n; i++) {
+        int start = i - half;
+        if (start < 0)
+            start = 0;
+        if (start > n - window_length)
+            start = n - window_length; /* clamp window to the signal (edge interpolation) */
+        for (int j = 0; j < window_length; j++)
+            ys[j] = tensor_get_float(x, start + j);
+        Tensor* yt     = sig_vec(ys, window_length, x->device);
+        Tensor* coeffs = (xt && yt) ? tensor_polyfit(xt, yt, polyorder) : NULL;
+        float pos      = (float)(i - start);
+        if (coeffs) {
+            Tensor* pt  = sig_vec(&pos, 1, x->device);
+            Tensor* val = pt ? tensor_polyval(coeffs, pt) : NULL;
+            y[i]        = val ? tensor_get_float(val, 0) : 0.0f;
+            tensor_free(pt);
+            tensor_free(val);
+        } else {
+            y[i] = ys[i - start];
+        }
+        tensor_free(yt);
+        tensor_free(coeffs);
+    }
+    tensor_free(xt);
+    Tensor* out = sig_vec(y, n, x->device);
+    cml_free(xs);
+    cml_free(ys);
+    cml_free(y);
+    return out;
+}
+
+/**
+ * Zero-crossing rate of a 1-D signal (fraction of adjacent samples whose sign differs).
+ * @param x (Tensor*)
+ * @return (float)
+ */
+float cml_zero_crossing_rate(Tensor* x) {
+    if (!x || x->ndim != 1 || x->shape[0] < 2)
+        return 0.0f;
+    tensor_ensure_executed(x);
+    if (!x->data)
+        return 0.0f;
+    int n       = x->shape[0];
+    int crosses = 0;
+    for (int i = 1; i < n; i++) {
+        float a = tensor_get_float(x, i - 1), b = tensor_get_float(x, i);
+        if ((a >= 0.0f) != (b >= 0.0f))
+            crosses++;
+    }
+    return (float)crosses / (n - 1);
+}
+
+/**
+ * Root-mean-square energy sqrt(mean(x^2)) of a 1-D signal.
+ * @param x (Tensor*)
+ * @return (float)
+ */
+float cml_rms_energy(Tensor* x) {
+    if (!x || x->ndim != 1 || x->shape[0] < 1)
+        return 0.0f;
+    tensor_ensure_executed(x);
+    if (!x->data)
+        return 0.0f;
+    int n    = x->shape[0];
+    double s = 0.0;
+    for (int i = 0; i < n; i++) {
+        float v = tensor_get_float(x, i);
+        s += (double)v * v;
+    }
+    return (float)sqrt(s / n);
+}
+
+/**
+ * Spectral centroid (magnitude-weighted mean frequency) of a 1-D signal at sample rate fs.
+ * @param x (Tensor*)
+ * @param fs (float)
+ * @return (float)
+ */
+float cml_spectral_centroid(Tensor* x, float fs) {
+    if (!x || x->ndim != 1 || fs <= 0.0f)
+        return 0.0f;
+    Tensor* R = cml_rfft(x);
+    if (!R)
+        return 0.0f;
+    int n      = x->shape[0];
+    int bins   = n / 2 + 1;
+    float* rd  = (float*)tensor_data_ptr(R);
+    double num = 0.0, den = 0.0;
+    for (int k = 0; k < bins; k++) {
+        double mag  = sqrt((double)rd[2 * k] * rd[2 * k] + (double)rd[2 * k + 1] * rd[2 * k + 1]);
+        double freq = (double)k * fs / n;
+        num += freq * mag;
+        den += mag;
+    }
+    tensor_free(R);
+    return den > 0.0 ? (float)(num / den) : 0.0f;
+}
