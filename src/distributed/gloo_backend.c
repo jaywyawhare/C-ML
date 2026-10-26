@@ -460,6 +460,37 @@ static int gloo_barrier(void* ctx) {
     return 0;
 }
 
+/** Resolve the connect address of a peer rank: the rank-th entry of a comma-separated GLOO_PEERS
+ * list when set (true multi-host), else the single MASTER_ADDR (same-host multi-port fallback).
+ * @param gctx (const GlooContext*)
+ * @param peer (int)
+ * @param out (char*)
+ * @param outsz (size_t)
+ * @return (void)
+ */
+static void gloo_peer_addr(const GlooContext* gctx, int peer, char* out, size_t outsz) {
+    const char* peers = getenv("GLOO_PEERS");
+    if (peers && peers[0]) {
+        int idx       = 0;
+        const char* p = peers;
+        while (idx < peer && (p = strchr(p, ','))) {
+            p++;
+            idx++;
+        }
+        if (idx == peer && *p && *p != ',') {
+            size_t k = 0;
+            while (p[k] && p[k] != ',' && k + 1 < outsz) {
+                out[k] = p[k];
+                k++;
+            }
+            out[k] = '\0';
+            return;
+        }
+    }
+    strncpy(out, gctx->master_addr, outsz - 1);
+    out[outsz - 1] = '\0';
+}
+
 /**
  * Bring up the peer mesh: read MASTER_ADDR/GLOO_PORT, listen on port_base+rank,
  * then connect to higher ranks and accept from lower ones for a deadlock-free,
@@ -566,16 +597,18 @@ static int gloo_init(void* ctx, int world_size, int rank) {
         memset(&peer_addr, 0, sizeof(peer_addr));
         peer_addr.sin_family = AF_INET;
         peer_addr.sin_port   = htons((uint16_t)(gctx->port_base + peer));
-        if (inet_pton(AF_INET, gctx->master_addr, &peer_addr.sin_addr) <= 0) {
-            LOG_ERROR("Gloo init: invalid master address '%s'", gctx->master_addr);
+        char peer_host[256];
+        gloo_peer_addr(gctx, peer, peer_host, sizeof(peer_host));
+        if (inet_pton(AF_INET, peer_host, &peer_addr.sin_addr) <= 0) {
+            LOG_ERROR("Gloo init: invalid peer address '%s' for rank %d", peer_host, peer);
             goto cleanup_error;
         }
 
         int sock = cml_sock_connect_retry((struct sockaddr*)&peer_addr, sizeof(peer_addr),
                                           GLOO_MAX_CONNECT_RETRIES, GLOO_CONNECT_RETRY_US);
         if (sock < 0) {
-            LOG_ERROR("Gloo init: failed to connect to rank %d at %s:%d: %s", peer,
-                      gctx->master_addr, gctx->port_base + peer, strerror(errno));
+            LOG_ERROR("Gloo init: failed to connect to rank %d at %s:%d: %s", peer, peer_host,
+                      gctx->port_base + peer, strerror(errno));
             goto cleanup_error;
         }
 
