@@ -928,6 +928,86 @@ Tensor* tensor_hankel(Tensor* c, Tensor* r);
  */
 Tensor* tensor_detrend(Tensor* y, int type);
 
+/**
+ * Median absolute deviation median(|x - median(x)|) over all elements.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_mad(Tensor* a);
+
+/**
+ * Trimmed mean after discarding a `proportion` fraction of elements from each sorted end.
+ * @param a (Tensor*)
+ * @param proportion (float)
+ * @return (float)
+ */
+float tensor_trim_mean(Tensor* a, float proportion);
+
+/**
+ * Standard error of the mean (sample std with ddof=1 divided by sqrt(n)).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_sem(Tensor* a);
+
+/**
+ * Winsorize all elements, clamping the lowest/highest fractions to the kept boundary values.
+ * @param a (Tensor*)
+ * @param lower (float)
+ * @param upper (float)
+ * @return (Tensor*)
+ */
+Tensor* tensor_winsorize(Tensor* a, float lower, float upper);
+
+/**
+ * Minkowski distance (sum|a-b|^p)^(1/p) between two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param p (float)
+ * @return (float)
+ */
+float tensor_minkowski_distance(Tensor* a, Tensor* b, float p);
+
+/**
+ * Chebyshev (L-infinity) distance between two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float tensor_chebyshev_distance(Tensor* a, Tensor* b);
+
+/**
+ * Hamming distance (fraction of differing positions) between two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float tensor_hamming_distance(Tensor* a, Tensor* b);
+
+/**
+ * Mahalanobis distance sqrt((a-b)^T VI (a-b)) with inverse covariance VI [d,d].
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param vi (Tensor*)
+ * @return (float)
+ */
+float tensor_mahalanobis_distance(Tensor* a, Tensor* b, Tensor* vi);
+
+typedef struct {
+    Tensor* centroids; // Cluster centers [k, features]
+    Tensor* labels;    // Assigned cluster index per sample [samples], as float
+    float inertia;     // Sum of squared distances of samples to their centroid
+} KMeansResult;
+
+/**
+ * Lloyd's k-means on a 2D [samples,features] matrix with deterministic first-k initialization.
+ * @param x (Tensor*)
+ * @param k (int)
+ * @param max_iter (int)
+ * @return (KMeansResult)
+ */
+KMeansResult tensor_kmeans(Tensor* x, int k, int max_iter);
+
 Tensor* tensor_from_url(const char* url);
 
 Tensor* tensor_where(Tensor* condition, Tensor* x, Tensor* y);

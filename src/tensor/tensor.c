@@ -4808,6 +4808,300 @@ Tensor* tensor_detrend(Tensor* y, int type) {
 }
 
 /**
+ * Median absolute deviation median(|x - median(x)|) over all elements.
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_mad(Tensor* a) {
+    int n      = 0;
+    float* buf = tensor_sorted_values(a, &n);
+    if (!buf)
+        return 0.0f;
+    float med = sorted_quantile(buf, n, 0.5f);
+    for (int i = 0; i < n; i++)
+        buf[i] = fabsf(buf[i] - med);
+    qsort(buf, n, sizeof(float), float_asc_cmp);
+    float mad = sorted_quantile(buf, n, 0.5f);
+    cml_free(buf);
+    return mad;
+}
+
+/**
+ * Trimmed mean after discarding a `proportion` fraction of elements from each sorted end.
+ * @param a (Tensor*)
+ * @param proportion (float)
+ * @return (float)
+ */
+float tensor_trim_mean(Tensor* a, float proportion) {
+    if (proportion < 0.0f || proportion >= 0.5f) {
+        LOG_ERROR("tensor_trim_mean: proportion must be in [0, 0.5)");
+        return 0.0f;
+    }
+    int n      = 0;
+    float* buf = tensor_sorted_values(a, &n);
+    if (!buf)
+        return 0.0f;
+    int cut   = (int)(n * proportion);
+    double s  = 0.0;
+    int count = 0;
+    for (int i = cut; i < n - cut; i++) {
+        s += buf[i];
+        count++;
+    }
+    cml_free(buf);
+    return count ? (float)(s / count) : 0.0f;
+}
+
+/**
+ * Standard error of the mean (sample std with ddof=1 divided by sqrt(n)).
+ * @param a (Tensor*)
+ * @return (float)
+ */
+float tensor_sem(Tensor* a) {
+    if (!a)
+        return 0.0f;
+    tensor_ensure_executed(a);
+    if (!a->data || a->numel < 2)
+        return 0.0f;
+    size_t n  = a->numel;
+    double mu = 0.0;
+    for (size_t i = 0; i < n; i++)
+        mu += tensor_get_float(a, i);
+    mu /= n;
+    double var = 0.0;
+    for (size_t i = 0; i < n; i++) {
+        double d = tensor_get_float(a, i) - mu;
+        var += d * d;
+    }
+    var /= (n - 1);
+    return (float)(sqrt(var) / sqrt((double)n));
+}
+
+/**
+ * Winsorize all elements, clamping the lowest/highest fractions to the kept boundary values.
+ * @param a (Tensor*)
+ * @param lower (float)
+ * @param upper (float)
+ * @return (Tensor*)
+ */
+Tensor* tensor_winsorize(Tensor* a, float lower, float upper) {
+    int n      = 0;
+    float* buf = tensor_sorted_values(a, &n);
+    if (!buf)
+        return NULL;
+    int glo      = (int)(n * lower);
+    int ghi      = (int)(n * upper);
+    float lo_val = buf[glo];
+    float hi_val = buf[n - 1 - ghi];
+    cml_free(buf);
+    tensor_ensure_executed(a);
+    float* out = cml_malloc(a->numel * sizeof(float));
+    if (!out)
+        return NULL;
+    for (size_t i = 0; i < a->numel; i++) {
+        float v = tensor_get_float(a, i);
+        out[i]  = v < lo_val ? lo_val : (v > hi_val ? hi_val : v);
+    }
+    TensorConfig config = {
+        .dtype = a->dtype, .device = a->device, .has_dtype = true, .has_device = true};
+    Tensor* result = tensor_from_data(out, a->shape, a->ndim, &config);
+    cml_free(out);
+    return result;
+}
+
+/**
+ * Minkowski distance (sum|a-b|^p)^(1/p) between two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param p (float)
+ * @return (float)
+ */
+float tensor_minkowski_distance(Tensor* a, Tensor* b, float p) {
+    int n;
+    if (!vec_pair(a, b, &n) || p <= 0.0f)
+        return 0.0f;
+    double s = 0.0;
+    for (int i = 0; i < n; i++)
+        s += pow(fabs((double)tensor_get_float(a, i) - tensor_get_float(b, i)), p);
+    return (float)pow(s, 1.0 / p);
+}
+
+/**
+ * Chebyshev (L-infinity) distance between two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float tensor_chebyshev_distance(Tensor* a, Tensor* b) {
+    int n;
+    if (!vec_pair(a, b, &n))
+        return 0.0f;
+    float best = 0.0f;
+    for (int i = 0; i < n; i++) {
+        float d = fabsf(tensor_get_float(a, i) - tensor_get_float(b, i));
+        if (d > best)
+            best = d;
+    }
+    return best;
+}
+
+/**
+ * Hamming distance (fraction of differing positions) between two equal-length 1-D vectors.
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @return (float)
+ */
+float tensor_hamming_distance(Tensor* a, Tensor* b) {
+    int n;
+    if (!vec_pair(a, b, &n))
+        return 0.0f;
+    int diff = 0;
+    for (int i = 0; i < n; i++)
+        diff += tensor_get_float(a, i) != tensor_get_float(b, i);
+    return (float)diff / n;
+}
+
+/**
+ * Mahalanobis distance sqrt((a-b)^T VI (a-b)) with inverse covariance VI [d,d].
+ * @param a (Tensor*)
+ * @param b (Tensor*)
+ * @param vi (Tensor*)
+ * @return (float)
+ */
+float tensor_mahalanobis_distance(Tensor* a, Tensor* b, Tensor* vi) {
+    int n;
+    if (!vec_pair(a, b, &n) || !vi || vi->ndim != 2 || vi->shape[0] != n || vi->shape[1] != n) {
+        LOG_ERROR("tensor_mahalanobis_distance: need vectors and a matching [d,d] VI");
+        return 0.0f;
+    }
+    tensor_ensure_executed(vi);
+    if (!vi->data)
+        return 0.0f;
+    float* d = cml_malloc((size_t)n * sizeof(float));
+    if (!d)
+        return 0.0f;
+    for (int i = 0; i < n; i++)
+        d[i] = tensor_get_float(a, i) - tensor_get_float(b, i);
+    double s = 0.0;
+    for (int i = 0; i < n; i++) {
+        double row = 0.0;
+        for (int j = 0; j < n; j++)
+            row += (double)d[j] * tensor_get_float(vi, (size_t)i * n + j);
+        s += row * d[i];
+    }
+    cml_free(d);
+    return (float)sqrt(s > 0.0 ? s : 0.0);
+}
+
+/**
+ * Lloyd's k-means on a 2D [samples,features] matrix with deterministic first-k initialization.
+ * @param x (Tensor*)
+ * @param k (int)
+ * @param max_iter (int)
+ * @return (KMeansResult)
+ */
+KMeansResult tensor_kmeans(Tensor* x, int k, int max_iter) {
+    KMeansResult result = {NULL, NULL, 0.0f};
+    if (!x || x->ndim != 2 || k < 1 || k > x->shape[0]) {
+        LOG_ERROR("tensor_kmeans: need a 2D matrix and 1 <= k <= samples");
+        return result;
+    }
+    tensor_ensure_executed(x);
+    if (!x->data)
+        return result;
+    int ns = x->shape[0], d = x->shape[1];
+    if (max_iter < 1)
+        max_iter = 100;
+    TensorConfig config = {
+        .dtype = x->dtype, .device = x->device, .has_dtype = true, .has_device = true};
+    int cshape[] = {k, d};
+    float* cent  = cml_malloc((size_t)k * d * sizeof(float));
+    int* labels  = cml_malloc((size_t)ns * sizeof(int));
+    float* sum   = cml_malloc((size_t)k * d * sizeof(float));
+    int* counts  = cml_malloc((size_t)k * sizeof(int));
+    if (!cent || !labels || !sum || !counts) {
+        cml_free(cent);
+        cml_free(labels);
+        cml_free(sum);
+        cml_free(counts);
+        return result;
+    }
+    for (int c = 0; c < k; c++) /* deterministic init: first k samples */
+        for (int j = 0; j < d; j++)
+            cent[(size_t)c * d + j] = tensor_get_float(x, (size_t)c * d + j);
+
+    Tensor* centroids = NULL;
+    for (int iter = 0; iter < max_iter; iter++) {
+        centroids    = tensor_from_data(cent, cshape, 2, &config);
+        Tensor* dist = centroids ? tensor_cdist(x, centroids) : NULL;
+        tensor_free(centroids);
+        centroids = NULL;
+        if (!dist) {
+            cml_free(cent);
+            cml_free(labels);
+            cml_free(sum);
+            cml_free(counts);
+            return result;
+        }
+        int changed = 0;
+        for (int i = 0; i < ns; i++) {
+            int best    = 0;
+            float bestd = tensor_get_float(dist, (size_t)i * k);
+            for (int c = 1; c < k; c++) {
+                float dc = tensor_get_float(dist, (size_t)i * k + c);
+                if (dc < bestd) {
+                    bestd = dc;
+                    best  = c;
+                }
+            }
+            if (iter == 0 || labels[i] != best)
+                changed = 1;
+            labels[i] = best;
+        }
+        tensor_free(dist);
+        for (int c = 0; c < k * d; c++)
+            sum[c] = 0.0f;
+        for (int c = 0; c < k; c++)
+            counts[c] = 0;
+        for (int i = 0; i < ns; i++) {
+            counts[labels[i]]++;
+            for (int j = 0; j < d; j++)
+                sum[(size_t)labels[i] * d + j] += tensor_get_float(x, (size_t)i * d + j);
+        }
+        for (int c = 0; c < k; c++)
+            if (counts[c] > 0)
+                for (int j = 0; j < d; j++)
+                    cent[(size_t)c * d + j] = sum[(size_t)c * d + j] / counts[c];
+        if (!changed)
+            break;
+    }
+
+    double inertia = 0.0;
+    for (int i = 0; i < ns; i++) {
+        int c = labels[i];
+        for (int j = 0; j < d; j++) {
+            double diff = (double)tensor_get_float(x, (size_t)i * d + j) - cent[(size_t)c * d + j];
+            inertia += diff * diff;
+        }
+    }
+    float* lab_f = cml_malloc((size_t)ns * sizeof(float));
+    if (lab_f) {
+        for (int i = 0; i < ns; i++)
+            lab_f[i] = (float)labels[i];
+        int lshape[]     = {ns};
+        result.centroids = tensor_from_data(cent, cshape, 2, &config);
+        result.labels    = tensor_from_data(lab_f, lshape, 1, &config);
+        result.inertia   = (float)inertia;
+        cml_free(lab_f);
+    }
+    cml_free(cent);
+    cml_free(labels);
+    cml_free(sum);
+    cml_free(counts);
+    return result;
+}
+
+/**
  * Download `url` (via curl/wget) to a temp file and load it with tensor_read_file.
  * NULL on download or parse failure.
  * @param url (const char*)
