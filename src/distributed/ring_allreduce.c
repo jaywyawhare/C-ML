@@ -64,24 +64,25 @@ static int ring_sendrecv(DistCommOps* ops, Tensor* send_t, int right, Tensor* re
  * @return (void)
  */
 static void apply_reduce_op(float* dst, const float* src, size_t n, DistReduceOp op) {
-    for (size_t i = 0; i < n; i++) {
-        switch (op) {
-        case DIST_REDUCE_SUM:
-        case DIST_REDUCE_AVG:
+    /* Switch hoisted out of the loop so each branch is a tight, auto-vectorizable kernel. */
+    switch (op) {
+    case DIST_REDUCE_SUM:
+    case DIST_REDUCE_AVG:
+        for (size_t i = 0; i < n; i++)
             dst[i] += src[i];
-            break;
-        case DIST_REDUCE_PRODUCT:
+        break;
+    case DIST_REDUCE_PRODUCT:
+        for (size_t i = 0; i < n; i++)
             dst[i] *= src[i];
-            break;
-        case DIST_REDUCE_MAX:
-            if (src[i] > dst[i])
-                dst[i] = src[i];
-            break;
-        case DIST_REDUCE_MIN:
-            if (src[i] < dst[i])
-                dst[i] = src[i];
-            break;
-        }
+        break;
+    case DIST_REDUCE_MAX:
+        for (size_t i = 0; i < n; i++)
+            dst[i] = src[i] > dst[i] ? src[i] : dst[i];
+        break;
+    case DIST_REDUCE_MIN:
+        for (size_t i = 0; i < n; i++)
+            dst[i] = src[i] < dst[i] ? src[i] : dst[i];
+        break;
     }
 }
 
