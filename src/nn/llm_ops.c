@@ -630,7 +630,7 @@ void cml_flash_attention_fold_tile(float* row_max, float* row_sum, float* acc, f
                                    const float* q_head, int q_stride, int tq_len, int q_pos0,
                                    const float* k_head, const float* v_head, int kv_stride,
                                    int tkv_len, int kv_pos0, int head_dim, float scale, bool causal,
-                                   int window_size) {
+                                   int window_size, int num_sink, float alibi_slope) {
     for (int qi = 0; qi < tq_len; qi++) {
         int sq            = q_pos0 + qi;
         const float* qrow = q_head + (size_t)qi * q_stride;
@@ -641,9 +641,12 @@ void cml_flash_attention_fold_tile(float* row_max, float* row_sum, float* acc, f
             for (int d = 0; d < head_dim; d++)
                 dot += qrow[d] * krow[d];
             float s = dot * scale;
+            if (alibi_slope != 0.0f)
+                s += -alibi_slope * (float)(sq - sk);
             if (causal && sk > sq)
                 s = -1e30f;
-            if (window_size > 0) {
+            /* Sliding window, but the first num_sink "attention sink" tokens stay visible. */
+            if (window_size > 0 && sk >= num_sink) {
                 int dist = sq - sk;
                 if (dist < 0)
                     dist = -dist;
@@ -681,6 +684,28 @@ void cml_flash_attention_fold_tile(float* row_max, float* row_sum, float* acc, f
         row_sum[qi] += tile_sum;
         row_max[qi] = new_max;
     }
+}
+
+/**
+ * Write the @p num_heads ALiBi per-head slopes into @p out (geometric sequence 2^(-8i/n), with
+ * the paper's interpolation for a non-power-of-two head count).
+ * @param num_heads (int)
+ * @param out (float*)
+ * @return (void)
+ */
+void cml_alibi_slopes(int num_heads, float* out) {
+    if (num_heads <= 0 || !out)
+        return;
+    int closest = 1;
+    while (closest * 2 <= num_heads)
+        closest *= 2;
+    float base = powf(2.0f, -8.0f / (float)closest);
+    for (int i = 0; i < closest; i++)
+        out[i] = powf(base, (float)(i + 1));
+    /* Remaining heads interpolate with the slopes of the next power of two (odd powers). */
+    float extra = powf(2.0f, -8.0f / (float)(2 * closest));
+    for (int i = 0, idx = closest; idx < num_heads; i++, idx++)
+        out[idx] = powf(extra, (float)(2 * i + 1));
 }
 
 /**
@@ -763,10 +788,26 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfi
     }
 
     int window_size = config->window_size;
+    int num_sink    = config->num_sink_tokens;
+
+    float* alibi = NULL;
+    if (config->use_alibi) {
+        alibi = (float*)cml_malloc((size_t)num_heads * sizeof(float));
+        if (!alibi) {
+            cml_free(output);
+            cml_free(row_max);
+            cml_free(row_sum);
+            cml_free(tile_scores);
+            cml_free(acc);
+            return NULL;
+        }
+        cml_alibi_slopes(num_heads, alibi);
+    }
 
     for (int b = 0; b < batch; b++) {
         for (int h = 0; h < num_heads; h++) {
-            int kv_h = h / groups;
+            int kv_h          = h / groups;
+            float alibi_slope = alibi ? alibi[h] : 0.0f;
 
             /* Process Q in tiles */
             for (int tq_start = 0; tq_start < seq_q; tq_start += tile_q) {
@@ -801,7 +842,7 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfi
                     cml_flash_attention_fold_tile(
                         row_max, row_sum, acc, tile_scores, q_head, num_heads * head_dim, tq_len,
                         tq_start, k_head, v_head, num_kv_heads * head_dim, tkv_len, tkv_start,
-                        head_dim, scale, config->causal, window_size);
+                        head_dim, scale, config->causal, window_size, num_sink, alibi_slope);
                 }
 
                 /* Normalize by sum and write output */
@@ -821,6 +862,7 @@ Tensor* cml_gqa_flash_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfi
     cml_free(row_sum);
     cml_free(tile_scores);
     cml_free(acc);
+    cml_free(alibi);
 
     int out_shape[]      = {batch, seq_q, num_heads * head_dim};
     TensorConfig out_cfg = {
@@ -934,6 +976,16 @@ Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) 
     if (base <= 0.0f)
         base = 10000.0f;
 
+    /* Context-extension scaling: linear interpolates positions, NTK rescales the base. */
+    float pos_scale = 1.0f;
+    float factor    = config->scaling_factor;
+    if (factor > 1.0f) {
+        if (config->scaling == CML_ROPE_SCALING_LINEAR)
+            pos_scale = 1.0f / factor;
+        else if (config->scaling == CML_ROPE_SCALING_NTK && dim > 2)
+            base *= powf(factor, (float)dim / (float)(dim - 2));
+    }
+
     /* Compute the total number of vectors to apply RoPE to.
      * The last dimension is head_dim and we rotate pairs within it.
      * All other dimensions are "batch" dimensions. */
@@ -962,7 +1014,7 @@ Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) 
                     ((size_t)b * seq_len * num_heads + (size_t)s * num_heads + h) * last_dim;
                 for (int i = 0; i < half_dim; i++) {
                     float freq                 = 1.0f / powf(base, (float)(2 * i) / (float)dim);
-                    float theta                = (float)pos * freq;
+                    float theta                = (float)pos * pos_scale * freq;
                     float cos_t                = cosf(theta);
                     float sin_t                = sinf(theta);
                     float x0                   = data[base_idx + 2 * i];
@@ -984,7 +1036,7 @@ Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) 
                 size_t base_idx = ((size_t)b * seq_len + s) * last_dim;
                 for (int i = 0; i < half_dim; i++) {
                     float freq                 = 1.0f / powf(base, (float)(2 * i) / (float)dim);
-                    float theta                = (float)pos * freq;
+                    float theta                = (float)pos * pos_scale * freq;
                     float cos_t                = cosf(theta);
                     float sin_t                = sinf(theta);
                     float x0                   = data[base_idx + 2 * i];
@@ -1002,7 +1054,7 @@ Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config) 
             size_t base_idx = (size_t)s * last_dim;
             for (int i = 0; i < half_dim; i++) {
                 float freq                 = 1.0f / powf(base, (float)(2 * i) / (float)dim);
-                float theta                = (float)pos * freq;
+                float theta                = (float)pos * pos_scale * freq;
                 float cos_t                = cosf(theta);
                 float sin_t                = sinf(theta);
                 float x0                   = data[base_idx + 2 * i];

@@ -64,6 +64,8 @@
 #include "core/pth_loader.h"
 #include "core/tinyfs.h"
 #include "nn/llm_ops.h"
+#include "nn/sampling.h"
+#include "nn/quantization.h"
 #include "alloc/tlsf_alloc.h"
 
 #include "zoo/zoo.h"

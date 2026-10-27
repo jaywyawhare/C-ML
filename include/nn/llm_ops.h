@@ -53,12 +53,14 @@ Tensor* cml_kv_cache_get_keys(CMLKVCache* cache);
 Tensor* cml_kv_cache_get_values(CMLKVCache* cache);
 
 typedef struct CMLGQAConfig {
-    int num_heads;    /* Total attention heads (Q) */
-    int num_kv_heads; /* Number of KV heads (K, V) - can be < num_heads */
-    int head_dim;     /* Dimension per head */
-    float scale;      /* Attention scale (default: 1/sqrt(head_dim)) */
-    bool causal;      /* Apply causal mask */
-    int window_size;  /* Sliding window size (0 = unlimited) */
+    int num_heads;       /* Total attention heads (Q) */
+    int num_kv_heads;    /* Number of KV heads (K, V) - can be < num_heads */
+    int head_dim;        /* Dimension per head */
+    float scale;         /* Attention scale (default: 1/sqrt(head_dim)) */
+    bool causal;         /* Apply causal mask */
+    int window_size;     /* Sliding window size (0 = unlimited) */
+    int num_sink_tokens; /* StreamingLLM: first N tokens stay attended past the window (0 = off) */
+    bool use_alibi;      /* Add ALiBi linear position bias instead of relying on RoPE */
 } CMLGQAConfig;
 
 typedef struct CMLFlashAttentionConfig {
@@ -70,11 +72,20 @@ typedef struct CMLFlashAttentionConfig {
 CMLFlashAttentionConfig cml_flash_attention_default_config(void);
 
 /**
+ * Write the num_heads ALiBi per-head slopes into out (geometric sequence 2^(-8i/n)).
+ * @param num_heads (int)
+ * @param out (float*)
+ * @return (void)
+ */
+void cml_alibi_slopes(int num_heads, float* out);
+
+/**
  * Fold one KV tile into a Q tile's FlashAttention online-softmax state (shared by the local
  * and ring attention kernels). Masking uses global positions q_pos0+qi / kv_pos0+ki. Query
  * rows are q_head[qi*q_stride + d]; KV rows k_head/v_head[ki*kv_stride + d]. State buffers
  * row_max (init -1e30f), row_sum (init 0), acc (init 0) and scratch scores[tq_len*tkv_len]
- * are caller-owned; normalize acc by row_sum after the last tile.
+ * are caller-owned; normalize acc by row_sum after the last tile. The first num_sink keys stay
+ * attended past the sliding window; a non-zero alibi_slope adds the ALiBi -slope*(sq-sk) bias.
  * @param row_max (float*)
  * @param row_sum (float*)
  * @param acc (float*)
@@ -92,13 +103,15 @@ CMLFlashAttentionConfig cml_flash_attention_default_config(void);
  * @param scale (float)
  * @param causal (bool)
  * @param window_size (int)
+ * @param num_sink (int)
+ * @param alibi_slope (float)
  * @return (void)
  */
 void cml_flash_attention_fold_tile(float* row_max, float* row_sum, float* acc, float* scores,
                                    const float* q_head, int q_stride, int tq_len, int q_pos0,
                                    const float* k_head, const float* v_head, int kv_stride,
                                    int tkv_len, int kv_pos0, int head_dim, float scale, bool causal,
-                                   int window_size);
+                                   int window_size, int num_sink, float alibi_slope);
 
 /**
  * Flash GQA forward pass (O(N) memory via online softmax)
@@ -138,10 +151,18 @@ Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* con
 Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_cache,
                                const CMLGQAConfig* config);
 
+typedef enum {
+    CML_ROPE_SCALING_NONE = 0, /* No context-length scaling */
+    CML_ROPE_SCALING_LINEAR,   /* Position Interpolation: positions divided by factor */
+    CML_ROPE_SCALING_NTK,      /* NTK-aware: base scaled by factor^(dim/(dim-2)) */
+} CMLRoPEScalingType;
+
 typedef struct CMLRoPEConfig {
-    int dim;         /* Embedding dimension */
-    int max_seq_len; /* Maximum sequence length */
-    float base;      /* Base frequency (default: 10000.0) */
+    int dim;                    /* Embedding dimension */
+    int max_seq_len;            /* Maximum sequence length */
+    float base;                 /* Base frequency (default: 10000.0) */
+    CMLRoPEScalingType scaling; /* Context-extension scaling mode (default: NONE) */
+    float scaling_factor;       /* Context-extension factor (>1 extends; 0/1 = no scaling) */
 } CMLRoPEConfig;
 
 /**

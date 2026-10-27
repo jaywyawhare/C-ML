@@ -522,6 +522,8 @@ set(NN_SOURCES
     src/nn/layers/identity.c
     src/nn/layers/prelu.c
     src/nn/llm_ops.c
+    src/nn/sampling.c
+    src/nn/quantization.c
     src/nn/llama.c
     src/nn/lora.c
     src/nn/qlora.c

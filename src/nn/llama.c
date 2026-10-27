@@ -1,6 +1,7 @@
 #include "nn/llama.h"
 #include "core/threefry.h"
 #include "nn/llm_ops.h"
+#include "nn/sampling.h"
 #include "core/gguf.h"
 #include "ops/uops.h"
 #include "core/logging.h"
@@ -695,27 +696,6 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
     return logits;
 }
 
-typedef struct {
-    float value;
-    int index;
-} LogitEntry;
-
-/**
- * qsort comparator ordering LogitEntry by value, descending.
- * @param a (const void*)
- * @param b (const void*)
- * @return (int)
- */
-static int logit_entry_cmp_desc(const void* a, const void* b) {
-    float va = ((const LogitEntry*)a)->value;
-    float vb = ((const LogitEntry*)b)->value;
-    if (va > vb)
-        return -1;
-    if (va < vb)
-        return 1;
-    return 0;
-}
-
 /**
  * Pick the next token from the last position's logits: greedy argmax, or
  * temperature scaling followed by top-k then top-p (nucleus) sampling.
@@ -760,89 +740,39 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
         return best_id;
     }
 
-    /* Apply temperature */
-    float* scaled = (float*)cml_malloc((size_t)vocab_size * sizeof(float));
-    if (!scaled)
-        return -1;
-
-    float inv_temp = 1.0f / config->temperature;
-    for (int i = 0; i < vocab_size; i++) {
-        scaled[i] = token_logits[i] * inv_temp;
-    }
-
-    /* Build sorted entries for top-k / top-p filtering */
-    LogitEntry* entries = (LogitEntry*)cml_malloc((size_t)vocab_size * sizeof(LogitEntry));
-    if (!entries) {
-        cml_free(scaled);
+    float* work  = (float*)cml_malloc((size_t)vocab_size * sizeof(float));
+    float* probs = (float*)cml_malloc((size_t)vocab_size * sizeof(float));
+    if (!work || !probs) {
+        cml_free(work);
+        cml_free(probs);
         return -1;
     }
+    memcpy(work, token_logits, (size_t)vocab_size * sizeof(float));
 
-    for (int i = 0; i < vocab_size; i++) {
-        entries[i].value = scaled[i];
-        entries[i].index = i;
-    }
-    qsort(entries, (size_t)vocab_size, sizeof(LogitEntry), logit_entry_cmp_desc);
+    cml_logits_temperature(work, vocab_size, config->temperature);
+    cml_logits_top_k(work, vocab_size, config->top_k);
+    cml_logits_top_p(work, vocab_size, config->top_p);
+    cml_softmax_row_temp(work, vocab_size, 1.0f, probs); /* masked logits -> 0 probability */
 
-    /* Top-k filtering: keep only top_k entries */
-    int k = config->top_k;
-    if (k <= 0 || k > vocab_size)
-        k = vocab_size;
-
-    /* Softmax over top-k entries */
-    float max_val = entries[0].value;
-    float sum_exp = 0.0f;
-    for (int i = 0; i < k; i++) {
-        entries[i].value = expf(entries[i].value - max_val);
-        sum_exp += entries[i].value;
-    }
-    for (int i = 0; i < k; i++) {
-        entries[i].value /= sum_exp;
-    }
-
-    /* Top-p (nucleus) filtering */
-    float cumulative = 0.0f;
-    int cutoff       = k;
-    if (config->top_p > 0.0f && config->top_p < 1.0f) {
-        for (int i = 0; i < k; i++) {
-            cumulative += entries[i].value;
-            if (cumulative >= config->top_p) {
-                cutoff = i + 1;
-                break;
-            }
-        }
-    }
-
-    /* Re-normalize after top-p cutoff */
-    if (cutoff < k) {
-        float re_sum = 0.0f;
-        for (int i = 0; i < cutoff; i++) {
-            re_sum += entries[i].value;
-        }
-        if (re_sum > 0.0f) {
-            for (int i = 0; i < cutoff; i++) {
-                entries[i].value /= re_sum;
-            }
-        }
-    }
-
-    /* Sample from the distribution */
     float r;
-    {
-        CMLRNGState* rng = cml_rng_get_global();
-        cml_rng_uniform(rng, &r, 1);
-    }
+    cml_rng_uniform(cml_rng_get_global(), &r, 1);
     float acc      = 0.0f;
-    int sampled_id = entries[0].index;
-    for (int i = 0; i < cutoff; i++) {
-        acc += entries[i].value;
+    float best     = -1.0f;
+    int sampled_id = 0; /* falls back to the argmax if rounding leaves r past the total */
+    for (int i = 0; i < vocab_size; i++) {
+        if (probs[i] > best) {
+            best       = probs[i];
+            sampled_id = i;
+        }
+        acc += probs[i];
         if (r <= acc) {
-            sampled_id = entries[i].index;
+            sampled_id = i;
             break;
         }
     }
 
-    cml_free(entries);
-    cml_free(scaled);
+    cml_free(work);
+    cml_free(probs);
     return sampled_id;
 }
 

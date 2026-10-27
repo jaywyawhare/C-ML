@@ -17,13 +17,15 @@
 static void ring_fold_shard(float* row_max, float* row_sum, float* acc, float* scores,
                             const float* q, int seq_q, int q_pos0, const float* k, const float* v,
                             int kv_len, int kv_pos0, int batch, int num_heads, int num_kv_heads,
-                            int head_dim, float scale, bool causal, int window) {
+                            int head_dim, float scale, bool causal, int window, int num_sink,
+                            const float* alibi) {
     int groups    = num_heads / num_kv_heads;
     int q_stride  = num_heads * head_dim;
     int kv_stride = num_kv_heads * head_dim;
     for (int b = 0; b < batch; b++) {
         for (int h = 0; h < num_heads; h++) {
             int kv_h            = h / groups;
+            float alibi_slope   = alibi ? alibi[h] : 0.0f;
             const float* q_head = q + ((size_t)b * seq_q * num_heads + h) * head_dim;
             const float* k_head = k + ((size_t)b * kv_len * num_kv_heads + kv_h) * head_dim;
             const float* v_head = v + ((size_t)b * kv_len * num_kv_heads + kv_h) * head_dim;
@@ -31,7 +33,7 @@ static void ring_fold_shard(float* row_max, float* row_sum, float* acc, float* s
             cml_flash_attention_fold_tile(row_max + st, row_sum + st, acc + st * head_dim, scores,
                                           q_head, q_stride, seq_q, q_pos0, k_head, v_head,
                                           kv_stride, kv_len, kv_pos0, head_dim, scale, causal,
-                                          window);
+                                          window, num_sink, alibi_slope);
         }
     }
 }
@@ -87,14 +89,22 @@ static Tensor* ring_attention_core(Tensor* Q, Tensor* K, Tensor* V, const CMLGQA
     float scale   = config->scale;
     if (scale <= 0.0f)
         scale = 1.0f / sqrtf((float)head_dim);
-    int window = config->window_size;
-    int q_pos0 = rank * shard_len; /* global position of this rank's first query row */
+    int window   = config->window_size;
+    int num_sink = config->num_sink_tokens;
+    int q_pos0   = rank * shard_len; /* global position of this rank's first query row */
 
     float* q_data = (float*)tensor_data_ptr(Q);
     float* k_data = (float*)tensor_data_ptr(K);
     float* v_data = (float*)tensor_data_ptr(V);
     if (!q_data || !k_data || !v_data)
         return NULL;
+
+    float alibi_storage[256];
+    float* alibi = NULL;
+    if (config->use_alibi && num_heads <= (int)(sizeof(alibi_storage) / sizeof(float))) {
+        cml_alibi_slopes(num_heads, alibi_storage);
+        alibi = alibi_storage;
+    }
 
     size_t kv_elems = (size_t)batch * shard_len * num_kv_heads * head_dim;
     size_t nq       = (size_t)batch * num_heads * seq_q;
@@ -129,7 +139,7 @@ static Tensor* ring_attention_core(Tensor* Q, Tensor* K, Tensor* V, const CMLGQA
     /* Fold the local shard first so the running max is real before any future (masked) shard. */
     ring_fold_shard(row_max, row_sum, acc, scores, q_data, seq_q, q_pos0, cur_k, cur_v, shard_len,
                     rank * shard_len, batch, num_heads, num_kv_heads, head_dim, scale, causal,
-                    window);
+                    window, num_sink, alibi);
 
     int left          = (rank - 1 + world) % world;
     int right         = (rank + 1) % world;
@@ -158,7 +168,7 @@ static Tensor* ring_attention_core(Tensor* Q, Tensor* K, Tensor* V, const CMLGQA
         int origin = (rank - step + world) % world;
         ring_fold_shard(row_max, row_sum, acc, scores, q_data, seq_q, q_pos0, nxt_k, nxt_v,
                         shard_len, origin * shard_len, batch, num_heads, num_kv_heads, head_dim,
-                        scale, causal, window);
+                        scale, causal, window, num_sink, alibi);
 
         /* Forward what we just received on the next step. */
         float* tk = cur_k;
