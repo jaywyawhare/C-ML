@@ -70,7 +70,7 @@ int main(void) {
 | | |
 |:--|:--|
 | **Layers** | 28: Linear, Conv1d/2d/3d, ConvTranspose, RNN/LSTM/GRU, Transformer, BatchNorm, LayerNorm, RMSNorm, Pooling, Dropout, PixelShuffle, ... |
-| **LLM** | LoRA/QLoRA, Flash Attention, GQA, paged KV cache, RoPE, MoE, speculative decoding, LLaMA 7B-70B |
+| **LLM** | LoRA/QLoRA, Flash Attention, GQA, ALiBi, RoPE scaling, paged + sliding-window KV cache, MoE, ring attention, logits-processor sampling, speculative decoding (draft-model + prompt-lookup), continuous-batch serving, LLaMA 7B-70B |
 | **Training** | 11 optimizers, 13 losses, 8 LR schedulers, gradient checkpointing, DDP, pipeline & tensor parallel |
 | **Compiler** | IR fusion (5 patterns), linearization, codegen to C/PTX/SPIR-V/WGSL/MSL, AOT, JIT, kernel cache |
 | **GPU** | CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL - userspace drivers for NV (RM ioctl) and AMD (KFD) (see maturity below) |

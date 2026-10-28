@@ -37,11 +37,11 @@ int main(void) {
 | `iris` | 150 | 4 | 3 | Classification | UCI (download) |
 | `wine` | 178 | 13 | 3 | Classification | UCI (download) |
 | `breast_cancer` | 569 | 30 | 2 | Classification | UCI (download) |
-| `boston` | 506 | 13 | -- | Regression | UCI (download) |
+| `boston` | 506 | 13 | - | Regression | UCI (download) |
 | `mnist` | 70,000 | 784 | 10 | Classification | IDX format (download) |
 | `fashion_mnist` | 70,000 | 784 | 10 | Classification | IDX format (download) |
 | `cifar10` | 60,000 | 3,072 | 10 | Classification | Binary (download) |
-| `airline` | 144 | 1 | -- | Time series | Built-in |
+| `airline` | 144 | 1 | - | Time series | Built-in |
 | `digits` | 1,797 | 64 | 10 | Classification | Built-in |
 
 Dataset names are case-insensitive.

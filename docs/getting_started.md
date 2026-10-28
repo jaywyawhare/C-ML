@@ -56,7 +56,7 @@ int main(void) {
     Tensor* input = cml_tensor(input_data, shape, 2, NULL);
     Tensor* output = cml_nn_sequential_forward(model, input);
 
-    // Lazy execution -- force evaluation before reading data
+    // Lazy execution - force evaluation before reading data
     tensor_ensure_executed(output);
     printf("Output: [%.4f, %.4f]\n",
            tensor_get_float(output, 0),
@@ -178,7 +178,7 @@ See [Python Bindings](python_installation.md) for full setup instructions and us
 
 ## Next Steps
 
-- [API Reference](api_reference.md) -- complete function and type documentation
-- [Neural Network Layers](nn_layers.md) -- available layers (Linear, Conv, RNN, Transformer, etc.)
-- [Training Guide](training.md) -- optimizers, loss functions, learning rate schedulers
-- [Datasets](datasets.md) -- built-in datasets and data loading utilities
+- [API Reference](api_reference.md) - complete function and type documentation
+- [Neural Network Layers](nn_layers.md) - available layers (Linear, Conv, RNN, Transformer, etc.)
+- [Training Guide](training.md) - optimizers, loss functions, learning rate schedulers
+- [Datasets](datasets.md) - built-in datasets and data loading utilities

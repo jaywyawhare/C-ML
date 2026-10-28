@@ -48,6 +48,13 @@ Draft model            Target model           Accept/Reject
 - If all K tokens are accepted, sample one bonus token from the target's final logits
 
 
+## Drafting and Acceptance Modes
+
+**Drafting.** By default the draft tokens come from a draft model set with `cml_speculative_set_draft_model`. Calling `cml_speculative_set_ngram_draft(dec, n)` switches to model-free prompt-lookup drafting: the draft is the continuation of the context's most recent matching n-gram, so no draft model is needed. This is cheap and effective on repetitive or structured output; pass `n <= 0` to return to the draft model.
+
+**Acceptance.** With `stochastic_accept = false` (the default) a draft token is accepted when it equals the target model's argmax, which reproduces the target's greedy decode exactly. With `stochastic_accept = true` the Leviathan accept/reject rule is used: accept with probability `min(1, p_target/p_draft)` and resample rejections from the normalized residual, which preserves the target sampling distribution at temperature > 0. The `top_k` and `top_p` warpers are applied identically to the target and draft distributions so the guarantee holds. Prompt-lookup drafting always uses greedy acceptance.
+
+
 ## API Reference
 
 ### Structs
@@ -59,6 +66,7 @@ typedef struct CMLSpeculativeConfig {
     float top_p;                /* Nucleus sampling */
     int top_k;                  /* Top-k sampling */
     bool do_sample;             /* Use sampling vs greedy */
+    bool stochastic_accept;     /* Leviathan accept/reject rule (default: false = greedy accept) */
 } CMLSpeculativeConfig;
 
 typedef struct CMLSpeculativeResult {
@@ -92,6 +100,7 @@ typedef int (*CMLSampleTokenFn)(void* model_ctx, Tensor* logits, float temperatu
 | `cml_speculative_free(decoder)` | Free a speculative decoder |
 | `cml_speculative_set_draft_model(dec, ctx, fwd, sample)` | Set draft model callbacks |
 | `cml_speculative_set_target_model(dec, ctx, fwd, sample)` | Set target model callbacks |
+| `cml_speculative_set_ngram_draft(dec, n)` | Enable model-free prompt-lookup drafting (n-gram) |
 | `cml_speculative_decode_step(dec, prefix, prefix_len)` | Run one speculative decode step |
 | `cml_speculative_result_free(result)` | Free a decode result |
 | `cml_speculative_acceptance_rate(decoder)` | Get overall acceptance rate across all steps |
@@ -106,6 +115,7 @@ typedef int (*CMLSampleTokenFn)(void* model_ctx, Tensor* logits, float temperatu
 | `top_p` | 0.9 | (0, 1] | Nucleus sampling probability |
 | `top_k` | 40 | >= 1 | Top-k sampling limit |
 | `do_sample` | true | - | Sampling (true) vs greedy (false) |
+| `stochastic_accept` | false | - | Leviathan accept/reject (true) vs greedy accept (false) |
 
 Maximum draft tokens per step is capped at `CML_SPEC_MAX_DRAFT_TOKENS` (16).
 

@@ -213,7 +213,7 @@ under the owner; the eventual `tensor_release()` performs the real free. See
 Tensor* a = cml_ones_2d(3, 4);
 Tensor* b = cml_ones_2d(3, 4);
 
-Tensor* c = cml_add(a, b);           // Lazy -- not yet computed
+Tensor* c = cml_add(a, b);           // Lazy - not yet computed
 float* data = tensor_data_ptr(c);    // Materializes the computation
 printf("c[0] = %f\n", data[0]);      // 2.0
 
@@ -576,11 +576,11 @@ Dataset* cml_dataset_load(const char* name);
 | `"iris"`          | Iris flower classification    | 150     | 4        | 3       |
 | `"wine"`          | Wine recognition              | 178     | 13       | 3       |
 | `"breast_cancer"` | Breast cancer diagnosis       | 569     | 30       | 2       |
-| `"boston"`        | Boston housing regression     | 506     | 13       | --      |
+| `"boston"`        | Boston housing regression     | 506     | 13       | -      |
 | `"mnist"`         | Handwritten digits            | 70000   | 784      | 10      |
 | `"fashion_mnist"` | Fashion article images        | 70000   | 784      | 10      |
 | `"cifar10"`       | Tiny color images             | 60000   | 3072     | 10      |
-| `"airline"`       | Airline passenger forecasting | varies  | varies   | --      |
+| `"airline"`       | Airline passenger forecasting | varies  | varies   | -      |
 | `"digits"`        | Smaller handwritten digits    | 1797    | 64       | 10      |
 
 ### From CSV
@@ -689,7 +689,7 @@ int model_load_checkpoint(Module* model, Optimizer* opt,
                           int* epoch, float* loss, const char* filepath);
 ```
 
-Checkpoints include model weights, optimizer state, current epoch, and loss value -- everything needed to resume training.
+Checkpoints include model weights, optimizer state, current epoch, and loss value - everything needed to resume training.
 
 ### Example
 
@@ -735,7 +735,7 @@ CleanupContext* cleanup_context_create(void);
 void cml_register_cleanup_context(CleanupContext* ctx);
 ```
 
-A cleanup context tracks allocated resources and frees them on program exit. `cleanup_context_create()` automatically registers with the global atexit handler via `cml_register_cleanup_context` -- do not call `cleanup_context_free()` manually if atexit will handle it (double-free risk).
+A cleanup context tracks allocated resources and frees them on program exit. `cleanup_context_create()` automatically registers with the global atexit handler via `cml_register_cleanup_context` - do not call `cleanup_context_free()` manually if atexit will handle it (double-free risk).
 
 ### Resource Tracking
 
@@ -852,7 +852,7 @@ int         error_stack_get_last_code(void);        // Last error code (or CM_SU
 ### Convenience Macros
 
 ```c
-// Wrap any pointer-returning call -- pushes an error if result is NULL
+// Wrap any pointer-returning call - pushes an error if result is NULL
 Tensor* t = CML_CHECK(cml_zeros_2d(3, 3), "Failed to create tensor");
 
 // Same, with an auto-generated message from the expression
@@ -994,9 +994,9 @@ profiler_free(prof);
 
 ## See Also
 
-- [Neural Network Layers](nn_layers.md) -- Detailed layer reference
-- [Autograd System](autograd.md) -- Automatic differentiation internals
-- [Graph Mode](graph_mode.md) -- Lazy execution and IR
-- [Getting Started](getting_started.md) -- Build, install, first program
-- [Datasets](datasets.md) -- Dataset hub and loading
-- [Miscellaneous APIs](miscellaneous.md) -- Sparse tensors, image dtypes, augmentation, Winograd, symbolic shapes, SIMD, disk backend, CMake integration
+- [Neural Network Layers](nn_layers.md) - Detailed layer reference
+- [Autograd System](autograd.md) - Automatic differentiation internals
+- [Graph Mode](graph_mode.md) - Lazy execution and IR
+- [Getting Started](getting_started.md) - Build, install, first program
+- [Datasets](datasets.md) - Dataset hub and loading
+- [Miscellaneous APIs](miscellaneous.md) - Sparse tensors, image dtypes, augmentation, Winograd, symbolic shapes, SIMD, disk backend, CMake integration

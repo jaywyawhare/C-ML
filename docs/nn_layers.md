@@ -117,7 +117,7 @@ module_free((Module*)model);
 
 ### ModuleList
 
-A dynamic, ordered collection of modules. Unlike `Sequential`, a `ModuleList` does not define a forward pass -- you iterate over it manually.
+A dynamic, ordered collection of modules. Unlike `Sequential`, a `ModuleList` does not define a forward pass - you iterate over it manually.
 
 ```c
 ModuleList* nn_module_list(void);
@@ -941,14 +941,14 @@ Create activation modules that can be added to `Sequential` or used standalone.
 | ---------- | --------------------------------------------------- | ------------------------------------- |
 | ReLU       | `nn_relu(bool inplace)`                             | `inplace`: modify input in-place      |
 | LeakyReLU  | `nn_leaky_relu(float negative_slope, bool inplace)` | `negative_slope`: slope for x \< 0    |
-| Sigmoid    | `nn_sigmoid()`                                      | --                                    |
-| Tanh       | `nn_tanh()`                                         | --                                    |
+| Sigmoid    | `nn_sigmoid()`                                      | -                                    |
+| Tanh       | `nn_tanh()`                                         | -                                    |
 | GELU       | `nn_gelu(bool approximate)`                         | `approximate`: use tanh approximation |
 | ELU        | `nn_elu(float alpha, bool inplace)`                 | `alpha`: scale for negative values    |
-| SELU       | `nn_selu()`                                         | --                                    |
-| SiLU       | `nn_silu()`                                         | -- (also known as Swish)              |
-| Mish       | `nn_mish()`                                         | --                                    |
-| HardSwish  | `nn_hardswish()`                                    | --                                    |
+| SELU       | `nn_selu()`                                         | -                                    |
+| SiLU       | `nn_silu()`                                         | - (also known as Swish)              |
+| Mish       | `nn_mish()`                                         | -                                    |
+| HardSwish  | `nn_hardswish()`                                    | -                                    |
 | Softmax    | `nn_softmax(int dim)`                               | `dim`: dimension to apply softmax     |
 | LogSoftmax | `nn_log_softmax(int dim)`                           | `dim`: dimension to apply log-softmax |
 

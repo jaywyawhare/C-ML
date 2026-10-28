@@ -431,7 +431,7 @@ Binary operations (all follow `void fn(const float* a, const float* b, float* ou
 
 `simd_add_f32`, `simd_sub_f32`, `simd_mul_f32`, `simd_div_f32`, `simd_pow_f32`, `simd_min_f32`, `simd_max_f32`, `simd_cmplt_f32`, `simd_cmpgt_f32`
 
-Ternary: `simd_where_f32(cond, a, b, out, n)` -- conditional select.
+Ternary: `simd_where_f32(cond, a, b, out, n)` - conditional select.
 
 Broadcast helpers: `simd_add_scalar_f32`, `simd_mul_scalar_f32`, `simd_add_broadcast_f32`, `simd_mul_broadcast_f32`, `simd_max_broadcast_f32`.
 

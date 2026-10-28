@@ -30,10 +30,10 @@ Memory Pools                 TLSF Allocator
 ```
 
 **Header files:**
-- `include/alloc/tlsf_alloc.h` -- TLSF allocator and timeline planner
-- `include/alloc/graph_allocator.h` -- Graph-based allocator and context
-- `include/alloc/memory_pools.h` -- Memory and tensor pools
-- `include/alloc/memory_management.h` -- Safe allocation helpers
+- `include/alloc/tlsf_alloc.h` - TLSF allocator and timeline planner
+- `include/alloc/graph_allocator.h` - Graph-based allocator and context
+- `include/alloc/memory_pools.h` - Memory and tensor pools
+- `include/alloc/memory_management.h` - Safe allocation helpers
 
 **Source files:**
 - `src/alloc/tlsf_alloc.c`
@@ -50,7 +50,7 @@ The TLSF allocator provides **O(1) time** allocation and deallocation with bound
 
 TLSF uses a two-level bitmap index to locate free blocks:
 
-- **First level (FL):** `floor(log2(size))` -- groups blocks by power-of-two size ranges.
+- **First level (FL):** `floor(log2(size))` - groups blocks by power-of-two size ranges.
 - **Second level (SL):** subdivides each FL range into 16 equal parts for finer granularity.
 - Bitmaps at each level allow O(1) lookup of the best-fit free block using hardware bit-scan instructions (`__builtin_clz`, `__builtin_ctz`).
 

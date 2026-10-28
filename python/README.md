@@ -170,11 +170,11 @@ Supports: `DEVICE_CPU`, `DEVICE_CUDA`, `DEVICE_METAL`, `DEVICE_ROCM`.
 
 ## Troubleshooting
 
-**`ImportError: CML bindings not found`** -- Run `python3 cml/build_cffi.py` in the `python/` dir.
+**`ImportError: CML bindings not found`** - Run `python3 cml/build_cffi.py` in the `python/` dir.
 
-**`OSError: cannot find libcml.so`** -- Set `LD_LIBRARY_PATH=../../build/lib:$LD_LIBRARY_PATH`.
+**`OSError: cannot find libcml.so`** - Set `LD_LIBRARY_PATH=../../build/lib:$LD_LIBRARY_PATH`.
 
-**Version mismatch** -- Rebuild both: `cd .. && make clean && make && cd python && python3 setup.py build_ext --inplace`.
+**Version mismatch** - Rebuild both: `cd .. && make clean && make && cd python && python3 setup.py build_ext --inplace`.
 
 ## Requirements
 
@@ -182,4 +182,4 @@ Supports: `DEVICE_CPU`, `DEVICE_CUDA`, `DEVICE_METAL`, `DEVICE_ROCM`.
 
 ## License
 
-DBaJ-GPL -- Use it, modify it, share it. Don't be a jerk about it.
+DBaJ-GPL - Use it, modify it, share it. Don't be a jerk about it.

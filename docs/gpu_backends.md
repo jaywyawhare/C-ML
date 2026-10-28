@@ -1,22 +1,22 @@
 # GPU Backends
 
-C-ML supports multiple GPU and accelerator backends for compute kernel execution. All backends use dynamic library loading (dlopen/dlsym) at runtime, so no compile-time SDK dependencies are required -- only the appropriate runtime libraries must be present on the system.
+C-ML supports multiple GPU and accelerator backends for compute kernel execution. All backends use dynamic library loading (dlopen/dlsym) at runtime, so no compile-time SDK dependencies are required - only the appropriate runtime libraries must be present on the system.
 
 ## Backend Summary
 
 | Backend | Hardware | Shading Language | CMake Flag | Default |
 |---|---|---|---|---|
 | [CUDA](#cuda-backend) | NVIDIA GPUs | PTX / CUDA C | `ENABLE_CUDA` | ON |
-| [NV Driver](#nvidia-direct-driver) | NVIDIA GPUs | PTX (via ptxas) | (built with CUDA) | -- |
+| [NV Driver](#nvidia-direct-driver) | NVIDIA GPUs | PTX (via ptxas) | (built with CUDA) | - |
 | [ROCm/HIP](#rocmhip-backend) | AMD GPUs | HIP / HSACO | `ENABLE_ROCM` | ON |
-| [AM Driver](#amd-direct-driver) | AMD RDNA3/4 GPUs | AMDGPU ELF (via LLVM) | (built with ROCm) | -- |
+| [AM Driver](#amd-direct-driver) | AMD RDNA3/4 GPUs | AMDGPU ELF (via LLVM) | (built with ROCm) | - |
 | [Vulkan](#vulkan-backend) | Any Vulkan GPU | SPIR-V | `ENABLE_VULKAN` | ON |
-| [SPIR-V Codegen](#spir-v-codegen) | (Vulkan GPUs) | SPIR-V binary | (built with Vulkan) | -- |
+| [SPIR-V Codegen](#spir-v-codegen) | (Vulkan GPUs) | SPIR-V binary | (built with Vulkan) | - |
 | [WebGPU](#webgpu-backend) | Any wgpu-native GPU | WGSL | `ENABLE_WEBGPU` | OFF |
 | [Metal](#metal-backend) | Apple GPUs (macOS) | MSL | `ENABLE_METAL` | ON (macOS) |
 | [OpenCL](#opencl-backend) | Any OpenCL device | OpenCL C | `ENABLE_OPENCL` | ON |
-| [Adreno](#adreno-backend) | Qualcomm Adreno GPUs | OpenCL / Vulkan | -- | -- |
-| [Hexagon](#hexagon-backend) | Qualcomm Hexagon DSP | HVX intrinsics | -- | -- |
+| [Adreno](#adreno-backend) | Qualcomm Adreno GPUs | OpenCL / Vulkan | - | - |
+| [Hexagon](#hexagon-backend) | Qualcomm Hexagon DSP | HVX intrinsics | - | - |
 
 **Header directory:** `include/ops/ir/gpu/` (GPU-specific), `include/backend/` (OpenCL)
 
@@ -32,8 +32,8 @@ The CUDA backend dynamically loads the CUDA driver API at runtime. It supports t
 
 ### Key Types
 
-- `CMLCUDABackend` -- Backend context holding device state, stream, and dlsym'd function pointers.
-- `CMLCUDAKernel` -- Compiled kernel with module, function handle, and launch configuration.
+- `CMLCUDABackend` - Backend context holding device state, stream, and dlsym'd function pointers.
+- `CMLCUDAKernel` - Compiled kernel with module, function handle, and launch configuration.
 
 ### API
 
@@ -112,10 +112,10 @@ This backend bypasses `libcuda.so` entirely. It opens NVIDIA device files direct
 
 ### Key Types
 
-- `CMLNVDriver` -- Driver context with file descriptors, RM object hierarchy (client/device/subdevice/channel), GPFIFO, and VA allocator.
-- `CMLNVBuffer` -- GPU buffer with virtual address, optional CPU mapping, and RM handle.
-- `CMLNVKernel` -- Compiled CUBIN blob loaded to GPU memory.
-- `CMLNVGPFIFO` -- Ring buffer of GPU FIFO entries for command submission.
+- `CMLNVDriver` - Driver context with file descriptors, RM object hierarchy (client/device/subdevice/channel), GPFIFO, and VA allocator.
+- `CMLNVBuffer` - GPU buffer with virtual address, optional CPU mapping, and RM handle.
+- `CMLNVKernel` - Compiled CUBIN blob loaded to GPU memory.
+- `CMLNVGPFIFO` - Ring buffer of GPU FIFO entries for command submission.
 
 ### API
 
@@ -163,8 +163,8 @@ The ROCm backend dynamically loads the HIP runtime. It provides kernel compilati
 
 ### Key Types
 
-- `CMLROCmBackend` -- Backend context with HIP device, context, stream, and dlsym'd function pointers.
-- `CMLROCmKernel` -- Compiled kernel with module, function handle, and launch dimensions.
+- `CMLROCmBackend` - Backend context with HIP device, context, stream, and dlsym'd function pointers.
+- `CMLROCmKernel` - Compiled kernel with module, function handle, and launch dimensions.
 
 ### API
 
@@ -210,10 +210,10 @@ This backend bypasses `libamdhip64.so` entirely. It opens `/dev/kfd` directly an
 
 ### Key Types
 
-- `CMLAMDriver` -- Driver context with KFD/DRM file descriptors, GPU info, AQL queue, and VA allocator.
-- `CMLAMBuffer` -- GPU buffer with virtual address, optional CPU mapping, KFD handle. Can be VRAM or GTT (system memory).
-- `CMLAMKernel` -- ELF code object loaded to GPU memory.
-- `CMLAMQueue` -- AQL hardware queue with ring buffer of 64-byte dispatch packets and a doorbell register.
+- `CMLAMDriver` - Driver context with KFD/DRM file descriptors, GPU info, AQL queue, and VA allocator.
+- `CMLAMBuffer` - GPU buffer with virtual address, optional CPU mapping, KFD handle. Can be VRAM or GTT (system memory).
+- `CMLAMKernel` - ELF code object loaded to GPU memory.
+- `CMLAMQueue` - AQL hardware queue with ring buffer of 64-byte dispatch packets and a doorbell register.
 
 ### API
 
@@ -261,9 +261,9 @@ A cross-vendor compute backend that dynamically loads all Vulkan functions at ru
 
 ### Key Types
 
-- `CMLVulkanBackend` -- Full Vulkan state: instance, device, queue, command pool, device info, and all function pointers.
-- `CMLVulkanBuffer` -- Buffer with device memory. Can be device-local (GPU-only) or host-visible (staging).
-- `CMLVulkanKernel` -- Compiled compute pipeline from SPIR-V: shader module, pipeline layout, descriptor set.
+- `CMLVulkanBackend` - Full Vulkan state: instance, device, queue, command pool, device info, and all function pointers.
+- `CMLVulkanBuffer` - Buffer with device memory. Can be device-local (GPU-only) or host-visible (staging).
+- `CMLVulkanKernel` - Compiled compute pipeline from SPIR-V: shader module, pipeline layout, descriptor set.
 
 ### API
 
@@ -353,8 +353,8 @@ A cross-platform backend that uses the WebGPU API via wgpu-native. All wgpu func
 
 ### Key Types
 
-- `CMLWebGPUBackend` -- Backend context with wgpu instance, adapter, device, queue, and all dlsym'd function pointers.
-- `CMLWebGPUKernel` -- Compiled compute pipeline from WGSL source.
+- `CMLWebGPUBackend` - Backend context with wgpu instance, adapter, device, queue, and all dlsym'd function pointers.
+- `CMLWebGPUKernel` - Compiled compute pipeline from WGSL source.
 
 ### API
 
@@ -570,7 +570,7 @@ The backend tracks up to 512 GPU buffers (`CML_OCL_MAX_TRACKED_BUFFERS`). Leaf i
 ## Adreno Backend
 
 **Header:** `include/ops/ir/gpu/adreno_backend.h`
-**Hardware:** Qualcomm Adreno GPUs (Snapdragon SoCs -- Adreno 730, 740, 750, etc.)
+**Hardware:** Qualcomm Adreno GPUs (Snapdragon SoCs - Adreno 730, 740, 750, etc.)
 **Target:** Mobile inference on Android devices
 
 Uses OpenCL (or Vulkan) under the hood for Adreno GPU compute. Reports GPU version, global memory size, max allocation size, compute units, and max work group size.
@@ -621,7 +621,7 @@ cmake -B build \
   ..
 ```
 
-All backends except WebGPU are enabled by default (Metal only on macOS). Each backend is compiled conditionally and uses dynamic loading, so the build will succeed even if the corresponding SDK/drivers are not installed -- the `cml_*_available()` check will simply return `false` at runtime.
+All backends except WebGPU are enabled by default (Metal only on macOS). Each backend is compiled conditionally and uses dynamic loading, so the build will succeed even if the corresponding SDK/drivers are not installed - the `cml_*_available()` check will simply return `false` at runtime.
 
 ## Common Pattern
 

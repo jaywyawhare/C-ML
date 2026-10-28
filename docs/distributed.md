@@ -148,8 +148,8 @@ int cml_ring_allreduce(float* data, size_t count,
 ```
 
 The algorithm runs in two phases:
-1. **Reduce-scatter ring** -- each rank ends up with one reduced chunk.
-2. **All-gather ring** -- each rank collects all reduced chunks.
+1. **Reduce-scatter ring**: each rank ends up with one reduced chunk.
+2. **All-gather ring**: each rank collects all reduced chunks.
 
 ### Point-to-Point
 
@@ -159,6 +159,17 @@ The `DistCommOps` vtable also exposes raw send/recv:
 int (*send)(Tensor* tensor, int dst_rank, int tag, void* ctx);
 int (*recv)(Tensor* tensor, int src_rank, int tag, void* ctx);
 ```
+
+### Ring Attention
+
+`include/distributed/ring_attention.h` runs attention over a sequence sharded across ranks. Each rank holds its own Q/K/V shard; the KV shards rotate around the ring and fold into a running online-softmax state, so no rank ever materializes the full sequence. With a single rank it falls back to local flash attention.
+
+```c
+Tensor* cml_ring_attention_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config);
+Tensor* cml_ring_attention_decode(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config);
+```
+
+The shared `CMLGQAConfig` applies, so causal masking, the sliding window, attention sinks, and ALiBi carry over from local attention.
 
 
 ## Distributed Data Parallel (DDP)
@@ -379,6 +390,7 @@ Backend name strings: `"nccl"`, `"mpi"`, `"gloo"`.
 | `include/distributed/pipeline_parallel.h`| Pipeline stages and micro-batching          |
 | `include/distributed/tensor_parallel.h`  | Column/row parallel layers, weight sharding |
 | `include/distributed/ring_allreduce.h`   | Ring all-reduce algorithm                   |
+| `include/distributed/ring_attention.h`   | Sequence-sharded ring attention             |
 
 ### Sources
 
@@ -389,6 +401,7 @@ Backend name strings: `"nccl"`, `"mpi"`, `"gloo"`.
 | `src/distributed/pipeline_parallel.c`    | Pipeline forward/backward                    |
 | `src/distributed/tensor_parallel.c`      | Column/row parallel, weight sharding, matmul |
 | `src/distributed/ring_allreduce.c`       | Ring all-reduce implementation               |
+| `src/distributed/ring_attention.c`       | Ring attention (prefill and decode)          |
 | `src/distributed/nccl_backend.c`         | NCCL backend (dlopen)                        |
 | `src/distributed/mpi_backend.c`          | MPI backend (dlopen)                         |
 | `src/distributed/gloo_backend.c`         | Gloo backend                                 |

@@ -16,7 +16,7 @@ Binaries are placed in `build/`.
 
 Step-by-step examples that progressively introduce CML features.
 
-### hello_cml -- Minimal Example
+### hello_cml - Minimal Example
 
 Minimal forward pass through a linear layer. Good starting point.
 
@@ -24,7 +24,7 @@ Minimal forward pass through a linear layer. Good starting point.
 ./build/hello_cml
 ```
 
-### simple_xor -- XOR Training
+### simple_xor - XOR Training
 
 Classic XOR problem with a full training loop. Demonstrates the complete train-evaluate cycle.
 
@@ -32,7 +32,7 @@ Classic XOR problem with a full training loop. Demonstrates the complete train-e
 ./build/simple_xor
 ```
 
-### ex01 -- Tensor Operations
+### ex01 - Tensor Operations
 
 Basic tensor creation, element-wise arithmetic, reductions, and shape manipulation. No dataset required.
 
@@ -40,7 +40,7 @@ Basic tensor creation, element-wise arithmetic, reductions, and shape manipulati
 ./build/tensor_ops
 ```
 
-### ex02 -- Linear Regression
+### ex02 - Linear Regression
 
 Linear regression trained with SGD on the Boston Housing dataset. Demonstrates `cml_dataset_load()`, `dataset_normalize()`, and `dataset_split()`.
 
@@ -48,7 +48,7 @@ Linear regression trained with SGD on the Boston Housing dataset. Demonstrates `
 ./build/linear_regression
 ```
 
-### ex03 -- Logistic Regression
+### ex03 - Logistic Regression
 
 Binary classification using sigmoid + BCE loss on the Breast Cancer dataset.
 
@@ -56,7 +56,7 @@ Binary classification using sigmoid + BCE loss on the Breast Cancer dataset.
 ./build/logistic_regression
 ```
 
-### ex04 -- MLP Classifier
+### ex04 - MLP Classifier
 
 Multi-class classification with a 2-layer MLP on the Iris dataset. Shows Sequential model building and MSE training.
 
@@ -64,7 +64,7 @@ Multi-class classification with a 2-layer MLP on the Iris dataset. Shows Sequent
 ./build/mlp_classifier
 ```
 
-### ex05 -- Autoencoder
+### ex05 - Autoencoder
 
 Autoencoder with an encoder-decoder architecture and bottleneck layer. Trained on Digits 8x8 images.
 
@@ -72,7 +72,7 @@ Autoencoder with an encoder-decoder architecture and bottleneck layer. Trained o
 ./build/autoencoder
 ```
 
-### ex06 -- Image Classification
+### ex06 - Image Classification
 
 Image classification MLP that processes 8x8 digit images using raw pixel features. Uses Digits dataset with BCE loss.
 
@@ -80,7 +80,7 @@ Image classification MLP that processes 8x8 digit images using raw pixel feature
 ./build/conv_net
 ```
 
-### ex07 -- RNN Sequence Prediction
+### ex07 - RNN Sequence Prediction
 
 RNN-based time series prediction on the Airline passengers dataset. Demonstrates `cml_nn_rnn_cell()` with sliding window input.
 
@@ -88,7 +88,7 @@ RNN-based time series prediction on the Airline passengers dataset. Demonstrates
 ./build/rnn_sequence
 ```
 
-### ex08 -- LSTM Time Series
+### ex08 - LSTM Time Series
 
 LSTM-based time series forecasting on Airline data. Shows `cml_nn_lstm_cell()` with hidden and cell state management.
 
@@ -96,7 +96,7 @@ LSTM-based time series forecasting on Airline data. Shows `cml_nn_lstm_cell()` w
 ./build/lstm_timeseries
 ```
 
-### ex09 -- GRU Classifier
+### ex09 - GRU Classifier
 
 GRU-based sequence classifier on the Iris dataset. Demonstrates `cml_nn_gru_cell()` processing features as a sequence.
 
@@ -104,7 +104,7 @@ GRU-based sequence classifier on the Iris dataset. Demonstrates `cml_nn_gru_cell
 ./build/gru_classifier
 ```
 
-### ex10 -- Embedding
+### ex10 - Embedding
 
 Embedding lookup table demo. Shows `cml_nn_embedding()` for mapping integer indices to dense vectors.
 
@@ -112,7 +112,7 @@ Embedding lookup table demo. Shows `cml_nn_embedding()` for mapping integer indi
 ./build/embedding
 ```
 
-### ex11 -- GAN
+### ex11 - GAN
 
 Generative Adversarial Network with separate generator and discriminator networks. Trained on Digits 8x8.
 
@@ -120,7 +120,7 @@ Generative Adversarial Network with separate generator and discriminator network
 ./build/gan
 ```
 
-### ex12 -- Multi-Task Learning
+### ex12 - Multi-Task Learning
 
 Multi-task learning with shared layers and task-specific heads. Uses the Wine dataset with two prediction targets.
 
@@ -128,7 +128,7 @@ Multi-task learning with shared layers and task-specific heads. Uses the Wine da
 ./build/multi_task
 ```
 
-### ex13 -- Transformer Encoder
+### ex13 - Transformer Encoder
 
 Demonstrates `cml_nn_multihead_attention()` and `cml_nn_transformer_encoder_layer()` with self-attention on synthetic sequences.
 
@@ -136,7 +136,7 @@ Demonstrates `cml_nn_multihead_attention()` and `cml_nn_transformer_encoder_laye
 ./build/transformer
 ```
 
-### ex14 -- LR Scheduler Comparison
+### ex14 - LR Scheduler Comparison
 
 Compares learning rate schedulers (Step, Exponential, Cosine, ReduceOnPlateau) side-by-side on Boston Housing regression.
 
@@ -144,7 +144,7 @@ Compares learning rate schedulers (Step, Exponential, Cosine, ReduceOnPlateau) s
 ./build/lr_scheduler
 ```
 
-### ex15 -- Activation Functions Showcase
+### ex15 - Activation Functions Showcase
 
 Trains separate networks using all 12 activation functions (ReLU, Sigmoid, Tanh, LeakyReLU, GELU, ELU, SELU, SiLU, Mish, HardSwish, Softmax, LogSoftmax) and compares convergence.
 
@@ -156,7 +156,7 @@ Trains separate networks using all 12 activation functions (ReLU, Sigmoid, Tanh,
 
 Performance measurement tools.
 
-### bench_forward -- Forward Pass Benchmark
+### bench_forward - Forward Pass Benchmark
 
 Benchmarks forward pass throughput for various layer types and sizes.
 
@@ -164,7 +164,7 @@ Benchmarks forward pass throughput for various layer types and sizes.
 ./build/bench_forward
 ```
 
-### bench_gemm -- GEMM Benchmark
+### bench_gemm - GEMM Benchmark
 
 Benchmarks general matrix multiply (GEMM) performance across different matrix sizes.
 
@@ -198,7 +198,7 @@ Run any demo:
 
 | Example | Task | Dataset | Key APIs |
 |---------|------|---------|----------|
-| ex01 | Tensor ops | -- | `cml_add`, `cml_matmul`, `cml_sum` |
+| ex01 | Tensor ops | - | `cml_add`, `cml_matmul`, `cml_sum` |
 | ex02 | Regression | Boston Housing | `cml_dataset_load`, `cml_optim_sgd` |
 | ex03 | Binary classification | Breast Cancer | `cml_nn_bce_loss`, `cml_nn_sigmoid` |
 | ex04 | Multi-class classification | Iris | `cml_nn_sequential`, `cml_nn_linear` |
@@ -207,11 +207,11 @@ Run any demo:
 | ex07 | Time series | Airline | `cml_nn_rnn_cell` |
 | ex08 | Time series | Airline | `cml_nn_lstm_cell` |
 | ex09 | Sequence classification | Iris | `cml_nn_gru_cell` |
-| ex10 | Embedding | -- | `cml_nn_embedding` |
+| ex10 | Embedding | - | `cml_nn_embedding` |
 | ex11 | Generative | Digits 8x8 | GAN training loop |
 | ex12 | Multi-task | Wine | Shared layers |
-| ex13 | Self-attention | -- | `cml_nn_transformer_encoder_layer` |
+| ex13 | Self-attention | - | `cml_nn_transformer_encoder_layer` |
 | ex14 | Scheduler comparison | Boston Housing | `lr_scheduler_*` |
 | ex15 | Activation comparison | Breast Cancer | All activation layers |
-| hello_cml | Forward pass | -- | `cml_nn_linear` |
+| hello_cml | Forward pass | - | `cml_nn_linear` |
 | simple_xor | Full training | XOR | Complete training loop |

@@ -2,7 +2,7 @@
 
 ## Required
 
-**C11 Compiler** -- GCC 4.9+, Clang 3.5+, or MSVC 2015+.
+**C11 Compiler** - GCC 4.9+, Clang 3.5+, or MSVC 2015+.
 
 **CMake 3.16+**
 
@@ -12,9 +12,9 @@ sudo pacman -S cmake                # Arch
 brew install cmake                  # macOS
 ```
 
-**libm** -- standard math library, included with all C compilers.
+**libm** - standard math library, included with all C compilers.
 
-**libdl** -- runtime loading of optional libraries. Included on Linux/macOS.
+**libdl** - runtime loading of optional libraries. Included on Linux/macOS.
 
 
 ## Optional (Recommended)
@@ -42,7 +42,7 @@ sudo apt-get install libsleef-dev      # Ubuntu/Debian
 sudo dnf install sleef-devel           # Fedora
 ```
 
-Arch Linux -- not in the official repos. Build from source:
+Arch Linux - not in the official repos. Build from source:
 
 ```bash
 git clone https://github.com/shibatch/sleef.git

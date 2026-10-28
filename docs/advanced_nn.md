@@ -130,32 +130,41 @@ Contiguous key/value storage for autoregressive decoding.
 CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim);
 void        cml_kv_cache_free(CMLKVCache* cache);
 int         cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value);
+void        cml_kv_cache_set_window(CMLKVCache* cache, int window, int num_sink);
 void        cml_kv_cache_reset(CMLKVCache* cache);
 Tensor*     cml_kv_cache_get_keys(CMLKVCache* cache);
 Tensor*     cml_kv_cache_get_values(CMLKVCache* cache);
 ```
 
+`cml_kv_cache_set_window` bounds the cache to the leading `num_sink` rows plus the most recent `window` rows, evicting the oldest in between on append. Pass `window <= 0` for unbounded retention (the default). This matches the sliding-window and attention-sink masking in `CMLGQAConfig`.
+
 ### Grouped Query Attention (GQA)
 
-Supports fewer KV heads than query heads (e.g., LLaMA 2 70B uses 8 KV heads for 64 query heads). Configurable with causal masking and sliding window.
+Supports fewer KV heads than query heads (for example, LLaMA 2 70B uses 8 KV heads for 64 query heads). Configurable with causal masking, a sliding window, attention sinks, and ALiBi position bias.
 
 ```c
 typedef struct CMLGQAConfig {
-    int num_heads;       // Query heads
-    int num_kv_heads;    // KV heads (can be < num_heads)
+    int num_heads;        // Query heads
+    int num_kv_heads;     // KV heads (can be < num_heads)
     int head_dim;
-    float scale;         // 1/sqrt(head_dim)
+    float scale;          // 1/sqrt(head_dim)
     bool causal;
-    int window_size;     // 0 = unlimited
+    int window_size;      // 0 = unlimited
+    int num_sink_tokens;  // StreamingLLM: first N tokens stay attended past the window (0 = off)
+    bool use_alibi;       // Add ALiBi linear position bias instead of relying on RoPE
 } CMLGQAConfig;
 
 Tensor* cml_gqa_forward(Tensor* Q, Tensor* K, Tensor* V, const CMLGQAConfig* config, Tensor* mask);
 Tensor* cml_gqa_forward_cached(Tensor* Q, Tensor* K, Tensor* V, CMLKVCache* kv_cache, const CMLGQAConfig* config);
+
+void cml_alibi_slopes(int num_heads, float* out);  // Per-head ALiBi slopes
 ```
+
+The attention-sink (`num_sink_tokens`) and ALiBi (`use_alibi`) options are honored by the flash and ring-attention paths.
 
 ### Flash Attention
 
-O(N) memory attention using online softmax with tiled computation. Drop-in replacement for standard GQA.
+O(N) memory attention using online softmax with tiled computation. Drop-in replacement for standard GQA, and honors `window_size`, `num_sink_tokens`, and `use_alibi`.
 
 ```c
 CMLFlashAttentionConfig cml_flash_attention_default_config(void);
@@ -175,14 +184,24 @@ Tensor* cml_gqa_flash_forward_cached(Tensor* Q, Tensor* K, Tensor* V,
 Applies rotary position encoding to query/key tensors in-place.
 
 ```c
+typedef enum {
+    CML_ROPE_SCALING_NONE = 0, // No context-length scaling
+    CML_ROPE_SCALING_LINEAR,   // Position Interpolation: positions divided by factor
+    CML_ROPE_SCALING_NTK,      // NTK-aware: base scaled by factor^(dim/(dim-2))
+} CMLRoPEScalingType;
+
 typedef struct CMLRoPEConfig {
-    int dim;            // Embedding dimension
+    int dim;                    // Embedding dimension
     int max_seq_len;
-    float base;         // Base frequency (default: 10000.0)
+    float base;                 // Base frequency (default: 10000.0)
+    CMLRoPEScalingType scaling; // Context-extension mode (default: NONE)
+    float scaling_factor;       // Context-extension factor (>1 extends; 0 or 1 = no scaling)
 } CMLRoPEConfig;
 
 Tensor* cml_rope_forward(Tensor* x, int start_pos, const CMLRoPEConfig* config);
 ```
+
+Set `scaling` and `scaling_factor` to extend a model's context length past its trained `max_seq_len`: linear interpolation divides positions by the factor, NTK-aware scales the base frequency instead.
 
 ### Mixture of Experts (MoE)
 
@@ -313,8 +332,38 @@ void cml_llama_reset(CMLLLaMAModel* model);
 | `temperature` | 0.8 | Sampling temperature |
 | `top_p` | 0.9 | Nucleus sampling threshold |
 | `top_k` | 40 | Top-k sampling limit |
+| `min_p` | 0 | Min-p threshold relative to the peak (0 = off) |
+| `typical_p` | 0 | Locally-typical sampling mass (0 = off) |
+| `repetition_penalty` | 1.0 | HF multiplicative penalty on seen tokens (1 = off) |
+| `frequency_penalty` | 0 | OpenAI additive per-occurrence penalty |
+| `presence_penalty` | 0 | OpenAI additive per-token penalty |
+| `no_repeat_ngram_size` | 0 | Ban repeated n-grams of this size (0 = off) |
+| `logit_bias_ids` / `logit_bias_values` / `logit_bias_count` | NULL / NULL / 0 | Per-token additive bias (use `-INFINITY` to ban) |
+| `stop_sequences` / `num_stop_sequences` | NULL / 0 | Strings that halt generation once decoded |
+| `seed` | 0 | RNG seed for reproducible sampling (0 = global RNG) |
+| `min_new_tokens` | 0 | Suppress EOS until this many tokens are generated |
 | `max_new_tokens` | 256 | Maximum tokens to generate |
 | `do_sample` | true | Sampling vs greedy decoding |
+
+`CMLGenerationResult` also carries `token_logprobs` (per generated token) alongside `token_ids` and `text`.
+
+### Logits Processors
+
+The sampling pipeline is built from standalone processors in `include/nn/sampling.h` that each transform a logits row in place. `cml_llama_sample_token` applies them in order; use them directly to build a custom sampler.
+
+```c
+void cml_logits_temperature(float* logits, int n, float temperature);
+void cml_logits_bias(float* logits, int n, const int* ids, const float* biases, int count);
+void cml_logits_suppress_tokens(float* logits, int n, const int* ids, int count);
+void cml_logits_repetition_penalty(float* logits, int n, const int* tokens, int num_tokens, float penalty);
+void cml_logits_frequency_presence_penalty(float* logits, int n, const int* history, int hist_len,
+                                           float frequency_penalty, float presence_penalty);
+int  cml_logits_no_repeat_ngram(float* logits, int n, const int* history, int hist_len, int ngram_size);
+int  cml_logits_top_k(float* logits, int n, int k);
+int  cml_logits_top_p(float* logits, int n, float top_p);
+int  cml_logits_min_p(float* logits, int n, float min_p);
+int  cml_logits_typical(float* logits, int n, float typical_p);
+```
 
 ### Usage Example
 
@@ -350,7 +399,7 @@ cml_llama_free(model);
 
 **File:** `include/nn/serving.h`
 
-Scheduling infrastructure for serving multiple concurrent LLM inference requests with continuous batching. Handles request queuing, batch admission, and lifecycle tracking. This is the bookkeeping layer -- the actual forward pass is performed externally.
+Scheduling infrastructure for serving multiple concurrent LLM inference requests with continuous batching. Handles request queuing, batch admission, and lifecycle tracking. This is the bookkeeping layer - the actual forward pass is performed externally.
 
 ### Request Lifecycle
 
@@ -373,9 +422,12 @@ int                cml_serving_step(CMLServingContext* ctx);  // One scheduling 
 CMLSequenceStatus  cml_serving_get_status(CMLServingContext* ctx, int request_id);
 const int*         cml_serving_get_tokens(CMLServingContext* ctx, int request_id, int* out_count);
 int                cml_serving_finish_request(CMLServingContext* ctx, int request_id);
+int                cml_serving_cancel(CMLServingContext* ctx, int request_id);
 
 CMLServingStats    cml_serving_get_stats(const CMLServingContext* ctx);
 ```
+
+`cml_serving_cancel` drops a queued request (preserving FIFO order) or finalizes an active one. Each `CMLSequenceRequest` carries its own sampling parameters (`top_k`, `min_p`, the penalties, `logit_bias_*`) and a per-request `seed`, so concurrent sequences sample independently.
 
 ### Serving Config
 
@@ -442,6 +494,7 @@ void cml_speculative_set_draft_model(CMLSpeculativeDecoder* dec, void* ctx,
                                      CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn);
 void cml_speculative_set_target_model(CMLSpeculativeDecoder* dec, void* ctx,
                                       CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn);
+void cml_speculative_set_ngram_draft(CMLSpeculativeDecoder* dec, int n);
 
 CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
                                                    const int* prefix_tokens, int prefix_len);
@@ -450,3 +503,5 @@ float cml_speculative_acceptance_rate(const CMLSpeculativeDecoder* dec);
 ```
 
 Default config: K=5 draft tokens, temperature=0.8, top_p=0.9, top_k=40, sampling enabled. Max draft tokens per step: 16 (`CML_SPEC_MAX_DRAFT_TOKENS`).
+
+`cml_speculative_set_ngram_draft(dec, n)` enables model-free prompt-lookup drafting: the draft tokens come from the context's most recent matching n-gram, so no draft model is needed. Set `stochastic_accept` in the config for the Leviathan accept/reject rule (which preserves the target distribution at temperature > 0); the default is exact greedy acceptance.

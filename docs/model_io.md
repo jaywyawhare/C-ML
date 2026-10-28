@@ -244,7 +244,7 @@ module_save_safetensors(model, "exported.safetensors");
 
 ### Notes
 
-- SafeTensors is designed for safe, fast loading -- no arbitrary code execution (unlike pickle-based formats).
+- SafeTensors is designed for safe, fast loading - no arbitrary code execution (unlike pickle-based formats).
 - The API mirrors the GGUF API for consistency.
 - Compatible with the Hugging Face `safetensors` Python library.
 
@@ -403,12 +403,33 @@ free(scales);
 - NF4 packs two 4-bit values per uint8. The resulting tensor has `numel / 2` elements.
 - The `CML_NF4_TABLE` global contains the 16 values optimized for normally distributed weights.
 
+### Low-bit Inference Kernels
+
+`include/nn/quantization.h` holds the raw-buffer kernels used for quantized inference: per-row symmetric int8, groupwise int4, an int8 matmul, and an int8 linear forward. They operate on plain `float`/`int8_t` buffers rather than tensors, so they compose with any weight layout.
+
+```c
+void cml_quantize_int8_row(const float* in, int rows, int cols, int8_t* q, float* scales);
+void cml_dequantize_int8_row(const int8_t* q, const float* scales, int rows, int cols, float* out);
+void cml_quantize_int4_group(const float* in, int n, int group_size, int8_t* q, float* scales);
+void cml_dequantize_int4_group(const int8_t* q, const float* scales, int n, int group_size, float* out);
+
+/* C[M,N] = A[M,K] @ Bt[N,K]^T in int8 with int32 accumulation (nn.Linear weight layout). */
+int cml_matmul_int8(const int8_t* A, const float* scales_a, int M, int K,
+                    const int8_t* Bt, const float* scales_b, int N, float* C);
+
+/* y[M,N] = x[M,K] @ W^T with pre-quantized int8 weights; quantizes x per row internally. */
+int cml_linear_int8_forward(const float* x, int M, int K,
+                            const int8_t* Wq, const float* W_scales, int N, float* y);
+```
+
+Quantize the weight matrix once with `cml_quantize_int8_row` (giving `Wq` and `W_scales` in `[N, K]` layout), then call `cml_linear_int8_forward` per forward pass.
+
 
 ## Architecture Export
 
 **Header:** `include/core/model_architecture.h`
 
-Extract and export a model's architecture as structured JSON for visualization and documentation purposes. This is not a weight serialization format -- it captures layer types, shapes, parameter counts, and connectivity.
+Extract and export a model's architecture as structured JSON for visualization and documentation purposes. This is not a weight serialization format - it captures layer types, shapes, parameter counts, and connectivity.
 
 ### Key API
 
@@ -438,7 +459,7 @@ model_architecture_free(arch);
 - The `LayerInfo` struct captures type, dimensions, kernel size, stride, padding, bias presence, and parameter count for each layer.
 - Each layer can carry a `details` string with additional JSON-encoded information.
 - Handles Sequential, Linear, Conv2d, and other standard module types.
-- This is for introspection and visualization only -- it does not save or load weights.
+- This is for introspection and visualization only - it does not save or load weights.
 
 
 ## Format Comparison

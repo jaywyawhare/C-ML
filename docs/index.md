@@ -31,10 +31,10 @@ C-ML is a production-ready machine learning library written in pure C, providing
 
 ### Advanced Features
 
-- **[Advanced NN & LLM](advanced_nn.md)** - LoRA, QLoRA, Flash Attention, Paged Attention, LLaMA, Serving, Speculative Decoding
+- **[Advanced NN & LLM](advanced_nn.md)** - LoRA, QLoRA, Flash Attention, ALiBi, RoPE scaling, KV cache windows, Paged Attention, LLaMA, logits processors, Serving, Speculative Decoding
 - **[Compiler Pipeline](compiler_pipeline.md)** - IR scheduling, linearization, fused codegen, AOT, JIT, Z3 verification
 - **[GPU Backends](gpu_backends.md)** - CUDA, ROCm, Vulkan, WebGPU, Metal, OpenCL, Adreno, Hexagon
-- **[Distributed Training](distributed.md)** - DDP, Pipeline Parallel, Tensor Parallel, collective ops
+- **[Distributed Training](distributed.md)** - DDP, Pipeline Parallel, Tensor Parallel, ring attention, collective ops
 - **[Model I/O](model_io.md)** - GGUF, SafeTensors, ONNX, PyTorch .pth, quantization
 - **[Memory Management](memory_management.md)** - TLSF allocator, graph allocator, memory pools, timeline planner
 - **[IR Graph Management](ir_graph_management.md)** - Graph lifecycle, capture, versioning, and debugging hooks
