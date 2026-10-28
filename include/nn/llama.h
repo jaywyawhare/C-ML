@@ -69,12 +69,18 @@ typedef struct CMLLLaMAModel {
 } CMLLLaMAModel;
 
 typedef struct CMLGenerationConfig {
-    float temperature;  /* Sampling temperature (default: 0.8) */
-    float top_p;        /* Nucleus sampling (default: 0.9) */
-    int top_k;          /* Top-k sampling (default: 40) */
-    int max_new_tokens; /* Max tokens to generate (default: 256) */
-    int eos_token_id;   /* Stop token */
-    bool do_sample;     /* Use sampling (vs greedy) */
+    float temperature;        /* Sampling temperature (default: 0.8) */
+    float top_p;              /* Nucleus sampling (default: 0.9) */
+    int top_k;                /* Top-k sampling (default: 40) */
+    float min_p;              /* Min-p sampling, 0 = off (default: 0) */
+    float typical_p;          /* Locally-typical sampling, 0 = off (default: 0) */
+    float repetition_penalty; /* HF multiplicative penalty, 1 = off (default: 1) */
+    float frequency_penalty;  /* OpenAI additive per-occurrence penalty (default: 0) */
+    float presence_penalty;   /* OpenAI additive per-token penalty (default: 0) */
+    int no_repeat_ngram_size; /* Ban repeated n-grams, 0 = off (default: 0) */
+    int max_new_tokens;       /* Max tokens to generate (default: 256) */
+    int eos_token_id;         /* Stop token */
+    bool do_sample;           /* Use sampling (vs greedy) */
 } CMLGenerationConfig;
 
 typedef struct CMLGenerationResult {
@@ -100,7 +106,8 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
                                         const CMLGenerationConfig* config);
 void cml_generation_result_free(CMLGenerationResult* result);
 
-int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config);
+int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config, const int* history,
+                           int history_len);
 
 void cml_llama_reset(CMLLLaMAModel* model);
 void cml_llama_print_config(const CMLLLaMAConfig* config);

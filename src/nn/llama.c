@@ -70,12 +70,18 @@ CMLLLaMAConfig cml_llama_config_70b(void) {
  * @return (CMLGenerationConfig)
  */
 CMLGenerationConfig cml_generation_default_config(void) {
-    CMLGenerationConfig config = {.temperature    = 0.8f,
-                                  .top_p          = 0.9f,
-                                  .top_k          = 40,
-                                  .max_new_tokens = 256,
-                                  .eos_token_id   = 2,
-                                  .do_sample      = true};
+    CMLGenerationConfig config = {.temperature          = 0.8f,
+                                  .top_p                = 0.9f,
+                                  .top_k                = 40,
+                                  .min_p                = 0.0f,
+                                  .typical_p            = 0.0f,
+                                  .repetition_penalty   = 1.0f,
+                                  .frequency_penalty    = 0.0f,
+                                  .presence_penalty     = 0.0f,
+                                  .no_repeat_ngram_size = 0,
+                                  .max_new_tokens       = 256,
+                                  .eos_token_id         = 2,
+                                  .do_sample            = true};
     return config;
 }
 
@@ -697,13 +703,16 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
 }
 
 /**
- * Pick the next token from the last position's logits: greedy argmax, or
- * temperature scaling followed by top-k then top-p (nucleus) sampling.
+ * Pick the next token from the last position's logits: greedy argmax, or the history-dependent
+ * penalties followed by temperature scaling and the top-k / typical / top-p / min-p warpers.
  * @param logits (Tensor*)
  * @param config (const CMLGenerationConfig*)
+ * @param history (const int*)
+ * @param history_len (int)
  * @return (int)
  */
-int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
+int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config, const int* history,
+                           int history_len) {
     if (!logits || !config)
         return -1;
 
@@ -749,9 +758,18 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config) {
     }
     memcpy(work, token_logits, (size_t)vocab_size * sizeof(float));
 
+    /* History-dependent penalties act on raw logits, then temperature and the warpers. */
+    cml_logits_repetition_penalty(work, vocab_size, history, history_len,
+                                  config->repetition_penalty);
+    cml_logits_frequency_presence_penalty(work, vocab_size, history, history_len,
+                                          config->frequency_penalty, config->presence_penalty);
+    cml_logits_no_repeat_ngram(work, vocab_size, history, history_len,
+                               config->no_repeat_ngram_size);
     cml_logits_temperature(work, vocab_size, config->temperature);
     cml_logits_top_k(work, vocab_size, config->top_k);
+    cml_logits_typical(work, vocab_size, config->typical_p);
     cml_logits_top_p(work, vocab_size, config->top_p);
+    cml_logits_min_p(work, vocab_size, config->min_p);
     cml_softmax_row_temp(work, vocab_size, 1.0f, probs); /* masked logits -> 0 probability */
 
     float r;
@@ -845,7 +863,8 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
     }
 
     for (int step = 0; step < config->max_new_tokens; step++) {
-        int next_token = cml_llama_sample_token(logits, config);
+        int next_token =
+            cml_llama_sample_token(logits, config, result->token_ids, result->num_tokens);
         tensor_free(logits);
         logits = NULL;
 

@@ -48,6 +48,12 @@ typedef struct CMLSequenceRequest {
     int max_new_tokens;
     float temperature;
     float top_p;
+    int top_k;                /* 0 = off */
+    float min_p;              /* 0 = off */
+    float repetition_penalty; /* 1 = off */
+    float frequency_penalty;  /* 0 = off */
+    float presence_penalty;   /* 0 = off */
+    int no_repeat_ngram_size; /* 0 = off */
 
     /* State */
     CMLSequenceStatus status;

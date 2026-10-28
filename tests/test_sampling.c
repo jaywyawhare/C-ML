@@ -76,6 +76,55 @@ static void test_min_p(void) {
     tests_passed++;
 }
 
+static void test_frequency_presence_penalty(void) {
+    printf("test_frequency_presence_penalty...\n");
+    float l[5];
+    load(l);
+    int hist[3] = {0, 0, 4}; /* token 0 appears twice, token 4 once */
+    cml_logits_frequency_presence_penalty(l, 5, hist, 3, 0.5f, 1.0f);
+    /* token 0: 2.0 - 0.5*2 (frequency) - 1.0 (presence) = 0.0 */
+    ASSERT(fabsf(l[0] - 0.0f) < 1e-6f, "frequency+presence on repeated token");
+    /* token 4: -1.0 - 0.5*1 - 1.0 = -2.5 */
+    ASSERT(fabsf(l[4] - (-2.5f)) < 1e-6f, "frequency+presence on single token");
+    ASSERT(fabsf(l[1] - 1.0f) < 1e-6f, "untouched token");
+    tests_passed++;
+}
+
+static void test_no_repeat_ngram(void) {
+    printf("test_no_repeat_ngram...\n");
+    float l[6];
+    for (int i = 0; i < 6; i++)
+        l[i] = 0.0f;
+    /* history [5,1,2,1], prefix (last 1) = [1]; earlier '1' at idx 1 is followed by token 2. */
+    int hist[4] = {5, 1, 2, 1};
+    int kept    = cml_logits_no_repeat_ngram(l, 6, hist, 4, 2);
+    ASSERT(kept == 5, "no_repeat_ngram kept count");
+    ASSERT(!isfinite(l[2]), "no_repeat_ngram bans the completing token");
+    ASSERT(isfinite(l[0]) && isfinite(l[1]) && isfinite(l[3]), "no_repeat_ngram keeps the rest");
+    /* ngram_size 3: prefix [2,1] never recurs earlier -> nothing banned. */
+    for (int i = 0; i < 6; i++)
+        l[i] = 0.0f;
+    ASSERT(cml_logits_no_repeat_ngram(l, 6, hist, 4, 3) == 6, "no_repeat_ngram no-op when unseen");
+    tests_passed++;
+}
+
+static void test_typical(void) {
+    printf("test_typical...\n");
+    float l[5];
+    load(l);
+    int kept = cml_logits_typical(l, 5, 0.9f); /* numpy oracle: keep {0,1,2,3} */
+    ASSERT(kept == 4, "typical(0.9) kept count");
+    ASSERT(isfinite(l[0]) && isfinite(l[1]) && isfinite(l[2]) && isfinite(l[3]),
+           "typical(0.9) keeps {0..3}");
+    ASSERT(!isfinite(l[4]), "typical(0.9) masks the tail");
+    load(l);
+    kept = cml_logits_typical(l, 5, 0.6f); /* numpy oracle: keep {0,1} */
+    ASSERT(kept == 2, "typical(0.6) kept count");
+    ASSERT(isfinite(l[0]) && isfinite(l[1]), "typical(0.6) keeps {0,1}");
+    ASSERT(!isfinite(l[2]) && !isfinite(l[3]) && !isfinite(l[4]), "typical(0.6) masks the rest");
+    tests_passed++;
+}
+
 int main(void) {
     printf("Sampling / logits-processor tests\n\n");
     test_temperature();
@@ -83,6 +132,9 @@ int main(void) {
     test_top_k();
     test_top_p();
     test_min_p();
+    test_frequency_presence_penalty();
+    test_no_repeat_ngram();
+    test_typical();
     printf("\nResults: %d passed, %d failed\n", tests_passed, tests_failed);
     return tests_failed > 0 ? 1 : 0;
 }

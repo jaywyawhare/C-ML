@@ -1,4 +1,6 @@
 #include "nn/serving.h"
+#include "nn/sampling.h"
+#include "nn/llm_ops.h"
 #include "core/logging.h"
 
 #include <stdlib.h>
@@ -235,57 +237,39 @@ static int serving_argmax(const float* logits, int n) {
 }
 
 /**
- * Sample a token id from logits. temperature <= 0 => greedy argmax; otherwise
- * temperature scaling + nucleus (top-p) sampling.
+ * Sample a token id from logits for a request, applying its history-dependent penalties and the
+ * temperature / top-k / top-p / min-p warpers via the shared logits-processor ops. temperature
+ * <= 0 => greedy argmax.
  * @param logits (const float*)
  * @param vocab (int)
- * @param temperature (float)
- * @param top_p (float)
+ * @param req (const CMLSequenceRequest*)
+ * @param history (const int*)
+ * @param hist_len (int)
  * @return (int)
  */
-static int serving_sample(const float* logits, int vocab, float temperature, float top_p) {
-    if (temperature <= 0.0f || vocab <= 1)
+static int serving_sample(const float* logits, int vocab, const CMLSequenceRequest* req,
+                          const int* history, int hist_len) {
+    if (req->temperature <= 0.0f || vocab <= 1)
         return serving_argmax(logits, vocab);
 
-    /* softmax with temperature (numerically stable) */
+    float* work  = (float*)cml_malloc((size_t)vocab * sizeof(float));
     float* probs = (float*)cml_malloc((size_t)vocab * sizeof(float));
-    if (!probs)
+    if (!work || !probs) {
+        cml_free(work);
+        cml_free(probs);
         return serving_argmax(logits, vocab);
-
-    cml_softmax_row_temp(logits, vocab, temperature, probs);
-
-    /* nucleus: build a simple descending cutoff by cumulative mass. We avoid a
-     * full sort by iterating with a running threshold: draw against the top-p
-     * renormalised distribution over tokens whose cumulative prob (in descending
-     * order) is within top_p. Approximate via a threshold pass. */
-    if (top_p > 0.0f && top_p < 1.0f) {
-        /* find the probability threshold t such that mass(prob >= t) ~ top_p */
-        float lo = 0.0f, hi = 1.0f, thresh = 0.0f;
-        for (int it = 0; it < 24; it++) {
-            float mid  = 0.5f * (lo + hi);
-            float mass = 0.0f;
-            for (int i = 0; i < vocab; i++)
-                if (probs[i] >= mid)
-                    mass += probs[i];
-            if (mass > top_p)
-                lo = mid;
-            else
-                hi = mid;
-            thresh = mid;
-        }
-        float kept = 0.0f;
-        for (int i = 0; i < vocab; i++) {
-            if (probs[i] < thresh)
-                probs[i] = 0.0f;
-            else
-                kept += probs[i];
-        }
-        if (kept > 0.0f) {
-            float k = 1.0f / kept;
-            for (int i = 0; i < vocab; i++)
-                probs[i] *= k;
-        }
     }
+    memcpy(work, logits, (size_t)vocab * sizeof(float));
+
+    cml_logits_repetition_penalty(work, vocab, history, hist_len, req->repetition_penalty);
+    cml_logits_frequency_presence_penalty(work, vocab, history, hist_len, req->frequency_penalty,
+                                          req->presence_penalty);
+    cml_logits_no_repeat_ngram(work, vocab, history, hist_len, req->no_repeat_ngram_size);
+    cml_logits_temperature(work, vocab, req->temperature);
+    cml_logits_top_k(work, vocab, req->top_k);
+    cml_logits_top_p(work, vocab, req->top_p);
+    cml_logits_min_p(work, vocab, req->min_p);
+    cml_softmax_row_temp(work, vocab, 1.0f, probs); /* masked logits -> 0 probability */
 
     float r    = serving_rand_uniform();
     float cum  = 0.0f;
@@ -297,6 +281,7 @@ static int serving_sample(const float* logits, int vocab, float temperature, flo
             break;
         }
     }
+    cml_free(work);
     cml_free(probs);
     return chosen;
 }
@@ -335,7 +320,16 @@ static int serving_generate_one(CMLServingContext* ctx, CMLSequenceRequest* req)
         return -1;
     }
 
-    int tok = serving_sample(logits, ctx->vocab_size, req->temperature, req->top_p);
+    /* History for the penalties is the prompt followed by everything generated so far. */
+    int hist_len = req->num_prompt_tokens + req->num_generated;
+    int* history = (int*)cml_malloc((size_t)hist_len * sizeof(int));
+    if (history) {
+        memcpy(history, req->prompt_tokens, (size_t)req->num_prompt_tokens * sizeof(int));
+        memcpy(history + req->num_prompt_tokens, req->generated_tokens,
+               (size_t)req->num_generated * sizeof(int));
+    }
+    int tok = serving_sample(logits, ctx->vocab_size, req, history, history ? hist_len : 0);
+    cml_free(history);
     cml_free(logits);
 
     /* grow the generated-token buffer if needed */
@@ -406,11 +400,17 @@ int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens, int num
 
     req->max_new_tokens =
         (max_new_tokens > 0) ? max_new_tokens : ctx->config.max_new_tokens_default;
-    req->temperature  = ctx->config.temperature_default;
-    req->top_p        = ctx->config.top_p_default;
-    req->status       = CML_SEQ_STATUS_QUEUED;
-    req->paged_seq_id = -1;
-    req->current_pos  = 0;
+    req->temperature          = ctx->config.temperature_default;
+    req->top_p                = ctx->config.top_p_default;
+    req->top_k                = 0;
+    req->min_p                = 0.0f;
+    req->repetition_penalty   = 1.0f;
+    req->frequency_penalty    = 0.0f;
+    req->presence_penalty     = 0.0f;
+    req->no_repeat_ngram_size = 0;
+    req->status               = CML_SEQ_STATUS_QUEUED;
+    req->paged_seq_id         = -1;
+    req->current_pos          = 0;
 
     /* Pre-allocate generated token buffer */
     req->gen_capacity     = req->max_new_tokens;

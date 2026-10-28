@@ -311,6 +311,9 @@ static void chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json
 
     float temperature = json_read_float(json_find_key(body_json, "temperature"), srv->temperature);
     float top_p       = json_read_float(json_find_key(body_json, "top_p"), srv->top_p);
+    int top_k         = json_read_int(json_find_key(body_json, "top_k"), 0);
+    float freq_pen    = json_read_float(json_find_key(body_json, "frequency_penalty"), 0.0f);
+    float pres_pen    = json_read_float(json_find_key(body_json, "presence_penalty"), 0.0f);
     int max_tokens    = json_read_int(json_find_key(body_json, "max_tokens"), srv->max_tokens);
     bool stream       = json_read_bool(json_find_key(body_json, "stream"), false);
 
@@ -333,6 +336,9 @@ static void chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json
     CMLGenerationConfig gen_config = cml_generation_default_config();
     gen_config.temperature         = temperature;
     gen_config.top_p               = top_p;
+    gen_config.top_k               = top_k;
+    gen_config.frequency_penalty   = freq_pen;
+    gen_config.presence_penalty    = pres_pen;
     gen_config.max_new_tokens      = max_tokens;
     gen_config.do_sample           = (temperature > 0.0f);
 
@@ -370,7 +376,8 @@ static void chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json
             if (!logits)
                 break;
 
-            int token_id = cml_llama_sample_token(logits, &gen_config);
+            int token_id =
+                cml_llama_sample_token(logits, &gen_config, prompt_tokens, num_prompt_tokens);
             tensor_free(logits);
 
             if (token_id == gen_config.eos_token_id)

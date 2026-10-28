@@ -345,7 +345,7 @@ static int test_sample_greedy(void) {
     CMLGenerationConfig gen_cfg = cml_generation_default_config();
     gen_cfg.do_sample           = false; /* greedy */
 
-    int token = cml_llama_sample_token(logits, &gen_cfg);
+    int token = cml_llama_sample_token(logits, &gen_cfg, NULL, 0);
     tensor_free(logits);
 
     /* The maximum logit is at index 2 (value 2.0) */
@@ -370,7 +370,7 @@ static int test_sample_greedy_2d(void) {
     CMLGenerationConfig gen_cfg = cml_generation_default_config();
     gen_cfg.do_sample           = false;
 
-    int token = cml_llama_sample_token(logits, &gen_cfg);
+    int token = cml_llama_sample_token(logits, &gen_cfg, NULL, 0);
     tensor_free(logits);
 
     /* Should return 3 (max of last row) */
@@ -395,7 +395,7 @@ static int test_sample_with_temperature(void) {
     gen_cfg.top_k               = 4;
     gen_cfg.top_p               = 1.0f;
 
-    int token = cml_llama_sample_token(logits, &gen_cfg);
+    int token = cml_llama_sample_token(logits, &gen_cfg, NULL, 0);
     tensor_free(logits);
 
     /* Token should be a valid index */
@@ -406,7 +406,7 @@ static int test_sample_with_temperature(void) {
 
 static int test_sample_null_args(void) {
     CMLGenerationConfig gen_cfg = cml_generation_default_config();
-    int token                   = cml_llama_sample_token(NULL, &gen_cfg);
+    int token                   = cml_llama_sample_token(NULL, &gen_cfg, NULL, 0);
     if (token != -1)
         return 0;
 
@@ -418,7 +418,7 @@ static int test_sample_null_args(void) {
     if (!logits)
         return 0;
 
-    token = cml_llama_sample_token(logits, NULL);
+    token = cml_llama_sample_token(logits, NULL, NULL, 0);
     tensor_free(logits);
     if (token != -1)
         return 0;

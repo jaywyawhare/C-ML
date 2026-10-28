@@ -56,6 +56,46 @@ int cml_logits_top_p(float* logits, int n, float top_p);
  */
 int cml_logits_min_p(float* logits, int n, float min_p);
 
+/**
+ * Apply OpenAI-style additive penalties in place over the token history: subtract
+ * frequency_penalty once per prior occurrence of a token and presence_penalty once per token that
+ * appears at all. No-op when both penalties are zero or the history is empty.
+ * @param logits (float*)
+ * @param n (int)
+ * @param history (const int*)
+ * @param hist_len (int)
+ * @param frequency_penalty (float)
+ * @param presence_penalty (float)
+ * @return (void)
+ */
+void cml_logits_frequency_presence_penalty(float* logits, int n, const int* history, int hist_len,
+                                           float frequency_penalty, float presence_penalty);
+
+/**
+ * Ban in place every token that would complete an n-gram already present in the history: the
+ * trailing (ngram_size-1) tokens form the prefix, and any token that followed that same prefix
+ * earlier is masked to -inf. Returns kept count.
+ * @param logits (float*)
+ * @param n (int)
+ * @param history (const int*)
+ * @param hist_len (int)
+ * @param ngram_size (int)
+ * @return (int)
+ */
+int cml_logits_no_repeat_ngram(float* logits, int n, const int* history, int hist_len,
+                               int ngram_size);
+
+/**
+ * Locally-typical filter in place: keep the smallest set of tokens, ordered by how close their
+ * surprisal is to the distribution entropy, whose cumulative softmax probability reaches typical_p;
+ * mask the rest to -inf. Returns kept count.
+ * @param logits (float*)
+ * @param n (int)
+ * @param typical_p (float)
+ * @return (int)
+ */
+int cml_logits_typical(float* logits, int n, float typical_p);
+
 #ifdef __cplusplus
 }
 #endif
