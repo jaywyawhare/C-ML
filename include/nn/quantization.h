@@ -71,6 +71,22 @@ void cml_dequantize_int4_group(const int8_t* q, const float* scales, int n, int 
 int cml_matmul_int8(const int8_t* A, const float* scales_a, int M, int K, const int8_t* Bt,
                     const float* scales_b, int N, float* C);
 
+/**
+ * int8 linear forward y[M,N] = x[M,K] @ W^T with pre-quantized weights: quantizes the activations
+ * x per row, then runs the int8 matmul against Wq[N,K] (nn.Linear layout, quantize once with
+ * cml_quantize_int8_row). Returns 0 on success, -1 on bad args or allocation failure.
+ * @param x (const float*)
+ * @param M (int)
+ * @param K (int)
+ * @param Wq (const int8_t*)
+ * @param W_scales (const float*)
+ * @param N (int)
+ * @param y (float*)
+ * @return (int)
+ */
+int cml_linear_int8_forward(const float* x, int M, int K, const int8_t* Wq, const float* W_scales,
+                            int N, float* y);
+
 #ifdef __cplusplus
 }
 #endif

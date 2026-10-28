@@ -85,9 +85,10 @@ typedef struct CMLGenerationConfig {
     const char** stop_sequences;    /* Strings that halt generation, NULL = none */
     int num_stop_sequences;         /* Length of stop_sequences */
     uint64_t seed;                  /* RNG seed for reproducible sampling, 0 = global RNG */
-    int max_new_tokens;             /* Max tokens to generate (default: 256) */
-    int eos_token_id;               /* Stop token */
-    bool do_sample;                 /* Use sampling (vs greedy) */
+    int min_new_tokens; /* Suppress EOS until this many tokens are generated (0 = off) */
+    int max_new_tokens; /* Max tokens to generate (default: 256) */
+    int eos_token_id;   /* Stop token */
+    bool do_sample;     /* Use sampling (vs greedy) */
 } CMLGenerationConfig;
 
 typedef struct CMLGenerationResult {

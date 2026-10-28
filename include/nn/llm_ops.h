@@ -17,6 +17,8 @@ typedef struct CMLKVCache {
     int current_len; /* Current sequence length in cache */
     int num_kv_heads;
     int head_dim;
+    int window;   /* Sliding-window retention bound, 0 = keep everything */
+    int num_sink; /* Leading sink rows kept past the window */
 } CMLKVCache;
 
 /**
@@ -45,6 +47,16 @@ CMLKVCache* cml_kv_cache_create(int max_seq_len, int num_kv_heads, int head_dim)
 void cml_kv_cache_free(CMLKVCache* cache);
 
 int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value);
+
+/**
+ * Bound the cache to a sliding window: keep the leading num_sink rows plus the most recent `window`
+ * rows, evicting the oldest in between on append. window <= 0 restores unbounded retention.
+ * @param cache (CMLKVCache*)
+ * @param window (int)
+ * @param num_sink (int)
+ * @return (void)
+ */
+void cml_kv_cache_set_window(CMLKVCache* cache, int window, int num_sink);
 
 void cml_kv_cache_reset(CMLKVCache* cache);
 

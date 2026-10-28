@@ -146,6 +146,45 @@ static int test_submit_multiple(void) {
     return 1;
 }
 
+static int test_cancel_queued(void) {
+    CMLServingConfig cfg   = cml_serving_default_config();
+    CMLServingContext* ctx = cml_serving_create(&cfg);
+    if (!ctx)
+        return 0;
+
+    int tokens[] = {10, 20, 30};
+    int id1      = cml_serving_submit(ctx, tokens, 3, 50);
+    int id2      = cml_serving_submit(ctx, tokens, 3, 50);
+    int id3      = cml_serving_submit(ctx, tokens, 3, 50);
+    if (id1 < 0 || id2 < 0 || id3 < 0) {
+        cml_serving_free(ctx);
+        return 0;
+    }
+
+    /* Cancel the middle queued request; FIFO order of the rest is preserved. */
+    if (cml_serving_cancel(ctx, id2) != 0 || ctx->queue_count != 2) {
+        cml_serving_free(ctx);
+        return 0;
+    }
+    if (cml_serving_get_status(ctx, id2) != CML_SEQ_STATUS_ERROR) {
+        cml_serving_free(ctx);
+        return 0;
+    }
+    if (ctx->queue[ctx->queue_head]->request_id != id1 ||
+        ctx->queue[(ctx->queue_head + 1) % ctx->queue_capacity]->request_id != id3) {
+        cml_serving_free(ctx);
+        return 0;
+    }
+    /* Cancelling an unknown request fails. */
+    if (cml_serving_cancel(ctx, 99999) != -1) {
+        cml_serving_free(ctx);
+        return 0;
+    }
+
+    cml_serving_free(ctx);
+    return 1;
+}
+
 static int test_submit_invalid_args(void) {
     CMLServingConfig cfg   = cml_serving_default_config();
     CMLServingContext* ctx = cml_serving_create(&cfg);
@@ -727,6 +766,7 @@ int main(void) {
     /* Submit */
     TEST(submit_single);
     TEST(submit_multiple);
+    TEST(cancel_queued);
     TEST(submit_invalid_args);
     TEST(submit_default_max_new_tokens);
 

@@ -600,6 +600,43 @@ int cml_serving_finish_request(CMLServingContext* ctx, int request_id) {
     return 0;
 }
 
+int cml_serving_cancel(CMLServingContext* ctx, int request_id) {
+    if (!ctx)
+        return -1;
+
+    /* Active request: reuse the finish path (stats + batch eviction). */
+    for (int i = 0; i < ctx->batch_size; i++)
+        if (ctx->active_batch[i] && ctx->active_batch[i]->request_id == request_id)
+            return cml_serving_finish_request(ctx, request_id);
+
+    /* Queued request: free it and close the gap, preserving FIFO order. */
+    int found = -1;
+    for (int i = 0; i < ctx->queue_count; i++) {
+        int idx = (ctx->queue_head + i) % ctx->queue_capacity;
+        if (ctx->queue[idx] && ctx->queue[idx]->request_id == request_id) {
+            found = i;
+            break;
+        }
+    }
+    if (found < 0) {
+        LOG_WARNING("cml_serving_cancel: request %d not found", request_id);
+        return -1;
+    }
+
+    int ridx = (ctx->queue_head + found) % ctx->queue_capacity;
+    free_request(ctx->queue[ridx]);
+    ctx->queue[ridx] = NULL;
+    for (int i = found; i < ctx->queue_count - 1; i++) {
+        int cur          = (ctx->queue_head + i) % ctx->queue_capacity;
+        int next         = (ctx->queue_head + i + 1) % ctx->queue_capacity;
+        ctx->queue[cur]  = ctx->queue[next];
+        ctx->queue[next] = NULL;
+    }
+    ctx->queue_count--;
+    ctx->queue_tail = (ctx->queue_head + ctx->queue_count) % ctx->queue_capacity;
+    return 0;
+}
+
 /**
  * Snapshot of the context's aggregate serving statistics (zeroed if ctx is NULL).
  * @param ctx (const CMLServingContext*)

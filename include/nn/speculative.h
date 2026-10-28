@@ -59,6 +59,10 @@ typedef struct CMLSpeculativeDecoder {
 
     int vocab_size;
 
+    /* Model-free prompt-lookup drafting: when ngram_n > 0 the draft tokens are
+     * read from the context's most recent matching n-gram instead of a draft model. */
+    int ngram_n;
+
     /* Statistics */
     size_t total_drafted;
     size_t total_accepted;
@@ -76,6 +80,15 @@ void cml_speculative_set_draft_model(CMLSpeculativeDecoder* dec, void* ctx,
 
 void cml_speculative_set_target_model(CMLSpeculativeDecoder* dec, void* ctx,
                                       CMLModelForwardFn forward_fn, CMLSampleTokenFn sample_fn);
+
+/**
+ * Enable model-free prompt-lookup drafting: draft tokens come from the most recent occurrence of
+ * the context's trailing n-gram. Pass n <= 0 to disable and fall back to the draft model.
+ * @param dec (CMLSpeculativeDecoder*)
+ * @param n (int)
+ * @return (void)
+ */
+void cml_speculative_set_ngram_draft(CMLSpeculativeDecoder* dec, int n);
 
 /**
  * Drafts K tokens, verifies with target model, accepts matching tokens.

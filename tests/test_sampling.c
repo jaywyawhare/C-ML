@@ -89,6 +89,17 @@ static void test_bias(void) {
     tests_passed++;
 }
 
+static void test_suppress_tokens(void) {
+    printf("test_suppress_tokens...\n");
+    float l[5];
+    load(l);
+    int ids[2] = {1, 3};
+    cml_logits_suppress_tokens(l, 5, ids, 2);
+    ASSERT(!isfinite(l[1]) && !isfinite(l[3]), "suppressed tokens masked to -inf");
+    ASSERT(isfinite(l[0]) && isfinite(l[2]) && isfinite(l[4]), "others untouched");
+    tests_passed++;
+}
+
 static void test_frequency_presence_penalty(void) {
     printf("test_frequency_presence_penalty...\n");
     float l[5];
@@ -142,6 +153,7 @@ int main(void) {
     printf("Sampling / logits-processor tests\n\n");
     test_temperature();
     test_bias();
+    test_suppress_tokens();
     test_repetition_penalty();
     test_top_k();
     test_top_p();

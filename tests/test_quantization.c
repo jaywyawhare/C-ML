@@ -101,12 +101,53 @@ static void test_int8_matmul(void) {
     tests_passed++;
 }
 
+static void test_int8_linear(void) {
+    printf("test_int8_linear...\n");
+    int M = 4, K = 24, N = 6;
+    float* x = (float*)cml_malloc((size_t)M * K * sizeof(float));
+    float* W = (float*)cml_malloc((size_t)N * K * sizeof(float)); /* [N,K] nn.Linear layout */
+    for (int i = 0; i < M * K; i++)
+        x[i] = frand();
+    for (int i = 0; i < N * K; i++)
+        W[i] = frand();
+
+    int8_t* Wq = (int8_t*)cml_malloc((size_t)N * K);
+    float* Ws  = (float*)cml_malloc((size_t)N * sizeof(float));
+    cml_quantize_int8_row(W, N, K, Wq, Ws);
+
+    float* y = (float*)cml_malloc((size_t)M * N * sizeof(float));
+    ASSERT(cml_linear_int8_forward(x, M, K, Wq, Ws, N, y) == 0, "int8 linear returns 0");
+
+    float amax = 0.0f, wmax = 0.0f;
+    for (int i = 0; i < M * K; i++)
+        if (fabsf(x[i]) > amax)
+            amax = fabsf(x[i]);
+    for (int i = 0; i < N * K; i++)
+        if (fabsf(W[i]) > wmax)
+            wmax = fabsf(W[i]);
+    float tol = 0.02f * (float)K * amax * wmax + 1e-4f;
+    for (int m = 0; m < M; m++)
+        for (int n = 0; n < N; n++) {
+            float ref = 0.0f;
+            for (int k = 0; k < K; k++)
+                ref += x[m * K + k] * W[n * K + k];
+            ASSERT(fabsf(ref - y[m * N + n]) < tol, "int8 linear close to fp32");
+        }
+    cml_free(x);
+    cml_free(W);
+    cml_free(Wq);
+    cml_free(Ws);
+    cml_free(y);
+    tests_passed++;
+}
+
 int main(void) {
     printf("Quantization tests\n\n");
     srand(7);
     test_int8_roundtrip();
     test_int4_roundtrip();
     test_int8_matmul();
+    test_int8_linear();
     printf("\nResults: %d passed, %d failed\n", tests_passed, tests_failed);
     return tests_failed > 0 ? 1 : 0;
 }

@@ -183,6 +183,15 @@ const int* cml_serving_get_tokens(CMLServingContext* ctx, int request_id, int* o
 
 int cml_serving_finish_request(CMLServingContext* ctx, int request_id);
 
+/**
+ * Cancel a request: finalize it if active, or drop it from the queue (preserving FIFO order) if
+ * still queued. Returns 0 on success, -1 if the request is unknown.
+ * @param ctx (CMLServingContext*)
+ * @param request_id (int)
+ * @return (int)
+ */
+int cml_serving_cancel(CMLServingContext* ctx, int request_id);
+
 CMLServingStats cml_serving_get_stats(const CMLServingContext* ctx);
 
 #ifdef __cplusplus

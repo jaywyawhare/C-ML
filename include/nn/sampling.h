@@ -69,6 +69,17 @@ int cml_logits_min_p(float* logits, int n, float min_p);
 void cml_logits_bias(float* logits, int n, const int* ids, const float* biases, int count);
 
 /**
+ * Hard-ban a set of token ids in place by masking them to -inf. Out-of-range ids are ignored.
+ * No-op when count <= 0.
+ * @param logits (float*)
+ * @param n (int)
+ * @param ids (const int*)
+ * @param count (int)
+ * @return (void)
+ */
+void cml_logits_suppress_tokens(float* logits, int n, const int* ids, int count);
+
+/**
  * Apply OpenAI-style additive penalties in place over the token history: subtract
  * frequency_penalty once per prior occurrence of a token and presence_penalty once per token that
  * appears at all. No-op when both penalties are zero or the history is empty.

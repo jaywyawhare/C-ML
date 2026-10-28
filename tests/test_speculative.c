@@ -670,6 +670,32 @@ static int test_stochastic_warp_top_k1(void) {
     return ok;
 }
 
+static int test_ngram_draft(void) {
+    /* Model-free prompt-lookup: no draft model set, drafts come from the context n-gram. */
+    CMLSpeculativeConfig cfg   = cml_speculative_default_config();
+    cfg.num_draft_tokens       = 4;
+    CMLSpeculativeDecoder* dec = cml_speculative_create(&cfg, MOCK_VOCAB_SIZE);
+    if (!dec)
+        return 0;
+
+    cml_speculative_set_ngram_draft(dec, 2);
+    MockModelCtx ctx = {.predict_token = 7};
+    cml_speculative_set_target_model(dec, &ctx, mock_forward, mock_sample);
+
+    /* Trailing 2-gram [5,6] recurs at index 0; its continuation [7,5,6] is the draft. */
+    int prefix[]              = {5, 6, 7, 5, 6};
+    CMLSpeculativeResult* res = cml_speculative_decode_step(dec, prefix, 5);
+    if (!res) {
+        cml_speculative_free(dec);
+        return 0;
+    }
+
+    int ok = (res->num_drafted == 3); /* continuation ran to the end of the context */
+    cml_speculative_result_free(res);
+    cml_speculative_free(dec);
+    return ok;
+}
+
 int main(void) {
     printf("test_speculative\n\n");
 
@@ -696,6 +722,7 @@ int main(void) {
     TEST(k_equals_1_agree);
     TEST(k_equals_1_disagree);
     TEST(stochastic_warp_top_k1);
+    TEST(ngram_draft);
     TEST(decode_no_callbacks);
     TEST(decode_invalid_prefix);
     TEST(timing_fields);

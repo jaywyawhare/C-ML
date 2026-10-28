@@ -1,4 +1,5 @@
 #include "nn/quantization.h"
+#include "alloc/cml_allocator.h"
 #include <math.h>
 #include <stddef.h>
 
@@ -87,4 +88,22 @@ int cml_matmul_int8(const int8_t* A, const float* scales_a, int M, int K, const 
         }
     }
     return 0;
+}
+
+int cml_linear_int8_forward(const float* x, int M, int K, const int8_t* Wq, const float* W_scales,
+                            int N, float* y) {
+    if (!x || !Wq || !W_scales || !y || M <= 0 || K <= 0 || N <= 0)
+        return -1;
+    int8_t* xq    = (int8_t*)cml_malloc((size_t)M * K);
+    float* xscale = (float*)cml_malloc((size_t)M * sizeof(float));
+    if (!xq || !xscale) {
+        cml_free(xq);
+        cml_free(xscale);
+        return -1;
+    }
+    cml_quantize_int8_row(x, M, K, xq, xscale);
+    int rc = cml_matmul_int8(xq, xscale, M, K, Wq, W_scales, N, y);
+    cml_free(xq);
+    cml_free(xscale);
+    return rc;
 }

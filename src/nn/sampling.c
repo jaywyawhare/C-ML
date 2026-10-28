@@ -171,6 +171,16 @@ void cml_logits_bias(float* logits, int n, const int* ids, const float* biases, 
     }
 }
 
+void cml_logits_suppress_tokens(float* logits, int n, const int* ids, int count) {
+    if (!logits || n <= 0 || !ids || count <= 0)
+        return;
+    for (int k = 0; k < count; k++) {
+        int id = ids[k];
+        if (id >= 0 && id < n)
+            logits[id] = -INFINITY;
+    }
+}
+
 void cml_logits_frequency_presence_penalty(float* logits, int n, const int* history, int hist_len,
                                            float frequency_penalty, float presence_penalty) {
     if (!logits || n <= 0 || !history || hist_len <= 0)

@@ -205,11 +205,6 @@ int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value) {
     /* new_key expected shape: [seq_len, num_kv_heads, head_dim] or
      * [1, num_kv_heads, head_dim] for single-token append */
     int append_len = new_key->shape[0];
-    if (cache->current_len + append_len > cache->max_seq_len) {
-        LOG_ERROR("cml_kv_cache_append: cache overflow (%d + %d > %d)", cache->current_len,
-                  append_len, cache->max_seq_len);
-        return -1;
-    }
 
     float* k_cache_data = (float*)tensor_data_ptr(cache->key_cache);
     float* v_cache_data = (float*)tensor_data_ptr(cache->value_cache);
@@ -221,7 +216,31 @@ int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value) {
         return -1;
     }
 
-    size_t row_size   = (size_t)cache->num_kv_heads * cache->head_dim;
+    size_t row_size = (size_t)cache->num_kv_heads * cache->head_dim;
+
+    /* Sliding window: evict the oldest non-sink rows so sinks + the most recent window fit. */
+    if (cache->window > 0) {
+        int cap  = cache->num_sink + cache->window;
+        int drop = cache->current_len + append_len - cap;
+        if (drop > cache->current_len - cache->num_sink)
+            drop = cache->current_len - cache->num_sink;
+        if (drop > 0) {
+            size_t keep_rows = (size_t)(cache->current_len - cache->num_sink - drop);
+            float* kbase     = k_cache_data + (size_t)cache->num_sink * row_size;
+            float* vbase     = v_cache_data + (size_t)cache->num_sink * row_size;
+            size_t src_off   = (size_t)drop * row_size;
+            memmove(kbase, kbase + src_off, keep_rows * row_size * sizeof(float));
+            memmove(vbase, vbase + src_off, keep_rows * row_size * sizeof(float));
+            cache->current_len -= drop;
+        }
+    }
+
+    if (cache->current_len + append_len > cache->max_seq_len) {
+        LOG_ERROR("cml_kv_cache_append: cache overflow (%d + %d > %d)", cache->current_len,
+                  append_len, cache->max_seq_len);
+        return -1;
+    }
+
     size_t offset     = (size_t)cache->current_len * row_size;
     size_t copy_bytes = (size_t)append_len * row_size * sizeof(float);
 
@@ -230,6 +249,25 @@ int cml_kv_cache_append(CMLKVCache* cache, Tensor* new_key, Tensor* new_value) {
 
     cache->current_len += append_len;
     return cache->current_len;
+}
+
+void cml_kv_cache_set_window(CMLKVCache* cache, int window, int num_sink) {
+    if (!cache)
+        return;
+    if (window <= 0) {
+        cache->window   = 0;
+        cache->num_sink = 0;
+        return;
+    }
+    if (num_sink < 0)
+        num_sink = 0;
+    if (num_sink + window > cache->max_seq_len) {
+        LOG_ERROR("cml_kv_cache_set_window: sink+window %d exceeds max_seq_len %d",
+                  num_sink + window, cache->max_seq_len);
+        return;
+    }
+    cache->window   = window;
+    cache->num_sink = num_sink;
 }
 
 /**

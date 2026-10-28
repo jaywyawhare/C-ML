@@ -85,6 +85,7 @@ CMLGenerationConfig cml_generation_default_config(void) {
                                   .stop_sequences       = NULL,
                                   .num_stop_sequences   = 0,
                                   .seed                 = 0,
+                                  .min_new_tokens       = 0,
                                   .max_new_tokens       = 256,
                                   .eos_token_id         = 2,
                                   .do_sample            = true};
@@ -709,6 +710,30 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
 }
 
 /**
+ * Pointer to the last position's logits row of a 1D [vocab] or 2D [seq_len, vocab] tensor, with its
+ * length written to out_vocab. Returns NULL on unexpected rank or unrealised data.
+ * @param logits (Tensor*)
+ * @param out_vocab (int*)
+ * @return (float*)
+ */
+static float* llama_logits_last_row(Tensor* logits, int* out_vocab) {
+    tensor_ensure_executed(logits);
+    float* data = (float*)tensor_data_ptr(logits);
+    if (!data)
+        return NULL;
+    if (logits->ndim == 2) {
+        *out_vocab = logits->shape[1];
+        return data + (logits->shape[0] - 1) * logits->shape[1];
+    }
+    if (logits->ndim == 1) {
+        *out_vocab = logits->shape[0];
+        return data;
+    }
+    LOG_ERROR("llama_logits_last_row: unexpected logits ndim=%d", logits->ndim);
+    return NULL;
+}
+
+/**
  * Pick the next token from the last position's logits: greedy argmax, or logit bias and the
  * history-dependent penalties followed by temperature and the top-k / typical / top-p / min-p
  * warpers. Writes the chosen token's log-probability to out_logprob when non-NULL.
@@ -724,25 +749,10 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config, co
     if (!logits || !config)
         return -1;
 
-    tensor_ensure_executed(logits);
-    float* data = (float*)tensor_data_ptr(logits);
-    if (!data)
-        return -1;
-
-    /* Get the last token's logits if logits is 2D [seq_len, vocab_size] */
     int vocab_size;
-    float* token_logits;
-    if (logits->ndim == 2) {
-        vocab_size   = logits->shape[1];
-        int last_pos = logits->shape[0] - 1;
-        token_logits = data + last_pos * vocab_size;
-    } else if (logits->ndim == 1) {
-        vocab_size   = logits->shape[0];
-        token_logits = data;
-    } else {
-        LOG_ERROR("cml_llama_sample_token: unexpected logits ndim=%d", logits->ndim);
+    float* token_logits = llama_logits_last_row(logits, &vocab_size);
+    if (!token_logits)
         return -1;
-    }
 
     /* Greedy decoding */
     if (!config->do_sample || config->temperature <= 0.0f) {
@@ -920,6 +930,14 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
     }
 
     for (int step = 0; step < config->max_new_tokens; step++) {
+        /* Hold EOS back until min_new_tokens have been produced. */
+        if (step < config->min_new_tokens) {
+            int vocab;
+            float* row = llama_logits_last_row(logits, &vocab);
+            if (row)
+                cml_logits_suppress_tokens(row, vocab, &config->eos_token_id, 1);
+        }
+
         float lp = 0.0f;
         int next_token =
             cml_llama_sample_token(logits, config, result->token_ids, result->num_tokens,

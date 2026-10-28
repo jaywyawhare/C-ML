@@ -106,6 +106,48 @@ static int test_kv_cache_append(void) {
     return 1;
 }
 
+static int kv_append_one(CMLKVCache* c, float v) {
+    int shape[]      = {1, 1, 1};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    Tensor* k  = tensor_from_data(&v, shape, 3, &cfg);
+    Tensor* vv = tensor_from_data(&v, shape, 3, &cfg);
+    int r      = (k && vv) ? cml_kv_cache_append(c, k, vv) : -1;
+    tensor_free(k);
+    tensor_free(vv);
+    return r;
+}
+
+static int test_kv_cache_window(void) {
+    CMLKVCache* c = cml_kv_cache_create(16, 1, 1);
+    if (!c)
+        return 0;
+    cml_kv_cache_set_window(c, 3, 1); /* keep sink row 0 + the most recent 3 */
+    for (int i = 0; i < 8; i++)
+        if (kv_append_one(c, (float)i) < 0) {
+            cml_kv_cache_free(c);
+            return 0;
+        }
+    if (c->current_len != 4) {
+        cml_kv_cache_free(c);
+        return 0;
+    }
+    Tensor* keys = cml_kv_cache_get_keys(c);
+    if (!keys) {
+        cml_kv_cache_free(c);
+        return 0;
+    }
+    float* kd     = (float*)tensor_data_ptr(keys);
+    float want[4] = {0.0f, 5.0f, 6.0f, 7.0f}; /* sink(0) + sliding window(5,6,7) */
+    int ok        = 1;
+    for (int i = 0; i < 4; i++)
+        if (fabsf(kd[i] - want[i]) > 1e-6f)
+            ok = 0;
+    tensor_free(keys);
+    cml_kv_cache_free(c);
+    return ok;
+}
+
 static int test_kv_cache_get_keys(void) {
     int num_kv_heads  = 2;
     int head_dim      = 4;
@@ -993,6 +1035,7 @@ int main(void) {
     TEST(kv_cache_append);
     TEST(kv_cache_get_keys);
     TEST(kv_cache_reset);
+    TEST(kv_cache_window);
 
     /* GQA */
     TEST(gqa_basic);

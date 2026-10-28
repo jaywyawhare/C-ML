@@ -178,6 +178,44 @@ void cml_speculative_set_target_model(CMLSpeculativeDecoder* dec, void* ctx,
     dec->target_sample    = sample_fn;
 }
 
+void cml_speculative_set_ngram_draft(CMLSpeculativeDecoder* dec, int n) {
+    if (!dec)
+        return;
+    dec->ngram_n = n > 0 ? n : 0;
+}
+
+/**
+ * Fill up to K draft tokens from the continuation of the context's most recent earlier match of
+ * its trailing ngram_n-gram. Returns the number of tokens filled (0 if no match).
+ * @param hist (const int*)
+ * @param hist_len (int)
+ * @param ngram_n (int)
+ * @param K (int)
+ * @param draft_out (int*)
+ * @return (int)
+ */
+static int ngram_draft_fill(const int* hist, int hist_len, int ngram_n, int K, int* draft_out) {
+    if (ngram_n <= 0 || hist_len <= ngram_n)
+        return 0;
+    const int* suffix = hist + hist_len - ngram_n;
+    for (int start = hist_len - ngram_n - 1; start >= 0; start--) {
+        int match = 1;
+        for (int j = 0; j < ngram_n; j++)
+            if (hist[start + j] != suffix[j]) {
+                match = 0;
+                break;
+            }
+        if (match) {
+            int src    = start + ngram_n;
+            int filled = 0;
+            while (filled < K && src < hist_len)
+                draft_out[filled++] = hist[src++];
+            return filled;
+        }
+    }
+    return 0;
+}
+
 /**
  * One speculative step: draft K tokens with the draft model, verify them in a
  * single target forward, then accept/reject (greedy or Leviathan stochastic rule)
@@ -193,7 +231,9 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
         LOG_ERROR("cml_speculative_decode_step: decoder is NULL");
         return NULL;
     }
-    if (!dec->draft_forward || !dec->draft_sample || !dec->target_forward || !dec->target_sample) {
+    bool ngram_draft = dec->ngram_n > 0;
+    if ((!ngram_draft && (!dec->draft_forward || !dec->draft_sample)) || !dec->target_forward ||
+        !dec->target_sample) {
         LOG_ERROR("cml_speculative_decode_step: model callbacks not set");
         return NULL;
     }
@@ -221,9 +261,9 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
         return NULL;
     }
 
-    /* Stochastic verification needs the draft distribution at each drafted
-     * position; keep the last-row logits per draft step. */
-    bool stochastic   = dec->config.stochastic_accept && dec->config.do_sample;
+    /* Stochastic verification needs the draft distribution at each drafted position; prompt-lookup
+     * drafting has none, so it always uses greedy acceptance. */
+    bool stochastic   = dec->config.stochastic_accept && dec->config.do_sample && !ngram_draft;
     float* draft_rows = NULL;
     if (stochastic) {
         draft_rows = (float*)cml_malloc((size_t)K * (size_t)dec->vocab_size * sizeof(float));
@@ -231,38 +271,43 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
             stochastic = false; /* degrade to greedy acceptance */
     }
 
-    /* 1. Draft phase: autoregressively generate K tokens with draft model. */
+    /* 1. Draft phase: fill K draft tokens from the context n-gram or the draft model. */
     double t_draft_start = cml_monotonic_ms();
 
-    int draft_seq_len = prefix_len;
-    for (int i = 0; i < K; i++) {
-        /* Forward the draft model on the current sequence. */
-        Tensor* draft_logits = dec->draft_forward(dec->draft_model_ctx, full_seq, draft_seq_len);
-        if (!draft_logits) {
-            LOG_WARNING("draft forward returned NULL at step %d", i);
-            K = i; /* Truncate to whatever we managed. */
-            break;
-        }
-
-        if (stochastic) {
-            tensor_ensure_executed(draft_logits);
-            const float* d = (const float*)tensor_data_ptr(draft_logits);
-            if (d) {
-                memcpy(draft_rows + (size_t)i * dec->vocab_size,
-                       d + (size_t)(draft_seq_len - 1) * dec->vocab_size,
-                       (size_t)dec->vocab_size * sizeof(float));
-            } else {
-                stochastic = false;
+    if (ngram_draft) {
+        K = ngram_draft_fill(prefix_tokens, prefix_len, dec->ngram_n, K, draft_tokens);
+        for (int i = 0; i < K; i++)
+            full_seq[prefix_len + i] = draft_tokens[i];
+    } else {
+        int draft_seq_len = prefix_len;
+        for (int i = 0; i < K; i++) {
+            Tensor* draft_logits =
+                dec->draft_forward(dec->draft_model_ctx, full_seq, draft_seq_len);
+            if (!draft_logits) {
+                LOG_WARNING("draft forward returned NULL at step %d", i);
+                K = i; /* Truncate to whatever we managed. */
+                break;
             }
+
+            if (stochastic) {
+                tensor_ensure_executed(draft_logits);
+                const float* d = (const float*)tensor_data_ptr(draft_logits);
+                if (d) {
+                    memcpy(draft_rows + (size_t)i * dec->vocab_size,
+                           d + (size_t)(draft_seq_len - 1) * dec->vocab_size,
+                           (size_t)dec->vocab_size * sizeof(float));
+                } else {
+                    stochastic = false;
+                }
+            }
+
+            int token = dec->draft_sample(dec->draft_model_ctx, draft_logits, temperature);
+            tensor_free(draft_logits);
+
+            draft_tokens[i]         = token;
+            full_seq[draft_seq_len] = token;
+            draft_seq_len++;
         }
-
-        /* Sample from last position. */
-        int token = dec->draft_sample(dec->draft_model_ctx, draft_logits, temperature);
-        tensor_free(draft_logits);
-
-        draft_tokens[i]         = token;
-        full_seq[draft_seq_len] = token;
-        draft_seq_len++;
     }
 
     double t_draft_end = cml_monotonic_ms();
@@ -375,9 +420,8 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
     cml_free(draft_rows);
     tensor_free(target_logits);
 
-    /* 4. Build the result. */
-    int total_output = num_accepted + ((num_accepted == K) ? 1 : 1);
-    /* accepted draft tokens + either correction or bonus */
+    /* 4. Build the result: accepted draft tokens plus one correction or bonus token. */
+    int total_output = num_accepted + 1;
 
     CMLSpeculativeResult* result =
         (CMLSpeculativeResult*)cml_calloc(1, sizeof(CMLSpeculativeResult));
