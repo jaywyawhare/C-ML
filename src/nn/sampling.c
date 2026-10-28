@@ -160,6 +160,17 @@ int cml_logits_min_p(float* logits, int n, float min_p) {
     return kept;
 }
 
+void cml_logits_bias(float* logits, int n, const int* ids, const float* biases, int count) {
+    if (!logits || n <= 0 || !ids || !biases || count <= 0)
+        return;
+    for (int k = 0; k < count; k++) {
+        int id = ids[k];
+        if (id < 0 || id >= n)
+            continue;
+        logits[id] += biases[k];
+    }
+}
+
 void cml_logits_frequency_presence_penalty(float* logits, int n, const int* history, int hist_len,
                                            float frequency_penalty, float presence_penalty) {
     if (!logits || n <= 0 || !history || hist_len <= 0)

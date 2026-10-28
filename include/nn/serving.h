@@ -13,6 +13,7 @@
 #include "tensor/tensor.h"
 #include "nn/llm_ops.h"
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,14 +49,19 @@ typedef struct CMLSequenceRequest {
     int max_new_tokens;
     float temperature;
     float top_p;
-    int top_k;                /* 0 = off */
-    float min_p;              /* 0 = off */
-    float repetition_penalty; /* 1 = off */
-    float frequency_penalty;  /* 0 = off */
-    float presence_penalty;   /* 0 = off */
-    int no_repeat_ngram_size; /* 0 = off */
+    int top_k;                      /* 0 = off */
+    float min_p;                    /* 0 = off */
+    float repetition_penalty;       /* 1 = off */
+    float frequency_penalty;        /* 0 = off */
+    float presence_penalty;         /* 0 = off */
+    int no_repeat_ngram_size;       /* 0 = off */
+    const int* logit_bias_ids;      /* Token ids to bias, NULL = none */
+    const float* logit_bias_values; /* Additive bias per id */
+    int logit_bias_count;           /* Length of the logit-bias arrays */
+    uint64_t seed;                  /* RNG seed, 0 = derive from request id */
 
     /* State */
+    uint32_t rng_state; /* Per-request sampler state */
     CMLSequenceStatus status;
     int paged_seq_id; /* ID in paged KV cache */
     int* generated_tokens;

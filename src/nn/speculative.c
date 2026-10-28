@@ -1,4 +1,6 @@
 #include "nn/speculative.h"
+#include "nn/sampling.h"
+#include "nn/llm_ops.h"
 #include "core/logging.h"
 #include "tensor/tensor.h"
 #include "backend/profiling.h"
@@ -52,16 +54,33 @@ CMLSpeculativeConfig cml_speculative_default_config(void) {
 }
 
 /**
- * Temperature softmax of one logits row into probs[vocab].
+ * Softmax one logits row into probs[vocab] after applying the config's temperature and top-k /
+ * top-p warpers via the shared logits-processor ops. The same warping on the target and draft rows
+ * keeps the Leviathan accept/reject rule valid.
  * @param row (const float*)
  * @param vocab (int)
- * @param temperature (float)
+ * @param cfg (const CMLSpeculativeConfig*)
  * @param probs (float*)
  * @return (void)
  */
-static void softmax_row(const float* row, int vocab, float temperature, float* probs) {
-    float t = temperature > 1e-6f ? temperature : 1.0f;
-    cml_softmax_row_temp(row, vocab, t, probs);
+static void warped_softmax_row(const float* row, int vocab, const CMLSpeculativeConfig* cfg,
+                               float* probs) {
+    float t = cfg->temperature > 1e-6f ? cfg->temperature : 1.0f;
+    if (cfg->top_k <= 0 && (cfg->top_p <= 0.0f || cfg->top_p >= 1.0f)) {
+        cml_softmax_row_temp(row, vocab, t, probs);
+        return;
+    }
+    float* tmp = (float*)cml_malloc((size_t)vocab * sizeof(float));
+    if (!tmp) {
+        cml_softmax_row_temp(row, vocab, t, probs);
+        return;
+    }
+    memcpy(tmp, row, (size_t)vocab * sizeof(float));
+    cml_logits_temperature(tmp, vocab, t);
+    cml_logits_top_k(tmp, vocab, cfg->top_k);
+    cml_logits_top_p(tmp, vocab, cfg->top_p);
+    cml_softmax_row_temp(tmp, vocab, 1.0f, probs);
+    cml_free(tmp);
 }
 
 /**
@@ -295,8 +314,8 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
 
         for (int i = 0; i < K; i++) {
             int target_row = prefix_len - 1 + i;
-            softmax_row(tdata + (size_t)target_row * vocab, vocab, temperature, p);
-            softmax_row(draft_rows + (size_t)i * vocab, vocab, temperature, q);
+            warped_softmax_row(tdata + (size_t)target_row * vocab, vocab, &dec->config, p);
+            warped_softmax_row(draft_rows + (size_t)i * vocab, vocab, &dec->config, q);
 
             int tok     = draft_tokens[i];
             float qd    = q[tok] > 1e-12f ? q[tok] : 1e-12f;
@@ -326,7 +345,7 @@ CMLSpeculativeResult* cml_speculative_decode_step(CMLSpeculativeDecoder* dec,
 
         if (num_accepted == K) {
             int last_row = prefix_len + K - 1;
-            softmax_row(tdata + (size_t)last_row * vocab, vocab, temperature, p);
+            warped_softmax_row(tdata + (size_t)last_row * vocab, vocab, &dec->config, p);
             bonus_token = sample_from_probs(p, vocab);
         }
         cml_free(p);

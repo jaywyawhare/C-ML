@@ -5,6 +5,7 @@
 #include "nn/llm_ops.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,24 +70,32 @@ typedef struct CMLLLaMAModel {
 } CMLLLaMAModel;
 
 typedef struct CMLGenerationConfig {
-    float temperature;        /* Sampling temperature (default: 0.8) */
-    float top_p;              /* Nucleus sampling (default: 0.9) */
-    int top_k;                /* Top-k sampling (default: 40) */
-    float min_p;              /* Min-p sampling, 0 = off (default: 0) */
-    float typical_p;          /* Locally-typical sampling, 0 = off (default: 0) */
-    float repetition_penalty; /* HF multiplicative penalty, 1 = off (default: 1) */
-    float frequency_penalty;  /* OpenAI additive per-occurrence penalty (default: 0) */
-    float presence_penalty;   /* OpenAI additive per-token penalty (default: 0) */
-    int no_repeat_ngram_size; /* Ban repeated n-grams, 0 = off (default: 0) */
-    int max_new_tokens;       /* Max tokens to generate (default: 256) */
-    int eos_token_id;         /* Stop token */
-    bool do_sample;           /* Use sampling (vs greedy) */
+    float temperature;              /* Sampling temperature (default: 0.8) */
+    float top_p;                    /* Nucleus sampling (default: 0.9) */
+    int top_k;                      /* Top-k sampling (default: 40) */
+    float min_p;                    /* Min-p sampling, 0 = off (default: 0) */
+    float typical_p;                /* Locally-typical sampling, 0 = off (default: 0) */
+    float repetition_penalty;       /* HF multiplicative penalty, 1 = off (default: 1) */
+    float frequency_penalty;        /* OpenAI additive per-occurrence penalty (default: 0) */
+    float presence_penalty;         /* OpenAI additive per-token penalty (default: 0) */
+    int no_repeat_ngram_size;       /* Ban repeated n-grams, 0 = off (default: 0) */
+    const int* logit_bias_ids;      /* Token ids to bias, NULL = none */
+    const float* logit_bias_values; /* Additive bias per id */
+    int logit_bias_count;           /* Length of the logit-bias arrays */
+    const char** stop_sequences;    /* Strings that halt generation, NULL = none */
+    int num_stop_sequences;         /* Length of stop_sequences */
+    uint64_t seed;                  /* RNG seed for reproducible sampling, 0 = global RNG */
+    int max_new_tokens;             /* Max tokens to generate (default: 256) */
+    int eos_token_id;               /* Stop token */
+    bool do_sample;                 /* Use sampling (vs greedy) */
 } CMLGenerationConfig;
 
 typedef struct CMLGenerationResult {
     int* token_ids;
     int num_tokens;
-    char* text; /* Decoded text (heap-allocated) */
+    char* text;            /* Decoded text (heap-allocated) */
+    float* token_logprobs; /* Per-generated-token log-probability, NULL if not sampled */
+    int num_logprobs;      /* Length of token_logprobs */
     float total_time_ms;
     float tokens_per_second;
 } CMLGenerationResult;
@@ -107,7 +116,7 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
 void cml_generation_result_free(CMLGenerationResult* result);
 
 int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config, const int* history,
-                           int history_len);
+                           int history_len, float* out_logprob);
 
 void cml_llama_reset(CMLLLaMAModel* model);
 void cml_llama_print_config(const CMLLLaMAConfig* config);

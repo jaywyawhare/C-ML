@@ -312,8 +312,12 @@ static void chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json
     float temperature = json_read_float(json_find_key(body_json, "temperature"), srv->temperature);
     float top_p       = json_read_float(json_find_key(body_json, "top_p"), srv->top_p);
     int top_k         = json_read_int(json_find_key(body_json, "top_k"), 0);
+    float min_p       = json_read_float(json_find_key(body_json, "min_p"), 0.0f);
+    float typical_p   = json_read_float(json_find_key(body_json, "typical_p"), 0.0f);
+    float rep_pen     = json_read_float(json_find_key(body_json, "repetition_penalty"), 1.0f);
     float freq_pen    = json_read_float(json_find_key(body_json, "frequency_penalty"), 0.0f);
     float pres_pen    = json_read_float(json_find_key(body_json, "presence_penalty"), 0.0f);
+    int seed          = json_read_int(json_find_key(body_json, "seed"), 0);
     int max_tokens    = json_read_int(json_find_key(body_json, "max_tokens"), srv->max_tokens);
     bool stream       = json_read_bool(json_find_key(body_json, "stream"), false);
 
@@ -337,8 +341,12 @@ static void chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json
     gen_config.temperature         = temperature;
     gen_config.top_p               = top_p;
     gen_config.top_k               = top_k;
+    gen_config.min_p               = min_p;
+    gen_config.typical_p           = typical_p;
+    gen_config.repetition_penalty  = rep_pen;
     gen_config.frequency_penalty   = freq_pen;
     gen_config.presence_penalty    = pres_pen;
+    gen_config.seed                = (uint64_t)(seed > 0 ? seed : 0);
     gen_config.max_new_tokens      = max_tokens;
     gen_config.do_sample           = (temperature > 0.0f);
 
@@ -377,7 +385,7 @@ static void chat_completions(int fd, CMLOpenAIServer* srv, const char* body_json
                 break;
 
             int token_id =
-                cml_llama_sample_token(logits, &gen_config, prompt_tokens, num_prompt_tokens);
+                cml_llama_sample_token(logits, &gen_config, prompt_tokens, num_prompt_tokens, NULL);
             tensor_free(logits);
 
             if (token_id == gen_config.eos_token_id)

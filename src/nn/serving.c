@@ -205,17 +205,17 @@ void cml_serving_set_model(CMLServingContext* ctx, CMLServingForwardFn forward_f
 
 /* xorshift RNG for stochastic sampling (per-context determinism not required;
  * greedy decoding - temperature <= 0 - is fully deterministic). */
-static uint32_t serving_rng_state = 0x2545F491u;
 /**
- * Next uniform float in [0,1) from the xorshift state.
+ * Next uniform float in [0,1) from a per-request xorshift state, advancing it in place.
+ * @param state (uint32_t*)
  * @return (float)
  */
-static float serving_rand_uniform(void) {
-    uint32_t x = serving_rng_state;
+static float serving_rand_uniform(uint32_t* state) {
+    uint32_t x = *state;
     x ^= x << 13;
     x ^= x >> 17;
     x ^= x << 5;
-    serving_rng_state = x;
+    *state = x;
     return (float)(x & 0xffffff) / (float)0x1000000;
 }
 
@@ -237,17 +237,17 @@ static int serving_argmax(const float* logits, int n) {
 }
 
 /**
- * Sample a token id from logits for a request, applying its history-dependent penalties and the
- * temperature / top-k / top-p / min-p warpers via the shared logits-processor ops. temperature
- * <= 0 => greedy argmax.
+ * Sample a token id from logits for a request, applying its logit bias, history-dependent
+ * penalties and the temperature / top-k / top-p / min-p warpers via the shared logits-processor
+ * ops, drawing from the request's own RNG state. temperature <= 0 => greedy argmax.
  * @param logits (const float*)
  * @param vocab (int)
- * @param req (const CMLSequenceRequest*)
+ * @param req (CMLSequenceRequest*)
  * @param history (const int*)
  * @param hist_len (int)
  * @return (int)
  */
-static int serving_sample(const float* logits, int vocab, const CMLSequenceRequest* req,
+static int serving_sample(const float* logits, int vocab, CMLSequenceRequest* req,
                           const int* history, int hist_len) {
     if (req->temperature <= 0.0f || vocab <= 1)
         return serving_argmax(logits, vocab);
@@ -261,6 +261,8 @@ static int serving_sample(const float* logits, int vocab, const CMLSequenceReque
     }
     memcpy(work, logits, (size_t)vocab * sizeof(float));
 
+    cml_logits_bias(work, vocab, req->logit_bias_ids, req->logit_bias_values,
+                    req->logit_bias_count);
     cml_logits_repetition_penalty(work, vocab, history, hist_len, req->repetition_penalty);
     cml_logits_frequency_presence_penalty(work, vocab, history, hist_len, req->frequency_penalty,
                                           req->presence_penalty);
@@ -271,7 +273,7 @@ static int serving_sample(const float* logits, int vocab, const CMLSequenceReque
     cml_logits_min_p(work, vocab, req->min_p);
     cml_softmax_row_temp(work, vocab, 1.0f, probs); /* masked logits -> 0 probability */
 
-    float r    = serving_rand_uniform();
+    float r    = serving_rand_uniform(&req->rng_state);
     float cum  = 0.0f;
     int chosen = vocab - 1;
     for (int i = 0; i < vocab; i++) {
@@ -408,9 +410,18 @@ int cml_serving_submit(CMLServingContext* ctx, const int* prompt_tokens, int num
     req->frequency_penalty    = 0.0f;
     req->presence_penalty     = 0.0f;
     req->no_repeat_ngram_size = 0;
-    req->status               = CML_SEQ_STATUS_QUEUED;
-    req->paged_seq_id         = -1;
-    req->current_pos          = 0;
+    req->logit_bias_ids       = NULL;
+    req->logit_bias_values    = NULL;
+    req->logit_bias_count     = 0;
+    req->seed                 = 0;
+    /* Per-request RNG: use the seed when set, else derive a distinct non-zero state from the id. */
+    req->rng_state =
+        req->seed ? (uint32_t)req->seed : (0x2545F491u ^ (uint32_t)req->request_id * 2654435761u);
+    if (req->rng_state == 0)
+        req->rng_state = 1;
+    req->status       = CML_SEQ_STATUS_QUEUED;
+    req->paged_seq_id = -1;
+    req->current_pos  = 0;
 
     /* Pre-allocate generated token buffer */
     req->gen_capacity     = req->max_new_tokens;

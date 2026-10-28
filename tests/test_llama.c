@@ -6,6 +6,7 @@
 
 #include "cml.h"
 #include "nn/llama.h"
+#include "core/threefry.h"
 #include "alloc/cml_allocator.h"
 #include "test_harness.h"
 
@@ -345,7 +346,7 @@ static int test_sample_greedy(void) {
     CMLGenerationConfig gen_cfg = cml_generation_default_config();
     gen_cfg.do_sample           = false; /* greedy */
 
-    int token = cml_llama_sample_token(logits, &gen_cfg, NULL, 0);
+    int token = cml_llama_sample_token(logits, &gen_cfg, NULL, 0, NULL);
     tensor_free(logits);
 
     /* The maximum logit is at index 2 (value 2.0) */
@@ -370,7 +371,7 @@ static int test_sample_greedy_2d(void) {
     CMLGenerationConfig gen_cfg = cml_generation_default_config();
     gen_cfg.do_sample           = false;
 
-    int token = cml_llama_sample_token(logits, &gen_cfg, NULL, 0);
+    int token = cml_llama_sample_token(logits, &gen_cfg, NULL, 0, NULL);
     tensor_free(logits);
 
     /* Should return 3 (max of last row) */
@@ -395,7 +396,7 @@ static int test_sample_with_temperature(void) {
     gen_cfg.top_k               = 4;
     gen_cfg.top_p               = 1.0f;
 
-    int token = cml_llama_sample_token(logits, &gen_cfg, NULL, 0);
+    int token = cml_llama_sample_token(logits, &gen_cfg, NULL, 0, NULL);
     tensor_free(logits);
 
     /* Token should be a valid index */
@@ -406,7 +407,7 @@ static int test_sample_with_temperature(void) {
 
 static int test_sample_null_args(void) {
     CMLGenerationConfig gen_cfg = cml_generation_default_config();
-    int token                   = cml_llama_sample_token(NULL, &gen_cfg, NULL, 0);
+    int token                   = cml_llama_sample_token(NULL, &gen_cfg, NULL, 0, NULL);
     if (token != -1)
         return 0;
 
@@ -418,7 +419,7 @@ static int test_sample_null_args(void) {
     if (!logits)
         return 0;
 
-    token = cml_llama_sample_token(logits, NULL, NULL, 0);
+    token = cml_llama_sample_token(logits, NULL, NULL, 0, NULL);
     tensor_free(logits);
     if (token != -1)
         return 0;
@@ -440,6 +441,76 @@ static int test_generation_default_config(void) {
     if (!cfg.do_sample)
         return 0;
     return 1;
+}
+
+static Tensor* logits_1d(const float* data, int n) {
+    int shape[]      = {n};
+    TensorConfig cfg = {
+        .dtype = DTYPE_FLOAT32, .device = DEVICE_CPU, .has_dtype = true, .has_device = true};
+    return tensor_from_data((float*)data, shape, 1, &cfg);
+}
+
+static int test_sample_logprob(void) {
+    float data[]   = {1.0f, 2.0f, 3.0f, 0.5f};
+    Tensor* logits = logits_1d(data, 4);
+    if (!logits)
+        return 0;
+    CMLGenerationConfig gc = cml_generation_default_config();
+    gc.do_sample           = false; /* greedy -> argmax idx 2 */
+    float lp               = 0.0f;
+    int tok                = cml_llama_sample_token(logits, &gc, NULL, 0, &lp);
+    tensor_free(logits);
+    if (tok != 2)
+        return 0;
+    /* Oracle: log-softmax at the argmax. */
+    float mx = 3.0f, se = 0.0f;
+    for (int i = 0; i < 4; i++)
+        se += expf(data[i] - mx);
+    float want = (data[2] - mx) - logf(se);
+    return (fabsf(lp - want) < 1e-3f) ? 1 : 0;
+}
+
+static int test_sample_logit_bias(void) {
+    float data[]   = {1.0f, 2.0f, 3.0f, 0.5f};
+    Tensor* logits = logits_1d(data, 4);
+    if (!logits)
+        return 0;
+    CMLGenerationConfig gc = cml_generation_default_config();
+    gc.do_sample           = true;
+    gc.temperature         = 1.0f;
+    gc.top_k               = 0;
+    gc.top_p               = 1.0f;
+    int ids[1]             = {3};
+    float bias[1]          = {100.0f}; /* lift the weakest logit far above the rest */
+    gc.logit_bias_ids      = ids;
+    gc.logit_bias_values   = bias;
+    gc.logit_bias_count    = 1;
+    int ok                 = 1;
+    for (int t = 0; t < 16; t++)
+        if (cml_llama_sample_token(logits, &gc, NULL, 0, NULL) != 3) {
+            ok = 0;
+            break;
+        }
+    tensor_free(logits);
+    return ok;
+}
+
+static int test_sample_seed_reproducible(void) {
+    float data[]   = {0.5f, 1.0f, 1.5f, 2.0f, 0.2f, 0.8f};
+    Tensor* logits = logits_1d(data, 6);
+    if (!logits)
+        return 0;
+    CMLGenerationConfig gc = cml_generation_default_config();
+    gc.do_sample           = true;
+    gc.temperature         = 1.0f;
+    gc.top_k               = 0;
+    gc.top_p               = 1.0f;
+    cml_rng_set_global_seed(12345);
+    int a = cml_llama_sample_token(logits, &gc, NULL, 0, NULL);
+    cml_rng_set_global_seed(12345);
+    int b = cml_llama_sample_token(logits, &gc, NULL, 0, NULL);
+    tensor_free(logits);
+    return (a == b) ? 1 : 0;
 }
 
 static int test_model_reset(void) {
@@ -563,6 +634,9 @@ int main(void) {
     TEST(sample_greedy_2d);
     TEST(sample_with_temperature);
     TEST(sample_null_args);
+    TEST(sample_logprob);
+    TEST(sample_logit_bias);
+    TEST(sample_seed_reproducible);
 
     /* Generation config tests */
     TEST(generation_default_config);

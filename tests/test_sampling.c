@@ -76,6 +76,19 @@ static void test_min_p(void) {
     tests_passed++;
 }
 
+static void test_bias(void) {
+    printf("test_bias...\n");
+    float l[5];
+    load(l);
+    int ids[2]      = {2, 4};
+    float biases[2] = {1.0f, -INFINITY};
+    cml_logits_bias(l, 5, ids, biases, 2);
+    ASSERT(fabsf(l[2] - 1.5f) < 1e-6f, "bias adds to the targeted logit"); /* 0.5 + 1.0 */
+    ASSERT(!isfinite(l[4]), "a -inf bias hard-bans a token");
+    ASSERT(fabsf(l[0] - 2.0f) < 1e-6f, "unbiased logit untouched");
+    tests_passed++;
+}
+
 static void test_frequency_presence_penalty(void) {
     printf("test_frequency_presence_penalty...\n");
     float l[5];
@@ -128,6 +141,7 @@ static void test_typical(void) {
 int main(void) {
     printf("Sampling / logits-processor tests\n\n");
     test_temperature();
+    test_bias();
     test_repetition_penalty();
     test_top_k();
     test_top_p();

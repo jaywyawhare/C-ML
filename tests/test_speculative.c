@@ -638,6 +638,38 @@ static int test_acceptance_rate_null(void) {
     return 1;
 }
 
+static int test_stochastic_warp_top_k1(void) {
+    /* top_k=1 collapses the warped target/draft distributions to a point mass at the argmax,
+     * so stochastic acceptance is deterministic and every token equals the predicted one. */
+    CMLSpeculativeConfig cfg   = cml_speculative_default_config();
+    cfg.stochastic_accept      = true;
+    cfg.top_k                  = 1;
+    cfg.num_draft_tokens       = 3;
+    CMLSpeculativeDecoder* dec = cml_speculative_create(&cfg, MOCK_VOCAB_SIZE);
+    if (!dec)
+        return 0;
+
+    MockModelCtx ctx = {.predict_token = 9};
+    cml_speculative_set_draft_model(dec, &ctx, mock_forward, mock_sample);
+    cml_speculative_set_target_model(dec, &ctx, mock_forward, mock_sample);
+
+    int prefix[]              = {1, 2};
+    CMLSpeculativeResult* res = cml_speculative_decode_step(dec, prefix, 2);
+    if (!res) {
+        cml_speculative_free(dec);
+        return 0;
+    }
+
+    int ok = (res->num_accepted == cfg.num_draft_tokens + 1); /* all K accepted + bonus */
+    for (int i = 0; ok && i < res->num_accepted; i++)
+        if (res->accepted_tokens[i] != 9)
+            ok = 0;
+
+    cml_speculative_result_free(res);
+    cml_speculative_free(dec);
+    return ok;
+}
+
 int main(void) {
     printf("test_speculative\n\n");
 
@@ -663,6 +695,7 @@ int main(void) {
     /* Edge cases */
     TEST(k_equals_1_agree);
     TEST(k_equals_1_disagree);
+    TEST(stochastic_warp_top_k1);
     TEST(decode_no_callbacks);
     TEST(decode_invalid_prefix);
     TEST(timing_fields);

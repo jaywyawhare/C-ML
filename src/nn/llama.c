@@ -79,6 +79,12 @@ CMLGenerationConfig cml_generation_default_config(void) {
                                   .frequency_penalty    = 0.0f,
                                   .presence_penalty     = 0.0f,
                                   .no_repeat_ngram_size = 0,
+                                  .logit_bias_ids       = NULL,
+                                  .logit_bias_values    = NULL,
+                                  .logit_bias_count     = 0,
+                                  .stop_sequences       = NULL,
+                                  .num_stop_sequences   = 0,
+                                  .seed                 = 0,
                                   .max_new_tokens       = 256,
                                   .eos_token_id         = 2,
                                   .do_sample            = true};
@@ -703,16 +709,18 @@ Tensor* cml_llama_forward(CMLLLaMAModel* model, const int* token_ids, int seq_le
 }
 
 /**
- * Pick the next token from the last position's logits: greedy argmax, or the history-dependent
- * penalties followed by temperature scaling and the top-k / typical / top-p / min-p warpers.
+ * Pick the next token from the last position's logits: greedy argmax, or logit bias and the
+ * history-dependent penalties followed by temperature and the top-k / typical / top-p / min-p
+ * warpers. Writes the chosen token's log-probability to out_logprob when non-NULL.
  * @param logits (Tensor*)
  * @param config (const CMLGenerationConfig*)
  * @param history (const int*)
  * @param history_len (int)
+ * @param out_logprob (float*)
  * @return (int)
  */
 int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config, const int* history,
-                           int history_len) {
+                           int history_len, float* out_logprob) {
     if (!logits || !config)
         return -1;
 
@@ -746,6 +754,12 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config, co
                 best_id  = i;
             }
         }
+        if (out_logprob) {
+            double se = 0.0;
+            for (int i = 0; i < vocab_size; i++)
+                se += exp((double)(token_logits[i] - best_val));
+            *out_logprob = (float)((double)(token_logits[best_id] - best_val) - log(se));
+        }
         return best_id;
     }
 
@@ -758,7 +772,10 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config, co
     }
     memcpy(work, token_logits, (size_t)vocab_size * sizeof(float));
 
-    /* History-dependent penalties act on raw logits, then temperature and the warpers. */
+    /* Logit bias and history-dependent penalties act on raw logits, then temperature and warpers.
+     */
+    cml_logits_bias(work, vocab_size, config->logit_bias_ids, config->logit_bias_values,
+                    config->logit_bias_count);
     cml_logits_repetition_penalty(work, vocab_size, history, history_len,
                                   config->repetition_penalty);
     cml_logits_frequency_presence_penalty(work, vocab_size, history, history_len,
@@ -789,14 +806,47 @@ int cml_llama_sample_token(Tensor* logits, const CMLGenerationConfig* config, co
         }
     }
 
+    if (out_logprob) {
+        float p      = probs[sampled_id];
+        *out_logprob = (p > 0.0f) ? logf(p) : -INFINITY;
+    }
+
     cml_free(work);
     cml_free(probs);
     return sampled_id;
 }
 
 /**
+ * True when the decoded generated tokens contain any non-empty stop sequence.
+ * @param tok (CMLTokenizer*)
+ * @param gen_ids (const int*)
+ * @param gen_len (int)
+ * @param stops (const char**)
+ * @param num_stops (int)
+ * @return (bool)
+ */
+static bool generated_hits_stop(CMLTokenizer* tok, const int* gen_ids, int gen_len,
+                                const char** stops, int num_stops) {
+    if (!tok || num_stops <= 0 || gen_len <= 0)
+        return false;
+    char* text = cml_tokenizer_decode(tok, gen_ids, gen_len);
+    if (!text)
+        return false;
+    bool hit = false;
+    for (int s = 0; s < num_stops; s++) {
+        if (stops[s] && stops[s][0] && strstr(text, stops[s])) {
+            hit = true;
+            break;
+        }
+    }
+    cml_free(text);
+    return hit;
+}
+
+/**
  * Tokenize `prompt`, prefill, then autoregressively decode up to max_new_tokens
- * (stopping on EOS or context limit), returning the token ids, decoded text and timing.
+ * (stopping on EOS, a stop sequence or the context limit), returning the token ids, decoded text,
+ * per-token logprobs and timing.
  * @param model (CMLLLaMAModel*)
  * @param prompt (const char*)
  * @param config (const CMLGenerationConfig*)
@@ -842,9 +892,16 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
         return NULL;
     }
 
+    result->token_logprobs = (float*)cml_malloc((size_t)config->max_new_tokens * sizeof(float));
+    result->num_logprobs   = 0;
+
     /* Copy prompt tokens into result */
     memcpy(result->token_ids, prompt_tokens, (size_t)num_prompt_tokens * sizeof(int));
     result->num_tokens = num_prompt_tokens;
+
+    /* A non-zero seed makes sampling reproducible across identical calls. */
+    if (config->seed != 0)
+        cml_rng_set_global_seed(config->seed);
 
     /* Reset KV caches */
     cml_llama_reset(model);
@@ -863,8 +920,10 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
     }
 
     for (int step = 0; step < config->max_new_tokens; step++) {
+        float lp = 0.0f;
         int next_token =
-            cml_llama_sample_token(logits, config, result->token_ids, result->num_tokens);
+            cml_llama_sample_token(logits, config, result->token_ids, result->num_tokens,
+                                   result->token_logprobs ? &lp : NULL);
         tensor_free(logits);
         logits = NULL;
 
@@ -876,9 +935,17 @@ CMLGenerationResult* cml_llama_generate(CMLLLaMAModel* model, const char* prompt
         /* Append token */
         result->token_ids[result->num_tokens] = next_token;
         result->num_tokens++;
+        if (result->token_logprobs)
+            result->token_logprobs[result->num_logprobs++] = lp;
 
         /* Check EOS */
         if (next_token == config->eos_token_id) {
+            break;
+        }
+
+        if (generated_hits_stop(model->tokenizer, result->token_ids + num_prompt_tokens,
+                                result->num_tokens - num_prompt_tokens, config->stop_sequences,
+                                config->num_stop_sequences)) {
             break;
         }
 
@@ -934,6 +1001,8 @@ void cml_generation_result_free(CMLGenerationResult* result) {
         cml_free(result->token_ids);
     if (result->text)
         cml_free(result->text);
+    if (result->token_logprobs)
+        cml_free(result->token_logprobs);
     cml_free(result);
 }
 
