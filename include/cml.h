@@ -38,6 +38,7 @@
 #include "autograd/loss_functions.h"
 #include "autograd/amp.h"
 #include "autograd/checkpointing.h"
+#include "autograd/forward_mode.h"
 #include "tensor/sparse_tensor.h"
 
 #include "nn.h"
@@ -66,6 +67,10 @@
 #include "nn/llm_ops.h"
 #include "nn/sampling.h"
 #include "nn/quantization.h"
+#include "nn/parametrize.h"
+#include "nn/grid_sample.h"
+#include "nn/distributions.h"
+#include "nn/packed_sequence.h"
 #include "alloc/tlsf_alloc.h"
 
 #include "zoo/zoo.h"

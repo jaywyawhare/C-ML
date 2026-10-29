@@ -487,6 +487,7 @@ set(TENSOR_SOURCES
 set(AUTOGRAD_SOURCES
     src/autograd/autograd.c
     src/autograd/forward_ops.c
+    src/autograd/forward_mode.c
     src/autograd/loss_functions.c
     src/autograd/checkpointing.c
     src/autograd/amp.c
@@ -533,6 +534,10 @@ set(NN_SOURCES
     src/nn/speculative.c
     src/nn/openai_api.c
     src/nn/state.c
+    src/nn/parametrize.c
+    src/nn/grid_sample.c
+    src/nn/distributions.c
+    src/nn/packed_sequence.c
 )
 
 set(SYMBOLIC_SOURCES
