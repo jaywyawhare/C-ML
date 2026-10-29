@@ -301,6 +301,15 @@ static inline bool cml_dtype_is_float(DType d) {
 }
 
 /**
+ * True when `d` is a complex dtype (interleaved [re, im] storage).
+ * @param d (DType)
+ * @return (bool)
+ */
+static inline bool cml_dtype_is_complex(DType d) {
+    return d == DTYPE_COMPLEX64 || d == DTYPE_COMPLEX128;
+}
+
+/**
  * True for every dtype except the FP8 variants (f32/f64/f16/bf16 and ints).
  * @param d (DType)
  * @return (bool)

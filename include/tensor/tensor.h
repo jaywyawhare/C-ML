@@ -31,6 +31,8 @@ typedef enum {
     DTYPE_FLOAT8_E5M2,      // 1 sign, 5 exponent, 2 mantissa (range [-57344, 57344])
     DTYPE_FLOAT8_E4M3_FNUZ, // FNUZ: no negative zero, no inf, bias=8 (AMD MI300)
     DTYPE_FLOAT8_E5M2_FNUZ, // FNUZ: no negative zero, no inf, bias=16 (AMD MI300)
+    DTYPE_COMPLEX64,        // 2x float32 interleaved [re, im], element size 8 bytes
+    DTYPE_COMPLEX128,       // 2x float64 interleaved [re, im], element size 16 bytes
 } DType;
 
 struct IRNode;

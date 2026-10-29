@@ -266,6 +266,10 @@ size_t cml_dtype_size(DType dtype) {
     case DTYPE_FLOAT8_E4M3_FNUZ:
     case DTYPE_FLOAT8_E5M2_FNUZ:
         return 1;
+    case DTYPE_COMPLEX64:
+        return 2 * sizeof(float);
+    case DTYPE_COMPLEX128:
+        return 2 * sizeof(double);
     default:
         return sizeof(float);
     }
@@ -313,6 +317,10 @@ const char* cml_dtype_to_string(DType dtype) {
         return "float8_e4m3fnuz";
     case DTYPE_FLOAT8_E5M2_FNUZ:
         return "float8_e5m2fnuz";
+    case DTYPE_COMPLEX64:
+        return "complex64";
+    case DTYPE_COMPLEX128:
+        return "complex128";
     default:
         return "unknown";
     }
@@ -580,6 +588,10 @@ float tensor_get_float(Tensor* t, size_t idx) {
         return fp8e4m3fnuz_to_float(((uint8_t*)t->data)[offset]);
     case DTYPE_FLOAT8_E5M2_FNUZ:
         return fp8e5m2fnuz_to_float(((uint8_t*)t->data)[offset]);
+    case DTYPE_COMPLEX64:
+        return ((float*)t->data)[2 * offset];
+    case DTYPE_COMPLEX128:
+        return (float)((double*)t->data)[2 * offset];
     default:
         return 0.0f;
     }
@@ -659,6 +671,12 @@ void tensor_set_float(Tensor* t, size_t idx, float value) {
         break;
     case DTYPE_FLOAT8_E5M2_FNUZ:
         ((uint8_t*)t->data)[offset] = float_to_fp8e5m2fnuz(value);
+        break;
+    case DTYPE_COMPLEX64:
+        ((float*)t->data)[2 * offset] = value;
+        break;
+    case DTYPE_COMPLEX128:
+        ((double*)t->data)[2 * offset] = (double)value;
         break;
     }
 }
