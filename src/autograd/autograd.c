@@ -1,4 +1,5 @@
 #include "autograd/autograd.h"
+#include "autograd/custom_function.h"
 #include "ops/ir/autodiff.h"
 #include "ops/ir/execution.h"
 #include "tensor/realize.h"
@@ -596,6 +597,11 @@ void tensor_backward(Tensor* tensor, Tensor* gradient, bool retain_graph, bool c
             return;
         }
     }
+
+    /* Drive any custom autograd functions: the engine deposited d(loss)/d(custom
+     * output) into each custom output's .grad; the sweep converts that into input
+     * gradients via the user backward. No-op when no custom nodes are registered. */
+    cml_autograd_custom_backward_sweep(create_graph);
 
     if (tensor->backward_hooks && tensor->grad) {
         TensorHookList* hook_list = (TensorHookList*)tensor->backward_hooks;
