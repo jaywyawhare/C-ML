@@ -42,6 +42,9 @@ DTYPE_FLOAT16 = 5
 DTYPE_BFLOAT16 = 6
 DTYPE_INT8 = 7
 DTYPE_UINT8 = 8
+# Complex dtypes live at the end of the C DType enum (after the fp8 variants).
+DTYPE_COMPLEX64 = 17
+DTYPE_COMPLEX128 = 18
 
 DTYPE_NAMES = {
     DTYPE_FLOAT32: "float32",
@@ -53,6 +56,8 @@ DTYPE_NAMES = {
     DTYPE_BFLOAT16: "bfloat16",
     DTYPE_INT8: "int8",
     DTYPE_UINT8: "uint8",
+    DTYPE_COMPLEX64: "complex64",
+    DTYPE_COMPLEX128: "complex128",
 }
 
 DTYPE_TO_NUMPY = {
@@ -64,6 +69,8 @@ DTYPE_TO_NUMPY = {
     DTYPE_FLOAT16: np.float16,
     DTYPE_INT8: np.int8,
     DTYPE_UINT8: np.uint8,
+    DTYPE_COMPLEX64: np.complex64,
+    DTYPE_COMPLEX128: np.complex128,
 }
 
 NUMPY_TO_DTYPE = {v: k for k, v in DTYPE_TO_NUMPY.items()}
@@ -582,10 +589,25 @@ class Tensor:
         ends = ffi.new("int[]", [stop] + list(shape[1:]))
         return Tensor(lib.uop_shrink(self._tensor, starts, ends, nd))
 
-    def index_select(self, indices) -> "Tensor":
-        """Rows at the given indices along dim 0 (lazy gather)."""
-        idx = Tensor([float(i) for i in indices])
-        return Tensor(lib.uop_gather(self._tensor, idx._tensor, 0))
+    def index_select(self, indices, dim: int = 0) -> "Tensor":
+        """Slices along ``dim`` at the given indices (torch.index_select).
+
+        ``dim`` defaults to 0 for backward compatibility with callers that pass
+        only a list of row indices."""
+        idx = indices if isinstance(indices, Tensor) else Tensor([float(i) for i in indices])
+        return Tensor(lib.tensor_index_select(self._tensor, int(dim), idx._tensor))
+
+    def narrow(self, dim: int, start: int, length: int) -> "Tensor":
+        """``length`` elements of ``dim`` starting at ``start`` (torch.narrow)."""
+        return Tensor(lib.tensor_narrow(self._tensor, int(dim), int(start), int(length)))
+
+    def movedim(self, source: int, destination: int) -> "Tensor":
+        """Move the axis at ``source`` to ``destination`` (torch.movedim)."""
+        return Tensor(lib.tensor_movedim(self._tensor, int(source), int(destination)))
+
+    def swapaxes(self, axis0: int, axis1: int) -> "Tensor":
+        """Swap two axes (torch.swapaxes / np.swapaxes)."""
+        return Tensor(lib.tensor_swapaxes(self._tensor, int(axis0), int(axis1)))
 
     def transpose(self, dim0=0, dim1=1):
         """Swap two dimensions (torch.Tensor.transpose)."""
@@ -753,6 +775,28 @@ class Tensor:
     def cast(self, dtype: int) -> "Tensor":
         """Cast to another dtype (torch.Tensor.to with a dtype)."""
         return Tensor(lib.cml_cast(self._tensor, dtype))
+
+    @property
+    def real(self) -> "Tensor":
+        """Real part of a complex tensor as a real tensor (torch.Tensor.real)."""
+        return Tensor(lib.tensor_real(self._tensor))
+
+    @property
+    def imag(self) -> "Tensor":
+        """Imaginary part of a complex tensor as a real tensor (torch.Tensor.imag)."""
+        return Tensor(lib.tensor_imag(self._tensor))
+
+    def conj(self) -> "Tensor":
+        """Complex conjugate (torch.Tensor.conj)."""
+        return Tensor(lib.tensor_conj(self._tensor))
+
+    def abs(self) -> "Tensor":
+        """Magnitude of a complex tensor as a real tensor (torch.Tensor.abs)."""
+        return Tensor(lib.tensor_abs(self._tensor))
+
+    def angle(self) -> "Tensor":
+        """Element-wise phase angle of a complex tensor (torch.Tensor.angle)."""
+        return Tensor(lib.tensor_angle(self._tensor))
 
     def dot(self, other: "Tensor") -> "Tensor":
         """Dot product of two 1-D tensors (torch.Tensor.dot)."""
@@ -1119,6 +1163,78 @@ class Tensor:
         """Elementwise maximum of two tensors (torch.maximum / np.maximum)."""
         o = other if isinstance(other, Tensor) else Tensor(other)
         return Tensor(lib.uop_max(self._tensor, o._tensor))
+
+    def _cmp_mask(self, other, cfn) -> "Tensor":
+        """Run a C comparison wrapper and promote its bool result to a float 0/1
+        mask (staying lazy), matching the rest of the Python comparison API."""
+        o = other if isinstance(other, Tensor) else Tensor(np.array([other], dtype=np.float32))
+        one = Tensor(np.ones(1, dtype=np.float32))  # held so it is not freed mid-call
+        return Tensor(lib.cml_mul(cfn(self._tensor, o._tensor), one._tensor))
+
+    def lt(self, other) -> "Tensor":
+        """Elementwise ``self < other`` as a 0/1 mask (torch.lt)."""
+        return self._cmp_mask(other, lib.tensor_lt)
+
+    def le(self, other) -> "Tensor":
+        """Elementwise ``self <= other`` as a 0/1 mask (torch.le)."""
+        return self._cmp_mask(other, lib.tensor_le)
+
+    def gt(self, other) -> "Tensor":
+        """Elementwise ``self > other`` as a 0/1 mask (torch.gt)."""
+        return self._cmp_mask(other, lib.tensor_gt)
+
+    def ge(self, other) -> "Tensor":
+        """Elementwise ``self >= other`` as a 0/1 mask (torch.ge)."""
+        return self._cmp_mask(other, lib.tensor_ge)
+
+    def eq(self, other) -> "Tensor":
+        """Elementwise ``self == other`` as a 0/1 mask (torch.eq).
+
+        Named method, distinct from ``__eq__`` which is object identity so the
+        Tensor stays hashable."""
+        return self._cmp_mask(other, lib.tensor_eq)
+
+    def ne(self, other) -> "Tensor":
+        """Elementwise ``self != other`` as a 0/1 mask (torch.ne)."""
+        return self._cmp_mask(other, lib.tensor_ne)
+
+    def logical_and(self, other) -> "Tensor":
+        """Elementwise logical AND as a 0/1 mask (torch.logical_and)."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        return Tensor(lib.tensor_logical_and(self._tensor, o._tensor))
+
+    def logical_or(self, other) -> "Tensor":
+        """Elementwise logical OR as a 0/1 mask (torch.logical_or)."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        return Tensor(lib.tensor_logical_or(self._tensor, o._tensor))
+
+    def logical_xor(self, other) -> "Tensor":
+        """Elementwise logical XOR as a 0/1 mask (torch.logical_xor)."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        return Tensor(lib.tensor_logical_xor(self._tensor, o._tensor))
+
+    def logical_not(self) -> "Tensor":
+        """Elementwise logical NOT as a 0/1 mask (torch.logical_not)."""
+        return Tensor(lib.tensor_logical_not(self._tensor))
+
+    def bitwise_and(self, other) -> "Tensor":
+        """Elementwise bitwise AND of integer tensors (torch.bitwise_and)."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        return Tensor(lib.tensor_bitwise_and(self._tensor, o._tensor))
+
+    def bitwise_or(self, other) -> "Tensor":
+        """Elementwise bitwise OR of integer tensors (torch.bitwise_or)."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        return Tensor(lib.tensor_bitwise_or(self._tensor, o._tensor))
+
+    def bitwise_xor(self, other) -> "Tensor":
+        """Elementwise bitwise XOR of integer tensors (torch.bitwise_xor)."""
+        o = other if isinstance(other, Tensor) else Tensor(other)
+        return Tensor(lib.tensor_bitwise_xor(self._tensor, o._tensor))
+
+    def bitwise_not(self) -> "Tensor":
+        """Elementwise bitwise NOT of an integer tensor (torch.bitwise_not)."""
+        return Tensor(lib.tensor_bitwise_not(self._tensor))
 
     def masked_fill(self, mask: "Tensor", value: float) -> "Tensor":
         """Fill elements where `mask` is true with `value` (torch.masked_fill)."""
@@ -1757,6 +1873,14 @@ class Tensor:
     def bool(self) -> "Tensor":
         """Cast to bool, by truthiness (torch.Tensor.bool)."""
         return self.cast(DTYPE_BOOL)
+
+    def complex64(self) -> "Tensor":
+        """Cast to complex64 (interleaved [re, im] of float32)."""
+        return self.cast(DTYPE_COMPLEX64)
+
+    def complex128(self) -> "Tensor":
+        """Cast to complex128 (interleaved [re, im] of float64)."""
+        return self.cast(DTYPE_COMPLEX128)
 
 
 class _TensorView(Tensor):

@@ -474,20 +474,25 @@ set(TENSOR_SOURCES
     src/tensor/tensor.c
     src/tensor/tensor_views.c
     src/tensor/tensor_manipulation.c
+    src/tensor/tensor_compare.c
     src/tensor/tensor_ops_extra.c
     src/tensor/sparse_tensor.c
+    src/tensor/sparse_csr.c
     src/tensor/image_dtype.c
     src/tensor/shard.c
     src/tensor/tensor_hash.c
     src/tensor/shape_tracker.c
     src/tensor/dtype_vec.c
     src/tensor/realize.c
+    src/tensor/complex.c
 )
 
 set(AUTOGRAD_SOURCES
     src/autograd/autograd.c
+    src/autograd/custom_function.c
     src/autograd/forward_ops.c
     src/autograd/forward_mode.c
+    src/autograd/functional_transforms.c
     src/autograd/loss_functions.c
     src/autograd/checkpointing.c
     src/autograd/amp.c
@@ -537,6 +542,7 @@ set(NN_SOURCES
     src/nn/parametrize.c
     src/nn/grid_sample.c
     src/nn/distributions.c
+    src/nn/distributions_ext.c
     src/nn/packed_sequence.c
 )
 

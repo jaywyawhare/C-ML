@@ -215,3 +215,130 @@ class LearningRateScheduler:
             self.optimizer.set_lr(new_lr)
 
         self.epoch += 1
+
+
+# ---------------------------------------------------------------------------
+# Torch-style free functions over the comparison / logical / bitwise / view
+# op wrappers. Each delegates to the matching cml.Tensor method, coercing the
+# first positional argument to a Tensor (so ``cml.functional.lt(a, b)`` mirrors
+# ``a.lt(b)`` and ``torch.lt``).
+# ---------------------------------------------------------------------------
+
+def _as_tensor(x):
+    """Coerce ``x`` to a cml.Tensor (pass through if it already is one)."""
+    return x if isinstance(x, cml.Tensor) else cml.Tensor(x)
+
+
+def lt(a, b):
+    """Elementwise ``a < b`` 0/1 mask (torch.lt)."""
+    return _as_tensor(a).lt(b)
+
+
+def le(a, b):
+    """Elementwise ``a <= b`` 0/1 mask (torch.le)."""
+    return _as_tensor(a).le(b)
+
+
+def gt(a, b):
+    """Elementwise ``a > b`` 0/1 mask (torch.gt)."""
+    return _as_tensor(a).gt(b)
+
+
+def ge(a, b):
+    """Elementwise ``a >= b`` 0/1 mask (torch.ge)."""
+    return _as_tensor(a).ge(b)
+
+
+def eq(a, b):
+    """Elementwise ``a == b`` 0/1 mask (torch.eq)."""
+    return _as_tensor(a).eq(b)
+
+
+def ne(a, b):
+    """Elementwise ``a != b`` 0/1 mask (torch.ne)."""
+    return _as_tensor(a).ne(b)
+
+
+def logical_and(a, b):
+    """Elementwise logical AND (torch.logical_and)."""
+    return _as_tensor(a).logical_and(b)
+
+
+def logical_or(a, b):
+    """Elementwise logical OR (torch.logical_or)."""
+    return _as_tensor(a).logical_or(b)
+
+
+def logical_xor(a, b):
+    """Elementwise logical XOR (torch.logical_xor)."""
+    return _as_tensor(a).logical_xor(b)
+
+
+def logical_not(a):
+    """Elementwise logical NOT (torch.logical_not)."""
+    return _as_tensor(a).logical_not()
+
+
+def bitwise_and(a, b):
+    """Elementwise bitwise AND (torch.bitwise_and)."""
+    return _as_tensor(a).bitwise_and(b)
+
+
+def bitwise_or(a, b):
+    """Elementwise bitwise OR (torch.bitwise_or)."""
+    return _as_tensor(a).bitwise_or(b)
+
+
+def bitwise_xor(a, b):
+    """Elementwise bitwise XOR (torch.bitwise_xor)."""
+    return _as_tensor(a).bitwise_xor(b)
+
+
+def bitwise_not(a):
+    """Elementwise bitwise NOT (torch.bitwise_not)."""
+    return _as_tensor(a).bitwise_not()
+
+
+def minimum(a, b):
+    """Elementwise minimum of two tensors (torch.minimum)."""
+    return _as_tensor(a).minimum(b)
+
+
+def maximum(a, b):
+    """Elementwise maximum of two tensors (torch.maximum)."""
+    return _as_tensor(a).maximum(b)
+
+
+def permute(a, *dims):
+    """Reorder dimensions (torch.permute)."""
+    return _as_tensor(a).permute(*dims)
+
+
+def expand(a, *shape):
+    """Broadcast to a larger shape without copying (torch.Tensor.expand)."""
+    return _as_tensor(a).expand(*shape)
+
+
+def narrow(a, dim, start, length):
+    """``length`` elements of ``dim`` starting at ``start`` (torch.narrow)."""
+    return _as_tensor(a).narrow(dim, start, length)
+
+
+def index_select(a, dim, index):
+    """Select slices along ``dim`` at ``index`` (torch.index_select)."""
+    return _as_tensor(a).index_select(index, dim)
+
+
+def unfold(a, dimension, size, step):
+    """Sliding windows along ``dimension`` (torch.Tensor.unfold)."""
+    return _as_tensor(a).unfold(dimension, size, step)
+
+
+def movedim(a, source, destination):
+    """Move the axis at ``source`` to ``destination`` (torch.movedim)."""
+    return _as_tensor(a).movedim(source, destination)
+
+
+def swapaxes(a, axis0, axis1):
+    """Swap two axes (torch.swapaxes)."""
+    return _as_tensor(a).swapaxes(axis0, axis1)

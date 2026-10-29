@@ -36,6 +36,9 @@ from cml import distributed
 from cml import onnx
 from cml import safetensors
 from cml import checkpoint
+from cml import distributions
+from cml import sparse
+from cml import func
 
 # Convenience top-level access (PyTorch-style: cml.Adam, cml.Linear, cml.ReLU).
 from cml.optim import (

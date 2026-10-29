@@ -199,6 +199,24 @@ ffi.cdef(
         int nnz;
     } SparseCOOData;
 
+    typedef struct SparseCSRData {
+        Tensor* crow_indices;
+        Tensor* col_indices;
+        Tensor* values;
+        int rows;
+        int cols;
+        int nnz;
+    } SparseCSRData;
+
+    typedef struct SparseCSCData {
+        Tensor* ccol_indices;
+        Tensor* row_indices;
+        Tensor* values;
+        int rows;
+        int cols;
+        int nnz;
+    } SparseCSCData;
+
     // Parameter and Module structs (full definitions for field access)
 
     typedef struct Parameter {
@@ -547,6 +565,27 @@ ffi.cdef(
     Tensor* uop_celu(Tensor* a, float alpha);
     Tensor* uop_minimum(Tensor* a, Tensor* b);
     Tensor* uop_max(Tensor* a, Tensor* b);
+    /* public tensor_* op wrappers (torch parity) */
+    Tensor* tensor_lt(Tensor* a, Tensor* b);
+    Tensor* tensor_le(Tensor* a, Tensor* b);
+    Tensor* tensor_gt(Tensor* a, Tensor* b);
+    Tensor* tensor_ge(Tensor* a, Tensor* b);
+    Tensor* tensor_eq(Tensor* a, Tensor* b);
+    Tensor* tensor_ne(Tensor* a, Tensor* b);
+    Tensor* tensor_logical_and(Tensor* a, Tensor* b);
+    Tensor* tensor_logical_or(Tensor* a, Tensor* b);
+    Tensor* tensor_logical_not(Tensor* a);
+    Tensor* tensor_logical_xor(Tensor* a, Tensor* b);
+    Tensor* tensor_bitwise_and(Tensor* a, Tensor* b);
+    Tensor* tensor_bitwise_or(Tensor* a, Tensor* b);
+    Tensor* tensor_bitwise_xor(Tensor* a, Tensor* b);
+    Tensor* tensor_bitwise_not(Tensor* a);
+    Tensor* tensor_minimum(Tensor* a, Tensor* b);
+    Tensor* tensor_maximum(Tensor* a, Tensor* b);
+    Tensor* tensor_narrow(Tensor* t, int dim, int start, int length);
+    Tensor* tensor_index_select(Tensor* t, int dim, Tensor* index);
+    Tensor* tensor_movedim(Tensor* t, int source, int destination);
+    Tensor* tensor_swapaxes(Tensor* t, int axis0, int axis1);
     Tensor* uop_masked_fill(Tensor* a, Tensor* mask, float value);
     Tensor* uop_repeat_interleave(Tensor* a, int repeats, int dim);
     Tensor* uop_cummax(Tensor* a, int dim);
@@ -807,6 +846,21 @@ ffi.cdef(
     void cml_set_requires_grad(Tensor* t, bool requires_grad);
     bool cml_is_leaf(Tensor* t);
 
+    // autograd/custom_function.h: custom differentiable ops (torch.autograd.Function)
+
+    typedef struct CMLAutogradContext CMLAutogradContext;
+    typedef Tensor* (*CMLCustomForward)(CMLAutogradContext* ctx, Tensor** inputs, int n_inputs,
+                                        void* user_data);
+    typedef void (*CMLCustomBackward)(CMLAutogradContext* ctx, Tensor* grad_output,
+                                      Tensor** grad_inputs, int n_inputs, void* user_data);
+    Tensor* cml_autograd_function_apply(CMLCustomForward fwd, CMLCustomBackward bwd,
+                                        Tensor** inputs, int n_inputs, void* user_data);
+    void cml_autograd_ctx_save(CMLAutogradContext* ctx, Tensor** tensors, int n);
+    Tensor** cml_autograd_ctx_saved(CMLAutogradContext* ctx, int* out_n);
+    void cml_autograd_ctx_set_data(CMLAutogradContext* ctx, void* p);
+    void* cml_autograd_ctx_get_data(CMLAutogradContext* ctx);
+    void cml_autograd_custom_reset(void);
+
     // cml.h: IR context management
 
     void cml_reset_ir_context(void);
@@ -823,6 +877,26 @@ ffi.cdef(
     int tensor_realize(Tensor* t);
     void tensor_pin(Tensor* t);
     void tensor_release(Tensor* t);
+
+    // tensor/complex.h: complex64/complex128 dtypes
+    Tensor* tensor_complex(Tensor* real, Tensor* imag);
+    Tensor* tensor_real(Tensor* t);
+    Tensor* tensor_imag(Tensor* t);
+    Tensor* tensor_conj(Tensor* t);
+    Tensor* tensor_angle(Tensor* t);
+    Tensor* tensor_abs(Tensor* t);
+    Tensor* view_as_complex(Tensor* t);
+    Tensor* view_as_real(Tensor* t);
+    Tensor* cml_complex_add(Tensor* a, Tensor* b);
+    Tensor* cml_complex_sub(Tensor* a, Tensor* b);
+    Tensor* cml_complex_mul(Tensor* a, Tensor* b);
+    Tensor* cml_complex_div(Tensor* a, Tensor* b);
+    Tensor* cml_complex_exp(Tensor* a);
+    Tensor* cml_complex_matmul(Tensor* a, Tensor* b);
+    Tensor* cml_complex_sum(Tensor* a);
+    Tensor* cml_complex_mean(Tensor* a);
+    Tensor* cml_fft_complex(Tensor* x, int inverse);
+    Tensor* cml_ifft_complex(Tensor* x);
 
     // cml.h: Kernel cache
 
@@ -856,6 +930,28 @@ ffi.cdef(
     Tensor* cml_sparse_matmul(SparseCOOData* sparse, Tensor* dense);
     SparseCOOData* cml_sparse_coalesce(SparseCOOData* sparse);
     void cml_sparse_free(SparseCOOData* sparse);
+
+    // tensor/sparse_tensor.h: CSR / CSC formats (linked from the static archive)
+    SparseCSRData* sparse_csr_create(Tensor* crow_indices, Tensor* col_indices,
+                                     Tensor* values, int rows, int cols);
+    SparseCSCData* sparse_csc_create(Tensor* ccol_indices, Tensor* row_indices,
+                                     Tensor* values, int rows, int cols);
+    SparseCSRData* sparse_coo_to_csr(SparseCOOData* coo);
+    SparseCOOData* sparse_csr_to_coo(SparseCSRData* csr);
+    SparseCSCData* sparse_csr_to_csc(SparseCSRData* csr);
+    Tensor* sparse_csr_to_dense(SparseCSRData* csr, const TensorConfig* config);
+    SparseCSRData* dense_to_sparse_csr(Tensor* dense);
+    Tensor* sparse_csr_matmul(SparseCSRData* csr, Tensor* dense);
+    Tensor* sparse_mv(SparseCSRData* csr, Tensor* vec);
+    SparseCSRData* sparse_add(SparseCSRData* a, SparseCSRData* b);
+    SparseCSRData* sparse_mul_scalar(SparseCSRData* csr, float scalar);
+    SparseCSCData* sparse_transpose(SparseCSRData* csr);
+    Tensor* sparse_sum(SparseCSRData* csr, int dim, const TensorConfig* config);
+    int sparse_csr_nnz(const SparseCSRData* csr);
+    bool sparse_csr_is_sparse(const SparseCSRData* csr);
+    double sparse_csr_density(const SparseCSRData* csr);
+    void sparse_csr_free(SparseCSRData* csr);
+    void sparse_csc_free(SparseCSCData* csc);
 
     // cml.h: Serialization (GGUF)
 
@@ -1130,6 +1226,128 @@ ffi.cdef(
     int  torch_realize(Tensor* t);
     Tensor* torch_linear(Tensor* input, Tensor* weight, Tensor* bias);
     Tensor* torch_linear_relu(Tensor* input, Tensor* weight, Tensor* bias);
+
+    // nn/distributions.h - core distributions
+    Tensor* cml_normal_rsample(Tensor* loc, Tensor* scale);
+    Tensor* cml_normal_log_prob(Tensor* loc, Tensor* scale, Tensor* value);
+    Tensor* cml_normal_entropy(Tensor* scale);
+    Tensor* cml_bernoulli_sample(Tensor* probs);
+    Tensor* cml_bernoulli_log_prob(Tensor* probs, Tensor* value);
+    Tensor* cml_bernoulli_entropy(Tensor* probs);
+    Tensor* cml_categorical_sample(Tensor* logits, int num_samples);
+    Tensor* cml_categorical_log_prob(Tensor* logits, Tensor* indices);
+    Tensor* cml_categorical_entropy(Tensor* logits);
+    Tensor* cml_gumbel_softmax(Tensor* logits, float tau, bool hard);
+
+    // nn/distributions.h - extended distributions
+    Tensor* cml_uniform_rsample(Tensor* low, Tensor* high);
+    Tensor* cml_uniform_log_prob(Tensor* low, Tensor* high, Tensor* value);
+    Tensor* cml_uniform_mean(Tensor* low, Tensor* high);
+    Tensor* cml_uniform_variance(Tensor* low, Tensor* high);
+    Tensor* cml_uniform_entropy(Tensor* low, Tensor* high);
+    Tensor* cml_exponential_rsample(Tensor* rate);
+    Tensor* cml_exponential_log_prob(Tensor* rate, Tensor* value);
+    Tensor* cml_exponential_mean(Tensor* rate);
+    Tensor* cml_exponential_variance(Tensor* rate);
+    Tensor* cml_exponential_entropy(Tensor* rate);
+    Tensor* cml_laplace_rsample(Tensor* loc, Tensor* scale);
+    Tensor* cml_laplace_log_prob(Tensor* loc, Tensor* scale, Tensor* value);
+    Tensor* cml_laplace_mean(Tensor* loc);
+    Tensor* cml_laplace_variance(Tensor* scale);
+    Tensor* cml_laplace_entropy(Tensor* scale);
+    Tensor* cml_cauchy_rsample(Tensor* loc, Tensor* scale);
+    Tensor* cml_cauchy_log_prob(Tensor* loc, Tensor* scale, Tensor* value);
+    Tensor* cml_cauchy_entropy(Tensor* scale);
+    Tensor* cml_gamma_sample(Tensor* concentration, Tensor* rate);
+    Tensor* cml_gamma_log_prob(Tensor* concentration, Tensor* rate, Tensor* value);
+    Tensor* cml_gamma_mean(Tensor* concentration, Tensor* rate);
+    Tensor* cml_gamma_variance(Tensor* concentration, Tensor* rate);
+    Tensor* cml_gamma_entropy(Tensor* concentration, Tensor* rate);
+    Tensor* cml_beta_sample(Tensor* c1, Tensor* c0);
+    Tensor* cml_beta_log_prob(Tensor* c1, Tensor* c0, Tensor* value);
+    Tensor* cml_beta_mean(Tensor* c1, Tensor* c0);
+    Tensor* cml_beta_variance(Tensor* c1, Tensor* c0);
+    Tensor* cml_beta_entropy(Tensor* c1, Tensor* c0);
+    Tensor* cml_chi2_sample(Tensor* df);
+    Tensor* cml_chi2_log_prob(Tensor* df, Tensor* value);
+    Tensor* cml_chi2_mean(Tensor* df);
+    Tensor* cml_chi2_variance(Tensor* df);
+    Tensor* cml_chi2_entropy(Tensor* df);
+    Tensor* cml_studentt_sample(Tensor* df, Tensor* loc, Tensor* scale);
+    Tensor* cml_studentt_log_prob(Tensor* df, Tensor* loc, Tensor* scale, Tensor* value);
+    Tensor* cml_studentt_mean(Tensor* df, Tensor* loc);
+    Tensor* cml_studentt_variance(Tensor* df, Tensor* scale);
+    Tensor* cml_studentt_entropy(Tensor* df, Tensor* scale);
+    Tensor* cml_poisson_sample(Tensor* rate);
+    Tensor* cml_poisson_log_prob(Tensor* rate, Tensor* value);
+    Tensor* cml_poisson_mean(Tensor* rate);
+    Tensor* cml_poisson_variance(Tensor* rate);
+    Tensor* cml_geometric_sample(Tensor* probs);
+    Tensor* cml_geometric_log_prob(Tensor* probs, Tensor* value);
+    Tensor* cml_geometric_mean(Tensor* probs);
+    Tensor* cml_geometric_variance(Tensor* probs);
+    Tensor* cml_geometric_entropy(Tensor* probs);
+    Tensor* cml_binomial_sample(int total_count, Tensor* probs);
+    Tensor* cml_binomial_log_prob(int total_count, Tensor* probs, Tensor* value);
+    Tensor* cml_binomial_mean(int total_count, Tensor* probs);
+    Tensor* cml_binomial_variance(int total_count, Tensor* probs);
+    Tensor* cml_dirichlet_sample(Tensor* concentration);
+    Tensor* cml_dirichlet_log_prob(Tensor* concentration, Tensor* value);
+    Tensor* cml_dirichlet_mean(Tensor* concentration);
+    Tensor* cml_dirichlet_variance(Tensor* concentration);
+    Tensor* cml_dirichlet_entropy(Tensor* concentration);
+    Tensor* cml_mvn_rsample(Tensor* loc, Tensor* covariance);
+    Tensor* cml_mvn_log_prob(Tensor* loc, Tensor* covariance, Tensor* value);
+    Tensor* cml_mvn_entropy(Tensor* covariance);
+
+    typedef enum {
+        CML_DIST_NORMAL,
+        CML_DIST_BERNOULLI,
+        CML_DIST_CATEGORICAL,
+        CML_DIST_GAMMA,
+        CML_DIST_BETA,
+        CML_DIST_EXPONENTIAL,
+        CML_DIST_UNIFORM,
+        CML_DIST_DIRICHLET
+    } CMLDistType;
+    typedef struct {
+        CMLDistType type;
+        Tensor* p1;
+        Tensor* p2;
+    } CMLDistribution;
+    CMLDistribution cml_dist_normal(Tensor* loc, Tensor* scale);
+    CMLDistribution cml_dist_bernoulli(Tensor* probs);
+    CMLDistribution cml_dist_categorical(Tensor* logits);
+    CMLDistribution cml_dist_gamma(Tensor* concentration, Tensor* rate);
+    CMLDistribution cml_dist_beta(Tensor* c1, Tensor* c0);
+    CMLDistribution cml_dist_exponential(Tensor* rate);
+    CMLDistribution cml_dist_uniform(Tensor* low, Tensor* high);
+    CMLDistribution cml_dist_dirichlet(Tensor* concentration);
+    Tensor* cml_kl_divergence(CMLDistribution p, CMLDistribution q);
+
+    // autograd/functional_transforms.h + forward_mode.h (torch.func parity)
+    typedef Tensor* (*CMLTransformFn)(Tensor** inputs, int n, void* ud);
+    typedef Tensor* (*CMLForwardFn)(Tensor* x, void* ctx);
+    typedef struct CMLVjp CMLVjp;
+
+    Tensor* cml_grad(CMLTransformFn f, void* ud, Tensor** inputs, int n, int argnum);
+    int cml_grad_multi(CMLTransformFn f, void* ud, Tensor** inputs, int n,
+                       const int* argnums, int num_argnums, Tensor** grads_out);
+    CMLVjp* cml_vjp(CMLTransformFn f, void* ud, Tensor** inputs, int n, Tensor** output);
+    int cml_vjp_fn(CMLVjp* vjp, Tensor* cotangent, Tensor** grads_out);
+    void cml_vjp_free(CMLVjp* vjp);
+    Tensor* cml_jacrev(CMLTransformFn f, void* ud, Tensor** inputs, int n, int argnum);
+    Tensor* cml_hessian(CMLTransformFn f, void* ud, Tensor** inputs, int n, int argnum);
+    Tensor* cml_vmap(CMLTransformFn f, void* ud, Tensor** inputs, int n,
+                     const int* in_axes, int out_axis);
+    Tensor* cml_functional_call(Module* module, const StateDict* params, Tensor* input);
+    Tensor* cml_jvp(CMLForwardFn f, void* ctx, Tensor* x, Tensor* v);
+    Tensor* cml_jacfwd(CMLForwardFn f, void* ctx, Tensor* x);
+    int cml_autodiff_use_graph(void);
+
+    StateDict* nn_state_dict_create(void);
+    int nn_state_dict_set(StateDict* sd, const char* key, Tensor* value);
+    void nn_state_dict_free(StateDict* sd);
 """
 )
 
@@ -1137,8 +1355,11 @@ ffi.set_source(
     "cml._cml_lib",
     """
     #include "cml.h"
+    #include "nn/distributions.h"
     #include "tensor/tensor.h"
+    #include "tensor/complex.h"
     #include "tensor/realize.h"
+    #include "autograd/custom_function.h"
     #include "torch/torch_c.h"
     #include "distributed/distributed.h"
     #include "distributed/data_parallel.h"
