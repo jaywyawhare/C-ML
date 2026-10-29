@@ -12,6 +12,14 @@ Tensor* tensor_as_strided(Tensor* t, int* shape, int ndim, size_t* strides, size
 Tensor* tensor_reshape(Tensor* t, int* new_shape, int new_ndim);
 Tensor* tensor_contiguous(Tensor* t);
 
+Tensor* tensor_permute(Tensor* t, int* dims, int ndim);
+Tensor* tensor_expand(Tensor* t, int* new_shape, int new_ndim);
+Tensor* tensor_narrow(Tensor* t, int dim, int start, int length);
+Tensor* tensor_index_select(Tensor* t, int dim, Tensor* index);
+Tensor* tensor_unfold(Tensor* t, int dim, int size, int step);
+Tensor* tensor_movedim(Tensor* t, int source, int destination);
+Tensor* tensor_swapaxes(Tensor* t, int axis0, int axis1);
+
 #ifdef __cplusplus
 }
 #endif
