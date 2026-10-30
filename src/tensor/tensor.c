@@ -11,6 +11,7 @@
 #include "tensor/realize.h"
 #include "core/serialization.h"
 #include "ops/ir/ir.h"
+#include "ops/ir/execution.h"
 #include "ops/ir/internal.h"
 #include "ops/ir/cpu_lazy_materialize.h"
 #include "ops/ir/graph_cache.h"
@@ -4636,7 +4637,12 @@ static float logit_scalar(float p) { return logf(p / (1.0f - p)); }
 static Tensor* elementwise_map(Tensor* a, float (*fn)(float)) {
     if (!a)
         return NULL;
+    /* Eager realization mid-expression: force `a` without letting the fuser fold
+     * away a still-single-use sibling operand the caller has not finished wiring
+     * up (see cml_begin_eager_realize). */
+    cml_begin_eager_realize();
     tensor_ensure_executed(a);
+    cml_end_eager_realize();
     if (!a->data)
         return NULL;
     float* out = cml_malloc(a->numel * sizeof(float));

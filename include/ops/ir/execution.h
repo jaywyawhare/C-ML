@@ -11,6 +11,25 @@ extern "C" {
 int cml_ir_execute(CMLGraph_t ir);
 
 /**
+ * Mark the start/end of an internal eager-op realization (an op such as lgamma
+ * that must force an operand to concrete data mid-expression). While a realize
+ * is in progress the lazy-realization path (cml_ir_execute_up_to) runs the
+ * elementwise fuser's single-use folding off, because the graph is still being
+ * built: a producer's use-count is not yet final and folding it would discard a
+ * buffer a not-yet-created sibling consumer will read. Nestable.
+ * @return (void)
+ */
+void cml_begin_eager_realize(void);
+void cml_end_eager_realize(void);
+
+/**
+ * True while an internal eager-op realization (see cml_begin_eager_realize) is
+ * on the stack.
+ * @return (int)
+ */
+int cml_in_eager_realize(void);
+
+/**
  * Replay-hit count on the global TinyJit (TINYJIT_REPLAY path); for tests.
  * @return (size_t)
  */

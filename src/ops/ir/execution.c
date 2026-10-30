@@ -6671,6 +6671,17 @@ int cml_ir_reexecute(CMLGraph_t ir) {
     return cpu_execute_ir(ir);
 }
 
+/* Depth of internal eager-op realizations in progress on this thread (see
+ * cml_begin_eager_realize): while > 0, lazy realization skips the elementwise
+ * fuser because the graph is mid-construction and use-counts are not final. */
+static __thread int g_eager_realize_depth = 0;
+void cml_begin_eager_realize(void) { g_eager_realize_depth++; }
+void cml_end_eager_realize(void) {
+    if (g_eager_realize_depth > 0)
+        g_eager_realize_depth--;
+}
+int cml_in_eager_realize(void) { return g_eager_realize_depth > 0; }
+
 /**
  * Whole-graph CPU execute: decompose, run the fusion scheduler, then TinyJit or cpu_execute_ir.
  * @param ir (CMLGraph_t)
@@ -6828,7 +6839,14 @@ int cml_ir_execute_up_to(CMLGraph_t ir, struct IRNode* target_node) {
 
     /* Full-graph fast path: if target is the tail node, use cpu_execute_ir
      * so the graph cache and stats stay consistent. */
-    if (target_node == ir->tail || !target_node->next) {
+    /* An internal eager-op realization (e.g. lgamma forcing one operand) runs
+     * mid-expression while the caller is still building the rest, so a node's
+     * use-count is not yet final. Skip the fuser here and execute only the
+     * target's cone via the per-node path below: folding a single-use producer
+     * now would discard a buffer that a not-yet-built sibling consumer (another
+     * eager op on the same operand) will read, leaving a dead tensor. Fusion
+     * still runs on user-direct realizations and the whole-graph execute. */
+    if ((target_node == ir->tail || !target_node->next) && !cml_in_eager_realize()) {
         if (cml_ir_use_fusion_scheduler()) {
             /* Mark only nodes reachable from the target used, so the fusion
              * scheduler skips dead nodes (e.g. earlier ops whose tensors were
