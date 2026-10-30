@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>C-ML Dashboard</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c9cff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 12 18 12 15 21 9 3 6 12 2 12'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233ecf8e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 12 18 12 15 21 9 3 6 12 2 12'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="dashboard.css">
 </head>
@@ -28,9 +28,12 @@
       <button class="shell-nav-item" data-view="profile" role="tab">Profile</button>
     </nav>
 
-    <div class="shell-conn" id="shell-conn" title="Visualizer server">
-      <span class="shell-conn-dot" aria-hidden="true"></span>
-      <span class="shell-conn-label">Connecting</span>
+    <div class="shell-right">
+      <div class="shell-conn" id="shell-conn" title="Visualizer server">
+        <span class="shell-conn-dot" aria-hidden="true"></span>
+        <span class="shell-conn-label">Connecting</span>
+      </div>
+      <button class="shell-theme" id="shell-theme" type="button" title="Toggle light / dark" aria-label="Toggle theme"></button>
     </div>
   </header>
 
@@ -45,6 +48,7 @@
     <div class="shell-empty" id="shell-empty" hidden></div>
   </main>
 
+  <script src="tokens.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

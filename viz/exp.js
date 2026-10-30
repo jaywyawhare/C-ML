@@ -76,7 +76,8 @@ const api = (path) => fetch(path).then(r => r.json());
 
 // ── boot ─────────────────────────────────────────────────────────────────
 async function boot() {
-  document.body.setAttribute("data-theme", S.theme);
+  S.theme = cmlTheme();
+  applyTheme(S.theme);
   // When embedded in the main viz (iframe), drop our redundant brand/conn chrome
   // so only the tab bar shows under the host's topbar.
   if (window.self !== window.top) document.body.classList.add("embed");
@@ -107,8 +108,10 @@ async function boot() {
   if (!window._wired) {
     window._wired = true;
     const tb = el("div", { class: "theme-toggle", title: "Toggle theme (t)",
-      onclick: () => { S.theme = S.theme === "dark" ? "light" : "dark"; boot(); } }, "Theme");
+      onclick: () => { setTheme(cmlTheme() === "dark" ? "light" : "dark"); boot(); } }, "Theme");
     $("#conn").before(tb);
+    // A theme change from the shell or the other frame re-themes this one.
+    onThemeChange(() => boot());
     document.addEventListener("keydown", e => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) return;
       const n = parseInt(e.key, 10);
@@ -121,7 +124,7 @@ async function boot() {
         S.tab = vs[(i + (e.key === "]" ? 1 : vs.length - 1)) % vs.length].id;
         boot();
       }
-      else if (e.key === "t") { S.theme = S.theme === "dark" ? "light" : "dark"; boot(); }
+      else if (e.key === "t") { setTheme(cmlTheme() === "dark" ? "light" : "dark"); boot(); }
     });
   }
   await loadRuns();
@@ -133,7 +136,10 @@ async function loadRuns() {
   S.runs = runs;
   // Re-resolved on every boot so a theme switch picks up that set's steps.
   runs.forEach((r, i) => { S.color[r.id] = seriesColor(i); });
-  if (S.selected.size === 0) runs.forEach(r => S.selected.add(r.id));
+  // Default to a usable subset: selecting hundreds of runs at once makes the
+  // comparison charts unreadable and the metrics query slow. The All/None
+  // controls in the sidebar let the reader widen or clear the set.
+  if (S.selected.size === 0) runs.slice(0, 10).forEach(r => S.selected.add(r.id));
   renderSidebar();
 }
 
@@ -152,6 +158,14 @@ function renderSidebar() {
     value: S.filter, style: { width: "100%", marginBottom: "8px" } });
   search.addEventListener("input", () => { S.filter = search.value; applyFilter(); });
   list.append(search);
+
+  // Select-all / clear, scoped to runs matching the current filter so widening
+  // the set from a search is one click.
+  const matching = () => S.runs.filter(r => runMatches(r, S.filter));
+  list.append(el("div", { class: "run-selbar" },
+    el("span", {}, `${S.selected.size} selected`),
+    el("button", { type: "button", onclick: () => { matching().forEach(r => S.selected.add(r.id)); renderSidebar(); render(); } }, "All"),
+    el("button", { type: "button", onclick: () => { S.selected.clear(); renderSidebar(); render(); } }, "None")));
 
   const ordered = [...S.runs].sort((a, b) => (S.starred.has(b.id) ? 1 : 0) - (S.starred.has(a.id) ? 1 : 0));
   ordered.forEach(r => {
@@ -209,7 +223,14 @@ function render() {
 // ── L3 + L5: dynamic comparison panels ─────────────────────────────────────
 async function renderCharts(c) {
   const runs = selectedRuns();
-  if (!runs.length) return c.append(el("div", { class: "empty" }, "Select one or more runs."));
+  if (!runs.length) {
+    if (!S.runs.length)
+      return c.append(emptyState("No runs tracked yet",
+        "Log a run through the cml_exp_* API and it appears here. The demo sweep logs three.",
+        "./build/bin/experiment_demo"));
+    return c.append(emptyState("No runs selected",
+      "Pick one or more runs from the sidebar to plot and compare their metrics.", null));
+  }
 
   const cfgKeys = [...new Set(S.runs.flatMap(r => Object.keys(r.config)))]
     .filter(k => S.runs.every(r => typeof r.config[k] !== "object")).sort();
@@ -256,7 +277,10 @@ async function renderCharts(c) {
     return;
   }
 
-  const metrics = await api(`/api/metrics?runs=${runs.map(r => r.id).join(",")}&keys=${keys.map(encodeURIComponent).join(",")}`);
+  // Fetch for every selected run (hidden included) so the legend can still list
+  // and un-hide them; only the visible ones are drawn.
+  const selAll = S.runs.filter(r => S.selected.has(r.id));
+  const metrics = await api(`/api/metrics?runs=${selAll.map(r => r.id).join(",")}&keys=${keys.map(encodeURIComponent).join(",")}`);
   keys.forEach(k => {
     const card = el("div", { class: "card" }, el("h4", {}, el("span", { class: "accent" }), k));
     const plot = el("div");
@@ -265,7 +289,8 @@ async function renderCharts(c) {
     const series = {};
     runs.forEach(r => { const d = (metrics[r.id] || {})[k] || []; if (d.length) series[r.id] = d; });
     lineChart(plot, series, { logY: S.logY, xKey: S.xKey, smooth: S.smooth });
-    card.append(legend(Object.keys(series)));
+    const legendIds = selAll.map(r => r.id).filter(id => ((metrics[id] || {})[k] || []).length);
+    card.append(legend(legendIds));
   });
 }
 
@@ -297,11 +322,24 @@ function ema(data, alpha, xKey) {
   return data.map(d => { prev = prev == null ? d.value : alpha * prev + (1 - alpha) * d.value; return { x: d[xKey], y: prev }; });
 }
 
+const fmtVal = d3.format("~g");
+
+/** Empty/error panel: what is missing, what fills it, and the command to run. */
+function emptyState(title, desc, command) {
+  const box = el("div", { class: "empty-state-box" },
+    el("div", { class: "empty-state-title" }, title),
+    el("div", { class: "empty-state-desc" }, desc));
+  if (command) box.append(el("code", { class: "empty-cmd" }, command));
+  return el("div", { class: "empty-state" }, box);
+}
+
 function lineChart(container, seriesByRun, opts) {
   const W = container.clientWidth || 360, H = 200, m = { t: 10, r: 12, b: 26, l: 44 };
   const runs = Object.keys(seriesByRun);
   if (!runs.length) { container.append(el("div", { class: "empty" }, "no data")); return; }
-  const all = runs.flatMap(rid => ema(seriesByRun[rid], opts.smooth, opts.xKey));
+  const data = {};
+  runs.forEach(rid => { data[rid] = ema(seriesByRun[rid], opts.smooth, opts.xKey); });
+  const all = runs.flatMap(rid => data[rid]);
   const svg = d3.select(container).append("svg").attr("width", W).attr("height", H);
   const x = d3.scaleLinear().domain(d3.extent(all, d => d.x)).range([m.l, W - m.r]);
   let yVals = all.map(d => d.y);
@@ -316,16 +354,81 @@ function lineChart(container, seriesByRun, opts) {
   svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d3.format("~g")));
   const line = d3.line().x(d => x(d.x)).y(d => y(d.y)).defined(d => d.y != null && (!opts.logY || d.y > 0));
   runs.forEach(rid => {
-    svg.append("path").datum(ema(seriesByRun[rid], opts.smooth, opts.xKey))
+    svg.append("path").datum(data[rid])
       .attr("fill", "none").attr("stroke", S.color[rid]).attr("stroke-width", 1.8).attr("d", line);
   });
+
+  /* Hover readout: one vertical crosshair, a dot per run at the nearest sample,
+   * and a tooltip listing each run's value (capped, since a chart may hold many
+   * runs). Nearest-x is found per run because runs can have different step sets. */
+  container.style.position = "relative";
+  let tip = container.querySelector(".chart-tooltip");
+  if (!tip) { tip = el("div", { class: "chart-tooltip" }); container.append(tip); }
+  tip.style.display = "none";
+  const cross = svg.append("line").attr("class", "crosshair").attr("y1", m.t).attr("y2", H - m.b).style("display", "none");
+  const dots = svg.append("g");
+  const bisect = d3.bisector(d => d.x).left;
+  svg.append("rect")
+    .attr("x", m.l).attr("y", m.t)
+    .attr("width", Math.max(0, W - m.r - m.l)).attr("height", Math.max(0, H - m.b - m.t))
+    .attr("fill", "none").attr("pointer-events", "all")
+    .on("mousemove", function (event) {
+      const [mx] = d3.pointer(event);
+      const xv = x.invert(mx);
+      cross.attr("x1", mx).attr("x2", mx).style("display", null);
+      dots.selectAll("*").remove();
+      const rows = [];
+      runs.forEach(rid => {
+        const arr = data[rid];
+        if (!arr.length) return;
+        let i = bisect(arr, xv);
+        if (i >= arr.length) i = arr.length - 1;
+        if (i > 0 && (xv - arr[i - 1].x) < (arr[i].x - xv)) i--;
+        const d = arr[i];
+        if (!d || d.y == null) return;
+        rows.push({ rid, x: d.x, y: d.y });
+        dots.append("circle").attr("cx", x(d.x)).attr("cy", y(d.y)).attr("r", 3)
+          .attr("fill", S.color[rid]).attr("stroke", tok("--bg-elev")).attr("stroke-width", 1.5);
+      });
+      if (!rows.length) { tip.style.display = "none"; return; }
+      rows.sort((a, b) => b.y - a.y);
+      const CAP = 16;
+      const head = `<b>${opts.xKey === "wall" ? "t" : "step"} ${fmtVal(rows[0].x)}</b>`;
+      const body = rows.slice(0, CAP).map(r => {
+        const name = (S.runs.find(z => z.id === r.rid) || {}).name || r.rid;
+        return `<span class="tt-row"><i style="background:${S.color[r.rid]}"></i>${esc(name)}<b>${fmtVal(r.y)}</b></span>`;
+      }).join("");
+      const more = rows.length > CAP ? `<span class="tt-more">+${rows.length - CAP} more</span>` : "";
+      tip.innerHTML = head + body + more;
+      tip.style.display = "block";
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      let tx = mx + 14, ty = event.offsetY - th / 2;
+      if (tx + tw > W) tx = mx - tw - 14;
+      if (ty < 2) ty = 2;
+      if (ty + th > H) ty = H - th - 2;
+      tip.style.left = tx + "px";
+      tip.style.top = ty + "px";
+    })
+    .on("mouseleave", function () {
+      tip.style.display = "none";
+      cross.style("display", "none");
+      dots.selectAll("*").remove();
+    });
 }
 
+/* Clicking a legend entry hides/shows that run across the charts, reusing the
+ * same S.hidden set the sidebar's hide action drives. A hidden run stays listed
+ * (struck through) so it can be brought back from the legend it vanished from. */
 function legend(runIds) {
   const l = el("div", { class: "legend" });
   runIds.forEach(rid => {
     const r = S.runs.find(x => x.id === rid);
-    l.append(el("span", {}, el("i", { style: { background: S.color[rid] } }), r ? r.name : rid));
+    const off = S.hidden.has(rid);
+    l.append(el("span", {
+      class: "legend-item" + (off ? " off" : ""),
+      title: off ? "Show in charts" : "Hide from charts",
+      onclick: () => { off ? S.hidden.delete(rid) : S.hidden.add(rid); renderSidebar(); render(); },
+    }, el("i", { style: { background: off ? "var(--muted-2)" : S.color[rid] } }), r ? r.name : rid));
   });
   return l;
 }

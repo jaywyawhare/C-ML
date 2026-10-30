@@ -188,6 +188,20 @@ body {
 
 .readout { font-variant-numeric: tabular-nums; }
 
+/* Empty/error state, shared by the Visualizer and the Experiment tracker: what
+ * is missing, what fills it, and a copyable command. */
+.empty-state { display: flex; align-items: center; justify-content: center; height: 100%; padding: var(--sp-5); }
+.empty-state-box { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-4); max-width: 460px; }
+.empty-state-box.is-error .empty-state-title { color: var(--err); }
+.empty-state-title { color: var(--text); font-size: var(--fs-600); font-weight: 600; margin-bottom: var(--sp-1); }
+.empty-state-desc { color: var(--text-dim); font-size: var(--fs-300); line-height: var(--lh-body); max-width: 60ch; }
+.empty-cmd {
+  margin-top: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: var(--mono); font-size: var(--fs-200); color: var(--text); user-select: all;
+}
+
 ::selection { background: var(--accent-soft); color: var(--text); }
 
 :where(a, button, input, select, textarea, [tabindex], [role="tab"], [role="button"]):focus-visible {

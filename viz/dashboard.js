@@ -102,6 +102,21 @@
   }
   ping(); setInterval(ping, 4000);
 
+  // Theme: the shell owns the toggle; writing localStorage fires a `storage`
+  // event in both app frames, which re-theme themselves (see tokens.js).
+  var themeBtn = document.getElementById("shell-theme");
+  function paintTheme() {
+    var t = cmlTheme();
+    applyTheme(t);
+    if (themeBtn) themeBtn.textContent = t === "light" ? "☾" : "☀";
+  }
+  if (themeBtn) themeBtn.addEventListener("click", function () {
+    setTheme(cmlTheme() === "light" ? "dark" : "light");
+    paintTheme();
+  });
+  window.addEventListener("storage", function (e) { if (e.key === "cml-theme") paintTheme(); });
+  paintTheme();
+
   // initial view from hash, default experiments
   show(location.hash.slice(1) || "experiments");
 })();

@@ -76,6 +76,10 @@ body.embed .topbar { padding-left: var(--sp-4); }
 }
 .run-count { font-size: var(--fs-200); font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
 .run-list { overflow-y: auto; padding: var(--sp-2); }
+.run-selbar { display: flex; align-items: center; gap: var(--sp-2); padding: 2px var(--sp-1) var(--sp-2); font-size: var(--fs-100); color: var(--muted); }
+.run-selbar span { margin-right: auto; font-variant-numeric: tabular-nums; }
+.run-selbar button { background: none; border: 0; color: var(--accent); font: inherit; cursor: pointer; padding: 2px 5px; border-radius: var(--radius-sm); }
+.run-selbar button:hover { background: var(--bg-elev2); }
 .sidebar input[type=text], .sidebar input[type=search], .sidebar input:not([type]) {
   font: inherit; font-size: var(--fs-200); color: var(--text);
   background: var(--control-bg); border: 1px solid var(--control-border); border-radius: var(--radius);
@@ -133,9 +137,31 @@ table.grid tr:hover td { background: var(--bg-elev2); }
 .axis text { fill: var(--muted); font-size: 10px; font-family: var(--font); }
 .axis path, .axis line { stroke: var(--border-2); }
 .grid-line { stroke: var(--grid-major); }
-.legend { display: flex; gap: var(--sp-3); flex-wrap: wrap; margin-top: 6px; }
+/* Cap the wrap height so a many-run chart's legend scrolls instead of pushing
+ * the panel open and shrinking the plot above it. */
+.legend { display: flex; gap: var(--sp-3); flex-wrap: wrap; margin-top: 6px; max-height: 96px; overflow-y: auto; }
 .legend span { display: flex; align-items: center; gap: 5px; color: var(--text-dim); font-size: var(--fs-200); }
 .legend i { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+.legend-item { cursor: pointer; border-radius: var(--radius-sm); padding: 1px 3px; }
+.legend-item:hover { background: var(--bg-elev2); color: var(--text); }
+.legend-item.off { color: var(--muted-2); text-decoration: line-through; }
+
+/* Chart hover readout: vertical crosshair + floating value list. The container
+ * (the plot div) is positioned relative so the tooltip anchors to it. */
+.crosshair { stroke: var(--border-2); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+.chart-tooltip {
+  position: absolute; z-index: 5; pointer-events: none;
+  max-width: 260px; max-height: 180px; overflow: hidden;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-elev); border: 1px solid var(--border-2); border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--fs-100); line-height: 1.5; color: var(--text-dim);
+}
+.chart-tooltip > b { display: block; color: var(--text); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+.chart-tooltip .tt-row { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.chart-tooltip .tt-row i { width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto; }
+.chart-tooltip .tt-row b { margin-left: auto; padding-left: var(--sp-3); color: var(--text); font-variant-numeric: tabular-nums; }
+.chart-tooltip .tt-more { display: block; margin-top: 2px; color: var(--muted); }
 
 .empty { color: var(--muted); text-align: center; padding: 60px 20px; }
 .select {

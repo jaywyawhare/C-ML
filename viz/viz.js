@@ -1070,8 +1070,10 @@ const SIMD_OP = {
 };
 
 function generateKernelCode(kernel, backend) {
-  const inputs = kernel.inputs || [];
-  const output = kernel.output || "out";
+  // The exporter leaves operand names blank for some fused nodes; fall back to
+  // in0/in1/… and "out" so the rendered kernel reads as code instead of "[idx]".
+  const inputs = (kernel.inputs || []).map((n, i) => (n && String(n).trim()) ? n : `in${i}`);
+  const output = (kernel.output && String(kernel.output).trim()) ? kernel.output : "out";
   const name = kernel.name;
   const wgsl = backend === "wgsl";
   const cuda_like = backend === "cuda" || backend === "rocm";
@@ -1147,9 +1149,17 @@ function generateKernelCode(kernel, backend) {
   function emitScalar(L, bi) {
     const reg = {};
     ops.forEach(op => {
-      const a = op.inputs[0] != null ? (reg[op.inputs[0]] ? op.inputs[0] : arr(op.inputs[0])) : "in0";
-      const b = op.inputs[1] != null ? (reg[op.inputs[1]] ? op.inputs[1] : arr(op.inputs[1])) : undefined;
-      const expr = opExpr(op.type, a, b);
+      let expr;
+      if (op.type === "FUSED_ELEMENTWISE") {
+        // This node doesn't carry its fused sub-op chain; show the operands it
+        // folds rather than inventing a specific operator.
+        const args = (op.inputs || []).map(n => (reg[n] ? n : arr(n)));
+        expr = `fused(${args.join(", ")})`;
+      } else {
+        const a = op.inputs[0] != null ? (reg[op.inputs[0]] ? op.inputs[0] : arr(op.inputs[0])) : "in0";
+        const b = op.inputs[1] != null ? (reg[op.inputs[1]] ? op.inputs[1] : arr(op.inputs[1])) : undefined;
+        expr = opExpr(op.type, a, b);
+      }
       if (op.output === output) L.push(`${bi}${arr(output)} = ${expr};`);
       else { L.push(`${bi}${decl(op.output, expr)}`); reg[op.output] = 1; }
     });
@@ -3036,6 +3046,12 @@ function renderTrainingEmpty(container, data) {
 // INIT
 // ═══════════════════════════════════════════════════════════════
 document.addEventListener("DOMContentLoaded", () => {
+  // Adopt the shared theme, and re-render the active view when the shell or the
+  // other frame switches it so chart/graph colours (read from CSS at draw time)
+  // refresh. See tokens.js.
+  applyTheme(cmlTheme());
+  onThemeChange((t) => { applyTheme(t); renderActiveTab(); });
+
   // Register cytoscape extensions
   if (typeof cytoscapeDagre !== "undefined") cytoscape.use(cytoscapeDagre);
   if (typeof cytoscapeElk !== "undefined") cytoscape.use(cytoscapeElk);

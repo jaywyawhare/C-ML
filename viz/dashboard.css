@@ -71,8 +71,31 @@ body { display: flex; flex-direction: column; }
   border-radius: 2px;
 }
 
-.shell-conn {
+.shell-right {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.shell-theme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--control-bg);
+  color: var(--text-dim);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.shell-theme:hover { color: var(--text); border-color: var(--control-border-hover); }
+
+.shell-conn {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
