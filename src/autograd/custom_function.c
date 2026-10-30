@@ -29,10 +29,10 @@ typedef struct CustomNode {
     struct CustomNode* next;
 } CustomNode;
 
-static CustomNode* g_nodes_head         = NULL;
-static CustomNode* g_nodes_tail         = NULL;
-static pthread_mutex_t g_nodes_lock     = PTHREAD_MUTEX_INITIALIZER;
-static bool g_warned_double_backward    = false;
+static CustomNode* g_nodes_head      = NULL;
+static CustomNode* g_nodes_tail      = NULL;
+static pthread_mutex_t g_nodes_lock  = PTHREAD_MUTEX_INITIALIZER;
+static bool g_warned_double_backward = false;
 
 /**
  * Free a context's saved-tensor array (not the tensors) and the context itself.

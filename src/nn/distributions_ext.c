@@ -331,9 +331,7 @@ Tensor* cml_cauchy_log_prob(Tensor* loc, Tensor* scale, Tensor* value) {
  * @param scale (Tensor*)
  * @return (Tensor*)
  */
-Tensor* cml_cauchy_entropy(Tensor* scale) {
-    return scale ? add_c(cml_log(scale), LOG_4PI) : NULL;
-}
+Tensor* cml_cauchy_entropy(Tensor* scale) { return scale ? add_c(cml_log(scale), LOG_4PI) : NULL; }
 
 /**
  * Draw a Gamma(shape, 1) variate (Marsaglia-Tsang); shape<1 uses the boosting
@@ -659,8 +657,8 @@ Tensor* cml_studentt_entropy(Tensor* df, Tensor* scale) {
     Tensor* df_2   = mul_c(df, 0.5f);
     Tensor* lb     = lbeta(df_2, cml_full_like(df, 0.5f));
     Tensor* e      = cml_log(scale);
-    e = cml_add(e, cml_mul(dfp1_2, cml_sub(cml_digamma(dfp1_2), cml_digamma(df_2))));
-    e = cml_add(e, mul_c(cml_log(df), 0.5f));
+    e              = cml_add(e, cml_mul(dfp1_2, cml_sub(cml_digamma(dfp1_2), cml_digamma(df_2))));
+    e              = cml_add(e, mul_c(cml_log(df), 0.5f));
     return cml_add(e, lb);
 }
 
@@ -853,13 +851,12 @@ Tensor* cml_binomial_sample(int total_count, Tensor* probs) {
 Tensor* cml_binomial_log_prob(int total_count, Tensor* probs, Tensor* value) {
     if (!probs || !value)
         return NULL;
-    float lg_n1   = lgammaf((float)total_count + 1.0f);
-    Tensor* comb  = cml_sub(cml_full_like(value, lg_n1), cml_lgamma(add_c(value, 1.0f)));
-    comb          = cml_sub(comb, cml_lgamma(add_c(add_c(mul_c(value, -1.0f), (float)total_count),
-                                                   1.0f)));
-    Tensor* terms = cml_add(cml_mul(value, cml_log(probs)),
-                            cml_mul(add_c(mul_c(value, -1.0f), (float)total_count),
-                                    cml_log(one_minus(probs))));
+    float lg_n1  = lgammaf((float)total_count + 1.0f);
+    Tensor* comb = cml_sub(cml_full_like(value, lg_n1), cml_lgamma(add_c(value, 1.0f)));
+    comb = cml_sub(comb, cml_lgamma(add_c(add_c(mul_c(value, -1.0f), (float)total_count), 1.0f)));
+    Tensor* terms =
+        cml_add(cml_mul(value, cml_log(probs)),
+                cml_mul(add_c(mul_c(value, -1.0f), (float)total_count), cml_log(one_minus(probs))));
     return cml_add(comb, terms);
 }
 
@@ -969,7 +966,8 @@ Tensor* cml_dirichlet_entropy(Tensor* concentration) {
     Tensor* a0       = cml_sum(concentration, -1, false);
     Tensor* log_beta = cml_sub(cml_sum(cml_lgamma(concentration), -1, false), cml_lgamma(a0));
     Tensor* t2       = cml_mul(add_c(a0, -(float)k), cml_digamma(a0));
-    Tensor* t3 = cml_sum(cml_mul(add_c(concentration, -1.0f), cml_digamma(concentration)), -1, false);
+    Tensor* t3 =
+        cml_sum(cml_mul(add_c(concentration, -1.0f), cml_digamma(concentration)), -1, false);
     return cml_sub(cml_add(log_beta, t2), t3);
 }
 
@@ -1298,23 +1296,23 @@ Tensor* cml_kl_divergence(CMLDistribution p, CMLDistribution q) {
     if (p.type != q.type)
         return NULL;
     switch (p.type) {
-        case CML_DIST_NORMAL:
-            return kl_normal(p.p1, p.p2, q.p1, q.p2);
-        case CML_DIST_BERNOULLI:
-            return kl_bernoulli(p.p1, q.p1);
-        case CML_DIST_CATEGORICAL:
-            return kl_categorical(p.p1, q.p1);
-        case CML_DIST_GAMMA:
-            return kl_gamma(p.p1, p.p2, q.p1, q.p2);
-        case CML_DIST_BETA:
-            return kl_beta(p.p1, p.p2, q.p1, q.p2);
-        case CML_DIST_EXPONENTIAL:
-            return kl_exponential(p.p1, q.p1);
-        case CML_DIST_UNIFORM:
-            return kl_uniform(p.p1, p.p2, q.p1, q.p2);
-        case CML_DIST_DIRICHLET:
-            return kl_dirichlet(p.p1, q.p1);
-        default:
-            return NULL;
+    case CML_DIST_NORMAL:
+        return kl_normal(p.p1, p.p2, q.p1, q.p2);
+    case CML_DIST_BERNOULLI:
+        return kl_bernoulli(p.p1, q.p1);
+    case CML_DIST_CATEGORICAL:
+        return kl_categorical(p.p1, q.p1);
+    case CML_DIST_GAMMA:
+        return kl_gamma(p.p1, p.p2, q.p1, q.p2);
+    case CML_DIST_BETA:
+        return kl_beta(p.p1, p.p2, q.p1, q.p2);
+    case CML_DIST_EXPONENTIAL:
+        return kl_exponential(p.p1, q.p1);
+    case CML_DIST_UNIFORM:
+        return kl_uniform(p.p1, p.p2, q.p1, q.p2);
+    case CML_DIST_DIRICHLET:
+        return kl_dirichlet(p.p1, q.p1);
+    default:
+        return NULL;
     }
 }

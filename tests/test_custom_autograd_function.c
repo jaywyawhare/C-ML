@@ -33,8 +33,8 @@ static void square_backward(CMLAutogradContext* ctx, Tensor* grad_output, Tensor
                             int n_inputs, void* user_data) {
     (void)user_data;
     REQUIRE(n_inputs == 1);
-    int n_saved     = 0;
-    Tensor** saved  = cml_autograd_ctx_saved(ctx, &n_saved);
+    int n_saved        = 0;
+    Tensor** saved     = cml_autograd_ctx_saved(ctx, &n_saved);
     g_square_saw_saved = (saved && n_saved == 1);
     REQUIRE(g_square_saw_saved);
     Tensor* x  = saved[0];
@@ -75,10 +75,10 @@ static void muladd_backward(CMLAutogradContext* ctx, Tensor* grad_output, Tensor
     int n_saved    = 0;
     Tensor** saved = cml_autograd_ctx_saved(ctx, &n_saved);
     REQUIRE(saved && n_saved == 2);
-    Tensor* a   = saved[0];
-    Tensor* b   = saved[1];
-    Tensor* da  = tensor_clone(grad_output);
-    Tensor* db  = tensor_clone(grad_output);
+    Tensor* a  = saved[0];
+    Tensor* b  = saved[1];
+    Tensor* da = tensor_clone(grad_output);
+    Tensor* db = tensor_clone(grad_output);
     for (size_t i = 0; i < da->numel; i++) {
         float g  = tensor_get_float(grad_output, i);
         float av = tensor_get_float(a, i);
@@ -104,7 +104,7 @@ static int test_custom_square_mixed(void) {
     cml_set_requires_grad(w, true);
 
     Tensor* inputs[] = {x};
-    Tensor* y        = cml_autograd_function_apply(square_forward, square_backward, inputs, 1, NULL);
+    Tensor* y = cml_autograd_function_apply(square_forward, square_backward, inputs, 1, NULL);
     REQUIRE(y != NULL);
 
     Tensor* z    = cml_mul(y, w);
@@ -139,12 +139,12 @@ static int test_custom_square_finite_diff(void) {
     cml_set_requires_grad(x, true);
 
     Tensor* inputs[] = {x};
-    Tensor* y        = cml_autograd_function_apply(square_forward, square_backward, inputs, 1, NULL);
-    Tensor* loss     = cml_sum(y, 0, false);
+    Tensor* y    = cml_autograd_function_apply(square_forward, square_backward, inputs, 1, NULL);
+    Tensor* loss = cml_sum(y, 0, false);
     cml_backward(loss, NULL, false, false);
     REQUIRE(x->grad);
 
-    int ok       = 1;
+    int ok        = 1;
     const float h = 1e-3f;
     for (int i = 0; i < n; i++) {
         float fp = 0.0f, fm = 0.0f;
@@ -175,8 +175,8 @@ static int test_custom_muladd(void) {
     cml_set_requires_grad(b, true);
 
     Tensor* inputs[] = {a, b};
-    Tensor* out      = cml_autograd_function_apply(muladd_forward, muladd_backward, inputs, 2, NULL);
-    Tensor* loss     = cml_sum(out, 0, false);
+    Tensor* out  = cml_autograd_function_apply(muladd_forward, muladd_backward, inputs, 2, NULL);
+    Tensor* loss = cml_sum(out, 0, false);
     cml_backward(loss, NULL, false, false);
 
     REQUIRE(a->grad && b->grad);

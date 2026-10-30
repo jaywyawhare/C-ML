@@ -28,11 +28,11 @@ static TensorConfig i32cfg = {
 #define ROWS 4
 #define COLS 3
 #define NNZ 5
-static const int32_t g_crow[ROWS + 1] = {0, 1, 2, 3, 5};
-static const int32_t g_col[NNZ]       = {1, 0, 2, 0, 1};
-static const float g_val[NNZ]         = {2.0f, 1.0f, -3.0f, 4.0f, 5.0f};
-static const float g_dense[ROWS * COLS] = {
-    0.0f, 2.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -3.0f, 4.0f, 5.0f, 0.0f};
+static const int32_t g_crow[ROWS + 1]   = {0, 1, 2, 3, 5};
+static const int32_t g_col[NNZ]         = {1, 0, 2, 0, 1};
+static const float g_val[NNZ]           = {2.0f, 1.0f, -3.0f, 4.0f, 5.0f};
+static const float g_dense[ROWS * COLS] = {0.0f, 2.0f, 0.0f,  1.0f, 0.0f, 0.0f,
+                                           0.0f, 0.0f, -3.0f, 4.0f, 5.0f, 0.0f};
 
 static Tensor* i32_vec(const int32_t* xs, int n) {
     int shape[] = {n};
@@ -51,9 +51,9 @@ static Tensor* f32_vec(const float* xs, int n) {
 }
 
 static SparseCSRData* make_csr(void) {
-    Tensor* crow    = i32_vec(g_crow, ROWS + 1);
-    Tensor* col     = i32_vec(g_col, NNZ);
-    Tensor* val     = f32_vec(g_val, NNZ);
+    Tensor* crow     = i32_vec(g_crow, ROWS + 1);
+    Tensor* col      = i32_vec(g_col, NNZ);
+    Tensor* val      = f32_vec(g_val, NNZ);
     SparseCSRData* c = sparse_csr_create(crow, col, val, ROWS, COLS);
     tensor_free(crow);
     tensor_free(col);
@@ -92,7 +92,7 @@ static int test_dense_to_csr_roundtrip(void) {
     REQUIRE(c != NULL);
     REQUIRE(sparse_csr_nnz(c) == NNZ);
     Tensor* back = sparse_csr_to_dense(c, &f32cfg);
-    int ok = dense_eq((float*)tensor_data_ptr(back), g_dense, ROWS * COLS);
+    int ok       = dense_eq((float*)tensor_data_ptr(back), g_dense, ROWS * COLS);
     tensor_free(back);
     sparse_csr_free(c);
     tensor_free(d);
@@ -100,16 +100,16 @@ static int test_dense_to_csr_roundtrip(void) {
 }
 
 static int test_csr_coo_roundtrip(void) {
-    SparseCSRData* c = make_csr();
+    SparseCSRData* c   = make_csr();
     SparseCOOData* coo = sparse_csr_to_coo(c);
     REQUIRE(coo != NULL && coo->nnz == NNZ);
     Tensor* d = sparse_to_dense(coo, &f32cfg);
-    int ok1 = dense_eq((float*)tensor_data_ptr(d), g_dense, ROWS * COLS);
+    int ok1   = dense_eq((float*)tensor_data_ptr(d), g_dense, ROWS * COLS);
     /* COO -> CSR back */
     SparseCSRData* c2 = sparse_coo_to_csr(coo);
     REQUIRE(c2 != NULL);
     Tensor* d2 = sparse_csr_to_dense(c2, &f32cfg);
-    int ok2 = dense_eq((float*)tensor_data_ptr(d2), g_dense, ROWS * COLS);
+    int ok2    = dense_eq((float*)tensor_data_ptr(d2), g_dense, ROWS * COLS);
     tensor_free(d);
     tensor_free(d2);
     sparse_free(coo);
@@ -142,10 +142,10 @@ static int test_csr_to_csc(void) {
 
 static int test_csr_matmul_vs_dense(void) {
     cml_reset_ir_context();
-    SparseCSRData* c = make_csr();
-    int b_shape[]    = {COLS, 2};
+    SparseCSRData* c   = make_csr();
+    int b_shape[]      = {COLS, 2};
     float bs[COLS * 2] = {1.0f, -2.0f, 0.5f, 3.0f, -1.0f, 4.0f};
-    Tensor* B        = tensor_zeros(b_shape, 2, &f32cfg);
+    Tensor* B          = tensor_zeros(b_shape, 2, &f32cfg);
     memcpy(tensor_data_ptr(B), bs, sizeof(bs));
 
     Tensor* C = sparse_csr_matmul(c, B);

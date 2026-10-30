@@ -330,7 +330,7 @@ Tensor* tensor_index_select(Tensor* t, int dim, Tensor* index) {
         return uop_gather(t, index, 0);
 
     /* uop_gather selects along axis 0, so rotate `d` to the front and back. */
-    int nd = t->ndim;
+    int nd   = t->ndim;
     int* fp  = cml_malloc((size_t)nd * sizeof(int));
     int* inv = cml_malloc((size_t)nd * sizeof(int));
     if (!fp || !inv) {
@@ -419,7 +419,7 @@ Tensor* tensor_unfold(Tensor* t, int dim, int size, int step) {
 Tensor* tensor_movedim(Tensor* t, int source, int destination) {
     if (!t)
         return NULL;
-    int s = views_norm_dim(source, t->ndim);
+    int s   = views_norm_dim(source, t->ndim);
     int dst = views_norm_dim(destination, t->ndim);
     if (s < 0 || dst < 0) {
         LOG_ERROR("tensor_movedim: axis (%d -> %d) out of range for %dD tensor", source,
@@ -427,7 +427,7 @@ Tensor* tensor_movedim(Tensor* t, int source, int destination) {
         return NULL;
     }
 
-    int nd   = t->ndim;
+    int nd    = t->ndim;
     int* perm = cml_malloc((size_t)nd * sizeof(int));
     if (!perm)
         return NULL;

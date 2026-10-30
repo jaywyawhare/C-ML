@@ -54,13 +54,13 @@ static Tensor* f_sumcube(Tensor** in, int n, void* ud) {
 static Tensor* f_vec2(Tensor** in, int n, void* ud) {
     (void)n;
     (void)ud;
-    Tensor* x    = in[0];
-    int s0[1]    = {0}, e0[1] = {1};
-    int s1[1]    = {1}, e1[1] = {2};
-    Tensor* x0   = uop_shrink(x, s0, e0, 1);
-    Tensor* x1   = uop_shrink(x, s1, e1, 1);
-    Tensor* y0   = uop_mul(x0, x0);
-    Tensor* y1   = uop_mul(x0, x1);
+    Tensor* x = in[0];
+    int s0[1] = {0}, e0[1] = {1};
+    int s1[1] = {1}, e1[1] = {2};
+    Tensor* x0    = uop_shrink(x, s0, e0, 1);
+    Tensor* x1    = uop_shrink(x, s1, e1, 1);
+    Tensor* y0    = uop_mul(x0, x0);
+    Tensor* y1    = uop_mul(x0, x1);
     Tensor* ys[2] = {y0, y1};
     return cml_concat(ys, 2, 0);
 }
@@ -196,7 +196,7 @@ static void test_functional_call(void) {
     REQUIRE(lin != NULL);
     Parameter* w = linear_get_weight(lin);
     REQUIRE(w != NULL);
-    size_t wn    = tensor_numel(w->tensor->shape, w->tensor->ndim);
+    size_t wn = tensor_numel(w->tensor->shape, w->tensor->ndim);
 
     /* snapshot the module's own weight */
     float orig[8];
@@ -221,8 +221,8 @@ static void test_functional_call(void) {
     REQUIRE(got != NULL);
 
     /* reference: a Linear carrying the swapped weight directly */
-    Linear* ref   = nn_linear(2, 2, DTYPE_FLOAT32, DEVICE_CPU, false);
-    Tensor* wref  = cml_zeros(w->tensor->shape, w->tensor->ndim, &cfg);
+    Linear* ref  = nn_linear(2, 2, DTYPE_FLOAT32, DEVICE_CPU, false);
+    Tensor* wref = cml_zeros(w->tensor->shape, w->tensor->ndim, &cfg);
     memcpy(tensor_data_ptr(wref), ws, wn * sizeof(float));
     REQUIRE(linear_set_weight(ref, wref) == 0);
     Tensor* xt2 = cml_zeros(ish, 2, &cfg);

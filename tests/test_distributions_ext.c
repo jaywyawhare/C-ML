@@ -79,7 +79,8 @@ static int test_exponential(void) {
     cml_reset_ir_context();
     float r[1] = {2}, x[1] = {1.0f};
     int sh[1] = {1};
-    REQUIRE(approx(scalar(cml_exponential_log_prob(mk(r, sh, 1), mk(x, sh, 1))), -1.306853f, 1e-4f));
+    REQUIRE(
+        approx(scalar(cml_exponential_log_prob(mk(r, sh, 1), mk(x, sh, 1))), -1.306853f, 1e-4f));
     REQUIRE(approx(scalar(cml_exponential_mean(mk(r, sh, 1))), 0.5f, 1e-5f));
     REQUIRE(approx(scalar(cml_exponential_variance(mk(r, sh, 1))), 0.25f, 1e-5f));
     REQUIRE(approx(scalar(cml_exponential_entropy(mk(r, sh, 1))), 0.306853f, 1e-4f));
@@ -103,8 +104,8 @@ static int test_cauchy(void) {
     cml_reset_ir_context();
     float m[1] = {0}, s[1] = {1}, x[1] = {1.0f};
     int sh[1] = {1};
-    REQUIRE(approx(scalar(cml_cauchy_log_prob(mk(m, sh, 1), mk(s, sh, 1), mk(x, sh, 1))), -1.837877f,
-                   1e-4f));
+    REQUIRE(approx(scalar(cml_cauchy_log_prob(mk(m, sh, 1), mk(s, sh, 1), mk(x, sh, 1))),
+                   -1.837877f, 1e-4f));
     REQUIRE(approx(scalar(cml_cauchy_entropy(mk(s, sh, 1))), 2.531024f, 1e-4f));
     cml_reset_ir_context();
     return 1;
@@ -114,8 +115,8 @@ static int test_gamma(void) {
     cml_reset_ir_context();
     float a[1] = {2}, b[1] = {1}, x[1] = {1.0f};
     int sh[1] = {1};
-    REQUIRE(approx(scalar(cml_gamma_log_prob(mk(a, sh, 1), mk(b, sh, 1), mk(x, sh, 1))), -1.0f,
-                   1e-4f));
+    REQUIRE(
+        approx(scalar(cml_gamma_log_prob(mk(a, sh, 1), mk(b, sh, 1), mk(x, sh, 1))), -1.0f, 1e-4f));
     REQUIRE(approx(scalar(cml_gamma_mean(mk(a, sh, 1), mk(b, sh, 1))), 2.0f, 1e-5f));
     REQUIRE(approx(scalar(cml_gamma_variance(mk(a, sh, 1), mk(b, sh, 1))), 2.0f, 1e-5f));
     REQUIRE(approx(scalar(cml_gamma_entropy(mk(a, sh, 1), mk(b, sh, 1))), 1.577216f, 1e-4f));
@@ -127,8 +128,8 @@ static int test_beta(void) {
     cml_reset_ir_context();
     float a[1] = {2}, b[1] = {3}, x[1] = {0.5f};
     int sh[1] = {1};
-    REQUIRE(
-        approx(scalar(cml_beta_log_prob(mk(a, sh, 1), mk(b, sh, 1), mk(x, sh, 1))), 0.405465f, 1e-4f));
+    REQUIRE(approx(scalar(cml_beta_log_prob(mk(a, sh, 1), mk(b, sh, 1), mk(x, sh, 1))), 0.405465f,
+                   1e-4f));
     REQUIRE(approx(scalar(cml_beta_mean(mk(a, sh, 1), mk(b, sh, 1))), 0.4f, 1e-5f));
     REQUIRE(approx(scalar(cml_beta_variance(mk(a, sh, 1), mk(b, sh, 1))), 0.04f, 1e-5f));
     REQUIRE(approx(scalar(cml_beta_entropy(mk(a, sh, 1), mk(b, sh, 1))), -0.234907f, 1e-4f));
@@ -152,9 +153,9 @@ static int test_studentt(void) {
     cml_reset_ir_context();
     float df[1] = {3}, loc[1] = {0}, sc[1] = {1}, x[1] = {1.0f};
     int sh[1] = {1};
-    REQUIRE(approx(scalar(cml_studentt_log_prob(mk(df, sh, 1), mk(loc, sh, 1), mk(sc, sh, 1),
-                                                mk(x, sh, 1))),
-                   -1.576253f, 1e-4f));
+    REQUIRE(approx(
+        scalar(cml_studentt_log_prob(mk(df, sh, 1), mk(loc, sh, 1), mk(sc, sh, 1), mk(x, sh, 1))),
+        -1.576253f, 1e-4f));
     REQUIRE(approx(scalar(cml_studentt_variance(mk(df, sh, 1), mk(sc, sh, 1))), 3.0f, 1e-5f));
     REQUIRE(approx(scalar(cml_studentt_entropy(mk(df, sh, 1), mk(sc, sh, 1))), 1.773478f, 1e-4f));
     cml_reset_ir_context();
@@ -188,7 +189,8 @@ static int test_binomial(void) {
     cml_reset_ir_context();
     float p[1] = {0.5f}, x[1] = {5.0f};
     int sh[1] = {1};
-    REQUIRE(approx(scalar(cml_binomial_log_prob(10, mk(p, sh, 1), mk(x, sh, 1))), -1.402043f, 1e-4f));
+    REQUIRE(
+        approx(scalar(cml_binomial_log_prob(10, mk(p, sh, 1), mk(x, sh, 1))), -1.402043f, 1e-4f));
     REQUIRE(approx(scalar(cml_binomial_mean(10, mk(p, sh, 1))), 5.0f, 1e-5f));
     REQUIRE(approx(scalar(cml_binomial_variance(10, mk(p, sh, 1))), 2.5f, 1e-5f));
     cml_reset_ir_context();
@@ -279,7 +281,8 @@ static int test_sampling_moments(void) {
     REQUIRE(fabs(mean - 5.0) < 0.05 && fabs(var - 2.5) < 0.1);
 
     /* StudentT(10): mean 0, var df/(df-2) = 1.25. */
-    moments(cml_studentt_sample(filled(M, 10.0f), filled(M, 0.0f), filled(M, 1.0f)), M, &mean, &var);
+    moments(cml_studentt_sample(filled(M, 10.0f), filled(M, 0.0f), filled(M, 1.0f)), M, &mean,
+            &var);
     REQUIRE(fabs(mean - 0.0) < 0.03 && fabs(var - 1.25) < 0.15);
 
     cml_reset_ir_context();

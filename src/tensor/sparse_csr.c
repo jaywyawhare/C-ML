@@ -100,8 +100,7 @@ SparseCSRData* sparse_csr_create(Tensor* crow_indices, Tensor* col_indices, Tens
         LOG_ERROR("sparse_csr_create: crow_indices must be 1D [rows+1]");
         return NULL;
     }
-    if (col_indices->ndim != 1 || values->ndim != 1 ||
-        col_indices->shape[0] != values->shape[0]) {
+    if (col_indices->ndim != 1 || values->ndim != 1 || col_indices->shape[0] != values->shape[0]) {
         LOG_ERROR("sparse_csr_create: col_indices and values must be 1D [nnz] of equal length");
         return NULL;
     }
@@ -148,8 +147,7 @@ SparseCSCData* sparse_csc_create(Tensor* ccol_indices, Tensor* row_indices, Tens
         LOG_ERROR("sparse_csc_create: ccol_indices must be 1D [cols+1]");
         return NULL;
     }
-    if (row_indices->ndim != 1 || values->ndim != 1 ||
-        row_indices->shape[0] != values->shape[0]) {
+    if (row_indices->ndim != 1 || values->ndim != 1 || row_indices->shape[0] != values->shape[0]) {
         LOG_ERROR("sparse_csc_create: row_indices and values must be 1D [nnz] of equal length");
         return NULL;
     }
@@ -273,7 +271,7 @@ SparseCOOData* sparse_csr_to_coo(SparseCSRData* csr) {
         }
     }
 
-    int dense_shape[] = {csr->rows, csr->cols};
+    int dense_shape[]  = {csr->rows, csr->cols};
     SparseCOOData* coo = sparse_coo_tensor(indices, values, dense_shape, 2);
     tensor_free(indices);
     tensor_free(values);
@@ -636,9 +634,9 @@ SparseCSRData* sparse_add(SparseCSRData* a, SparseCSRData* b) {
         crow_d[r + 1] = out;
     }
 
-    Tensor* crow = make_i32_1d(rows + 1, a->crow_indices->device);
-    Tensor* cidx = make_i32_1d(out, a->col_indices->device);
-    Tensor* vals = make_f32_1d(out, a->values->device);
+    Tensor* crow          = make_i32_1d(rows + 1, a->crow_indices->device);
+    Tensor* cidx          = make_i32_1d(out, a->col_indices->device);
+    Tensor* vals          = make_f32_1d(out, a->values->device);
     SparseCSRData* result = NULL;
     if (crow && cidx && vals) {
         memcpy(crow->data, crow_d, (size_t)(rows + 1) * sizeof(int32_t));
@@ -718,8 +716,8 @@ Tensor* sparse_sum(SparseCSRData* csr, int dim, const TensorConfig* config) {
         LOG_ERROR("sparse_sum: NULL input");
         return NULL;
     }
-    int out_len = dim < 0 ? 1 : (dim == 0 ? csr->cols : csr->rows);
-    int shape[] = {out_len};
+    int out_len    = dim < 0 ? 1 : (dim == 0 ? csr->cols : csr->rows);
+    int shape[]    = {out_len};
     Tensor* output = tensor_zeros(shape, 1, config);
     if (!output) {
         LOG_ERROR("sparse_sum: failed to create output");

@@ -124,14 +124,16 @@ static int test_complex_exp(void) {
  * A = [[1+i, 2],[0, 1-i]], B = [[1, i],[2, 0]]
  * AB = [[5+i, -1+i], [2-2i, 0]] */
 static int test_complex_matmul(void) {
-    float ar[4] = {1, 2, 0, 1};
-    float ai[4] = {1, 0, 0, -1};
-    float br[4] = {1, 0, 2, 0};
-    float bi[4] = {0, 1, 0, 0};
-    int sh[2]   = {2, 2};
+    float ar[4]      = {1, 2, 0, 1};
+    float ai[4]      = {1, 0, 0, -1};
+    float br[4]      = {1, 0, 2, 0};
+    float bi[4]      = {0, 1, 0, 0};
+    int sh[2]        = {2, 2};
     TensorConfig cfg = {.dtype = DTYPE_FLOAT32, .has_dtype = true};
-    Tensor* a = tensor_complex(tensor_from_data(ar, sh, 2, &cfg), tensor_from_data(ai, sh, 2, &cfg));
-    Tensor* b = tensor_complex(tensor_from_data(br, sh, 2, &cfg), tensor_from_data(bi, sh, 2, &cfg));
+    Tensor* a =
+        tensor_complex(tensor_from_data(ar, sh, 2, &cfg), tensor_from_data(ai, sh, 2, &cfg));
+    Tensor* b =
+        tensor_complex(tensor_from_data(br, sh, 2, &cfg), tensor_from_data(bi, sh, 2, &cfg));
     Tensor* m = cml_complex_matmul(a, b);
     REQUIRE(m != NULL && m->numel == 4);
     REQUIRE(close(cre(m, 0), 5.0f) && close(cim(m, 0), 1.0f));  /* 5+i */

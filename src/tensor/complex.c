@@ -65,9 +65,9 @@ static void cload(const void* p, size_t i, DType d, double* re, double* im) {
  */
 static void cstore(void* p, size_t i, DType d, double re, double im) {
     if (d == DTYPE_COMPLEX128) {
-        double* dp      = (double*)p;
-        dp[2 * i]       = re;
-        dp[2 * i + 1]   = im;
+        double* dp    = (double*)p;
+        dp[2 * i]     = re;
+        dp[2 * i + 1] = im;
     } else {
         float* fp     = (float*)p;
         fp[2 * i]     = (float)re;
@@ -144,10 +144,9 @@ Tensor* tensor_complex(Tensor* real, Tensor* imag) {
     if (real->requires_grad || imag->requires_grad)
         LOG_WARNING("tensor_complex: complex tensors are non-differentiable; grad will not flow");
 
-    DType cdtype =
-        (real->dtype == DTYPE_FLOAT64 || imag->dtype == DTYPE_FLOAT64) ? DTYPE_COMPLEX128
-                                                                       : DTYPE_COMPLEX64;
-    Tensor* out = complex_like(real, cdtype);
+    DType cdtype = (real->dtype == DTYPE_FLOAT64 || imag->dtype == DTYPE_FLOAT64) ? DTYPE_COMPLEX128
+                                                                                  : DTYPE_COMPLEX64;
+    Tensor* out  = complex_like(real, cdtype);
     if (!out)
         return NULL;
     for (size_t i = 0; i < out->numel; i++)
@@ -312,10 +311,9 @@ static Tensor* complex_binary(Tensor* a, Tensor* b, int op) {
         LOG_ERROR("complex binary op: shape mismatch");
         return NULL;
     }
-    DType cdtype =
-        (a->dtype == DTYPE_COMPLEX128 || b->dtype == DTYPE_COMPLEX128) ? DTYPE_COMPLEX128
-                                                                       : DTYPE_COMPLEX64;
-    Tensor* out = complex_like(a, cdtype);
+    DType cdtype = (a->dtype == DTYPE_COMPLEX128 || b->dtype == DTYPE_COMPLEX128) ? DTYPE_COMPLEX128
+                                                                                  : DTYPE_COMPLEX64;
+    Tensor* out  = complex_like(a, cdtype);
     if (!out)
         return NULL;
     for (size_t i = 0; i < a->numel; i++) {
@@ -368,9 +366,8 @@ Tensor* cml_complex_matmul(Tensor* a, Tensor* b) {
         return NULL;
     }
     int M = a->shape[0], K = a->shape[1], N = b->shape[1];
-    DType cdtype =
-        (a->dtype == DTYPE_COMPLEX128 || b->dtype == DTYPE_COMPLEX128) ? DTYPE_COMPLEX128
-                                                                       : DTYPE_COMPLEX64;
+    DType cdtype = (a->dtype == DTYPE_COMPLEX128 || b->dtype == DTYPE_COMPLEX128) ? DTYPE_COMPLEX128
+                                                                                  : DTYPE_COMPLEX64;
     int out_shape[2] = {M, N};
     Tensor* out      = tensor_create(cdtype, a->device, 2, out_shape, false);
     if (!out)

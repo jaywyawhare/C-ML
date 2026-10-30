@@ -53,7 +53,7 @@ typedef Tensor* (*UnFn)(Tensor*);
 
 static int check_binary(BinFn fn, const float* a, const float* b, const float* expect, int n) {
     cml_reset_ir_context();
-    int sh[1] = {n};
+    int sh[1]  = {n};
     Tensor* ta = mk(a, sh, 1);
     Tensor* tb = mk(b, sh, 1);
     Tensor* y  = fn(ta, tb);
@@ -68,7 +68,7 @@ static int check_binary(BinFn fn, const float* a, const float* b, const float* e
 
 static int check_unary(UnFn fn, const float* a, const float* expect, int n) {
     cml_reset_ir_context();
-    int sh[1] = {n};
+    int sh[1]  = {n};
     Tensor* ta = mk(a, sh, 1);
     Tensor* y  = fn(ta);
     int ok     = values_match(y, expect, n);
@@ -162,9 +162,9 @@ static int test_maximum(void) {
 
 static int test_permute_forward(void) {
     cml_reset_ir_context();
-    float d[6] = {1, 2, 3, 4, 5, 6}; /* [2,3] row-major */
-    int sh[2]  = {2, 3};
-    Tensor* x  = mk(d, sh, 2);
+    float d[6]  = {1, 2, 3, 4, 5, 6}; /* [2,3] row-major */
+    int sh[2]   = {2, 3};
+    Tensor* x   = mk(d, sh, 2);
     int perm[2] = {1, 0};
     Tensor* y   = tensor_permute(x, perm, 2);
     float e[6]  = {1, 4, 2, 5, 3, 6}; /* [3,2] */
@@ -184,7 +184,7 @@ static int test_expand_forward(void) {
     int ns[2]  = {3, 3};
     Tensor* y  = tensor_expand(x, ns, 2);
     float e[9] = {7, 8, 9, 7, 8, 9, 7, 8, 9};
-    int ok = y && y->shape[0] == 3 && y->shape[1] == 3 && values_match(y, e, 9);
+    int ok     = y && y->shape[0] == 3 && y->shape[1] == 3 && values_match(y, e, 9);
     tensor_free(x);
     if (y)
         tensor_free(y);
@@ -199,7 +199,7 @@ static int test_narrow_forward(void) {
     Tensor* x  = mk(d, sh, 2);
     Tensor* y  = tensor_narrow(x, 1, 1, 2); /* cols [1,3) */
     float e[4] = {2, 3, 5, 6};
-    int ok = y && y->shape[0] == 2 && y->shape[1] == 2 && values_match(y, e, 4);
+    int ok     = y && y->shape[0] == 2 && y->shape[1] == 2 && values_match(y, e, 4);
     tensor_free(x);
     if (y)
         tensor_free(y);
@@ -209,15 +209,15 @@ static int test_narrow_forward(void) {
 
 static int test_index_select_forward(void) {
     cml_reset_ir_context();
-    float d[6] = {1, 2, 3, 4, 5, 6};
-    int sh[2]  = {2, 3};
-    Tensor* x  = mk(d, sh, 2);
+    float d[6]   = {1, 2, 3, 4, 5, 6};
+    int sh[2]    = {2, 3};
+    Tensor* x    = mk(d, sh, 2);
     float idx[2] = {0, 2};
     int ish[1]   = {2};
     Tensor* ix   = mk(idx, ish, 1);
     Tensor* y    = tensor_index_select(x, 1, ix); /* cols 0 and 2 */
     float e[4]   = {1, 3, 4, 6};
-    int ok = y && y->shape[0] == 2 && y->shape[1] == 2 && values_match(y, e, 4);
+    int ok       = y && y->shape[0] == 2 && y->shape[1] == 2 && values_match(y, e, 4);
     tensor_free(x);
     tensor_free(ix);
     if (y)
@@ -233,7 +233,7 @@ static int test_unfold_forward(void) {
     Tensor* x  = mk(d, sh, 1);
     Tensor* y  = tensor_unfold(x, 0, 3, 1); /* windows [1,2,3],[2,3,4],[3,4,5] */
     float e[9] = {1, 2, 3, 2, 3, 4, 3, 4, 5};
-    int ok = y && y->ndim == 2 && y->shape[0] == 3 && y->shape[1] == 3 && values_match(y, e, 9);
+    int ok     = y && y->ndim == 2 && y->shape[0] == 3 && y->shape[1] == 3 && values_match(y, e, 9);
     tensor_free(x);
     if (y)
         tensor_free(y);
@@ -248,7 +248,7 @@ static int test_movedim_forward(void) {
     Tensor* x  = mk(d, sh, 2);
     Tensor* y  = tensor_movedim(x, 0, 1); /* == transpose for 2D */
     float e[6] = {1, 4, 2, 5, 3, 6};
-    int ok = y && y->shape[0] == 3 && y->shape[1] == 2 && values_match(y, e, 6);
+    int ok     = y && y->shape[0] == 3 && y->shape[1] == 2 && values_match(y, e, 6);
     tensor_free(x);
     if (y)
         tensor_free(y);
@@ -258,12 +258,12 @@ static int test_movedim_forward(void) {
 
 static int test_swapaxes_forward(void) {
     cml_reset_ir_context();
-    float d[6]  = {1, 2, 3, 4, 5, 6};
-    int sh[2]   = {2, 3};
-    Tensor* x   = mk(d, sh, 2);
-    Tensor* y   = tensor_swapaxes(x, 0, 1);
-    float e[6]  = {1, 4, 2, 5, 3, 6};
-    int ok = y && y->shape[0] == 3 && y->shape[1] == 2 && values_match(y, e, 6);
+    float d[6] = {1, 2, 3, 4, 5, 6};
+    int sh[2]  = {2, 3};
+    Tensor* x  = mk(d, sh, 2);
+    Tensor* y  = tensor_swapaxes(x, 0, 1);
+    float e[6] = {1, 4, 2, 5, 3, 6};
+    int ok     = y && y->shape[0] == 3 && y->shape[1] == 2 && values_match(y, e, 6);
     tensor_free(x);
     if (y)
         tensor_free(y);
