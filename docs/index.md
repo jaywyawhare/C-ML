@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="dark-mode.svg">
-    <source media="(prefers-color-scheme: light)" srcset="light-mode.svg">
-    <img alt="C-ML" src="light-mode.svg" height="96">
+    <source media="(prefers-color-scheme: dark)" srcset="cml-banner-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="cml-banner-light.svg">
+    <img alt="C-ML" src="cml-banner-light.svg" height="96">
   </picture>
 </p>
 
