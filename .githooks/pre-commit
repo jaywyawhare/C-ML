@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Block a commit whose staged C/H files are not clang-format-clean, so the
+# CI format-check gate never fails after the fact. Install with:
+#   scripts/setup-hooks.sh   (or scripts/setup_env.sh)
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+if ! "$root/scripts/format.sh" check --staged; then
+    echo >&2
+    echo "pre-commit: staged files are not clang-format-clean (CI would reject this)." >&2
+    echo "pre-commit: run 'scripts/format.sh fix' then 'git add -u' and commit again." >&2
+    exit 1
+fi

@@ -975,3 +975,8 @@ main() {
 
 # Run main function
 main "$@"
+
+# Install the clang-format pre-commit gate for this clone (best-effort).
+if git rev-parse --show-toplevel >/dev/null 2>&1; then
+    "$(git rev-parse --show-toplevel)/scripts/setup-hooks.sh" || true
+fi
