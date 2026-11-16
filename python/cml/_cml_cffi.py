@@ -27,8 +27,28 @@ if _STATIC_LIB is None:
             _STATIC_LIB = _c
             break
 
+def _llvm_config_candidates():
+    """Return llvm-config executables to try, CMake's choice first.
+
+    Returns:
+        list[str]: the LLVM_CONFIG_EXE cached by the libcml.a build, then the
+        same versioned names CMakeLists.txt searches.
+    """
+    exes = []
+    if _STATIC_LIB:
+        cache = os.path.join(os.path.dirname(os.path.dirname(_STATIC_LIB)), "CMakeCache.txt")
+        try:
+            with open(cache) as f:
+                for line in f:
+                    if line.startswith("LLVM_CONFIG_EXE:"):
+                        exes.append(line.split("=", 1)[1].strip())
+                        break
+        except OSError:
+            pass
+    return exes + ["llvm-config"] + [f"llvm-config-{v}" for v in range(22, 15, -1)]
+
 def _llvm_link_flags():
-    for exe in ("llvm-config", "llvm-config-18", "llvm-config-17", "llvm-config-16"):
+    for exe in _llvm_config_candidates():
         try:
             # --link-shared -> -lLLVM (shared); static LLVM component libs are not
             # -fPIC and cannot be linked into the CFFI shared module.
