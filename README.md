@@ -6,19 +6,42 @@
   </picture>
 </p>
 
-<p align="center">Machine learning in pure C. No frameworks. No runtime. Just code.</p>
-
 <p align="center">
-  <a href="https://github.com/jaywyawhare/C-ML/releases"><img src="https://img.shields.io/badge/version-0.0.3-blue.svg" alt="Version"></a>
-  <img src="https://img.shields.io/badge/C11-compatible-blue.svg" alt="C11">
-  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg" alt="Platform">
+  <a href="https://github.com/jaywyawhare/C-ML/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/jaywyawhare/C-ML/ci.yml?branch=master&label=CI&style=flat&labelColor=201C19"></a>
+  <a href="https://github.com/jaywyawhare/C-ML/actions/workflows/fuzz.yml"><img alt="fuzz & sanitizers" src="https://img.shields.io/github/actions/workflow/status/jaywyawhare/C-ML/fuzz.yml?branch=master&label=fuzz%20%26%20sanitizers&style=flat&labelColor=201C19"></a>
+  <a href="https://github.com/jaywyawhare/C-ML/actions/workflows/wheels.yml"><img alt="wheels" src="https://img.shields.io/github/actions/workflow/status/jaywyawhare/C-ML/wheels.yml?branch=master&label=wheels&style=flat&labelColor=201C19"></a>
+  <a href="https://github.com/jaywyawhare/C-ML/actions/workflows/deploy-website.yml"><img alt="website" src="https://img.shields.io/github/actions/workflow/status/jaywyawhare/C-ML/deploy-website.yml?branch=master&label=website&style=flat&labelColor=201C19"></a>
 </p>
 
----
+<p align="center">
+  <a href="https://github.com/jaywyawhare/C-ML/releases"><img alt="Release" src="https://img.shields.io/github/v/release/jaywyawhare/C-ML?include_prereleases&label=release&color=BB5015&style=flat&labelColor=201C19"></a>
+  <img alt="C11" src="https://img.shields.io/badge/C-11-BB5015?style=flat&labelColor=201C19">
+  <a href="python/README.md"><img alt="Python 3.8+" src="https://img.shields.io/badge/python-3.8%2B-BB5015?style=flat&labelColor=201C19"></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-BB5015?style=flat&labelColor=201C19">
+  <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-zero-BB5015?style=flat&labelColor=201C19">
+  <a href="LICENSE.md"><img alt="License" src="https://img.shields.io/badge/license-DBaJ--NC--CFL-BB5015?style=flat&labelColor=201C19"></a>
+  <a href="https://github.com/jaywyawhare/C-ML/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/jaywyawhare/C-ML?color=BB5015&style=flat&labelColor=201C19"></a>
+  <a href="https://github.com/jaywyawhare/C-ML/commits/master"><img alt="Last commit" src="https://img.shields.io/github/last-commit/jaywyawhare/C-ML/master?color=BB5015&style=flat&labelColor=201C19"></a>
+</p>
 
-C-ML is a from-scratch C11 ML library. Tensors, autograd, 28 layers, optimizers, a compiler that fuses ops and emits GPU kernels (PTX/SPIR-V/WGSL/MSL), distributed training, LLM inference, and model I/O for GGUF/ONNX/SafeTensors. Zero required dependencies.
+<p align="center">
+  <a href="https://jaywyawhare.github.io/C-ML/"><b>Website</b></a> ·
+  <a href="docs/getting_started.md"><b>Getting started</b></a> ·
+  <a href="docs/api_reference.md"><b>API reference</b></a> ·
+  <a href="python/README.md"><b>Python</b></a> ·
+  <a href="examples/README.md"><b>Examples</b></a> ·
+  <a href="https://github.com/jaywyawhare/C-ML/releases"><b>Releases</b></a>
+</p>
 
-## Build
+C-ML is a machine learning library written from scratch in C11. It covers
+tensors, autograd, 28 layers and the optimizers to train them, a compiler that
+fuses ops and emits GPU kernels (PTX, SPIR-V, WGSL, MSL), distributed training,
+LLM inference, and model I/O for GGUF, ONNX and SafeTensors. It has no required
+dependencies.
+
+## Quick start
+
+Build the library, tests and examples:
 
 ```bash
 git clone https://github.com/jaywyawhare/C-ML.git
@@ -26,144 +49,124 @@ cd C-ML && mkdir -p build && cd build
 cmake -DBUILD_EXAMPLES=ON -DBUILD_TESTS=ON .. && make -j$(nproc)
 ```
 
-## Usage
+Fit `y = 2x + 1` with one linear layer:
 
 ```c
 #include "cml.h"
+#include <stdio.h>
 
 int main(void) {
     cml_init();
 
-    Dataset* ds = cml_dataset_load("iris");
-    dataset_normalize(ds, "minmax");
-    Dataset *train, *test;
-    dataset_split(ds, 0.8f, &train, &test);
+    float xs[8], ys[8];
+    for (int i = 0; i < 8; i++) {
+        xs[i] = i / 7.0f;
+        ys[i] = 2.0f * xs[i] + 1.0f;
+    }
+    Tensor* x = cml_tensor_2d(xs, 8, 1);
+    Tensor* y = cml_tensor_2d(ys, 8, 1);
 
-    Sequential* model = cml_nn_sequential();
-    DeviceType dev = cml_get_default_device();
-    DType dt = cml_get_default_dtype();
-    model = cml_nn_sequential_add(model, (Module*)cml_nn_linear(4, 16, dt, dev, true));
-    model = cml_nn_sequential_add(model, (Module*)cml_nn_relu(false));
-    model = cml_nn_sequential_add(model, (Module*)cml_nn_linear(16, 3, dt, dev, true));
+    Module* model = (Module*)cml_nn_linear(1, 1, DTYPE_FLOAT32, DEVICE_CPU, true);
+    Optimizer* opt = cml_optim_sgd_for_model(model, 0.1f, 0.0f, 0.0f);
 
-    Optimizer* opt = cml_optim_adam_for_model((Module*)model, 0.01f, 0.0f, 0.9f, 0.999f, 1e-8f);
-    cml_nn_module_set_training((Module*)model, true);
-
-    for (int epoch = 0; epoch < 100; epoch++) {
+    for (int step = 1; step <= 200; step++) {
         cml_optim_zero_grad(opt);
-        Tensor* out = cml_nn_module_forward((Module*)model, train->X);
-        Tensor* loss = cml_nn_mse_loss(out, train->y);
+        Tensor* loss = cml_nn_mse_loss(cml_nn_module_forward(model, x), y);
         cml_backward(loss, NULL, false, false);
         cml_optim_step(opt);
+        if (step % 50 == 0)
+            printf("step %d  loss %.5f\n", step, tensor_get_float(loss, 0));
         tensor_free(loss);
-        tensor_free(out);
     }
 
     cml_cleanup();
+    return 0;
 }
 ```
 
----
+The [examples guide](docs/examples.md) has 17 more tutorials, from XOR and linear regression to RNNs, GANs and a Transformer encoder.
+
+### Python
+
+```bash
+cd python && pip install cffi && python3 cml/build_cffi.py && pip install -e .
+python3 -c "import cml; cml.init(); print('ok'); cml.cleanup()"
+```
+
+See the [Python guide](python/README.md) for the PyTorch-style API.
 
 ## Features
 
-| | |
+| Area | What's included |
 |:--|:--|
-| **Layers** | 28: Linear, Conv1d/2d/3d, ConvTranspose, RNN/LSTM/GRU, Transformer, BatchNorm, LayerNorm, RMSNorm, Pooling, Dropout, PixelShuffle, ... |
-| **LLM** | LoRA/QLoRA, Flash Attention, GQA, ALiBi, RoPE scaling, paged + sliding-window KV cache, MoE, ring attention, logits-processor sampling, speculative decoding (draft-model + prompt-lookup), continuous-batch serving, LLaMA 7B-70B |
-| **Training** | 11 optimizers, 13 losses, 8 LR schedulers, gradient checkpointing, DDP, pipeline & tensor parallel |
-| **Compiler** | IR fusion (5 patterns), linearization, codegen to C/PTX/SPIR-V/WGSL/MSL, AOT, JIT, kernel cache |
-| **GPU** | CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL - userspace drivers for NV (RM ioctl) and AMD (KFD) (see maturity below) |
-| **Runtime** | LLVM JIT by default (shape-specialized SIMD; interpreter fallback), multi-dtype compute (f32/f64/f16/bf16/int), BLAS, TLSF allocator, memory pools, thread pool |
-| **I/O** | GGUF, SafeTensors, ONNX, PyTorch .pth, int8/int4/NF4 quantization |
-| **Python** | CFFI bindings, NumPy integration, operator overloading |
+| **Layers** | 28 layers: Linear, Conv1d/2d/3d, ConvTranspose, RNN, LSTM, GRU, Transformer, BatchNorm, LayerNorm, RMSNorm, pooling, Dropout, PixelShuffle |
+| **Training** | 11 optimizers · 13 losses · 8 LR schedulers · gradient checkpointing · DDP · pipeline and tensor parallelism |
+| **LLMs** | LLaMA 7B–70B · LoRA / QLoRA · Flash Attention · GQA · ALiBi · RoPE scaling · paged and sliding-window KV cache · MoE · ring attention · speculative decoding · continuous-batching server |
+| **Compiler** | IR with 5 fusion patterns · linearization · codegen to C, PTX, SPIR-V, WGSL and MSL · AOT and JIT · kernel cache |
+| **Runtime** | LLVM JIT with shape-specialized SIMD and an interpreter fallback · f32, f64, f16, bf16 and int dtypes · BLAS · TLSF allocator · memory and thread pools |
+| **Model I/O** | GGUF · SafeTensors · ONNX · PyTorch checkpoints · int8, int4 and NF4 quantization |
+| **Python** | CFFI bindings · NumPy interop · operator overloading |
 
-### Backend maturity
+## Backend status
 
-GPU paths are exercised by CI only through the CPU reference backend, mocks,
-and emulators - driver-call correctness needs the real hardware. Status per
-backend as of 2026-08:
+CI runs every GPU path through the CPU reference backend, mocks and emulators.
+Driver calls are only proven correct on real hardware, so the GPU backends are
+marked accordingly. Status as of 2026-08:
 
-| Backend | Maturity | Notes |
-|---|---|---|
-| CPU (SIMD/BLAS/LLVM JIT) | stable | default; full test suite runs on it |
-| HCQ queue/signal/pipeline | stable | uniform ops dispatch incl. CPU reference (`test_hcq_cpu`, `test_hcq_registry`) |
-| CUDA / ROCm / OpenCL / Vulkan / WebGPU adapters | build-verified | compile everywhere, dlopen at runtime, fail cleanly without hardware; driver bodies unvalidated on-GPU |
-| NV (RM ioctl) / AM (KFD) drivers | experimental | full mock-based tests (`nv_mock`, `am_mock`); real ioctl paths need hardware |
-| Adreno / Hexagon / Thunder / USB | placeholder | identity/generic kernels or stubs; not for production |
-| Multi-GPU (peer copy, device placement) | simulated only | `DEVICE_SIM_GPU` device simulator |
-
----
+| Backend | Status | What that means |
+|:--|:--|:--|
+| CPU: SIMD, BLAS, LLVM JIT | **Stable** | Default backend; the full test suite runs on it |
+| HCQ queues, signals, pipelines | **Stable** | Same dispatch path for every backend, tested on the CPU reference |
+| CUDA, ROCm, OpenCL, Vulkan, WebGPU | **Build-verified** | Compile everywhere, load at runtime and fail cleanly without hardware; not yet validated on a GPU |
+| NV (RM ioctl), AMD (KFD) drivers | **Experimental** | Covered by mock tests; real ioctl paths need hardware |
+| Multi-GPU: peer copy, device placement | **Simulated** | Runs on the device simulator only |
+| Adreno, Hexagon, Thunder, USB | **Placeholder** | Stub or generic kernels; not for production |
 
 ## Architecture
 
-```
-user code       C or Python
-     |
-cml.h           28 layers, optimizers, losses, LLM ops, serving
-     |
-autograd        dynamic graphs, checkpointing, distributed
-     |
-tensor ops      broadcasting, SIMD, BLAS
-     |
-compiler        IR -> schedule -> linearize -> codegen -> cache
-     |
-drivers         HCQ, NV (RM ioctl), AM (KFD), TLSF, pools
-     |
-hardware        CUDA, ROCm, Vulkan, Metal, WebGPU, OpenCL, Adreno, Hexagon, CPU
-```
-
+```mermaid
 ---
-
-## Testing
-
-180 C test programs plus Python pytest run in CI: cross-dtype conformance
-(77 ops x 8 dtypes vs f32 references), a VJP sweep against finite differences,
-an API-contract sweep over every public surface, and HCQ/quantization/matmul
-exactness tests. Coverage baseline is ~58% line / ~38% branch; the gaps are the
-hardware-gated `gpu/*` backends and the f32 SIMD paths. See the coverage build
-in `tools/coverage_report.sh`.
-
+config:
+  flowchart:
+    wrappingWidth: 640
+    nodeSpacing: 24
+    rankSpacing: 28
 ---
+flowchart TB
+    user["<b>Your code</b><br/>C or Python"]
+    api["<b>Public API</b><br/>28 layers · optimizers · losses · LLM ops · serving"]
+    autograd["<b>Autograd</b><br/>dynamic graphs · checkpointing · distributed"]
+    ops["<b>Tensor ops</b><br/>broadcasting · SIMD · BLAS"]
+    subgraph compiler["Compiler"]
+        direction LR
+        ir["IR"] --> sched["schedule"] --> lin["linearize"] --> cg["codegen<br/>C · PTX · SPIR-V · WGSL · MSL"] --> cache["kernel cache"]
+    end
+    drivers["<b>Runtime & drivers</b><br/>LLVM JIT · HCQ · NV (RM ioctl) · AM (KFD) · TLSF · pools"]
+    hw["<b>Hardware</b><br/>CPU · CUDA · ROCm · Vulkan · Metal · WebGPU · OpenCL · Adreno · Hexagon"]
 
-<details>
-<summary><b>Docs</b></summary>
+    user --> api --> autograd --> ops --> compiler --> drivers --> hw
 
-| | |
-|---|---|
-| [Getting Started](docs/getting_started.md) | [API Reference](docs/api_reference.md) |
-| [NN Layers](docs/nn_layers.md) | [Advanced NN & LLM](docs/advanced_nn.md) |
-| [Training](docs/training.md) | [Compiler Pipeline](docs/compiler_pipeline.md) |
-| [GPU Backends](docs/gpu_backends.md) | [Distributed Training](docs/distributed.md) |
-| [Model I/O](docs/model_io.md) | [Memory Management](docs/memory_management.md) |
-| [IR Graph Management](docs/ir_graph_management.md) | [Linearization](docs/linearization.md) |
-| [Datasets](docs/datasets.md) | [Optimizations](docs/optimizations.md) |
-| [Autograd](docs/autograd.md) | [Graph Mode](docs/graph_mode.md) |
-| [BEAM Search](docs/beam_search.md) | [Speculative Decoding](docs/speculative_decoding.md) |
-| [Kernel Studio](docs/kernel_studio.md) | [Kernel Studio Quick Ref](docs/kernel_studio_quickref.md) |
-| [Benchmarks](docs/benchmarks.md) | [Examples](docs/examples.md) |
-| [Miscellaneous](docs/miscellaneous.md) | [External Deps](docs/EXTERNAL_DEPENDENCIES.md) |
-| [Python Bindings](docs/python_installation.md) | [Python (repo)](python/INSTALLATION.md) |
-| [License](LICENSE.md) | [Documentation index](docs/index.md) |
+    classDef layer fill:#F8F2E7,stroke:#201C19,stroke-width:1.5px,color:#201C19
+    classDef step fill:#F8F2E7,stroke:#BB5015,stroke-width:1.5px,color:#201C19
+    classDef edge fill:#201C19,stroke:#BB5015,stroke-width:1.5px,color:#F8F2E7
+    class api,autograd,ops,drivers layer
+    class ir,sched,lin,cg,cache step
+    class user,hw edge
+    style compiler fill:transparent,stroke:#BB5015,stroke-width:1.5px,stroke-dasharray:4 3,color:#BB5015
+    linkStyle default stroke:#BB5015,stroke-width:1.5px
+```
 
-</details>
+## Documentation
 
-## Logo
+| Topic | Guides |
+|:--|:--|
+| **Start here** | [Getting started](docs/getting_started.md) · [API reference](docs/api_reference.md) · [Examples](docs/examples.md) · [Python bindings](docs/python_installation.md) |
+| **Models** | [NN layers](docs/nn_layers.md) · [Advanced NN and LLMs](docs/advanced_nn.md) · [Speculative decoding](docs/speculative_decoding.md) · [BEAM search](docs/beam_search.md) |
+| **Training** | [Training](docs/training.md) · [Autograd](docs/autograd.md) · [Datasets](docs/datasets.md) · [Distributed training](docs/distributed.md) |
+| **Compiler** | [Compiler pipeline](docs/compiler_pipeline.md) · [IR graph management](docs/ir_graph_management.md) · [Graph mode](docs/graph_mode.md) · [Linearization](docs/linearization.md) · [Optimizations](docs/optimizations.md) |
+| **Runtime** | [GPU backends](docs/gpu_backends.md) · [Memory management](docs/memory_management.md) · [Kernel Studio](docs/kernel_studio.md) ([quick reference](docs/kernel_studio_quickref.md)) |
+| **Reference** | [Model I/O](docs/model_io.md) · [Benchmarks](docs/benchmarks.md) · [External dependencies](docs/EXTERNAL_DEPENDENCIES.md) · [Miscellaneous](docs/miscellaneous.md) · [All docs](docs/index.md) |
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/cml-logo-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="docs/cml-logo-light.svg">
-    <img alt="C-ML logo" src="docs/cml-logo-light.svg" height="96">
-  </picture>
-  &nbsp;&nbsp;&nbsp;
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/cml-icon-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="docs/cml-icon-light.svg">
-    <img alt="C-ML icon" src="docs/cml-icon-light.svg" height="96">
-  </picture>
-</p>
+## License
 
-Assets: [logo](docs/cml-logo-light.svg) ([dark](docs/cml-logo-dark.svg)), [icon](docs/cml-icon-light.svg) ([dark](docs/cml-icon-dark.svg)), [banner](docs/cml-banner-light.svg) ([dark](docs/cml-banner-dark.svg)), [social preview](docs/cml-social-preview-light.png) ([dark](docs/cml-social-preview-dark.png)).
-
-[DBaJ-NC-CFL](LICENSE.md)
+[DBaJ-NC-CFL](LICENSE.md), the "Don't Be a Jerk" non-commercial license.
