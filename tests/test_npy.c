@@ -2,6 +2,7 @@
  * [[0,1,2],[3,4,5]]) and a save->load round-trip. */
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "cml.h"
 #include "core/npy_io.h"
 #include "tensor/tensor.h"
@@ -51,11 +52,58 @@ static int test_rejects_bad(void) {
     return cml_tensor_load_npy("/tmp/does_not_exist_xyz.npy") == NULL;
 }
 
+/* Property: for random float32 tensors of random rank and shape, save->load is
+ * bit-exact (shape, rank and every element). Seeded so failures reproduce. */
+static unsigned prng_state = 0x9E3779B9u;
+static unsigned prng_next(void) {
+    prng_state ^= prng_state << 13;
+    prng_state ^= prng_state >> 17;
+    prng_state ^= prng_state << 5;
+    return prng_state;
+}
+
+static int test_round_trip_property(void) {
+    for (int iter = 0; iter < 200; iter++) {
+        int ndim = 1 + (int)(prng_next() % 4);
+        int shape[4];
+        size_t numel = 1;
+        for (int d = 0; d < ndim; d++) {
+            shape[d] = 1 + (int)(prng_next() % 6);
+            numel *= (size_t)shape[d];
+        }
+        float* data = (float*)malloc(numel * sizeof(float));
+        if (!data)
+            return 0;
+        for (size_t i = 0; i < numel; i++)
+            data[i] = ((float)(int)(prng_next() % 20001) - 10000.0f) / 100.0f;
+
+        Tensor* t  = cml_tensor(data, shape, ndim, NULL);
+        int ok     = t && cml_tensor_save_npy(t, "/tmp/cml_test_prop.npy") == 0;
+        Tensor* bk = ok ? cml_tensor_load_npy("/tmp/cml_test_prop.npy") : NULL;
+        ok &= bk && bk->ndim == ndim && bk->numel == numel;
+        for (int d = 0; ok && d < ndim; d++)
+            ok &= bk->shape[d] == shape[d];
+        float* out = ok ? (float*)tensor_data_ptr(bk) : NULL;
+        for (size_t i = 0; ok && out && i < numel; i++)
+            ok &= out[i] == data[i];
+
+        tensor_free(t);
+        tensor_free(bk);
+        free(data);
+        if (!ok) {
+            printf("  property failed at iter %d (ndim=%d)\n", iter, ndim);
+            return 0;
+        }
+    }
+    return 1;
+}
+
 int main(void) {
     cml_init();
     printf("=== NumPy .npy I/O ===\n");
     TEST(load_numpy_ref);
     TEST(round_trip);
+    TEST(round_trip_property);
     TEST(rejects_bad);
     cml_cleanup();
     return TEST_SUMMARY();
