@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="cml-banner-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="cml-banner-light.svg">
-    <img alt="C-ML" src="cml-banner-light.svg" height="96">
+    <img alt="C-ML: machine learning in pure C" src="cml-banner-light.svg" width="100%">
   </picture>
 </p>
 

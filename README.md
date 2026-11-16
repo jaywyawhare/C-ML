@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/cml-banner-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="docs/cml-banner-light.svg">
-    <img alt="C-ML" src="docs/cml-banner-light.svg" height="96">
+    <img alt="C-ML: machine learning in pure C" src="docs/cml-banner-light.svg" width="100%">
   </picture>
 </p>
 
@@ -147,5 +147,23 @@ in `tools/coverage_report.sh`.
 | [License](LICENSE.md) | [Documentation index](docs/index.md) |
 
 </details>
+
+## Logo
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/cml-logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/cml-logo-light.svg">
+    <img alt="C-ML logo" src="docs/cml-logo-light.svg" height="96">
+  </picture>
+  &nbsp;&nbsp;&nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/cml-icon-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/cml-icon-light.svg">
+    <img alt="C-ML icon" src="docs/cml-icon-light.svg" height="96">
+  </picture>
+</p>
+
+Assets: [logo](docs/cml-logo-light.svg) ([dark](docs/cml-logo-dark.svg)), [icon](docs/cml-icon-light.svg) ([dark](docs/cml-icon-dark.svg)), [banner](docs/cml-banner-light.svg) ([dark](docs/cml-banner-dark.svg)), [social preview](docs/cml-social-preview-light.png) ([dark](docs/cml-social-preview-dark.png)).
 
 [DBaJ-NC-CFL](LICENSE.md)

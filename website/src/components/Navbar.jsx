@@ -21,7 +21,7 @@ export default function Navbar() {
   return (
     <nav ref={ref} className="nav" style={{ opacity: 0 }}>
       <Link className="nav-logo" to="/">
-        <img className="nav-logo-icon" src="https://raw.githubusercontent.com/jaywyawhare/C-ML/master/docs/cml-banner-light.svg" alt="C-ML" />
+        <img className="nav-logo-icon" src="https://raw.githubusercontent.com/jaywyawhare/C-ML/master/docs/cml-logo-dark.svg" alt="C-ML" />
         <span className="nav-ver">0.0.3</span>
       </Link>
 
