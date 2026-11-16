@@ -12,6 +12,7 @@ on:
       - 'tests/test_fuzzer_ops.c'
       - 'tests/test_unary_fuzz.c'
       - 'tests/test_broadcast_fuzz.c'
+      - 'verification/**'
       - '.github/workflows/fuzz.yml'
   workflow_dispatch:
 
@@ -61,3 +62,23 @@ jobs:
         run: cd python && python cml/build_cffi.py
       - name: Run slow parity sweep
         run: cd python && python -m pytest tests/ -q -m slow
+
+  formal:
+    # Model-check the TLA+ specs under verification/: each spec's correct config
+    # must hold and its broken config must be refuted. Protocol/ordering bugs in
+    # HCQ signalling, the global-IR reset lifecycle and ring all-reduce that the
+    # C test suite cannot enumerate are caught here.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Fetch TLC (pinned)
+        run: |
+          mkdir -p "$HOME/.cache/tla"
+          curl -fsSL -o "$HOME/.cache/tla/tla2tools.jar" \
+            https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar
+      - name: Model-check specs
+        run: TLA2TOOLS="$HOME/.cache/tla/tla2tools.jar" ./verification/run.sh
